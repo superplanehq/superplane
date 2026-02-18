@@ -2,11 +2,38 @@ package codeartifact
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 )
+
+/*
+ * Package formats supported by AWS CodeArtifact.
+ * See: https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_DescribePackageVersion.html
+ */
+var PackageFormatOptions = []configuration.FieldOption{
+	{Label: "npm", Value: "npm"},
+	{Label: "pypi", Value: "pypi"},
+	{Label: "maven", Value: "maven"},
+	{Label: "nuget", Value: "nuget"},
+	{Label: "generic", Value: "generic"},
+	{Label: "ruby", Value: "ruby"},
+	{Label: "swift", Value: "swift"},
+	{Label: "cargo", Value: "cargo"},
+}
+
+/*
+ * Package version statuses supported by AWS CodeArtifact.
+ */
+var PackageVersionStatusOptions = []configuration.FieldOption{
+	{Value: "Published", Label: "Published"},
+	{Value: "Unfinished", Label: "Unfinished"},
+	{Value: "Unlisted", Label: "Unlisted"},
+	{Value: "Archived", Label: "Archived"},
+	{Value: "Disposed", Label: "Disposed"},
+}
 
 /*
  * CodeArtifact is only available in the following regions.
@@ -86,4 +113,19 @@ func validateRepository(ctx core.IntegrationContext, http core.HTTPContext, regi
 	}
 
 	return nil, fmt.Errorf("repository not found: %s", repository)
+}
+
+/*
+ * Parse a comma separated list of versions into a slice of strings.
+ */
+func parseVersionsList(s string) []string {
+	versions := []string{}
+	for _, v := range strings.Split(s, ",") {
+		v = strings.TrimSpace(v)
+		if v != "" {
+			versions = append(versions, v)
+		}
+	}
+
+	return versions
 }

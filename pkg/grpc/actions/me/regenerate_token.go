@@ -27,6 +27,10 @@ func RegenerateToken(ctx context.Context) (*pb.RegenerateTokenResponse, error) {
 		return nil, status.Error(codes.NotFound, "user not found")
 	}
 
+	if user.IsServiceAccount() {
+		return nil, status.Error(codes.PermissionDenied, "service accounts must use the service account token endpoint")
+	}
+
 	plainToken, err := crypto.Base64String(64)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to generate new token")

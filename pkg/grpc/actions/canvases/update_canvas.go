@@ -312,7 +312,7 @@ func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, reg
 	case models.NodeTypeTrigger:
 		return setupTrigger(ctx, tx, encryptor, registry, node, webhookBaseURL)
 	case models.NodeTypeComponent:
-		return setupComponent(tx, encryptor, registry, node)
+		return setupComponent(ctx, tx, encryptor, registry, node, webhookBaseURL)
 	case models.NodeTypeWidget:
 		// Widgets are not persisted and don't have any logic to execute and to setup.
 		return nil
@@ -363,7 +363,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 	return tx.Save(node).Error
 }
 
-func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode) error {
+func setupComponent(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string) error {
 	ref := node.Ref.Data()
 	component, err := registry.GetComponent(ref.Component.Name)
 	if err != nil {
@@ -376,6 +376,7 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 		HTTP:          registry.HTTPContext(),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
+		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
 	}
 
 	if node.AppInstallationID != nil {

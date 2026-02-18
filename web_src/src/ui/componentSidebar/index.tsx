@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { resolveIcon } from "@/lib/utils";
-import { Check, Copy, Loader2, TriangleAlert, X } from "lucide-react";
+import { Check, Copy, Loader2, Settings, TriangleAlert, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getHeaderIconSrc, IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import {
@@ -34,6 +34,7 @@ import {
   TriggersTrigger,
   BlueprintsBlueprint,
   OrganizationsIntegration,
+  OrganizationsBrowserAction,
   ComponentsIntegrationRef,
 } from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
@@ -253,6 +254,9 @@ export const ComponentSidebar = ({
   const [isCreateIntegrationDialogOpen, setIsCreateIntegrationDialogOpen] = useState(false);
   const [createIntegrationName, setCreateIntegrationName] = useState("");
   const [createIntegrationConfig, setCreateIntegrationConfig] = useState<Record<string, unknown>>({});
+  const [createIntegrationBrowserAction, setCreateIntegrationBrowserAction] = useState<
+    OrganizationsBrowserAction | undefined
+  >(undefined);
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
   const [configureIntegrationName, setConfigureIntegrationName] = useState("");
   // Use autocompleteExampleObj directly - current node is already filtered out upstream
@@ -279,6 +283,17 @@ export const ComponentSidebar = ({
   );
   const selectedIntegrationForDialog = isCreateIntegrationDialogOpen ? createIntegrationDefinition : undefined;
   const selectedInstructions = selectedIntegrationForDialog?.instructions?.trim();
+  const integrationHomeHref = useMemo(() => {
+    if (!domainId) return "#";
+    const selectedIntegrationId =
+      integrationRef?.id ||
+      integrations?.find((integration) => integration.spec?.integrationName === selectedIntegrationForDialog?.name)
+        ?.metadata?.id;
+    if (selectedIntegrationId) {
+      return `/${domainId}/settings/integrations/${selectedIntegrationId}`;
+    }
+    return `/${domainId}/settings/integrations`;
+  }, [domainId, integrationRef?.id, integrations, selectedIntegrationForDialog?.name]);
 
   const handleCopyNodeId = useCallback(async () => {
     if (nodeId) {
@@ -291,6 +306,7 @@ export const ComponentSidebar = ({
   const handleOpenCreateIntegrationDialog = useCallback(() => {
     setCreateIntegrationName(createIntegrationDefinition?.name ?? "");
     setCreateIntegrationConfig({});
+    setCreateIntegrationBrowserAction(undefined);
     setIsCreateIntegrationDialogOpen(true);
   }, [createIntegrationDefinition?.name]);
 
@@ -298,20 +314,32 @@ export const ComponentSidebar = ({
     setIsCreateIntegrationDialogOpen(false);
     setCreateIntegrationName("");
     setCreateIntegrationConfig({});
+    setCreateIntegrationBrowserAction(undefined);
     createIntegrationMutation.reset();
   }, [createIntegrationMutation]);
 
   const handleCreateIntegrationSubmit = useCallback(async () => {
     if (!selectedIntegrationForDialog?.name || !domainId) return;
+    const nextName = createIntegrationName.trim();
+    if (!nextName) {
+      showErrorToast("Integration name is required");
+      return;
+    }
+
     try {
-      await createIntegrationMutation.mutateAsync({
+      const result = await createIntegrationMutation.mutateAsync({
         integrationName: selectedIntegrationForDialog.name,
-        name: createIntegrationName.trim(),
+        name: nextName,
         configuration: createIntegrationConfig,
       });
+      const browserAction = result.data?.integration?.status?.browserAction;
+      if (browserAction) {
+        setCreateIntegrationBrowserAction(browserAction);
+        return;
+      }
       handleCloseCreateIntegrationDialog();
-    } catch (_error) {
-      showErrorToast("Failed to create integration");
+    } catch (error) {
+      showErrorToast(`Failed to create integration: ${getApiErrorMessage(error)}`);
     }
   }, [
     selectedIntegrationForDialog?.name,
@@ -321,6 +349,30 @@ export const ComponentSidebar = ({
     createIntegrationMutation,
     handleCloseCreateIntegrationDialog,
   ]);
+
+  const handleCreateBrowserAction = useCallback(() => {
+    if (!createIntegrationBrowserAction) return;
+    const { url, method, formFields } = createIntegrationBrowserAction;
+    if (method?.toUpperCase() === "POST" && formFields) {
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = url || "";
+      form.target = "_blank";
+      form.style.display = "none";
+      Object.entries(formFields).forEach(([key, value]) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = String(value);
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+    } else if (url) {
+      window.open(url, "_blank");
+    }
+  }, [createIntegrationBrowserAction]);
 
   const handleOpenConfigureIntegrationDialog = useCallback((integrationId: string) => {
     setConfigureIntegrationId(integrationId);
@@ -904,14 +956,27 @@ export const ComponentSidebar = ({
                     iconSlug={selectedIntegrationForDialog.icon}
                     className="h-6 w-6 text-gray-500 dark:text-gray-400"
                   />
-                  <DialogTitle>
-                    Configure{" "}
-                    {getIntegrationTypeDisplayName(undefined, selectedIntegrationForDialog.name) ||
-                      selectedIntegrationForDialog.name}
-                  </DialogTitle>
+                  <div className="flex items-center gap-2">
+                    <DialogTitle>
+                      Configure{" "}
+                      {getIntegrationTypeDisplayName(undefined, selectedIntegrationForDialog.name) ||
+                        selectedIntegrationForDialog.name}
+                    </DialogTitle>
+                    <a
+                      href={integrationHomeHref}
+                      className="inline-flex h-4 w-4 items-center justify-center text-gray-500 hover:text-gray-800 transition-colors"
+                      aria-label="Open integration settings"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </a>
+                  </div>
                 </div>
-                {selectedInstructions && (
-                  <IntegrationInstructions description={selectedInstructions} className="mt-2" />
+                {(createIntegrationBrowserAction?.description || selectedInstructions) && (
+                  <IntegrationInstructions
+                    description={createIntegrationBrowserAction?.description || selectedInstructions}
+                    onContinue={createIntegrationBrowserAction?.url ? handleCreateBrowserAction : undefined}
+                    className="mt-2"
+                  />
                 )}
               </DialogHeader>
               <div className="space-y-4">
@@ -920,17 +985,17 @@ export const ComponentSidebar = ({
                     Integration Name
                     <span className="text-gray-800 ml-1">*</span>
                   </Label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">A unique name for this integration</p>
                   <Input
                     type="text"
                     value={createIntegrationName}
                     onChange={(e) => setCreateIntegrationName(e.target.value)}
                     placeholder="e.g., my-app-integration"
                   />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
                 </div>
                 {selectedIntegrationForDialog.configuration &&
                   selectedIntegrationForDialog.configuration.length > 0 && (
-                    <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
+                    <div className="space-y-4">
                       {selectedIntegrationForDialog.configuration.map((field: ConfigurationField) => {
                         if (!field.name) return null;
                         return (
@@ -952,28 +1017,41 @@ export const ComponentSidebar = ({
                   )}
               </div>
               <DialogFooter className="gap-2 sm:justify-start mt-6">
-                <Button
-                  color="blue"
-                  onClick={() => void handleCreateIntegrationSubmit()}
-                  disabled={createIntegrationMutation.isPending || !createIntegrationName?.trim()}
-                  className="flex items-center gap-2"
-                >
-                  {createIntegrationMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Connecting...
-                    </>
-                  ) : (
-                    "Connect"
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleCloseCreateIntegrationDialog}
-                  disabled={createIntegrationMutation.isPending}
-                >
-                  Cancel
-                </Button>
+                {createIntegrationBrowserAction ? (
+                  <>
+                    <Button color="blue" onClick={handleCloseCreateIntegrationDialog}>
+                      Save
+                    </Button>
+                    <Button variant="outline" onClick={handleCloseCreateIntegrationDialog}>
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      color="blue"
+                      onClick={() => void handleCreateIntegrationSubmit()}
+                      disabled={createIntegrationMutation.isPending || !createIntegrationName?.trim()}
+                      className="flex items-center gap-2"
+                    >
+                      {createIntegrationMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Connecting...
+                        </>
+                      ) : (
+                        "Connect"
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleCloseCreateIntegrationDialog}
+                      disabled={createIntegrationMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                )}
               </DialogFooter>
               {createIntegrationMutation.isError && (
                 <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
@@ -1005,11 +1083,24 @@ export const ComponentSidebar = ({
                     iconSlug={configureIntegrationDefinition?.icon}
                     className="h-6 w-6 text-gray-500 dark:text-gray-400"
                   />
-                  <DialogTitle>
-                    Configure{" "}
-                    {getIntegrationTypeDisplayName(undefined, configureIntegration.spec?.integrationName) ||
-                      configureIntegration.spec?.integrationName}
-                  </DialogTitle>
+                  <div className="flex items-center gap-2">
+                    <DialogTitle>
+                      Configure{" "}
+                      {getIntegrationTypeDisplayName(undefined, configureIntegration.spec?.integrationName) ||
+                        configureIntegration.spec?.integrationName}
+                    </DialogTitle>
+                    <a
+                      href={
+                        configureIntegration.metadata?.id
+                          ? `/${domainId}/settings/integrations/${configureIntegration.metadata.id}`
+                          : `/${domainId}/settings/integrations`
+                      }
+                      className="inline-flex h-4 w-4 items-center justify-center text-gray-500 hover:text-gray-800 transition-colors"
+                      aria-label="Open integration settings"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </a>
+                  </div>
                 </div>
               </DialogHeader>
               {configureIntegration.status?.state === "error" && configureIntegration.status?.stateDescription && (
@@ -1037,13 +1128,13 @@ export const ComponentSidebar = ({
                     Integration Name
                     <span className="text-gray-800 ml-1">*</span>
                   </Label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">A unique name for this integration</p>
                   <Input
                     type="text"
                     value={configureIntegrationName}
                     onChange={(e) => setConfigureIntegrationName(e.target.value)}
                     placeholder="e.g., my-app-integration"
                   />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
                 </div>
 
                 {configureIntegrationDefinition?.configuration &&

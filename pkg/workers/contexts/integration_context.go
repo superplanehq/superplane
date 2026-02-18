@@ -400,3 +400,22 @@ func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscription
 
 	return contexts, nil
 }
+
+// FindSubscription finds the first subscription matching the predicate.
+// Note: This loads all subscriptions via ListSubscriptions() and iterates through them.
+// For installations with many subscriptions, this may be inefficient. Consider adding
+// an index-based lookup if performance becomes an issue.
+func (c *IntegrationContext) FindSubscription(predicate func(core.IntegrationSubscriptionContext) bool) (core.IntegrationSubscriptionContext, error) {
+	subscriptions, err := c.ListSubscriptions()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, subscription := range subscriptions {
+		if predicate(subscription) {
+			return subscription, nil
+		}
+	}
+
+	return nil, nil
+}
