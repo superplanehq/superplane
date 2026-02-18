@@ -16,7 +16,8 @@ func init() {
 type IncidentIO struct{}
 
 type Configuration struct {
-	APIKey string `json:"apiKey"`
+	APIKey               string `json:"apiKey"`
+	WebhookSigningSecret string `json:"webhookSigningSecret"`
 }
 
 type Metadata struct{}
@@ -38,22 +39,24 @@ func (i *IncidentIO) Description() string {
 }
 
 func (i *IncidentIO) Instructions() string {
-	return `## Connect incident.io to SuperPlane
+	return `## API integration
 
-1. **Create an API key** in [incident.io Settings > API keys](https://app.incident.io/settings/api-keys). Grant the key permission to create incidents and read severities (and optionally view private incidents if you use private incidents).
+1. In [incident.io Settings > API keys](https://app.incident.io/settings/api-keys), click **Create API key** and give it a name.
+2. Under **Add permissions**, select exactly these (use "Find a permission" if needed):
+   - **View data, like public incidents and organisation settings** (needed to read severities)
+   - **Create incidents** (needed for the Create Incident action)
+   - **View all incident data, including private incidents** (only if you use private incidents)
+3. Create the key and **paste the API key** in the Configuration section below.
 
-2. **Paste the API key** below. The key is stored securely and used to validate the connection and to run Create Incident actions.
+## Webhook integration
 
-## On Incident trigger (webhooks)
+Required for the **On Incident** trigger. Until this is done, the trigger will not receive events.
 
-incident.io sends webhooks via Svix. There is no API to register webhook endpoints; you configure them in the incident.io dashboard:
+1. Copy the **webhook URL** from the Webhook section below.
+2. In incident.io go to **Settings → Webhooks**, create a new endpoint, and paste that URL. Subscribe to **Public incident created (v2)** and **Public incident updated (v2)**.
+3. Copy the **Signing secret** from the endpoint and paste it in **Webhook signing secret** in the Configuration section above, then save.
 
-1. Add the **On Incident** trigger to your workflow and select the events you want (e.g. Incident created, Incident updated).
-2. Copy the **webhook URL** shown for this trigger (after saving the canvas).
-3. In incident.io go to **Settings > Webhooks** and create a new endpoint. Paste the SuperPlane webhook URL and subscribe to the same events (e.g. **Public incident created (v2)**, **Public incident updated (v2)**).
-4. Copy the **Signing secret** from the new endpoint in incident.io and paste it into the trigger's **Signing secret** field in SuperPlane.
-
-Without the signing secret, webhook requests cannot be verified and will be rejected.`
+The On Incident trigger becomes operational once the URL is registered in incident.io and the signing secret is saved here.`
 }
 
 func (i *IncidentIO) Configuration() []configuration.Field {
@@ -64,7 +67,16 @@ func (i *IncidentIO) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "API key from incident.io. Create one in Settings > API keys.",
+			Description: "API key from incident.io. Create one in Settings > API keys with permissions: View data (public incidents and organisation settings), Create incidents; optionally View all incident data (private incidents).",
+		},
+		{
+			Name:        "webhookSigningSecret",
+			Label:       "Webhook signing secret",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Sensitive:   true,
+			Description: "From your incident.io webhook endpoint (Settings → Webhooks). Paste the signing secret here so the On Incident trigger can verify requests. Optional if you set it on the trigger.",
+			Placeholder: "whsec_...",
 		},
 	}
 }

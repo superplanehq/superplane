@@ -61,7 +61,7 @@ incident.io does not provide an API to register webhook endpoints. After adding 
 
 1. Copy the webhook URL shown for this trigger (after saving the canvas).
 2. In incident.io go to **Settings > Webhooks** and create a new endpoint with that URL.
-3. Subscribe to **Public incident created (v2)** and/or **Public incident updated (v2)** as needed.
+3. Subscribe to exactly these events: **Public incident created (v2)** and **Public incident updated (v2)**.
 4. Copy the **Signing secret** from the endpoint and paste it into the trigger's Signing secret field.`
 }
 
@@ -90,15 +90,6 @@ func (t *OnIncident) Configuration() []configuration.Field {
 				},
 			},
 		},
-		{
-			Name:        "signingSecret",
-			Label:       "Signing secret",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Sensitive:   true,
-			Description: "Paste the signing secret from your incident.io webhook endpoint (Settings > Webhooks). Required to verify webhooks; add it after creating the endpoint with the URL below.",
-			Placeholder: "whsec_...",
-		},
 	}
 }
 
@@ -113,9 +104,16 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("at least one event type must be chosen")
 	}
 
+	signingSecret := config.SigningSecret
+	if signingSecret == "" && ctx.Integration != nil {
+		if b, getErr := ctx.Integration.GetConfig("webhookSigningSecret"); getErr == nil && len(b) > 0 {
+			signingSecret = string(b)
+		}
+	}
+
 	if err := ctx.Integration.RequestWebhook(WebhookConfiguration{
 		Events:        config.Events,
-		SigningSecret: config.SigningSecret,
+		SigningSecret: signingSecret,
 	}); err != nil {
 		return err
 	}
@@ -153,8 +151,13 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	}
 
 	signingSecret := config.SigningSecret
+	if signingSecret == "" && ctx.Integration != nil {
+		if b, getErr := ctx.Integration.GetConfig("webhookSigningSecret"); getErr == nil && len(b) > 0 {
+			signingSecret = string(b)
+		}
+	}
 	if signingSecret == "" {
-		return http.StatusForbidden, fmt.Errorf("signing secret is required for webhook verification; add it in the trigger configuration")
+		return http.StatusForbidden, fmt.Errorf("signing secret is required for webhook verification; add it in the integration (Settings → Integrations) or on the trigger")
 	}
 
 	webhookID := ctx.Headers.Get("webhook-id")
