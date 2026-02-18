@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Settings } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
@@ -46,8 +46,23 @@ export function IntegrationCreateDialog({
   const createIntegrationMutation = useCreateIntegration(organizationId);
   const updateIntegrationMutation = useUpdateIntegration(organizationId, createdIncidentIntegration?.id ?? "");
 
-  const selectedInstructions = integrationDefinition?.instructions?.trim();
-  const configurationFields = integrationDefinition?.configuration ?? [];
+  const selectedInstructions = useMemo(() => {
+    const raw = integrationDefinition?.instructions?.trim();
+    if (!raw) return raw ?? "";
+    if (integrationDefinition?.name === "incident") {
+      const idx = raw.indexOf("## Webhook integration");
+      return idx >= 0 ? raw.slice(0, idx).trim() : raw;
+    }
+    return raw;
+  }, [integrationDefinition?.instructions, integrationDefinition?.name]);
+
+  const configurationFields = useMemo(() => {
+    const fields = integrationDefinition?.configuration ?? [];
+    if (integrationDefinition?.name === "incident") {
+      return fields.filter((f) => f.name === "apiKey");
+    }
+    return fields;
+  }, [integrationDefinition?.configuration, integrationDefinition?.name]);
 
   useEffect(() => {
     if (open) {
@@ -239,8 +254,8 @@ export function IntegrationCreateDialog({
                   </Button>
                 </div>
               </div>
-              {configurationFields
-                ?.filter((f: ConfigurationField) => f.name === "signingSecret" || f.name === "webhookSigningSecret")
+              {(integrationDefinition?.configuration ?? [])
+                .filter((f: ConfigurationField) => f.name === "signingSecret" || f.name === "webhookSigningSecret")
                 .map((field) => (
                   <ConfigurationFieldRenderer
                     key={field.name}
