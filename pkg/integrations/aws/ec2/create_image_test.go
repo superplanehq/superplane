@@ -24,11 +24,15 @@ func Test__CreateImage__Setup(t *testing.T) {
 	})
 
 	t.Run("missing region -> error", func(t *testing.T) {
-		err := component.Setup(core.SetupContext{Configuration: map[string]any{
-			"region":     " ",
-			"instanceId": "i-123",
-			"name":       "my-image",
-		}})
+		err := component.Setup(core.SetupContext{
+			Metadata:    &contexts.MetadataContext{},
+			Integration: &contexts.IntegrationContext{},
+			Configuration: map[string]any{
+				"region":     " ",
+				"instanceId": "i-123",
+				"name":       "my-image",
+			},
+		})
 		require.ErrorContains(t, err, "region is required")
 	})
 

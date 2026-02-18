@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -163,6 +164,10 @@ func (c *CreateImage) Setup(ctx core.SetupContext) error {
 	nodeMetadata := CreateImageNodeMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &nodeMetadata); err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	if strings.TrimSpace(config.Region) == "" {
+		return fmt.Errorf("region is required")
 	}
 
 	if nodeMetadata.SubscriptionID != "" && nodeMetadata.Region == config.Region {
