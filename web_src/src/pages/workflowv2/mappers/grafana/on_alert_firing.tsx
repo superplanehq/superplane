@@ -1,12 +1,6 @@
 import { getBackgroundColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
-import {
-  CustomFieldRenderer,
-  NodeInfo,
-  TriggerEventContext,
-  TriggerRenderer,
-  TriggerRendererContext,
-} from "../types";
+import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import { OnAlertFiringEventData } from "./types";
