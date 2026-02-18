@@ -1,0 +1,13 @@
+{
+  "data": {
+    "pipelineIdentifier": "build_and_deploy",
+    "planExecutionId": "00000000-0000-0000-0000-000000000000",
+    "status": "Success",
+    "name": "Build and Deploy",
+    "executionUrl": "https://app.harness.io/ng/account/00000000000000000000000000/module/CI/orgs/default/projects/my_project/pipelines/build_and_deploy/executions/00000000-0000-0000-0000-000000000000/pipeline",
+    "startTs": 1771329600,
+    "endTs": 1771329900
+  },
+  "timestamp": "2026-02-17T12:05:00Z",
+  "type": "harness.pipeline.finished"
+}
