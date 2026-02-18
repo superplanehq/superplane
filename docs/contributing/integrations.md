@@ -188,7 +188,7 @@ type OnEventConfiguration struct {
 }
 
 func (t *OnEvent) Name() string {
-	return "myapp.onEvent"
+	return "myintegration.onEvent"
 }
 
 func (t *OnEvent) Label() string {
@@ -334,7 +334,7 @@ func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 Add the trigger to your integration's `Triggers()` method:
 
 ```go
-func (a *MyApp) Triggers() []core.Trigger {
+func (i *MyIntegration) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnEvent{},
 	}
@@ -435,7 +435,7 @@ interface OnEventEventData {
 }
 
 /**
- * Renderer for the "myapp.onEvent" trigger
+ * Renderer for the "myintegration.onEvent" trigger
  */
 export const onEventTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {

@@ -1,0 +1,12 @@
+{
+  "data": {
+    "value": "approve",
+    "clicked_at": "2026-02-10T21:00:00Z",
+    "clicked_by": {
+      "id": "U01234567",
+      "username": "pedro"
+    }
+  },
+  "timestamp": "2026-02-10T21:00:00Z",
+  "type": "slack.button.clicked"
+}

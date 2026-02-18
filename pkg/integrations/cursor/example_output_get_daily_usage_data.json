@@ -1,0 +1,28 @@
+{
+    "data": [
+      {
+        "acceptedLinesAdded": 1102,
+        "acceptedLinesDeleted": 645,
+        "agentRequests": 12,
+        "chatRequests": 128,
+        "composerRequests": 45,
+        "date": 1710720000000,
+        "email": "developer@company.com",
+        "isActive": true,
+        "mostUsedModel": "gpt-4",
+        "subscriptionIncludedReqs": 180,
+        "totalAccepts": 73,
+        "totalApplies": 87,
+        "totalLinesAdded": 1543,
+        "totalLinesDeleted": 892,
+        "totalRejects": 14,
+        "totalTabsAccepted": 289,
+        "totalTabsShown": 342,
+        "usageBasedReqs": 5
+      }
+    ],
+    "period": {
+      "endDate": 1710892800000,
+      "startDate": 1710720000000
+    }
+}

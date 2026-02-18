@@ -1,0 +1,17 @@
+{
+  "data": {
+    "annotations": {
+      "description": "Demo alert from local Prometheus setup",
+      "summary": "SuperPlane test alert is firing"
+    },
+    "labels": {
+      "alertname": "SuperplaneTestAlert",
+      "severity": "warning"
+    },
+    "startsAt": "2026-02-12T16:08:09.000517289Z",
+    "status": "firing",
+    "value": "1e+00"
+  },
+  "timestamp": "2026-02-12T16:18:05.943610583Z",
+  "type": "prometheus.alert"
+}

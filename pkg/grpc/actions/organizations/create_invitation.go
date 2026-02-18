@@ -47,12 +47,12 @@ func CreateInvitation(ctx context.Context, authService authorization.Authorizati
 
 func handleExistingUser(authService authorization.Authorization, authenticatedUserID, orgID uuid.UUID, user *models.User) (*pb.CreateInvitationResponse, error) {
 	if !user.DeletedAt.Valid {
-		return nil, status.Errorf(codes.InvalidArgument, "user %s is already an active member of organization", user.Email)
+		return nil, status.Errorf(codes.InvalidArgument, "user %s is already an active member of organization", user.GetEmail())
 	}
 
 	var invitation *models.OrganizationInvitation
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		i, err := models.CreateInvitationInTransaction(tx, orgID, authenticatedUserID, user.Email, models.InvitationStateAccepted)
+		i, err := models.CreateInvitationInTransaction(tx, orgID, authenticatedUserID, user.GetEmail(), models.InvitationStateAccepted)
 		if err != nil {
 			return status.Errorf(codes.InvalidArgument, "Failed to create invitation: %v", err)
 		}

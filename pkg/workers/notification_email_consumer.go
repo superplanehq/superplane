@@ -158,7 +158,7 @@ func addUsersToRecipientSet(orgID uuid.UUID, userIDs []string, recipients map[st
 	}
 
 	for _, user := range users {
-		normalized := utils.NormalizeEmail(user.Email)
+		normalized := utils.NormalizeEmail(user.GetEmail())
 		if normalized == "" {
 			continue
 		}

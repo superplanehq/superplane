@@ -1,0 +1,141 @@
+---
+title: "CircleCI"
+---
+
+Trigger and monitor CircleCI pipelines
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Workflow Completed" href="#on-workflow-completed" description="Listen to CircleCI workflow completion events" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Run Pipeline" href="#run-pipeline" description="Run a CircleCI pipeline and wait for completion" />
+</CardGrid>
+
+## Instructions
+
+Create a Personal API Token in CircleCI → User Settings → Personal API Tokens
+
+<a id="on-workflow-completed"></a>
+
+## On Workflow Completed
+
+Triggers when a CircleCI workflow completes.
+
+### Use Cases
+
+- **Workflow chaining**: Start SuperPlane workflows when CircleCI workflows complete
+- **Status monitoring**: Monitor CI/CD workflow results
+- **Notifications**: Send alerts when workflows succeed or fail
+- **Post-processing**: Process artifacts after workflow completion
+
+### Configuration
+
+- **Project Slug**: The CircleCI project slug (e.g., gh/username/repo)
+
+### Event Data
+
+Each workflow completion event includes:
+- **workflow**: Workflow information including ID, name, status, and URL
+- **pipeline**: Parent pipeline information including ID, number, and trigger details
+- **project**: Project information
+- **organization**: Organization information
+
+### Webhook Setup
+
+This trigger automatically sets up a CircleCI webhook when configured. The webhook is managed by SuperPlane and cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "happened_at": "2021-09-01T22:49:34.317Z",
+    "id": "3888f21b-eaa7-38e3-8f3d-75a63bba8895",
+    "pipeline": {
+      "created_at": "2021-09-01T22:49:03.544Z",
+      "id": "1285fe1d-d3a6-44fc-8886-8979558254c4",
+      "number": 130
+    },
+    "project": {
+      "id": "84996744-a854-4f5e-aea3-04e2851dc1d2",
+      "name": "repo",
+      "slug": "github/username/repo"
+    },
+    "type": "workflow-completed",
+    "workflow": {
+      "created_at": "2021-09-01T22:49:03.616Z",
+      "id": "fda08377-fe7e-46b1-8992-3a7aaecac9c3",
+      "name": "build-test-deploy",
+      "status": "success",
+      "stopped_at": "2021-09-01T22:49:34.170Z",
+      "url": "https://app.circleci.com/pipelines/github/username/repo/130/workflows/fda08377-fe7e-46b1-8992-3a7aaecac9c3"
+    }
+  },
+  "timestamp": "2021-09-01T22:49:34.317Z",
+  "type": "circleci.workflow.completed"
+}
+```
+
+<a id="run-pipeline"></a>
+
+## Run Pipeline
+
+The Run Pipeline component starts a CircleCI pipeline and waits for it to complete.
+
+### Use Cases
+
+- **CI/CD orchestration**: Trigger builds and deployments from SuperPlane workflows
+- **Pipeline automation**: Run CircleCI pipelines as part of workflow automation
+- **Multi-stage deployments**: Coordinate complex deployment pipelines
+- **Workflow chaining**: Chain multiple CircleCI workflows together
+
+### How It Works
+
+1. Triggers a CircleCI pipeline with the specified location (branch or tag) and parameters
+2. Waits for all workflows in the pipeline to complete (monitored via webhook)
+3. Routes execution based on workflow results:
+   - **Success channel**: All workflows completed successfully
+   - **Failed channel**: Any workflow failed or was cancelled
+
+### Configuration
+
+- **Project Slug**: CircleCI project slug (e.g., gh/username/repo)
+- **Location**: Branch or tag to run the pipeline
+- **Pipeline definition ID**: Find in CircleCI: Project Settings → Project Setup.
+- **Parameters**: Optional pipeline parameters as key-value pairs (supports expressions)
+
+### Output Channels
+
+- **Success**: Emitted when all workflows complete successfully
+- **Failed**: Emitted when any workflow fails or is cancelled
+
+### Example Output
+
+```json
+{
+  "data": {
+    "pipeline": {
+      "created_at": "2021-09-01T22:49:03.544Z",
+      "id": "1285fe1d-d3a6-44fc-8886-8979558254c4",
+      "number": 130
+    },
+    "workflows": [
+      {
+        "id": "fda08377-fe7e-46b1-8992-3a7aaecac9c3",
+        "name": "build-test-deploy",
+        "status": "success"
+      }
+    ]
+  },
+  "timestamp": "2021-09-01T22:49:34.317Z",
+  "type": "circleci.workflow.completed"
+}
+```
+

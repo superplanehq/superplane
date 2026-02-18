@@ -16,12 +16,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/cloudwatch"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/ecs"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/eventbridge"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/iam"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/route53"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/sns"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/sqs"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -33,7 +37,7 @@ const (
 )
 
 func init() {
-	registry.RegisterIntegration("aws", &AWS{})
+	registry.RegisterIntegrationWithWebhookHandler("aws", &AWS{}, &WebhookHandler{})
 }
 
 type AWS struct{}
@@ -131,7 +135,21 @@ func (a *AWS) Configuration() []configuration.Field {
 
 func (a *AWS) Components() []core.Component {
 	return []core.Component{
+		&codeartifact.CopyPackageVersions{},
+		&codeartifact.CreateRepository{},
+		&codeartifact.DeletePackageVersions{},
+		&codeartifact.DeleteRepository{},
+		&codeartifact.DisposePackageVersions{},
 		&codeartifact.GetPackageVersion{},
+		&codeartifact.UpdatePackageVersionsStatus{},
+		&ecs.DescribeService{},
+		&ecs.RunTask{},
+		&ecs.StopTask{},
+		&sns.GetTopic{},
+		&sns.GetSubscription{},
+		&sns.CreateTopic{},
+		&sns.DeleteTopic{},
+		&sns.PublishMessage{},
 		&ecr.GetImage{},
 		&ecr.GetImageScanFindings{},
 		&ecr.ScanImage{},
@@ -141,14 +159,19 @@ func (a *AWS) Components() []core.Component {
 		&sqs.CreateQueue{},
 		&sqs.DeleteQueue{},
 		&sqs.PurgeQueue{},
+		&route53.CreateRecord{},
+		&route53.UpsertRecord{},
+		&route53.DeleteRecord{},
 	}
 }
 
 func (a *AWS) Triggers() []core.Trigger {
 	return []core.Trigger{
+		&cloudwatch.OnAlarm{},
 		&codeartifact.OnPackageVersion{},
 		&ecr.OnImageScan{},
 		&ecr.OnImagePush{},
+		&sns.OnTopicMessage{},
 	}
 }
 
@@ -307,7 +330,7 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 - Add permissions for the integration to manage EventBridge connections, API destinations, and rules. To get started, you can use the **AmazonEventBridgeFullAccess** managed policy
 - Add permissions for the integration manage IAM roles needed for itself. To get started, you can use the **IAMFullAccess** managed policy
 - Add permissions for the integration to manage SQS. To get started, you can use the **AmazonSQSFullAccess** managed policy
-- Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need
+- Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need.
 - Give it a name and description, and create it
 
 **3. Complete the installation setup**

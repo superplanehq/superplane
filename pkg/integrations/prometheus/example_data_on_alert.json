@@ -1,0 +1,33 @@
+{
+  "data": {
+    "annotations": {
+      "description": "Demo alert from local Prometheus setup",
+      "summary": "SuperPlane test alert is firing"
+    },
+    "commonAnnotations": {
+      "description": "Demo alert from local Prometheus setup",
+      "summary": "SuperPlane test alert is firing"
+    },
+    "commonLabels": {
+      "alertname": "SuperplaneTestAlert",
+      "severity": "warning"
+    },
+    "endsAt": "0001-01-01T00:00:00Z",
+    "externalURL": "http://localhost:9093",
+    "fingerprint": "aac3b474e2c0658c",
+    "generatorURL": "http://fd66aa456472:9090/graph?g0.expr=vector%281%29&g0.tab=1",
+    "groupKey": "{}:{alertname=\"SuperplaneTestAlert\"}",
+    "groupLabels": {
+      "alertname": "SuperplaneTestAlert"
+    },
+    "labels": {
+      "alertname": "SuperplaneTestAlert",
+      "severity": "warning"
+    },
+    "receiver": "superplane",
+    "startsAt": "2026-02-12T16:08:39Z",
+    "status": "firing"
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "prometheus.alert"
+}

@@ -29,7 +29,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
       data: orgUsers = [],
       isLoading: loadingOrgUsers,
       error: orgUsersError,
-    } = useOrganizationUsers(organizationId);
+    } = useOrganizationUsers(organizationId, true);
     const {
       data: groupUsers = [],
       isLoading: loadingGroupUsers,
@@ -200,7 +200,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                           {member.spec?.displayName || member.metadata!.id!}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          {member.metadata?.email || `${member.metadata!.id!}@email.placeholder`}
+                          {member.metadata?.email || "Service Account"}
                         </div>
                       </div>
                     </div>
