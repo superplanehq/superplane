@@ -2,7 +2,9 @@ package grafana
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -34,6 +36,10 @@ func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 
 	uid, err := client.UpsertWebhookContactPoint(name, ctx.Webhook.GetURL(), sharedSecret)
 	if err != nil {
+		if !shouldFallbackToManualSetup(err) {
+			return nil, fmt.Errorf("grafana webhook setup: contact point provisioning will be retried: %w", err)
+		}
+
 		if ctx.Logger != nil {
 			ctx.Logger.Warnf("grafana webhook setup: falling back to manual setup (contact point provisioning failed): %v", err)
 		}
@@ -97,4 +103,23 @@ func buildContactPointName(webhookID string) string {
 	hash.Write([]byte(webhookID))
 	suffix := fmt.Sprintf("%x", hash.Sum(nil))
 	return fmt.Sprintf("superplane-%s", suffix[:16])
+}
+
+func shouldFallbackToManualSetup(err error) bool {
+	var statusErr *apiStatusError
+	if !errors.As(err, &statusErr) {
+		return false
+	}
+
+	switch statusErr.StatusCode {
+	case http.StatusBadRequest,
+		http.StatusUnauthorized,
+		http.StatusForbidden,
+		http.StatusNotFound,
+		http.StatusMethodNotAllowed,
+		http.StatusUnprocessableEntity:
+		return true
+	default:
+		return false
+	}
 }

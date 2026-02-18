@@ -106,6 +106,72 @@ func Test__GrafanaWebhookHandler__Setup__ManualFallbackWhenClientUnavailable(t *
 	assert.Nil(t, metadata)
 }
 
+func Test__GrafanaWebhookHandler__Setup__ManualFallbackOnNonRetriableProvisioningError(t *testing.T) {
+	handler := &GrafanaWebhookHandler{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusForbidden,
+				Body:       io.NopCloser(strings.NewReader(`forbidden`)),
+			},
+		},
+	}
+	webhookCtx := &testWebhookContext{
+		id:            "wh_123",
+		url:           "https://example.com/webhook",
+		configuration: map[string]any{"sharedSecret": "top-secret"},
+	}
+
+	metadata, err := handler.Setup(core.WebhookHandlerContext{
+		HTTP:    httpCtx,
+		Webhook: webhookCtx,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "token",
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Nil(t, metadata)
+	require.Len(t, httpCtx.Requests, 1)
+	assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+}
+
+func Test__GrafanaWebhookHandler__Setup__RetriesOnRetriableProvisioningError(t *testing.T) {
+	handler := &GrafanaWebhookHandler{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusInternalServerError,
+				Body:       io.NopCloser(strings.NewReader(`internal error`)),
+			},
+		},
+	}
+	webhookCtx := &testWebhookContext{
+		id:            "wh_123",
+		url:           "https://example.com/webhook",
+		configuration: map[string]any{"sharedSecret": "top-secret"},
+	}
+
+	metadata, err := handler.Setup(core.WebhookHandlerContext{
+		HTTP:    httpCtx,
+		Webhook: webhookCtx,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "token",
+			},
+		},
+	})
+
+	require.ErrorContains(t, err, "will be retried")
+	assert.Nil(t, metadata)
+	require.Len(t, httpCtx.Requests, 1)
+	assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+}
+
 func Test__GrafanaWebhookHandler__Cleanup(t *testing.T) {
 	handler := &GrafanaWebhookHandler{}
 	httpCtx := &contexts.HTTPContext{

@@ -27,6 +27,24 @@ type contactPoint struct {
 	Name string `json:"name"`
 }
 
+type apiStatusError struct {
+	Operation    string
+	StatusCode   int
+	ResponseBody string
+}
+
+func (e *apiStatusError) Error() string {
+	return fmt.Sprintf("%s failed with status %d: %s", e.Operation, e.StatusCode, e.ResponseBody)
+}
+
+func newAPIStatusError(operation string, status int, responseBody []byte) error {
+	return &apiStatusError{
+		Operation:    operation,
+		StatusCode:   status,
+		ResponseBody: string(responseBody),
+	}
+}
+
 func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext, requireToken bool) (*Client, error) {
 	baseURL, err := readBaseURL(ctx)
 	if err != nil {
@@ -138,7 +156,7 @@ func (c *Client) ListContactPoints() ([]contactPoint, error) {
 	}
 
 	if status < 200 || status >= 300 {
-		return nil, fmt.Errorf("grafana contact point list failed with status %d: %s", status, string(responseBody))
+		return nil, newAPIStatusError("grafana contact point list", status, responseBody)
 	}
 
 	var direct []contactPoint
@@ -202,7 +220,7 @@ func (c *Client) UpsertWebhookContactPoint(name, webhookURL, bearerToken string)
 			return "", fmt.Errorf("error updating contact point: %v", err)
 		}
 		if status < 200 || status >= 300 {
-			return "", fmt.Errorf("grafana contact point update failed with status %d: %s", status, string(responseBody))
+			return "", newAPIStatusError("grafana contact point update", status, responseBody)
 		}
 		return existingUID, nil
 	}
@@ -217,7 +235,7 @@ func (c *Client) UpsertWebhookContactPoint(name, webhookURL, bearerToken string)
 		return "", fmt.Errorf("error creating contact point: %v", err)
 	}
 	if status < 200 || status >= 300 {
-		return "", fmt.Errorf("grafana contact point create failed with status %d: %s", status, string(responseBody))
+		return "", newAPIStatusError("grafana contact point create", status, responseBody)
 	}
 
 	created := contactPoint{}
@@ -254,7 +272,7 @@ func (c *Client) DeleteContactPoint(uid string) error {
 	}
 
 	if status < 200 || status >= 300 {
-		return fmt.Errorf("grafana contact point delete failed with status %d: %s", status, string(responseBody))
+		return newAPIStatusError("grafana contact point delete", status, responseBody)
 	}
 
 	return nil
