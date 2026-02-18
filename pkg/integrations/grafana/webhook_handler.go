@@ -33,6 +33,9 @@ func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 
 	name := buildContactPointName(ctx.Webhook.GetID())
 	sharedSecret := strings.TrimSpace(config.SharedSecret)
+	if err := ctx.Webhook.SetSecret([]byte(sharedSecret)); err != nil {
+		return nil, fmt.Errorf("failed to persist shared secret in webhook storage: %w", err)
+	}
 
 	uid, err := client.UpsertWebhookContactPoint(name, ctx.Webhook.GetURL(), sharedSecret)
 	if err != nil {
@@ -54,12 +57,12 @@ func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 func (h *GrafanaWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	metadata := GrafanaWebhookMetadata{}
 	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata); err != nil {
-		return nil
+		return err
 	}
 
 	return client.DeleteContactPoint(strings.TrimSpace(metadata.ContactPointUID))
@@ -90,8 +93,18 @@ func (h *GrafanaWebhookHandler) Merge(current, requested any) (any, bool, error)
 		return nil, false, err
 	}
 
+	sharedSecretProvided := false
+	if requestedMap, ok := requested.(map[string]any); ok {
+		_, sharedSecretProvided = requestedMap["sharedSecret"]
+	}
+
+	mergedSharedSecret := strings.TrimSpace(currentConfig.SharedSecret)
+	if sharedSecretProvided {
+		mergedSharedSecret = strings.TrimSpace(requestedConfig.SharedSecret)
+	}
+
 	merged := OnAlertFiringConfig{
-		SharedSecret: strings.TrimSpace(requestedConfig.SharedSecret),
+		SharedSecret: mergedSharedSecret,
 	}
 
 	changed := strings.TrimSpace(currentConfig.SharedSecret) != merged.SharedSecret

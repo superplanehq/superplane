@@ -66,6 +66,7 @@ func Test__GrafanaWebhookHandler__Setup__ProvisionContactPoint(t *testing.T) {
 	result, ok := metadata.(GrafanaWebhookMetadata)
 	require.True(t, ok)
 	assert.Equal(t, "cp_123", result.ContactPointUID)
+	assert.Equal(t, []byte("top-secret"), webhookCtx.secret)
 
 	require.Len(t, httpCtx.Requests, 2)
 	assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
@@ -239,4 +240,12 @@ func Test__GrafanaWebhookHandler__Merge(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, changed)
 	assert.Equal(t, OnAlertFiringConfig{SharedSecret: "same"}, merged)
+
+	merged, changed, err = handler.Merge(
+		map[string]any{"sharedSecret": "keep-existing"},
+		map[string]any{},
+	)
+	require.NoError(t, err)
+	require.False(t, changed)
+	assert.Equal(t, OnAlertFiringConfig{SharedSecret: "keep-existing"}, merged)
 }

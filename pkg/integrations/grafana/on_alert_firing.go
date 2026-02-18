@@ -112,12 +112,11 @@ func (t *OnAlertFiring) HandleAction(ctx core.TriggerActionContext) (map[string]
 }
 
 func (t *OnAlertFiring) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	config := OnAlertFiringConfig{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error decoding configuration: %v", err)
+	sharedSecret, err := resolveWebhookSharedSecret(ctx)
+	if err != nil {
+		return http.StatusInternalServerError, err
 	}
 
-	sharedSecret := strings.TrimSpace(config.SharedSecret)
 	if sharedSecret != "" {
 		authHeader := strings.TrimSpace(ctx.Headers.Get("Authorization"))
 		if authHeader == "" {
@@ -192,6 +191,23 @@ func extractString(value any) string {
 		return ""
 	}
 	return strings.TrimSpace(text)
+}
+
+func resolveWebhookSharedSecret(ctx core.WebhookRequestContext) (string, error) {
+	if ctx.Webhook != nil {
+		secret, err := ctx.Webhook.GetSecret()
+		if err == nil {
+			return strings.TrimSpace(string(secret)), nil
+		}
+	}
+
+	// Backward compatibility for older records where sharedSecret lived in configuration.
+	config := OnAlertFiringConfig{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return "", fmt.Errorf("error decoding configuration: %v", err)
+	}
+
+	return strings.TrimSpace(config.SharedSecret), nil
 }
 
 func setWebhookURLMetadata(ctx core.TriggerContext, webhookURL string) error {
