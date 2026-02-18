@@ -66,10 +66,8 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     const webhookHeading = "## Webhook integration";
     const idx = raw.indexOf(webhookHeading);
     const apiInstructions = idx >= 0 ? raw.slice(0, idx).trim() : raw;
-    const webhookBody =
-      idx >= 0 ? raw.slice(idx + webhookHeading.length).trimStart() : "";
-    const webhookInstructions =
-      idx >= 0 && webhookBody ? webhookHeading + "\n\n" + webhookBody : null;
+    const webhookBody = idx >= 0 ? raw.slice(idx + webhookHeading.length).trimStart() : "";
+    const webhookInstructions = idx >= 0 && webhookBody ? webhookHeading + "\n\n" + webhookBody : null;
     const webhookConfigured =
       integration?.status?.metadata &&
       typeof integration.status.metadata.webhookSigningSecretConfigured === "boolean" &&
