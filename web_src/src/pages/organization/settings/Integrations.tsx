@@ -131,8 +131,15 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   }, [filterQuery, integrationCatalog]);
 
   const selectedInstructions = useMemo(() => {
-    return selectedIntegration?.instructions?.trim();
-  }, [selectedIntegration?.instructions]);
+    const raw = selectedIntegration?.instructions?.trim();
+    if (!raw) return raw;
+    // For incident, modal shows only API integration; webhook is on the details page.
+    if (selectedIntegration?.name === "incident") {
+      const idx = raw.indexOf("## Webhook integration");
+      return idx >= 0 ? raw.slice(0, idx).trim() : raw;
+    }
+    return raw;
+  }, [selectedIntegration?.instructions, selectedIntegration?.name]);
 
   const getNextIntegrationName = (baseName?: string) => {
     const normalizedBaseName = baseName?.trim() || "integration";
@@ -398,24 +405,27 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       </p>
                     </div>
 
-                    {/* Configuration Fields */}
+                    {/* Configuration Fields - for incident, modal shows only API key; webhook is on details page */}
                     {selectedIntegration.configuration && selectedIntegration.configuration.length > 0 && (
                       <div className="space-y-4">
-                        {selectedIntegration.configuration.map((field) => {
-                          if (!field.name) return null;
-                          return (
+                        {selectedIntegration.configuration
+                          .filter((field) => {
+                            if (!field.name) return false;
+                            if (selectedIntegration.name === "incident") return field.name === "apiKey";
+                            return true;
+                          })
+                          .map((field) => (
                             <ConfigurationFieldRenderer
-                              key={field.name}
+                              key={field.name!}
                               field={field}
-                              value={configuration[field.name]}
-                              onChange={(value) => setConfiguration({ ...configuration, [field.name || ""]: value })}
+                              value={configuration[field.name!]}
+                              onChange={(value) => setConfiguration({ ...configuration, [field.name!]: value })}
                               allValues={configuration}
                               domainId={organizationId}
                               domainType="DOMAIN_TYPE_ORGANIZATION"
                               organizationId={organizationId}
                             />
-                          );
-                        })}
+                          ))}
                       </div>
                     )}
                   </div>

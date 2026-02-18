@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations/incident"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -92,7 +93,13 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 		}
 	}
 
-	proto, err := serializeIntegration(registry, newIntegration, []models.CanvasNodeReference{})
+	if newIntegration.AppName == "incident" {
+		if ensureErr := incident.EnsureWebhookExists(database.Conn(), newIntegration.ID, registry.Encryptor); ensureErr != nil {
+			integrationLogger.WithError(ensureErr).Error("failed to ensure incident webhook")
+		}
+	}
+
+	proto, err := serializeIntegration(registry, newIntegration, []models.CanvasNodeReference{}, webhooksBaseURL)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to serialize integration: %v", err)
 	}
@@ -102,7 +109,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 	}, nil
 }
 
-func serializeIntegration(registry *registry.Registry, instance *models.Integration, nodeRefs []models.CanvasNodeReference) (*pb.Integration, error) {
+func serializeIntegration(registry *registry.Registry, instance *models.Integration, nodeRefs []models.CanvasNodeReference, webhooksBaseURL string) (*pb.Integration, error) {
 	integration, err := registry.GetIntegration(instance.AppName)
 	if err != nil {
 		return nil, err
@@ -116,7 +123,27 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 		return nil, err
 	}
 
-	metadata, err := structpb.NewStruct(instance.Metadata.Data())
+	metadataMap := instance.Metadata.Data()
+	if metadataMap == nil {
+		metadataMap = map[string]any{}
+	}
+	if instance.AppName == "incident" {
+		m := maps.Clone(metadataMap)
+		if m == nil {
+			m = make(map[string]any)
+		}
+		if webhooksBaseURL != "" {
+			webhooks, listErr := models.ListIntegrationWebhooks(database.Conn(), instance.ID)
+			if listErr == nil && len(webhooks) > 0 {
+				m["webhookUrl"] = webhooksBaseURL + "/api/v1/webhooks/" + webhooks[0].ID.String()
+			}
+		}
+		if v, _ := instance.Configuration.Data()["webhookSigningSecret"].(string); v != "" {
+			m["webhookSigningSecretConfigured"] = true
+		}
+		metadataMap = m
+	}
+	metadata, err := structpb.NewStruct(metadataMap)
 	if err != nil {
 		return nil, err
 	}
