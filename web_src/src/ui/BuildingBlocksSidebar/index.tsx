@@ -15,6 +15,7 @@ import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
+import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
@@ -29,7 +30,9 @@ import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
+import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
+import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.svg";
@@ -400,6 +403,7 @@ function CategorySection({
 
   // Determine category icon
   const appLogoMap: Record<string, string | Record<string, string>> = {
+    bitbucket: bitbucketIcon,
     circleci: circleciIcon,
     cloudflare: cloudflareIcon,
     dash0: dash0Icon,
@@ -427,6 +431,8 @@ function CategorySection({
       cloudwatch: awsCloudwatchIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
+      route53: awsRoute53Icon,
+      ecs: awsEcsIcon,
       sns: awsSnsIcon,
     },
   };
@@ -480,6 +486,7 @@ function CategorySection({
 
           // Use SVG icons for application components/triggers (SMTP uses resolveIcon("mail"), same as core)
           const appLogoMap: Record<string, string | Record<string, string>> = {
+            bitbucket: bitbucketIcon,
             circleci: circleciIcon,
             cloudflare: cloudflareIcon,
             dash0: dash0Icon,
@@ -507,6 +514,8 @@ function CategorySection({
               cloudwatch: awsCloudwatchIcon,
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
+              route53: awsRoute53Icon,
+              ecs: awsEcsIcon,
               sns: awsSnsIcon,
             },
           };
