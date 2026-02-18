@@ -24,6 +24,7 @@ const (
 	OnPipelineCompletedPollPageSize  = 100
 	OnPipelineCompletedPollMaxPages  = 100
 	OnPipelineCompletedMaxPollErrors = 5
+	OnPipelineCompletedCheckpointLockShardCount = 64
 	// When pipeline-scoped webhook delivery is configured, defer very recent
 	// poll items to avoid duplicate emits from webhook/poll races.
 	OnPipelineCompletedPollRaceWindow = 2 * time.Minute
@@ -35,7 +36,7 @@ var errOnPipelineCompletedUnsupportedPipelineIdentifierFilter = errors.New(
 var errOnPipelineCompletedDeferredForRaceWindow = errors.New(
 	"poll execution deferred due to race window",
 )
-var onPipelineCompletedCheckpointLocks sync.Map
+var onPipelineCompletedCheckpointLocks [OnPipelineCompletedCheckpointLockShardCount]sync.Mutex
 
 type OnPipelineCompleted struct{}
 
@@ -587,21 +588,8 @@ func (t *OnPipelineCompleted) updatePollingMetadata(
 
 func onPipelineCompletedCheckpointMutex(config OnPipelineCompletedConfiguration) *sync.Mutex {
 	lockKey := onPipelineCompletedCheckpointLockKey(config)
-	if value, ok := onPipelineCompletedCheckpointLocks.Load(lockKey); ok {
-		mutex, ok := value.(*sync.Mutex)
-		if ok {
-			return mutex
-		}
-	}
-
-	mutex := &sync.Mutex{}
-	actual, _ := onPipelineCompletedCheckpointLocks.LoadOrStore(lockKey, mutex)
-	resolved, ok := actual.(*sync.Mutex)
-	if ok {
-		return resolved
-	}
-
-	return mutex
+	shard := onPipelineCompletedCheckpointLockShardIndex(lockKey)
+	return &onPipelineCompletedCheckpointLocks[shard]
 }
 
 func onPipelineCompletedCheckpointLockKey(config OnPipelineCompletedConfiguration) string {
@@ -623,6 +611,20 @@ func onPipelineCompletedCheckpointLockKey(config OnPipelineCompletedConfiguratio
 		strings.TrimSpace(config.PipelineIdentifier),
 		strings.Join(statuses, ","),
 	}, "|")
+}
+
+func onPipelineCompletedCheckpointLockShardIndex(lockKey string) int {
+	if lockKey == "" {
+		return 0
+	}
+
+	hash := uint64(1469598103934665603)
+	for i := 0; i < len(lockKey); i++ {
+		hash ^= uint64(lockKey[i])
+		hash *= 1099511628211
+	}
+
+	return int(hash % uint64(OnPipelineCompletedCheckpointLockShardCount))
 }
 
 func executionSummaryFromWebhookPayload(event pipelineWebhookEvent, payload map[string]any) ExecutionSummary {
