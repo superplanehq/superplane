@@ -4,6 +4,8 @@ import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, Tr
 import { TriggerProps } from "@/ui/trigger";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import { OnAlertFiringEventData } from "./types";
+import { stringOrDash } from "../utils";
+import { formatTimestamp } from "./utils";
 
 /**
  * Renderer for the "grafana.onAlertFiring" trigger
@@ -142,19 +144,4 @@ function buildSubtitle(status: string, createdAt?: string): string {
   }
 
   return timeAgo;
-}
-
-function stringOrDash(value?: unknown): string {
-  if (value === undefined || value === null || value === "") {
-    return "-";
-  }
-
-  return String(value);
-}
-
-function formatTimestamp(value?: string): string {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString();
 }

@@ -13,6 +13,7 @@ import { MetadataItem } from "@/ui/metadataList";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import { QueryDataSourceConfiguration } from "./types";
 import { formatTimeAgo } from "@/utils/date";
+import { formatTimestamp } from "./utils";
 
 export const queryDataSourceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -68,13 +69,6 @@ export const queryDataSourceMapper: ComponentBaseMapper = {
     return formatTimeAgo(new Date(context.execution.createdAt));
   },
 };
-
-function formatTimestamp(value?: string): string {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString();
-}
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
