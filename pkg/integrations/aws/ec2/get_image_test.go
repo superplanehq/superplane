@@ -118,7 +118,9 @@ func Test__GetImage__Execute(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, execState.Payloads, 1)
 		payload := execState.Payloads[0].(map[string]any)["data"]
-		image, ok := payload.(*Image)
+		output, ok := payload.(map[string]any)
+		require.True(t, ok)
+		image, ok := output["image"].(*Image)
 		require.True(t, ok)
 		assert.Equal(t, "ami-123", image.ImageID)
 		assert.Equal(t, "my-ami", image.Name)

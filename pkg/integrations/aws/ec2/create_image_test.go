@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -212,6 +213,7 @@ func Test__CreateImage__OnIntegrationMessage(t *testing.T) {
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		execCtx := &core.ExecutionContext{
 			ExecutionState: execState,
+			Logger:         log.NewEntry(log.New()),
 			Metadata: &contexts.MetadataContext{Metadata: CreateImageExecutionMetadata{
 				ImageID: imageID,
 				State:   ImageStatePending,
@@ -223,7 +225,34 @@ func Test__CreateImage__OnIntegrationMessage(t *testing.T) {
 	t.Run("available event -> emits output", func(t *testing.T) {
 		executionCtx, execState := newExecutionContext("ami-abc")
 		err := component.OnIntegrationMessage(core.IntegrationMessageContext{
+			Logger: log.NewEntry(log.New()),
+			Integration: &contexts.IntegrationContext{
+				Secrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`
+							<DescribeImagesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+								<requestId>req-123</requestId>
+								<imagesSet>
+									<item>
+										<imageId>ami-abc</imageId>
+										<imageState>available</imageState>
+									</item>
+								</imagesSet>
+							</DescribeImagesResponse>
+						`)),
+					},
+				},
+			},
 			Message: common.EventBridgeEvent{
+				Region:     "us-east-1",
 				Source:     Source,
 				DetailType: DetailTypeAMIStateChange,
 				Detail: map[string]any{
@@ -245,15 +274,18 @@ func Test__CreateImage__OnIntegrationMessage(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, execState.Payloads, 1)
 		payload := execState.Payloads[0].(map[string]any)["data"]
-		output, ok := payload.(CreateImageOutput)
+		output, ok := payload.(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, "ami-abc", output.ImageID)
-		assert.Equal(t, ImageStateAvailable, output.State)
+		image, ok := output["image"].(*Image)
+		require.True(t, ok)
+		assert.Equal(t, "ami-abc", image.ImageID)
+		assert.Equal(t, ImageStateAvailable, image.State)
 	})
 
 	t.Run("failed event -> fails execution", func(t *testing.T) {
 		executionCtx, execState := newExecutionContext("ami-abc")
 		err := component.OnIntegrationMessage(core.IntegrationMessageContext{
+			Logger: log.NewEntry(log.New()),
 			Message: common.EventBridgeEvent{
 				Source:     Source,
 				DetailType: DetailTypeAMIStateChange,
@@ -281,6 +313,7 @@ func Test__CreateImage__OnIntegrationMessage(t *testing.T) {
 	t.Run("pending event -> ignores", func(t *testing.T) {
 		executionCtx, execState := newExecutionContext("ami-abc")
 		err := component.OnIntegrationMessage(core.IntegrationMessageContext{
+			Logger: log.NewEntry(log.New()),
 			Message: common.EventBridgeEvent{
 				Source:     Source,
 				DetailType: DetailTypeAMIStateChange,
