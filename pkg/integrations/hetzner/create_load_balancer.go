@@ -77,7 +77,7 @@ func (c *CreateLoadBalancer) Configuration() []configuration.Field {
 			Label:       "Name",
 			Type:        configuration.FieldTypeExpression,
 			Required:    true,
-			Description: "Load Balancer name",
+			Description: "Name",
 		},
 		{
 			Name:        "loadBalancerType",
@@ -90,7 +90,7 @@ func (c *CreateLoadBalancer) Configuration() []configuration.Field {
 					Type: "load_balancer_type",
 				},
 			},
-			Description: "Load Balancer type",
+			Description: "Type",
 		},
 		{
 			Name:        "location",
@@ -103,7 +103,7 @@ func (c *CreateLoadBalancer) Configuration() []configuration.Field {
 					Type: "location",
 				},
 			},
-			Description: "Location (optional, omit for auto).",
+			Description: "Location",
 		},
 		{
 			Name:        "algorithm",

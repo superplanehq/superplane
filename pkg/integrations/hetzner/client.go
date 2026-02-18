@@ -390,7 +390,7 @@ func (c *Client) ListServerTypes() ([]ServerTypeResponse, error) {
 	var out struct {
 		ServerTypes []ServerTypeResponse `json:"server_types"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := decodeJSON(resp.Body, &out); err != nil {
 		return nil, fmt.Errorf("decode list server types response: %w", err)
 	}
 	return out.ServerTypes, nil
