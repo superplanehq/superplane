@@ -1,7 +1,11 @@
 import { CustomFieldRenderer, NodeInfo, type CustomFieldRendererContext } from "../types";
 import { Icon } from "@/components/Icon";
 
-const integrationsPath = `/${typeof window !== "undefined" ? window.location.pathname.split("/")[1] || "" : ""}/settings/integrations`;
+function getIntegrationsPath(): string {
+  if (typeof window === "undefined") return "/settings/integrations";
+  const orgSlug = window.location.pathname.split("/")[1] || "";
+  return `/${orgSlug}/settings/integrations`;
+}
 
 export const onIncidentCustomFieldRenderer: CustomFieldRenderer = {
   render: (_node: NodeInfo, context?: CustomFieldRendererContext) => {
@@ -25,7 +29,7 @@ export const onIncidentCustomFieldRenderer: CustomFieldRenderer = {
               received.
             </p>
             <a
-              href={integrationsPath}
+              href={getIntegrationsPath()}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-amber-800 dark:text-amber-200 hover:underline"
