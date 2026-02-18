@@ -80,6 +80,12 @@ func (h *GrafanaWebhookHandler) CompareConfig(a, b any) (bool, error) {
 		return false, err
 	}
 
+	bindingKeyA := strings.TrimSpace(configA.WebhookBindingKey)
+	bindingKeyB := strings.TrimSpace(configB.WebhookBindingKey)
+	if bindingKeyA != "" || bindingKeyB != "" {
+		return bindingKeyA != "" && bindingKeyA == bindingKeyB, nil
+	}
+
 	return strings.TrimSpace(configA.SharedSecret) == strings.TrimSpace(configB.SharedSecret), nil
 }
 
@@ -95,8 +101,10 @@ func (h *GrafanaWebhookHandler) Merge(current, requested any) (any, bool, error)
 	}
 
 	sharedSecretProvided := false
+	webhookBindingKeyProvided := false
 	if requestedMap, ok := requested.(map[string]any); ok {
 		_, sharedSecretProvided = requestedMap["sharedSecret"]
+		_, webhookBindingKeyProvided = requestedMap["webhookBindingKey"]
 	}
 
 	mergedSharedSecret := strings.TrimSpace(currentConfig.SharedSecret)
@@ -104,11 +112,18 @@ func (h *GrafanaWebhookHandler) Merge(current, requested any) (any, bool, error)
 		mergedSharedSecret = strings.TrimSpace(requestedConfig.SharedSecret)
 	}
 
-	merged := OnAlertFiringConfig{
-		SharedSecret: mergedSharedSecret,
+	mergedWebhookBindingKey := strings.TrimSpace(currentConfig.WebhookBindingKey)
+	if webhookBindingKeyProvided && strings.TrimSpace(requestedConfig.WebhookBindingKey) != "" {
+		mergedWebhookBindingKey = strings.TrimSpace(requestedConfig.WebhookBindingKey)
 	}
 
-	changed := strings.TrimSpace(currentConfig.SharedSecret) != merged.SharedSecret
+	merged := OnAlertFiringConfig{
+		SharedSecret:      mergedSharedSecret,
+		WebhookBindingKey: mergedWebhookBindingKey,
+	}
+
+	changed := strings.TrimSpace(currentConfig.SharedSecret) != merged.SharedSecret ||
+		strings.TrimSpace(currentConfig.WebhookBindingKey) != merged.WebhookBindingKey
 	return merged, changed, nil
 }
 

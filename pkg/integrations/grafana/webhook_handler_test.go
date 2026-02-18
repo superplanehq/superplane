@@ -82,7 +82,7 @@ func Test__GrafanaWebhookHandler__Setup__ProvisionContactPoint(t *testing.T) {
 	settings, ok := payload["settings"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "https://example.com/webhook", settings["url"])
-	assert.Equal(t, "bearer", settings["authorization_scheme"])
+	assert.Equal(t, "Bearer", settings["authorization_scheme"])
 	assert.Equal(t, "top-secret", settings["authorization_credentials"])
 }
 
@@ -209,44 +209,51 @@ func Test__GrafanaWebhookHandler__CompareConfig(t *testing.T) {
 	handler := &GrafanaWebhookHandler{}
 
 	equal, err := handler.CompareConfig(
-		map[string]any{"sharedSecret": "secret"},
-		map[string]any{"sharedSecret": " secret "},
+		map[string]any{"webhookBindingKey": "node-1"},
+		map[string]any{"webhookBindingKey": " node-1 "},
 	)
 	require.NoError(t, err)
 	assert.True(t, equal)
 
 	equal, err = handler.CompareConfig(
-		map[string]any{"sharedSecret": "secret-a"},
-		map[string]any{"sharedSecret": "secret-b"},
+		map[string]any{"webhookBindingKey": "node-1", "sharedSecret": "secret-a"},
+		map[string]any{"webhookBindingKey": "node-2", "sharedSecret": "secret-a"},
 	)
 	require.NoError(t, err)
 	assert.False(t, equal)
+
+	equal, err = handler.CompareConfig(
+		map[string]any{"sharedSecret": "secret"},
+		map[string]any{"sharedSecret": " secret "},
+	)
+	require.NoError(t, err)
+	assert.True(t, equal)
 }
 
 func Test__GrafanaWebhookHandler__Merge(t *testing.T) {
 	handler := &GrafanaWebhookHandler{}
 
 	merged, changed, err := handler.Merge(
-		map[string]any{"sharedSecret": "old"},
-		map[string]any{"sharedSecret": " new "},
+		map[string]any{"sharedSecret": "old", "webhookBindingKey": "node-1"},
+		map[string]any{"sharedSecret": " new ", "webhookBindingKey": "node-1"},
 	)
 	require.NoError(t, err)
 	require.True(t, changed)
-	assert.Equal(t, OnAlertFiringConfig{SharedSecret: "new"}, merged)
+	assert.Equal(t, OnAlertFiringConfig{SharedSecret: "new", WebhookBindingKey: "node-1"}, merged)
 
 	merged, changed, err = handler.Merge(
-		map[string]any{"sharedSecret": " same "},
-		map[string]any{"sharedSecret": "same"},
+		map[string]any{"sharedSecret": " same ", "webhookBindingKey": "node-1"},
+		map[string]any{"sharedSecret": "same", "webhookBindingKey": "node-1"},
 	)
 	require.NoError(t, err)
 	require.False(t, changed)
-	assert.Equal(t, OnAlertFiringConfig{SharedSecret: "same"}, merged)
+	assert.Equal(t, OnAlertFiringConfig{SharedSecret: "same", WebhookBindingKey: "node-1"}, merged)
 
 	merged, changed, err = handler.Merge(
-		map[string]any{"sharedSecret": "keep-existing"},
+		map[string]any{"sharedSecret": "keep-existing", "webhookBindingKey": "node-1"},
 		map[string]any{},
 	)
 	require.NoError(t, err)
 	require.False(t, changed)
-	assert.Equal(t, OnAlertFiringConfig{SharedSecret: "keep-existing"}, merged)
+	assert.Equal(t, OnAlertFiringConfig{SharedSecret: "keep-existing", WebhookBindingKey: "node-1"}, merged)
 }

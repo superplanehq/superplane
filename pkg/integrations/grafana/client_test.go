@@ -110,6 +110,7 @@ func Test__Client__UpsertWebhookContactPoint__UpdatesExisting(t *testing.T) {
 	require.Equal(t, "cp_1", uid)
 	require.Len(t, httpContext.Requests, 2)
 	require.Equal(t, http.MethodPut, httpContext.Requests[1].Method)
+	require.Equal(t, "true", httpContext.Requests[1].Header.Get("X-Disable-Provenance"))
 }
 
 func Test__Client__UpsertWebhookContactPoint__CreatesAndFindsUID(t *testing.T) {
@@ -140,6 +141,7 @@ func Test__Client__UpsertWebhookContactPoint__CreatesAndFindsUID(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "cp_2", uid)
 	require.Len(t, httpContext.Requests, 3)
+	require.Equal(t, "true", httpContext.Requests[1].Header.Get("X-Disable-Provenance"))
 
 	body, err := io.ReadAll(httpContext.Requests[1].Body)
 	require.NoError(t, err)
