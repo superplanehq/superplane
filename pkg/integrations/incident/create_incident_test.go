@@ -21,6 +21,7 @@ func Test__CreateIncident__Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"name":       "Test Incident",
 				"summary":    "Test summary",
+				"severityId": "sev_abc123",
 				"visibility": "public",
 			},
 		})
@@ -41,18 +42,30 @@ func Test__CreateIncident__Setup(t *testing.T) {
 	t.Run("empty name returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":    "",
-				"summary": "Test summary",
+				"name":       "",
+				"summary":    "Test summary",
+				"severityId": "sev_abc123",
 			},
 		})
 
 		require.ErrorContains(t, err, "name is required")
 	})
 
-	t.Run("name only - optional fields not required", func(t *testing.T) {
+	t.Run("missing severity returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"name": "Minimal Incident",
+			},
+		})
+
+		require.ErrorContains(t, err, "severity is required")
+	})
+
+	t.Run("name and severity - minimal required fields", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":       "Minimal Incident",
+				"severityId": "sev_abc123",
 			},
 		})
 
@@ -94,7 +107,7 @@ func Test__CreateIncident__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			ID:             execID,
-			Configuration:  map[string]any{"name": "Database issues", "summary": "Slow queries", "visibility": "public"},
+			Configuration:  map[string]any{"name": "Database issues", "summary": "Slow queries", "severityId": "sev_abc123", "visibility": "public"},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
 			ExecutionState: execStateCtx,

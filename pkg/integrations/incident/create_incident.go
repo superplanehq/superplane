@@ -46,7 +46,7 @@ func (c *CreateIncident) Documentation() string {
 
 - **Name**: The incident name or title (required, supports expressions)
 - **Summary**: Additional details about the incident (optional, supports expressions)
-- **Severity**: Select a severity from your incident.io organization (optional)
+- **Severity**: Select a severity from your incident.io organization (required)
 - **Visibility**: Public (anyone can access) or Private (only invited users)
 
 ## Output
@@ -93,7 +93,7 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			Name:        "severityId",
 			Label:       "Severity",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
+			Required:    true,
 			Description: "The severity level of the incident",
 			Placeholder: "Select a severity",
 			TypeOptions: &configuration.TypeOptions{
@@ -129,6 +129,9 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 
 	if spec.Name == "" {
 		return errors.New("name is required")
+	}
+	if spec.SeverityID == "" {
+		return errors.New("severity is required")
 	}
 
 	return nil
