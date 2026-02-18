@@ -189,8 +189,8 @@ func (c *Client) UpsertWebhookContactPoint(name, webhookURL, bearerToken string)
 	}
 
 	payload := map[string]any{
-		"name":   name,
-		"type":   "webhook",
+		"name":                  name,
+		"type":                  "webhook",
 		"disableResolveMessage": false,
 		"settings": map[string]any{
 			"url":        webhookURL,
