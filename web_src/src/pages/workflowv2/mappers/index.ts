@@ -99,6 +99,7 @@ import {
 } from "./openai/index";
 import {
   componentMappers as grafanaComponentMappers,
+  customFieldRenderers as grafanaCustomFieldRenderers,
   triggerRenderers as grafanaTriggerRenderers,
   eventStateRegistry as grafanaEventStateRegistry,
 } from "./grafana/index";
@@ -256,6 +257,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  grafana: grafanaCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
 };
