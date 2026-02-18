@@ -15,12 +15,13 @@ const (
 )
 
 type Client struct {
-	APIToken  string
-	AccountID string
-	OrgID     string
-	ProjectID string
-	BaseURL   string
-	http      core.HTTPContext
+	APIToken                 string
+	AccountID                string
+	OrgID                    string
+	ProjectID                string
+	BaseURL                  string
+	disableCurrentUserLookup bool
+	http                     core.HTTPContext
 }
 
 type APIError struct {

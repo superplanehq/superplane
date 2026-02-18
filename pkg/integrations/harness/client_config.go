@@ -141,8 +141,19 @@ func (c *Client) ResolveAccountID() (string, error) {
 		return c.AccountID, nil
 	}
 
+	if c.disableCurrentUserLookup {
+		return "", nil
+	}
+
 	resolvedFromUser, err := c.resolveAccountIDFromCurrentUser()
 	if err != nil {
+		if shouldIgnoreCurrentUserLookupError(err) {
+			// /currentUser is not reliable for non-USER principals and may return
+			// backend errors for service-account keys. Keep AccountID empty and
+			// continue with account-scoped probes.
+			c.disableCurrentUserLookup = true
+			return "", nil
+		}
 		return "", err
 	}
 
@@ -152,6 +163,28 @@ func (c *Client) ResolveAccountID() (string, error) {
 	}
 
 	return c.AccountID, nil
+}
+
+func shouldIgnoreCurrentUserLookupError(err error) bool {
+	apiError := &APIError{}
+	if !errors.As(err, &apiError) {
+		return false
+	}
+
+	if apiError.StatusCode >= http.StatusInternalServerError {
+		return true
+	}
+
+	body := strings.ToLower(strings.TrimSpace(apiError.Body))
+	if body == "" {
+		return false
+	}
+
+	if strings.Contains(body, "current user can be accessed only by 'user' principal type") {
+		return true
+	}
+
+	return strings.Contains(body, "principal type")
 }
 
 func (c *Client) resolveAccountIDFromCurrentUser() (string, error) {
