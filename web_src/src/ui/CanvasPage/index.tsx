@@ -164,7 +164,11 @@ export interface CanvasPageProps {
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
   onAnnotationBlur?: () => void;
-  getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
+  getCustomField?: (
+    nodeId: string,
+    onRun?: (initialData?: string) => void,
+    integration?: OrganizationsIntegration,
+  ) => (() => React.ReactNode) | null;
   onSave?: (nodes: CanvasNode[]) => void;
   integrations?: OrganizationsIntegration[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
@@ -1047,7 +1051,11 @@ function Sidebar({
   currentTab?: "latest" | "settings";
   onTabChange?: (tab: "latest" | "settings") => void;
   organizationId?: string;
-  getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
+  getCustomField?: (
+    nodeId: string,
+    onRun?: (initialData?: string) => void,
+    integration?: OrganizationsIntegration,
+  ) => (() => React.ReactNode) | null;
   integrations?: OrganizationsIntegration[];
   workflowNodes?: ComponentsNode[];
   components?: ComponentsComponent[];
@@ -1185,7 +1193,11 @@ function Sidebar({
       domainType="DOMAIN_TYPE_ORGANIZATION"
       customField={
         getCustomField && state.componentSidebar.selectedNodeId
-          ? getCustomField(state.componentSidebar.selectedNodeId) || undefined
+          ? getCustomField(
+              state.componentSidebar.selectedNodeId,
+              undefined,
+              integrations?.find((i) => i.metadata?.id === editingNodeData?.integrationRef?.id),
+            ) || undefined
           : undefined
       }
       integrationName={editingNodeData?.integrationName}

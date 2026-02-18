@@ -37,6 +37,7 @@ import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.sv
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
+import incidentIcon from "@/assets/icons/integrations/incident.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
@@ -419,6 +420,7 @@ function CategorySection({
     cursor: cursorIcon,
     pagerduty: pagerDutyIcon,
     rootly: rootlyIcon,
+    incident: incidentIcon,
     semaphore: SemaphoreLogo,
     slack: slackIcon,
     sendgrid: sendgridIcon,
@@ -501,6 +503,7 @@ function CategorySection({
             cursor: cursorIcon,
             pagerduty: pagerDutyIcon,
             rootly: rootlyIcon,
+            incident: incidentIcon,
             semaphore: SemaphoreLogo,
             slack: slackIcon,
             sendgrid: sendgridIcon,
