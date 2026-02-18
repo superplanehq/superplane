@@ -1,6 +1,12 @@
 import { getBackgroundColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
-import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import {
+  CustomFieldRenderer,
+  NodeInfo,
+  TriggerEventContext,
+  TriggerRenderer,
+  TriggerRendererContext,
+} from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import { OnAlertFiringEventData } from "./types";
@@ -86,7 +92,8 @@ interface OnAlertFiringMetadata {
 export const onAlertFiringCustomFieldRenderer: CustomFieldRenderer = {
   render: (node: NodeInfo) => {
     const metadata = node.metadata as OnAlertFiringMetadata | undefined;
-    const webhookUrl = metadata?.webhookUrl || metadata?.webhook_url || metadata?.url || "[URL GENERATED ONCE THE CANVAS IS SAVED]";
+    const webhookUrl =
+      metadata?.webhookUrl || metadata?.webhook_url || metadata?.url || "[URL GENERATED ONCE THE CANVAS IS SAVED]";
 
     return (
       <div className="border-t-1 border-gray-200 pt-4">

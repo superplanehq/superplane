@@ -1,9 +1,9 @@
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import {
+  ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ComponentBaseContext,
   ExecutionInfo,
   NodeInfo,
   OutputPayload,
@@ -85,7 +85,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   if (configuration?.query) {
-    const preview = configuration.query.length > 50 ? configuration.query.substring(0, 50) + "..." : configuration.query;
+    const preview =
+      configuration.query.length > 50 ? configuration.query.substring(0, 50) + "..." : configuration.query;
     metadata.push({ icon: "code", label: preview });
   }
 
