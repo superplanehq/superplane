@@ -105,6 +105,7 @@ func Test__GrafanaWebhookHandler__Setup__ManualFallbackWhenClientUnavailable(t *
 
 	require.NoError(t, err)
 	assert.Nil(t, metadata)
+	assert.Equal(t, []byte("top-secret"), webhookCtx.secret)
 }
 
 func Test__GrafanaWebhookHandler__Setup__ManualFallbackOnNonRetriableProvisioningError(t *testing.T) {
