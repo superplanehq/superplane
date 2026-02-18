@@ -23,8 +23,10 @@ export const onAlertFiringTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnAlertFiringEventData | undefined;
+    const createdAt = context.event?.createdAt;
 
     return {
+      "Triggered At": createdAt ? new Date(createdAt).toLocaleString() : "-",
       Status: stringOrDash(eventData?.status || "firing"),
       "Alert Name": stringOrDash(getAlertName(eventData)),
       "Rule UID": stringOrDash(eventData?.ruleUid),
