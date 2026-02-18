@@ -79,11 +79,17 @@ type Server struct {
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
 	isDev                 bool
+	jsAPIHandler          http.Handler
 }
 
 // WebsocketHub returns the websocket hub for this server
 func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
+}
+
+// SetJSAPIHandler sets the HTTP handler for JS component API routes.
+func (s *Server) SetJSAPIHandler(h http.Handler) {
+	s.jsAPIHandler = h
 }
 
 func NewServer(
@@ -247,6 +253,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
+
+	// JS component API routes (must be registered before the PathPrefix routes)
+	if s.jsAPIHandler != nil {
+		s.Router.PathPrefix("/api/v1/js-components").Handler(orgAuthMiddleware(s.jsAPIHandler))
+	}
 
 	accountAuthMiddleware := middleware.AccountAuthMiddleware(s.jwt)
 	protectedAccountGRPCHandler := accountAuthMiddleware(s.grpcGatewayAccountHandler(grpcGatewayMux))

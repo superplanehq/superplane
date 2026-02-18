@@ -1,6 +1,6 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Box, GitBranch, MoreVertical, Palette, Pencil, Plus, Rainbow, Search, Trash2 } from "lucide-react";
+import { Box, Code, GitBranch, MoreVertical, Palette, Pencil, Plus, Rainbow, Search, Trash2 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -302,6 +302,8 @@ function PageHeader({
   canCreateBlueprints,
   permissionsLoading,
 }: PageHeaderProps) {
+  const { organizationId } = useParams<{ organizationId: string }>();
+  const navigate = useNavigate();
   const heading = activeTab === "custom-components" ? "Bundles" : "Canvases";
   const description =
     activeTab === "custom-components"
@@ -323,12 +325,18 @@ function PageHeader({
         <Text className="text-gray-800 dark:text-gray-400">{description}</Text>
       </div>
 
-      <PermissionTooltip allowed={canCreate || permissionsLoading} message={createMessage}>
-        <Button onClick={onNewClick} size="sm" disabled={!canCreate}>
-          <Plus size={16} />
-          {buttonText}
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" onClick={() => navigate(`/${organizationId}/js-components`)}>
+          <Code size={16} />
+          Component Builder
         </Button>
-      </PermissionTooltip>
+        <PermissionTooltip allowed={canCreate || permissionsLoading} message={createMessage}>
+          <Button onClick={onNewClick} size="sm" disabled={!canCreate}>
+            <Plus size={16} />
+            {buttonText}
+          </Button>
+        </PermissionTooltip>
+      </div>
     </div>
   );
 }

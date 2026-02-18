@@ -184,7 +184,7 @@ func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypt
 	grpc.RunServer(baseURL, webhooksBaseURL, basePath, encryptor, authService, registry, oidcProvider, lookupInternalAPIPort())
 }
 
-func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcProvider oidc.Provider, authService authorization.Authorization) {
+func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcProvider oidc.Provider, authService authorization.Authorization, jsAPI *jsruntime.APIHandler) {
 	log.Println("Starting Public API with integrated Web Server")
 
 	appEnv := os.Getenv("APP_ENV")
@@ -195,6 +195,10 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcProvider, basePath, baseURL, webhooksBaseURL, appEnv, templateDir, authService, blockSignup)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
+	}
+
+	if jsAPI != nil {
+		server.SetJSAPIHandler(jsruntime.NewRouter(jsAPI))
 	}
 
 	// Start the EventDistributer worker if enabled
@@ -361,10 +365,10 @@ func Start() {
 	}
 
 	templates.Setup(registry)
-	startJSComponents(registry)
+	jsAPI := startJSComponents(registry)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
-		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcProvider, authService)
+		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcProvider, authService, jsAPI)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
@@ -378,14 +382,10 @@ func Start() {
 	select {}
 }
 
-func startJSComponents(reg *registry.Registry) {
+func startJSComponents(reg *registry.Registry) *jsruntime.APIHandler {
 	dir := os.Getenv("SUPERPLANE_JS_COMPONENTS_DIR")
 	if dir == "" {
 		dir = "js_components"
-	}
-
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return
 	}
 
 	timeout := 30 * time.Second
@@ -396,11 +396,16 @@ func startJSComponents(reg *registry.Registry) {
 	}
 
 	rt := jsruntime.NewRuntime(timeout)
+	apiHandler := jsruntime.NewAPIHandler(dir, rt)
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return apiHandler
+	}
 
 	loaded, err := jsruntime.LoadComponents(dir, rt, reg)
 	if err != nil {
 		log.Errorf("Failed to load JS components from %s: %v", dir, err)
-		return
+		return apiHandler
 	}
 
 	if len(loaded) > 0 {
@@ -417,6 +422,8 @@ func startJSComponents(reg *registry.Registry) {
 	watcher := jsruntime.NewWatcher(dir, watchInterval, rt, reg)
 	watcher.SetInitialState(loaded)
 	go watcher.Start(context.Background())
+
+	return apiHandler
 }
 
 // getWebhookBaseURL returns the webhook base URL, using the same pattern as SyncContext.

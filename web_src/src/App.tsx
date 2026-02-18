@@ -18,6 +18,7 @@ import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import { CustomComponent } from "./pages/custom-component";
 import { CreateCanvasPage } from "./pages/canvas/CreateCanvasPage";
+import { JSComponentsPage } from "./pages/js-components";
 import HomePage from "./pages/home";
 import NodeRunPage from "./pages/node-run";
 import { OrganizationSettings } from "./pages/organization/settings";
@@ -88,6 +89,7 @@ function AppRouter() {
                 element={withAuthAndPermission(CustomComponent, "blueprints", "read")}
               />
             )}
+            <Route path="js-components" element={withAuthOnly(JSComponentsPage)} />
             <Route path="canvases/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
             <Route path="templates/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
             <Route
