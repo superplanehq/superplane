@@ -23,10 +23,10 @@ export const onAlertFiringTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnAlertFiringEventData | undefined;
-    const createdAt = context.event?.createdAt;
+    const createdAt = formatTimestamp(context.event?.createdAt);
 
     return {
-      "Triggered At": createdAt ? new Date(createdAt).toLocaleString() : "-",
+      "Triggered At": createdAt,
       Status: stringOrDash(eventData?.status || "firing"),
       "Alert Name": stringOrDash(getAlertName(eventData)),
       "Rule UID": stringOrDash(eventData?.ruleUid),
@@ -135,12 +135,12 @@ function getAlertName(eventData?: OnAlertFiringEventData): string | undefined {
 }
 
 function buildSubtitle(status: string, createdAt?: string): string {
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
-  if (status && timeAgo) {
+  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "-";
+  if (status) {
     return `${status} - ${timeAgo}`;
   }
 
-  return status || timeAgo;
+  return timeAgo;
 }
 
 function stringOrDash(value?: unknown): string {
@@ -149,4 +149,11 @@ function stringOrDash(value?: unknown): string {
   }
 
   return String(value);
+}
+
+function formatTimestamp(value?: string): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString();
 }

@@ -1,10 +1,6 @@
 package grafana
 
 import (
-	"fmt"
-	"net/url"
-	"strings"
-
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -91,25 +87,8 @@ func (g *Grafana) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (g *Grafana) Sync(ctx core.SyncContext) error {
-	baseURL, err := ctx.Integration.GetConfig("baseURL")
-	if err != nil {
-		return fmt.Errorf("error reading baseURL: %v", err)
-	}
-
-	baseURLRaw := strings.TrimSpace(string(baseURL))
-	if baseURL == nil || baseURLRaw == "" {
-		return fmt.Errorf("baseURL is required")
-	}
-
-	parsed, err := url.Parse(baseURLRaw)
-	if err != nil {
-		return fmt.Errorf("invalid baseURL: %v", err)
-	}
-	if parsed.Scheme == "" || parsed.Host == "" {
-		return fmt.Errorf("invalid baseURL: must include scheme and host (e.g. https://grafana.example.com)")
-	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return fmt.Errorf("invalid baseURL: unsupported scheme %q (expected http or https)", parsed.Scheme)
+	if _, err := readBaseURL(ctx.Integration); err != nil {
+		return err
 	}
 
 	ctx.Integration.Ready()

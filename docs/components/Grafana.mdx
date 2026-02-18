@@ -48,7 +48,9 @@ The On Alert Firing trigger starts a workflow execution when Grafana Unified Ale
 
 ### Configuration
 
-No additional configuration is required beyond the integration setup.
+- **Shared Secret** (optional): If set, requests must include `Authorization: Bearer <shared-secret>`.
+- If auto-provisioning succeeds, SuperPlane configures this bearer token in the Grafana contact point automatically.
+- If you configure the contact point manually, add the same Authorization header in Grafana.
 
 ### Event Data
 
