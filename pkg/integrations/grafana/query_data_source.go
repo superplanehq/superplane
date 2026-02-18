@@ -130,25 +130,21 @@ func (q *QueryDataSource) Configuration() []configuration.Field {
 }
 
 func (q *QueryDataSource) Setup(ctx core.SetupContext) error {
-	spec := QueryDataSourceSpec{}
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
-		return fmt.Errorf("error decoding configuration: %v", err)
+	spec, err := decodeQueryDataSourceSpec(ctx.Configuration)
+	if err != nil {
+		return err
 	}
 
-	if strings.TrimSpace(spec.DataSourceUID) == "" {
-		return errors.New("dataSourceUid is required")
-	}
-	if strings.TrimSpace(spec.Query) == "" {
-		return errors.New("query is required")
-	}
-
-	return nil
+	return validateQueryDataSourceSpec(spec)
 }
 
 func (q *QueryDataSource) Execute(ctx core.ExecutionContext) error {
-	spec := QueryDataSourceSpec{}
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
-		return fmt.Errorf("error decoding configuration: %v", err)
+	spec, err := decodeQueryDataSourceSpec(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+	if err := validateQueryDataSourceSpec(spec); err != nil {
+		return err
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
@@ -243,4 +239,24 @@ func defaultTimeRange() (string, string) {
 	now := time.Now().UTC()
 	from := now.Add(-5 * time.Minute)
 	return fmt.Sprintf("%d", from.UnixMilli()), fmt.Sprintf("%d", now.UnixMilli())
+}
+
+func decodeQueryDataSourceSpec(configuration any) (QueryDataSourceSpec, error) {
+	spec := QueryDataSourceSpec{}
+	if err := mapstructure.Decode(configuration, &spec); err != nil {
+		return QueryDataSourceSpec{}, fmt.Errorf("error decoding configuration: %v", err)
+	}
+
+	return spec, nil
+}
+
+func validateQueryDataSourceSpec(spec QueryDataSourceSpec) error {
+	if strings.TrimSpace(spec.DataSourceUID) == "" {
+		return errors.New("dataSourceUid is required")
+	}
+	if strings.TrimSpace(spec.Query) == "" {
+		return errors.New("query is required")
+	}
+
+	return nil
 }

@@ -54,6 +54,24 @@ func Test__QueryDataSource__Setup(t *testing.T) {
 func Test__QueryDataSource__Execute(t *testing.T) {
 	component := QueryDataSource{}
 
+	t.Run("invalid configuration returns validation error", func(t *testing.T) {
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"dataSourceUid": "",
+				"query":         "up",
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "token123",
+					"baseURL":  "https://grafana.example.com",
+				},
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+		})
+
+		require.ErrorContains(t, err, "dataSourceUid is required")
+	})
+
 	t.Run("successful query emits result", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{

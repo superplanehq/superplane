@@ -33,22 +33,27 @@ export const queryDataSourceMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    const details: Record<string, string> = {
+      "Queried At": formatTimestamp(context.execution.createdAt),
+    };
 
     if (!outputs || !outputs.default || outputs.default.length === 0) {
-      return { Response: "No data returned" };
+      details.Response = "No data returned";
+      return details;
     }
 
     const payload = outputs.default[0];
     const responseData = payload?.data as Record<string, any> | undefined;
+    const payloadTimestamp = formatTimestamp(payload?.timestamp);
+    if (payloadTimestamp !== "-") {
+      details["Queried At"] = payloadTimestamp;
+    }
 
     if (!responseData) {
-      return { Response: "No data returned" };
+      details.Response = "No data returned";
+      return details;
     }
 
-    const details: Record<string, string> = {};
-    if (payload?.timestamp) {
-      details["Queried At"] = new Date(payload.timestamp).toLocaleString();
-    }
     try {
       details["Response Data"] = JSON.stringify(responseData, null, 2);
     } catch (error) {
@@ -59,10 +64,17 @@ export const queryDataSourceMapper: ComponentBaseMapper = {
   },
 
   subtitle(context: SubtitleContext): string {
-    if (!context.execution.createdAt) return "";
+    if (!context.execution.createdAt) return "-";
     return formatTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function formatTimestamp(value?: string): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString();
+}
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
@@ -94,7 +106,7 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
     {
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
       eventTitle: eventTitle,
-      eventSubtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)) : "",
+      eventSubtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)) : "-",
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id || "",
     },
