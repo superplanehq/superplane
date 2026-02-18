@@ -34,6 +34,7 @@ import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
+import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -415,6 +416,7 @@ function CategorySection({
       codeArtifact: awsIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
+      sqs: awsSqsIcon,
     },
   };
 
@@ -488,6 +490,7 @@ function CategorySection({
               codeArtifact: awsCodeArtifactIcon,
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
+              sqs: awsSqsIcon,
             },
           };
           const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;

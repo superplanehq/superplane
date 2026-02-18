@@ -8,6 +8,13 @@ import { buildActionStateRegistry } from "../utils";
 import { scanImageMapper } from "./ecr/scan_image";
 import { onPackageVersionTriggerRenderer } from "./codeartifact/on_package_version";
 import { getPackageVersionMapper } from "./codeartifact/get_package_version";
+import {
+  createQueueMapper,
+  deleteQueueMapper,
+  getQueueMapper,
+  purgeQueueMapper,
+  sendMessageMapper,
+} from "./sqs";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "lambda.runFunction": runFunctionMapper,
@@ -15,6 +22,11 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "ecr.getImageScanFindings": getImageScanFindingsMapper,
   "ecr.scanImage": scanImageMapper,
   "codeArtifact.getPackageVersion": getPackageVersionMapper,
+  "sqs.createQueue": createQueueMapper,
+  "sqs.getQueue": getQueueMapper,
+  "sqs.sendMessage": sendMessageMapper,
+  "sqs.deleteQueue": deleteQueueMapper,
+  "sqs.purgeQueue": purgeQueueMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -28,4 +40,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ecr.getImageScanFindings": buildActionStateRegistry("retrieved"),
   "ecr.scanImage": buildActionStateRegistry("scanned"),
   "codeArtifact.getPackageVersion": buildActionStateRegistry("retrieved"),
+  "sqs.createQueue": buildActionStateRegistry("created"),
+  "sqs.getQueue": buildActionStateRegistry("retrieved"),
+  "sqs.sendMessage": buildActionStateRegistry("sent"),
+  "sqs.deleteQueue": buildActionStateRegistry("deleted"),
+  "sqs.purgeQueue": buildActionStateRegistry("purged"),
 };
