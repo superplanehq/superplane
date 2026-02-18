@@ -116,6 +116,15 @@ func (c *Client) buildURL(path string) string {
 }
 
 func (c *Client) execRequest(method, path string, body io.Reader, contentType string) ([]byte, int, error) {
+	return c.execRequestWithHeaders(method, path, body, contentType, nil)
+}
+
+func (c *Client) execRequestWithHeaders(
+	method, path string,
+	body io.Reader,
+	contentType string,
+	headers map[string]string,
+) ([]byte, int, error) {
 	req, err := http.NewRequest(method, c.buildURL(path), body)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error building request: %v", err)
@@ -127,6 +136,9 @@ func (c *Client) execRequest(method, path string, body io.Reader, contentType st
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
+	}
+	for key, value := range headers {
+		req.Header.Set(key, value)
 	}
 
 	res, err := c.http.Do(req)
@@ -209,7 +221,7 @@ func (c *Client) UpsertWebhookContactPoint(name, webhookURL, bearerToken string)
 
 	if bearerToken != "" {
 		settings := payload["settings"].(map[string]any)
-		settings["authorization_scheme"] = "bearer"
+		settings["authorization_scheme"] = "Bearer"
 		settings["authorization_credentials"] = bearerToken
 	}
 
@@ -219,11 +231,14 @@ func (c *Client) UpsertWebhookContactPoint(name, webhookURL, bearerToken string)
 	}
 
 	if existingUID != "" {
-		responseBody, status, err := c.execRequest(
+		responseBody, status, err := c.execRequestWithHeaders(
 			http.MethodPut,
 			fmt.Sprintf("/api/v1/provisioning/contact-points/%s", existingUID),
 			bytes.NewReader(body),
 			"application/json",
+			map[string]string{
+				"X-Disable-Provenance": "true",
+			},
 		)
 		if err != nil {
 			return "", fmt.Errorf("error updating contact point: %v", err)
@@ -234,11 +249,14 @@ func (c *Client) UpsertWebhookContactPoint(name, webhookURL, bearerToken string)
 		return existingUID, nil
 	}
 
-	responseBody, status, err := c.execRequest(
+	responseBody, status, err := c.execRequestWithHeaders(
 		http.MethodPost,
 		"/api/v1/provisioning/contact-points",
 		bytes.NewReader(body),
 		"application/json",
+		map[string]string{
+			"X-Disable-Provenance": "true",
+		},
 	)
 	if err != nil {
 		return "", fmt.Errorf("error creating contact point: %v", err)

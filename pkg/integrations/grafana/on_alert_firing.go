@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -15,7 +16,8 @@ import (
 type OnAlertFiring struct{}
 
 type OnAlertFiringConfig struct {
-	SharedSecret string `json:"sharedSecret"`
+	SharedSecret      string `json:"sharedSecret"`
+	WebhookBindingKey string `json:"webhookBindingKey,omitempty" mapstructure:"webhookBindingKey"`
 }
 
 func (t *OnAlertFiring) Name() string {
@@ -79,7 +81,22 @@ func (t *OnAlertFiring) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("missing integration context")
 	}
 
-	if err := ctx.Integration.RequestWebhook(ctx.Configuration); err != nil {
+	config := OnAlertFiringConfig{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("error decoding configuration: %v", err)
+	}
+
+	bindingKey := getWebhookBindingKey(ctx)
+	if bindingKey == "" {
+		bindingKey = uuid.NewString()
+	}
+
+	requestConfig := OnAlertFiringConfig{
+		SharedSecret:      strings.TrimSpace(config.SharedSecret),
+		WebhookBindingKey: bindingKey,
+	}
+
+	if err := ctx.Integration.RequestWebhook(requestConfig); err != nil {
 		return err
 	}
 
@@ -93,10 +110,8 @@ func (t *OnAlertFiring) Setup(ctx core.TriggerContext) error {
 	}
 
 	if ctx.Metadata != nil {
-		if err := setWebhookURLMetadata(ctx, webhookURL); err != nil {
-			if ctx.Logger != nil {
-				ctx.Logger.Warnf("grafana onAlertFiring: failed to store webhook url metadata: %v", err)
-			}
+		if err := setWebhookMetadata(ctx, webhookURL, bindingKey); err != nil && ctx.Logger != nil {
+			ctx.Logger.Warnf("grafana onAlertFiring: failed to store webhook url metadata: %v", err)
 		}
 	}
 
@@ -210,7 +225,21 @@ func resolveWebhookSharedSecret(ctx core.WebhookRequestContext) (string, error) 
 	return strings.TrimSpace(config.SharedSecret), nil
 }
 
-func setWebhookURLMetadata(ctx core.TriggerContext, webhookURL string) error {
+func getWebhookBindingKey(ctx core.TriggerContext) string {
+	if ctx.Metadata == nil {
+		return ""
+	}
+
+	existing := ctx.Metadata.Get()
+	existingMap, ok := existing.(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	return strings.TrimSpace(extractString(existingMap["webhookBindingKey"]))
+}
+
+func setWebhookMetadata(ctx core.TriggerContext, webhookURL, bindingKey string) error {
 	metadata := map[string]any{}
 	if existing := ctx.Metadata.Get(); existing != nil {
 		if existingMap, ok := existing.(map[string]any); ok {
@@ -221,5 +250,6 @@ func setWebhookURLMetadata(ctx core.TriggerContext, webhookURL string) error {
 	}
 
 	metadata["webhookUrl"] = webhookURL
+	metadata["webhookBindingKey"] = bindingKey
 	return ctx.Metadata.Set(metadata)
 }
