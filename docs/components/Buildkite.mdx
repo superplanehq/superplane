@@ -50,24 +50,23 @@ Each build finished event includes:
 
 ### Webhook Setup
 
-This trigger automatically handles Buildkite webhook events through the integration-level webhook. When you configure a single webhook for your Buildkite integration, SuperPlane will automatically route build.finished events to all matching triggers based on your configuration.
+This trigger requires setting up a webhook in Buildkite to receive build events:
+
+1. When you configure this trigger, SuperPlane generates a unique webhook URL and token
+2. A browser action will guide you to the Buildkite webhook settings page
+3. In Buildkite, create a new webhook with:
+   - **Webhook URL**: The URL provided by SuperPlane
+   - **Webhook Token**: The token provided by SuperPlane
+   - **Events**: Select "build.finished"
+   - **Pipelines**: Select the specific pipeline(s) you want to monitor
 
 ### Event Processing
 
 SuperPlane automatically:
-1. Receives webhook events at integration webhook URL
-2. Authenticates requests using your webhook token
-3. Filters events by organization, pipeline, and branch
-4. Routes matching events to appropriate trigger instances
-5. Emits buildkite.build.finished events to start workflow executions
-
-### Manual Webhook Configuration (if needed)
-
-For manual setup in Buildkite:
-1. In Buildkite, go to Settings → Notification Services → Add → Webhook
-2. Webhook URL: use your SuperPlane integration webhook URL
-3. Events: select "build.finished"
-4. Pipelines: select the pipelines you want to monitor
+1. Receives webhook events at the trigger-specific webhook URL
+2. Authenticates requests using the webhook token
+3. Filters events by pipeline and branch (if configured)
+4. Emits buildkite.build.finished events to start workflow executions
 
 ### Example Data
 

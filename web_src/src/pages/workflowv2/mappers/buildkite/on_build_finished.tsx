@@ -1,14 +1,21 @@
+import { useState } from "react";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import BuildkiteLogo from "@/assets/buildkite-logo.svg";
 import { formatTimeAgo } from "@/utils/date";
+import { Button } from "@/components/ui/button";
+import { Copy, Check } from "lucide-react";
+import { showErrorToast } from "@/utils/toast";
 
 interface OnBuildFinishedMetadata {
   organization?: string;
   pipeline?: string;
   branch?: string;
   appSubscriptionID?: string;
+  webhookUrl?: string;
+  webhookToken?: string;
+  orgSlug?: string;
 }
 
 interface OnBuildFinishedEventData {
@@ -128,5 +135,85 @@ export const onBuildFinishedTriggerRenderer: TriggerRenderer = {
     }
 
     return props;
+  },
+};
+
+export const onBuildFinishedCustomFieldRenderer: CustomFieldRenderer = {
+  render: (node: NodeInfo) => {
+    const metadata = node.metadata as OnBuildFinishedMetadata | undefined;
+    const webhookUrl = metadata?.webhookUrl || "[URL GENERATED ONCE THE CANVAS IS SAVED]";
+    const webhookToken = metadata?.webhookToken || "[TOKEN GENERATED ONCE THE CANVAS IS SAVED]";
+    const orgSlug = metadata?.orgSlug;
+
+    const handleOpenBuildkite = () => {
+      if (orgSlug) {
+        window.open(`https://buildkite.com/organizations/${orgSlug}/services/webhook/new`, "_blank");
+      }
+    };
+
+    const CopyButton: React.FC<{ code: string }> = ({ code }) => {
+      const [copied, setCopied] = useState(false);
+
+      const handleCopy = async () => {
+        try {
+          await navigator.clipboard.writeText(code);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        } catch (_err) {
+          showErrorToast("Failed to copy text");
+        }
+      };
+
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCopy}
+          className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+          title={copied ? "Copied!" : "Copy to clipboard"}
+        >
+          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+        </Button>
+      );
+    };
+
+    return (
+      <div className="border-t-1 border-gray-200 pt-4">
+        <div className="space-y-3">
+          <div>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Buildkite Webhook Setup</span>
+            <div className="text-xs text-gray-800 dark:text-gray-100 mt-2 border-1 border-yellow-200 dark:border-yellow-700 px-2.5 py-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
+              <ol className="list-decimal ml-4 space-y-1">
+                <li>Save the canvas to generate the webhook URL and token.</li>
+                <li>Click the button below to open Buildkite webhook settings.</li>
+                <li>Enter the webhook URL and token below.</li>
+                <li>Select &quot;build.finished&quot; as the event and choose your pipeline.</li>
+              </ol>
+              {orgSlug && (
+                <div className="mt-3">
+                  <Button variant="outline" size="sm" onClick={handleOpenBuildkite}>
+                    Open Buildkite Webhook Settings
+                  </Button>
+                </div>
+              )}
+              <div className="mt-3 relative group">
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Webhook URL</span>
+                <pre className="mt-1 text-xs text-gray-800 dark:text-gray-100 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-md font-mono whitespace-pre-wrap break-all">
+                  {webhookUrl}
+                </pre>
+                <CopyButton code={webhookUrl} />
+              </div>
+              <div className="mt-3 relative group">
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Webhook Token</span>
+                <pre className="mt-1 text-xs text-gray-800 dark:text-gray-100 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-md font-mono whitespace-pre-wrap break-all">
+                  {webhookToken}
+                </pre>
+                <CopyButton code={webhookToken} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   },
 };

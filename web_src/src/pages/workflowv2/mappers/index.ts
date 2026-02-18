@@ -121,6 +121,7 @@ import {
 } from "./cursor/index";
 import {
   componentMappers as buildkiteComponentMappers,
+  customFieldRenderers as buildkiteCustomFieldRenderers,
   triggerRenderers as buildkiteTriggerRenderers,
   eventStateRegistry as buildkiteEventStateRegistry,
 } from "./buildkite/index";
@@ -263,6 +264,7 @@ const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer
   github: githubCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
+  buildkite: buildkiteCustomFieldRenderers,
 };
 
 /**

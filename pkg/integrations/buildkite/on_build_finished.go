@@ -1,6 +1,7 @@
 package buildkite
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -12,21 +13,16 @@ import (
 type OnBuildFinished struct{}
 
 type OnBuildFinishedMetadata struct {
-	Pipeline          string  `json:"pipeline"`
-	Branch            string  `json:"branch,omitempty"`
-	AppSubscriptionID *string `json:"appSubscriptionID,omitempty"`
+	Pipeline     string `json:"pipeline"`
+	Branch       string `json:"branch,omitempty"`
+	WebhookURL   string `json:"webhookUrl"`
+	WebhookToken string `json:"webhookToken"`
+	OrgSlug      string `json:"orgSlug"`
 }
 
 type OnBuildFinishedConfiguration struct {
 	Pipeline string `json:"pipeline"`
 	Branch   string `json:"branch,omitempty"`
-}
-
-type BuildkiteSubscriptionConfiguration struct {
-	Organization string `json:"organization"`
-	Pipeline     string `json:"pipeline"`
-	Branch       string `json:"branch,omitempty"`
-	EventType    string `json:"eventType,omitempty"`
 }
 
 func (t *OnBuildFinished) Name() string {
@@ -66,24 +62,23 @@ Each build finished event includes:
 
 ## Webhook Setup
 
-This trigger automatically handles Buildkite webhook events through the integration-level webhook. When you configure a single webhook for your Buildkite integration, SuperPlane will automatically route build.finished events to all matching triggers based on your configuration.
+This trigger requires setting up a webhook in Buildkite to receive build events:
+
+1. When you configure this trigger, SuperPlane generates a unique webhook URL and token
+2. A browser action will guide you to the Buildkite webhook settings page
+3. In Buildkite, create a new webhook with:
+   - **Webhook URL**: The URL provided by SuperPlane
+   - **Webhook Token**: The token provided by SuperPlane
+   - **Events**: Select "build.finished"
+   - **Pipelines**: Select the specific pipeline(s) you want to monitor
 
 ## Event Processing
 
 SuperPlane automatically:
-1. Receives webhook events at integration webhook URL
-2. Authenticates requests using your webhook token
-3. Filters events by organization, pipeline, and branch
-4. Routes matching events to appropriate trigger instances
-5. Emits buildkite.build.finished events to start workflow executions
-
-## Manual Webhook Configuration (if needed)
-
-For manual setup in Buildkite:
-1. In Buildkite, go to Settings → Notification Services → Add → Webhook
-2. Webhook URL: use your SuperPlane integration webhook URL
-3. Events: select "build.finished"
-4. Pipelines: select the pipelines you want to monitor`
+1. Receives webhook events at the trigger-specific webhook URL
+2. Authenticates requests using the webhook token
+3. Filters events by pipeline and branch (if configured)
+4. Emits buildkite.build.finished events to start workflow executions`
 }
 
 func (t *OnBuildFinished) Icon() string {
@@ -147,63 +142,61 @@ func (t *OnBuildFinished) Configuration() []configuration.Field {
 }
 
 func (t *OnBuildFinished) Setup(ctx core.TriggerContext) error {
-	// If subscription ID is already set, nothing to do.
-	var metadata OnBuildFinishedMetadata
-	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
-	if err != nil {
+	metadata := OnBuildFinishedMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	// Validate configuration
-	var config OnBuildFinishedConfiguration
+	config := OnBuildFinishedConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	// Validate that we have the required configuration
 	if config.Pipeline == "" {
-		return fmt.Errorf("pipeline is required for trigger configuration")
+		return fmt.Errorf("pipeline is required")
 	}
 
-	subscriptionID, err := t.subscribe(ctx, metadata, config)
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to buildkite events: %w", err)
+	// If webhook is already set up for this pipeline, nothing to do
+	if metadata.Pipeline == config.Pipeline &&
+		metadata.Branch == config.Branch &&
+		metadata.WebhookURL != "" &&
+		metadata.WebhookToken != "" {
+		return nil
 	}
 
-	return ctx.Metadata.Set(OnBuildFinishedMetadata{
-		Pipeline:          config.Pipeline,
-		Branch:            config.Branch,
-		AppSubscriptionID: subscriptionID,
-	})
-}
-
-func (t *OnBuildFinished) subscribe(ctx core.TriggerContext, metadata OnBuildFinishedMetadata, config OnBuildFinishedConfiguration) (*string, error) {
-	if metadata.AppSubscriptionID != nil {
-		return metadata.AppSubscriptionID, nil
-	}
-
+	// Get orgSlug from integration config
 	orgConfig, err := ctx.Integration.GetConfig("organization")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get organization from integration config: %w", err)
+		return fmt.Errorf("failed to get organization from integration config: %w", err)
 	}
 	orgSlug, err := extractOrgSlug(string(orgConfig))
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract organization slug: %w", err)
+		return fmt.Errorf("failed to extract organization slug: %w", err)
 	}
 
-	subscriptionID, err := ctx.Integration.Subscribe(BuildkiteSubscriptionConfiguration{
-		Organization: orgSlug,
+	var webhookSecret []byte
+	webhookURL := metadata.WebhookURL
+
+	if webhookURL == "" {
+		webhookURL, err = ctx.Webhook.Setup()
+		if err != nil {
+			return fmt.Errorf("failed to setup webhook: %w", err)
+		}
+		webhookSecret, err = ctx.Webhook.GetSecret()
+		if err != nil {
+			return fmt.Errorf("failed to get webhook secret: %w", err)
+		}
+	} else {
+		webhookSecret = []byte(metadata.WebhookToken)
+	}
+
+	return ctx.Metadata.Set(OnBuildFinishedMetadata{
 		Pipeline:     config.Pipeline,
 		Branch:       config.Branch,
-		EventType:    "build.finished",
+		WebhookURL:   webhookURL,
+		WebhookToken: string(webhookSecret),
+		OrgSlug:      orgSlug,
 	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to subscribe to buildkite events: %w", err)
-	}
-
-	s := subscriptionID.String()
-	return &s, nil
 }
 
 func (t *OnBuildFinished) Actions() []core.Action {
@@ -215,42 +208,72 @@ func (t *OnBuildFinished) HandleAction(ctx core.TriggerActionContext) (map[strin
 }
 
 func (t *OnBuildFinished) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	config := OnBuildFinishedConfiguration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	metadata := OnBuildFinishedMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	// Verify webhook signature/token
+	if err := VerifyWebhook(ctx.Headers, ctx.Body, []byte(metadata.WebhookToken)); err != nil {
+		ctx.Logger.WithError(err).Warn("webhook verification failed")
+		return http.StatusForbidden, fmt.Errorf("webhook verification failed: %w", err)
+	}
+
+	// Parse the payload
+	var payload map[string]any
+	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
+		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
+	}
+
+	// Verify this is a build.finished event
+	eventType := ctx.Headers.Get("X-Buildkite-Event")
+	if eventType == "" {
+		if event, ok := payload["event"].(string); ok {
+			eventType = event
+		}
+	}
+
+	if eventType != "build.finished" {
+		return http.StatusOK, nil // Silently ignore non-build.finished events
+	}
+
+	// Filter by pipeline if configured
+	if config.Pipeline != "" && config.Pipeline != "*" {
+		if pipeline, ok := payload["pipeline"].(map[string]any); ok {
+			if pipelineSlug, ok := pipeline["slug"].(string); ok {
+				if config.Pipeline != pipelineSlug {
+					ctx.Logger.Infof("Ignoring event for pipeline %s", pipelineSlug)
+					return http.StatusOK, nil
+				}
+			}
+		}
+	}
+
+	// Filter by branch if configured
+	if config.Branch != "" {
+		if build, ok := payload["build"].(map[string]any); ok {
+			if branch, ok := build["branch"].(string); ok {
+				if config.Branch != branch {
+					ctx.Logger.Infof("Ignoring event for branch %s", branch)
+					return http.StatusOK, nil
+				}
+			}
+		}
+	}
+
+	// Emit event to trigger workflow execution
+	if err := ctx.Events.Emit("buildkite.build.finished", payload); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %w", err)
+	}
+
 	return http.StatusOK, nil
 }
 
 func (t *OnBuildFinished) Cleanup(ctx core.TriggerContext) error {
-	return nil
-}
-
-func (t *OnBuildFinished) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {
-	// Extract webhook configuration from context
-	var config OnBuildFinishedConfiguration
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	// Extract message payload (should be build.finished event)
-	message := ctx.Message
-	if message == nil {
-		return fmt.Errorf("received empty message")
-	}
-
-	// Verify this is a build.finished event
-	messageMap, ok := message.(map[string]any)
-	if !ok {
-		return fmt.Errorf("message is not a map")
-	}
-
-	eventType, ok := messageMap["event"].(string)
-	if !ok || eventType != "build.finished" {
-		return nil // Silently ignore non-build.finished events
-	}
-
-	// Emit event to trigger workflow execution
-	err := ctx.Events.Emit("buildkite.build.finished", message)
-	if err != nil {
-		return fmt.Errorf("error emitting event: %v", err)
-	}
-
 	return nil
 }
