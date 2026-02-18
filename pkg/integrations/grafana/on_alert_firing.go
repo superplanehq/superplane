@@ -66,6 +66,7 @@ func (t *OnAlertFiring) Configuration() []configuration.Field {
 			Name:        "sharedSecret",
 			Label:       "Shared Secret",
 			Type:        configuration.FieldTypeString,
+			Sensitive:   true,
 			Required:    false,
 			Description: "Optional shared secret that must be sent as Authorization: Bearer <secret> header",
 			Placeholder: "your-secret",
