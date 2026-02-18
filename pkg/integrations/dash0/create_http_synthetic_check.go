@@ -226,7 +226,7 @@ func (c *CreateHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if spec.Name == "" {
+	if strings.TrimSpace(spec.Name) == "" {
 		return errors.New("name is required")
 	}
 

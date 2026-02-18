@@ -59,8 +59,8 @@ export const deleteHttpSyntheticCheckMapper: ComponentBaseMapper = {
   },
 
   subtitle(context: SubtitleContext): string {
-    if (!context.execution.createdAt) return "";
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    const timestamp = context.execution.updatedAt || context.execution.createdAt;
+    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
   },
 };
 
@@ -85,12 +85,14 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+  const subtitleTimestamp = execution.updatedAt || execution.createdAt;
+  const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
 
   return [
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle,
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,
     },

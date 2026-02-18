@@ -61,10 +61,14 @@ func (c *DeleteHTTPSyntheticCheck) Configuration() []configuration.Field {
 		{
 			Name:        "checkId",
 			Label:       "Check ID",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The Dash0 synthetic check ID to delete",
-			Placeholder: "64617368-3073-796e-7468-abc123def456",
+			Description: "Select the Dash0 synthetic check to delete",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "synthetic-check",
+				},
+			},
 		},
 		{
 			Name:        "dataset",

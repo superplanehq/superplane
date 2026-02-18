@@ -117,7 +117,7 @@ func (d *Dash0) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (d *Dash0) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != "check-rule" {
+	if resourceType != "check-rule" && resourceType != "synthetic-check" {
 		return []core.IntegrationResource{}, nil
 	}
 
@@ -126,22 +126,44 @@ func (d *Dash0) ListResources(resourceType string, ctx core.ListResourcesContext
 		return nil, fmt.Errorf("error creating dash0 client: %w", err)
 	}
 
-	checkRules, err := client.ListCheckRules()
-	if err != nil {
-		ctx.Logger.Warnf("Error fetching check rules: %v", err)
+	switch resourceType {
+	case "check-rule":
+		checkRules, err := client.ListCheckRules()
+		if err != nil {
+			ctx.Logger.Warnf("Error fetching check rules: %v", err)
+			return []core.IntegrationResource{}, nil
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(checkRules))
+		for _, rule := range checkRules {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: rule.Name,
+				ID:   rule.ID,
+			})
+		}
+
+		return resources, nil
+	case "synthetic-check":
+		syntheticChecks, err := client.ListSyntheticChecks("default")
+		if err != nil {
+			ctx.Logger.Warnf("Error fetching synthetic checks: %v", err)
+			return []core.IntegrationResource{}, nil
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(syntheticChecks))
+		for _, check := range syntheticChecks {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: check.Name,
+				ID:   check.ID,
+			})
+		}
+
+		return resources, nil
+	default:
 		return []core.IntegrationResource{}, nil
 	}
-
-	resources := make([]core.IntegrationResource, 0, len(checkRules))
-	for _, rule := range checkRules {
-		resources = append(resources, core.IntegrationResource{
-			Type: resourceType,
-			Name: rule.Name,
-			ID:   rule.ID,
-		})
-	}
-
-	return resources, nil
 }
 
 func (d *Dash0) HandleRequest(ctx core.HTTPRequestContext) {
