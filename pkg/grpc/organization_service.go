@@ -99,12 +99,12 @@ func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.Invi
 
 func (s *OrganizationService) ListIntegrations(ctx context.Context, req *pb.ListIntegrationsRequest) (*pb.ListIntegrationsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.ListIntegrations(ctx, s.registry, orgID)
+	return organizations.ListIntegrations(ctx, s.registry, orgID, s.webhooksBaseURL)
 }
 
 func (s *OrganizationService) DescribeIntegration(ctx context.Context, req *pb.DescribeIntegrationRequest) (*pb.DescribeIntegrationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.DescribeIntegration(ctx, s.registry, orgID, req.IntegrationId)
+	return organizations.DescribeIntegration(ctx, s.registry, orgID, req.IntegrationId, s.webhooksBaseURL)
 }
 
 func (s *OrganizationService) ListIntegrationResources(ctx context.Context, req *pb.ListIntegrationResourcesRequest) (*pb.ListIntegrationResourcesResponse, error) {
