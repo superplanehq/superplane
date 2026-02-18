@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -198,7 +199,8 @@ func (c *Client) ExecuteCode(sandboxID string, req *ExecuteCodeRequest) (*Execut
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	httpTimeout := time.Duration(req.Timeout+30) * time.Second
+	responseBody, err := c.execRequestWithTimeout(http.MethodPost, url, bytes.NewReader(body), httpTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +225,8 @@ func (c *Client) ExecuteCommand(sandboxID string, req *ExecuteCommandRequest) (*
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	httpTimeout := time.Duration(req.Timeout+30) * time.Second
+	responseBody, err := c.execRequestWithTimeout(http.MethodPost, url, bytes.NewReader(body), httpTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -250,6 +253,10 @@ type APIError struct {
 }
 
 func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error) {
+	return c.execRequestWithTimeout(method, url, body, 0)
+}
+
+func (c *Client) execRequestWithTimeout(method, url string, body io.Reader, timeout time.Duration) ([]byte, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %v", err)
@@ -258,7 +265,13 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
-	res, err := c.http.Do(req)
+	var res *http.Response
+	if timeout > 0 {
+		res, err = c.http.DoWithTimeout(req, timeout)
+	} else {
+		res, err = c.http.Do(req)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %v", err)
 	}
@@ -275,7 +288,6 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 	}
 
 	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
-		// Try to parse error response for a cleaner message
 		var apiErr APIError
 		if json.Unmarshal(responseBody, &apiErr) == nil && apiErr.Message != "" {
 			return nil, fmt.Errorf("API error (%d): %s", res.StatusCode, apiErr.Message)

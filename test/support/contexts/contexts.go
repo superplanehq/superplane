@@ -318,3 +318,7 @@ func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 	c.Responses = c.Responses[1:]
 	return response, nil
 }
+
+func (c *HTTPContext) DoWithTimeout(request *http.Request, _ time.Duration) (*http.Response, error) {
+	return c.Do(request)
+}

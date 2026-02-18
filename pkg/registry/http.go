@@ -97,20 +97,27 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 }
 
 func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
-	if len(c.privateIPRanges) == 0 && len(c.blockedHosts) == 0 {
-		return c.do(request)
-	}
-
-	err := c.validateURL(request.URL)
-	if err != nil {
-		return nil, err
-	}
-
-	return c.do(request)
+	return c.doWithClient(request, c.client)
 }
 
-func (c *HTTPContext) do(request *http.Request) (*http.Response, error) {
-	resp, err := c.client.Do(request)
+func (c *HTTPContext) DoWithTimeout(request *http.Request, timeout time.Duration) (*http.Response, error) {
+	client := &http.Client{
+		Timeout:       timeout,
+		Transport:     c.client.Transport,
+		CheckRedirect: c.client.CheckRedirect,
+	}
+
+	return c.doWithClient(request, client)
+}
+
+func (c *HTTPContext) doWithClient(request *http.Request, client *http.Client) (*http.Response, error) {
+	if len(c.privateIPRanges) > 0 || len(c.blockedHosts) > 0 {
+		if err := c.validateURL(request.URL); err != nil {
+			return nil, err
+		}
+	}
+
+	resp, err := client.Do(request)
 	if err != nil {
 		return nil, err
 	}
