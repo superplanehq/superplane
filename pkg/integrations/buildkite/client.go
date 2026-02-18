@@ -54,33 +54,6 @@ func (c *Client) makeRequest(method, endpoint string, body any) (*http.Response,
 	return c.http.Do(req)
 }
 
-type Organization struct {
-	ID     string `json:"id"`
-	Slug   string `json:"slug"`
-	Name   string `json:"name"`
-	WebURL string `json:"web_url"`
-}
-
-func (c *Client) ListOrganizations() ([]Organization, error) {
-	resp, err := c.makeRequest("GET", "/organizations", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status %d", resp.StatusCode)
-	}
-
-	var organizations []Organization
-	err = json.NewDecoder(resp.Body).Decode(&organizations)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	return organizations, nil
-}
-
 type Pipeline struct {
 	ID     string `json:"id"`
 	Slug   string `json:"slug"`

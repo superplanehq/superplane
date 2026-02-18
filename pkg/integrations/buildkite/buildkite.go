@@ -146,21 +146,6 @@ func (b *Buildkite) ListResources(resourceType string, ctx core.ListResourcesCon
 	}
 
 	switch resourceType {
-	case "organization":
-		orgs, err := client.ListOrganizations()
-		if err != nil {
-			return nil, fmt.Errorf("error listing organizations: %v", err)
-		}
-
-		resources := make([]core.IntegrationResource, len(orgs))
-		for i, org := range orgs {
-			resources[i] = core.IntegrationResource{
-				Type: "organization",
-				ID:   org.Slug,
-				Name: org.Name,
-			}
-		}
-		return resources, nil
 
 	case "pipeline":
 		orgConfig, err := ctx.Integration.GetConfig("organization")
