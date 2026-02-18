@@ -21,6 +21,7 @@ import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
+import incidentIcon from "@/assets/icons/integrations/incident.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
@@ -50,6 +51,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   cursor: cursorIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
+  incident: incidentIcon,
   semaphore: SemaphoreLogo,
   slack: slackIcon,
   smtp: smtpIcon,
@@ -78,6 +80,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   cursor: cursorIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
+  incident: incidentIcon,
   semaphore: SemaphoreLogo,
   slack: slackIcon,
   sendgrid: sendgridIcon,
