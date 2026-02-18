@@ -42,6 +42,7 @@ import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
+import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 
 export interface BuildingBlock {
@@ -430,6 +431,7 @@ function CategorySection({
       cloudwatch: awsCloudwatchIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
+      sqs: awsSqsIcon,
       route53: awsRoute53Icon,
       ecs: awsEcsIcon,
       sns: awsSnsIcon,
@@ -512,6 +514,7 @@ function CategorySection({
               cloudwatch: awsCloudwatchIcon,
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
+              sqs: awsSqsIcon,
               route53: awsRoute53Icon,
               ecs: awsEcsIcon,
               sns: awsSnsIcon,

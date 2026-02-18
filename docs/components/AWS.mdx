@@ -34,6 +34,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="ECS • Stop Task" href="#ecs-•-stop-task" description="Stop a running AWS ECS task" />
   <LinkCard title="Lambda • Run Function" href="#lambda-•-run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
   <LinkCard title="Route 53 • Create DNS Record" href="#route-53-•-create-dns-record" description="Create a DNS record in an AWS Route 53 hosted zone" />
+  <LinkCard title="SQS • Create Queue" href="#sqs-•-create-queue" description="Create an SQS queue" />
+  <LinkCard title="SQS • Delete Queue" href="#sqs-•-delete-queue" description="Delete an SQS queue" />
+  <LinkCard title="SQS • Get Queue" href="#sqs-•-get-queue" description="Retrieve an existing SQS queue" />
+  <LinkCard title="SQS • Purge Queue" href="#sqs-•-purge-queue" description="Purge all messages from an SQS queue" />
+  <LinkCard title="SQS • Send Message" href="#sqs-•-send-message" description="Send a message to an SQS queue" />
   <LinkCard title="Route 53 • Delete DNS Record" href="#route-53-•-delete-dns-record" description="Delete a DNS record from an AWS Route 53 hosted zone" />
   <LinkCard title="Route 53 • Upsert DNS Record" href="#route-53-•-upsert-dns-record" description="Create or update a DNS record in an AWS Route 53 hosted zone" />
   <LinkCard title="SNS • Create Topic" href="#sns-•-create-topic" description="Create an AWS SNS topic" />
@@ -931,6 +936,166 @@ The Run Lambda component invokes a Lambda function.
     "memorySize": "128 MB"
   },
   "requestId": "9f8d2b5e-1c7a-4d62-8f1a-0f8b8e4f3a12"
+}
+```
+
+<a id="sqs-•-create-queue"></a>
+
+## SQS • Create Queue
+
+The Create Queue component creates a new SQS queue.
+
+### Use Cases
+
+- **New workflows**: Create a dedicated queue for a new workflow or service
+- **Ephemeral queues**: Spin up short-lived queues for temporary processing
+- **Environment isolation**: Create separate queues per environment or tenant
+
+### Configuration
+
+- **Region**: AWS region where the queue will be created
+- **Queue Name**: Name of the SQS queue
+- **Queue Type**: Standard or FIFO
+- **Attributes**: Optional SQS attributes (visibility timeout, message retention, etc.)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+    "queueArn": "arn:aws:sqs:us-east-1:123456789012:my-queue"
+  },
+  "timestamp": "2026-02-18T12:00:00Z",
+  "type": "aws.sqs.queue.created"
+}
+```
+
+<a id="sqs-•-get-queue"></a>
+
+## SQS • Get Queue
+
+The Get Queue component retrieves metadata and configuration for an existing SQS queue.
+
+### Use Cases
+
+- **Health checks**: Verify that a queue exists before sending messages
+- **Configuration audits**: Inspect attributes like visibility timeout or retention period
+- **Dynamic routing**: Resolve queue URLs from names at runtime
+
+### Configuration
+
+- **Region**: AWS region of the queue
+- **Queue URL or Name**: URL or name of the SQS queue
+
+### Example Output
+
+```json
+{
+  "data": {
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+    "queueArn": "arn:aws:sqs:us-east-1:123456789012:my-queue",
+    "attributes": {
+      "VisibilityTimeout": "30",
+      "MessageRetentionPeriod": "345600",
+      "FifoQueue": "false"
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00Z",
+  "type": "aws.sqs.queue"
+}
+```
+
+<a id="sqs-•-send-message"></a>
+
+## SQS • Send Message
+
+The Send Message component sends a message to an SQS queue.
+
+### Use Cases
+
+- **Event fan-out**: Push events into queues for downstream workers
+- **Asynchronous processing**: Offload long-running work from synchronous flows
+- **Retries and buffering**: Use SQS as a durable buffer between services
+
+### Configuration
+
+- **Region**: AWS region of the queue
+- **Queue URL or Name**: Target SQS queue
+- **Message Body**: JSON payload to send
+- **Message Attributes**: Optional typed attributes for routing and filtering
+- **Delay Seconds**: Optional delay before the message becomes visible
+
+### Example Output
+
+```json
+{
+  "data": {
+    "messageId": "7c8b9d10-1112-1314-1516-171819202122",
+    "md5OfMessageBody": "5eb63bbbe01eeed093cb22bb8f5acdc3"
+  },
+  "timestamp": "2026-02-18T12:00:00Z",
+  "type": "aws.sqs.message.sent"
+}
+```
+
+<a id="sqs-•-delete-queue"></a>
+
+## SQS • Delete Queue
+
+The Delete Queue component deletes an SQS queue.
+
+### Use Cases
+
+- **Cleanup**: Remove queues created for temporary environments or tests
+- **Decommissioning**: Delete queues that are no longer used
+- **Cost control**: Reduce clutter and avoid accidental usage
+
+### Configuration
+
+- **Region**: AWS region of the queue
+- **Queue URL or Name**: SQS queue to delete
+
+### Example Output
+
+```json
+{
+  "data": {
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+    "status": "DELETED"
+  },
+  "timestamp": "2026-02-18T12:00:00Z",
+  "type": "aws.sqs.queue.deleted"
+}
+```
+
+<a id="sqs-•-purge-queue"></a>
+
+## SQS • Purge Queue
+
+The Purge Queue component removes all messages from an SQS queue.
+
+### Use Cases
+
+- **Reset state**: Clear stuck or invalid messages before reprocessing
+- **Test environments**: Clean up test data between runs
+- **Operational recovery**: Quickly clear a backlog after a bad deployment
+
+### Configuration
+
+- **Region**: AWS region of the queue
+- **Queue URL or Name**: SQS queue to purge
+
+### Example Output
+
+```json
+{
+  "data": {
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+    "status": "PURGED"
+  },
+  "timestamp": "2026-02-18T12:00:00Z",
+  "type": "aws.sqs.queue.purged"
 }
 ```
 

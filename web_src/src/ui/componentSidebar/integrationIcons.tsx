@@ -2,6 +2,7 @@ import { resolveIcon } from "@/lib/utils";
 import React from "react";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
+import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
@@ -87,6 +88,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   aws: {
     cloudwatch: awsCloudwatchIcon,
     lambda: awsLambdaIcon,
+    sqs: awsSqsIcon,
     route53: awsRoute53Icon,
     ecs: awsEcsIcon,
     sns: awsSnsIcon,
