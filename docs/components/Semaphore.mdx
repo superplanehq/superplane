@@ -15,6 +15,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Get Pipeline" href="#get-pipeline" description="Fetch a Semaphore pipeline by ID" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run Semaphore workflow" />
 </CardGrid>
 
@@ -124,6 +125,81 @@ This trigger automatically sets up a Semaphore webhook when configured. The webh
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "semaphore.pipeline.done"
+}
+```
+
+<a id="get-pipeline"></a>
+
+## Get Pipeline
+
+The Get Pipeline component fetches a Semaphore pipeline by ID and returns its current state, result, workflow ID, and metadata.
+
+### Use Cases
+
+- **Pipeline status checks**: After Run Workflow starts a pipeline, fetch its status to decide when to proceed or notify
+- **Result verification**: Look up the result of a specific pipeline to get full details or confirm state
+- **Conditional deployments**: Verify a pipeline passed before triggering a dependent action (e.g. deploy only if build pipeline passed)
+
+### Configuration
+
+- **Pipeline ID**: The Semaphore pipeline ID (e.g. from Run Workflow output or On Pipeline Done event data). Accepts expressions.
+
+### Output
+
+Returns the pipeline object including:
+- **name**: Pipeline name
+- **ppl_id**: Pipeline ID
+- **wf_id**: Workflow ID
+- **state**: Pipeline state (e.g. done, running)
+- **result**: Pipeline result (e.g. passed, failed, stopped)
+- **result_reason**: Reason for the result
+- **created_at**: When the pipeline was created
+- **done_at**: When the pipeline finished
+- **running_at**: When the pipeline started running
+- **yaml_file_name**: Pipeline YAML file name
+- **working_directory**: Pipeline working directory
+
+### Example Output
+
+```json
+{
+  "data": {
+    "created_at": {
+      "nanos": 0,
+      "seconds": 1737559967
+    },
+    "done_at": {
+      "nanos": 0,
+      "seconds": 1737559975
+    },
+    "error_description": "",
+    "name": "Initial Pipeline",
+    "pending_at": {
+      "nanos": 0,
+      "seconds": 1737559968
+    },
+    "ppl_id": "00000000-0000-0000-0000-000000000000",
+    "queuing_at": {
+      "nanos": 0,
+      "seconds": 1737559968
+    },
+    "result": "passed",
+    "result_reason": "test",
+    "running_at": {
+      "nanos": 0,
+      "seconds": 1737559968
+    },
+    "state": "done",
+    "stopping_at": {
+      "nanos": 0,
+      "seconds": 0
+    },
+    "wf_id": "00000000-0000-0000-0000-000000000000",
+    "working_directory": ".semaphore",
+    "yaml_file_name": "semaphore.yml"
+  },
+  "timestamp": "2026-01-22T15:32:56.061430218Z",
+  "type": "semaphore.pipeline"
 }
 ```
 

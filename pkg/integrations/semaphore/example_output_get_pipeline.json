@@ -1,0 +1,39 @@
+{
+  "data": {
+    "created_at": {
+      "nanos": 0,
+      "seconds": 1737559967
+    },
+    "done_at": {
+      "nanos": 0,
+      "seconds": 1737559975
+    },
+    "error_description": "",
+    "name": "Initial Pipeline",
+    "pending_at": {
+      "nanos": 0,
+      "seconds": 1737559968
+    },
+    "ppl_id": "00000000-0000-0000-0000-000000000000",
+    "queuing_at": {
+      "nanos": 0,
+      "seconds": 1737559968
+    },
+    "result": "passed",
+    "result_reason": "test",
+    "running_at": {
+      "nanos": 0,
+      "seconds": 1737559968
+    },
+    "state": "done",
+    "stopping_at": {
+      "nanos": 0,
+      "seconds": 0
+    },
+    "wf_id": "00000000-0000-0000-0000-000000000000",
+    "working_directory": ".semaphore",
+    "yaml_file_name": "semaphore.yml"
+  },
+  "timestamp": "2026-01-22T15:32:56.061430218Z",
+  "type": "semaphore.pipeline"
+}

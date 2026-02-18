@@ -153,6 +153,27 @@ func (c *Client) GetPipeline(id string) (*Pipeline, error) {
 	return pipelineResponse.Pipeline, nil
 }
 
+func (c *Client) GetPipelineRaw(id string) (map[string]any, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/pipelines/%s", c.OrgURL, id)
+	responseBody, err := c.execRequest(http.MethodGet, URL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	pipeline, ok := response["pipeline"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("pipeline data missing from response")
+	}
+
+	return pipeline, nil
+}
+
 func (c *Client) ListPipelines(projectID string) ([]any, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/pipelines?project_id=%s", c.OrgURL, projectID)
 	response, err := c.execRequest(http.MethodGet, URL, nil)
