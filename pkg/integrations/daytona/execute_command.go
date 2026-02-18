@@ -3,6 +3,7 @@ package daytona
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -10,7 +11,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const ExecuteCommandPayloadType = "daytona.command.response"
+const (
+	ExecuteCommandPayloadType  = "daytona.command.response"
+	ExecuteCommandPollInterval = 5 * time.Second
+)
 
 type ExecuteCommand struct{}
 
@@ -19,6 +23,14 @@ type ExecuteCommandSpec struct {
 	Command   string `json:"command"`
 	Cwd       string `json:"cwd,omitempty"`
 	Timeout   int    `json:"timeout,omitempty"`
+}
+
+type ExecuteCommandMetadata struct {
+	SandboxID string `json:"sandboxId" mapstructure:"sandboxId"`
+	SessionID string `json:"sessionId" mapstructure:"sessionId"`
+	CmdID     string `json:"cmdId" mapstructure:"cmdId"`
+	StartedAt int64  `json:"startedAt" mapstructure:"startedAt"`
+	Timeout   int    `json:"timeout" mapstructure:"timeout"`
 }
 
 func (e *ExecuteCommand) Name() string {
@@ -36,12 +48,19 @@ func (e *ExecuteCommand) Description() string {
 func (e *ExecuteCommand) Documentation() string {
 	return `The Execute Command component runs shell commands in an existing Daytona sandbox.
 
+## How It Works
+
+1. Creates a session in the sandbox and kicks off the command asynchronously
+2. Polls the session until the command finishes
+3. Retrieves the command output and emits the result
+
 ## Use Cases
 
 - **Package installation**: Install dependencies (pip install, npm install)
 - **File operations**: Create, move, or delete files in the sandbox
 - **System commands**: Run any shell command in the isolated environment
 - **Build processes**: Execute build scripts or compilation commands
+- **Long-running tasks**: Commands that take minutes to complete (builds, deployments)
 
 ## Configuration
 
@@ -140,22 +159,33 @@ func (e *ExecuteCommand) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %v", err)
 	}
 
-	req := &ExecuteCommandRequest{
-		Command: spec.Command,
-		Cwd:     spec.Cwd,
-		Timeout: spec.Timeout,
+	command := spec.Command
+	if spec.Cwd != "" {
+		command = fmt.Sprintf("cd %s && %s", spec.Cwd, spec.Command)
 	}
 
-	response, err := client.ExecuteCommand(spec.SandboxID, req)
+	sessionID := fmt.Sprintf("sp-%s", ctx.ID.String())
+	if err := client.CreateSession(spec.SandboxID, sessionID); err != nil {
+		return fmt.Errorf("failed to create session: %v", err)
+	}
+
+	result, err := client.ExecuteSessionCommand(spec.SandboxID, sessionID, command)
 	if err != nil {
 		return fmt.Errorf("failed to execute command: %v", err)
 	}
 
-	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
-		ExecuteCommandPayloadType,
-		[]any{response},
-	)
+	metadata := ExecuteCommandMetadata{
+		SandboxID: spec.SandboxID,
+		SessionID: sessionID,
+		CmdID:     result.CmdID,
+		StartedAt: time.Now().Unix(),
+		Timeout:   spec.Timeout,
+	}
+	if err := ctx.Metadata.Set(metadata); err != nil {
+		return err
+	}
+
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, ExecuteCommandPollInterval)
 }
 
 func (e *ExecuteCommand) Cancel(ctx core.ExecutionContext) error {
@@ -167,11 +197,65 @@ func (e *ExecuteCommand) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.U
 }
 
 func (e *ExecuteCommand) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{Name: "poll", UserAccessible: false},
+	}
 }
 
 func (e *ExecuteCommand) HandleAction(ctx core.ActionContext) error {
-	return nil
+	if ctx.Name == "poll" {
+		return e.poll(ctx)
+	}
+	return fmt.Errorf("unknown action: %s", ctx.Name)
+}
+
+func (e *ExecuteCommand) poll(ctx core.ActionContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	var metadata ExecuteCommandMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("decode metadata: %w", err)
+	}
+
+	if metadata.Timeout > 0 {
+		elapsed := time.Now().Unix() - metadata.StartedAt
+		if elapsed > int64(metadata.Timeout) {
+			return fmt.Errorf("command timed out after %d seconds", metadata.Timeout)
+		}
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	session, err := client.GetSession(metadata.SandboxID, metadata.SessionID)
+	if err != nil {
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, ExecuteCommandPollInterval)
+	}
+
+	cmd := session.FindCommand(metadata.CmdID)
+	if cmd == nil || cmd.ExitCode == nil {
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, ExecuteCommandPollInterval)
+	}
+
+	logs, err := client.GetSessionCommandLogs(metadata.SandboxID, metadata.SessionID, metadata.CmdID)
+	if err != nil {
+		logs = ""
+	}
+
+	response := &ExecuteCommandResponse{
+		ExitCode: *cmd.ExitCode,
+		Result:   logs,
+	}
+
+	return ctx.ExecutionState.Emit(
+		core.DefaultOutputChannel.Name,
+		ExecuteCommandPayloadType,
+		[]any{response},
+	)
 }
 
 func (e *ExecuteCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

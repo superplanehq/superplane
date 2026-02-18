@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -56,32 +55,6 @@ type CreateSandboxRequest struct {
 	AutoStopInterval int               `json:"autoStopInterval,omitempty"`
 }
 
-// ExecuteCodeRequest represents the request to execute code in a sandbox
-type ExecuteCodeRequest struct {
-	Code     string `json:"code"`
-	Language string `json:"language"`
-	Timeout  int    `json:"timeout,omitempty"`
-}
-
-// ExecuteCodeResponse represents the response from code execution
-type ExecuteCodeResponse struct {
-	ExitCode int    `json:"exitCode"`
-	Result   string `json:"result"`
-}
-
-// ExecuteCommandRequest represents the request to execute a command in a sandbox
-type ExecuteCommandRequest struct {
-	Command string `json:"command"`
-	Cwd     string `json:"cwd,omitempty"`
-	Timeout int    `json:"timeout,omitempty"`
-}
-
-// ExecuteCommandResponse represents the response from command execution
-type ExecuteCommandResponse struct {
-	ExitCode int    `json:"exitCode"`
-	Result   string `json:"result"`
-}
-
 // Snapshot represents a Daytona snapshot
 type Snapshot struct {
 	ID   string `json:"id"`
@@ -91,6 +64,52 @@ type Snapshot struct {
 // PaginatedSnapshots represents a paginated list of snapshots
 type PaginatedSnapshots struct {
 	Items []Snapshot `json:"items"`
+}
+
+// SessionExecuteRequest represents the request to execute a command in a session
+type SessionExecuteRequest struct {
+	Command  string `json:"command"`
+	RunAsync bool   `json:"runAsync"`
+}
+
+// SessionExecuteResponse represents the response from async session command execution
+type SessionExecuteResponse struct {
+	CmdID string `json:"cmdId"`
+}
+
+// SessionCommand represents a command within a session
+type SessionCommand struct {
+	CmdID    string `json:"cmdId"`
+	Command  string `json:"command"`
+	ExitCode *int   `json:"exitCode"`
+}
+
+// Session represents a Daytona session with its executed commands
+type Session struct {
+	SessionID string           `json:"sessionId"`
+	Commands  []SessionCommand `json:"commands"`
+}
+
+// FindCommand returns the command with the given ID, or nil if not found.
+func (s *Session) FindCommand(cmdID string) *SessionCommand {
+	for i := range s.Commands {
+		if s.Commands[i].CmdID == cmdID {
+			return &s.Commands[i]
+		}
+	}
+	return nil
+}
+
+// ExecuteCommandResponse represents the response from command execution
+type ExecuteCommandResponse struct {
+	ExitCode int    `json:"exitCode"`
+	Result   string `json:"result"`
+}
+
+// ExecuteCodeResponse represents the response from code execution
+type ExecuteCodeResponse struct {
+	ExitCode int    `json:"exitCode"`
+	Result   string `json:"result"`
 }
 
 // ListSnapshots lists available snapshots
@@ -154,9 +173,8 @@ func (c *Client) FetchConfig() (*APIConfig, error) {
 	return &config, nil
 }
 
-// toolboxURL returns the toolbox execute URL for a given sandbox.
-// It fetches the proxyToolboxUrl from /api/config and constructs the URL.
-func (c *Client) toolboxURL(sandboxID string) (string, error) {
+// toolboxBaseURL returns the base toolbox URL for a given sandbox.
+func (c *Client) toolboxBaseURL(sandboxID string) (string, error) {
 	config, err := c.FetchConfig()
 	if err != nil {
 		return "", err
@@ -166,77 +184,92 @@ func (c *Client) toolboxURL(sandboxID string) (string, error) {
 		return "", fmt.Errorf("proxyToolboxUrl not found in config")
 	}
 
-	return fmt.Sprintf("%s/%s/process/execute", config.ProxyToolboxURL, sandboxID), nil
+	return fmt.Sprintf("%s/%s", config.ProxyToolboxURL, sandboxID), nil
 }
 
-// ExecuteCode executes code in a sandbox (uses the execute command endpoint)
-func (c *Client) ExecuteCode(sandboxID string, req *ExecuteCodeRequest) (*ExecuteCodeResponse, error) {
-	url, err := c.toolboxURL(sandboxID)
+// CreateSession creates a new session in the sandbox.
+func (c *Client) CreateSession(sandboxID, sessionID string) error {
+	baseURL, err := c.toolboxBaseURL(sandboxID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve toolbox URL: %v", err)
+	}
+
+	body, err := json.Marshal(map[string]string{"sessionId": sessionID})
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	_, err = c.execRequest(http.MethodPost, baseURL+"/process/session", bytes.NewReader(body))
+	return err
+}
+
+// ExecuteSessionCommand executes a command asynchronously in a session.
+// Returns the command ID which can be used to poll for completion.
+func (c *Client) ExecuteSessionCommand(sandboxID, sessionID, command string) (*SessionExecuteResponse, error) {
+	baseURL, err := c.toolboxBaseURL(sandboxID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve toolbox URL: %v", err)
 	}
 
-	// Convert code execution to a command based on language
-	var command string
-	switch req.Language {
-	case "python":
-		command = fmt.Sprintf("python3 -c %q", req.Code)
-	case "javascript":
-		command = fmt.Sprintf("node -e %q", req.Code)
-	case "typescript":
-		command = fmt.Sprintf("npx ts-node -e %q", req.Code)
-	default:
-		command = fmt.Sprintf("python3 -c %q", req.Code)
+	reqBody := &SessionExecuteRequest{
+		Command:  command,
+		RunAsync: true,
 	}
 
-	cmdReq := &ExecuteCommandRequest{
-		Command: command,
-		Timeout: req.Timeout,
-	}
-
-	body, err := json.Marshal(cmdReq)
+	body, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	httpTimeout := time.Duration(req.Timeout+30) * time.Second
-	responseBody, err := c.execRequestWithTimeout(http.MethodPost, url, bytes.NewReader(body), httpTimeout)
+	url := fmt.Sprintf("%s/process/session/%s/exec", baseURL, sessionID)
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 
-	var response ExecuteCodeResponse
+	var response SessionExecuteResponse
 	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal execute code response: %v", err)
+		return nil, fmt.Errorf("failed to unmarshal session execute response: %v", err)
 	}
 
 	return &response, nil
 }
 
-// ExecuteCommand executes a shell command in a sandbox
-func (c *Client) ExecuteCommand(sandboxID string, req *ExecuteCommandRequest) (*ExecuteCommandResponse, error) {
-	url, err := c.toolboxURL(sandboxID)
+// GetSession retrieves a session and its command statuses.
+func (c *Client) GetSession(sandboxID, sessionID string) (*Session, error) {
+	baseURL, err := c.toolboxBaseURL(sandboxID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve toolbox URL: %v", err)
 	}
 
-	body, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %v", err)
-	}
-
-	httpTimeout := time.Duration(req.Timeout+30) * time.Second
-	responseBody, err := c.execRequestWithTimeout(http.MethodPost, url, bytes.NewReader(body), httpTimeout)
+	url := fmt.Sprintf("%s/process/session/%s", baseURL, sessionID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var response ExecuteCommandResponse
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal execute command response: %v", err)
+	var session Session
+	if err := json.Unmarshal(responseBody, &session); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal session response: %v", err)
 	}
 
-	return &response, nil
+	return &session, nil
+}
+
+// GetSessionCommandLogs retrieves the logs for a specific command in a session.
+func (c *Client) GetSessionCommandLogs(sandboxID, sessionID, commandID string) (string, error) {
+	baseURL, err := c.toolboxBaseURL(sandboxID)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve toolbox URL: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/process/session/%s/command/%s/logs", baseURL, sessionID, commandID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return string(responseBody), nil
 }
 
 // DeleteSandbox deletes a sandbox
@@ -253,10 +286,6 @@ type APIError struct {
 }
 
 func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error) {
-	return c.execRequestWithTimeout(method, url, body, 0)
-}
-
-func (c *Client) execRequestWithTimeout(method, url string, body io.Reader, timeout time.Duration) ([]byte, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %v", err)
@@ -265,13 +294,7 @@ func (c *Client) execRequestWithTimeout(method, url string, body io.Reader, time
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
-	var res *http.Response
-	if timeout > 0 {
-		res, err = c.http.DoWithTimeout(req, timeout)
-	} else {
-		res, err = c.http.Do(req)
-	}
-
+	res, err := c.http.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %v", err)
 	}

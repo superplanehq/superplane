@@ -175,132 +175,111 @@ func Test__Client__CreateSandbox(t *testing.T) {
 	})
 }
 
-func Test__Client__ExecuteCommand(t *testing.T) {
-	t.Run("successful command execution", func(t *testing.T) {
+func Test__Client__CreateSession(t *testing.T) {
+	t.Run("successful session creation", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				configResponse(),
 				{
 					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
-				},
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"exitCode":0,"result":"hello world"}`)),
+					Body:       io.NopCloser(strings.NewReader(`{"sessionId":"session-1"}`)),
 				},
 			},
 		}
 
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"apiKey": "test-api-key",
-			},
-		}
-
-		client, err := NewClient(httpContext, appCtx)
-		require.NoError(t, err)
-
-		response, err := client.ExecuteCommand("sandbox-123", &ExecuteCommandRequest{
-			Command: "echo hello world",
-		})
+		client := newTestClient(t, httpContext)
+		err := client.CreateSession("sandbox-123", "session-1")
 
 		require.NoError(t, err)
-		assert.Equal(t, 0, response.ExitCode)
-		assert.Equal(t, "hello world", response.Result)
 		require.Len(t, httpContext.Requests, 2)
-		assert.Contains(t, httpContext.Requests[1].URL.String(), "/toolbox/sandbox-123/process/execute")
-	})
-
-	t.Run("command execution failure -> error", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusInternalServerError,
-					Body:       io.NopCloser(strings.NewReader(`{"message":"execution failed"}`)),
-				},
-			},
-		}
-
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"apiKey": "test-api-key",
-			},
-		}
-
-		client, err := NewClient(httpContext, appCtx)
-		require.NoError(t, err)
-
-		_, err = client.ExecuteCommand("sandbox-123", &ExecuteCommandRequest{
-			Command: "invalid",
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "500")
+		assert.Equal(t, http.MethodPost, httpContext.Requests[1].Method)
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/toolbox/sandbox-123/process/session")
 	})
 }
 
-func Test__Client__ExecuteCode(t *testing.T) {
-	t.Run("successful python code execution", func(t *testing.T) {
+func Test__Client__ExecuteSessionCommand(t *testing.T) {
+	t.Run("successful async execution", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				configResponse(),
 				{
 					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
-				},
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"exitCode":0,"result":"42"}`)),
+					Body:       io.NopCloser(strings.NewReader(`{"cmdId":"cmd-abc"}`)),
 				},
 			},
 		}
 
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"apiKey": "test-api-key",
+		client := newTestClient(t, httpContext)
+		resp, err := client.ExecuteSessionCommand("sandbox-123", "session-1", "echo hello")
+
+		require.NoError(t, err)
+		assert.Equal(t, "cmd-abc", resp.CmdID)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/process/session/session-1/exec")
+	})
+}
+
+func Test__Client__GetSession(t *testing.T) {
+	t.Run("command still running", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				configResponse(),
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"sessionId":"session-1","commands":[{"cmdId":"cmd-abc","command":"echo hello","exitCode":null}]}`)),
+				},
 			},
 		}
 
-		client, err := NewClient(httpContext, appCtx)
-		require.NoError(t, err)
-
-		response, err := client.ExecuteCode("sandbox-123", &ExecuteCodeRequest{
-			Code:     "print(42)",
-			Language: "python",
-		})
+		client := newTestClient(t, httpContext)
+		session, err := client.GetSession("sandbox-123", "session-1")
 
 		require.NoError(t, err)
-		assert.Equal(t, 0, response.ExitCode)
-		assert.Equal(t, "42", response.Result)
+		assert.Equal(t, "session-1", session.SessionID)
+		require.Len(t, session.Commands, 1)
+		assert.Nil(t, session.Commands[0].ExitCode)
 	})
 
-	t.Run("successful javascript code execution", func(t *testing.T) {
+	t.Run("command completed", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				configResponse(),
 				{
 					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
-				},
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"exitCode":0,"result":"hello"}`)),
+					Body:       io.NopCloser(strings.NewReader(`{"sessionId":"session-1","commands":[{"cmdId":"cmd-abc","command":"echo hello","exitCode":0}]}`)),
 				},
 			},
 		}
 
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"apiKey": "test-api-key",
+		client := newTestClient(t, httpContext)
+		session, err := client.GetSession("sandbox-123", "session-1")
+
+		require.NoError(t, err)
+		cmd := session.FindCommand("cmd-abc")
+		require.NotNil(t, cmd)
+		require.NotNil(t, cmd.ExitCode)
+		assert.Equal(t, 0, *cmd.ExitCode)
+	})
+}
+
+func Test__Client__GetSessionCommandLogs(t *testing.T) {
+	t.Run("successful log retrieval", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				configResponse(),
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`"hello world"`)),
+				},
 			},
 		}
 
-		client, err := NewClient(httpContext, appCtx)
-		require.NoError(t, err)
-
-		response, err := client.ExecuteCode("sandbox-123", &ExecuteCodeRequest{
-			Code:     "console.log('hello')",
-			Language: "javascript",
-		})
+		client := newTestClient(t, httpContext)
+		logs, err := client.GetSessionCommandLogs("sandbox-123", "session-1", "cmd-abc")
 
 		require.NoError(t, err)
-		assert.Equal(t, 0, response.ExitCode)
+		assert.Contains(t, logs, "hello world")
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/process/session/session-1/command/cmd-abc/logs")
 	})
 }
 
@@ -315,16 +294,8 @@ func Test__Client__DeleteSandbox(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"apiKey": "test-api-key",
-			},
-		}
-
-		client, err := NewClient(httpContext, appCtx)
-		require.NoError(t, err)
-
-		err = client.DeleteSandbox("sandbox-123", false)
+		client := newTestClient(t, httpContext)
+		err := client.DeleteSandbox("sandbox-123", false)
 
 		require.NoError(t, err)
 		require.Len(t, httpContext.Requests, 1)
@@ -343,16 +314,8 @@ func Test__Client__DeleteSandbox(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"apiKey": "test-api-key",
-			},
-		}
-
-		client, err := NewClient(httpContext, appCtx)
-		require.NoError(t, err)
-
-		err = client.DeleteSandbox("sandbox-123", true)
+		client := newTestClient(t, httpContext)
+		err := client.DeleteSandbox("sandbox-123", true)
 
 		require.NoError(t, err)
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "force=true")
@@ -368,17 +331,50 @@ func Test__Client__DeleteSandbox(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"apiKey": "test-api-key",
-			},
-		}
+		client := newTestClient(t, httpContext)
+		err := client.DeleteSandbox("invalid-id", false)
 
-		client, err := NewClient(httpContext, appCtx)
-		require.NoError(t, err)
-
-		err = client.DeleteSandbox("invalid-id", false)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "404")
 	})
+}
+
+func Test__Session__FindCommand(t *testing.T) {
+	session := &Session{
+		Commands: []SessionCommand{
+			{CmdID: "cmd-1", Command: "echo a"},
+			{CmdID: "cmd-2", Command: "echo b"},
+		},
+	}
+
+	t.Run("existing command", func(t *testing.T) {
+		cmd := session.FindCommand("cmd-2")
+		require.NotNil(t, cmd)
+		assert.Equal(t, "echo b", cmd.Command)
+	})
+
+	t.Run("missing command", func(t *testing.T) {
+		cmd := session.FindCommand("cmd-999")
+		assert.Nil(t, cmd)
+	})
+}
+
+func configResponse() *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+	}
+}
+
+func newTestClient(t *testing.T, httpContext *contexts.HTTPContext) *Client {
+	t.Helper()
+	appCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"apiKey": "test-api-key",
+		},
+	}
+
+	client, err := NewClient(httpContext, appCtx)
+	require.NoError(t, err)
+	return client
 }

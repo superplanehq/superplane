@@ -165,7 +165,6 @@ type ExecutionContext struct {
  */
 type HTTPContext interface {
 	Do(*http.Request) (*http.Response, error)
-	DoWithTimeout(*http.Request, time.Duration) (*http.Response, error)
 }
 
 /*
