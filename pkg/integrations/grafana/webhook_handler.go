@@ -18,6 +18,16 @@ type GrafanaWebhookMetadata struct {
 }
 
 func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
+	config := OnAlertFiringConfig{}
+	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config); err != nil {
+		return nil, fmt.Errorf("error decoding webhook configuration: %v", err)
+	}
+
+	sharedSecret := strings.TrimSpace(config.SharedSecret)
+	if err := ctx.Webhook.SetSecret([]byte(sharedSecret)); err != nil {
+		return nil, fmt.Errorf("failed to persist shared secret in webhook storage: %w", err)
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
 	if err != nil {
 		if ctx.Logger != nil {
@@ -26,16 +36,7 @@ func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 		return nil, nil
 	}
 
-	config := OnAlertFiringConfig{}
-	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config); err != nil {
-		return nil, fmt.Errorf("error decoding webhook configuration: %v", err)
-	}
-
 	name := buildContactPointName(ctx.Webhook.GetID())
-	sharedSecret := strings.TrimSpace(config.SharedSecret)
-	if err := ctx.Webhook.SetSecret([]byte(sharedSecret)); err != nil {
-		return nil, fmt.Errorf("failed to persist shared secret in webhook storage: %w", err)
-	}
 
 	uid, err := client.UpsertWebhookContactPoint(name, ctx.Webhook.GetURL(), sharedSecret)
 	if err != nil {
