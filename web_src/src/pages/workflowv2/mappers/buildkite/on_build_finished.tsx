@@ -166,13 +166,13 @@ export const onBuildFinishedCustomFieldRenderer: CustomFieldRenderer = {
 
       return (
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
           onClick={handleCopy}
-          className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="h-auto p-0 px-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           title={copied ? "Copied!" : "Copy to clipboard"}
         >
-          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+          {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
         </Button>
       );
     };
@@ -196,19 +196,23 @@ export const onBuildFinishedCustomFieldRenderer: CustomFieldRenderer = {
                   </Button>
                 </div>
               )}
-              <div className="mt-3 relative group">
-                <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Webhook URL</span>
+              <div className="mt-3">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Webhook URL</span>
+                  <CopyButton code={webhookUrl} />
+                </div>
                 <pre className="mt-1 text-xs text-gray-800 dark:text-gray-100 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-md font-mono whitespace-pre-wrap break-all">
                   {webhookUrl}
                 </pre>
-                <CopyButton code={webhookUrl} />
               </div>
-              <div className="mt-3 relative group">
-                <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Webhook Token</span>
+              <div className="mt-3">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Webhook Token</span>
+                  <CopyButton code={webhookToken} />
+                </div>
                 <pre className="mt-1 text-xs text-gray-800 dark:text-gray-100 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-md font-mono whitespace-pre-wrap break-all">
                   {webhookToken}
                 </pre>
-                <CopyButton code={webhookToken} />
               </div>
             </div>
           </div>
