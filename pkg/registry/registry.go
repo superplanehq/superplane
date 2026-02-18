@@ -168,21 +168,32 @@ func (r *Registry) ListComponents() []core.Component {
 }
 
 func (r *Registry) GetComponent(name string) (core.Component, error) {
+	if component, ok := r.Components[name]; ok {
+		return component, nil
+	}
+
 	parts := strings.SplitN(name, ".", 2)
 	if len(parts) > 2 {
 		return nil, fmt.Errorf("invalid component name: %s", name)
 	}
 
 	if len(parts) == 1 {
-		component, ok := r.Components[name]
-		if !ok {
-			return nil, fmt.Errorf("component %s not registered", name)
-		}
-
-		return component, nil
+		return nil, fmt.Errorf("component %s not registered", name)
 	}
 
 	return r.GetIntegrationComponent(parts[0], name)
+}
+
+// RegisterJSComponent registers a JS component directly in the instance-level Components map
+// (bypassing the global package-level registry used by Go init() functions). This allows
+// runtime registration and replacement without affecting other Registry instances.
+func (r *Registry) RegisterJSComponent(name string, c core.Component) {
+	r.Components[name] = NewPanicableComponent(c)
+}
+
+// UnregisterComponent removes a component from the instance-level Components map.
+func (r *Registry) UnregisterComponent(name string) {
+	delete(r.Components, name)
 }
 
 func (r *Registry) GetWidget(name string) (core.Widget, error) {

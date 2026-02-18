@@ -214,6 +214,7 @@ export function BuildingBlocksSidebar({
 
   const categoryOrder: Record<string, number> = {
     Core: 0,
+    Custom: 1,
     Bundles: 2,
   };
 
@@ -446,6 +447,8 @@ function CategorySection({
   let CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null = null;
   if (category.name === "Core") {
     CategoryIcon = resolveIcon("zap");
+  } else if (category.name === "Custom") {
+    CategoryIcon = resolveIcon("code");
   } else if (category.name === "Bundles") {
     CategoryIcon = resolveIcon("package");
   } else if (integrationName === "smtp") {

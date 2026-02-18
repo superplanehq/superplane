@@ -99,8 +99,9 @@ transformation, conditional logic, API calls — doesn't require cutting-edge la
 ### File-Based Loading
 
 JavaScript components live as `.js` files in a directory configured via the
-`SUPERPLANE_JS_COMPONENTS_DIR` environment variable. At server startup, SuperPlane scans this
-directory and registers each file as a component.
+`SUPERPLANE_JS_COMPONENTS_DIR` environment variable (default: `js_components` relative to the
+working directory). At server startup, SuperPlane scans this directory — if it exists — and
+registers each file as a component.
 
 #### Directory Structure
 
@@ -122,7 +123,7 @@ configured directory for changes and keeps the registry in sync.
 
 **Initial load (startup):**
 
-1. Read `SUPERPLANE_JS_COMPONENTS_DIR` (default: no JS components loaded if unset).
+1. Read `SUPERPLANE_JS_COMPONENTS_DIR` (default: `js_components`). If the directory does not exist, skip.
 2. Scan the directory for `*.js` files (non-recursive).
 3. For each file:
    a. Read the source code.
@@ -161,11 +162,11 @@ down a previously working component.
 
 | Environment Variable            | Default | Description                                    |
 |---------------------------------|---------|------------------------------------------------|
-| `SUPERPLANE_JS_COMPONENTS_DIR`  | (unset) | Path to directory containing `.js` components. |
+| `SUPERPLANE_JS_COMPONENTS_DIR`  | `js_components` | Path to directory containing `.js` components. |
 | `SUPERPLANE_JS_WATCH_INTERVAL`  | `5s`    | Polling interval for detecting file changes.   |
 
-When `SUPERPLANE_JS_COMPONENTS_DIR` is unset or empty, no JavaScript components are loaded,
-no watcher is started, and the feature is effectively disabled.
+If the resolved directory does not exist on disk, no JavaScript components are loaded, no watcher
+is started, and the feature is effectively disabled.
 
 ### JavaScript SDK
 

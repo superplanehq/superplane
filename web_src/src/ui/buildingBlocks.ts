@@ -42,7 +42,9 @@ export function buildBuildingBlockCategories(
   const filteredTriggers = triggers.filter((trigger) => !deprecatedTriggerNames.has(trigger.name ?? ""));
   const filteredComponents = components.filter((component) => !deprecatedComponentNames.has(component.name ?? ""));
 
-  // Combine triggers and components into a single "Core" category
+  const jsComponents = filteredComponents.filter((c) => c.name?.startsWith("js."));
+  const builtInComponents = filteredComponents.filter((c) => !c.name?.startsWith("js."));
+
   const coreBlocks: BuildingBlock[] = [
     ...filteredTriggers.map((t): BuildingBlock => {
       const block: BuildingBlock = {
@@ -58,7 +60,7 @@ export function buildBuildingBlockCategories(
       block.componentSubtype = getComponentSubtype(block);
       return block;
     }),
-    ...filteredComponents.map((c): BuildingBlock => {
+    ...builtInComponents.map((c): BuildingBlock => {
       const block: BuildingBlock = {
         name: c.name!,
         label: c.label,
@@ -75,11 +77,35 @@ export function buildBuildingBlockCategories(
     }),
   ];
 
+  const customBlocks: BuildingBlock[] = jsComponents.map((c): BuildingBlock => {
+    const block: BuildingBlock = {
+      name: c.name!,
+      label: c.label,
+      description: c.description,
+      type: "component",
+      outputChannels: c.outputChannels,
+      configuration: c.configuration,
+      icon: c.icon,
+      color: c.color,
+      isLive: true,
+    };
+    block.componentSubtype = getComponentSubtype(block);
+    return block;
+  });
+
   const liveCategories: BuildingBlockCategory[] = [
     {
       name: "Core",
       blocks: coreBlocks,
     },
+    ...(customBlocks.length > 0
+      ? [
+          {
+            name: "Custom",
+            blocks: customBlocks,
+          },
+        ]
+      : []),
     {
       name: "Bundles",
       blocks: blueprints.map((b): BuildingBlock => {

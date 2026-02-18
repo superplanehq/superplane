@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
+	"github.com/superplanehq/superplane/pkg/jsruntime"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/public"
@@ -360,6 +361,7 @@ func Start() {
 	}
 
 	templates.Setup(registry)
+	startJSComponents(registry)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcProvider, authService)
@@ -374,6 +376,47 @@ func Start() {
 	log.Println("SuperPlane is UP.")
 
 	select {}
+}
+
+func startJSComponents(reg *registry.Registry) {
+	dir := os.Getenv("SUPERPLANE_JS_COMPONENTS_DIR")
+	if dir == "" {
+		dir = "js_components"
+	}
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return
+	}
+
+	timeout := 30 * time.Second
+	if v := os.Getenv("SUPERPLANE_JS_EXECUTION_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			timeout = d
+		}
+	}
+
+	rt := jsruntime.NewRuntime(timeout)
+
+	loaded, err := jsruntime.LoadComponents(dir, rt, reg)
+	if err != nil {
+		log.Errorf("Failed to load JS components from %s: %v", dir, err)
+		return
+	}
+
+	if len(loaded) > 0 {
+		log.Infof("Loaded %d JS component(s): %s", len(loaded), strings.Join(loaded, ", "))
+	}
+
+	watchInterval := 5 * time.Second
+	if v := os.Getenv("SUPERPLANE_JS_WATCH_INTERVAL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			watchInterval = d
+		}
+	}
+
+	watcher := jsruntime.NewWatcher(dir, watchInterval, rt, reg)
+	watcher.SetInitialState(loaded)
+	go watcher.Start(context.Background())
 }
 
 // getWebhookBaseURL returns the webhook base URL, using the same pattern as SyncContext.
