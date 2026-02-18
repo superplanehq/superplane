@@ -165,6 +165,25 @@ type CheckRule struct {
 	Name string `json:"name,omitempty"`
 }
 
+type SyntheticCheck struct {
+	ID   string `json:"id"`
+	Name string `json:"name,omitempty"`
+}
+
+type syntheticCheckResponse struct {
+	ID       string `json:"id"`
+	Name     string `json:"name,omitempty"`
+	Metadata struct {
+		Name   string            `json:"name"`
+		Labels map[string]string `json:"labels"`
+	} `json:"metadata"`
+}
+
+type syntheticCheckListResponse struct {
+	Items []syntheticCheckResponse `json:"items"`
+	Data  []syntheticCheckResponse `json:"data"`
+}
+
 func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	apiURL := fmt.Sprintf("%s/api/alerting/check-rules", c.BaseURL)
 
@@ -205,6 +224,71 @@ func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	}
 
 	return checkRules, nil
+}
+
+func (c *Client) ListSyntheticChecks(dataset string) ([]SyntheticCheck, error) {
+	apiURL := fmt.Sprintf("%s/api/synthetic-checks?dataset=%s", c.BaseURL, url.QueryEscape(dataset))
+
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil, "")
+	if err != nil {
+		return nil, err
+	}
+
+	var stringList []string
+	if err := json.Unmarshal(responseBody, &stringList); err == nil {
+		syntheticChecks := make([]SyntheticCheck, len(stringList))
+		for i, id := range stringList {
+			syntheticChecks[i] = SyntheticCheck{ID: id, Name: id}
+		}
+		return syntheticChecks, nil
+	}
+
+	var syntheticChecks []syntheticCheckResponse
+	if err := json.Unmarshal(responseBody, &syntheticChecks); err == nil {
+		return normalizeSyntheticChecks(syntheticChecks), nil
+	}
+
+	var wrapped syntheticCheckListResponse
+	if err := json.Unmarshal(responseBody, &wrapped); err != nil {
+		return nil, fmt.Errorf("error parsing synthetic checks response: %v", err)
+	}
+
+	if len(wrapped.Items) > 0 {
+		return normalizeSyntheticChecks(wrapped.Items), nil
+	}
+
+	return normalizeSyntheticChecks(wrapped.Data), nil
+}
+
+func normalizeSyntheticChecks(checks []syntheticCheckResponse) []SyntheticCheck {
+	syntheticChecks := make([]SyntheticCheck, 0, len(checks))
+	for _, check := range checks {
+		id := check.ID
+		if id == "" {
+			id = check.Metadata.Labels["dash0.com/id"]
+		}
+		if id == "" {
+			id = check.Metadata.Labels["dash0.com/origin"]
+		}
+		if id == "" {
+			continue
+		}
+
+		name := check.Name
+		if name == "" {
+			name = check.Metadata.Name
+		}
+		if name == "" {
+			name = id
+		}
+
+		syntheticChecks = append(syntheticChecks, SyntheticCheck{
+			ID:   id,
+			Name: name,
+		})
+	}
+
+	return syntheticChecks
 }
 
 // SyntheticCheckAssertion represents a single assertion in a synthetic check.
