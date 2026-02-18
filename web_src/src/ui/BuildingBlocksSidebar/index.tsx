@@ -42,6 +42,7 @@ import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
+import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 
 export interface BuildingBlock {
@@ -411,6 +412,7 @@ function CategorySection({
     discord: discordIcon,
     github: githubIcon,
     gitlab: gitlabIcon,
+    harness: harnessIcon,
     hetzner: hetznerIcon,
     jira: jiraIcon,
     openai: openAiIcon,
@@ -494,6 +496,7 @@ function CategorySection({
             discord: discordIcon,
             github: githubIcon,
             gitlab: gitlabIcon,
+            harness: harnessIcon,
             hetzner: hetznerIcon,
             openai: openAiIcon,
             "open-ai": openAiIcon,

@@ -1,0 +1,141 @@
+---
+title: "Harness"
+---
+
+Run and react to your Harness pipelines
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Pipeline Completed" href="#on-pipeline-completed" description="Runs when a Harness pipeline completes" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Run Pipeline" href="#run-pipeline" description="Start a Harness pipeline and wait for it to complete" />
+</CardGrid>
+
+<a id="on-pipeline-completed"></a>
+
+## On Pipeline Completed
+
+The On Pipeline Completed trigger starts a workflow when a Harness pipeline finishes execution.
+
+### Use Cases
+
+- **Failure alerts**: Notify Slack or create a ticket when a pipeline fails
+- **Pipeline orchestration**: Chain workflows based on pipeline completion
+- **Status monitoring**: Track CI/CD pipeline results across projects
+- **Post-deployment actions**: Run follow-up tasks after successful deployments
+
+### Setup
+
+This trigger requires a webhook to be configured in Harness:
+
+1. In SuperPlane, add this trigger to your workflow and copy the webhook URL displayed
+2. In Harness, go to your pipeline's **Notify** settings
+3. Add a new notification rule with **Webhook** as the channel
+4. Paste the SuperPlane webhook URL
+5. Select the pipeline events you want to listen for (e.g. Pipeline Success, Pipeline Failed)
+
+### Configuration
+
+- **Event Types**: Optionally filter which pipeline events to process (e.g. PipelineSuccess, PipelineFailed). Leave empty to receive all pipeline completion events.
+
+### Event Data
+
+Each pipeline completion event includes:
+- **pipelineName**: Name of the pipeline
+- **pipelineIdentifier**: Pipeline identifier
+- **projectIdentifier**: Project the pipeline belongs to
+- **orgIdentifier**: Organization identifier
+- **eventType**: Type of event (PipelineSuccess, PipelineFailed, PipelineEnd)
+- **executionUrl**: Direct link to the execution in Harness
+- **triggeredBy**: Who or what triggered the pipeline
+- **startTime/endTime**: Execution timestamps
+
+### Example Data
+
+```json
+{
+  "data": {
+    "eventData": {
+      "accountIdentifier": "00000000000000000000000000",
+      "orgIdentifier": "default",
+      "projectIdentifier": "my_project",
+      "pipelineIdentifier": "build_and_deploy",
+      "pipelineName": "Build and Deploy",
+      "planExecutionId": "00000000-0000-0000-0000-000000000000",
+      "executionUrl": "https://app.harness.io/ng/#/account/00000000000000000000000000/cd/orgs/default/projects/my_project/pipelines/build_and_deploy/executions/00000000-0000-0000-0000-000000000000/pipeline",
+      "pipelineUrl": "https://app.harness.io/ng/#/account/00000000000000000000000000/cd/orgs/default/projects/my_project/pipelines/build_and_deploy/pipeline-studio",
+      "eventType": "PipelineSuccess",
+      "nodeStatus": "completed",
+      "triggeredBy": {
+        "triggerType": "MANUAL",
+        "name": "Test User",
+        "email": "test@example.com"
+      },
+      "startTime": "Mon Feb 17 12:00:00 GMT 2026",
+      "startTs": 1771329600,
+      "endTime": "Mon Feb 17 12:05:00 GMT 2026",
+      "endTs": 1771329900
+    }
+  },
+  "timestamp": "2026-02-17T12:05:00Z",
+  "type": "harness.pipeline.completed"
+}
+```
+
+<a id="run-pipeline"></a>
+
+## Run Pipeline
+
+The Run Pipeline component triggers a Harness pipeline execution and waits for it to complete.
+
+### Use Cases
+
+- **Deploy on merge**: Trigger a production deploy pipeline after a successful CI build
+- **Scheduled pipelines**: Run pipelines on a schedule or in response to external events
+- **Pipeline chaining**: Execute one pipeline when another finishes
+- **Cross-project orchestration**: Trigger pipelines across different Harness projects
+
+### How It Works
+
+1. Triggers a pipeline execution via the Harness API
+2. Monitors the pipeline status via polling
+3. Routes execution based on pipeline outcome:
+   - **Success channel**: Pipeline completed successfully
+   - **Failed channel**: Pipeline failed, was aborted, or errored
+
+### Configuration
+
+- **Organization**: The Harness organization identifier
+- **Project**: The Harness project identifier
+- **Pipeline**: The pipeline identifier to execute
+- **Module**: Optional module type (CI, CD)
+
+### Output Channels
+
+- **Success**: Emitted when the pipeline completes successfully
+- **Failed**: Emitted when the pipeline fails, errors, or is aborted
+
+### Example Output
+
+```json
+{
+  "data": {
+    "pipelineIdentifier": "build_and_deploy",
+    "planExecutionId": "00000000-0000-0000-0000-000000000000",
+    "status": "Success",
+    "name": "Build and Deploy",
+    "executionUrl": "https://app.harness.io/ng/account/00000000000000000000000000/module/CI/orgs/default/projects/my_project/pipelines/build_and_deploy/executions/00000000-0000-0000-0000-000000000000/pipeline",
+    "startTs": 1771329600,
+    "endTs": 1771329900
+  },
+  "timestamp": "2026-02-17T12:05:00Z",
+  "type": "harness.pipeline.finished"
+}
+```

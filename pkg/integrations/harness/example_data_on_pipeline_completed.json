@@ -1,0 +1,27 @@
+{
+  "data": {
+    "eventData": {
+      "accountIdentifier": "00000000000000000000000000",
+      "orgIdentifier": "default",
+      "projectIdentifier": "my_project",
+      "pipelineIdentifier": "build_and_deploy",
+      "pipelineName": "Build and Deploy",
+      "planExecutionId": "00000000-0000-0000-0000-000000000000",
+      "executionUrl": "https://app.harness.io/ng/#/account/00000000000000000000000000/cd/orgs/default/projects/my_project/pipelines/build_and_deploy/executions/00000000-0000-0000-0000-000000000000/pipeline",
+      "pipelineUrl": "https://app.harness.io/ng/#/account/00000000000000000000000000/cd/orgs/default/projects/my_project/pipelines/build_and_deploy/pipeline-studio",
+      "eventType": "PipelineSuccess",
+      "nodeStatus": "completed",
+      "triggeredBy": {
+        "triggerType": "MANUAL",
+        "name": "Test User",
+        "email": "test@example.com"
+      },
+      "startTime": "Mon Feb 17 12:00:00 GMT 2026",
+      "startTs": 1771329600,
+      "endTime": "Mon Feb 17 12:05:00 GMT 2026",
+      "endTs": 1771329900
+    }
+  },
+  "timestamp": "2026-02-17T12:05:00Z",
+  "type": "harness.pipeline.completed"
+}

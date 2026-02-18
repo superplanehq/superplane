@@ -85,6 +85,12 @@ import {
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
+import {
+  componentMappers as harnessComponentMappers,
+  customFieldRenderers as harnessCustomFieldRenderers,
+  triggerRenderers as harnessTriggerRenderers,
+  eventStateRegistry as harnessEventStateRegistry,
+} from "./harness/index";
 import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
@@ -177,6 +183,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   claude: claudeComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
+  harness: harnessComponentMappers,
   hetzner: hetznerComponentMappers,
   dockerhub: dockerhubComponentMappers,
 };
@@ -204,6 +211,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
+  harness: harnessTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -228,6 +236,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
+  harness: harnessEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -253,6 +262,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  harness: harnessCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
 };
