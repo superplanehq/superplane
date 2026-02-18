@@ -67,8 +67,8 @@ var exampleDataOnBranchCreatedBytes []byte
 //go:embed example_data_on_workflow_run.json
 var exampleDataOnWorkflowRunBytes []byte
 
-//go:embed get_workflow_usage_example_output.json
-var getWorkflowUsageExampleOutputBytes []byte
+//go:embed example_output_get_workflow_usage.json
+var exampleOutputGetWorkflowUsageBytes []byte
 
 var exampleOutputCreateIssueOnce sync.Once
 var exampleOutputCreateIssue map[string]any
@@ -130,8 +130,8 @@ var exampleDataOnBranchCreated map[string]any
 var exampleDataOnWorkflowRunOnce sync.Once
 var exampleDataOnWorkflowRun map[string]any
 
-var getWorkflowUsageExampleOutputOnce sync.Once
-var getWorkflowUsageExampleOutput map[string]any
+var exampleOutputGetWorkflowUsageOnce sync.Once
+var exampleOutputGetWorkflowUsage map[string]any
 
 func (c *CreateIssue) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIssueOnce, exampleOutputCreateIssueBytes, &exampleOutputCreateIssue)
@@ -226,5 +226,5 @@ func (t *OnWorkflowRun) ExampleData() map[string]any {
 }
 
 func (g *GetWorkflowUsage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&getWorkflowUsageExampleOutputOnce, getWorkflowUsageExampleOutputBytes, &getWorkflowUsageExampleOutput)
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetWorkflowUsageOnce, exampleOutputGetWorkflowUsageBytes, &exampleOutputGetWorkflowUsage)
 }
