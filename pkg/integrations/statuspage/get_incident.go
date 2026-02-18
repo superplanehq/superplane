@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -15,8 +16,9 @@ type GetIncident struct{}
 
 // GetIncidentSpec is the strongly typed configuration for the Get Incident component.
 type GetIncidentSpec struct {
-	Page     string `json:"page"`
-	Incident string `json:"incident"`
+	Page              string `json:"page"`
+	Incident          string `json:"incident"`
+	IncidentExpression string `json:"incidentExpression"`
 }
 
 func (c *GetIncident) Name() string {
@@ -107,11 +109,30 @@ func (c *GetIncident) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "incident",
-			Label:       "Incident ID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Incident",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Incident ID to fetch (supports expressions)",
-			Placeholder: "e.g., p31zjtct2jer or {{ $['Create Incident'].data.id }}",
+			Description: "Select an incident or choose 'Use expression' when page is an expression",
+			Placeholder: "Select an incident",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeIncident,
+					Parameters: []configuration.ParameterRef{
+						{Name: "page_id", ValueFrom: &configuration.ParameterValueFrom{Field: "page"}},
+					},
+				},
+			},
+		},
+		{
+			Name:        "incidentExpression",
+			Label:       "Incident expression",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Expression for incident ID when using expression for page (e.g. {{ $['Create Incident'].data.id }})",
+			Placeholder: "e.g. {{ $['Create Incident'].data.id }}",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "incident", Values: []string{IncidentUseExpressionID}},
+			},
 		},
 	}
 }
@@ -130,8 +151,20 @@ func (c *GetIncident) Setup(ctx core.SetupContext) error {
 	if spec.Incident == "" {
 		return errors.New("incident is required")
 	}
+	if spec.Incident == IncidentUseExpressionID {
+		if spec.IncidentExpression == "" {
+			return errors.New("incident expression is required when using expression for incident")
+		}
+	}
 
 	metadata := resolveMetadataSetup(ctx, spec.Page, nil)
+	if spec.Incident != "" && spec.Incident != IncidentUseExpressionID && !strings.Contains(spec.Incident, "{{") {
+		incidentName, err := resolveIncidentName(ctx, spec.Page, spec.Incident)
+		if err != nil {
+			return fmt.Errorf("incident not found or inaccessible: %w", err)
+		}
+		metadata.IncidentName = incidentName
+	}
 	return ctx.Metadata.Set(metadata)
 }
 
@@ -142,12 +175,20 @@ func (c *GetIncident) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %w", err)
 	}
 
+	incidentID := spec.Incident
+	if incidentID == IncidentUseExpressionID {
+		incidentID = spec.IncidentExpression
+	}
+	if incidentID == "" {
+		return fmt.Errorf("incident ID is required")
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %w", err)
 	}
 
-	incident, err := client.GetIncident(spec.Page, spec.Incident)
+	incident, err := client.GetIncident(spec.Page, incidentID)
 	if err != nil {
 		return fmt.Errorf("failed to get incident: %w", err)
 	}

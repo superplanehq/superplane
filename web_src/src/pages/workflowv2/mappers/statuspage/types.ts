@@ -1,6 +1,7 @@
 export interface StatuspageNodeMetadata {
   pageName?: string;
   componentNames?: string[];
+  incidentName?: string;
 }
 
 export interface StatuspageIncidentUpdate {

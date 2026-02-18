@@ -62,6 +62,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as {
     page?: string;
     incident?: string;
+    incidentExpression?: string;
   };
   const nodeMetadata = node.metadata as StatuspageNodeMetadata | undefined;
 
@@ -70,7 +71,10 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "globe", label: "Page: " + pageLabel });
   }
   if (configuration?.incident) {
-    const incidentLabel = truncateForDisplay(configuration.incident);
+    const incidentLabel =
+      configuration.incident === "__use_expression__"
+        ? truncateForDisplay(configuration.incidentExpression ?? "expression")
+        : nodeMetadata?.incidentName ?? truncateForDisplay(configuration.incident);
     metadata.push({ icon: "alert-triangle", label: "Incident: " + incidentLabel });
   }
 

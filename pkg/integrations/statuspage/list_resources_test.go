@@ -111,6 +111,101 @@ func Test__ListResources__Component_expression_page_id(t *testing.T) {
 	assert.Empty(t, resources)
 }
 
+func Test__ListResources__Incident_with_page_id(t *testing.T) {
+	s := &Statuspage{}
+	incidentsJSON := `[{"id":"inc1","name":"Outage"},{"id":"inc2","name":"Scheduled Maintenance"}]`
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(incidentsJSON)),
+			},
+		},
+	}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{"apiKey": "test-key"},
+	}
+	ctx := core.ListResourcesContext{
+		HTTP:        httpContext,
+		Integration: integrationCtx,
+		Parameters:  map[string]string{"page_id": "page1"},
+	}
+
+	resources, err := s.ListResources(ResourceTypeIncident, ctx)
+	require.NoError(t, err)
+	require.Len(t, resources, 2)
+	assert.Equal(t, ResourceTypeIncident, resources[0].Type)
+	assert.Equal(t, "Outage", resources[0].Name)
+	assert.Equal(t, "inc1", resources[0].ID)
+	assert.Equal(t, ResourceTypeIncident, resources[1].Type)
+	assert.Equal(t, "Scheduled Maintenance", resources[1].Name)
+	assert.Equal(t, "inc2", resources[1].ID)
+	require.Len(t, httpContext.Requests, 1)
+	assert.Contains(t, httpContext.Requests[0].URL.String(), "/pages/page1/incidents")
+}
+
+func Test__ListResources__Incident_empty_page_id(t *testing.T) {
+	s := &Statuspage{}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{"apiKey": "test-key"},
+	}
+	ctx := core.ListResourcesContext{
+		HTTP:        nil,
+		Integration: integrationCtx,
+		Parameters:  map[string]string{},
+	}
+
+	resources, err := s.ListResources(ResourceTypeIncident, ctx)
+	require.NoError(t, err)
+	require.Len(t, resources, 1)
+	assert.Equal(t, IncidentUseExpressionID, resources[0].ID)
+}
+
+func Test__ListResources__Incident_expression_page_id(t *testing.T) {
+	s := &Statuspage{}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{"apiKey": "test-key"},
+	}
+	ctx := core.ListResourcesContext{
+		HTTP:        nil,
+		Integration: integrationCtx,
+		Parameters:  map[string]string{"page_id": "{{ previous().data.page_id }}"},
+	}
+
+	resources, err := s.ListResources(ResourceTypeIncident, ctx)
+	require.NoError(t, err)
+	require.Len(t, resources, 1)
+	assert.Equal(t, IncidentUseExpressionID, resources[0].ID)
+}
+
+func Test__ListResources__Incident_invalid_page_id_returns_use_expression(t *testing.T) {
+	// When page_id is invalid (e.g. from expression or typo like "bla bla"), API returns 404.
+	// Return "Use expression" option so user can select it and type expression in incidentExpression field.
+	s := &Statuspage{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader(`{"error":"Not found"}`)),
+			},
+		},
+	}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{"apiKey": "test-key"},
+	}
+	ctx := core.ListResourcesContext{
+		HTTP:        httpContext,
+		Integration: integrationCtx,
+		Parameters:  map[string]string{"page_id": "bla bla"},
+	}
+
+	resources, err := s.ListResources(ResourceTypeIncident, ctx)
+	require.NoError(t, err)
+	require.Len(t, resources, 1)
+	assert.Equal(t, IncidentUseExpressionID, resources[0].ID)
+	assert.Equal(t, "Use expression for incident", resources[0].Name)
+}
+
 func Test__ListResources__Unknown_type(t *testing.T) {
 	s := &Statuspage{}
 	integrationCtx := &contexts.IntegrationContext{

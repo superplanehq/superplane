@@ -54,6 +54,14 @@ func Test__UpdateIncident__Setup(t *testing.T) {
 	component := &UpdateIncident{}
 
 	t.Run("valid configuration with status and body", func(t *testing.T) {
+		incidentResponse := `{"incident":` + sampleRealtimeIncidentJSON + `}`
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"id":"kctbh9vrtdwd","name":"My Page"}]`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(incidentResponse))},
+			},
+		}
+		metadataCtx := &contexts.MetadataContext{}
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{"apiKey": "test-key"},
 		}
@@ -65,10 +73,14 @@ func Test__UpdateIncident__Setup(t *testing.T) {
 				"statusRealtime": "resolved",
 				"body":           "Issue resolved.",
 			},
+			HTTP:        httpContext,
 			Integration: integrationCtx,
-			Metadata:    &contexts.MetadataContext{},
+			Metadata:    metadataCtx,
 		})
 		require.NoError(t, err)
+		md, ok := metadataCtx.Metadata.(NodeMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "Database Connection Issues", md.IncidentName)
 	})
 
 	t.Run("valid configuration with status only", func(t *testing.T) {
@@ -169,6 +181,78 @@ func Test__UpdateIncident__Setup(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "at least one of status, body, impact override, or components must be provided")
 	})
+
+	t.Run("incident not found returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"error":"Not found"}`))},
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-key"},
+		}
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"page":           "kctbh9vrtdwd",
+				"incident":       "nonexistent",
+				"incidentType":   "realtime",
+				"statusRealtime": "resolved",
+			},
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			Metadata:    &contexts.MetadataContext{},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "incident not found or inaccessible")
+	})
+
+	t.Run("expression incident skips verification", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-key"},
+		}
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"page":           "kctbh9vrtdwd",
+				"incident":       "{{ $['Create Incident'].data.id }}",
+				"incidentType":   "realtime",
+				"statusRealtime": "resolved",
+			},
+			Integration: integrationCtx,
+			Metadata:    &contexts.MetadataContext{},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("use expression without incidentExpression returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"page":           "kctbh9vrtdwd",
+				"incident":       IncidentUseExpressionID,
+				"incidentType":   "realtime",
+				"statusRealtime": "resolved",
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "incident expression is required")
+	})
+
+	t.Run("use expression with incidentExpression succeeds", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-key"},
+		}
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"page":               "kctbh9vrtdwd",
+				"incident":           IncidentUseExpressionID,
+				"incidentExpression": "{{ $['Create Incident'].data.id }}",
+				"incidentType":       "realtime",
+				"statusRealtime":     "resolved",
+			},
+			Integration: integrationCtx,
+			Metadata:    &contexts.MetadataContext{},
+		})
+		require.NoError(t, err)
+	})
 }
 
 func Test__UpdateIncident__Execute(t *testing.T) {
@@ -217,6 +301,41 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 		assert.Equal(t, "Database Connection Issues", data["name"])
 		assert.Equal(t, "resolved", data["status"])
 		assert.Equal(t, "http://stspg.io/p31zjtct2jer", data["shortlink"])
+	})
+
+	t.Run("use expression with incidentExpression uses resolved value", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(sampleRealtimeIncidentJSON))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(sampleUpdatedIncidentJSON))},
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-key"},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"page":               "kctbh9vrtdwd",
+				"incident":           IncidentUseExpressionID,
+				"incidentExpression": "p31zjtct2jer",
+				"incidentType":       "realtime",
+				"statusRealtime":     "resolved",
+				"body":               "Updated.",
+			},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: executionState,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, executionState.Payloads, 1)
+		wrapped, ok := executionState.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		data, ok := wrapped["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "p31zjtct2jer", data["id"])
 	})
 
 	t.Run("deliver_notifications false is sent in request", func(t *testing.T) {

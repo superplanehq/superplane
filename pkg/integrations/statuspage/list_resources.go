@@ -10,6 +10,7 @@ import (
 const (
 	ResourceTypePage                    = "page"
 	ResourceTypeComponent               = "component"
+	ResourceTypeIncident                = "incident"
 	ResourceTypeImpact                  = "impact"
 	ResourceTypeImpactUpdate            = "impact_update" // includes Don't override (__none__), maintenance for Update Incident
 	ResourceTypeIncidentStatusRealtime  = "incident_status_realtime"
@@ -23,6 +24,8 @@ func (s *Statuspage) ListResources(resourceType string, ctx core.ListResourcesCo
 		return listPages(ctx)
 	case ResourceTypeComponent:
 		return listComponents(ctx)
+	case ResourceTypeIncident:
+		return listIncidents(ctx)
 	case ResourceTypeImpact:
 		return listImpactResources()
 	case ResourceTypeImpactUpdate:
@@ -130,6 +133,47 @@ func listComponents(ctx core.ListResourcesContext) ([]core.IntegrationResource, 
 			Type: ResourceTypeComponent,
 			Name: comp.Name,
 			ID:   comp.ID,
+		})
+	}
+	return resources, nil
+}
+
+// IncidentUseExpressionID is the sentinel value when user selects "Use expression" from the dropdown
+// (shown when page is expression or invalid). The incidentExpression field then holds the actual expression.
+const IncidentUseExpressionID = "__use_expression__"
+
+func listIncidents(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	pageID := ctx.Parameters["page_id"]
+	if pageID == "" || strings.Contains(pageID, "{{") {
+		// Page is expression or not yet selected. Offer "Use expression" so user can type incident expression.
+		return []core.IntegrationResource{
+			{Type: ResourceTypeIncident, Name: "Use expression for incident", ID: IncidentUseExpressionID},
+		}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	incidents, err := client.ListIncidents(pageID, "", 100)
+	if err != nil {
+		// When page_id is invalid (e.g. from expression or typo), API returns 404.
+		// Return "Use expression" option so user can select it and type expression in incidentExpression field.
+		if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "not found") {
+			return []core.IntegrationResource{
+				{Type: ResourceTypeIncident, Name: "Use expression for incident", ID: IncidentUseExpressionID},
+			}, nil
+		}
+		return nil, fmt.Errorf("failed to list incidents: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(incidents))
+	for _, inc := range incidents {
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeIncident,
+			Name: inc.Name,
+			ID:   inc.ID,
 		})
 	}
 	return resources, nil

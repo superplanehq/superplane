@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -25,9 +26,10 @@ func isScheduledStatus(status string) bool {
 
 // UpdateIncidentSpec is the strongly typed configuration for the Update Incident component.
 type UpdateIncidentSpec struct {
-	Page            string `json:"page"`
-	Incident        string `json:"incident"`
-	IncidentType    string `json:"incidentType"`
+	Page               string `json:"page"`
+	Incident           string `json:"incident"`
+	IncidentExpression string `json:"incidentExpression"`
+	IncidentType       string `json:"incidentType"`
 	StatusRealtime  string `json:"statusRealtime"`
 	StatusScheduled string `json:"statusScheduled"`
 	Body            string `json:"body"`
@@ -134,11 +136,30 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "incident",
-			Label:       "Incident ID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Incident",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Incident ID to update (supports expressions)",
-			Placeholder: "e.g., p31zjtct2jer or {{ $['Create Incident'].data.id }}",
+			Description: "Select an incident or choose 'Use expression' when page is an expression",
+			Placeholder: "Select an incident",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeIncident,
+					Parameters: []configuration.ParameterRef{
+						{Name: "page_id", ValueFrom: &configuration.ParameterValueFrom{Field: "page"}},
+					},
+				},
+			},
+		},
+		{
+			Name:        "incidentExpression",
+			Label:       "Incident expression",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Expression for incident ID when using expression for page (e.g. {{ $['Create Incident'].data.id }})",
+			Placeholder: "e.g. {{ $['Create Incident'].data.id }}",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "incident", Values: []string{IncidentUseExpressionID}},
+			},
 		},
 		{
 			Name:     "incidentType",
@@ -275,6 +296,11 @@ func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
 	if spec.Incident == "" {
 		return errors.New("incident is required")
 	}
+	if spec.Incident == IncidentUseExpressionID {
+		if spec.IncidentExpression == "" {
+			return errors.New("incident expression is required when using expression for incident")
+		}
+	}
 
 	incidentType := spec.IncidentType
 	if incidentType == "" {
@@ -307,6 +333,13 @@ func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
 		return ids
 	})
 	metadata := resolveMetadataSetup(ctx, spec.Page, componentIDs)
+	if spec.Incident != "" && spec.Incident != IncidentUseExpressionID && !strings.Contains(spec.Incident, "{{") {
+		incidentName, err := resolveIncidentName(ctx, spec.Page, spec.Incident)
+		if err != nil {
+			return fmt.Errorf("incident not found or inaccessible: %w", err)
+		}
+		metadata.IncidentName = incidentName
+	}
 	return ctx.Metadata.Set(metadata)
 }
 
@@ -315,6 +348,14 @@ func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
 		return fmt.Errorf("error decoding configuration: %w", err)
+	}
+
+	incidentID := spec.Incident
+	if incidentID == IncidentUseExpressionID {
+		incidentID = spec.IncidentExpression
+	}
+	if incidentID == "" {
+		return fmt.Errorf("incident ID is required")
 	}
 
 	incidentType := spec.IncidentType
@@ -346,7 +387,7 @@ func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if effectiveStatus != "" {
-		existing, err := client.GetIncident(spec.Page, spec.Incident)
+		existing, err := client.GetIncident(spec.Page, incidentID)
 		if err != nil {
 			return fmt.Errorf("failed to fetch incident for validation: %w", err)
 		}
@@ -400,7 +441,7 @@ func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 		DeliverNotifications: spec.DeliverNotifications,
 	}
 
-	incident, err := client.UpdateIncident(spec.Page, spec.Incident, req)
+	incident, err := client.UpdateIncident(spec.Page, incidentID, req)
 	if err != nil {
 		return fmt.Errorf("failed to update incident: %w", err)
 	}

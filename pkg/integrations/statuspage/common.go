@@ -10,6 +10,7 @@ import (
 type NodeMetadata struct {
 	PageName       string   `json:"pageName"`
 	ComponentNames []string `json:"componentNames,omitempty"`
+	IncidentName   string   `json:"incidentName,omitempty"`
 }
 
 // containsExpression returns true if any string in the slice contains an expression placeholder.
@@ -90,6 +91,26 @@ func resolveMetadataSetup(ctx core.SetupContext, pageID string, componentIDs []s
 		}
 	}
 	return metadata
+}
+
+// resolveIncidentName fetches the incident from the API when both IDs are static (no expressions).
+// Returns the incident name and nil on success. Returns ("", err) when the incident does not exist or on API error.
+func resolveIncidentName(ctx core.SetupContext, pageID, incidentID string) (string, error) {
+	if pageID == "" || incidentID == "" || strings.Contains(pageID, "{{") || strings.Contains(incidentID, "{{") || ctx.HTTP == nil {
+		return "", nil
+	}
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return "", err
+	}
+	inc, err := client.GetIncident(pageID, incidentID)
+	if err != nil {
+		return "", err
+	}
+	if name, ok := inc["name"].(string); ok {
+		return name, nil
+	}
+	return "", nil
 }
 
 // componentIDsForMetadataSetup returns component IDs from config or from getIDsFromSpec when config has none.
