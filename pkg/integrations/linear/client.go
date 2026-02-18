@@ -137,7 +137,11 @@ func (c *Client) ListTeams() ([]Team, error) {
 		if !out.Teams.PageInfo.HasNextPage {
 			break
 		}
-		cursor = &out.Teams.PageInfo.EndCursor
+		newCursor := out.Teams.PageInfo.EndCursor
+		if cursor != nil && newCursor == *cursor {
+			break
+		}
+		cursor = &newCursor
 	}
 	return all, nil
 }
@@ -181,7 +185,11 @@ func (c *Client) ListLabels() ([]Label, error) {
 		if !out.Organization.Labels.PageInfo.HasNextPage {
 			break
 		}
-		cursor = &out.Organization.Labels.PageInfo.EndCursor
+		newCursor := out.Organization.Labels.PageInfo.EndCursor
+		if cursor != nil && newCursor == *cursor {
+			break
+		}
+		cursor = &newCursor
 	}
 	return all, nil
 }

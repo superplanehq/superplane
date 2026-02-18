@@ -39,7 +39,7 @@ const (
 )
 
 func init() {
-	registry.RegisterIntegrationWithWebhookHandler("linear", &Linear{}, &LinearWebhookHandler{})
+	registry.RegisterIntegration("linear", &Linear{})
 }
 
 type Linear struct{}

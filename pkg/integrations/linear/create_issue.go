@@ -196,10 +196,6 @@ func (c *CreateIssue) Setup(ctx core.SetupContext) error {
 }
 
 func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
-	if ctx.Integration == nil {
-		return fmt.Errorf("integration not configured")
-	}
-
 	spec := CreateIssueSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("decode configuration: %w", err)
