@@ -120,6 +120,11 @@ import {
   eventStateRegistry as cursorEventStateRegistry,
 } from "./cursor/index";
 import {
+  componentMappers as opencostComponentMappers,
+  triggerRenderers as opencostTriggerRenderers,
+  eventStateRegistry as opencostEventStateRegistry,
+} from "./opencost/index";
+import {
   componentMappers as dockerhubComponentMappers,
   customFieldRenderers as dockerhubCustomFieldRenderers,
   triggerRenderers as dockerhubTriggerRenderers,
@@ -179,6 +184,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cursor: cursorComponentMappers,
   hetzner: hetznerComponentMappers,
   dockerhub: dockerhubComponentMappers,
+  opencost: opencostComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -204,6 +210,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
+  opencost: opencostTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -228,6 +235,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
+  opencost: opencostEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {

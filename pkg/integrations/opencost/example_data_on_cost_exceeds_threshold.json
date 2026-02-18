@@ -1,0 +1,18 @@
+{
+  "data": {
+    "name": "production",
+    "start": "2026-02-17T00:00:00Z",
+    "end": "2026-02-18T00:00:00Z",
+    "cpuCost": 28.45,
+    "gpuCost": 0,
+    "ramCost": 18.32,
+    "pvCost": 5.67,
+    "networkCost": 2.12,
+    "totalCost": 54.56,
+    "threshold": 50,
+    "window": "1d",
+    "aggregate": "namespace"
+  },
+  "timestamp": "2026-02-18T09:05:00.000Z",
+  "type": "opencost.costAllocation"
+}
