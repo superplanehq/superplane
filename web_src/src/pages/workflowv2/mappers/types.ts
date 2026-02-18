@@ -169,15 +169,20 @@ export interface EventStateRegistry {
  * for specific component/trigger types. Can be used for both settings sidebar
  * (via getCustomFieldRenderer) and canvas nodes (via customField prop).
  */
+export interface CustomFieldRendererContext {
+  onRun?: (initialData?: string) => void;
+  /** Full integration object when editing an app trigger/component (e.g. for incident webhook status) */
+  integration?: import("@/api-client").OrganizationsIntegration;
+}
+
 export interface CustomFieldRenderer {
   /**
    * Render custom UI for the given node configuration
    * @param node The node from the backend
-   * @param configuration Current node configuration
-   * @param context Optional context with additional handlers (e.g., onRun for triggering the emit modal with initial data)
+   * @param context Optional context (e.g., onRun, integration for app nodes)
    * @returns React node to render
    */
-  render(node: NodeInfo, context?: { onRun?: (initialData?: string) => void }): ReactNode;
+  render(node: NodeInfo, context?: CustomFieldRendererContext): ReactNode;
 }
 
 export interface OutputPayload {
