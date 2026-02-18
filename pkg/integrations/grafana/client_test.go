@@ -169,3 +169,45 @@ func Test__Client__DeleteContactPoint__NotFoundIsIgnored(t *testing.T) {
 	err := client.DeleteContactPoint("cp_missing")
 	require.NoError(t, err)
 }
+
+func Test__Client__listContactPoints__AcceptsWrappedItemsFormat(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"items":[{"uid":"cp_1","name":"superplane-1"}]}`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	points, err := client.listContactPoints()
+	require.NoError(t, err)
+	require.Len(t, points, 1)
+	require.Equal(t, "cp_1", points[0].UID)
+}
+
+func Test__Client__listContactPoints__ErrorsWhenWrappedItemsFieldMissing(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"contactPoints":[{"uid":"cp_1","name":"superplane-1"}]}`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	_, err := client.listContactPoints()
+	require.ErrorContains(t, err, "error parsing contact points response")
+}

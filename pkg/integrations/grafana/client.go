@@ -165,10 +165,19 @@ func (c *Client) listContactPoints() ([]contactPoint, error) {
 	}
 
 	wrapped := struct {
-		Items []contactPoint `json:"items"`
+		Items json.RawMessage `json:"items"`
 	}{}
 	if err := json.Unmarshal(responseBody, &wrapped); err == nil {
-		return wrapped.Items, nil
+		if wrapped.Items == nil || bytes.Equal(bytes.TrimSpace(wrapped.Items), []byte("null")) {
+			return nil, fmt.Errorf("error parsing contact points response")
+		}
+
+		var items []contactPoint
+		if err := json.Unmarshal(wrapped.Items, &items); err != nil {
+			return nil, fmt.Errorf("error parsing contact points response")
+		}
+
+		return items, nil
 	}
 
 	return nil, fmt.Errorf("error parsing contact points response")
