@@ -100,6 +100,29 @@ func Test__CreateIncident__Setup(t *testing.T) {
 		assert.Contains(t, err.Error(), "page is required")
 	})
 
+	t.Run("page not found returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"id":"other-page","name":"Other"}]`))},
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-key"},
+		}
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"page":         "nonexistent-page",
+				"incidentType": "realtime",
+				"name":         "Test Incident",
+			},
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			Metadata:    &contexts.MetadataContext{},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "page \"nonexistent-page\" not found or not accessible")
+	})
+
 	t.Run("missing incidentType returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
@@ -160,6 +183,49 @@ func Test__CreateIncident__Setup(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "scheduledFor must be before scheduledUntil")
+	})
+
+	t.Run("scheduled with invalid scheduledFor returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"page":           "kctbh9vrtdwd",
+				"incidentType":   "scheduled",
+				"name":           "Scheduled Maintenance",
+				"scheduledFor":   "not-a-valid-datetime",
+				"scheduledUntil": "2026-02-15T04:00:00Z",
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid scheduledFor")
+	})
+
+	t.Run("scheduled with invalid scheduledUntil returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"page":           "kctbh9vrtdwd",
+				"incidentType":   "scheduled",
+				"name":           "Scheduled Maintenance",
+				"scheduledFor":   "2026-02-15T02:00:00Z",
+				"scheduledUntil": "invalid-datetime",
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid scheduledUntil")
+	})
+
+	t.Run("scheduled with invalid timezone returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"page":              "kctbh9vrtdwd",
+				"incidentType":      "scheduled",
+				"name":              "Scheduled Maintenance",
+				"scheduledFor":      "2026-02-15T02:00",
+				"scheduledUntil":    "2026-02-15T04:00",
+				"scheduledTimezone": "Invalid/Timezone",
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid scheduledFor")
 	})
 
 	t.Run("valid configuration with components", func(t *testing.T) {

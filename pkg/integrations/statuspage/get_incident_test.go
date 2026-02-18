@@ -82,6 +82,7 @@ func Test__GetIncident__Setup(t *testing.T) {
 	t.Run("incident not found returns error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"id":"kctbh9vrtdwd","name":"My Page"}]`))},
 				{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"error":"Not found"}`))},
 			},
 		}

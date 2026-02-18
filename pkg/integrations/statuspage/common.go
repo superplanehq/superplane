@@ -1,6 +1,7 @@
 package statuspage
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -55,24 +56,32 @@ func resolveComponentNameOrIDs(client *Client, pageID string, nameOrIDToStatus m
 }
 
 // resolveMetadataSetup fetches page and component names from the API when pageID and componentIDs
-// are static (no expressions). Returns empty metadata if HTTP context is unavailable or on error.
-func resolveMetadataSetup(ctx core.SetupContext, pageID string, componentIDs []string) NodeMetadata {
+// are static (no expressions). Verifies page existence when static and HTTP is available;
+// returns an error when page resolution fails. Component metadata is best-effort only.
+// Returns empty metadata and nil when verification is skipped (expression, no HTTP, etc.).
+func resolveMetadataSetup(ctx core.SetupContext, pageID string, componentIDs []string) (NodeMetadata, error) {
 	metadata := NodeMetadata{}
 	if pageID == "" || strings.Contains(pageID, "{{") || ctx.HTTP == nil {
-		return metadata
+		return metadata, nil
 	}
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return metadata
+		return NodeMetadata{}, fmt.Errorf("failed to create client: %w", err)
 	}
 	pages, err := client.ListPages()
-	if err == nil {
-		for _, p := range pages {
-			if p.ID == pageID {
-				metadata.PageName = p.Name
-				break
-			}
+	if err != nil {
+		return NodeMetadata{}, fmt.Errorf("failed to list pages: %w", err)
+	}
+	var pageFound bool
+	for _, p := range pages {
+		if p.ID == pageID {
+			metadata.PageName = p.Name
+			pageFound = true
+			break
 		}
+	}
+	if !pageFound {
+		return NodeMetadata{}, fmt.Errorf("page %q not found or not accessible", pageID)
 	}
 	if len(componentIDs) > 0 && !containsExpression(componentIDs) {
 		components, err := client.ListComponents(pageID)
@@ -90,7 +99,7 @@ func resolveMetadataSetup(ctx core.SetupContext, pageID string, componentIDs []s
 			}
 		}
 	}
-	return metadata
+	return metadata, nil
 }
 
 // resolveIncidentName fetches the incident from the API when both IDs are static (no expressions).

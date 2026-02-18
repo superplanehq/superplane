@@ -392,15 +392,27 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 			return errors.New("scheduledUntil is required for scheduled incidents")
 		}
 
-		// Validate scheduledFor is before scheduledUntil
+		// Validate scheduledFor and scheduledUntil when static (no expressions).
+		// Invalid datetime/timezone values must fail setup, not Execute.
+		forStr := derefStr(spec.ScheduledFor)
+		untilStr := derefStr(spec.ScheduledUntil)
 		tz := "UTC"
 		if spec.ScheduledTimezone != nil && *spec.ScheduledTimezone != "" {
 			tz = *spec.ScheduledTimezone
 		}
-		parsedFor, errFor := toUTCISO8601(derefStr(spec.ScheduledFor), tz)
-		parsedUntil, errUntil := toUTCISO8601(derefStr(spec.ScheduledUntil), tz)
-		if errFor == nil && errUntil == nil && parsedFor >= parsedUntil {
-			return errors.New("scheduledFor must be before scheduledUntil")
+		canValidate := !strings.Contains(forStr, "{{") && !strings.Contains(untilStr, "{{") && !strings.Contains(tz, "{{")
+		if canValidate {
+			parsedFor, errFor := toUTCISO8601(forStr, tz)
+			if errFor != nil {
+				return fmt.Errorf("invalid scheduledFor: %w", errFor)
+			}
+			parsedUntil, errUntil := toUTCISO8601(untilStr, tz)
+			if errUntil != nil {
+				return fmt.Errorf("invalid scheduledUntil: %w", errUntil)
+			}
+			if parsedFor >= parsedUntil {
+				return errors.New("scheduledFor must be before scheduledUntil")
+			}
 		}
 	}
 
@@ -414,7 +426,10 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 		}
 		return ids
 	})
-	metadata := resolveMetadataSetup(ctx, spec.Page, componentIDs)
+	metadata, err := resolveMetadataSetup(ctx, spec.Page, componentIDs)
+	if err != nil {
+		return err
+	}
 	return ctx.Metadata.Set(metadata)
 }
 

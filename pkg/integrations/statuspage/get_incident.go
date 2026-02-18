@@ -16,8 +16,8 @@ type GetIncident struct{}
 
 // GetIncidentSpec is the strongly typed configuration for the Get Incident component.
 type GetIncidentSpec struct {
-	Page              string `json:"page"`
-	Incident          string `json:"incident"`
+	Page               string `json:"page"`
+	Incident           string `json:"incident"`
 	IncidentExpression string `json:"incidentExpression"`
 }
 
@@ -157,7 +157,10 @@ func (c *GetIncident) Setup(ctx core.SetupContext) error {
 		}
 	}
 
-	metadata := resolveMetadataSetup(ctx, spec.Page, nil)
+	metadata, err := resolveMetadataSetup(ctx, spec.Page, nil)
+	if err != nil {
+		return err
+	}
 	if spec.Incident != "" && spec.Incident != IncidentUseExpressionID && !strings.Contains(spec.Incident, "{{") {
 		incidentName, err := resolveIncidentName(ctx, spec.Page, spec.Incident)
 		if err != nil {

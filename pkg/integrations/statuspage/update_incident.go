@@ -30,11 +30,11 @@ type UpdateIncidentSpec struct {
 	Incident           string `json:"incident"`
 	IncidentExpression string `json:"incidentExpression"`
 	IncidentType       string `json:"incidentType"`
-	StatusRealtime  string `json:"statusRealtime"`
-	StatusScheduled string `json:"statusScheduled"`
-	Body            string `json:"body"`
-	ImpactOverride  string `json:"impactOverride"`
-	Components      []struct {
+	StatusRealtime     string `json:"statusRealtime"`
+	StatusScheduled    string `json:"statusScheduled"`
+	Body               string `json:"body"`
+	ImpactOverride     string `json:"impactOverride"`
+	Components         []struct {
 		ComponentID string `json:"componentId"`
 		Status      string `json:"status"`
 	} `json:"components"`
@@ -332,7 +332,10 @@ func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
 		}
 		return ids
 	})
-	metadata := resolveMetadataSetup(ctx, spec.Page, componentIDs)
+	metadata, err := resolveMetadataSetup(ctx, spec.Page, componentIDs)
+	if err != nil {
+		return err
+	}
 	if spec.Incident != "" && spec.Incident != IncidentUseExpressionID && !strings.Contains(spec.Incident, "{{") {
 		incidentName, err := resolveIncidentName(ctx, spec.Page, spec.Incident)
 		if err != nil {
