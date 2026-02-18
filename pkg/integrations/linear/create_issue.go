@@ -206,6 +206,9 @@ func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
 	if spec.Title == "" {
 		return fmt.Errorf("title is required")
 	}
+	if ctx.Integration == nil {
+		return fmt.Errorf("integration not configured")
+	}
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("create client: %w", err)
