@@ -405,3 +405,44 @@ func FindNodeQueueItem(workflowID uuid.UUID, queueItemID uuid.UUID) (*CanvasNode
 
 	return &queueItem, nil
 }
+
+// ListDeletedCanvasNodes returns soft-deleted canvas nodes whose parent canvas
+// is NOT soft-deleted. These are nodes removed during workflow updates that
+// need their associated resources cleaned up.
+func ListDeletedCanvasNodes() ([]CanvasNode, error) {
+	var nodes []CanvasNode
+	err := database.Conn().
+		Unscoped().
+		Joins("JOIN workflows ON workflow_nodes.workflow_id = workflows.id").
+		Where("workflow_nodes.deleted_at IS NOT NULL").
+		Where("workflows.deleted_at IS NULL").
+		Find(&nodes).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
+}
+
+// LockDeletedCanvasNode locks a soft-deleted canvas node for processing
+// using SELECT FOR UPDATE SKIP LOCKED.
+func LockDeletedCanvasNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*CanvasNode, error) {
+	var node CanvasNode
+
+	err := tx.
+		Unscoped().
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Where("deleted_at IS NOT NULL").
+		First(&node).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &node, nil
+}
