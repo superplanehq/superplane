@@ -27,8 +27,10 @@ import { deleteTopicMapper } from "./sns/delete_topic";
 import { getSubscriptionMapper } from "./sns/get_subscription";
 import { getTopicMapper } from "./sns/get_topic";
 import { publishMessageMapper } from "./sns/publish_message";
+import { runPipelineMapper } from "./codepipeline/run_pipeline";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
+  "codepipeline.runPipeline": runPipelineMapper,
   "lambda.runFunction": runFunctionMapper,
   "ecs.describeService": describeServiceMapper,
   "ecs.runTask": runTaskMapper,
