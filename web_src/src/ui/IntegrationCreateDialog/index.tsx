@@ -240,7 +240,7 @@ export function IntegrationCreateDialog({
                 </div>
               </div>
               {configurationFields
-                ?.filter((f: ConfigurationField) => f.name === "signingSecret")
+                ?.filter((f: ConfigurationField) => f.name === "signingSecret" || f.name === "webhookSigningSecret")
                 .map((field) => (
                   <ConfigurationFieldRenderer
                     key={field.name}
