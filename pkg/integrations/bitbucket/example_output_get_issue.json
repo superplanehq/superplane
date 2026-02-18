@@ -1,0 +1,22 @@
+{
+  "data": {
+    "id": 42,
+    "title": "Investigate API timeout spike",
+    "state": "open",
+    "kind": "bug",
+    "priority": "major",
+    "reporter": {
+      "display_name": "Jane Doe"
+    },
+    "assignee": {
+      "display_name": "John Doe"
+    },
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/my-workspace/my-repo/issues/42/investigate-api-timeout-spike"
+      }
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00.000000000Z",
+  "type": "bitbucket.issue"
+}

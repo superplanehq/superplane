@@ -4,10 +4,21 @@ title: "Bitbucket"
 
 React to events in your Bitbucket repositories
 
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
 ## Triggers
 
 <CardGrid>
   <LinkCard title="On Push" href="#on-push" description="Listen to Bitbucket push events" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a Bitbucket repository" />
+  <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a Bitbucket issue" />
+  <LinkCard title="Get Issue" href="#get-issue" description="Get a Bitbucket issue by ID" />
+  <LinkCard title="Update Issue" href="#update-issue" description="Update an existing Bitbucket issue" />
 </CardGrid>
 
 ## Instructions
@@ -146,6 +157,187 @@ This trigger automatically sets up a Bitbucket webhook when configured. The webh
     "type": "repository",
     "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}"
   }
+}
+```
+
+<a id="create-issue"></a>
+
+## Create Issue
+
+The Create Issue component creates a new issue in a Bitbucket repository.
+
+### Use Cases
+
+- **Incident follow-ups**: Open issues automatically from alerts
+- **Task creation**: Turn workflow outputs into trackable work
+- **Operational logging**: Capture remediation steps as issues
+
+### Configuration
+
+- **Repository**: Select the Bitbucket repository where the issue will be created
+- **Title**: The issue title (supports expressions)
+- **Body**: Optional issue description
+
+### Output
+
+Returns the created issue payload from Bitbucket.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": 42,
+    "title": "Investigate API timeout spike",
+    "state": "new",
+    "kind": "bug",
+    "priority": "major",
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/my-workspace/my-repo/issues/42/investigate-api-timeout-spike"
+      }
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00.000000000Z",
+  "type": "bitbucket.issue"
+}
+```
+
+<a id="create-issue-comment"></a>
+
+## Create Issue Comment
+
+The Create Issue Comment component adds a comment to a Bitbucket issue.
+
+### Use Cases
+
+- **Incident updates**: Post status updates on linked issues
+- **Automation notes**: Record workflow decisions directly on issues
+- **Cross-system sync**: Mirror notes from external systems into Bitbucket
+
+### Configuration
+
+- **Repository**: Select the Bitbucket repository containing the issue
+- **Issue Number**: Numeric issue ID to comment on (supports expressions)
+- **Body**: Comment text
+
+### Output
+
+Returns the created issue comment payload from Bitbucket.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": 1001,
+    "content": {
+      "raw": "Deployment completed successfully in production."
+    },
+    "created_on": "2026-02-18T12:00:00.000000+00:00",
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/my-workspace/my-repo/issues/42#comment-1001"
+      }
+    },
+    "user": {
+      "display_name": "SuperPlane Bot"
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00.000000000Z",
+  "type": "bitbucket.issueComment"
+}
+```
+
+<a id="get-issue"></a>
+
+## Get Issue
+
+The Get Issue component retrieves an issue from a Bitbucket repository.
+
+### Use Cases
+
+- **Issue lookups**: Fetch issue details for follow-up automation
+- **State checks**: Read issue status before taking actions
+- **Data enrichment**: Reuse issue fields in notifications or downstream systems
+
+### Configuration
+
+- **Repository**: Select the Bitbucket repository containing the issue
+- **Issue Number**: Numeric issue ID to retrieve (supports expressions)
+
+### Output
+
+Returns the full issue payload returned by Bitbucket.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": 42,
+    "title": "Investigate API timeout spike",
+    "state": "open",
+    "kind": "bug",
+    "priority": "major",
+    "reporter": {
+      "display_name": "Jane Doe"
+    },
+    "assignee": {
+      "display_name": "John Doe"
+    },
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/my-workspace/my-repo/issues/42/investigate-api-timeout-spike"
+      }
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00.000000000Z",
+  "type": "bitbucket.issue"
+}
+```
+
+<a id="update-issue"></a>
+
+## Update Issue
+
+The Update Issue component updates fields on an existing Bitbucket issue.
+
+### Use Cases
+
+- **Status transitions**: Move issues to resolved or closed based on workflow outcomes
+- **Issue maintenance**: Update titles or descriptions with fresh context
+- **Automation**: Keep issue state synchronized with external systems
+
+### Configuration
+
+- **Repository**: Select the Bitbucket repository containing the issue
+- **Issue Number**: Numeric issue ID to update
+- **Title**: Optional new title
+- **Body**: Optional new description
+- **State**: Optional state update
+
+### Output
+
+Returns the updated issue payload from Bitbucket.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": 42,
+    "title": "Investigate API timeout spike",
+    "state": "resolved",
+    "updated_on": "2026-02-18T12:00:00.000000+00:00",
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/my-workspace/my-repo/issues/42/investigate-api-timeout-spike"
+      }
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00.000000000Z",
+  "type": "bitbucket.issue"
 }
 ```
 

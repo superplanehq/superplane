@@ -120,7 +120,12 @@ func (b *Bitbucket) Configuration() []configuration.Field {
 }
 
 func (b *Bitbucket) Components() []core.Component {
-	return []core.Component{}
+	return []core.Component{
+		&GetIssue{},
+		&CreateIssue{},
+		&UpdateIssue{},
+		&CreateIssueComment{},
+	}
 }
 
 func (b *Bitbucket) Triggers() []core.Trigger {

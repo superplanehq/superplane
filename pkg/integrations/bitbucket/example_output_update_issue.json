@@ -1,0 +1,15 @@
+{
+  "data": {
+    "id": 42,
+    "title": "Investigate API timeout spike",
+    "state": "resolved",
+    "updated_on": "2026-02-18T12:00:00.000000+00:00",
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/my-workspace/my-repo/issues/42/investigate-api-timeout-spike"
+      }
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00.000000000Z",
+  "type": "bitbucket.issue"
+}

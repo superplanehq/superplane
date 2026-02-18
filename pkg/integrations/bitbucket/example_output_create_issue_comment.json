@@ -1,0 +1,19 @@
+{
+  "data": {
+    "id": 1001,
+    "content": {
+      "raw": "Deployment completed successfully in production."
+    },
+    "created_on": "2026-02-18T12:00:00.000000+00:00",
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/my-workspace/my-repo/issues/42#comment-1001"
+      }
+    },
+    "user": {
+      "display_name": "SuperPlane Bot"
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00.000000000Z",
+  "type": "bitbucket.issueComment"
+}

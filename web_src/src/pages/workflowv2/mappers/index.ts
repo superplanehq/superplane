@@ -107,7 +107,11 @@ import {
   triggerRenderers as claudeTriggerRenderers,
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
-import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
+import {
+  componentMappers as bitbucketComponentMappers,
+  triggerRenderers as bitbucketTriggerRenderers,
+  eventStateRegistry as bitbucketEventStateRegistry,
+} from "./bitbucket/index";
 import {
   componentMappers as prometheusComponentMappers,
   customFieldRenderers as prometheusCustomFieldRenderers,
@@ -175,6 +179,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
+  bitbucket: bitbucketComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
   hetzner: hetznerComponentMappers,
@@ -223,6 +228,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
+  bitbucket: bitbucketEventStateRegistry,
   aws: awsEventStateRegistry,
   prometheus: prometheusEventStateRegistry,
   cursor: cursorEventStateRegistry,

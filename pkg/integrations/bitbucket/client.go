@@ -81,6 +81,55 @@ func (c *Client) setAuthHeaders(req *http.Request) {
 	}
 }
 
+func (c *Client) doJSONRequest(method, url string, payload any, expectedStatusCodes ...int) ([]byte, error) {
+	var bodyReader io.Reader
+	if payload != nil {
+		requestBody, err := json.Marshal(payload)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling request body: %w", err)
+		}
+		bodyReader = bytes.NewReader(requestBody)
+	}
+
+	req, err := http.NewRequest(method, url, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	c.setAuthHeaders(req)
+	req.Header.Set("Accept", "application/json")
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if !statusCodeAllowed(resp.StatusCode, expectedStatusCodes) {
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(responseBody))
+	}
+
+	return responseBody, nil
+}
+
+func statusCodeAllowed(statusCode int, expectedStatusCodes []int) bool {
+	for _, expectedStatusCode := range expectedStatusCodes {
+		if statusCode == expectedStatusCode {
+			return true
+		}
+	}
+
+	return false
+}
+
 type Workspace struct {
 	UUID string `json:"uuid" mapstructure:"uuid"`
 	Name string `json:"name" mapstructure:"name"`
@@ -161,6 +210,86 @@ func (c *Client) ListRepositories(workspace string) ([]Repository, error) {
 	}
 
 	return repositories, nil
+}
+
+func (c *Client) GetIssue(workspace, repositorySlug string, issueNumber int) (map[string]any, error) {
+	url := fmt.Sprintf("%s/repositories/%s/%s/issues/%d", baseURL, workspace, repositorySlug, issueNumber)
+
+	responseBody, err := c.doJSONRequest(http.MethodGet, url, nil, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
+
+	issue := map[string]any{}
+	if err := json.Unmarshal(responseBody, &issue); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return issue, nil
+}
+
+func (c *Client) CreateIssue(workspace, repositorySlug string, issue map[string]any) (map[string]any, error) {
+	url := fmt.Sprintf("%s/repositories/%s/%s/issues", baseURL, workspace, repositorySlug)
+
+	responseBody, err := c.doJSONRequest(http.MethodPost, url, issue, http.StatusCreated, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
+
+	createdIssue := map[string]any{}
+	if err := json.Unmarshal(responseBody, &createdIssue); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return createdIssue, nil
+}
+
+func (c *Client) UpdateIssue(
+	workspace,
+	repositorySlug string,
+	issueNumber int,
+	issue map[string]any,
+) (map[string]any, error) {
+	url := fmt.Sprintf("%s/repositories/%s/%s/issues/%d", baseURL, workspace, repositorySlug, issueNumber)
+
+	responseBody, err := c.doJSONRequest(http.MethodPut, url, issue, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
+
+	updatedIssue := map[string]any{}
+	if err := json.Unmarshal(responseBody, &updatedIssue); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return updatedIssue, nil
+}
+
+func (c *Client) CreateIssueComment(
+	workspace,
+	repositorySlug string,
+	issueNumber int,
+	commentBody string,
+) (map[string]any, error) {
+	url := fmt.Sprintf("%s/repositories/%s/%s/issues/%d/comments", baseURL, workspace, repositorySlug, issueNumber)
+
+	request := map[string]any{
+		"content": map[string]any{
+			"raw": commentBody,
+		},
+	}
+
+	responseBody, err := c.doJSONRequest(http.MethodPost, url, request, http.StatusCreated, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
+
+	comment := map[string]any{}
+	if err := json.Unmarshal(responseBody, &comment); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return comment, nil
 }
 
 type BitbucketHookRequest struct {
