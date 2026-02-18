@@ -30,6 +30,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
+  <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Retrieve billable GitHub Actions usage (minutes) for the organization" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
@@ -1278,6 +1279,88 @@ Returns release information including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="get-workflow-usage"></a>
+
+## Get Workflow Usage
+
+The Get Workflow Usage component retrieves billable GitHub Actions usage (minutes) for the installation's organization.
+
+### Prerequisites
+
+This action calls GitHub's **billing usage** API, which requires the GitHub App to have **Organization permission: Organization administration (read)**. 
+
+**Important**: Existing installations will need to approve the new permission when prompted by GitHub. Until the permission is granted, this action will return a 403 error.
+
+**Note**: This component uses GitHub's enhanced billing usage report API, which provides detailed usage information.
+
+### Behavior
+
+- Returns billing data for the **current billing cycle** 
+- Only private repositories on GitHub-hosted runners accrue billable minutes
+- Public repositories and self-hosted runners show zero billable usage
+- Can filter by specific repositories when selected
+- Uses enhanced billing platform API for accurate reporting
+
+### Configuration
+
+- **Repositories** (optional, multiselect): Select one or more specific repositories to track. These will be included in the output for reference (max 5) and stored in node metadata with full repository details (ID, name, URL). When repositories are selected, only usage for those repositories is included in the totals.
+
+### Output
+
+Returns usage data with:
+- `minutes_used`: Total billable minutes used in the current billing cycle
+- `minutes_used_breakdown`: Map of minutes by runner SKU (e.g., "Actions Linux": 120, "Actions Windows": 60, "Actions macOS": 30)
+- `included_minutes`: Always 0 (not provided by enhanced billing API)
+- `total_paid_minutes_used`: Estimated paid minutes based on cost data
+- `repositories`: List of selected repositories for tracking (max 5)
+
+**Note**: Breakdown is by runner SKU (OS and type), not by individual workflow.
+
+### Node Metadata
+
+The component stores repository information in node metadata:
+- Repository ID, name, and URL for each selected repository (max 5)
+- This metadata is displayed in the workflow canvas for easy reference
+
+### Use Cases
+
+- **Billing Monitoring**: Track GitHub Actions usage for billing purposes
+- **Quota Management**: Monitor usage to avoid exceeding billing quotas
+- **Cost Control**: Alert when usage approaches limits or budget thresholds
+- **Usage Reporting**: Generate monthly or periodic usage reports for compliance
+- **Resource Planning**: Analyze runner usage patterns by OS type
+
+### References
+
+- [GitHub Billing Usage API](https://docs.github.com/rest/billing/usage)
+- [GitHub Enhanced Billing Platform](https://docs.github.com/billing/using-the-new-billing-platform)
+- [Permissions required for GitHub Apps - Organization Administration](https://docs.github.com/en/rest/overview/permissions-required-for-github-apps#organization-permissions-for-administration)
+- [Viewing your usage of metered products](https://docs.github.com/en/billing/managing-billing-for-github-actions/viewing-your-github-actions-usage)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "included_minutes": 0,
+    "minutes_used": 1840.5,
+    "minutes_used_breakdown": {
+      "Actions Linux": 1200,
+      "Actions Windows": 400.5,
+      "Actions macOS": 240
+    },
+    "repositories": [
+      "repo1",
+      "repo2",
+      "repo3"
+    ],
+    "total_paid_minutes_used": 150
+  },
+  "timestamp": "2026-02-17T20:00:00Z",
+  "type": "github.workflowUsage"
 }
 ```
 
