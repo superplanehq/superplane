@@ -5,23 +5,15 @@ import (
 	_ "embed"
 	"fmt"
 	"slices"
-	"sync"
 
 	gh "github.com/google/go-github/v74/github"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/utils"
 )
 
 type GetWorkflowUsage struct{}
-
-//go:embed get_workflow_usage_example_output.json
-var getWorkflowUsageExampleOutputBytes []byte
-
-var getWorkflowUsageExampleOutputOnce sync.Once
-var getWorkflowUsageExampleOutput map[string]any
 
 type GetWorkflowUsageConfiguration struct {
 	Repositories []string `mapstructure:"repositories"`
@@ -150,14 +142,12 @@ func (g *GetWorkflowUsage) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	// If repositories are specified, validate they exist in metadata
 	if len(config.Repositories) > 0 {
 		selectedRepos, err := validateAndCollectRepositories(ctx, config.Repositories)
 		if err != nil {
 			return err
 		}
 
-		// Save selected repositories to node metadata (max 5)
 		reposToStore := selectedRepos
 		if len(reposToStore) > 5 {
 			reposToStore = reposToStore[:5]
@@ -189,20 +179,17 @@ func (g *GetWorkflowUsage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
-	// Use the enhanced billing usage report API
 	report, _, err := client.Billing.GetUsageReportOrg(
 		context.Background(),
 		appMetadata.Owner,
-		nil, // No time filtering - returns current billing cycle
+		nil,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to get billing usage: %w", err)
 	}
 
-	// Aggregate usage data from the report
 	result := aggregateUsageData(report, config.Repositories)
 
-	// Add selected repositories to output (max 5)
 	if len(config.Repositories) > 0 {
 		reposToInclude := config.Repositories
 		if len(reposToInclude) > 5 {
@@ -242,10 +229,6 @@ func (g *GetWorkflowUsage) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (g *GetWorkflowUsage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&getWorkflowUsageExampleOutputOnce, getWorkflowUsageExampleOutputBytes, &getWorkflowUsageExampleOutput)
-}
-
 // validateAndCollectRepositories validates that the specified repositories exist in the app metadata
 // and collects their full repository objects.
 func validateAndCollectRepositories(ctx core.SetupContext, repoNames []string) ([]RepositoryMetadata, error) {
@@ -281,18 +264,15 @@ func aggregateUsageData(report *gh.UsageReport, repositories []string) WorkflowU
 	result := WorkflowUsageResult{
 		MinutesUsed:          0,
 		MinutesUsedBreakdown: make(gh.MinutesUsedBreakdown),
-		IncludedMinutes:      0, // Enhanced billing API doesn't include this field
+		IncludedMinutes:      0,
 		TotalPaidMinutesUsed: 0,
 	}
 
-	// Process usage items
 	for _, item := range report.UsageItems {
-		// Only process Actions-related items
 		if item.GetProduct() != "actions" {
 			continue
 		}
 
-		// Filter by repositories if specified
 		if len(repositories) > 0 {
 			repoName := item.GetRepositoryName()
 			if !slices.Contains(repositories, repoName) {
@@ -300,21 +280,16 @@ func aggregateUsageData(report *gh.UsageReport, repositories []string) WorkflowU
 			}
 		}
 
-		// Aggregate total minutes (quantity represents minutes for Actions)
 		if item.Quantity != nil {
 			result.MinutesUsed += *item.Quantity
 		}
 
-		// Aggregate by SKU (runner OS type)
 		sku := item.GetSKU()
 		if sku != "" && item.Quantity != nil {
 			result.MinutesUsedBreakdown[sku] = result.MinutesUsedBreakdown[sku] + int(*item.Quantity)
 		}
 
-		// Calculate paid minutes from cost
-		// The enhanced billing API provides cost information
 		if item.NetAmount != nil && *item.NetAmount > 0 {
-			// Approximate paid minutes from cost (rough estimate at $0.008/min average)
 			result.TotalPaidMinutesUsed += *item.NetAmount / 0.008
 		}
 	}
