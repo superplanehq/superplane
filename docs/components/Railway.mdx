@@ -1,0 +1,154 @@
+---
+title: "Railway"
+---
+
+Deploy and monitor Railway applications
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Deployment Event" href="#on-deployment-event" description="Trigger when a Railway deployment status changes" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Trigger Deploy" href="#trigger-deploy" description="Trigger a new deployment for a Railway service" />
+</CardGrid>
+
+## Instructions
+
+Create an API token in Railway and paste it below.
+
+**Important:** When creating the token, select a **specific workspace** to access its projects. The "No Workspace" option will not work.
+
+[Create Railway Token →](https://railway.com/account/tokens)
+
+<a id="on-deployment-event"></a>
+
+## On Deployment Event
+
+The On Deployment Event trigger starts a workflow when Railway sends deployment status webhooks.
+
+### Setup
+
+After configuring this trigger:
+1. Copy the webhook URL shown in the trigger settings
+2. Go to Railway → Your Project → Settings → Webhooks
+3. Add the webhook URL and select "Deploy" events
+4. Save the webhook configuration
+
+### Use Cases
+
+- **Deployment notifications**: Notify Slack when deployments complete or fail
+- **Incident creation**: Create tickets when deployments crash
+- **Pipeline chaining**: Trigger downstream workflows after successful deployments
+
+### Configuration
+
+- **Project**: Select the Railway project to monitor
+- **Event Filter**: Optionally filter by deployment event type (deployed, failed, crashed, etc.)
+  - Leave empty to receive all deployment events
+
+### Event Data
+
+Each deployment event includes:
+- `type`: Event type (e.g., Deployment.deployed, Deployment.failed)
+- `details.status`: Deployment status (SUCCESS, FAILED, etc.)
+- `resource.deployment.id`: Deployment ID
+- `resource.service`: Service name and ID
+- `resource.environment`: Environment name and ID
+- `resource.project`: Project information
+- `timestamp`: When the event occurred
+
+### Example Data
+
+```json
+{
+  "details": {
+    "branch": "main",
+    "commitAuthor": "developer",
+    "commitHash": "abc123def456",
+    "commitMessage": "Update deployment",
+    "id": "deploy-abc123",
+    "serviceId": "srv-xyz789",
+    "source": "GitHub",
+    "status": "SUCCESS"
+  },
+  "resource": {
+    "deployment": {
+      "id": "deploy-jkl345"
+    },
+    "environment": {
+      "id": "env-def456",
+      "isEphemeral": false,
+      "name": "production"
+    },
+    "project": {
+      "id": "proj-xyz789",
+      "name": "my-project"
+    },
+    "service": {
+      "id": "srv-ghi012",
+      "name": "api-server"
+    },
+    "workspace": {
+      "id": "ws-abc123",
+      "name": "My Workspace"
+    }
+  },
+  "severity": "INFO",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "type": "Deployment.deployed"
+}
+```
+
+<a id="trigger-deploy"></a>
+
+## Trigger Deploy
+
+The Trigger Deploy component starts a new deployment for a Railway service and waits for it to complete.
+
+### Use Cases
+
+- **Deploy on merge**: Automatically deploy when code is merged to main
+- **Scheduled deployments**: Deploy on a schedule (e.g., nightly releases)
+- **Manual approval**: Deploy after approval in the workflow
+- **Cross-service orchestration**: Deploy services in sequence
+
+### How It Works
+
+1. Triggers a new deployment via Railway's API
+2. Polls for deployment status updates (Queued → Building → Deploying → Success/Failed)
+3. Routes execution based on final deployment status:
+   - **Deployed channel**: Deployment succeeded
+   - **Failed channel**: Deployment failed
+   - **Crashed channel**: Deployment crashed
+
+### Configuration
+
+- **Project**: Select the Railway project
+- **Service**: Select the service to deploy
+- **Environment**: Select the target environment (e.g., production, staging)
+
+### Output Channels
+
+- **Deployed**: Emitted when deployment succeeds
+- **Failed**: Emitted when deployment fails
+- **Crashed**: Emitted when deployment crashes
+
+### Example Output
+
+```json
+{
+  "deploymentId": "deploy-abc123",
+  "environment": "env-def456",
+  "project": "proj-xyz789",
+  "service": "srv-ghi012",
+  "status": "SUCCESS",
+  "url": "https://my-service-production.up.railway.app"
+}
+```
+
