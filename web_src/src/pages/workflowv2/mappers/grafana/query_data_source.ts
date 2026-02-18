@@ -70,13 +70,6 @@ export const queryDataSourceMapper: ComponentBaseMapper = {
   },
 };
 
-function formatTimestamp(value?: string): string {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString();
-}
-
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as QueryDataSourceConfiguration;
