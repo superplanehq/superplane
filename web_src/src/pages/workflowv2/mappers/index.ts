@@ -109,6 +109,12 @@ import {
 } from "./claude/index";
 import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
 import {
+  componentMappers as railwayComponentMappers,
+  triggerRenderers as railwayTriggerRenderers,
+  customFieldRenderers as railwayCustomFieldRenderers,
+  eventStateRegistry as railwayEventStateRegistry,
+} from "./railway/index";
+import {
   componentMappers as prometheusComponentMappers,
   customFieldRenderers as prometheusCustomFieldRenderers,
   triggerRenderers as prometheusTriggerRenderers,
@@ -175,6 +181,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
+  railway: railwayComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
   hetzner: hetznerComponentMappers,
@@ -200,6 +207,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
+  railway: railwayTriggerRenderers,
   bitbucket: bitbucketTriggerRenderers,
   prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
@@ -224,6 +232,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
+  railway: railwayEventStateRegistry,
   prometheus: prometheusEventStateRegistry,
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
@@ -254,6 +263,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
+  railway: railwayCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
 };
 
