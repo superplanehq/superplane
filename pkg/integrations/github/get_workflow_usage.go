@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"slices"
 	"sync"
 
 	gh "github.com/google/go-github/v74/github"
@@ -151,30 +152,9 @@ func (g *GetWorkflowUsage) Setup(ctx core.SetupContext) error {
 
 	// If repositories are specified, validate they exist in metadata
 	if len(config.Repositories) > 0 {
-		// Validate each repository
-		var appMetadata Metadata
-		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-			return fmt.Errorf("failed to decode application metadata: %w", err)
-		}
-
-		// Check each repository exists and collect full repository objects
-		var selectedRepos []RepositoryMetadata
-		for _, repoName := range config.Repositories {
-			found := false
-			for _, availableRepo := range appMetadata.Repositories {
-				if availableRepo.Name == repoName {
-					selectedRepos = append(selectedRepos, RepositoryMetadata{
-						ID:   availableRepo.ID,
-						Name: availableRepo.Name,
-						URL:  availableRepo.URL,
-					})
-					found = true
-					break
-				}
-			}
-			if !found {
-				return fmt.Errorf("repository %s is not accessible to app installation", repoName)
-			}
+		selectedRepos, err := validateAndCollectRepositories(ctx, config.Repositories)
+		if err != nil {
+			return err
 		}
 
 		// Save selected repositories to node metadata (max 5)
@@ -210,7 +190,6 @@ func (g *GetWorkflowUsage) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Use the enhanced billing usage report API
-	// This returns detailed usage information with per-repository breakdown
 	report, _, err := client.Billing.GetUsageReportOrg(
 		context.Background(),
 		appMetadata.Owner,
@@ -221,53 +200,7 @@ func (g *GetWorkflowUsage) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Aggregate usage data from the report
-	result := WorkflowUsageResult{
-		MinutesUsed:          0,
-		MinutesUsedBreakdown: make(gh.MinutesUsedBreakdown),
-		IncludedMinutes:      0, // Enhanced billing API doesn't include this field
-		TotalPaidMinutesUsed: 0,
-	}
-
-	// Process usage items
-	for _, item := range report.UsageItems {
-		// Only process Actions-related items
-		if item.GetProduct() != "actions" {
-			continue
-		}
-
-		// Filter by repositories if specified
-		if len(config.Repositories) > 0 {
-			found := false
-			repoName := item.GetRepositoryName()
-			for _, repo := range config.Repositories {
-				if repoName == repo {
-					found = true
-					break
-				}
-			}
-			if !found {
-				continue
-			}
-		}
-
-		// Aggregate total minutes (quantity represents minutes for Actions)
-		if item.Quantity != nil {
-			result.MinutesUsed += *item.Quantity
-		}
-
-		// Aggregate by SKU (runner OS type)
-		sku := item.GetSKU()
-		if sku != "" && item.Quantity != nil {
-			result.MinutesUsedBreakdown[sku] = result.MinutesUsedBreakdown[sku] + int(*item.Quantity)
-		}
-
-		// Calculate paid minutes from cost
-		// The enhanced billing API provides cost information
-		if item.NetAmount != nil && *item.NetAmount > 0 {
-			// Approximate paid minutes from cost (rough estimate at $0.008/min average)
-			result.TotalPaidMinutesUsed += *item.NetAmount / 0.008
-		}
-	}
+	result := aggregateUsageData(report, config.Repositories)
 
 	// Add selected repositories to output (max 5)
 	if len(config.Repositories) > 0 {
@@ -311,4 +244,80 @@ func (g *GetWorkflowUsage) Cleanup(ctx core.SetupContext) error {
 
 func (g *GetWorkflowUsage) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&getWorkflowUsageExampleOutputOnce, getWorkflowUsageExampleOutputBytes, &getWorkflowUsageExampleOutput)
+}
+
+// validateAndCollectRepositories validates that the specified repositories exist in the app metadata
+// and collects their full repository objects.
+func validateAndCollectRepositories(ctx core.SetupContext, repoNames []string) ([]RepositoryMetadata, error) {
+	var appMetadata Metadata
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
+		return nil, fmt.Errorf("failed to decode application metadata: %w", err)
+	}
+
+	var selectedRepos []RepositoryMetadata
+	for _, repoName := range repoNames {
+		repoIndex := slices.IndexFunc(appMetadata.Repositories, func(r Repository) bool {
+			return r.Name == repoName
+		})
+
+		if repoIndex == -1 {
+			return nil, fmt.Errorf("repository %s is not accessible to app installation", repoName)
+		}
+
+		availableRepo := appMetadata.Repositories[repoIndex]
+		selectedRepos = append(selectedRepos, RepositoryMetadata{
+			ID:   availableRepo.ID,
+			Name: availableRepo.Name,
+			URL:  availableRepo.URL,
+		})
+	}
+
+	return selectedRepos, nil
+}
+
+// aggregateUsageData processes the billing usage report and aggregates usage data.
+// If repositories are specified, only usage for those repositories is included.
+func aggregateUsageData(report *gh.UsageReport, repositories []string) WorkflowUsageResult {
+	result := WorkflowUsageResult{
+		MinutesUsed:          0,
+		MinutesUsedBreakdown: make(gh.MinutesUsedBreakdown),
+		IncludedMinutes:      0, // Enhanced billing API doesn't include this field
+		TotalPaidMinutesUsed: 0,
+	}
+
+	// Process usage items
+	for _, item := range report.UsageItems {
+		// Only process Actions-related items
+		if item.GetProduct() != "actions" {
+			continue
+		}
+
+		// Filter by repositories if specified
+		if len(repositories) > 0 {
+			repoName := item.GetRepositoryName()
+			if !slices.Contains(repositories, repoName) {
+				continue
+			}
+		}
+
+		// Aggregate total minutes (quantity represents minutes for Actions)
+		if item.Quantity != nil {
+			result.MinutesUsed += *item.Quantity
+		}
+
+		// Aggregate by SKU (runner OS type)
+		sku := item.GetSKU()
+		if sku != "" && item.Quantity != nil {
+			result.MinutesUsedBreakdown[sku] = result.MinutesUsedBreakdown[sku] + int(*item.Quantity)
+		}
+
+		// Calculate paid minutes from cost
+		// The enhanced billing API provides cost information
+		if item.NetAmount != nil && *item.NetAmount > 0 {
+			// Approximate paid minutes from cost (rough estimate at $0.008/min average)
+			result.TotalPaidMinutesUsed += *item.NetAmount / 0.008
+		}
+	}
+
+	return result
 }
