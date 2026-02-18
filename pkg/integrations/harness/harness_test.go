@@ -124,4 +124,70 @@ func Test__Harness__Sync(t *testing.T) {
 		require.ErrorContains(t, err, "invalid account")
 		assert.NotEqual(t, "ready", integrationCtx.State)
 	})
+
+	t.Run("service-account key currentUser 400 still verifies", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusBadRequest,
+					Body: io.NopCloser(strings.NewReader(
+						`{"message":"Invalid request: Current user can be accessed only by 'USER' principal type"}`,
+					)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"data":{"content":[]}}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
+			"apiToken": "service-account-token-without-pat-prefix",
+			"baseURL":  DefaultBaseURL,
+		}}
+
+		err := integration.Sync(core.SyncContext{
+			Configuration: integrationCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationCtx.State)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/ng/api/user/currentUser")
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/ng/api/organizations")
+	})
+
+	t.Run("service-account key currentUser 500 still verifies", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader(`{"error":"Internal Server Error"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"data":{"content":[]}}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
+			"apiToken": "service-account-token-without-pat-prefix",
+			"baseURL":  DefaultBaseURL,
+		}}
+
+		err := integration.Sync(core.SyncContext{
+			Configuration: integrationCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationCtx.State)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/ng/api/user/currentUser")
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/ng/api/organizations")
+	})
 }
