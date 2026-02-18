@@ -1,0 +1,15 @@
+{
+  "data": {
+    "minutes_used": 1840.5,
+    "minutes_used_breakdown": {
+      "Actions Linux": 1200.0,
+      "Actions Windows": 400.5,
+      "Actions macOS": 240.0
+    },
+    "included_minutes": 0,
+    "total_paid_minutes_used": 150.0,
+    "repositories": ["repo1", "repo2", "repo3"]
+  },
+  "timestamp": "2026-02-17T20:00:00Z",
+  "type": "github.workflowUsage"
+}
