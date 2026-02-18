@@ -19,11 +19,11 @@ import (
 
 const OnPipelineCompletedPayloadType = "harness.pipeline.completed"
 const (
-	OnPipelineCompletedPollAction    = "poll"
-	OnPipelineCompletedPollInterval  = 1 * time.Minute
-	OnPipelineCompletedPollPageSize  = 100
-	OnPipelineCompletedPollMaxPages  = 100
-	OnPipelineCompletedMaxPollErrors = 5
+	OnPipelineCompletedPollAction               = "poll"
+	OnPipelineCompletedPollInterval             = 1 * time.Minute
+	OnPipelineCompletedPollPageSize             = 100
+	OnPipelineCompletedPollMaxPages             = 100
+	OnPipelineCompletedMaxPollErrors            = 5
 	OnPipelineCompletedCheckpointLockShardCount = 64
 	// When pipeline-scoped webhook delivery is configured, defer very recent
 	// poll items to avoid duplicate emits from webhook/poll races.
@@ -618,7 +618,7 @@ func onPipelineCompletedCheckpointLockShardIndex(lockKey string) int {
 		return 0
 	}
 
-	hash := uint64(1469598103934665603)
+	hash := uint64(14695981039346656037)
 	for i := 0; i < len(lockKey); i++ {
 		hash ^= uint64(lockKey[i])
 		hash *= 1099511628211
