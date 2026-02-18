@@ -86,6 +86,11 @@ import {
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
 import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
+import {
+  componentMappers as jfrogArtifactoryComponentMappers,
+  triggerRenderers as jfrogArtifactoryTriggerRenderers,
+  eventStateRegistry as jfrogArtifactoryEventStateRegistry,
+} from "./jfrogArtifactory/index";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
   componentMappers as discordComponentMappers,
@@ -178,6 +183,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
   hetzner: hetznerComponentMappers,
+  jfrogArtifactory: jfrogArtifactoryComponentMappers,
   dockerhub: dockerhubComponentMappers,
 };
 
@@ -203,6 +209,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   bitbucket: bitbucketTriggerRenderers,
   prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
+  jfrogArtifactory: jfrogArtifactoryTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
 };
 
@@ -227,6 +234,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   prometheus: prometheusEventStateRegistry,
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
+  jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
 };
 
