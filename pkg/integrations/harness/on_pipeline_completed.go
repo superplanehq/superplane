@@ -12,9 +12,7 @@ import (
 
 type OnPipelineCompleted struct{}
 
-type OnPipelineCompletedConfiguration struct {
-	EventTypes []string `json:"eventTypes" mapstructure:"eventTypes"`
-}
+type OnPipelineCompletedConfiguration struct{}
 
 type OnPipelineCompletedMetadata struct {
 	WebhookURL string `json:"webhookUrl" mapstructure:"webhookUrl"`
@@ -52,10 +50,6 @@ This trigger requires a webhook to be configured in Harness:
 4. Paste the SuperPlane webhook URL
 5. Select the pipeline events you want to listen for (e.g. Pipeline Success, Pipeline Failed)
 
-## Configuration
-
-- **Event Types**: Optionally filter which pipeline events to process (e.g. PipelineSuccess, PipelineFailed). Leave empty to receive all pipeline completion events.
-
 ## Event Data
 
 Each pipeline completion event includes:
@@ -78,23 +72,7 @@ func (t *OnPipelineCompleted) Color() string {
 }
 
 func (t *OnPipelineCompleted) Configuration() []configuration.Field {
-	return []configuration.Field{
-		{
-			Name:        "eventTypes",
-			Label:       "Event Types",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
-			Description: "Filter by event types (e.g. PipelineSuccess, PipelineFailed, PipelineEnd). Leave empty to receive all pipeline completion events.",
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "Event Type",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeString,
-					},
-				},
-			},
-		},
-	}
+	return []configuration.Field{}
 }
 
 func (t *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {

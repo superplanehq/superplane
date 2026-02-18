@@ -64,14 +64,6 @@ export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     const metadataItems = [];
 
-    const configuration = node.configuration as any;
-    if (configuration?.eventTypes?.length > 0) {
-      metadataItems.push({
-        icon: "filter",
-        label: configuration.eventTypes.join(", "),
-      });
-    }
-
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: harnessIcon,
