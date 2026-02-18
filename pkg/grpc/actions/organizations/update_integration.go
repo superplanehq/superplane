@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations/incident"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -112,7 +113,13 @@ func UpdateIntegration(
 		return nil, status.Error(codes.Internal, "failed to save integration")
 	}
 
-	proto, err := serializeIntegration(registry, instance, []models.CanvasNodeReference{})
+	if instance.AppName == "incident" {
+		if ensureErr := incident.EnsureWebhookExists(database.Conn(), instance.ID, registry.Encryptor); ensureErr != nil {
+			logging.ForIntegration(*instance).WithError(ensureErr).Error("failed to ensure incident webhook")
+		}
+	}
+
+	proto, err := serializeIntegration(registry, instance, []models.CanvasNodeReference{}, webhooksBaseURL)
 	if err != nil {
 		log.Errorf("failed to serialize integration %s: %v", instance.ID, err)
 		return nil, status.Error(codes.Internal, "failed to serialize integration")
