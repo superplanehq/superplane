@@ -1,0 +1,25 @@
+{
+  "data": {
+    "payload_version": 1,
+    "notification_configuration_id": "nc-1234567890abcdef",
+    "run_url": "https://app.terraform.io/app/my-org/workspaces/my-workspace/runs/run-CZcmD7eagjhF6JGN",
+    "run_id": "run-CZcmD7eagjhF6JGN",
+    "run_message": "Triggered by SuperPlane",
+    "run_created_at": "2026-01-28T10:30:00.000Z",
+    "run_created_by": "user-abc123",
+    "workspace_id": "ws-abc123def456",
+    "workspace_name": "my-workspace",
+    "organization_name": "my-org",
+    "notifications": [
+      {
+        "message": "Run applied successfully",
+        "trigger": "run:completed",
+        "run_status": "applied",
+        "run_updated_at": "2026-01-28T10:35:00.000Z",
+        "run_updated_by": null
+      }
+    ]
+  },
+  "timestamp": "2026-01-28T10:35:00.000Z",
+  "type": "terraformcloud.run.completed"
+}

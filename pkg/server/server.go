@@ -56,6 +56,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/sendgrid"
 	_ "github.com/superplanehq/superplane/pkg/integrations/slack"
 	_ "github.com/superplanehq/superplane/pkg/integrations/smtp"
+	_ "github.com/superplanehq/superplane/pkg/integrations/terraformcloud"
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"

@@ -109,6 +109,11 @@ import {
 } from "./claude/index";
 import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
 import {
+  componentMappers as terraformcloudComponentMappers,
+  triggerRenderers as terraformcloudTriggerRenderers,
+  eventStateRegistry as terraformcloudEventStateRegistry,
+} from "./terraformcloud/index";
+import {
   componentMappers as prometheusComponentMappers,
   customFieldRenderers as prometheusCustomFieldRenderers,
   triggerRenderers as prometheusTriggerRenderers,
@@ -179,6 +184,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cursor: cursorComponentMappers,
   hetzner: hetznerComponentMappers,
   dockerhub: dockerhubComponentMappers,
+  terraformcloud: terraformcloudComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -204,6 +210,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
+  terraformcloud: terraformcloudTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -228,6 +235,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
+  terraformcloud: terraformcloudEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
