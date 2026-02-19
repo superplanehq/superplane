@@ -70,28 +70,6 @@ func (c *GetIncident) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (c *GetIncident) ExampleOutput() map[string]any {
-	return map[string]any{
-		"id":            "p31zjtct2jer",
-		"name":          "Database Connection Issues",
-		"status":        "investigating",
-		"impact":        "major",
-		"shortlink":     "http://stspg.io/p31zjtct2jer",
-		"created_at":    "2026-02-12T10:30:00.000Z",
-		"updated_at":    "2026-02-12T10:30:00.000Z",
-		"page_id":       "kctbh9vrtdwd",
-		"component_ids": []string{"8kbf7d35c070"},
-		"incident_updates": []map[string]any{
-			{
-				"id":         "upd1",
-				"status":     "investigating",
-				"body":       "We are investigating reports of slow database queries.",
-				"created_at": "2026-02-12T10:30:00.000Z",
-			},
-		},
-	}
-}
-
 func (c *GetIncident) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
