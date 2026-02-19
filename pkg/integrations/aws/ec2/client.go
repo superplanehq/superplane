@@ -270,6 +270,52 @@ func (c *Client) ListInstances() ([]Instance, error) {
 	return instances, nil
 }
 
+func (c *Client) ListImages(ownerID string) ([]Image, error) {
+	images := []Image{}
+	nextToken := ""
+	trimmedOwnerID := strings.TrimSpace(ownerID)
+
+	for {
+		params := url.Values{}
+		params.Set("MaxResults", "100")
+		params.Set("Owner.1", trimmedOwnerID)
+
+		if nextToken != "" {
+			params.Set("NextToken", nextToken)
+		}
+
+		response := describeImagesResponse{}
+		if err := c.postForm("DescribeImages", params, &response); err != nil {
+			return nil, err
+		}
+
+		for _, image := range response.Images {
+			images = append(images, Image{
+				ImageID:            strings.TrimSpace(image.ImageID),
+				Name:               strings.TrimSpace(image.Name),
+				Description:        strings.TrimSpace(image.Description),
+				State:              strings.TrimSpace(image.State),
+				CreationDate:       strings.TrimSpace(image.CreationDate),
+				OwnerID:            strings.TrimSpace(image.OwnerID),
+				Architecture:       strings.TrimSpace(image.Architecture),
+				ImageType:          strings.TrimSpace(image.ImageType),
+				RootDeviceType:     strings.TrimSpace(image.RootDeviceType),
+				RootDeviceName:     strings.TrimSpace(image.RootDeviceName),
+				VirtualizationType: strings.TrimSpace(image.VirtualizationType),
+				Hypervisor:         strings.TrimSpace(image.Hypervisor),
+				Region:             c.region,
+			})
+		}
+
+		nextToken = strings.TrimSpace(response.NextToken)
+		if nextToken == "" {
+			break
+		}
+	}
+
+	return images, nil
+}
+
 func (c *Client) runImageBooleanAction(action, imageID string, additionalParams url.Values) (string, error) {
 	params := additionalParams
 	if params == nil {
@@ -399,6 +445,7 @@ type describeInstancesResponse struct {
 type describeImagesResponse struct {
 	RequestID string     `xml:"requestId"`
 	Images    []xmlImage `xml:"imagesSet>item"`
+	NextToken string     `xml:"nextToken"`
 }
 
 type xmlReservation struct {

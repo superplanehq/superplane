@@ -625,22 +625,35 @@ The Copy Image component copies an AMI to another AWS region.
 - **Image Name**: Name for the copied AMI
 - **Description**: Optional AMI description
 
+### Completion behavior
+
+- The component waits for EventBridge `EC2 AMI State Change` events for the copied AMI.
+- It completes when the AMI state becomes `available`.
+- It fails if the AMI state becomes `failed`.
+
 ### Example Output
 
 ```json
 {
   "data": {
-    "description": "Copied for disaster recovery",
-    "imageId": "ami-0c0ffee1234567890",
-    "name": "my-app-2026-02-19",
-    "region": "us-west-2",
-    "requestId": "req-copy",
-    "sourceImageId": "ami-07f0e4f3e9c123abc",
-    "sourceRegion": "us-east-1",
-    "state": "pending"
+    "image": {
+      "architecture": "x86_64",
+      "creationDate": "2026-02-19T09:00:00.000Z",
+      "description": "Copied for disaster recovery",
+      "hypervisor": "xen",
+      "imageId": "ami-0c0ffee1234567890",
+      "imageType": "machine",
+      "name": "my-app-2026-02-19",
+      "ownerId": "123456789012",
+      "region": "us-west-2",
+      "rootDeviceName": "/dev/xvda",
+      "rootDeviceType": "ebs",
+      "state": "available",
+      "virtualizationType": "hvm"
+    }
   },
   "timestamp": "2026-02-19T09:00:00Z",
-  "type": "aws.ec2.image.copied"
+  "type": "aws.ec2.image"
 }
 ```
 

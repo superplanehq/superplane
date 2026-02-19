@@ -2,6 +2,7 @@ import { ComponentBaseMapper } from "../../types";
 import { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
 import { buildEc2OperationMapper } from "./operation_mapper";
+import { Ec2Image } from "./types";
 
 interface Configuration {
   region?: string;
@@ -11,14 +12,7 @@ interface Configuration {
 }
 
 interface Output {
-  requestId?: string;
-  imageId?: string;
-  sourceImageId?: string;
-  sourceRegion?: string;
-  region?: string;
-  name?: string;
-  description?: string;
-  state?: string;
+  image?: Ec2Image;
 }
 
 export const copyImageMapper: ComponentBaseMapper = buildEc2OperationMapper<Configuration, Output>({
@@ -38,20 +32,27 @@ export const copyImageMapper: ComponentBaseMapper = buildEc2OperationMapper<Conf
     }
     return items;
   },
-  details(_configuration, output): Record<string, string> {
+  details(configuration, output): Record<string, string> {
     if (!output) {
-      return {};
+      return {
+        "Source Image ID": stringOrDash(configuration?.sourceImageId),
+      };
     }
 
     return {
-      "Request ID": stringOrDash(output.requestId),
-      "Image ID": stringOrDash(output.imageId),
-      "Source Image ID": stringOrDash(output.sourceImageId),
-      "Source Region": stringOrDash(output.sourceRegion),
-      Region: stringOrDash(output.region),
-      Name: stringOrDash(output.name),
-      Description: stringOrDash(output.description),
-      State: stringOrDash(output.state),
+      "Source Image ID": stringOrDash(configuration?.sourceImageId),
+      "Image ID": stringOrDash(output.image?.imageId),
+      Name: stringOrDash(output.image?.name),
+      Description: stringOrDash(output.image?.description),
+      State: stringOrDash(output.image?.state),
+      "Creation Date": stringOrDash(output.image?.creationDate),
+      Architecture: stringOrDash(output.image?.architecture),
+      "Image Type": stringOrDash(output.image?.imageType),
+      "Root Device Type": stringOrDash(output.image?.rootDeviceType),
+      "Root Device Name": stringOrDash(output.image?.rootDeviceName),
+      "Virtualization Type": stringOrDash(output.image?.virtualizationType),
+      Hypervisor: stringOrDash(output.image?.hypervisor),
+      "Owner ID": stringOrDash(output.image?.ownerId),
     };
   },
 });

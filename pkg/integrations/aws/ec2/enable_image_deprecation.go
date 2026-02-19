@@ -69,8 +69,45 @@ func (c *EnableImageDeprecation) OutputChannels(configuration any) []core.Output
 
 func (c *EnableImageDeprecation) Configuration() []configuration.Field {
 	return []configuration.Field{
-		regionSelectField(),
-		imageIDField("imageId", "Image ID", "AMI ID to deprecate", "region"),
+		{
+			Name:     "region",
+			Label:    "Region",
+			Type:     configuration.FieldTypeSelect,
+			Required: true,
+			Default:  "us-east-1",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: common.AllRegions,
+				},
+			},
+		},
+		{
+			Name:        "imageId",
+			Label:       "Image ID",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "AMI ID to deprecate",
+			Placeholder: "ami-1234567890abcdef0",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "ec2.image",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+					},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "region",
+					Values: []string{"*"},
+				},
+			},
+		},
 		{
 			Name:        "deprecateAt",
 			Label:       "Deprecate At",
