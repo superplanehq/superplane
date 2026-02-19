@@ -79,14 +79,18 @@ func (f *FlyIO) Configuration() []configuration.Field {
 			Label:       "Organization Slug",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Default organization slug (e.g., 'personal'). Used for listing apps and creating new ones.",
+			Description: "Default organization slug (e.g., 'personal'). Used to scope app discovery.",
 		},
 	}
 }
 
 func (f *FlyIO) Components() []core.Component {
 	return []core.Component{
-		&ListApps{},
+		&GetApp{},
+		&StartMachine{},
+		&StopMachine{},
+		&CreateMachine{},
+		&DeleteMachine{},
 	}
 }
 
