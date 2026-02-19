@@ -17,10 +17,12 @@ func Test__ServiceNow__ListResources(t *testing.T) {
 
 	integrationCtx := &contexts.IntegrationContext{
 		Configuration: map[string]any{
-			"instanceUrl": "https://dev12345.service-now.com",
-			"authType":    "basicAuth",
-			"username":    "admin",
-			"password":    "password",
+			"instanceUrl":  "https://dev12345.service-now.com",
+			"clientId":     "client-123",
+			"clientSecret": "secret-123",
+		},
+		Secrets: map[string]core.IntegrationSecret{
+			OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("access-token-123")},
 		},
 	}
 
@@ -62,19 +64,36 @@ func Test__ServiceNow__ListResources(t *testing.T) {
 		assert.Equal(t, "Jane Doe", resources[1].Name)
 	})
 
-	t.Run("returns list of assignment groups", func(t *testing.T) {
+	t.Run("returns list of categories from metadata", func(t *testing.T) {
 		ctx := core.ListResourcesContext{
-			Integration: integrationCtx,
-			HTTP: &contexts.HTTPContext{
-				Responses: []*http.Response{
-					{
-						StatusCode: http.StatusOK,
-						Body: io.NopCloser(strings.NewReader(`{
-							"result": [
-								{"sys_id": "grp1", "name": "Network"},
-								{"sys_id": "grp2", "name": "Database"}
-							]
-						}`)),
+			Integration: &contexts.IntegrationContext{
+				Metadata: Metadata{
+					Categories: []ChoiceRecord{
+						{Label: "Software", Value: "software"},
+						{Label: "Hardware", Value: "hardware"},
+					},
+				},
+			},
+		}
+
+		resources, err := s.ListResources("category", ctx)
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 2)
+		assert.Equal(t, "software", resources[0].ID)
+		assert.Equal(t, "Software", resources[0].Name)
+		assert.Equal(t, "category", resources[0].Type)
+		assert.Equal(t, "hardware", resources[1].ID)
+		assert.Equal(t, "Hardware", resources[1].Name)
+	})
+
+	t.Run("returns list of assignment groups from metadata", func(t *testing.T) {
+		ctx := core.ListResourcesContext{
+			Integration: &contexts.IntegrationContext{
+				Metadata: Metadata{
+					AssignmentGroups: []AssignmentGroupRecord{
+						{SysID: "grp1", Name: "Network"},
+						{SysID: "grp2", Name: "Database"},
 					},
 				},
 			},
@@ -156,5 +175,142 @@ func Test__ServiceNow__ListResources(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Empty(t, resources)
+	})
+
+	t.Run("returns hardcoded state resources", func(t *testing.T) {
+		resources, err := s.ListResources("state", core.ListResourcesContext{
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 6)
+		assert.Equal(t, "1", resources[0].ID)
+		assert.Equal(t, "New", resources[0].Name)
+		assert.Equal(t, "state", resources[0].Type)
+		assert.Equal(t, "6", resources[3].ID)
+		assert.Equal(t, "Resolved", resources[3].Name)
+	})
+
+	t.Run("returns hardcoded urgency resources", func(t *testing.T) {
+		resources, err := s.ListResources("urgency", core.ListResourcesContext{
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 3)
+		assert.Equal(t, "1", resources[0].ID)
+		assert.Equal(t, "High", resources[0].Name)
+		assert.Equal(t, "urgency", resources[0].Type)
+		assert.Equal(t, "3", resources[2].ID)
+		assert.Equal(t, "Low", resources[2].Name)
+	})
+
+	t.Run("returns hardcoded impact resources", func(t *testing.T) {
+		resources, err := s.ListResources("impact", core.ListResourcesContext{
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 3)
+		assert.Equal(t, "1", resources[0].ID)
+		assert.Equal(t, "High", resources[0].Name)
+		assert.Equal(t, "impact", resources[0].Type)
+	})
+
+	t.Run("returns hardcoded priority resources", func(t *testing.T) {
+		resources, err := s.ListResources("priority", core.ListResourcesContext{
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 5)
+		assert.Equal(t, "1", resources[0].ID)
+		assert.Equal(t, "Critical", resources[0].Name)
+		assert.Equal(t, "priority", resources[0].Type)
+		assert.Equal(t, "5", resources[4].ID)
+		assert.Equal(t, "Planning", resources[4].Name)
+	})
+
+	t.Run("returns hardcoded on_hold_reason resources", func(t *testing.T) {
+		resources, err := s.ListResources("on_hold_reason", core.ListResourcesContext{
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 4)
+		assert.Equal(t, "1", resources[0].ID)
+		assert.Equal(t, "Awaiting Caller", resources[0].Name)
+		assert.Equal(t, "on_hold_reason", resources[0].Type)
+	})
+
+	t.Run("returns hardcoded resolution_code resources", func(t *testing.T) {
+		resources, err := s.ListResources("resolution_code", core.ListResourcesContext{
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 10)
+		assert.Equal(t, "resolution_code", resources[0].Type)
+		assert.Equal(t, "Duplicate", resources[0].ID)
+		assert.Equal(t, "Duplicate", resources[0].Name)
+	})
+
+	t.Run("returns list of services", func(t *testing.T) {
+		ctx := core.ListResourcesContext{
+			Integration: integrationCtx,
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"result": [
+								{"sys_id": "svc1", "name": "Email Service"},
+								{"sys_id": "svc2", "name": "Web Portal"}
+							]
+						}`)),
+					},
+				},
+			},
+		}
+
+		resources, err := s.ListResources("service", ctx)
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 2)
+		assert.Equal(t, "svc1", resources[0].ID)
+		assert.Equal(t, "Email Service", resources[0].Name)
+		assert.Equal(t, "service", resources[0].Type)
+		assert.Equal(t, "svc2", resources[1].ID)
+		assert.Equal(t, "Web Portal", resources[1].Name)
+	})
+
+	t.Run("returns list of subcategories for a category", func(t *testing.T) {
+		ctx := core.ListResourcesContext{
+			Integration: integrationCtx,
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"result": [
+								{"label": "Email", "value": "email"},
+								{"label": "Operating System", "value": "os"}
+							]
+						}`)),
+					},
+				},
+			},
+			Parameters: map[string]string{
+				"category": "software",
+			},
+		}
+
+		resources, err := s.ListResources("subcategory", ctx)
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 2)
+		assert.Equal(t, "email", resources[0].ID)
+		assert.Equal(t, "Email", resources[0].Name)
+		assert.Equal(t, "subcategory", resources[0].Type)
 	})
 }
