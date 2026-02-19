@@ -56,17 +56,22 @@ func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 }
 
 func (h *GrafanaWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
-	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
-	if err != nil {
-		return err
-	}
-
 	metadata := GrafanaWebhookMetadata{}
 	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata); err != nil {
 		return err
 	}
 
-	return client.DeleteContactPoint(strings.TrimSpace(metadata.ContactPointUID))
+	contactPointUID := strings.TrimSpace(metadata.ContactPointUID)
+	if contactPointUID == "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
+	if err != nil {
+		return err
+	}
+
+	return client.DeleteContactPoint(contactPointUID)
 }
 
 func (h *GrafanaWebhookHandler) CompareConfig(a, b any) (bool, error) {
