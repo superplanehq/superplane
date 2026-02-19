@@ -2,15 +2,15 @@
 title: "Dash0"
 ---
 
-Connect to Dash0 to query data using Prometheus API
-
-import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+Connect to Dash0 to query data using Prometheus API and react to alert events
 
 ## Triggers
 
 <CardGrid>
   <LinkCard title="On Alert Event" href="#on-alert-event" description="Listen to Dash0 alert webhook events when checks fire or resolve" />
 </CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
 
@@ -218,3 +218,4 @@ Returns the Prometheus query response including:
   "type": "dash0.prometheus.response"
 }
 ```
+
