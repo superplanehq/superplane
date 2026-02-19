@@ -172,32 +172,7 @@ func (t *OnAlertFiring) Cleanup(ctx core.TriggerContext) error {
 }
 
 func isFiringAlert(payload map[string]any) bool {
-	status := extractString(payload["status"])
-	if strings.EqualFold(status, "firing") {
-		return true
-	}
-
-	alerts, ok := payload["alerts"]
-	if !ok {
-		return false
-	}
-
-	alertList, ok := alerts.([]any)
-	if !ok {
-		return false
-	}
-
-	for _, item := range alertList {
-		alert, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		if strings.EqualFold(extractString(alert["status"]), "firing") {
-			return true
-		}
-	}
-
-	return false
+	return strings.EqualFold(extractString(payload["status"]), "firing")
 }
 
 func extractString(value any) string {
