@@ -22,8 +22,8 @@ type WebhookMetadata struct {
 var (
 	defaultTriggers = []string{"run:completed", "run:errored"}
 	allowedTriggers = map[string]struct{}{
-		"run:completed":      {},
-		"run:errored":        {},
+		"run:completed":       {},
+		"run:errored":         {},
 		"run:needs_attention": {},
 	}
 )
