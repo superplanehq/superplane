@@ -15,6 +15,10 @@ export interface ListIssuesConfiguration {
   checkRules?: string[];
 }
 
+export interface GetCheckDetailsConfiguration {
+  checkId?: string;
+  includeHistory?: boolean;
+}
 export interface PrometheusResponse {
   status: string;
   data: {
