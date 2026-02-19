@@ -18,20 +18,21 @@ interface Output {
 export const copyImageMapper: ComponentBaseMapper = buildEc2OperationMapper<Configuration, Output>({
   metadata(configuration): MetadataItem[] {
     const items: MetadataItem[] = [];
-    if (configuration?.region) {
-      items.push({ icon: "globe", label: `to ${configuration.region}` });
+    if (configuration?.sourceRegion && configuration?.region) {
+      items.push({ icon: "globe", label: `${configuration.sourceRegion} → ${configuration.region}` });
     }
-    if (configuration?.sourceRegion) {
-      items.push({ icon: "map", label: `from ${configuration.sourceRegion}` });
-    }
+
     if (configuration?.sourceImageId) {
       items.push({ icon: "disc", label: configuration.sourceImageId });
     }
+
     if (configuration?.name) {
       items.push({ icon: "tag", label: configuration.name });
     }
+
     return items;
   },
+
   details(configuration, output): Record<string, string> {
     if (!output) {
       return {

@@ -23,11 +23,19 @@ const (
 type CopyImage struct{}
 
 type CopyImageConfiguration struct {
-	Region        string `json:"region" mapstructure:"region"`
-	SourceRegion  string `json:"sourceRegion" mapstructure:"sourceRegion"`
-	SourceImageID string `json:"sourceImageId" mapstructure:"sourceImageId"`
-	Name          string `json:"name" mapstructure:"name"`
-	Description   string `json:"description" mapstructure:"description"`
+	SourceRegion  string  `json:"sourceRegion" mapstructure:"sourceRegion"`
+	SourceImageID string  `json:"sourceImageId" mapstructure:"sourceImageId"`
+	Region        string  `json:"region" mapstructure:"region"`
+	Name          *string `json:"name,omitempty" mapstructure:"name,omitempty"`
+	Description   *string `json:"description,omitempty" mapstructure:"description,omitempty"`
+}
+
+func (c *CopyImageConfiguration) IsNameSet() bool {
+	return c.Name != nil && *c.Name != ""
+}
+
+func (c *CopyImageConfiguration) IsDescriptionSet() bool {
+	return c.Description != nil && *c.Description != ""
 }
 
 type CopyImageNodeMetadata struct {
@@ -94,18 +102,6 @@ func (c *CopyImage) OutputChannels(configuration any) []core.OutputChannel {
 func (c *CopyImage) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:     "region",
-			Label:    "Destination Region",
-			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			Default:  "us-east-1",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: common.AllRegions,
-				},
-			},
-		},
-		{
 			Name:     "sourceRegion",
 			Label:    "Source Region",
 			Type:     configuration.FieldTypeSelect,
@@ -145,18 +141,40 @@ func (c *CopyImage) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:     "region",
+			Label:    "Destination Region",
+			Type:     configuration.FieldTypeSelect,
+			Required: true,
+			Default:  "us-west-1",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: common.AllRegions,
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "sourceRegion",
+					Values: []string{"*"},
+				},
+			},
+		},
+		{
 			Name:        "name",
 			Label:       "Image Name",
 			Type:        configuration.FieldTypeString,
-			Required:    true,
+			Required:    false,
+			Togglable:   true,
 			Placeholder: "my-app-2026-02-19",
+			Description: "The name of the copied image. If not specified, the source image name will be used.",
 		},
 		{
 			Name:        "description",
 			Label:       "Description",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
+			Togglable:   true,
 			Placeholder: "Optional image description",
+			Description: "The description of the copied image. If not specified, the source image description will be used.",
 		},
 	}
 }
@@ -176,33 +194,30 @@ func (c *CopyImage) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return err
 	}
-	if _, err := requireSourceRegion(config.SourceRegion); err != nil {
-		return err
+
+	if config.SourceRegion == "" {
+		return fmt.Errorf("source region is required")
 	}
-	if _, err := requireSourceImageID(config.SourceImageID); err != nil {
-		return err
-	}
-	if _, err := requireImageName(config.Name); err != nil {
-		return err
+
+	if config.SourceImageID == "" {
+		return fmt.Errorf("source image ID is required")
 	}
 
 	if nodeMetadata.SubscriptionID != "" && nodeMetadata.Region == region {
 		return nil
 	}
 
-	integrationMetadata := common.IntegrationMetadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, region, DetailTypeAMIStateChange)
+	if err != nil {
+		return fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
-	if integrationMetadata.EventBridge == nil {
-		return fmt.Errorf("event bridge metadata is not configured")
-	}
-
-	if !hasAMIStateChangeRule(integrationMetadata) {
+	if !hasRule {
 		if err := ctx.Metadata.Set(CopyImageNodeMetadata{Region: region}); err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
+
+		ctx.Logger.Infof("Requesting rule provisioning for source %s and detail type %s in region %s", Source, DetailTypeAMIStateChange, region)
 
 		if err := ctx.Integration.ScheduleActionCall(
 			"provisionRule",
@@ -215,6 +230,8 @@ func (c *CopyImage) Setup(ctx core.SetupContext) error {
 		); err != nil {
 			return fmt.Errorf("failed to schedule rule provisioning for integration: %w", err)
 		}
+
+		ctx.Logger.Infof("Scheduling rule availability check in %v", copyImageInitialRuleAvailabilityTimeout)
 
 		return ctx.Requests.ScheduleActionCall(
 			"checkRuleAvailability",
@@ -238,27 +255,54 @@ func (c *CopyImage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, 
 	return ctx.DefaultProcessing()
 }
 
+func (c *CopyImage) getNameAndDescription(ctx core.ExecutionContext, config CopyImageConfiguration) (string, string, error) {
+	//
+	// If name and description are provided, no need to describe source image.
+	//
+	if config.IsNameSet() && config.IsDescriptionSet() {
+		return *config.Name, *config.Description, nil
+	}
+
+	//
+	// Otherwise, describe source image to get details.
+	//
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get AWS credentials: %w", err)
+	}
+
+	client := NewClient(ctx.HTTP, creds, config.SourceRegion)
+	image, err := client.DescribeImage(config.SourceImageID)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to describe image: %w", err)
+	}
+
+	var name string
+	var description string
+	if !config.IsNameSet() {
+		name = image.Name
+	} else {
+		name = *config.Name
+	}
+
+	if !config.IsDescriptionSet() {
+		description = image.Description
+	} else {
+		description = *config.Description
+	}
+
+	return name, description, nil
+}
+
 func (c *CopyImage) Execute(ctx core.ExecutionContext) error {
 	config := CopyImageConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	region, err := requireRegion(config.Region)
+	name, description, err := c.getNameAndDescription(ctx, config)
 	if err != nil {
-		return err
-	}
-	sourceRegion, err := requireSourceRegion(config.SourceRegion)
-	if err != nil {
-		return err
-	}
-	sourceImageID, err := requireSourceImageID(config.SourceImageID)
-	if err != nil {
-		return err
-	}
-	name, err := requireImageName(config.Name)
-	if err != nil {
-		return err
+		return fmt.Errorf("failed to determine image name: %w", err)
 	}
 
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
@@ -266,12 +310,12 @@ func (c *CopyImage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to get AWS credentials: %w", err)
 	}
 
-	client := NewClient(ctx.HTTP, creds, region)
+	client := NewClient(ctx.HTTP, creds, config.Region)
 	output, err := client.CopyImage(CopyImageInput{
-		SourceImageID: sourceImageID,
-		SourceRegion:  sourceRegion,
+		SourceImageID: config.SourceImageID,
+		SourceRegion:  config.SourceRegion,
 		Name:          name,
-		Description:   normalizeOptionalString(config.Description),
+		Description:   description,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to copy image: %w", err)
@@ -279,8 +323,8 @@ func (c *CopyImage) Execute(ctx core.ExecutionContext) error {
 
 	err = ctx.Metadata.Set(CopyImageExecutionMetadata{
 		ImageID:       output.ImageID,
-		SourceImageID: sourceImageID,
-		SourceRegion:  sourceRegion,
+		SourceImageID: config.SourceImageID,
+		SourceRegion:  config.SourceRegion,
 		State:         output.State,
 	})
 	if err != nil {
@@ -396,18 +440,13 @@ func (c *CopyImage) checkRuleAvailability(ctx core.ActionContext) error {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	integrationMetadata := common.IntegrationMetadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, nodeMetadata.Region, DetailTypeAMIStateChange)
+	if err != nil {
+		return fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
-	if !hasAMIStateChangeRule(integrationMetadata) {
-		ctx.Logger.Infof("Rule not available for source %s - checking again in %s", Source, copyImageCheckRuleRetryInterval)
-		return ctx.Requests.ScheduleActionCall(
-			"checkRuleAvailability",
-			map[string]any{},
-			copyImageCheckRuleRetryInterval,
-		)
+	if !hasRule {
+		return ctx.Requests.ScheduleActionCall(ctx.Name, map[string]any{}, 10*time.Second)
 	}
 
 	subscriptionID, err := ctx.Integration.Subscribe(c.subscriptionPattern(nodeMetadata.Region))

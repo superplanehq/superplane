@@ -138,7 +138,7 @@ func (p *OnImage) Setup(ctx core.TriggerContext) error {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
 
-		return p.provisionRule(ctx.Integration, ctx.Requests, region)
+		return p.provisionRule(ctx, region)
 	}
 
 	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(region))
@@ -152,8 +152,9 @@ func (p *OnImage) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (p *OnImage) provisionRule(integration core.IntegrationContext, requests core.RequestContext, region string) error {
-	err := integration.ScheduleActionCall(
+func (p *OnImage) provisionRule(ctx core.TriggerContext, region string) error {
+	ctx.Logger.Infof("Requesting rule provisioning for source %s and detail type %s in region %s", Source, DetailTypeAMIStateChange, region)
+	err := ctx.Integration.ScheduleActionCall(
 		"provisionRule",
 		common.ProvisionRuleParameters{
 			Region:     region,
@@ -162,11 +163,14 @@ func (p *OnImage) provisionRule(integration core.IntegrationContext, requests co
 		},
 		time.Second,
 	)
+
 	if err != nil {
 		return fmt.Errorf("failed to schedule rule provisioning for integration: %w", err)
 	}
 
-	return requests.ScheduleActionCall(
+	ctx.Logger.Infof("Scheduling rule availability check in %v", copyImageInitialRuleAvailabilityTimeout)
+
+	return ctx.Requests.ScheduleActionCall(
 		"checkRuleAvailability",
 		map[string]any{},
 		5*time.Second,
