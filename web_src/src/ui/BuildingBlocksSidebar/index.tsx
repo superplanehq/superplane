@@ -39,6 +39,7 @@ import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import BuildkiteLogo from "@/assets/buildkite-logo.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
@@ -421,6 +422,7 @@ function CategorySection({
     pagerduty: pagerDutyIcon,
     rootly: rootlyIcon,
     semaphore: SemaphoreLogo,
+    buildkite: BuildkiteLogo,
     slack: slackIcon,
     sendgrid: sendgridIcon,
     prometheus: prometheusIcon,
@@ -504,6 +506,7 @@ function CategorySection({
             pagerduty: pagerDutyIcon,
             rootly: rootlyIcon,
             semaphore: SemaphoreLogo,
+            buildkite: BuildkiteLogo,
             slack: slackIcon,
             sendgrid: sendgridIcon,
             prometheus: prometheusIcon,

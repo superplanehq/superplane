@@ -28,6 +28,7 @@ import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
+import BuildkiteLogo from "@/assets/buildkite-logo.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 
@@ -52,6 +53,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   semaphore: SemaphoreLogo,
+  buildkite: BuildkiteLogo,
   slack: slackIcon,
   smtp: smtpIcon,
   sendgrid: sendgridIcon,
@@ -80,6 +82,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   semaphore: SemaphoreLogo,
+  buildkite: BuildkiteLogo,
   slack: slackIcon,
   sendgrid: sendgridIcon,
   prometheus: prometheusIcon,
