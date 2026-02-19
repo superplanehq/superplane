@@ -681,6 +681,61 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		assert.EqualValues(t, recentEndTs, storedMetadata.LastExecutionEnded)
 	})
 
+	t.Run("poll does not checkpoint non-terminal executions", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		requests := &contexts.RequestContext{}
+		oldCheckpoint := time.Now().Add(-time.Hour).UnixMilli()
+		metadata := &contexts.MetadataContext{Metadata: OnPipelineCompletedMetadata{
+			LastExecutionEnded: oldCheckpoint,
+			LastExecutionID:    "exec-old",
+		}}
+		startTs := time.Now().UnixMilli()
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						fmt.Sprintf(
+							`{"data":{"content":[{"planExecutionId":"exec-running","pipelineIdentifier":"deploy","status":"RUNNING","startTs":"%d"}]}}`,
+							startTs,
+						),
+					)),
+				},
+			},
+		}
+
+		_, err := trigger.HandleAction(core.TriggerActionContext{
+			Name: OnPipelineCompletedPollAction,
+			Configuration: OnPipelineCompletedConfiguration{
+				OrgID:              "default",
+				ProjectID:          "default_project",
+				PipelineIdentifier: "deploy",
+				Statuses:           []string{"failed"},
+			},
+			HTTP:     httpCtx,
+			Metadata: metadata,
+			Requests: requests,
+			Events:   events,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken":  "pat.acc-123.test",
+					"orgId":     "default",
+					"projectId": "default_project",
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, OnPipelineCompletedPollAction, requests.Action)
+		assert.Equal(t, OnPipelineCompletedPollInterval, requests.Duration)
+		assert.Equal(t, 0, events.Count())
+
+		storedMetadata, ok := metadata.Get().(OnPipelineCompletedMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "exec-old", storedMetadata.LastExecutionID)
+		assert.EqualValues(t, oldCheckpoint, storedMetadata.LastExecutionEnded)
+	})
+
 	t.Run("poll retries transient API errors without failing the action", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		requests := &contexts.RequestContext{}

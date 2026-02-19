@@ -510,7 +510,15 @@ func (t *OnPipelineCompleted) processPolledExecution(
 	}
 
 	status := canonicalStatus(execution.Status)
-	shouldEmit := isTerminalStatus(status)
+	isTerminal := isTerminalStatus(status)
+	shouldEmit := isTerminal
+
+	// Never advance checkpoints for non-terminal executions.
+	// Their ordering can be based on start time and may jump ahead of
+	// unrelated executions that have not completed yet.
+	if !isTerminal {
+		return nil
+	}
 
 	pipelineScoped := strings.TrimSpace(config.PipelineIdentifier) != ""
 	if pipelineScoped && strings.TrimSpace(execution.PipelineIdentifier) != config.PipelineIdentifier {

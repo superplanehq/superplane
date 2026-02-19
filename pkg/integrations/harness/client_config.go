@@ -59,7 +59,7 @@ func optionalConfig(ctx core.IntegrationContext, name string) (string, error) {
 		}
 
 		// Optional fields can be stored as null in configuration.
-		if name == "baseURL" && strings.Contains(errText, "not a string") {
+		if strings.Contains(errText, "not a string") {
 			return "", nil
 		}
 
