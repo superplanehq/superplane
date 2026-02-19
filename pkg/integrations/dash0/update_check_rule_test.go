@@ -39,15 +39,20 @@ func Test__UpdateCheckRule__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "name is required")
 	})
 
-	t.Run("legacy spec remains supported", func(t *testing.T) {
+	t.Run("duplicate label keys are rejected", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"originOrId": "checkout-errors",
-				"spec":       `{"alert":"CheckoutErrors","expr":"sum(rate(http_requests_total{service=\"checkout\",status=~\"5..\"}[5m])) > 1"}`,
+				"name":       "Checkout errors",
+				"expression": `sum(rate(http_requests_total{service="checkout",status=~"5.."}[5m])) > 1`,
+				"labels": []map[string]any{
+					{"key": "severity", "value": "critical"},
+					{"key": "severity", "value": "warning"},
+				},
 			},
 		})
 
-		require.NoError(t, err)
+		require.ErrorContains(t, err, `labels[1].key "severity" is duplicated`)
 	})
 }
 
