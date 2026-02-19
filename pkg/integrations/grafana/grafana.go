@@ -36,9 +36,12 @@ func (g *Grafana) Description() string {
 func (g *Grafana) Instructions() string {
 	return `
 To connect Grafana:
-1. Create a Service Account token or API key in Grafana (Configuration > API Keys or Service Accounts).
-2. Set the Base URL to your Grafana instance (e.g. https://grafana.example.com).
-3. Paste the API token into SuperPlane and save.
+1. In Grafana, go to Administration > Users and access > Service accounts.
+2. Create a Service Account and assign a role (Viewer/Editor/Admin as needed).
+3. Open the Service Account and create a token. Copy it immediately.
+4. (Legacy Grafana) If Service Accounts are unavailable, use an API key.
+5. Set the Base URL to your Grafana instance (e.g. https://grafana.example.com).
+6. Paste the token into SuperPlane and save.
 
 For the alert trigger:
 1. SuperPlane will attempt to automatically create/update a Grafana Webhook contact point.
