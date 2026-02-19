@@ -21,6 +21,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   smtp: "SMTP",
   sendgrid: "SendGrid",
   dockerhub: "DockerHub",
+  terraformcloud: "Terraform Cloud",
 };
 
 /**
