@@ -21,6 +21,7 @@ type OnPackageVersion struct{}
 
 type OnPackageVersionConfiguration struct {
 	Region     string                    `json:"region" mapstructure:"region"`
+	Domain     string                    `json:"domain" mapstructure:"domain"`
 	Repository string                    `json:"repository" mapstructure:"repository"`
 	Packages   []configuration.Predicate `json:"packages" mapstructure:"packages"`
 	Versions   []configuration.Predicate `json:"versions" mapstructure:"versions"`
@@ -182,7 +183,7 @@ func (p *OnPackageVersion) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
-	repository, err := validateRepository(ctx.Integration, ctx.HTTP, region, config.Repository)
+	repository, err := validateRepository(ctx.Integration, ctx.HTTP, region, config.Domain, config.Repository)
 	if err != nil {
 		return fmt.Errorf("failed to validate repository: %w", err)
 	}
