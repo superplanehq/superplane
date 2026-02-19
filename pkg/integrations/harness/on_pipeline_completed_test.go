@@ -45,8 +45,26 @@ func Test__OnPipelineCompleted__Setup(t *testing.T) {
 
 	t.Run("without pipeline filter -> polling mode", func(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
-		integrationCtx := &contexts.IntegrationContext{}
+		integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
+			"apiToken": "pat.acc.test",
+		}}
 		requestCtx := &contexts.RequestContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"data":{"content":[{"organization":{"identifier":"default","name":"Default"}}]}}`,
+					)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"data":{"content":[{"projectResponse":{"project":{"identifier":"default_project","name":"Default Project"}}}]}}`,
+					)),
+				},
+			},
+		}
 
 		err := trigger.Setup(core.TriggerContext{
 			Configuration: OnPipelineCompletedConfiguration{
@@ -54,6 +72,7 @@ func Test__OnPipelineCompleted__Setup(t *testing.T) {
 				ProjectID: "default_project",
 				Statuses:  []string{"failed"},
 			},
+			HTTP:        httpCtx,
 			Metadata:    metadataCtx,
 			Webhook:     &contexts.WebhookContext{},
 			Integration: integrationCtx,
@@ -76,8 +95,32 @@ func Test__OnPipelineCompleted__Setup(t *testing.T) {
 
 	t.Run("with pipeline filter -> webhook requested", func(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
-		integrationCtx := &contexts.IntegrationContext{}
+		integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
+			"apiToken": "pat.acc.test",
+		}}
 		requestCtx := &contexts.RequestContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"data":{"content":[{"organization":{"identifier":"default","name":"Default"}}]}}`,
+					)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"data":{"content":[{"projectResponse":{"project":{"identifier":"default_project","name":"Default Project"}}}]}}`,
+					)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"data":{"yamlPipeline":"pipeline:\n  identifier: deploy\n"}}`,
+					)),
+				},
+			},
+		}
 
 		err := trigger.Setup(core.TriggerContext{
 			Configuration: OnPipelineCompletedConfiguration{
@@ -86,6 +129,7 @@ func Test__OnPipelineCompleted__Setup(t *testing.T) {
 				PipelineIdentifier: "deploy",
 				Statuses:           []string{"failed"},
 			},
+			HTTP:        httpCtx,
 			Metadata:    metadataCtx,
 			Webhook:     &contexts.WebhookContext{},
 			Integration: integrationCtx,
@@ -103,6 +147,52 @@ func Test__OnPipelineCompleted__Setup(t *testing.T) {
 		assert.Equal(t, "default", requestConfig.OrgID)
 		assert.Equal(t, "default_project", requestConfig.ProjectID)
 		assert.Equal(t, []string{"PipelineEnd"}, requestConfig.EventTypes)
+		assert.Empty(t, requestCtx.Action)
+	})
+
+	t.Run("invalid pipeline selection fails setup", func(t *testing.T) {
+		metadataCtx := &contexts.MetadataContext{}
+		integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
+			"apiToken": "pat.acc.test",
+		}}
+		requestCtx := &contexts.RequestContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"data":{"content":[{"organization":{"identifier":"default","name":"Default"}}]}}`,
+					)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"data":{"content":[{"projectResponse":{"project":{"identifier":"default_project","name":"Default Project"}}}]}}`,
+					)),
+				},
+				{
+					StatusCode: http.StatusNotFound,
+					Body:       io.NopCloser(strings.NewReader(`{"message":"pipeline not found"}`)),
+				},
+			},
+		}
+
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: OnPipelineCompletedConfiguration{
+				OrgID:              "default",
+				ProjectID:          "default_project",
+				PipelineIdentifier: "missing",
+				Statuses:           []string{"failed"},
+			},
+			HTTP:        httpCtx,
+			Metadata:    metadataCtx,
+			Webhook:     &contexts.WebhookContext{},
+			Integration: integrationCtx,
+			Requests:    requestCtx,
+		})
+
+		require.ErrorContains(t, err, `pipeline "missing" not found or inaccessible in organization "default" project "default_project"`)
+		require.Empty(t, integrationCtx.WebhookRequests)
 		assert.Empty(t, requestCtx.Action)
 	})
 }

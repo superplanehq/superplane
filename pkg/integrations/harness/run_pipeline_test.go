@@ -104,7 +104,31 @@ func Test__RunPipeline__Setup(t *testing.T) {
 	component := &RunPipeline{}
 
 	t.Run("valid configuration", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{}
+		integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
+			"apiToken": "pat.acc.test",
+		}}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"data":{"content":[{"organization":{"identifier":"default","name":"Default"}}]}}`,
+					)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"data":{"content":[{"projectResponse":{"project":{"identifier":"default_project","name":"Default Project"}}}]}}`,
+					)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"data":{"yamlPipeline":"pipeline:\n  identifier: deploy-prod\n"}}`,
+					)),
+				},
+			},
+		}
 		err := component.Setup(core.SetupContext{
 			Configuration: RunPipelineSpec{
 				OrgID:              "default",
@@ -112,6 +136,7 @@ func Test__RunPipeline__Setup(t *testing.T) {
 				PipelineIdentifier: "deploy-prod",
 				Ref:                "refs/heads/main",
 			},
+			HTTP:        httpCtx,
 			Integration: integrationCtx,
 		})
 
@@ -122,6 +147,42 @@ func Test__RunPipeline__Setup(t *testing.T) {
 		assert.Equal(t, "deploy-prod", requestConfig.PipelineIdentifier)
 		assert.Equal(t, "default", requestConfig.OrgID)
 		assert.Equal(t, "default_project", requestConfig.ProjectID)
+	})
+
+	t.Run("invalid project selection fails setup", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
+			"apiToken": "pat.acc.test",
+		}}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"data":{"content":[{"organization":{"identifier":"default","name":"Default"}}]}}`,
+					)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"data":{"content":[{"projectResponse":{"project":{"identifier":"other_project","name":"Other"}}}]}}`,
+					)),
+				},
+			},
+		}
+
+		err := component.Setup(core.SetupContext{
+			Configuration: RunPipelineSpec{
+				OrgID:              "default",
+				ProjectID:          "default_project",
+				PipelineIdentifier: "deploy-prod",
+				Ref:                "refs/heads/main",
+			},
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+		})
+
+		require.ErrorContains(t, err, `project "default_project" not found or inaccessible in organization "default"`)
+		require.Empty(t, integrationCtx.WebhookRequests)
 	})
 
 	t.Run("missing pipeline identifier", func(t *testing.T) {
