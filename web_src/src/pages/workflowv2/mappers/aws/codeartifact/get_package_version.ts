@@ -14,11 +14,7 @@ import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.sv
 import { formatTimeAgo } from "@/utils/date";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { MetadataItem } from "@/ui/metadataList";
-import {
-  PackageVersionDescription,
-  PackageLicense,
-  PackageVersionPayload,
-} from "./types";
+import { PackageVersionDescription, PackageLicense, PackageVersionPayload } from "./types";
 import { formatPackageName } from "./utils";
 import { stringOrDash } from "../../utils";
 
@@ -90,7 +86,7 @@ export const getPackageVersionMapper: ComponentBaseMapper = {
 function getPackageVersionMetadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as GetPackageVersionConfiguration | undefined;
   const items: MetadataItem[] = [];
-  
+
   if (configuration?.region) {
     items.push({
       icon: "globe",

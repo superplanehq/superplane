@@ -2,11 +2,7 @@ import { getBackgroundColorClass } from "@/utils/colors";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
 import { TriggerProps } from "@/ui/trigger";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
-import {
-  PackageVersionDetail,
-  PackageVersionEvent,
-  Repository,
-} from "./types";
+import { PackageVersionDetail, PackageVersionEvent, Repository } from "./types";
 import { formatPackageLabel, formatPackageName } from "./utils";
 import { formatTimeAgo } from "@/utils/date";
 import { formatPredicate, numberOrZero, Predicate, stringOrDash } from "../../utils";
