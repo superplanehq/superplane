@@ -201,6 +201,19 @@ func (t *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("missing metadata context")
 	}
 
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	if err := validateHarnessScopeSelection(client, config.OrgID, config.ProjectID); err != nil {
+		return err
+	}
+
+	if err := validateHarnessPipelineSelection(client, config.OrgID, config.ProjectID, config.PipelineIdentifier); err != nil {
+		return err
+	}
+
 	webhookConfig := WebhookConfiguration{
 		PipelineIdentifier: config.PipelineIdentifier,
 		OrgID:              config.OrgID,

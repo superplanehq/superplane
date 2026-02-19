@@ -207,6 +207,19 @@ func (r *RunPipeline) Setup(ctx core.SetupContext) error {
 		return nil
 	}
 
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	if err := validateHarnessScopeSelection(client, spec.OrgID, spec.ProjectID); err != nil {
+		return err
+	}
+
+	if err := validateHarnessPipelineSelection(client, spec.OrgID, spec.ProjectID, spec.PipelineIdentifier); err != nil {
+		return err
+	}
+
 	if err := ctx.Integration.RequestWebhook(WebhookConfiguration{
 		PipelineIdentifier: spec.PipelineIdentifier,
 		OrgID:              spec.OrgID,
