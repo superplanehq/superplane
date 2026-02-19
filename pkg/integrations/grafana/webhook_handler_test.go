@@ -226,6 +226,27 @@ func Test__GrafanaWebhookHandler__Cleanup__NoContactPointUIDWithoutTokenIsNoOp(t
 	require.Len(t, httpCtx.Requests, 0)
 }
 
+func Test__GrafanaWebhookHandler__Cleanup__NilMetadataIsNoOp(t *testing.T) {
+	handler := &GrafanaWebhookHandler{}
+	httpCtx := &contexts.HTTPContext{}
+	webhookCtx := &testWebhookContext{
+		metadata: nil,
+	}
+
+	err := handler.Cleanup(core.WebhookHandlerContext{
+		HTTP:    httpCtx,
+		Webhook: webhookCtx,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseURL": "https://grafana.example.com",
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, httpCtx.Requests, 0)
+}
+
 func Test__GrafanaWebhookHandler__CompareConfig(t *testing.T) {
 	handler := &GrafanaWebhookHandler{}
 
