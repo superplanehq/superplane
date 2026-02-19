@@ -81,49 +81,6 @@ Returns a list of issues with:
 }
 ```
 
-<a id="send-log-event"></a>
-
-## Send Log Event
-
-The Send Log Event component sends workflow log records to Dash0 using OTLP HTTP ingestion.
-
-### Use Cases
-
-- **Audit trails**: Record workflow milestones in Dash0 logs
-- **Change tracking**: Emit deployment, approval, and remediation events
-- **Observability correlation**: Correlate workflow activity with traces and metrics
-
-### Configuration
-
-- **Service Name**: Service name attached to emitted records
-- **Records**: One or more log records containing:
-  - message
-  - severity
-  - timestamp (optional, RFC3339 or unix)
-  - attributes (optional key/value map)
-
-### Output
-
-Emits:
-- **serviceName**: Service name used for ingestion
-- **sentCount**: Number of records sent in this request
-
-### Example Output
-
-```json
-{
-  "data": {
-    "response": {
-      "status": "ok"
-    },
-    "sentCount": 2,
-    "serviceName": "superplane.workflow"
-  },
-  "timestamp": "2026-02-09T12:00:00Z",
-  "type": "dash0.log.event.sent"
-}
-```
-
 <a id="query-prometheus"></a>
 
 ## Query Prometheus
@@ -191,6 +148,49 @@ Returns the Prometheus query response including:
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "dash0.prometheus.response"
+}
+```
+
+<a id="send-log-event"></a>
+
+## Send Log Event
+
+The Send Log Event component sends workflow log records to Dash0 using OTLP HTTP ingestion.
+
+### Use Cases
+
+- **Audit trails**: Record workflow milestones in Dash0 logs
+- **Change tracking**: Emit deployment, approval, and remediation events
+- **Observability correlation**: Correlate workflow activity with traces and metrics
+
+### Configuration
+
+- **Service Name**: Service name attached to emitted records
+- **Records**: One or more log records containing:
+  - message
+  - severity
+  - timestamp (optional, RFC3339 or unix)
+  - attributes (optional key/value map)
+
+### Output
+
+Emits:
+- **serviceName**: Service name used for ingestion
+- **sentCount**: Number of records sent in this request
+
+### Example Output
+
+```json
+{
+  "data": {
+    "response": {
+      "status": "ok"
+    },
+    "sentCount": 2,
+    "serviceName": "superplane.workflow"
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.log.event.sent"
 }
 ```
 
