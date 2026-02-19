@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -125,17 +126,164 @@ func Test__ExecuteCode__Setup(t *testing.T) {
 func Test__ExecuteCode__Execute(t *testing.T) {
 	component := ExecuteCode{}
 
-	t.Run("successful code execution", func(t *testing.T) {
+	t.Run("schedules poll after async kickoff", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"cmdId":"cmd-001"}`))},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		metadataCtx := &contexts.MetadataContext{}
+		requestCtx := &contexts.RequestContext{}
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"sandboxId": "sandbox-123",
+				"code":      "print('hello world')",
+				"language":  "python",
+				"timeout":   60,
+			},
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
+			Metadata:       metadataCtx,
+			Requests:       requestCtx,
+		})
+
+		require.NoError(t, err)
+		assert.False(t, execCtx.Finished, "execution should not be finished yet")
+		assert.Equal(t, "poll", requestCtx.Action)
+		assert.Equal(t, ExecuteCodePollInterval, requestCtx.Duration)
+
+		metadata, ok := metadataCtx.Metadata.(ExecuteCodeMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "sandbox-123", metadata.SandboxID)
+		assert.Equal(t, "cmd-001", metadata.CmdID)
+		assert.Equal(t, 60, metadata.Timeout)
+	})
+
+	t.Run("constructs python command correctly", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"cmdId":"cmd-001"}`))},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"sandboxId": "sandbox-123",
+				"code":      "print(42)",
+				"language":  "python",
+			},
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       &contexts.RequestContext{},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 4)
+		body, _ := io.ReadAll(httpContext.Requests[3].Body)
+		assert.Contains(t, string(body), "python3 -c")
+	})
+
+	t.Run("create session failure -> error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"message":"sandbox not found"}`))},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"sandboxId": "invalid-sandbox",
+				"code":      "print('hello')",
+				"language":  "python",
+			},
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       &contexts.RequestContext{},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create session")
+	})
+}
+
+func Test__ExecuteCode__HandleAction(t *testing.T) {
+	component := ExecuteCode{}
+
+	t.Run("poll reschedules when command is still running", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-abc","commands":[{"id":"cmd-001"}]}`))},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		requestCtx := &contexts.RequestContext{}
+		err := component.HandleAction(core.ActionContext{
+			Name: "poll",
+			HTTP: httpContext,
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{
+					"sandboxId": "sandbox-123",
+					"sessionId": "session-abc",
+					"cmdId":     "cmd-001",
+					"startedAt": time.Now(),
+					"timeout":   300,
 				},
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"exitCode":0,"result":"hello world"}`)),
-				},
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Requests:       requestCtx,
+			Integration:    appCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "poll", requestCtx.Action)
+	})
+
+	t.Run("poll emits result when command completes", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-abc","commands":[{"id":"cmd-001","exitCode":0}]}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`42`))},
 			},
 		}
 
@@ -146,15 +294,21 @@ func Test__ExecuteCode__Execute(t *testing.T) {
 		}
 
 		execCtx := &contexts.ExecutionStateContext{}
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"code":      "print('hello world')",
-				"language":  "python",
+		err := component.HandleAction(core.ActionContext{
+			Name: "poll",
+			HTTP: httpContext,
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{
+					"sandboxId": "sandbox-123",
+					"sessionId": "session-abc",
+					"cmdId":     "cmd-001",
+					"startedAt": time.Now(),
+					"timeout":   300,
+				},
 			},
-			HTTP:           httpContext,
-			Integration:    appCtx,
 			ExecutionState: execCtx,
+			Requests:       &contexts.RequestContext{},
+			Integration:    appCtx,
 		})
 
 		require.NoError(t, err)
@@ -164,72 +318,50 @@ func Test__ExecuteCode__Execute(t *testing.T) {
 		require.Len(t, execCtx.Payloads, 1)
 	})
 
-	t.Run("code execution with non-zero exit code", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
-				},
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"exitCode":1,"result":"error: division by zero"}`)),
-				},
-			},
-		}
-
+	t.Run("poll times out", func(t *testing.T) {
 		appCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiKey": "test-api-key",
 			},
 		}
 
-		execCtx := &contexts.ExecutionStateContext{}
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"code":      "print(1/0)",
-				"language":  "python",
-			},
-			HTTP:           httpContext,
-			Integration:    appCtx,
-			ExecutionState: execCtx,
-		})
-
-		require.NoError(t, err)
-		assert.True(t, execCtx.Finished)
-	})
-
-	t.Run("code execution failure -> error", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusNotFound,
-					Body:       io.NopCloser(strings.NewReader(`{"message":"sandbox not found"}`)),
+		err := component.HandleAction(core.ActionContext{
+			Name: "poll",
+			HTTP: &contexts.HTTPContext{},
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{
+					"sandboxId": "sandbox-123",
+					"sessionId": "session-abc",
+					"cmdId":     "cmd-001",
+					"startedAt": time.Now().Add(-10 * time.Minute),
+					"timeout":   30,
 				},
 			},
-		}
-
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"apiKey": "test-api-key",
-			},
-		}
-
-		execCtx := &contexts.ExecutionStateContext{}
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"sandboxId": "invalid-sandbox",
-				"code":      "print('hello')",
-				"language":  "python",
-			},
-			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Requests:       &contexts.RequestContext{},
 			Integration:    appCtx,
-			ExecutionState: execCtx,
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to execute code")
+		assert.Contains(t, err.Error(), "timed out")
+	})
+
+	t.Run("skips when execution already finished", func(t *testing.T) {
+		err := component.HandleAction(core.ActionContext{
+			Name:           "poll",
+			ExecutionState: &contexts.ExecutionStateContext{Finished: true},
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("unknown action -> error", func(t *testing.T) {
+		err := component.HandleAction(core.ActionContext{
+			Name: "unknown",
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown action")
 	})
 }
 
