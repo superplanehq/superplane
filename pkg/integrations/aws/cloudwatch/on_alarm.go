@@ -3,7 +3,6 @@ package cloudwatch
 import (
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
@@ -146,17 +145,12 @@ func (p *OnAlarm) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
-	integrationMetadata := common.IntegrationMetadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, metadata.Region, DetailTypeAlarmStateChange)
+	if err != nil {
+		return fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
-	if integrationMetadata.EventBridge == nil {
-		return fmt.Errorf("event bridge metadata is not configured")
-	}
-
-	rule, ok := integrationMetadata.EventBridge.Rules[Source]
-	if !ok || !slices.Contains(rule.DetailTypes, DetailTypeAlarmStateChange) {
+	if !hasRule {
 		if err := ctx.Metadata.Set(OnAlarmMetadata{Region: config.Region}); err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
@@ -229,37 +223,13 @@ func (p *OnAlarm) checkRuleAvailability(ctx core.TriggerActionContext) (map[stri
 		return nil, fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	integrationMetadata := common.IntegrationMetadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
-		return nil, fmt.Errorf("failed to decode integration metadata: %w", err)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, metadata.Region, DetailTypeAlarmStateChange)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
-	if integrationMetadata.EventBridge == nil {
-		ctx.Logger.Infof("EventBridge metadata not found - checking again in 10 seconds")
-		return nil, ctx.Requests.ScheduleActionCall(
-			"checkRuleAvailability",
-			map[string]any{},
-			10*time.Second,
-		)
-	}
-
-	rule, ok := integrationMetadata.EventBridge.Rules[Source]
-	if !ok {
-		ctx.Logger.Infof("Rule not found for source %s - checking again in 10 seconds", Source)
-		return nil, ctx.Requests.ScheduleActionCall(
-			"checkRuleAvailability",
-			map[string]any{},
-			10*time.Second,
-		)
-	}
-
-	if !slices.Contains(rule.DetailTypes, DetailTypeAlarmStateChange) {
-		ctx.Logger.Infof("Rule does not have detail type '%s' - checking again in 10 seconds", DetailTypeAlarmStateChange)
-		return nil, ctx.Requests.ScheduleActionCall(
-			"checkRuleAvailability",
-			map[string]any{},
-			10*time.Second,
-		)
+	if !hasRule {
+		return nil, ctx.Requests.ScheduleActionCall(ctx.Name, map[string]any{}, 10*time.Second)
 	}
 
 	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(metadata.Region))

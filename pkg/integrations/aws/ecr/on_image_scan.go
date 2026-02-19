@@ -140,21 +140,12 @@ func (p *OnImageScan) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
-	//
-	// Create EventBridge rule and target
-	//
-	integrationMetadata := common.IntegrationMetadata{}
-	err = mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, metadata.Region, DetailTypeECRImageScan)
 	if err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
+		return fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
-	//
-	// If an EventBridge rule does not yet exist yet in this region, for this source,
-	// we ask the integration to provision it for us.
-	//
-	rule, ok := integrationMetadata.EventBridge.Rules[Source]
-	if !ok || !slices.Contains(rule.DetailTypes, DetailTypeECRImageScan) {
+	if !hasRule {
 		err = ctx.Metadata.Set(OnImagePushMetadata{
 			Region:     config.Region,
 			Repository: repository,
