@@ -89,6 +89,39 @@ func Test__OnAlertFiring__HandleWebhook(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, eventContext.Count())
 	})
+
+	t.Run("resolved top-level status with firing sub-alerts -> no event emitted", func(t *testing.T) {
+		mixedPayload := []byte(`{"status":"resolved","alerts":[{"status":"firing"}]}`)
+		eventContext := &contexts.EventContext{}
+
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          mixedPayload,
+			Headers:       http.Header{},
+			Configuration: map[string]any{},
+			Events:        eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("firing top-level status with resolved sub-alerts -> event emitted", func(t *testing.T) {
+		mixedPayload := []byte(`{"status":"firing","alerts":[{"status":"resolved"}]}`)
+		eventContext := &contexts.EventContext{}
+
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          mixedPayload,
+			Headers:       http.Header{},
+			Configuration: map[string]any{},
+			Events:        eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventContext.Count())
+		assert.Equal(t, "grafana.alert.firing", eventContext.Payloads[0].Type)
+	})
 }
 
 func Test__OnAlertFiring__Setup(t *testing.T) {
