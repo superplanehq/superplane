@@ -2,6 +2,10 @@ import { resolveIcon } from "@/lib/utils";
 import React from "react";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
+import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
+import circleciIcon from "@/assets/icons/integrations/circleci.svg";
+import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
+import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
@@ -16,6 +20,7 @@ import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
+import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
@@ -44,6 +49,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   github: githubIcon,
   gitlab: gitlabIcon,
   hetzner: hetznerIcon,
+  grafana: grafanaIcon,
   jira: jiraIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
@@ -72,6 +78,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   github: githubIcon,
   gitlab: gitlabIcon,
   hetzner: hetznerIcon,
+  grafana: grafanaIcon,
   jira: jiraIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,

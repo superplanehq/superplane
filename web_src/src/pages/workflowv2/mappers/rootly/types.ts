@@ -35,3 +35,11 @@ export interface IncidentEvent {
   occurred_at?: string;
   created_at?: string;
 }
+
+export interface IncidentEvent {
+  id?: string;
+  event?: string;
+  visibility?: string;
+  occurred_at?: string;
+  created_at?: string;
+}
