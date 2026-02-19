@@ -2,10 +2,8 @@ package ecs
 
 import (
 	"fmt"
-	"slices"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 )
@@ -59,32 +57,12 @@ func subscribeWhenTaskStateChangeRuleAvailable(
 	subscriptionPattern *common.EventBridgeEvent,
 	onSubscribed func(subscriptionID string) error,
 ) error {
-	integrationMetadata := common.IntegrationMetadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, ecsEventBridgeSource, subscriptionPattern.Region, subscriptionPattern.DetailType)
+	if err != nil {
+		return fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
-	if integrationMetadata.EventBridge == nil {
-		ctx.Logger.Infof("EventBridge metadata not found - checking again in %s", retryInterval)
-		return ctx.Requests.ScheduleActionCall(checkActionName, map[string]any{}, retryInterval)
-	}
-
-	rule, ok := integrationMetadata.EventBridge.Rules[ecsEventBridgeSource]
-	if !ok {
-		ctx.Logger.Infof(
-			"Rule not found for source %s - checking again in %s",
-			ecsEventBridgeSource,
-			retryInterval,
-		)
-		return ctx.Requests.ScheduleActionCall(checkActionName, map[string]any{}, retryInterval)
-	}
-
-	if !slices.Contains(rule.DetailTypes, ecsTaskStateChangeEventDetailType) {
-		ctx.Logger.Infof(
-			"Rule does not have detail type %q - checking again in %s",
-			ecsTaskStateChangeEventDetailType,
-			retryInterval,
-		)
+	if !hasRule {
 		return ctx.Requests.ScheduleActionCall(checkActionName, map[string]any{}, retryInterval)
 	}
 
