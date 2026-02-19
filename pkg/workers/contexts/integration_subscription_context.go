@@ -70,12 +70,17 @@ func (c *IntegrationSubscriptionContext) sendMessageToComponent(message any) err
 		return fmt.Errorf("component %s is not an app component", componentName)
 	}
 
+	node := c.node
+	tx := c.tx
+	httpCtx := c.registry.HTTPContext()
+	logger := logging.WithIntegration(logging.ForNode(*c.node), *c.integration)
+
 	return integrationComponent.OnIntegrationMessage(core.IntegrationMessageContext{
-		HTTP:          c.registry.HTTPContext(),
-		Configuration: c.node.Configuration.Data(),
-		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
+		HTTP:          httpCtx,
+		Configuration: node.Configuration.Data(),
+		NodeMetadata:  NewNodeMetadataContext(tx, node),
 		Integration:   c.integrationCtx,
-		Events:        NewEventContext(c.tx, c.node),
+		Events:        NewEventContext(tx, node),
 		Message:       message,
 		Logger:        logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {

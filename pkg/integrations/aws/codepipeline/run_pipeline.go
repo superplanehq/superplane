@@ -630,8 +630,19 @@ func (r *RunPipeline) finish(ctx core.ActionContext) error {
 	return ctx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{outputPayload})
 }
 
-// OnIntegrationMessage filters EventBridge events by pipeline name and re-emits
-// matching events so the system can route them to the correct execution via HandleWebhook.
+// OnIntegrationMessage receives EventBridge events routed through the AWS
+// integration's shared /events endpoint. Unlike triggers, where each message
+// starts a new event chain, this component needs to resolve an existing
+// execution that is waiting for pipeline completion.
+//
+// The flow is:
+//  1. EventBridge fires a CodePipeline Pipeline Execution State Change event.
+//  2. The AWS integration receives it and routes it here via the subscription.
+//  3. We match the event to our pipeline, then look up the waiting execution
+//     by the pipeline_execution_id KV set during Execute().
+//  4. For terminal states (SUCCEEDED/FAILED/CANCELLED), we emit to the
+//     appropriate output channel, finishing the execution in near real-time
+//     instead of waiting for the next poll cycle.
 func (r *RunPipeline) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {
 	event := common.EventBridgeEvent{}
 	err := mapstructure.Decode(ctx.Message, &event)
@@ -664,7 +675,89 @@ func (r *RunPipeline) OnIntegrationMessage(ctx core.IntegrationMessageContext) e
 		return nil
 	}
 
-	return ctx.Events.Emit(PayloadType, ctx.Message)
+	state, ok := event.Detail["state"].(string)
+	if !ok {
+		return nil
+	}
+
+	// Only process terminal states; ignore STARTED, RESUMED, etc.
+	var status string
+	switch state {
+	case "SUCCEEDED":
+		status = PipelineStatusSucceeded
+	case "FAILED":
+		status = PipelineStatusFailed
+	case "CANCELED", "CANCELLED":
+		status = PipelineStatusStopped
+	default:
+		return nil
+	}
+
+	executionID, ok := event.Detail["execution-id"].(string)
+	if !ok || executionID == "" {
+		return fmt.Errorf("missing execution-id in EventBridge event detail")
+	}
+
+	if ctx.FindExecutionByKV == nil {
+		// Fallback: if execution resolution is not available, emit a root event
+		// so that the event is at least recorded. The poll will resolve it.
+		ctx.Logger.Warnf("FindExecutionByKV not available, falling back to event emission")
+		return ctx.Events.Emit(PayloadType, ctx.Message)
+	}
+
+	executionCtx, err := ctx.FindExecutionByKV("pipeline_execution_id", executionID)
+	if err != nil {
+		ctx.Logger.Warnf("Failed to find execution for pipeline_execution_id=%s: %v", executionID, err)
+		return nil
+	}
+
+	if executionCtx == nil {
+		ctx.Logger.Infof("No execution found for pipeline_execution_id=%s, ignoring", executionID)
+		return nil
+	}
+
+	execMetadata := RunPipelineExecutionMetadata{}
+	err = mapstructure.Decode(executionCtx.Metadata.Get(), &execMetadata)
+	if err != nil {
+		return fmt.Errorf("failed to decode execution metadata: %w", err)
+	}
+
+	if execMetadata.Execution == nil {
+		return nil
+	}
+
+	// Already resolved (e.g., poll beat us to it), nothing to do.
+	if execMetadata.Execution.Status == PipelineStatusSucceeded ||
+		execMetadata.Execution.Status == PipelineStatusFailed ||
+		execMetadata.Execution.Status == PipelineStatusStopped {
+		return nil
+	}
+
+	if executionCtx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	execMetadata.Execution.Status = status
+	err = executionCtx.Metadata.Set(execMetadata)
+	if err != nil {
+		return fmt.Errorf("failed to update execution metadata: %w", err)
+	}
+
+	outputPayload := map[string]any{
+		"pipeline": map[string]any{
+			"name":        metadata.Pipeline.Name,
+			"executionId": executionID,
+			"status":      status,
+			"state":       state,
+		},
+		"detail": event.Detail,
+	}
+
+	if status == PipelineStatusSucceeded {
+		return executionCtx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{outputPayload})
+	}
+
+	return executionCtx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{outputPayload})
 }
 
 func (r *RunPipeline) Cleanup(ctx core.SetupContext) error {
