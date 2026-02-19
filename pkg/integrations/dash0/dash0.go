@@ -69,6 +69,9 @@ func (d *Dash0) Components() []core.Component {
 	return []core.Component{
 		&QueryPrometheus{},
 		&ListIssues{},
+		&CreateHTTPSyntheticCheck{},
+		&UpdateHTTPSyntheticCheck{},
+		&DeleteHTTPSyntheticCheck{},
 	}
 }
 
@@ -114,31 +117,56 @@ func (d *Dash0) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (d *Dash0) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != "check-rule" {
-		return []core.IntegrationResource{}, nil
-	}
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("error creating dash0 client: %w", err)
 	}
 
-	checkRules, err := client.ListCheckRules()
-	if err != nil {
-		ctx.Logger.Warnf("Error fetching check rules: %v", err)
+	switch resourceType {
+	case "check-rule":
+		checkRules, err := client.ListCheckRules()
+		if err != nil {
+			ctx.Logger.Warnf("Error fetching check rules: %v", err)
+			return []core.IntegrationResource{}, nil
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(checkRules))
+		for _, rule := range checkRules {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: rule.Name,
+				ID:   rule.ID,
+			})
+		}
+
+		return resources, nil
+
+	case "synthetic-check":
+		checks, err := client.ListSyntheticChecks("default")
+		if err != nil {
+			ctx.Logger.Warnf("Error fetching synthetic checks: %v", err)
+			return []core.IntegrationResource{}, nil
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(checks))
+		for _, check := range checks {
+			id := check.Metadata.Labels["dash0.com/id"]
+			name := check.Spec.Plugin.Display.Name
+			if name == "" {
+				name = check.Metadata.Name
+			}
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: name,
+				ID:   id,
+			})
+		}
+
+		return resources, nil
+
+	default:
 		return []core.IntegrationResource{}, nil
 	}
-
-	resources := make([]core.IntegrationResource, 0, len(checkRules))
-	for _, rule := range checkRules {
-		resources = append(resources, core.IntegrationResource{
-			Type: resourceType,
-			Name: rule.Name,
-			ID:   rule.ID,
-		})
-	}
-
-	return resources, nil
 }
 
 func (d *Dash0) HandleRequest(ctx core.HTTPRequestContext) {
