@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -49,6 +50,25 @@ func Test__QueryDataSource__Setup(t *testing.T) {
 
 		require.NoError(t, err)
 	})
+}
+
+func Test__QueryDataSource__Configuration__UsesIntegrationResourceForDataSource(t *testing.T) {
+	component := QueryDataSource{}
+	fields := component.Configuration()
+
+	var dataSourceField *configuration.Field
+	for i := range fields {
+		if fields[i].Name == "dataSourceUid" {
+			dataSourceField = &fields[i]
+			break
+		}
+	}
+
+	require.NotNil(t, dataSourceField)
+	require.Equal(t, configuration.FieldTypeIntegrationResource, dataSourceField.Type)
+	require.NotNil(t, dataSourceField.TypeOptions)
+	require.NotNil(t, dataSourceField.TypeOptions.Resource)
+	require.Equal(t, resourceTypeDataSource, dataSourceField.TypeOptions.Resource.Type)
 }
 
 func Test__QueryDataSource__Execute(t *testing.T) {

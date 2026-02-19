@@ -1,10 +1,15 @@
 package grafana
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
+
+const resourceTypeDataSource = "data-source"
 
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("grafana", &Grafana{}, &GrafanaWebhookHandler{})
@@ -100,5 +105,38 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	return []core.IntegrationResource{}, nil
+	if resourceType != resourceTypeDataSource {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
+	if err != nil {
+		return nil, fmt.Errorf("error creating client: %w", err)
+	}
+
+	dataSources, err := client.ListDataSources()
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(dataSources))
+	for _, source := range dataSources {
+		id := strings.TrimSpace(source.UID)
+		if id == "" {
+			continue
+		}
+
+		name := strings.TrimSpace(source.Name)
+		if name == "" {
+			name = id
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceTypeDataSource,
+			Name: name,
+			ID:   id,
+		})
+	}
+
+	return resources, nil
 }

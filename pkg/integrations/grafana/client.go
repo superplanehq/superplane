@@ -27,6 +27,11 @@ type contactPoint struct {
 	Name string `json:"name"`
 }
 
+type dataSource struct {
+	UID  string `json:"uid"`
+	Name string `json:"name"`
+}
+
 type apiStatusError struct {
 	Operation    string
 	StatusCode   int
@@ -303,4 +308,22 @@ func (c *Client) DeleteContactPoint(uid string) error {
 	}
 
 	return nil
+}
+
+func (c *Client) ListDataSources() ([]dataSource, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/datasources", nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error listing data sources: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana data source list", status, responseBody)
+	}
+
+	var sources []dataSource
+	if err := json.Unmarshal(responseBody, &sources); err != nil {
+		return nil, fmt.Errorf("error parsing data sources response: %v", err)
+	}
+
+	return sources, nil
 }

@@ -213,3 +213,73 @@ func Test__Client__listContactPoints__ErrorsWhenWrappedItemsFieldMissing(t *test
 	_, err := client.listContactPoints()
 	require.ErrorContains(t, err, "error parsing contact points response")
 }
+
+func Test__Client__ListDataSources(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[{"uid":"prom","name":"Prometheus"},{"uid":"loki","name":"Loki"}]`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	dataSources, err := client.ListDataSources()
+	require.NoError(t, err)
+	require.Len(t, dataSources, 2)
+	require.Equal(t, "prom", dataSources[0].UID)
+	require.Equal(t, "Prometheus", dataSources[0].Name)
+}
+
+func Test__Grafana__ListResources(t *testing.T) {
+	g := &Grafana{}
+
+	t.Run("unknown resource type returns empty", func(t *testing.T) {
+		resources, err := g.ListResources("unknown", core.ListResourcesContext{
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseURL":  "https://grafana.example.com",
+					"apiToken": "token",
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.Empty(t, resources)
+	})
+
+	t.Run("data-source returns grafana datasources", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`[
+						{"uid":"prom","name":"Prometheus"},
+						{"uid":"loki","name":"Loki"},
+						{"uid":"","name":"Missing UID"}
+					]`)),
+				},
+			},
+		}
+
+		resources, err := g.ListResources(resourceTypeDataSource, core.ListResourcesContext{
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseURL":  "https://grafana.example.com",
+					"apiToken": "token",
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		require.Equal(t, "Prometheus", resources[0].Name)
+		require.Equal(t, "prom", resources[0].ID)
+		require.Equal(t, resourceTypeDataSource, resources[0].Type)
+	})
+}
