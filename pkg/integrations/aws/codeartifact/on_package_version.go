@@ -68,9 +68,40 @@ func (p *OnPackageVersion) Configuration() []configuration.Field {
 		{
 			Name:     "region",
 			Label:    "Region",
-			Type:     configuration.FieldTypeString,
+			Type:     configuration.FieldTypeSelect,
 			Required: true,
 			Default:  "us-east-1",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: RegionsForCodeArtifact,
+				},
+			},
+		},
+		{
+			Name:     "domain",
+			Label:    "Domain",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: true,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "region",
+					Values: []string{"*"},
+				},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "codeartifact.domain",
+					UseNameAsValue: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:     "repository",
@@ -80,6 +111,14 @@ func (p *OnPackageVersion) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "codeartifact.repository",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+					},
 				},
 			},
 		},

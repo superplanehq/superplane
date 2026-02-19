@@ -48,6 +48,13 @@ export function buildCodeArtifactMetadataItems(
 ): MetadataItem[] {
   const items: MetadataItem[] = [];
 
+  if (metadata?.region) {
+    items.push({
+      icon: "globe",
+      label: metadata.region,
+    });
+  }
+
   if (metadata?.repository?.domainName) {
     items.push({
       icon: "database",
