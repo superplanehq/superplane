@@ -239,14 +239,6 @@ type IntegrationContext interface {
 	RequestWebhook(configuration any) error
 
 	/*
-	 * Ensure an integration-level webhook exists.
-	 * Called from the integration's Sync() to create a webhook
-	 * that is not tied to any specific node. Returns the webhook ID
-	 * if one was found or created.
-	 */
-	EnsureIntegrationWebhook(configuration any) (*uuid.UUID, error)
-
-	/*
 	 * Subscribe to integration events.
 	 */
 	Subscribe(any) (*uuid.UUID, error)
