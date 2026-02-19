@@ -6,6 +6,13 @@ import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
+import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
+import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
+import circleciIcon from "@/assets/icons/integrations/circleci.svg";
+import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
+import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
+import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
+import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
@@ -32,6 +39,7 @@ import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 /** Integration type name (e.g. "github") → logo src. Used for Settings tab and header. */
 export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   aws: awsIcon,
+  bitbucket: bitbucketIcon,
   circleci: circleciIcon,
   cloudflare: cloudflareIcon,
   dash0: dash0Icon,
@@ -42,7 +50,6 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   gitlab: gitlabIcon,
   hetzner: hetznerIcon,
   grafana: grafanaIcon,
-  hetzner: hetznerIcon,
   jira: jiraIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
@@ -61,6 +68,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
 
 /** Block name first part (e.g. "github") or compound (e.g. aws.lambda) → logo src for header. */
 export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
+  bitbucket: bitbucketIcon,
   circleci: circleciIcon,
   cloudflare: cloudflareIcon,
   dash0: dash0Icon,
@@ -71,7 +79,6 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   gitlab: gitlabIcon,
   hetzner: hetznerIcon,
   grafana: grafanaIcon,
-  hetzner: hetznerIcon,
   jira: jiraIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
@@ -88,6 +95,8 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   aws: {
     cloudwatch: awsCloudwatchIcon,
     lambda: awsLambdaIcon,
+    ec2: awsEc2Icon,
+    route53: awsRoute53Icon,
     ecs: awsEcsIcon,
     sns: awsSnsIcon,
   },

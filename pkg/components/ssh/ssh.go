@@ -505,7 +505,6 @@ func (c *SSHCommand) setResultMetadata(metadata core.MetadataContext, result *Co
 		"stdout":   result.Stdout,
 		"stderr":   result.Stderr,
 	}
-}
 
 	return metadata.Set(current)
 }
