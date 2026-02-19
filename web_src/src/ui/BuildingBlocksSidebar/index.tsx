@@ -404,6 +404,7 @@ function CategorySection({
 
   // Determine category icon
   const appLogoMap: Record<string, string | Record<string, string>> = {
+    bitbucket: bitbucketIcon,
     circleci: circleciIcon,
     cloudflare: cloudflareIcon,
     dash0: dash0Icon,

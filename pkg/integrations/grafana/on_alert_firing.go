@@ -186,8 +186,13 @@ func extractString(value any) string {
 func resolveWebhookSharedSecret(ctx core.WebhookRequestContext) (string, error) {
 	if ctx.Webhook != nil {
 		secret, err := ctx.Webhook.GetSecret()
-		if err == nil {
-			return strings.TrimSpace(string(secret)), nil
+		if err != nil {
+			return "", fmt.Errorf("error getting webhook secret: %w", err)
+		}
+
+		normalizedSecret := strings.TrimSpace(string(secret))
+		if normalizedSecret != "" {
+			return normalizedSecret, nil
 		}
 	}
 

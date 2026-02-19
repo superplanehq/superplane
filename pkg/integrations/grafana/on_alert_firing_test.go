@@ -1,6 +1,7 @@
 package grafana
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 
@@ -9,6 +10,31 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+type webhookSecretContext struct {
+	secret []byte
+	err    error
+}
+
+func (w *webhookSecretContext) Setup() (string, error) {
+	return "", nil
+}
+
+func (w *webhookSecretContext) GetSecret() ([]byte, error) {
+	if w.err != nil {
+		return nil, w.err
+	}
+
+	return w.secret, nil
+}
+
+func (w *webhookSecretContext) ResetSecret() ([]byte, []byte, error) {
+	return nil, nil, nil
+}
+
+func (w *webhookSecretContext) GetBaseURL() string {
+	return "http://localhost:3000/api/v1"
+}
 
 func Test__OnAlertFiring__HandleWebhook(t *testing.T) {
 	trigger := &OnAlertFiring{}
@@ -115,6 +141,44 @@ func Test__OnAlertFiring__HandleWebhook(t *testing.T) {
 			Headers:       http.Header{},
 			Configuration: map[string]any{},
 			Events:        eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventContext.Count())
+		assert.Equal(t, "grafana.alert.firing", eventContext.Payloads[0].Type)
+	})
+
+	t.Run("webhook secret retrieval error returns 500", func(t *testing.T) {
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          payload,
+			Headers:       http.Header{},
+			Configuration: map[string]any{"sharedSecret": "secret"},
+			Webhook: &webhookSecretContext{
+				err: errors.New("storage unavailable"),
+			},
+			Events: eventContext,
+		})
+
+		require.Equal(t, http.StatusInternalServerError, code)
+		require.ErrorContains(t, err, "error getting webhook secret")
+		require.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("falls back to configuration secret when webhook secret is empty", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set("Authorization", "Bearer secret")
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          payload,
+			Headers:       headers,
+			Configuration: map[string]any{"sharedSecret": "secret"},
+			Webhook: &webhookSecretContext{
+				secret: []byte(""),
+			},
+			Events: eventContext,
 		})
 
 		require.Equal(t, http.StatusOK, code)
