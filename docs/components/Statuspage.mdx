@@ -57,24 +57,103 @@ Returns the full Statuspage Incident object from the API. The payload has struct
 
 ```json
 {
-  "component_ids": [
-    "8kbf7d35c070"
-  ],
-  "created_at": "2026-02-12T10:30:00.000Z",
-  "id": "p31zjtct2jer",
-  "impact": "major",
-  "incident_updates": [
-    {
-      "body": "We are investigating reports of slow database queries.",
-      "created_at": "2026-02-12T10:30:00.000Z",
-      "id": "upd1",
-      "status": "investigating"
-    }
-  ],
-  "name": "Database Connection Issues",
-  "page_id": "kctbh9vrtdwd",
-  "shortlink": "http://stspg.io/p31zjtct2jer",
-  "status": "investigating"
+  "data": {
+    "auto_transition_deliver_notifications_at_end": null,
+    "auto_transition_deliver_notifications_at_start": null,
+    "auto_transition_to_maintenance_state": null,
+    "auto_transition_to_operational_state": null,
+    "components": [
+      {
+        "automation_email": "component+example123...",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "description": null,
+        "group": false,
+        "group_id": null,
+        "id": "8kbf7d35c070",
+        "name": "API",
+        "only_show_if_degraded": false,
+        "page_id": "kctbh9vrtdwd",
+        "position": 1,
+        "showcase": true,
+        "start_date": "2026-02-12",
+        "status": "partial_outage",
+        "updated_at": "2026-02-12T10:30:00.000Z"
+      },
+      {
+        "automation_email": "component+example456...",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "description": null,
+        "group": false,
+        "group_id": null,
+        "id": "9kbf7d35c071",
+        "name": "Management Portal",
+        "only_show_if_degraded": false,
+        "page_id": "kctbh9vrtdwd",
+        "position": 2,
+        "showcase": true,
+        "start_date": "2026-02-12",
+        "status": "degraded_performance",
+        "updated_at": "2026-02-12T10:30:00.000Z"
+      }
+    ],
+    "created_at": "2026-02-12T10:30:00.000Z",
+    "id": "p31zjtct2jer",
+    "impact": "major",
+    "impact_override": "major",
+    "incident_updates": [
+      {
+        "affected_components": [
+          {
+            "code": "8kbf7d35c070",
+            "name": "API",
+            "new_status": "partial_outage",
+            "old_status": "partial_outage"
+          },
+          {
+            "code": "9kbf7d35c071",
+            "name": "Management Portal",
+            "new_status": "degraded_performance",
+            "old_status": "degraded_performance"
+          }
+        ],
+        "body": "We are investigating reports of slow database queries.",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "custom_tweet": null,
+        "deliver_notifications": true,
+        "display_at": "2026-02-12T10:30:00.000Z",
+        "id": "upd1",
+        "incident_id": "p31zjtct2jer",
+        "status": "investigating",
+        "tweet_id": null,
+        "twitter_updated_at": null,
+        "updated_at": "2026-02-12T10:30:00.000Z",
+        "wants_twitter_update": false
+      }
+    ],
+    "metadata": {},
+    "monitoring_at": null,
+    "name": "Database Connection Issues",
+    "page_id": "kctbh9vrtdwd",
+    "postmortem_body": null,
+    "postmortem_body_last_updated_at": null,
+    "postmortem_ignored": false,
+    "postmortem_notified_subscribers": false,
+    "postmortem_notified_twitter": false,
+    "postmortem_published_at": null,
+    "reminder_intervals": null,
+    "resolved_at": null,
+    "scheduled_auto_completed": false,
+    "scheduled_auto_in_progress": false,
+    "scheduled_for": null,
+    "scheduled_remind_prior": false,
+    "scheduled_reminded_at": null,
+    "scheduled_until": null,
+    "shortlink": "https://stspg.io/p31zjtct2jer",
+    "status": "investigating",
+    "updated_at": "2026-02-12T10:30:00.000Z"
+  },
+  "timestamp": "2026-02-12T10:30:00.000Z",
+  "type": "statuspage.incident"
 }
 ```
 
@@ -109,25 +188,95 @@ Returns the full Statuspage Incident object from the API. The payload has struct
 
 ```json
 {
-  "component_ids": [
-    "8kbf7d35c070"
-  ],
-  "created_at": "2026-02-12T10:30:00.000Z",
-  "id": "p31zjtct2jer",
-  "impact": "major",
-  "incident_updates": [
-    {
-      "body": "We are investigating reports of slow database queries.",
-      "created_at": "2026-02-12T10:30:00.000Z",
-      "id": "upd1",
-      "status": "investigating"
-    }
-  ],
-  "name": "Database Connection Issues",
-  "page_id": "kctbh9vrtdwd",
-  "shortlink": "http://stspg.io/p31zjtct2jer",
-  "status": "investigating",
-  "updated_at": "2026-02-12T10:30:00.000Z"
+  "data": {
+    "auto_transition_deliver_notifications_at_end": null,
+    "auto_transition_deliver_notifications_at_start": null,
+    "auto_transition_to_maintenance_state": null,
+    "auto_transition_to_operational_state": null,
+    "components": [
+      {
+        "automation_email": "component+example123...",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "description": null,
+        "group": false,
+        "group_id": null,
+        "id": "8kbf7d35c070",
+        "name": "API",
+        "only_show_if_degraded": false,
+        "page_id": "kctbh9vrtdwd",
+        "position": 1,
+        "showcase": true,
+        "status": "partial_outage",
+        "updated_at": "2026-02-12T10:30:00.000Z"
+      }
+    ],
+    "created_at": "2026-02-12T10:30:00.000Z",
+    "id": "p31zjtct2jer",
+    "impact": "major",
+    "impact_override": "major",
+    "incident_updates": [
+      {
+        "affected_components": null,
+        "body": "We are investigating reports of slow database queries.",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "custom_tweet": null,
+        "deliver_notifications": true,
+        "display_at": "2026-02-12T10:30:00.000Z",
+        "id": "upd1",
+        "incident_id": "p31zjtct2jer",
+        "status": "monitoring",
+        "tweet_id": null,
+        "twitter_updated_at": null,
+        "updated_at": "2026-02-12T10:30:00.000Z",
+        "wants_twitter_update": false
+      },
+      {
+        "affected_components": [
+          {
+            "code": "8kbf7d35c070",
+            "name": "API",
+            "new_status": "degraded_performance",
+            "old_status": "operational"
+          }
+        ],
+        "body": "We have identified the problem and are working on a fix.",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "custom_tweet": null,
+        "deliver_notifications": true,
+        "display_at": "2026-02-12T10:30:00.000Z",
+        "id": "upd2",
+        "incident_id": "p31zjtct2jer",
+        "status": "identified",
+        "tweet_id": null,
+        "twitter_updated_at": null,
+        "updated_at": "2026-02-12T10:30:00.000Z",
+        "wants_twitter_update": false
+      }
+    ],
+    "metadata": {},
+    "monitoring_at": "2026-02-12T10:30:00.000Z",
+    "name": "Database Connection Issues",
+    "page_id": "kctbh9vrtdwd",
+    "postmortem_body": null,
+    "postmortem_body_last_updated_at": null,
+    "postmortem_ignored": false,
+    "postmortem_notified_subscribers": false,
+    "postmortem_notified_twitter": false,
+    "postmortem_published_at": null,
+    "reminder_intervals": null,
+    "resolved_at": null,
+    "scheduled_auto_completed": false,
+    "scheduled_auto_in_progress": false,
+    "scheduled_for": null,
+    "scheduled_remind_prior": false,
+    "scheduled_reminded_at": null,
+    "scheduled_until": null,
+    "shortlink": "https://stspg.io/p31zjtct2jer",
+    "status": "monitoring",
+    "updated_at": "2026-02-12T10:30:00.000Z"
+  },
+  "timestamp": "2026-02-12T10:30:00.000Z",
+  "type": "statuspage.incident"
 }
 ```
 
@@ -169,25 +318,118 @@ Returns the full Statuspage Incident object from the API. The payload has struct
 
 ```json
 {
-  "component_ids": [
-    "8kbf7d35c070"
-  ],
-  "created_at": "2026-02-12T10:30:00.000Z",
-  "id": "p31zjtct2jer",
-  "impact": "major",
-  "incident_updates": [
-    {
-      "body": "All systems operational. Issue resolved.",
-      "created_at": "2026-02-12T11:00:00.000Z",
-      "id": "upd1",
-      "status": "resolved"
-    }
-  ],
-  "name": "Database Connection Issues",
-  "page_id": "kctbh9vrtdwd",
-  "shortlink": "http://stspg.io/p31zjtct2jer",
-  "status": "resolved",
-  "updated_at": "2026-02-12T11:00:00.000Z"
+  "data": {
+    "auto_transition_deliver_notifications_at_end": null,
+    "auto_transition_deliver_notifications_at_start": null,
+    "auto_transition_to_maintenance_state": null,
+    "auto_transition_to_operational_state": null,
+    "components": [
+      {
+        "automation_email": "component+example123...",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "description": null,
+        "group": false,
+        "group_id": null,
+        "id": "8kbf7d35c070",
+        "name": "API",
+        "only_show_if_degraded": false,
+        "page_id": "kctbh9vrtdwd",
+        "position": 1,
+        "showcase": true,
+        "start_date": "2026-02-12",
+        "status": "partial_outage",
+        "updated_at": "2026-02-12T10:30:00.000Z"
+      },
+      {
+        "automation_email": "component+example456...",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "description": null,
+        "group": false,
+        "group_id": null,
+        "id": "9kbf7d35c071",
+        "name": "Management Portal",
+        "only_show_if_degraded": false,
+        "page_id": "kctbh9vrtdwd",
+        "position": 2,
+        "showcase": true,
+        "start_date": "2026-02-12",
+        "status": "degraded_performance",
+        "updated_at": "2026-02-12T10:30:00.000Z"
+      }
+    ],
+    "created_at": "2026-02-12T10:30:00.000Z",
+    "id": "p31zjtct2jer",
+    "impact": "minor",
+    "impact_override": "minor",
+    "incident_updates": [
+      {
+        "affected_components": null,
+        "body": "We're tracking the problem.",
+        "created_at": "2026-02-12T11:00:00.000Z",
+        "custom_tweet": null,
+        "deliver_notifications": true,
+        "display_at": "2026-02-12T11:00:00.000Z",
+        "id": "upd1",
+        "incident_id": "p31zjtct2jer",
+        "status": "monitoring",
+        "tweet_id": null,
+        "twitter_updated_at": null,
+        "updated_at": "2026-02-12T11:00:00.000Z",
+        "wants_twitter_update": false
+      },
+      {
+        "affected_components": [
+          {
+            "code": "8kbf7d35c070",
+            "name": "API",
+            "new_status": "partial_outage",
+            "old_status": "partial_outage"
+          },
+          {
+            "code": "9kbf7d35c071",
+            "name": "Management Portal",
+            "new_status": "degraded_performance",
+            "old_status": "degraded_performance"
+          }
+        ],
+        "body": "There is a problem.",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "custom_tweet": null,
+        "deliver_notifications": true,
+        "display_at": "2026-02-12T10:30:00.000Z",
+        "id": "upd2",
+        "incident_id": "p31zjtct2jer",
+        "status": "investigating",
+        "tweet_id": null,
+        "twitter_updated_at": null,
+        "updated_at": "2026-02-12T10:30:00.000Z",
+        "wants_twitter_update": false
+      }
+    ],
+    "metadata": {},
+    "monitoring_at": "2026-02-12T11:00:00.000Z",
+    "name": "Database Connection Issues",
+    "page_id": "kctbh9vrtdwd",
+    "postmortem_body": null,
+    "postmortem_body_last_updated_at": null,
+    "postmortem_ignored": false,
+    "postmortem_notified_subscribers": false,
+    "postmortem_notified_twitter": false,
+    "postmortem_published_at": null,
+    "reminder_intervals": null,
+    "resolved_at": null,
+    "scheduled_auto_completed": false,
+    "scheduled_auto_in_progress": false,
+    "scheduled_for": null,
+    "scheduled_remind_prior": false,
+    "scheduled_reminded_at": null,
+    "scheduled_until": null,
+    "shortlink": "https://stspg.io/p31zjtct2jer",
+    "status": "monitoring",
+    "updated_at": "2026-02-12T11:00:00.000Z"
+  },
+  "timestamp": "2026-02-12T11:00:00.000Z",
+  "type": "statuspage.incident"
 }
 ```
 
