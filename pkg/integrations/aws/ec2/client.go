@@ -53,6 +53,31 @@ type CreateImageOutput struct {
 	State      string `json:"state" mapstructure:"state"`
 }
 
+type CopyImageInput struct {
+	SourceImageID string
+	SourceRegion  string
+	Name          string
+	Description   string
+}
+
+type CopyImageOutput struct {
+	RequestID     string `json:"requestId" mapstructure:"requestId"`
+	ImageID       string `json:"imageId" mapstructure:"imageId"`
+	SourceImageID string `json:"sourceImageId" mapstructure:"sourceImageId"`
+	SourceRegion  string `json:"sourceRegion" mapstructure:"sourceRegion"`
+	Name          string `json:"name" mapstructure:"name"`
+	Description   string `json:"description" mapstructure:"description"`
+	Region        string `json:"region" mapstructure:"region"`
+	State         string `json:"state" mapstructure:"state"`
+}
+
+type EnableImageDeprecationOutput struct {
+	RequestID   string `json:"requestId" mapstructure:"requestId"`
+	ImageID     string `json:"imageId" mapstructure:"imageId"`
+	Region      string `json:"region" mapstructure:"region"`
+	DeprecateAt string `json:"deprecateAt" mapstructure:"deprecateAt"`
+}
+
 type Image struct {
 	RequestID          string `json:"requestId" mapstructure:"requestId"`
 	ImageID            string `json:"imageId" mapstructure:"imageId"`
@@ -107,6 +132,71 @@ func (c *Client) CreateImage(input CreateImageInput) (*CreateImageOutput, error)
 		Region:     c.region,
 		State:      ImageStatePending,
 	}, nil
+}
+
+func (c *Client) CopyImage(input CopyImageInput) (*CopyImageOutput, error) {
+	params := url.Values{}
+	params.Set("SourceImageId", strings.TrimSpace(input.SourceImageID))
+	params.Set("SourceRegion", strings.TrimSpace(input.SourceRegion))
+	params.Set("Name", strings.TrimSpace(input.Name))
+
+	description := strings.TrimSpace(input.Description)
+	if description != "" {
+		params.Set("Description", description)
+	}
+
+	response := copyImageResponse{}
+	if err := c.postForm("CopyImage", params, &response); err != nil {
+		return nil, err
+	}
+
+	if strings.TrimSpace(response.ImageID) == "" {
+		return nil, fmt.Errorf("response did not include image ID")
+	}
+
+	return &CopyImageOutput{
+		RequestID:     response.RequestID,
+		ImageID:       response.ImageID,
+		SourceImageID: strings.TrimSpace(input.SourceImageID),
+		SourceRegion:  strings.TrimSpace(input.SourceRegion),
+		Name:          strings.TrimSpace(input.Name),
+		Description:   description,
+		Region:        c.region,
+		State:         ImageStatePending,
+	}, nil
+}
+
+func (c *Client) DeregisterImage(imageID string) (string, error) {
+	return c.runImageBooleanAction("DeregisterImage", imageID, nil)
+}
+
+func (c *Client) EnableImage(imageID string) (string, error) {
+	return c.runImageBooleanAction("EnableImage", imageID, nil)
+}
+
+func (c *Client) DisableImage(imageID string) (string, error) {
+	return c.runImageBooleanAction("DisableImage", imageID, nil)
+}
+
+func (c *Client) EnableImageDeprecation(imageID, deprecateAt string) (*EnableImageDeprecationOutput, error) {
+	params := url.Values{}
+	params.Set("DeprecateAt", strings.TrimSpace(deprecateAt))
+
+	requestID, err := c.runImageBooleanAction("EnableImageDeprecation", imageID, params)
+	if err != nil {
+		return nil, err
+	}
+
+	return &EnableImageDeprecationOutput{
+		RequestID:   requestID,
+		ImageID:     strings.TrimSpace(imageID),
+		Region:      c.region,
+		DeprecateAt: strings.TrimSpace(deprecateAt),
+	}, nil
+}
+
+func (c *Client) DisableImageDeprecation(imageID string) (string, error) {
+	return c.runImageBooleanAction("DisableImageDeprecation", imageID, nil)
 }
 
 func (c *Client) DescribeImage(imageID string) (*Image, error) {
@@ -178,6 +268,25 @@ func (c *Client) ListInstances() ([]Instance, error) {
 	}
 
 	return instances, nil
+}
+
+func (c *Client) runImageBooleanAction(action, imageID string, additionalParams url.Values) (string, error) {
+	params := additionalParams
+	if params == nil {
+		params = url.Values{}
+	}
+	params.Set("ImageId", strings.TrimSpace(imageID))
+
+	response := imageActionResponse{}
+	if err := c.postForm(action, params, &response); err != nil {
+		return "", err
+	}
+
+	if !response.Return {
+		return "", fmt.Errorf("%s returned unsuccessful response", action)
+	}
+
+	return strings.TrimSpace(response.RequestID), nil
 }
 
 func (c *Client) postForm(action string, params url.Values, out any) error {
@@ -270,6 +379,16 @@ func parseError(body []byte) *common.Error {
 type createImageResponse struct {
 	RequestID string `xml:"requestId"`
 	ImageID   string `xml:"imageId"`
+}
+
+type copyImageResponse struct {
+	RequestID string `xml:"requestId"`
+	ImageID   string `xml:"imageId"`
+}
+
+type imageActionResponse struct {
+	RequestID string `xml:"requestId"`
+	Return    bool   `xml:"return"`
 }
 
 type describeInstancesResponse struct {

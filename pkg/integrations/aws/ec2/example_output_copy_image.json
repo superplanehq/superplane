@@ -1,0 +1,14 @@
+{
+  "data": {
+    "requestId": "req-copy",
+    "imageId": "ami-0c0ffee1234567890",
+    "sourceImageId": "ami-07f0e4f3e9c123abc",
+    "sourceRegion": "us-east-1",
+    "name": "my-app-2026-02-19",
+    "description": "Copied for disaster recovery",
+    "region": "us-west-2",
+    "state": "pending"
+  },
+  "timestamp": "2026-02-19T09:00:00Z",
+  "type": "aws.ec2.image.copied"
+}
