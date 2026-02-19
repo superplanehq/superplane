@@ -1,0 +1,56 @@
+{
+    "data": {
+        "id": "abc123-def456",
+        "sequential_id": 42,
+        "title": "API latency spike detected",
+        "slug": "api-latency-spike-detected",
+        "status": "mitigated",
+        "summary": "The API response times have increased significantly across all endpoints.",
+        "severity": "sev1",
+        "url": "https://app.rootly.com/incidents/abc123-def456",
+        "started_at": "2026-01-19T12:00:00Z",
+        "mitigated_at": "2026-01-19T12:30:00Z",
+        "resolved_at": null,
+        "user": {
+            "id": "user-001",
+            "full_name": "Jane Smith",
+            "email": "jane@example.com"
+        },
+        "started_by": {
+            "id": "user-002",
+            "full_name": "John Doe",
+            "email": "john@example.com"
+        },
+        "services": [
+            {
+                "id": "svc-001",
+                "name": "Production API",
+                "slug": "production-api"
+            }
+        ],
+        "groups": [
+            {
+                "id": "grp-001",
+                "name": "Backend Team",
+                "slug": "backend-team"
+            }
+        ],
+        "events": [
+            {
+                "id": "evt-001",
+                "kind": "incident_created",
+                "visibility": "internal",
+                "created_at": "2026-01-19T12:00:00Z"
+            }
+        ],
+        "action_items": [
+            {
+                "id": "ai-001",
+                "summary": "Investigate root cause of latency increase",
+                "status": "open"
+            }
+        ]
+    },
+    "timestamp": "2026-01-19T12:05:00Z",
+    "type": "rootly.incident"
+}

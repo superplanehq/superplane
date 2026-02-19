@@ -58,13 +58,19 @@ export const useOrganization = (organizationId: string) => {
   });
 };
 
-export const useOrganizationUsers = (organizationId: string) => {
+export const useOrganizationUsers = (organizationId: string, includeServiceAccounts = false) => {
   return useQuery({
-    queryKey: organizationKeys.users(organizationId),
+    queryKey: includeServiceAccounts
+      ? [...organizationKeys.users(organizationId), includeServiceAccounts]
+      : organizationKeys.users(organizationId),
     queryFn: async () => {
       const response = await usersListUsers(
         withOrganizationHeader({
-          query: { domainType: "DOMAIN_TYPE_ORGANIZATION", domainId: organizationId },
+          query: {
+            domainType: "DOMAIN_TYPE_ORGANIZATION",
+            domainId: organizationId,
+            includeServiceAccounts,
+          },
         }),
       );
       return response.data?.users || [];

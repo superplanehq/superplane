@@ -29,7 +29,7 @@ func GetUser(ctx context.Context) (*pb.User, error) {
 
 	return &pb.User{
 		Id:             user.ID.String(),
-		Email:          user.Email,
+		Email:          user.GetEmail(),
 		OrganizationId: orgID,
 		CreatedAt:      timestamppb.New(user.CreatedAt),
 		HasToken:       user.TokenHash != "",

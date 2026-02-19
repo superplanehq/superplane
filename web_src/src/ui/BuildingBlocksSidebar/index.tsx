@@ -15,6 +15,7 @@ import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
+import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
@@ -22,6 +23,7 @@ import discordIcon from "@/assets/icons/integrations/discord.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
@@ -29,7 +31,10 @@ import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
+import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
+import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
+import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
@@ -400,6 +405,7 @@ function CategorySection({
 
   // Determine category icon
   const appLogoMap: Record<string, string | Record<string, string>> = {
+    bitbucket: bitbucketIcon,
     circleci: circleciIcon,
     cloudflare: cloudflareIcon,
     dash0: dash0Icon,
@@ -409,6 +415,7 @@ function CategorySection({
     github: githubIcon,
     gitlab: gitlabIcon,
     hetzner: hetznerIcon,
+    grafana: grafanaIcon,
     jira: jiraIcon,
     openai: openAiIcon,
     "open-ai": openAiIcon,
@@ -424,10 +431,13 @@ function CategorySection({
     dockerhub: dockerIcon,
     statuspage: statuspageIcon,
     aws: {
+      ec2: awsEc2Icon,
       codeArtifact: awsIcon,
       cloudwatch: awsCloudwatchIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
+      route53: awsRoute53Icon,
+      ecs: awsEcsIcon,
       sns: awsSnsIcon,
     },
   };
@@ -481,6 +491,7 @@ function CategorySection({
 
           // Use SVG icons for application components/triggers (SMTP uses resolveIcon("mail"), same as core)
           const appLogoMap: Record<string, string | Record<string, string>> = {
+            bitbucket: bitbucketIcon,
             circleci: circleciIcon,
             cloudflare: cloudflareIcon,
             dash0: dash0Icon,
@@ -490,6 +501,7 @@ function CategorySection({
             github: githubIcon,
             gitlab: gitlabIcon,
             hetzner: hetznerIcon,
+            grafana: grafanaIcon,
             openai: openAiIcon,
             "open-ai": openAiIcon,
             claude: claudeIcon,
@@ -507,7 +519,10 @@ function CategorySection({
               codeArtifact: awsCodeArtifactIcon,
               cloudwatch: awsCloudwatchIcon,
               ecr: awsEcrIcon,
+              ec2: awsEc2Icon,
               lambda: awsLambdaIcon,
+              route53: awsRoute53Icon,
+              ecs: awsEcsIcon,
               sns: awsSnsIcon,
             },
           };

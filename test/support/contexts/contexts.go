@@ -165,6 +165,10 @@ func (c *IntegrationContext) RequestWebhook(configuration any) error {
 	return nil
 }
 
+func (c *IntegrationContext) EnsureIntegrationWebhook(configuration any) (*uuid.UUID, error) {
+	return nil, nil
+}
+
 func (c *IntegrationContext) ScheduleResync(interval time.Duration) error {
 	c.ResyncRequests = append(c.ResyncRequests, interval)
 	return nil
@@ -176,6 +180,10 @@ func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters an
 }
 
 func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
+	return nil, nil
+}
+
+func (c *IntegrationContext) FindSubscription(predicate func(core.IntegrationSubscriptionContext) bool) (core.IntegrationSubscriptionContext, error) {
 	return nil, nil
 }
 

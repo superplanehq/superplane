@@ -139,13 +139,14 @@ type IntegrationTrigger interface {
 }
 
 type IntegrationMessageContext struct {
-	Message       any
-	Configuration any
-	NodeMetadata  MetadataContext
-	Logger        *logrus.Entry
-	HTTP          HTTPContext
-	Integration   IntegrationContext
-	Events        EventContext
+	Message           any
+	Configuration     any
+	NodeMetadata      MetadataContext
+	Logger            *logrus.Entry
+	HTTP              HTTPContext
+	Integration       IntegrationContext
+	Events            EventContext
+	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
 }
 
 type IntegrationResource struct {
@@ -238,6 +239,14 @@ type IntegrationContext interface {
 	RequestWebhook(configuration any) error
 
 	/*
+	 * Ensure an integration-level webhook exists.
+	 * Called from the integration's Sync() to create a webhook
+	 * that is not tied to any specific node. Returns the webhook ID
+	 * if one was found or created.
+	 */
+	EnsureIntegrationWebhook(configuration any) (*uuid.UUID, error)
+
+	/*
 	 * Subscribe to integration events.
 	 */
 	Subscribe(any) (*uuid.UUID, error)
@@ -252,6 +261,12 @@ type IntegrationContext interface {
 	 * List integration subscriptions from nodes.
 	 */
 	ListSubscriptions() ([]IntegrationSubscriptionContext, error)
+
+	/*
+	 * Find a subscription by a predicate function.
+	 * Returns the first subscription that matches the predicate, or nil if none found.
+	 */
+	FindSubscription(predicate func(IntegrationSubscriptionContext) bool) (IntegrationSubscriptionContext, error)
 }
 
 type IntegrationSubscriptionContext interface {

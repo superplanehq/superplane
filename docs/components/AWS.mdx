@@ -9,6 +9,7 @@ Manage resources and execute AWS commands in workflows
 <CardGrid>
   <LinkCard title="CloudWatch • On Alarm" href="#cloud-watch-•-on-alarm" description="Listen to AWS CloudWatch alarm state change events" />
   <LinkCard title="CodeArtifact • On Package Version" href="#code-artifact-•-on-package-version" description="Listen to AWS CodeArtifact package version events" />
+  <LinkCard title="EC2 • On Image" href="#ec2-•-on-image" description="Listen to AWS EC2 AMI state change events" />
   <LinkCard title="ECR • On Image Push" href="#ecr-•-on-image-push" description="Listen to AWS ECR image push events" />
   <LinkCard title="ECR • On Image Scan" href="#ecr-•-on-image-scan" description="Listen to AWS ECR image scan events" />
   <LinkCard title="SNS • On Topic Message" href="#sns-•-on-topic-message" description="Listen to AWS SNS topic notifications" />
@@ -26,10 +27,18 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CodeArtifact • Dispose Package Versions" href="#code-artifact-•-dispose-package-versions" description="Delete assets and set package version status to Disposed (record remains)" />
   <LinkCard title="CodeArtifact • Get Package Version" href="#code-artifact-•-get-package-version" description="Describe an AWS CodeArtifact package version" />
   <LinkCard title="CodeArtifact • Update Package Versions Status" href="#code-artifact-•-update-package-versions-status" description="Update the status of one or more package versions (Archived, Published, Unlisted)" />
+  <LinkCard title="EC2 • Create Image" href="#ec2-•-create-image" description="Create a new AMI image from an EC2 instance" />
+  <LinkCard title="EC2 • Get Image" href="#ec2-•-get-image" description="Get an EC2 AMI image by ID" />
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
+  <LinkCard title="ECS • Describe Service" href="#ecs-•-describe-service" description="Describe an AWS ECS service" />
+  <LinkCard title="ECS • Run Task" href="#ecs-•-run-task" description="Run a task in AWS ECS" />
+  <LinkCard title="ECS • Stop Task" href="#ecs-•-stop-task" description="Stop a running AWS ECS task" />
   <LinkCard title="Lambda • Run Function" href="#lambda-•-run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
+  <LinkCard title="Route 53 • Create DNS Record" href="#route-53-•-create-dns-record" description="Create a DNS record in an AWS Route 53 hosted zone" />
+  <LinkCard title="Route 53 • Delete DNS Record" href="#route-53-•-delete-dns-record" description="Delete a DNS record from an AWS Route 53 hosted zone" />
+  <LinkCard title="Route 53 • Upsert DNS Record" href="#route-53-•-upsert-dns-record" description="Create or update a DNS record in an AWS Route 53 hosted zone" />
   <LinkCard title="SNS • Create Topic" href="#sns-•-create-topic" description="Create an AWS SNS topic" />
   <LinkCard title="SNS • Delete Topic" href="#sns-•-delete-topic" description="Delete an AWS SNS topic" />
   <LinkCard title="SNS • Get Subscription" href="#sns-•-get-subscription" description="Get an AWS SNS subscription by ARN" />
@@ -152,6 +161,55 @@ The On Package Version trigger starts a workflow execution when a package versio
   },
   "timestamp": "2026-03-10T14:25:30.31254162Z",
   "type": "aws.codeartifact.package.version"
+}
+```
+
+<a id="ec2-•-on-image"></a>
+
+## EC2 • On Image
+
+The On Image trigger starts a workflow execution when an EC2 AMI changes state.
+
+### Use Cases
+
+- **Image pipeline orchestration**: Continue workflows when a new AMI becomes available
+- **Failure handling**: Alert and remediate when AMI creation fails
+- **Compliance workflows**: Run validation and distribution after image creation
+
+### Configuration
+
+- **Region**: AWS region where AMI state changes are monitored
+- **Image State**: State to trigger on (pending, available, failed)
+
+### Event Data
+
+Each AMI state event includes:
+- **detail.ImageId**: AMI ID (for example: ami-1234567890abcdef0)
+- **detail.State**: AMI state
+- **detail.ErrorMessage**: Error message for failed states (if available)
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account": "123456789012",
+    "detail": {
+      "ImageId": "ami-07f0e4f3e9c123abc",
+      "State": "available"
+    },
+    "detail-type": "EC2 AMI State Change",
+    "id": "f74f3de5-f9b7-4f3d-909a-531fc3ff2f14",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:ec2:us-east-1::image/ami-07f0e4f3e9c123abc"
+    ],
+    "source": "aws.ec2",
+    "time": "2026-02-10T12:10:00Z",
+    "version": "0"
+  },
+  "timestamp": "2026-02-10T12:10:01Z",
+  "type": "aws.ec2.image"
 }
 ```
 
@@ -541,6 +599,101 @@ The Update Package Versions Status component sets the status of package versions
 }
 ```
 
+<a id="ec2-•-create-image"></a>
+
+## EC2 • Create Image
+
+The Create Image component creates a new Amazon Machine Image (AMI) from an EC2 instance.
+
+### Use Cases
+
+- **Golden image pipelines**: Build immutable infrastructure images from validated instances
+- **Backup workflows**: Snapshot instance state before deployments or migrations
+- **Release automation**: Produce versioned AMIs as part of CI/CD
+
+### Configuration
+
+- **Region**: AWS region where the instance runs
+- **Instance**: EC2 instance ID to create an image from
+- **Image Name**: Name for the AMI
+- **Description**: Optional image description
+- **No Reboot**: If enabled, create the image without rebooting the instance
+
+### Completion behavior
+
+- The component waits for EventBridge `EC2 AMI State Change` events for the created AMI.
+- It completes when the AMI state becomes `available`.
+- It fails if the AMI state becomes `failed`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "architecture": "x86_64",
+      "creationDate": "2026-02-18T12:00:00.000Z",
+      "description": "Golden image for production",
+      "hypervisor": "xen",
+      "imageId": "ami-07f0e4f3e9c123abc",
+      "imageType": "machine",
+      "name": "my-app-2026-02-18",
+      "ownerId": "123456789012",
+      "region": "us-east-1",
+      "rootDeviceName": "/dev/xvda",
+      "rootDeviceType": "ebs",
+      "state": "available",
+      "virtualizationType": "hvm"
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00Z",
+  "type": "aws.ec2.image"
+}
+```
+
+<a id="ec2-•-get-image"></a>
+
+## EC2 • Get Image
+
+The Get Image component retrieves metadata for an EC2 AMI.
+
+### Use Cases
+
+- **Release automation**: Validate AMI metadata before deployment
+- **Operational checks**: Inspect AMI state and ownership in workflows
+- **Traceability**: Resolve AMI details by image ID
+
+### Configuration
+
+- **Region**: AWS region of the AMI
+- **Image ID**: AMI ID (for example: ami-1234567890abcdef0)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "architecture": "x86_64",
+      "creationDate": "2026-02-18T12:00:00.000Z",
+      "description": "Golden image for production",
+      "hypervisor": "xen",
+      "imageId": "ami-1234567890abcdef0",
+      "imageType": "machine",
+      "name": "my-app-2026-02-18",
+      "ownerId": "123456789012",
+      "region": "us-east-1",
+      "rootDeviceName": "/dev/xvda",
+      "rootDeviceType": "ebs",
+      "state": "available",
+      "virtualizationType": "hvm"
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00Z",
+  "type": "aws.ec2.image"
+}
+```
+
 <a id="ecr-•-get-image"></a>
 
 ## ECR • Get Image
@@ -718,6 +871,179 @@ At least one of **Image Digest** or **Image Tag** is required. If both are provi
 }
 ```
 
+<a id="ecs-•-describe-service"></a>
+
+## ECS • Describe Service
+
+The Describe Service component fetches details about a single ECS service.
+
+### Use Cases
+
+- **Deployment checks**: Inspect running/desired task counts before or after deployment
+- **Operational visibility**: Fetch service status and task definition details in workflows
+- **Automation branching**: Route workflow execution based on ECS service state
+
+### Example Output
+
+```json
+{
+  "data": {
+    "service": {
+      "clusterArn": "arn:aws:ecs:us-west-1:123456789012:cluster/production-cluster-alpha",
+      "createdAt": "2026-01-20T10:12:33Z",
+      "deployments": [
+        {
+          "createdAt": "2026-01-20T10:12:33Z",
+          "desiredCount": 3,
+          "id": "ecs-svc/8473629182736450912",
+          "pendingCount": 0,
+          "runningCount": 3,
+          "status": "PRIMARY",
+          "taskDefinition": "arn:aws:ecs:us-west-1:123456789012:task-definition/api-gateway-service:7",
+          "updatedAt": "2026-01-20T10:18:11Z"
+        }
+      ],
+      "desiredCount": 3,
+      "enableExecuteCommand": true,
+      "events": [
+        {
+          "createdAt": "2026-01-20T10:18:11Z",
+          "id": "d91b5e4a-7a5f-4b1d-bdb4-3d4f8f8a9912",
+          "message": "(service api-gateway-service-prod) has reached a steady state."
+        },
+        {
+          "createdAt": "2026-01-20T10:17:02Z",
+          "id": "a12f9c47-92c3-4c9f-8d12-88d6ab3f8e72",
+          "message": "(service api-gateway-service-prod) (deployment ecs-svc/8473629182736450912) deployment completed."
+        },
+        {
+          "createdAt": "2026-01-20T10:13:05Z",
+          "id": "c7a8e3b1-11f2-4fbc-9d8e-2194bb0eaf55",
+          "message": "(service api-gateway-service-prod) has started 3 tasks: (task 9f8e7d6c5b4a3210e1f2a3b4c5d6e7f8)."
+        }
+      ],
+      "launchType": "FARGATE",
+      "networkConfiguration": {
+        "awsvpcConfiguration": {
+          "assignPublicIp": "DISABLED",
+          "securityGroups": [
+            "sg-0a1b2c3d4e5f6a7b8",
+            "sg-1b2c3d4e5f6a7b8c9"
+          ],
+          "subnets": [
+            "subnet-01a2b3c4d5e6f7a8b",
+            "subnet-09f8e7d6c5b4a3210"
+          ]
+        }
+      },
+      "pendingCount": 0,
+      "platformVersion": "1.4.0",
+      "propagateTags": "SERVICE",
+      "runningCount": 3,
+      "schedulingStrategy": "REPLICA",
+      "serviceArn": "arn:aws:ecs:us-west-1:123456789012:service/production-cluster-alpha/api-gateway-service-prod",
+      "serviceName": "api-gateway-service-prod",
+      "status": "ACTIVE",
+      "taskDefinition": "arn:aws:ecs:us-west-1:123456789012:task-definition/api-gateway-service:7",
+      "taskSets": []
+    }
+  },
+  "timestamp": "2026-01-20T12:45:09.123456789Z",
+  "type": "aws.ecs.service"
+}
+```
+
+<a id="ecs-•-run-task"></a>
+
+## ECS • Run Task
+
+The Run Task component starts one or more ECS tasks and completes based on task lifecycle events.
+
+### Use Cases
+
+- **One-off workloads**: Execute ad-hoc jobs on ECS
+- **Batch processing**: Trigger task runs from workflow events
+- **Operational automation**: Run remediation or maintenance tasks
+
+### Completion behavior
+
+- Always waits for tasks to leave startup states (for example, PENDING) before completing.
+- If **Timeout (seconds)** is set, waits for all tracked tasks to reach STOPPED, or completes with timeout when that deadline is reached.
+
+### Notes
+
+- For Fargate tasks, set **Network Configuration** using the ECS awsvpcConfiguration format.
+- Use **Capacity Provider Strategy** when you want ECS to choose capacity providers; it cannot be combined with **Launch Type**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "failures": [],
+    "tasks": [
+      {
+        "clusterArn": "arn:aws:ecs:us-east-1:111122223333:cluster/superplane-demo-cluster",
+        "createdAt": "2026-02-10T14:30:01Z",
+        "desiredStatus": "RUNNING",
+        "group": "family:superplane-ecs-task",
+        "lastStatus": "RUNNING",
+        "launchType": "FARGATE",
+        "platformVersion": "1.4.0",
+        "startedBy": "",
+        "stoppedReason": "",
+        "taskArn": "arn:aws:ecs:us-east-1:111122223333:task/superplane-demo-cluster/aaaaaaaa11111111bbbbbbbb22222222",
+        "taskDefinitionArn": "arn:aws:ecs:us-east-1:111122223333:task-definition/superplane-ecs-task:1"
+      }
+    ],
+    "timedOut": false
+  },
+  "timestamp": "2026-02-10T14:30:37.633534466Z",
+  "type": "aws.ecs.task"
+}
+```
+
+<a id="ecs-•-stop-task"></a>
+
+## ECS • Stop Task
+
+The Stop Task component requests ECS to stop a running task and waits for the task to reach STOPPED.
+
+### Use Cases
+
+- **Operational control**: Stop ad-hoc or long-running tasks from workflows
+- **Remediation**: Terminate unhealthy tasks during automated incident response
+- **Cost control**: Stop no-longer-needed background workloads
+
+### Notes
+
+- ECS sends a SIGTERM signal and then force-stops the task if it does not exit gracefully.
+- **Reason** is optional and appears in ECS task stop metadata when provided.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "task": {
+      "clusterArn": "arn:aws:ecs:us-east-1:111122223333:cluster/superplane-demo-cluster",
+      "createdAt": "2026-02-10T14:30:01Z",
+      "desiredStatus": "STOPPED",
+      "group": "family:superplane-ecs-task",
+      "lastStatus": "STOPPED",
+      "launchType": "FARGATE",
+      "platformVersion": "1.4.0",
+      "startedBy": "",
+      "stoppedReason": "stopping",
+      "taskArn": "arn:aws:ecs:us-east-1:111122223333:task/superplane-demo-cluster/aaaaaaaa11111111bbbbbbbb22222222",
+      "taskDefinitionArn": "arn:aws:ecs:us-east-1:111122223333:task-definition/superplane-ecs-task:1"
+    }
+  },
+  "timestamp": "2026-02-10T14:31:19.987196041Z",
+  "type": "aws.ecs.task"
+}
+```
+
 <a id="lambda-•-run-function"></a>
 
 ## Lambda • Run Function
@@ -752,6 +1078,121 @@ The Run Lambda component invokes a Lambda function.
     "memorySize": "128 MB"
   },
   "requestId": "9f8d2b5e-1c7a-4d62-8f1a-0f8b8e4f3a12"
+}
+```
+
+<a id="route-53-•-create-dns-record"></a>
+
+## Route 53 • Create DNS Record
+
+The Create DNS Record component creates a new DNS record in an AWS Route 53 hosted zone.
+
+### Use Cases
+
+- **Domain management**: Create DNS records for new services or endpoints
+- **Automated provisioning**: Set up DNS entries as part of infrastructure workflows
+- **Multi-environment setup**: Create environment-specific DNS records automatically
+
+### How It Works
+
+1. Connects to AWS Route 53 using the integration credentials
+2. Creates a new DNS record in the specified hosted zone
+3. Returns the change status and submission timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "change": {
+      "id": "/change/C1234567890ABC",
+      "status": "INSYNC",
+      "submittedAt": "2026-01-28T10:30:00.000Z"
+    },
+    "record": {
+      "name": "api.example.com",
+      "type": "A"
+    }
+  },
+  "timestamp": "2026-01-28T10:30:00.000Z",
+  "type": "aws.route53.change"
+}
+```
+
+<a id="route-53-•-delete-dns-record"></a>
+
+## Route 53 • Delete DNS Record
+
+The Delete DNS Record component deletes a DNS record from an AWS Route 53 hosted zone.
+
+### Use Cases
+
+- **Cleanup**: Remove DNS records when decommissioning services
+- **Environment teardown**: Delete DNS entries for temporary environments
+- **Migration**: Remove old DNS records after migrating to new endpoints
+
+### How It Works
+
+1. Connects to AWS Route 53 using the integration credentials
+2. Deletes the specified DNS record from the hosted zone
+3. The record name, type, TTL, and values must match the existing record exactly
+4. Returns the change status and submission timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "change": {
+      "id": "/change/C5555555555GHI",
+      "status": "INSYNC",
+      "submittedAt": "2026-01-28T10:30:00.000Z"
+    },
+    "record": {
+      "name": "api.example.com",
+      "type": "A"
+    }
+  },
+  "timestamp": "2026-01-28T10:30:00.000Z",
+  "type": "aws.route53.change"
+}
+```
+
+<a id="route-53-•-upsert-dns-record"></a>
+
+## Route 53 • Upsert DNS Record
+
+The Upsert DNS Record component creates or updates a DNS record in an AWS Route 53 hosted zone.
+
+### Use Cases
+
+- **Idempotent updates**: Safely create or update DNS records without checking existence first
+- **Rolling deployments**: Update DNS records to point to new infrastructure
+- **Failover management**: Switch DNS records between primary and secondary endpoints
+
+### How It Works
+
+1. Connects to AWS Route 53 using the integration credentials
+2. Creates the DNS record if it doesn't exist, or updates it if it does
+3. Returns the change status and submission timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "change": {
+      "id": "/change/C9876543210DEF",
+      "status": "INSYNC",
+      "submittedAt": "2026-01-28T10:30:00.000Z"
+    },
+    "record": {
+      "name": "api.example.com",
+      "type": "A"
+    }
+  },
+  "timestamp": "2026-01-28T10:30:00.000Z",
+  "type": "aws.route53.change"
 }
 ```
 

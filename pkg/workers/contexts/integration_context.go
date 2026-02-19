@@ -107,6 +107,51 @@ func (c *IntegrationContext) replaceMismatchedWebhook(configuration any, handler
 	return c.tx.Delete(webhook).Error
 }
 
+func (c *IntegrationContext) EnsureIntegrationWebhook(configuration any) (*uuid.UUID, error) {
+	handler, err := c.registry.GetWebhookHandler(c.integration.AppName)
+	if err != nil {
+		return nil, err
+	}
+
+	webhooks, err := models.ListIntegrationWebhooks(c.tx, c.integration.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list webhooks: %v", err)
+	}
+
+	for _, hook := range webhooks {
+		ok, err := handler.CompareConfig(hook.Configuration.Data(), configuration)
+		if err != nil {
+			return nil, err
+		}
+
+		if ok {
+			return &hook.ID, nil
+		}
+	}
+
+	webhookID := uuid.New()
+	_, encryptedKey, err := crypto.NewRandomKey(context.Background(), c.encryptor, webhookID.String())
+	if err != nil {
+		return nil, fmt.Errorf("error generating key for new webhook: %v", err)
+	}
+
+	now := time.Now()
+	webhook := models.Webhook{
+		ID:                webhookID,
+		State:             models.WebhookStatePending,
+		Secret:            encryptedKey,
+		Configuration:     datatypes.NewJSONType(configuration),
+		AppInstallationID: &c.integration.ID,
+		CreatedAt:         &now,
+	}
+
+	if err := c.tx.Create(&webhook).Error; err != nil {
+		return nil, err
+	}
+
+	return &webhookID, nil
+}
+
 func (c *IntegrationContext) createWebhook(configuration any) error {
 	webhookID := uuid.New()
 	_, encryptedKey, err := crypto.NewRandomKey(context.Background(), c.encryptor, webhookID.String())
@@ -231,6 +276,28 @@ func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
 	}
 
 	return c.encryptor.Decrypt(context.Background(), []byte(decoded), []byte(c.integration.ID.String()))
+}
+
+func (c *IntegrationContext) GetOptionalConfig(name string) ([]byte, error) {
+	config := c.integration.Configuration.Data()
+	_, ok := config[name]
+	if !ok {
+		impl, err := c.registry.GetIntegration(c.integration.AppName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get integration %s: %w", c.integration.AppName, err)
+		}
+
+		configDef, err := findConfigDef(impl.Configuration(), name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find config %s: %w", name, err)
+		}
+
+		if !configDef.Required {
+			return nil, nil
+		}
+	}
+
+	return c.GetConfig(name)
 }
 
 func findConfigDef(configs []configuration.Field, name string) (configuration.Field, error) {
@@ -399,4 +466,23 @@ func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscription
 	}
 
 	return contexts, nil
+}
+
+// FindSubscription finds the first subscription matching the predicate.
+// Note: This loads all subscriptions via ListSubscriptions() and iterates through them.
+// For installations with many subscriptions, this may be inefficient. Consider adding
+// an index-based lookup if performance becomes an issue.
+func (c *IntegrationContext) FindSubscription(predicate func(core.IntegrationSubscriptionContext) bool) (core.IntegrationSubscriptionContext, error) {
+	subscriptions, err := c.ListSubscriptions()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, subscription := range subscriptions {
+		if predicate(subscription) {
+			return subscription, nil
+		}
+	}
+
+	return nil, nil
 }

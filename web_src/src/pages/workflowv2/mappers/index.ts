@@ -85,6 +85,7 @@ import {
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
+import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
 import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
@@ -97,6 +98,12 @@ import {
   triggerRenderers as openaiTriggerRenderers,
   eventStateRegistry as openaiEventStateRegistry,
 } from "./openai/index";
+import {
+  componentMappers as grafanaComponentMappers,
+  customFieldRenderers as grafanaCustomFieldRenderers,
+  triggerRenderers as grafanaTriggerRenderers,
+  eventStateRegistry as grafanaEventStateRegistry,
+} from "./grafana/index";
 import {
   componentMappers as circleCIComponentMappers,
   triggerRenderers as circleCITriggerRenderers,
@@ -165,6 +172,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
   gitlab: gitlabComponentMappers,
+  grafana: grafanaComponentMappers,
   pagerduty: pagerdutyComponentMappers,
   dash0: dash0ComponentMappers,
   daytona: daytonaComponentMappers,
@@ -205,6 +213,8 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
+  grafana: grafanaTriggerRenderers,
+  bitbucket: bitbucketTriggerRenderers,
   prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
   statuspage: statuspageTriggerRenderers,
@@ -230,6 +240,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   claude: claudeEventStateRegistry,
   statuspage: statuspageEventStateRegistry,
   aws: awsEventStateRegistry,
+  grafana: grafanaEventStateRegistry,
   prometheus: prometheusEventStateRegistry,
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
@@ -259,6 +270,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  grafana: grafanaCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
 };

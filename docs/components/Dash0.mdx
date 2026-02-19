@@ -4,14 +4,236 @@ title: "Dash0"
 
 Connect to Dash0 to query data using Prometheus API
 
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Notification" href="#on-notification" description="Trigger a workflow when Dash0 sends a notification" />
+</CardGrid>
+
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create HTTP Synthetic Check" href="#create-http-synthetic-check" description="Create an HTTP synthetic check in Dash0 to monitor endpoint availability and performance" />
+  <LinkCard title="Delete HTTP Synthetic Check" href="#delete-http-synthetic-check" description="Delete an HTTP synthetic check from Dash0 by ID" />
   <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
   <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
+  <LinkCard title="Update HTTP Synthetic Check" href="#update-http-synthetic-check" description="Update an existing HTTP synthetic check in Dash0 by ID" />
 </CardGrid>
+
+## Instructions
+
+To set up the Dash0 integration:
+
+1. Go to your Dash0 dashboard -> **Organization Settings** -> **API Tokens**
+2. Click **Create API Token**, give it a name, and copy the token
+3. Paste the token in the **API Token** field below
+4. Copy your **Prometheus API Base URL** from **Organization Settings** -> **Endpoints** -> **Prometheus API**
+
+### Webhook Setup (for triggers)
+
+To receive Dash0 notifications:
+
+1. After connecting, copy the **Webhook URL** shown on the integration details page
+2. In your Dash0 dashboard, go to **Alerting** -> **Notification Channels**
+3. Create a new channel with type **Webhook**
+4. Paste the webhook URL and save
+
+<a id="on-notification"></a>
+
+## On Notification
+
+The On Notification trigger starts a workflow execution when Dash0 sends a notification to SuperPlane.
+
+### Setup
+
+1. Go to the Dash0 integration settings in SuperPlane and copy the webhook URL shown there.
+2. In your Dash0 account, configure a notification channel using that URL.
+3. When Dash0 sends a notification (e.g. a synthetic check failure), this trigger will fire.
+
+### Output
+
+Emits the raw Dash0 notification payload as `dash0.notification`.
+
+### Example Data
+
+```json
+{
+  "checkName": "Login API health check",
+  "severity": "critical",
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "synthetic-check-failed"
+}
+```
+
+<a id="create-http-synthetic-check"></a>
+
+## Create HTTP Synthetic Check
+
+The Create Synthetic Check component creates an HTTP synthetic check in Dash0 to monitor the availability and performance of your endpoints.
+
+### Use Cases
+
+- **Uptime monitoring**: Create checks to monitor API endpoints and websites
+- **Performance validation**: Set response time thresholds to catch regressions
+- **Deployment verification**: Create synthetic checks after deployments to verify availability
+- **Multi-region monitoring**: Monitor endpoints from multiple global locations
+
+### Configuration
+
+#### Name & Dataset
+- **Name**: Display name of the synthetic check
+- **Dataset**: The Dash0 dataset to create the check in (defaults to "default")
+
+#### Request
+- **URL**: Target URL to monitor
+- **Method**: HTTP method (GET, POST, PUT, PATCH, DELETE, HEAD)
+- **Redirects**: Whether to follow HTTP redirects
+- **Allow Insecure**: Skip TLS certificate validation (useful for staging environments)
+- **Headers**: Custom HTTP request headers
+- **Body**: Request body payload (for POST/PUT/PATCH)
+
+#### Schedule
+- **Interval**: How often the check runs (e.g. 30s, 1m, 5m, 1h, 2d)
+- **Locations**: Probe locations (Frankfurt, Oregon, North Virginia, London, Brussels, Melbourne)
+- **Strategy**: Execution strategy (all locations or round-robin)
+
+#### Assertions
+Each assertion has a kind, severity (critical or degraded), and kind-specific parameters:
+- **Status Code**: Validate the HTTP response status code
+- **Timing**: Set thresholds for response, request, SSL, connection, DNS, or total time
+- **Error Type**: Detect specific error types (DNS, connection, SSL, timeout)
+- **SSL Certificate Validity**: Enforce minimum days until certificate expiration
+- **Response Header**: Validate presence or value of a specific response header
+- **JSON Body**: Validate JSON response fields using JSONPath expressions
+- **Text Body**: Match plain-text response content
+
+#### Retries
+- **Attempts**: Number of retry attempts on failure
+- **Delay**: Delay between retries (e.g. 1s, 2s, 5s)
+
+### Output
+
+Returns the created synthetic check details from the Dash0 API, including the check ID and full configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "kind": "Dash0SyntheticCheck",
+    "metadata": {
+      "annotations": {},
+      "labels": {
+        "dash0.com/dataset": "default",
+        "dash0.com/id": "64617368-3073-796e-7468-abc123def456",
+        "dash0.com/origin": "api-abc12345-6789-0123-4567-890abcdef012",
+        "dash0.com/version": "1"
+      },
+      "name": "login-api-health-check"
+    },
+    "spec": {
+      "enabled": true,
+      "plugin": {
+        "display": {
+          "name": "Login API health check"
+        },
+        "kind": "http",
+        "spec": {
+          "assertions": {
+            "criticalAssertions": [
+              {
+                "kind": "status_code",
+                "spec": {
+                  "operator": "is",
+                  "value": "200"
+                }
+              },
+              {
+                "kind": "timing",
+                "spec": {
+                  "operator": "lte",
+                  "type": "response",
+                  "value": "5000ms"
+                }
+              }
+            ],
+            "degradedAssertions": [
+              {
+                "kind": "timing",
+                "spec": {
+                  "operator": "lte",
+                  "type": "response",
+                  "value": "2000ms"
+                }
+              }
+            ]
+          },
+          "request": {
+            "headers": [],
+            "method": "get",
+            "queryParameters": [],
+            "redirects": "follow",
+            "tls": {
+              "allowInsecure": false
+            },
+            "tracing": {
+              "addTracingHeaders": true
+            },
+            "url": "https://api.example.com/health"
+          },
+          "retries": {
+            "kind": "fixed",
+            "spec": {
+              "attempts": 3,
+              "delay": "1s"
+            }
+          }
+        }
+      },
+      "schedule": {
+        "interval": "1m",
+        "locations": [
+          "de-frankfurt",
+          "us-oregon"
+        ],
+        "strategy": "all_locations"
+      }
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "dash0.syntheticCheck.created"
+}
+```
+
+<a id="delete-http-synthetic-check"></a>
+
+## Delete HTTP Synthetic Check
+
+The Delete HTTP Synthetic Check component removes a synthetic check from Dash0 by its ID. Use the check ID from a Create/Get/Update output (e.g. metadata.labels["dash0.com/id"]) or from the Dash0 dashboard.
+
+### Configuration
+
+- **Check ID**: The Dash0 synthetic check ID to delete (required).
+- **Dataset**: The dataset the check belongs to (defaults to "default").
+
+### Output
+
+Returns a confirmation payload (e.g. deleted id).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "id": "64617368-3073-796e-7468-abc123def456"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "dash0.syntheticCheck.deleted"
+}
+```
 
 <a id="list-issues"></a>
 
@@ -147,6 +369,91 @@ Returns the Prometheus query response including:
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "dash0.prometheus.response"
+}
+```
+
+<a id="update-http-synthetic-check"></a>
+
+## Update HTTP Synthetic Check
+
+The Update HTTP Synthetic Check component updates an existing synthetic check in Dash0. Use the check ID from a previous Create HTTP Synthetic Check output (e.g. metadata.labels["dash0.com/id"]) or from the Dash0 dashboard.
+
+### Configuration
+
+- **Check ID**: The Dash0 synthetic check ID to update (required).
+- **Dataset**: The dataset the check belongs to (defaults to "default").
+- **Name**, **Request**, **Schedule**, **Assertions**, **Retries**: Same as Create HTTP Synthetic Check; the full spec is sent to replace the existing check.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "kind": "Dash0SyntheticCheck",
+    "metadata": {
+      "annotations": {},
+      "labels": {
+        "dash0.com/dataset": "default",
+        "dash0.com/id": "64617368-3073-796e-7468-abc123def456",
+        "dash0.com/origin": "api-abc12345-6789-0123-4567-890abcdef012",
+        "dash0.com/version": "2"
+      },
+      "name": "login-api-health-check"
+    },
+    "spec": {
+      "enabled": true,
+      "plugin": {
+        "display": {
+          "name": "Login API health check"
+        },
+        "kind": "http",
+        "spec": {
+          "assertions": {
+            "criticalAssertions": [
+              {
+                "kind": "status_code",
+                "spec": {
+                  "operator": "is",
+                  "value": "200"
+                }
+              }
+            ],
+            "degradedAssertions": []
+          },
+          "request": {
+            "headers": [],
+            "method": "get",
+            "queryParameters": [],
+            "redirects": "follow",
+            "tls": {
+              "allowInsecure": false
+            },
+            "tracing": {
+              "addTracingHeaders": true
+            },
+            "url": "https://api.example.com/health"
+          },
+          "retries": {
+            "kind": "fixed",
+            "spec": {
+              "attempts": 3,
+              "delay": "1s"
+            }
+          }
+        }
+      },
+      "schedule": {
+        "interval": "1m",
+        "locations": [
+          "de-frankfurt",
+          "us-oregon"
+        ],
+        "strategy": "all_locations"
+      }
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "dash0.syntheticCheck.updated"
 }
 ```
 
