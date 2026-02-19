@@ -1,0 +1,11 @@
+{
+  "data": {
+    "serviceName": "superplane.workflow",
+    "sentCount": 2,
+    "response": {
+      "status": "ok"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.log.event.sent"
+}

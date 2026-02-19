@@ -19,6 +19,12 @@ var exampleOutputListIssuesBytes []byte
 var exampleOutputListIssuesOnce sync.Once
 var exampleOutputListIssues map[string]any
 
+//go:embed example_output_send_log_event.json
+var exampleOutputSendLogEventBytes []byte
+
+var exampleOutputSendLogEventOnce sync.Once
+var exampleOutputSendLogEvent map[string]any
+
 //go:embed example_output_create_http_synthetic_check.json
 var exampleOutputCreateHTTPSyntheticCheckBytes []byte
 
@@ -43,6 +49,10 @@ func (c *QueryPrometheus) ExampleOutput() map[string]any {
 
 func (c *ListIssues) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputListIssuesOnce, exampleOutputListIssuesBytes, &exampleOutputListIssues)
+}
+
+func (c *SendLogEvent) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputSendLogEventOnce, exampleOutputSendLogEventBytes, &exampleOutputSendLogEvent)
 }
 
 func (c *CreateHTTPSyntheticCheck) ExampleOutput() map[string]any {
