@@ -56,6 +56,10 @@ func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 }
 
 func (h *GrafanaWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
+	if ctx.Webhook.GetMetadata() == nil {
+		return nil
+	}
+
 	metadata := GrafanaWebhookMetadata{}
 	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata); err != nil {
 		return err
