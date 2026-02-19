@@ -278,6 +278,28 @@ func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
 	return c.encryptor.Decrypt(context.Background(), []byte(decoded), []byte(c.integration.ID.String()))
 }
 
+func (c *IntegrationContext) GetOptionalConfig(name string) ([]byte, error) {
+	config := c.integration.Configuration.Data()
+	_, ok := config[name]
+	if !ok {
+		impl, err := c.registry.GetIntegration(c.integration.AppName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get integration %s: %w", c.integration.AppName, err)
+		}
+
+		configDef, err := findConfigDef(impl.Configuration(), name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find config %s: %w", name, err)
+		}
+
+		if !configDef.Required {
+			return nil, nil
+		}
+	}
+
+	return c.GetConfig(name)
+}
+
 func findConfigDef(configs []configuration.Field, name string) (configuration.Field, error) {
 	for _, config := range configs {
 		if config.Name == name {
