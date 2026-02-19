@@ -643,11 +643,11 @@ func Test__RunPipeline__Finish(t *testing.T) {
 func Test__RunPipeline__OnIntegrationMessage(t *testing.T) {
 	component := &RunPipeline{}
 
-	t.Run("pipeline mismatch -> no event", func(t *testing.T) {
-		eventContext := &contexts.EventContext{}
+	t.Run("pipeline mismatch -> ignored", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.OnIntegrationMessage(core.IntegrationMessageContext{
 			Logger: logrus.NewEntry(logrus.New()),
-			Events: eventContext,
+			Events: &contexts.EventContext{},
 			NodeMetadata: &contexts.MetadataContext{
 				Metadata: RunPipelineNodeMetadata{
 					Pipeline: &PipelineMetadata{Name: "my-pipeline"},
@@ -656,15 +656,183 @@ func Test__RunPipeline__OnIntegrationMessage(t *testing.T) {
 			Message: common.EventBridgeEvent{
 				Source:     "aws.codepipeline",
 				DetailType: "CodePipeline Pipeline Execution State Change",
-				Detail:     map[string]any{"pipeline": "other-pipeline", "state": "SUCCEEDED"},
+				Detail:     map[string]any{"pipeline": "other-pipeline", "state": "SUCCEEDED", "execution-id": "exec-1"},
+			},
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				t.Fatal("FindExecutionByKV should not be called for mismatched pipeline")
+				return nil, nil
 			},
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, 0, eventContext.Count())
+		assert.False(t, executionState.Finished)
 	})
 
-	t.Run("pipeline match -> emits event", func(t *testing.T) {
+	t.Run("nil pipeline metadata -> ignored", func(t *testing.T) {
+		err := component.OnIntegrationMessage(core.IntegrationMessageContext{
+			Logger: logrus.NewEntry(logrus.New()),
+			Events: &contexts.EventContext{},
+			NodeMetadata: &contexts.MetadataContext{
+				Metadata: RunPipelineNodeMetadata{Pipeline: nil},
+			},
+			Message: common.EventBridgeEvent{
+				Detail: map[string]any{"pipeline": "my-pipeline", "state": "SUCCEEDED", "execution-id": "exec-1"},
+			},
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("non-terminal state (STARTED) -> ignored", func(t *testing.T) {
+		err := component.OnIntegrationMessage(core.IntegrationMessageContext{
+			Logger: logrus.NewEntry(logrus.New()),
+			Events: &contexts.EventContext{},
+			NodeMetadata: &contexts.MetadataContext{
+				Metadata: RunPipelineNodeMetadata{
+					Pipeline: &PipelineMetadata{Name: "my-pipeline"},
+				},
+			},
+			Message: common.EventBridgeEvent{
+				Detail: map[string]any{"pipeline": "my-pipeline", "state": "STARTED", "execution-id": "exec-1"},
+			},
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				t.Fatal("FindExecutionByKV should not be called for non-terminal state")
+				return nil, nil
+			},
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("SUCCEEDED -> resolves execution on passed channel", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		executionMetadata := &contexts.MetadataContext{
+			Metadata: RunPipelineExecutionMetadata{
+				Pipeline:  &PipelineMetadata{Name: "my-pipeline"},
+				Execution: &ExecutionMetadata{ID: "exec-1", Status: PipelineStatusInProgress},
+			},
+		}
+
+		err := component.OnIntegrationMessage(core.IntegrationMessageContext{
+			Logger: logrus.NewEntry(logrus.New()),
+			Events: &contexts.EventContext{},
+			NodeMetadata: &contexts.MetadataContext{
+				Metadata: RunPipelineNodeMetadata{
+					Pipeline: &PipelineMetadata{Name: "my-pipeline"},
+				},
+			},
+			Message: common.EventBridgeEvent{
+				Source:     "aws.codepipeline",
+				DetailType: "CodePipeline Pipeline Execution State Change",
+				Detail:     map[string]any{"pipeline": "my-pipeline", "state": "SUCCEEDED", "execution-id": "exec-1"},
+			},
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				assert.Equal(t, "pipeline_execution_id", key)
+				assert.Equal(t, "exec-1", value)
+				return &core.ExecutionContext{
+					Metadata:       executionMetadata,
+					ExecutionState: executionState,
+					Logger:         logrus.NewEntry(logrus.New()),
+				}, nil
+			},
+		})
+
+		require.NoError(t, err)
+		assert.True(t, executionState.Finished)
+		assert.Equal(t, PassedOutputChannel, executionState.Channel)
+		assert.Equal(t, PayloadType, executionState.Type)
+	})
+
+	t.Run("FAILED -> resolves execution on failed channel", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		executionMetadata := &contexts.MetadataContext{
+			Metadata: RunPipelineExecutionMetadata{
+				Pipeline:  &PipelineMetadata{Name: "my-pipeline"},
+				Execution: &ExecutionMetadata{ID: "exec-1", Status: PipelineStatusInProgress},
+			},
+		}
+
+		err := component.OnIntegrationMessage(core.IntegrationMessageContext{
+			Logger: logrus.NewEntry(logrus.New()),
+			Events: &contexts.EventContext{},
+			NodeMetadata: &contexts.MetadataContext{
+				Metadata: RunPipelineNodeMetadata{
+					Pipeline: &PipelineMetadata{Name: "my-pipeline"},
+				},
+			},
+			Message: common.EventBridgeEvent{
+				Source:     "aws.codepipeline",
+				DetailType: "CodePipeline Pipeline Execution State Change",
+				Detail:     map[string]any{"pipeline": "my-pipeline", "state": "FAILED", "execution-id": "exec-1"},
+			},
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				return &core.ExecutionContext{
+					Metadata:       executionMetadata,
+					ExecutionState: executionState,
+					Logger:         logrus.NewEntry(logrus.New()),
+				}, nil
+			},
+		})
+
+		require.NoError(t, err)
+		assert.True(t, executionState.Finished)
+		assert.Equal(t, FailedOutputChannel, executionState.Channel)
+	})
+
+	t.Run("execution not found -> ignored", func(t *testing.T) {
+		err := component.OnIntegrationMessage(core.IntegrationMessageContext{
+			Logger: logrus.NewEntry(logrus.New()),
+			Events: &contexts.EventContext{},
+			NodeMetadata: &contexts.MetadataContext{
+				Metadata: RunPipelineNodeMetadata{
+					Pipeline: &PipelineMetadata{Name: "my-pipeline"},
+				},
+			},
+			Message: common.EventBridgeEvent{
+				Detail: map[string]any{"pipeline": "my-pipeline", "state": "SUCCEEDED", "execution-id": "unknown-exec"},
+			},
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				return nil, nil
+			},
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("already finished execution -> ignored", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{Finished: true, KVs: map[string]string{}}
+		executionMetadata := &contexts.MetadataContext{
+			Metadata: RunPipelineExecutionMetadata{
+				Pipeline:  &PipelineMetadata{Name: "my-pipeline"},
+				Execution: &ExecutionMetadata{ID: "exec-1", Status: PipelineStatusSucceeded},
+			},
+		}
+
+		err := component.OnIntegrationMessage(core.IntegrationMessageContext{
+			Logger: logrus.NewEntry(logrus.New()),
+			Events: &contexts.EventContext{},
+			NodeMetadata: &contexts.MetadataContext{
+				Metadata: RunPipelineNodeMetadata{
+					Pipeline: &PipelineMetadata{Name: "my-pipeline"},
+				},
+			},
+			Message: common.EventBridgeEvent{
+				Detail: map[string]any{"pipeline": "my-pipeline", "state": "SUCCEEDED", "execution-id": "exec-1"},
+			},
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				return &core.ExecutionContext{
+					Metadata:       executionMetadata,
+					ExecutionState: executionState,
+					Logger:         logrus.NewEntry(logrus.New()),
+				}, nil
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, executionState.Channel, "should not re-emit on an already-resolved execution")
+	})
+
+	t.Run("FindExecutionByKV nil -> falls back to event emission", func(t *testing.T) {
 		eventContext := &contexts.EventContext{}
 		err := component.OnIntegrationMessage(core.IntegrationMessageContext{
 			Logger: logrus.NewEntry(logrus.New()),
@@ -675,32 +843,14 @@ func Test__RunPipeline__OnIntegrationMessage(t *testing.T) {
 				},
 			},
 			Message: common.EventBridgeEvent{
-				Source:     "aws.codepipeline",
-				DetailType: "CodePipeline Pipeline Execution State Change",
-				Detail:     map[string]any{"pipeline": "my-pipeline", "state": "SUCCEEDED"},
+				Detail: map[string]any{"pipeline": "my-pipeline", "state": "SUCCEEDED", "execution-id": "exec-1"},
 			},
+			FindExecutionByKV: nil,
 		})
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, eventContext.Count())
 		assert.Equal(t, PayloadType, eventContext.Payloads[0].Type)
-	})
-
-	t.Run("nil pipeline metadata -> no event", func(t *testing.T) {
-		eventContext := &contexts.EventContext{}
-		err := component.OnIntegrationMessage(core.IntegrationMessageContext{
-			Logger: logrus.NewEntry(logrus.New()),
-			Events: eventContext,
-			NodeMetadata: &contexts.MetadataContext{
-				Metadata: RunPipelineNodeMetadata{Pipeline: nil},
-			},
-			Message: common.EventBridgeEvent{
-				Detail: map[string]any{"pipeline": "my-pipeline", "state": "SUCCEEDED"},
-			},
-		})
-
-		require.NoError(t, err)
-		assert.Equal(t, 0, eventContext.Count())
 	})
 }
 
