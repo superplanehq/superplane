@@ -7,19 +7,6 @@ import (
 
 // buildSyntheticCheckSpecificationFromConfiguration validates and builds a synthetic check specification map.
 func buildSyntheticCheckSpecificationFromConfiguration(config UpsertSyntheticCheckConfiguration, scope string) (map[string]any, error) {
-	if strings.TrimSpace(config.Spec) != "" {
-		specification, err := parseSpecification(config.Spec, "spec", scope)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := validateSyntheticCheckSpecification(specification, "spec", scope); err != nil {
-			return nil, err
-		}
-
-		return specification, nil
-	}
-
 	name, err := requireNonEmptyValue(config.Name, "name", scope)
 	if err != nil {
 		return nil, err

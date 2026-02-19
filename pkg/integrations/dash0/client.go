@@ -13,17 +13,15 @@ import (
 )
 
 const (
-	// MaxResponseSize limits the size of Prometheus API responses to prevent excessive memory usage
-	// 1MB should be sufficient for most Prometheus queries while preventing abuse
+	// MaxResponseSize limits the size of Prometheus API responses to prevent excessive memory usage.
 	MaxResponseSize = 1 * 1024 * 1024 // 1MB
 )
 
 type Client struct {
-	Token         string
-	BaseURL       string
-	LogsIngestURL string
-	Dataset       string
-	http          core.HTTPContext
+	Token   string
+	BaseURL string
+	Dataset string
+	http    core.HTTPContext
 }
 
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -42,7 +40,6 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 		return nil, fmt.Errorf("baseURL is required for Dash0 Cloud. Find your API URL in Dash0 dashboard under Organization Settings > Endpoints Reference")
 	}
 
-	// Strip /api/prometheus if user included it in the base URL
 	baseURL = strings.TrimSuffix(baseURL, "/api/prometheus")
 
 	dataset := "default"
@@ -54,55 +51,12 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 		}
 	}
 
-	logsIngestURL := deriveLogsIngestURL(baseURL)
-
 	return &Client{
-		Token:         string(apiToken),
-		BaseURL:       baseURL,
-		LogsIngestURL: logsIngestURL,
-		Dataset:       dataset,
-		http:          http,
+		Token:   string(apiToken),
+		BaseURL: baseURL,
+		Dataset: dataset,
+		http:    http,
 	}, nil
-}
-
-// deriveLogsIngestURL derives the OTLP logs ingress host from the configured API base URL.
-func deriveLogsIngestURL(baseURL string) string {
-	parsedURL, err := url.Parse(baseURL)
-	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
-		return strings.TrimSuffix(baseURL, "/")
-	}
-
-	hostname := parsedURL.Hostname()
-	if strings.HasPrefix(hostname, "api.") {
-		hostname = "ingress." + strings.TrimPrefix(hostname, "api.")
-	}
-
-	if port := parsedURL.Port(); port != "" {
-		parsedURL.Host = fmt.Sprintf("%s:%s", hostname, port)
-	} else {
-		parsedURL.Host = hostname
-	}
-
-	parsedURL.Path = ""
-	parsedURL.RawPath = ""
-	parsedURL.RawQuery = ""
-	parsedURL.Fragment = ""
-
-	return strings.TrimSuffix(parsedURL.String(), "/")
-}
-
-// withDatasetQuery appends the configured dataset query parameter to a request URL.
-func (c *Client) withDatasetQuery(requestURL string) (string, error) {
-	parsedURL, err := url.Parse(requestURL)
-	if err != nil {
-		return "", fmt.Errorf("error parsing request URL: %v", err)
-	}
-
-	query := parsedURL.Query()
-	query.Set("dataset", c.Dataset)
-	parsedURL.RawQuery = query.Encode()
-
-	return parsedURL.String(), nil
 }
 
 func (c *Client) execRequest(method, url string, body io.Reader, contentType string) ([]byte, error) {
@@ -123,14 +77,12 @@ func (c *Client) execRequest(method, url string, body io.Reader, contentType str
 	}
 	defer res.Body.Close()
 
-	// Limit response size to prevent excessive memory usage
 	limitedReader := io.LimitReader(res.Body, MaxResponseSize)
 	responseBody, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, fmt.Errorf("error reading body: %v", err)
 	}
 
-	// Check if we hit the limit (response was truncated)
 	if len(responseBody) >= MaxResponseSize {
 		return nil, fmt.Errorf("response too large: exceeds maximum size of %d bytes", MaxResponseSize)
 	}
@@ -154,8 +106,8 @@ type PrometheusResponseData struct {
 
 type PrometheusQueryResult struct {
 	Metric map[string]string `json:"metric"`
-	Value  []interface{}     `json:"value,omitempty"`  // For instant queries: [timestamp, value]
-	Values [][]interface{}   `json:"values,omitempty"` // For range queries: [[timestamp, value], ...]
+	Value  []interface{}     `json:"value,omitempty"`
+	Values [][]interface{}   `json:"values,omitempty"`
 }
 
 func (c *Client) ExecutePrometheusInstantQuery(promQLQuery, dataset string) (map[string]any, error) {
@@ -234,100 +186,32 @@ func (c *Client) ListCheckRules() ([]CheckRule, error) {
 		return nil, err
 	}
 
-	// The API might return either:
-	// 1. A list of strings (IDs only)
-	// 2. A list of objects with id and name
 	var checkRules []CheckRule
 
-	// Try parsing as list of strings first
 	var stringList []string
 	if err := json.Unmarshal(responseBody, &stringList); err == nil {
-		// If successful, convert strings to CheckRule objects
 		checkRules = make([]CheckRule, len(stringList))
-		for i, id := range stringList {
-			checkRules[i] = CheckRule{
+		for index, id := range stringList {
+			checkRules[index] = CheckRule{
 				ID:   id,
-				Name: id, // Use ID as name if name is not available
+				Name: id,
 			}
 		}
+
 		return checkRules, nil
 	}
 
-	// Try parsing as list of CheckRule objects
 	if err := json.Unmarshal(responseBody, &checkRules); err != nil {
 		return nil, fmt.Errorf("error parsing check rules response: %v", err)
 	}
 
-	// If names are empty, use ID as name
-	for i := range checkRules {
-		if checkRules[i].Name == "" {
-			checkRules[i].Name = checkRules[i].ID
+	for index := range checkRules {
+		if checkRules[index].Name == "" {
+			checkRules[index].Name = checkRules[index].ID
 		}
 	}
 
 	return checkRules, nil
-}
-
-// SendLogEvents sends OTLP log batches to Dash0 ingestion endpoint.
-func (c *Client) SendLogEvents(request OTLPLogsRequest) (map[string]any, error) {
-	requestURL := fmt.Sprintf("%s/v1/logs", c.LogsIngestURL)
-
-	body, err := json.Marshal(request)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling logs request: %v", err)
-	}
-
-	responseBody, err := c.execRequest(http.MethodPost, requestURL, bytes.NewReader(body), "application/json")
-	if err != nil {
-		return nil, err
-	}
-
-	parsed, err := parseJSONResponse(responseBody)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing send log event response: %v", err)
-	}
-
-	return parsed, nil
-}
-
-// GetCheckDetails fetches check context by failed-check ID with check-rules fallback.
-func (c *Client) GetCheckDetails(checkID string, includeHistory bool) (map[string]any, error) {
-	trimmedCheckID := strings.TrimSpace(checkID)
-	if trimmedCheckID == "" {
-		return nil, fmt.Errorf("check id is required")
-	}
-
-	querySuffix := ""
-	if includeHistory {
-		querySuffix = "?include_history=true"
-	}
-
-	escapedID := url.PathEscape(trimmedCheckID)
-	requestURL := fmt.Sprintf("%s/api/alerting/failed-checks/%s%s", c.BaseURL, escapedID, querySuffix)
-
-	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil, "")
-	if err != nil {
-		if strings.Contains(err.Error(), "request got 404 code") {
-			fallbackURL := fmt.Sprintf("%s/api/alerting/check-rules/%s%s", c.BaseURL, escapedID, querySuffix)
-			responseBody, err = c.execRequest(http.MethodGet, fallbackURL, nil, "")
-			if err != nil {
-				return nil, fmt.Errorf("fallback check-rules lookup failed: %v", err)
-			}
-		} else {
-			return nil, err
-		}
-	}
-
-	parsed, err := parseJSONResponse(responseBody)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing check details response: %v", err)
-	}
-
-	if _, ok := parsed["checkId"]; !ok {
-		parsed["checkId"] = trimmedCheckID
-	}
-
-	return parsed, nil
 }
 
 // UpsertSyntheticCheck creates or updates a synthetic check by origin/id.
@@ -363,6 +247,20 @@ func (c *Client) UpsertSyntheticCheck(originOrID string, specification map[strin
 	}
 
 	return parsed, nil
+}
+
+// withDatasetQuery appends the configured dataset query parameter to a request URL.
+func (c *Client) withDatasetQuery(requestURL string) (string, error) {
+	parsedURL, err := url.Parse(requestURL)
+	if err != nil {
+		return "", fmt.Errorf("error parsing request URL: %v", err)
+	}
+
+	query := parsedURL.Query()
+	query.Set("dataset", c.Dataset)
+	parsedURL.RawQuery = query.Encode()
+
+	return parsedURL.String(), nil
 }
 
 // parseJSONResponse normalizes object or array JSON responses into a map.

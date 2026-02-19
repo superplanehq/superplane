@@ -79,8 +79,6 @@ func (d *Dash0) Components() []core.Component {
 	return []core.Component{
 		&QueryPrometheus{},
 		&ListIssues{},
-		&SendLogEvent{},
-		&GetCheckDetails{},
 		&CreateSyntheticCheck{},
 	}
 }

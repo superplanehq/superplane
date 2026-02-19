@@ -26,14 +26,14 @@ func Test__CreateSyntheticCheck__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "name is required")
 	})
 
-	t.Run("legacy spec remains supported", func(t *testing.T) {
+	t.Run("spec fallback is not supported", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"spec": `[{"kind":"Dash0SyntheticCheck","metadata":{"name":"checkout-health"},"spec":{"enabled":true,"plugin":{"kind":"http","spec":{"request":{"method":"get","url":"https://example.com"}}}}}]`,
 			},
 		})
 
-		require.NoError(t, err)
+		require.ErrorContains(t, err, "name is required")
 	})
 }
 

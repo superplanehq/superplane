@@ -1,47 +1,9 @@
 package dash0
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 )
-
-// parseSpecification validates and parses a JSON object field used by upsert actions.
-func parseSpecification(specification, fieldName, scope string) (map[string]any, error) {
-	trimmed := strings.TrimSpace(specification)
-	if trimmed == "" {
-		return nil, fmt.Errorf("%s: %s is required", scope, fieldName)
-	}
-
-	var payload map[string]any
-	objectErr := json.Unmarshal([]byte(trimmed), &payload)
-	if objectErr == nil {
-		if len(payload) == 0 {
-			return nil, fmt.Errorf("%s: %s cannot be an empty JSON object", scope, fieldName)
-		}
-
-		return payload, nil
-	}
-
-	var payloadArray []map[string]any
-	if err := json.Unmarshal([]byte(trimmed), &payloadArray); err == nil {
-		if len(payloadArray) == 0 {
-			return nil, fmt.Errorf("%s: %s cannot be an empty JSON array", scope, fieldName)
-		}
-
-		if len(payloadArray) > 1 {
-			return nil, fmt.Errorf("%s: %s must be a JSON object or a single-item JSON array", scope, fieldName)
-		}
-
-		if len(payloadArray[0]) == 0 {
-			return nil, fmt.Errorf("%s: %s cannot contain an empty JSON object", scope, fieldName)
-		}
-
-		return payloadArray[0], nil
-	}
-
-	return nil, fmt.Errorf("%s: parse %s as JSON object: %w", scope, fieldName, objectErr)
-}
 
 // requireNonEmptyValue trims and validates required string configuration values.
 func requireNonEmptyValue(value, fieldName, scope string) (string, error) {
