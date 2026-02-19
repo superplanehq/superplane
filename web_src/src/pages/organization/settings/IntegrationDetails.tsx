@@ -1,4 +1,4 @@
-import { ArrowLeft, CircleX, ExternalLink, Loader2, Plug, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, CircleX, Copy, ExternalLink, Loader2, Plug, Trash2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import {
@@ -319,6 +319,15 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
                 <p className="text-sm text-gray-800 dark:text-gray-100 font-mono">{integration.metadata?.id}</p>
               </div>
             </div>
+            {typeof integration.status?.metadata?.webhookURL === "string" && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Webhook URL</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  Configure your service to POST events to this URL.
+                </p>
+                <WebhookURLInput url={integration.status.metadata.webhookURL} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -434,6 +443,29 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function WebhookURLInput({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (_err) {
+      showErrorToast("Failed to copy webhook URL");
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <Input type="text" value={url} readOnly className="font-mono text-sm flex-1" />
+      <Button variant="outline" size="icon" onClick={handleCopy} title={copied ? "Copied!" : "Copy to clipboard"}>
+        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+      </Button>
     </div>
   );
 }

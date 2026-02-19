@@ -3,7 +3,6 @@ package ec2
 import (
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
@@ -166,56 +165,59 @@ func (c *CreateImage) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	if strings.TrimSpace(config.Region) == "" {
+	region := strings.TrimSpace(config.Region)
+	if region == "" {
 		return fmt.Errorf("region is required")
 	}
 
-	if nodeMetadata.SubscriptionID != "" && nodeMetadata.Region == config.Region {
+	if nodeMetadata.SubscriptionID != "" && nodeMetadata.Region == region {
 		return nil
 	}
 
-	integrationMetadata := common.IntegrationMetadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, region, DetailTypeAMIStateChange)
+	if err != nil {
+		return fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
-	if integrationMetadata.EventBridge == nil {
-		return fmt.Errorf("event bridge metadata is not configured")
-	}
-
-	if !hasAMIStateChangeRule(integrationMetadata) {
-		if err := ctx.Metadata.Set(CreateImageNodeMetadata{Region: config.Region}); err != nil {
+	if !hasRule {
+		if err := ctx.Metadata.Set(CreateImageNodeMetadata{Region: region}); err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
 
-		if err := ctx.Integration.ScheduleActionCall(
-			"provisionRule",
-			common.ProvisionRuleParameters{
-				Region:     config.Region,
-				Source:     Source,
-				DetailType: DetailTypeAMIStateChange,
-			},
-			time.Second,
-		); err != nil {
-			return fmt.Errorf("failed to schedule rule provisioning for integration: %w", err)
-		}
-
-		return ctx.Requests.ScheduleActionCall(
-			"checkRuleAvailability",
-			map[string]any{},
-			createImageInitialRuleAvailabilityWait,
-		)
+		return c.provisionRule(ctx.Integration, ctx.Requests, region)
 	}
 
-	subscriptionID, err := ctx.Integration.Subscribe(c.subscriptionPattern(config.Region))
+	subscriptionID, err := ctx.Integration.Subscribe(c.subscriptionPattern(region))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
 	}
 
 	return ctx.Metadata.Set(CreateImageNodeMetadata{
-		Region:         config.Region,
+		Region:         region,
 		SubscriptionID: subscriptionID.String(),
 	})
+}
+
+func (c *CreateImage) provisionRule(integration core.IntegrationContext, requests core.RequestContext, region string) error {
+	err := integration.ScheduleActionCall(
+		"provisionRule",
+		common.ProvisionRuleParameters{
+			Region:     region,
+			Source:     Source,
+			DetailType: DetailTypeAMIStateChange,
+		},
+		time.Second,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to schedule rule provisioning for integration: %w", err)
+	}
+
+	return requests.ScheduleActionCall(
+		"checkRuleAvailability",
+		map[string]any{},
+		createImageInitialRuleAvailabilityWait,
+	)
 }
 
 func (c *CreateImage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -354,18 +356,13 @@ func (c *CreateImage) checkRuleAvailability(ctx core.ActionContext) error {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	integrationMetadata := common.IntegrationMetadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, nodeMetadata.Region, DetailTypeAMIStateChange)
+	if err != nil {
+		return fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
-	if !hasAMIStateChangeRule(integrationMetadata) {
-		ctx.Logger.Infof("Rule not available for source %s - checking again in %s", Source, createImageCheckRuleRetryInterval)
-		return ctx.Requests.ScheduleActionCall(
-			"checkRuleAvailability",
-			map[string]any{},
-			createImageCheckRuleRetryInterval,
-		)
+	if !hasRule {
+		return ctx.Requests.ScheduleActionCall(ctx.Name, map[string]any{}, 10*time.Second)
 	}
 
 	subscriptionID, err := ctx.Integration.Subscribe(c.subscriptionPattern(nodeMetadata.Region))
@@ -379,19 +376,6 @@ func (c *CreateImage) checkRuleAvailability(ctx core.ActionContext) error {
 
 func (c *CreateImage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
-}
-
-func hasAMIStateChangeRule(integrationMetadata common.IntegrationMetadata) bool {
-	if integrationMetadata.EventBridge == nil {
-		return false
-	}
-
-	rule, ok := integrationMetadata.EventBridge.Rules[Source]
-	if !ok {
-		return false
-	}
-
-	return slices.Contains(rule.DetailTypes, DetailTypeAMIStateChange)
 }
 
 func (c *CreateImage) subscriptionPattern(region string) *common.EventBridgeEvent {

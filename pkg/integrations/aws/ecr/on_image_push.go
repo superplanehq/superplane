@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -135,23 +136,19 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
-	//
-	// Create EventBridge rule and target
-	//
-	integrationMetadata := common.IntegrationMetadata{}
-	err = mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata)
-	if err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	region := strings.TrimSpace(config.Region)
+	if region == "" {
+		return fmt.Errorf("region is required")
 	}
 
-	//
-	// If an EventBridge rule does not yet exist yet in this region, for this source,
-	// we ask the integration to provision it for us.
-	//
-	rule, ok := integrationMetadata.EventBridge.Rules[Source]
-	if !ok || !slices.Contains(rule.DetailTypes, DetailTypeECRImageAction) {
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, region, DetailTypeECRImageAction)
+	if err != nil {
+		return fmt.Errorf("failed to check rule availability: %w", err)
+	}
+
+	if !hasRule {
 		err = ctx.Metadata.Set(OnImagePushMetadata{
-			Region:     config.Region,
+			Region:     region,
 			Repository: repository,
 		})
 
@@ -159,19 +156,19 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
 
-		return p.provisionRule(ctx.Integration, ctx.Requests, config.Region)
+		return p.provisionRule(ctx.Integration, ctx.Requests, region)
 	}
 
 	//
 	// If the rule exists, subscribe to the integration with the proper pattern.
 	//
-	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(config.Region))
+	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(region))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
 	}
 
 	return ctx.Metadata.Set(OnImagePushMetadata{
-		Region:         config.Region,
+		Region:         region,
 		SubscriptionID: subscriptionID.String(),
 		Repository:     repository,
 	})
