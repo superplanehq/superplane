@@ -80,23 +80,6 @@ func Test__GetIncidents__Setup(t *testing.T) {
 		assert.Equal(t, "user2", metadata.Caller.ID)
 	})
 
-	t.Run("skips setup when metadata already populated", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{}
-		metadataCtx := &contexts.MetadataContext{
-			Metadata: NodeMetadata{InstanceURL: "https://existing.service-now.com"},
-		}
-
-		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{"assignmentGroup": "grp1"},
-			HTTP:          httpContext,
-			Integration:   oauthIntegrationContext(),
-			Metadata:      metadataCtx,
-		})
-
-		require.NoError(t, err)
-		require.Len(t, httpContext.Requests, 0)
-	})
-
 	t.Run("invalid resource returns error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{

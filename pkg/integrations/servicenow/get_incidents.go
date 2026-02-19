@@ -274,15 +274,6 @@ func (c *GetIncidents) Configuration() []configuration.Field {
 }
 
 func (c *GetIncidents) Setup(ctx core.SetupContext) error {
-	var existing NodeMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &existing); err != nil {
-		return fmt.Errorf("failed to decode node metadata: %w", err)
-	}
-
-	if existing.InstanceURL != "" {
-		return nil
-	}
-
 	spec := GetIncidentsSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("error decoding configuration: %w", err)

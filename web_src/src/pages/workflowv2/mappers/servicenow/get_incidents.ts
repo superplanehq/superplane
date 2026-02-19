@@ -132,21 +132,19 @@ export const getIncidentsMapper: ComponentBaseMapper = {
 
     const incidents = getIncidents(context.execution);
 
-    if (incidents.length === 0) {
-      return details;
+    if (incidents.length > 0) {
+      const incidentDetails = incidents.map((incident) => ({
+        number: incident.number || "",
+        short_description: incident.short_description || "No description",
+        state: incident.state ? STATE_LABELS[incident.state] || incident.state : "",
+        urgency: incident.urgency ? URGENCY_LABELS[incident.urgency] || incident.urgency : "",
+        impact: incident.impact ? IMPACT_LABELS[incident.impact] || incident.impact : "",
+        sys_id: incident.sys_id,
+        sys_created_on: incident.sys_created_on,
+      }));
+
+      details["Incidents"] = incidentDetails;
     }
-
-    const incidentDetails = incidents.map((incident) => ({
-      number: incident.number || "",
-      short_description: incident.short_description || "No description",
-      state: incident.state ? STATE_LABELS[incident.state] || incident.state : "",
-      urgency: incident.urgency ? URGENCY_LABELS[incident.urgency] || incident.urgency : "",
-      impact: incident.impact ? IMPACT_LABELS[incident.impact] || incident.impact : "",
-      sys_id: incident.sys_id,
-      sys_created_on: incident.sys_created_on,
-    }));
-
-    details["Incidents"] = incidentDetails;
 
     if (
       context.execution.resultMessage &&
