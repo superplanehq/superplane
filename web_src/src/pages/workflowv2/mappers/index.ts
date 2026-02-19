@@ -185,6 +185,13 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   hetzner: hetznerComponentMappers,
   dockerhub: dockerhubComponentMappers,
   grafana: grafanaComponentMappers,
+  grafana: grafanaComponentMappers,
+  circleci: circleCIComponentMappers,
+  claude: claudeComponentMappers,
+  prometheus: prometheusComponentMappers,
+  cursor: cursorComponentMappers,
+  hetzner: hetznerComponentMappers,
+  dockerhub: dockerhubComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -224,9 +231,12 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   smtp: smtpEventStateRegistry,
   sendgrid: sendgridEventStateRegistry,
   render: renderEventStateRegistry,
+  render: renderEventStateRegistry,
   discord: discordEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   openai: openaiEventStateRegistry,
+  circleci: circleCIEventStateRegistry,
+  claude: claudeEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
@@ -235,6 +245,11 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
   grafana: grafanaEventStateRegistry,
+  grafana: grafanaEventStateRegistry,
+  prometheus: prometheusEventStateRegistry,
+  cursor: cursorEventStateRegistry,
+  gitlab: gitlabEventStateRegistry,
+  dockerhub: dockerhubEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {

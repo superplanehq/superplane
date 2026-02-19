@@ -294,17 +294,6 @@ export const ComponentSidebar = ({
     }
     return `/${domainId}/settings/integrations`;
   }, [domainId, integrationRef?.id, integrations, selectedIntegrationForDialog?.name]);
-  const nodeWebhookUrl = useMemo(() => {
-    if (!nodeId) return "";
-    const node = workflowNodes.find((n) => n.id === nodeId);
-    const metadata = node?.metadata as Record<string, unknown> | undefined;
-    if (!metadata) return "";
-    const webhookUrl = typeof metadata.webhookUrl === "string" ? metadata.webhookUrl : "";
-    const webhookUrlSnake = typeof metadata.webhook_url === "string" ? metadata.webhook_url : "";
-    const legacyUrl = typeof metadata.url === "string" ? metadata.url : "";
-    return webhookUrl || webhookUrlSnake || legacyUrl || "";
-  }, [nodeId, workflowNodes]);
-
   const handleCopyNodeId = useCallback(async () => {
     if (nodeId) {
       await navigator.clipboard.writeText(nodeId);
