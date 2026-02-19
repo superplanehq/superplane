@@ -1,0 +1,17 @@
+{
+  "data": {
+    "created_at": "2026-02-17T07:19:04.772-08:00",
+    "event": "trying new configs, error none",
+    "event_type": "incident_event.created",
+    "id": "251d3d98-65bb-44bc-9e31-607d037c6c39",
+    "incident": {
+      "id": "5dcbfe70-0416-469a-8629-be5353f4fd60"
+    },
+    "kind": "event",
+    "occurred_at": "2026-02-17T07:19:04.772-08:00",
+    "user_display_name": "",
+    "visibility": "internal"
+  },
+  "timestamp": "2026-02-17T15:19:20.901088287Z",
+  "type": "rootly.onEvent"
+}

@@ -31,6 +31,7 @@ export interface Incident {
 export interface IncidentEvent {
   id?: string;
   event?: string;
+  kind?: string;
   visibility?: string;
   occurred_at?: string;
   created_at?: string;
