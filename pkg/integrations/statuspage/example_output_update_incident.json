@@ -1,0 +1,114 @@
+{
+  "type": "statuspage.incident",
+  "data": {
+    "id": "p31zjtct2jer",
+    "name": "Database Connection Issues",
+    "status": "monitoring",
+    "impact": "minor",
+    "impact_override": "minor",
+    "shortlink": "https://stspg.io/p31zjtct2jer",
+    "created_at": "2026-02-12T10:30:00.000Z",
+    "updated_at": "2026-02-12T11:00:00.000Z",
+    "page_id": "kctbh9vrtdwd",
+    "monitoring_at": "2026-02-12T11:00:00.000Z",
+    "resolved_at": null,
+    "scheduled_for": null,
+    "scheduled_until": null,
+    "scheduled_remind_prior": false,
+    "scheduled_reminded_at": null,
+    "scheduled_auto_in_progress": false,
+    "scheduled_auto_completed": false,
+    "auto_transition_deliver_notifications_at_start": null,
+    "auto_transition_deliver_notifications_at_end": null,
+    "auto_transition_to_maintenance_state": null,
+    "auto_transition_to_operational_state": null,
+    "reminder_intervals": null,
+    "postmortem_body": null,
+    "postmortem_body_last_updated_at": null,
+    "postmortem_ignored": false,
+    "postmortem_notified_subscribers": false,
+    "postmortem_notified_twitter": false,
+    "postmortem_published_at": null,
+    "metadata": {},
+    "components": [
+      {
+        "id": "8kbf7d35c070",
+        "page_id": "kctbh9vrtdwd",
+        "group_id": null,
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "updated_at": "2026-02-12T10:30:00.000Z",
+        "group": false,
+        "name": "API",
+        "description": null,
+        "position": 1,
+        "status": "partial_outage",
+        "showcase": true,
+        "only_show_if_degraded": false,
+        "automation_email": "component+example123...",
+        "start_date": "2026-02-12"
+      },
+      {
+        "id": "9kbf7d35c071",
+        "page_id": "kctbh9vrtdwd",
+        "group_id": null,
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "updated_at": "2026-02-12T10:30:00.000Z",
+        "group": false,
+        "name": "Management Portal",
+        "description": null,
+        "position": 2,
+        "status": "degraded_performance",
+        "showcase": true,
+        "only_show_if_degraded": false,
+        "automation_email": "component+example456...",
+        "start_date": "2026-02-12"
+      }
+    ],
+    "incident_updates": [
+      {
+        "id": "upd1",
+        "incident_id": "p31zjtct2jer",
+        "status": "monitoring",
+        "body": "We're tracking the problem.",
+        "created_at": "2026-02-12T11:00:00.000Z",
+        "updated_at": "2026-02-12T11:00:00.000Z",
+        "display_at": "2026-02-12T11:00:00.000Z",
+        "affected_components": null,
+        "custom_tweet": null,
+        "deliver_notifications": true,
+        "tweet_id": null,
+        "twitter_updated_at": null,
+        "wants_twitter_update": false
+      },
+      {
+        "id": "upd2",
+        "incident_id": "p31zjtct2jer",
+        "status": "investigating",
+        "body": "There is a problem.",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "updated_at": "2026-02-12T10:30:00.000Z",
+        "display_at": "2026-02-12T10:30:00.000Z",
+        "affected_components": [
+          {
+            "code": "8kbf7d35c070",
+            "name": "API",
+            "old_status": "partial_outage",
+            "new_status": "partial_outage"
+          },
+          {
+            "code": "9kbf7d35c071",
+            "name": "Management Portal",
+            "old_status": "degraded_performance",
+            "new_status": "degraded_performance"
+          }
+        ],
+        "custom_tweet": null,
+        "deliver_notifications": true,
+        "tweet_id": null,
+        "twitter_updated_at": null,
+        "wants_twitter_update": false
+      }
+    ]
+  },
+  "timestamp": "2026-02-12T11:00:00.000Z"
+}
