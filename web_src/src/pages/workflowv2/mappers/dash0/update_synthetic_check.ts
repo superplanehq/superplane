@@ -35,7 +35,8 @@ export const updateSyntheticCheckMapper: ComponentBaseMapper = {
   },
 
   subtitle(context: SubtitleContext): string {
-    return formatTimeAgo(new Date(context.execution.createdAt!));
+    const executionTime = context.execution.updatedAt ?? context.execution.createdAt;
+    return formatTimeAgo(new Date(executionTime!));
   },
 };
 
