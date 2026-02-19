@@ -499,6 +499,7 @@ function CategorySection({
             datadog: datadogIcon,
             discord: discordIcon,
             github: githubIcon,
+            jira: jiraIcon,
             gitlab: gitlabIcon,
             hetzner: hetznerIcon,
             grafana: grafanaIcon,
