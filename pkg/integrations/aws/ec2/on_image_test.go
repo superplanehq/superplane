@@ -61,7 +61,7 @@ func Test__OnImage__Setup(t *testing.T) {
 			Metadata: common.IntegrationMetadata{
 				EventBridge: &common.EventBridgeMetadata{
 					Rules: map[string]common.EventBridgeRuleMetadata{
-						Source: {
+						"aws.ec2:us-east-1": {
 							Source:      Source,
 							DetailTypes: []string{DetailTypeAMIStateChange},
 						},
@@ -119,7 +119,7 @@ func Test__OnImage__HandleAction(t *testing.T) {
 			Metadata: common.IntegrationMetadata{
 				EventBridge: &common.EventBridgeMetadata{
 					Rules: map[string]common.EventBridgeRuleMetadata{
-						Source: {
+						"aws.ec2:us-east-1": {
 							Source:      Source,
 							DetailTypes: []string{DetailTypeAMIStateChange},
 						},

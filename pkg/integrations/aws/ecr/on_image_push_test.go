@@ -101,7 +101,7 @@ func Test__OnImagePush__Setup(t *testing.T) {
 			Metadata: common.IntegrationMetadata{
 				EventBridge: &common.EventBridgeMetadata{
 					Rules: map[string]common.EventBridgeRuleMetadata{
-						Source: {
+						"aws.ecr:us-east-1": {
 							Source:      Source,
 							DetailTypes: []string{DetailTypeECRImageAction},
 						},

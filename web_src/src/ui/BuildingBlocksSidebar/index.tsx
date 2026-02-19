@@ -23,6 +23,7 @@ import discordIcon from "@/assets/icons/integrations/discord.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
@@ -44,6 +45,7 @@ import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
+import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -413,6 +415,7 @@ function CategorySection({
     github: githubIcon,
     gitlab: gitlabIcon,
     hetzner: hetznerIcon,
+    grafana: grafanaIcon,
     jira: jiraIcon,
     openai: openAiIcon,
     "open-ai": openAiIcon,
@@ -426,6 +429,7 @@ function CategorySection({
     prometheus: prometheusIcon,
     render: renderIcon,
     dockerhub: dockerIcon,
+    statuspage: statuspageIcon,
     aws: {
       ec2: awsEc2Icon,
       codeArtifact: awsIcon,
@@ -497,6 +501,7 @@ function CategorySection({
             github: githubIcon,
             gitlab: gitlabIcon,
             hetzner: hetznerIcon,
+            grafana: grafanaIcon,
             openai: openAiIcon,
             "open-ai": openAiIcon,
             claude: claudeIcon,
@@ -509,6 +514,7 @@ function CategorySection({
             prometheus: prometheusIcon,
             render: renderIcon,
             dockerhub: dockerIcon,
+            statuspage: statuspageIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
               cloudwatch: awsCloudwatchIcon,

@@ -17,19 +17,6 @@ const (
 	ecsTaskStateChangeEventDetailType = "ECS Task State Change"
 )
 
-func hasTaskStateChangeRule(integrationMetadata common.IntegrationMetadata) bool {
-	if integrationMetadata.EventBridge == nil {
-		return false
-	}
-
-	rule, ok := integrationMetadata.EventBridge.Rules[ecsEventBridgeSource]
-	if !ok {
-		return false
-	}
-
-	return slices.Contains(rule.DetailTypes, ecsTaskStateChangeEventDetailType)
-}
-
 func scheduleTaskStateChangeRuleProvision(
 	integration core.IntegrationContext,
 	requests core.RequestContext,
