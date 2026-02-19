@@ -27,7 +27,7 @@ type contactPoint struct {
 	Name string `json:"name"`
 }
 
-type dataSource struct {
+type DataSource struct {
 	UID  string `json:"uid"`
 	Name string `json:"name"`
 }
@@ -310,7 +310,7 @@ func (c *Client) DeleteContactPoint(uid string) error {
 	return nil
 }
 
-func (c *Client) ListDataSources() ([]dataSource, error) {
+func (c *Client) ListDataSources() ([]DataSource, error) {
 	responseBody, status, err := c.execRequest(http.MethodGet, "/api/datasources", nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("error listing data sources: %v", err)
@@ -320,7 +320,7 @@ func (c *Client) ListDataSources() ([]dataSource, error) {
 		return nil, newAPIStatusError("grafana data source list", status, responseBody)
 	}
 
-	var sources []dataSource
+	var sources []DataSource
 	if err := json.Unmarshal(responseBody, &sources); err != nil {
 		return nil, fmt.Errorf("error parsing data sources response: %v", err)
 	}
