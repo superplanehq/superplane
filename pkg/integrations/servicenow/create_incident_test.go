@@ -13,28 +13,24 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
+func oauthIntegrationContext() *contexts.IntegrationContext {
+	return &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"instanceUrl":  "https://dev12345.service-now.com",
+			"clientId":     "client-123",
+			"clientSecret": "secret-123",
+		},
+		Secrets: map[string]core.IntegrationSecret{
+			OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("access-token-123")},
+		},
+	}
+}
+
 func Test__CreateIncident__Setup(t *testing.T) {
 	component := &CreateIncident{}
 
-	t.Run("valid configuration with successful connection", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"result": []}`)),
-				},
-			},
-		}
-
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"instanceUrl": "https://dev12345.service-now.com",
-				"authType":    "basicAuth",
-				"username":    "admin",
-				"password":    "password",
-			},
-		}
-
+	t.Run("valid configuration sets instance url in metadata", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
 		metadataCtx := &contexts.MetadataContext{}
 
 		err := component.Setup(core.SetupContext{
@@ -44,13 +40,12 @@ func Test__CreateIncident__Setup(t *testing.T) {
 				"impact":           "2",
 			},
 			HTTP:        httpContext,
-			Integration: integrationCtx,
+			Integration: oauthIntegrationContext(),
 			Metadata:    metadataCtx,
 		})
 
 		require.NoError(t, err)
-		require.Len(t, httpContext.Requests, 1)
-		assert.Equal(t, "https://dev12345.service-now.com/api/now/table/incident?sysparm_limit=1", httpContext.Requests[0].URL.String())
+		require.Len(t, httpContext.Requests, 0)
 
 		metadata := metadataCtx.Metadata.(NodeMetadata)
 		assert.Equal(t, "https://dev12345.service-now.com", metadata.InstanceURL)
@@ -59,11 +54,6 @@ func Test__CreateIncident__Setup(t *testing.T) {
 	t.Run("valid configuration with resources verifies them", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				// ValidateConnection
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"result": []}`)),
-				},
 				// GetAssignmentGroup
 				{
 					StatusCode: http.StatusOK,
@@ -82,15 +72,6 @@ func Test__CreateIncident__Setup(t *testing.T) {
 			},
 		}
 
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"instanceUrl": "https://dev12345.service-now.com",
-				"authType":    "basicAuth",
-				"username":    "admin",
-				"password":    "password",
-			},
-		}
-
 		metadataCtx := &contexts.MetadataContext{}
 
 		err := component.Setup(core.SetupContext{
@@ -103,12 +84,12 @@ func Test__CreateIncident__Setup(t *testing.T) {
 				"caller":           "user2",
 			},
 			HTTP:        httpContext,
-			Integration: integrationCtx,
+			Integration: oauthIntegrationContext(),
 			Metadata:    metadataCtx,
 		})
 
 		require.NoError(t, err)
-		require.Len(t, httpContext.Requests, 4)
+		require.Len(t, httpContext.Requests, 3)
 
 		metadata := metadataCtx.Metadata.(NodeMetadata)
 		assert.Equal(t, "https://dev12345.service-now.com", metadata.InstanceURL)
@@ -123,26 +104,35 @@ func Test__CreateIncident__Setup(t *testing.T) {
 		assert.Equal(t, "Jane Doe", metadata.Caller.Name)
 	})
 
+	t.Run("skips setup when metadata already populated", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: NodeMetadata{InstanceURL: "https://existing.service-now.com"},
+		}
+
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"shortDescription": "Test Incident",
+				"urgency":          "2",
+				"impact":           "2",
+				"assignmentGroup":  "grp1",
+			},
+			HTTP:        httpContext,
+			Integration: oauthIntegrationContext(),
+			Metadata:    metadataCtx,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 0)
+	})
+
 	t.Run("invalid assignment group returns error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"result": []}`)),
-				},
-				{
 					StatusCode: http.StatusNotFound,
 					Body:       io.NopCloser(strings.NewReader(`{"error": "not found"}`)),
 				},
-			},
-		}
-
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"instanceUrl": "https://dev12345.service-now.com",
-				"authType":    "basicAuth",
-				"username":    "admin",
-				"password":    "password",
 			},
 		}
 
@@ -154,7 +144,7 @@ func Test__CreateIncident__Setup(t *testing.T) {
 				"assignmentGroup":  "invalid-group",
 			},
 			HTTP:        httpContext,
-			Integration: integrationCtx,
+			Integration: oauthIntegrationContext(),
 			Metadata:    &contexts.MetadataContext{},
 		})
 
@@ -168,6 +158,7 @@ func Test__CreateIncident__Setup(t *testing.T) {
 				"urgency": "2",
 				"impact":  "2",
 			},
+			Metadata: &contexts.MetadataContext{},
 		})
 
 		require.ErrorContains(t, err, "shortDescription is required")
@@ -179,6 +170,7 @@ func Test__CreateIncident__Setup(t *testing.T) {
 				"shortDescription": "Test Incident",
 				"impact":           "2",
 			},
+			Metadata: &contexts.MetadataContext{},
 		})
 
 		require.ErrorContains(t, err, "urgency is required")
@@ -190,43 +182,10 @@ func Test__CreateIncident__Setup(t *testing.T) {
 				"shortDescription": "Test Incident",
 				"urgency":          "2",
 			},
+			Metadata: &contexts.MetadataContext{},
 		})
 
 		require.ErrorContains(t, err, "impact is required")
-	})
-
-	t.Run("invalid ServiceNow connection returns error", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusUnauthorized,
-					Body:       io.NopCloser(strings.NewReader(`{"error": "unauthorized"}`)),
-				},
-			},
-		}
-
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"instanceUrl": "https://dev12345.service-now.com",
-				"authType":    "basicAuth",
-				"username":    "admin",
-				"password":    "wrong",
-			},
-		}
-
-		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{
-				"shortDescription": "Test Incident",
-				"urgency":          "2",
-				"impact":           "2",
-			},
-			HTTP:        httpContext,
-			Integration: integrationCtx,
-			Metadata:    &contexts.MetadataContext{},
-		})
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "error validating ServiceNow connection")
 	})
 }
 
@@ -252,15 +211,6 @@ func Test__CreateIncident__Execute(t *testing.T) {
 			},
 		}
 
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"instanceUrl": "https://dev12345.service-now.com",
-				"authType":    "basicAuth",
-				"username":    "admin",
-				"password":    "password",
-			},
-		}
-
 		executionState := &contexts.ExecutionStateContext{
 			KVs: map[string]string{},
 		}
@@ -278,7 +228,7 @@ func Test__CreateIncident__Execute(t *testing.T) {
 				"caller":           "def456abc123",
 			},
 			HTTP:           httpContext,
-			Integration:    integrationCtx,
+			Integration:    oauthIntegrationContext(),
 			ExecutionState: executionState,
 		})
 
@@ -317,15 +267,6 @@ func Test__CreateIncident__Execute(t *testing.T) {
 			},
 		}
 
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"instanceUrl": "https://dev12345.service-now.com",
-				"authType":    "basicAuth",
-				"username":    "admin",
-				"password":    "wrong",
-			},
-		}
-
 		executionState := &contexts.ExecutionStateContext{
 			KVs: map[string]string{},
 		}
@@ -337,7 +278,7 @@ func Test__CreateIncident__Execute(t *testing.T) {
 				"impact":           "2",
 			},
 			HTTP:           httpContext,
-			Integration:    integrationCtx,
+			Integration:    oauthIntegrationContext(),
 			ExecutionState: executionState,
 		})
 
