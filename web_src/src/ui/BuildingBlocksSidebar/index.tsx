@@ -45,6 +45,7 @@ import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
+import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -428,6 +429,7 @@ function CategorySection({
     prometheus: prometheusIcon,
     render: renderIcon,
     dockerhub: dockerIcon,
+    statuspage: statuspageIcon,
     aws: {
       ec2: awsEc2Icon,
       codeArtifact: awsIcon,
@@ -512,6 +514,7 @@ function CategorySection({
             prometheus: prometheusIcon,
             render: renderIcon,
             dockerhub: dockerIcon,
+            statuspage: statuspageIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
               cloudwatch: awsCloudwatchIcon,
