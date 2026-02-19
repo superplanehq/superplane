@@ -68,8 +68,9 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 		},
 	}
 
+	// Use a longer timeout so slow external APIs (e.g. GCP Pub/Sub, Logging) can complete during webhook provisioning.
 	httpCtx.client = &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: 120 * time.Second,
 		Transport: &http.Transport{
 			ForceAttemptHTTP2:     true,
 			MaxIdleConns:          100,
