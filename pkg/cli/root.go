@@ -11,18 +11,20 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	canvases "github.com/superplanehq/superplane/pkg/cli/commands/canvases"
-	config "github.com/superplanehq/superplane/pkg/cli/commands/config"
+	events "github.com/superplanehq/superplane/pkg/cli/commands/events"
+	executions "github.com/superplanehq/superplane/pkg/cli/commands/executions"
 	index "github.com/superplanehq/superplane/pkg/cli/commands/index"
 	integrations "github.com/superplanehq/superplane/pkg/cli/commands/integrations"
+	queue "github.com/superplanehq/superplane/pkg/cli/commands/queue"
 	secrets "github.com/superplanehq/superplane/pkg/cli/commands/secrets"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
 const (
-	DefaultAPIURL     = "http://localhost:8000"
-	ConfigKeyAPIURL   = "api_url"
-	ConfigKeyAPIToken = "api_token"
-	ConfigKeyFormat   = "output_format"
+	DefaultAPIURL           = "http://localhost:8000"
+	ConfigKeyOutput         = "output"
+	ConfigKeyContexts       = "contexts"
+	ConfigKeyCurrentContext = "currentContext"
 )
 
 var cfgFile string
@@ -41,20 +43,21 @@ var RootCmd = &cobra.Command{
 }
 
 func init() {
-	viper.SetDefault(ConfigKeyAPIURL, DefaultAPIURL)
-	viper.SetDefault(ConfigKeyFormat, "text")
+	viper.SetDefault(ConfigKeyOutput, "text")
 	cobra.OnInitialize(initConfig)
 
 	RootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "verbose output")
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.superplane.yaml)")
-	RootCmd.PersistentFlags().StringVarP(&OutputFormat, "output", "o", "", "output format: text|json|yaml (overrides config output_format)")
+	RootCmd.PersistentFlags().StringVarP(&OutputFormat, "output", "o", "", "output format: text|json|yaml (overrides config output)")
 
 	options := defaultBindOptions()
 	RootCmd.AddCommand(canvases.NewCommand(options))
+	RootCmd.AddCommand(executions.NewCommand(options))
+	RootCmd.AddCommand(events.NewCommand(options))
 	RootCmd.AddCommand(index.NewCommand(options))
 	RootCmd.AddCommand(integrations.NewCommand(options))
+	RootCmd.AddCommand(queue.NewCommand(options))
 	RootCmd.AddCommand(secrets.NewCommand(options))
-	RootCmd.AddCommand(config.NewCommand(options))
 }
 
 func initConfig() {
@@ -90,24 +93,36 @@ func defaultBindOptions() core.BindOptions {
 	return core.BindOptions{
 		NewAPIClient:        DefaultClient,
 		DefaultOutputFormat: GetOutputFormat,
+		NewConfigContext: func() core.ConfigContext {
+			context, ok := GetCurrentContext()
+			if !ok {
+				return nil
+			}
+
+			return NewCurrentContext(context)
+		},
 	}
 }
 
 func GetAPIURL() string {
-	if viper.IsSet(ConfigKeyAPIURL) {
-		return viper.GetString(ConfigKeyAPIURL)
+	if currentContext, ok := GetCurrentContext(); ok {
+		return currentContext.URL
 	}
 
 	return DefaultAPIURL
 }
 
 func GetAPIToken() string {
-	return viper.GetString(ConfigKeyAPIToken)
+	if currentContext, ok := GetCurrentContext(); ok {
+		return currentContext.APIToken
+	}
+
+	return ""
 }
 
 func GetOutputFormat() string {
-	if viper.IsSet(ConfigKeyFormat) {
-		return viper.GetString(ConfigKeyFormat)
+	if viper.IsSet(ConfigKeyOutput) {
+		return viper.GetString(ConfigKeyOutput)
 	}
 
 	return "text"
