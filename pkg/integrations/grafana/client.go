@@ -104,7 +104,23 @@ func readBaseURL(ctx core.IntegrationContext) (string, error) {
 }
 
 func readAPIToken(ctx core.IntegrationContext) (string, error) {
-	apiTokenConfig, err := ctx.GetConfig("apiToken")
+	type optionalConfigReader interface {
+		GetOptionalConfig(name string) ([]byte, error)
+	}
+
+	var (
+		apiTokenConfig []byte
+		err            error
+	)
+
+	if optionalCtx, ok := ctx.(optionalConfigReader); ok {
+		apiTokenConfig, err = optionalCtx.GetOptionalConfig("apiToken")
+	} else {
+		apiTokenConfig, err = ctx.GetConfig("apiToken")
+		if err != nil && strings.Contains(err.Error(), "config apiToken not found") {
+			return "", nil
+		}
+	}
 	if err != nil {
 		return "", fmt.Errorf("error reading apiToken: %v", err)
 	}
