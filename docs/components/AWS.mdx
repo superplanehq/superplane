@@ -629,12 +629,25 @@ The Create Image component creates a new Amazon Machine Image (AMI) from an EC2 
 
 ```json
 {
-  "imageId": "ami-07f0e4f3e9c123abc",
-  "instanceId": "i-0c2f5f9df9b123abc",
-  "name": "my-app-2026-02-18",
-  "region": "us-east-1",
-  "requestId": "f55e52db-5164-4bcf-8717-478f2f4ee6b4",
-  "state": "available"
+  "data": {
+    "image": {
+      "architecture": "x86_64",
+      "creationDate": "2026-02-18T12:00:00.000Z",
+      "description": "Golden image for production",
+      "hypervisor": "xen",
+      "imageId": "ami-07f0e4f3e9c123abc",
+      "imageType": "machine",
+      "name": "my-app-2026-02-18",
+      "ownerId": "123456789012",
+      "region": "us-east-1",
+      "rootDeviceName": "/dev/xvda",
+      "rootDeviceType": "ebs",
+      "state": "available",
+      "virtualizationType": "hvm"
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00Z",
+  "type": "aws.ec2.image"
 }
 ```
 
@@ -660,20 +673,21 @@ The Get Image component retrieves metadata for an EC2 AMI.
 ```json
 {
   "data": {
-    "architecture": "x86_64",
-    "creationDate": "2026-02-18T12:00:00.000Z",
-    "description": "Golden image for production",
-    "hypervisor": "xen",
-    "imageId": "ami-1234567890abcdef0",
-    "imageType": "machine",
-    "name": "my-app-2026-02-18",
-    "ownerId": "123456789012",
-    "region": "us-east-1",
-    "requestId": "req-1234567890",
-    "rootDeviceName": "/dev/xvda",
-    "rootDeviceType": "ebs",
-    "state": "available",
-    "virtualizationType": "hvm"
+    "image": {
+      "architecture": "x86_64",
+      "creationDate": "2026-02-18T12:00:00.000Z",
+      "description": "Golden image for production",
+      "hypervisor": "xen",
+      "imageId": "ami-1234567890abcdef0",
+      "imageType": "machine",
+      "name": "my-app-2026-02-18",
+      "ownerId": "123456789012",
+      "region": "us-east-1",
+      "rootDeviceName": "/dev/xvda",
+      "rootDeviceType": "ebs",
+      "state": "available",
+      "virtualizationType": "hvm"
+    }
   },
   "timestamp": "2026-02-18T12:00:00Z",
   "type": "aws.ec2.image"
