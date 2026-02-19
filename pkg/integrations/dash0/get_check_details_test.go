@@ -218,6 +218,6 @@ func Test__GetCheckDetails__Execute(t *testing.T) {
 		data, ok := emittedPayload["data"].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "check-123", data["checkId"])
-		assert.Equal(t, map[string]any{"checkId": "check-123"}, data["details"])
+		assert.Equal(t, map[string]any{}, data["details"])
 	})
 }

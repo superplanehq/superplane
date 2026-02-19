@@ -60,8 +60,9 @@ export const queryPrometheusMapper: ComponentBaseMapper = {
     return details;
   },
   subtitle(context: SubtitleContext): string {
-    if (!context.execution.createdAt) return "";
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    const executionTime = context.execution.updatedAt ?? context.execution.createdAt;
+    if (!executionTime) return "";
+    return formatTimeAgo(new Date(executionTime));
   },
 };
 

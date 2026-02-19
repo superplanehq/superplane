@@ -256,10 +256,6 @@ func (c *Client) GetCheckDetails(checkID string, includeHistory bool) (map[strin
 		return nil, fmt.Errorf("error parsing check details response: %v", err)
 	}
 
-	if _, ok := parsed["checkId"]; !ok {
-		parsed["checkId"] = trimmedCheckID
-	}
-
 	return parsed, nil
 }
 
