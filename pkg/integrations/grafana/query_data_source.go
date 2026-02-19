@@ -90,10 +90,14 @@ func (q *QueryDataSource) Configuration() []configuration.Field {
 		{
 			Name:        "dataSourceUid",
 			Label:       "Data Source UID",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The Grafana datasource UID to query",
-			Placeholder: "prometheus",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: resourceTypeDataSource,
+				},
+			},
 		},
 		{
 			Name:        "query",
