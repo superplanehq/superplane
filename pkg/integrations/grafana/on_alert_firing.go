@@ -96,12 +96,12 @@ func (t *OnAlertFiring) Setup(ctx core.TriggerContext) error {
 		WebhookBindingKey: bindingKey,
 	}
 
-	if err := ctx.Integration.RequestWebhook(requestConfig); err != nil {
-		return err
-	}
-
 	if ctx.Webhook == nil {
 		return fmt.Errorf("missing webhook context")
+	}
+
+	if err := ctx.Integration.RequestWebhook(requestConfig); err != nil {
+		return err
 	}
 
 	webhookURL, err := ctx.Webhook.Setup()
