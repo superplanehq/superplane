@@ -94,7 +94,8 @@ export const sshMapper: ComponentBaseMapper = {
     const result = metadata?.result as { stdout?: string; stderr?: string; exitCode?: number } | undefined;
     const host = metadata?.host as string | undefined;
     const port = metadata?.port as number | undefined;
-    const username = metadata?.username as string | undefined;
+    // Backend sends username as "user" in execution metadata (ExecutionMetadata.User json:"user")
+    const username = (metadata?.user ?? metadata?.username) as string | undefined;
     if (host) {
       const portSuffix = port && port !== 22 ? `:${port}` : "";
       details["Host"] = `${username || "user"}@${host}${portSuffix}`;
