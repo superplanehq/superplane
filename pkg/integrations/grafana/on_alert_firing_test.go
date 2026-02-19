@@ -186,11 +186,13 @@ func Test__OnAlertFiring__Setup(t *testing.T) {
 	})
 
 	t.Run("missing webhook context returns error", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{}
 		err := trigger.Setup(core.TriggerContext{
 			Configuration: map[string]any{"sharedSecret": "secret"},
-			Integration:   &contexts.IntegrationContext{},
+			Integration:   integrationContext,
 		})
 
 		require.ErrorContains(t, err, "missing webhook context")
+		require.Len(t, integrationContext.WebhookRequests, 0)
 	})
 }
