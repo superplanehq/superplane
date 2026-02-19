@@ -43,7 +43,8 @@ export function buildDash0EventSections(
   const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-  const timeAgo = formatTimeAgo(new Date(execution.createdAt!));
+  const subtitleTime = execution.updatedAt ?? execution.createdAt;
+  const timeAgo = formatTimeAgo(new Date(subtitleTime!));
 
   let subtitle = timeAgo;
   if (subtitlePrefix) {
@@ -60,4 +61,3 @@ export function buildDash0EventSections(
     },
   ];
 }
-
