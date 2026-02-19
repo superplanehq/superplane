@@ -3,7 +3,6 @@ package ecr
 import (
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
@@ -238,35 +237,13 @@ func (p *OnImageScan) checkRuleAvailability(ctx core.TriggerActionContext) (map[
 		return nil, fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	integrationMetadata := common.IntegrationMetadata{}
-	err = mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, metadata.Region, DetailTypeECRImageScan)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode integration metadata: %w", err)
+		return nil, fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
-	//
-	// If the rule was not provisioned yet, check again in 10 seconds.
-	//
-	rule, ok := integrationMetadata.EventBridge.Rules[Source]
-	if !ok {
-		ctx.Logger.Infof("Rule not found for source %s - checking again in 10 seconds", Source)
-		return nil, ctx.Requests.ScheduleActionCall(
-			"checkRuleAvailability",
-			map[string]any{},
-			10*time.Second,
-		)
-	}
-
-	//
-	// If the rule does not have the detail type we are interested in, check again in 10 seconds.
-	//
-	if !slices.Contains(rule.DetailTypes, DetailTypeECRImageScan) {
-		ctx.Logger.Infof("Rule does not have detail type '%s' - checking again in 10 seconds", DetailTypeECRImageScan)
-		return nil, ctx.Requests.ScheduleActionCall(
-			"checkRuleAvailability",
-			map[string]any{},
-			10*time.Second,
-		)
+	if !hasRule {
+		return nil, ctx.Requests.ScheduleActionCall(ctx.Name, map[string]any{}, 10*time.Second)
 	}
 
 	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(metadata.Region))

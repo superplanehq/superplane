@@ -716,6 +716,10 @@ func (a *AWS) subscriptionApplies(subscription core.IntegrationSubscriptionConte
 		return false
 	}
 
+	if configuration.Region != event.Region {
+		return false
+	}
+
 	if configuration.DetailType != event.DetailType {
 		return false
 	}
