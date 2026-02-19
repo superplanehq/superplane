@@ -49,6 +49,13 @@ func ListImages(ctx core.ListResourcesContext, resourceType string) ([]core.Inte
 		return nil, fmt.Errorf("region is required")
 	}
 
+	var includeDisabled bool
+	if ctx.Parameters["includeDisabled"] == "true" {
+		includeDisabled = true
+	} else {
+		includeDisabled = false
+	}
+
 	integrationMetadata := common.IntegrationMetadata{}
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
 		return nil, fmt.Errorf("failed to decode integration metadata: %w", err)
@@ -64,7 +71,7 @@ func ListImages(ctx core.ListResourcesContext, resourceType string) ([]core.Inte
 	}
 
 	client := NewClient(ctx.HTTP, creds, region)
-	images, err := client.ListImages(accountID)
+	images, err := client.ListImages(accountID, includeDisabled)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list EC2 images: %w", err)
 	}

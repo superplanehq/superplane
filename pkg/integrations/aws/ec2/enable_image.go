@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -16,13 +17,6 @@ type EnableImage struct{}
 type EnableImageConfiguration struct {
 	Region  string `json:"region" mapstructure:"region"`
 	ImageID string `json:"imageId" mapstructure:"imageId"`
-}
-
-type EnableImageOutput struct {
-	RequestID string `json:"requestId" mapstructure:"requestId"`
-	ImageID   string `json:"imageId" mapstructure:"imageId"`
-	Region    string `json:"region" mapstructure:"region"`
-	Enabled   bool   `json:"enabled" mapstructure:"enabled"`
 }
 
 func (c *EnableImage) Name() string {
@@ -95,6 +89,10 @@ func (c *EnableImage) Configuration() []configuration.Field {
 								Field: "region",
 							},
 						},
+						{
+							Name:  "includeDisabled",
+							Value: aws.String("true"),
+						},
 					},
 				},
 			},
@@ -138,6 +136,7 @@ func (c *EnableImage) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
+
 	imageID, err := requireImageID(config.ImageID)
 	if err != nil {
 		return err
@@ -154,11 +153,11 @@ func (c *EnableImage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to enable image: %w", err)
 	}
 
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "aws.ec2.image.enabled", []any{EnableImageOutput{
-		RequestID: requestID,
-		ImageID:   imageID,
-		Region:    region,
-		Enabled:   true,
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "aws.ec2.image.enabled", []any{map[string]any{
+		"requestId": requestID,
+		"image": map[string]any{
+			"imageId": imageID,
+		},
 	}})
 }
 

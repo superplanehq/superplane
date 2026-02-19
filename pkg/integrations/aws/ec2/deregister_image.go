@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -14,15 +15,9 @@ import (
 type DeregisterImage struct{}
 
 type DeregisterImageConfiguration struct {
-	Region  string `json:"region" mapstructure:"region"`
-	ImageID string `json:"imageId" mapstructure:"imageId"`
-}
-
-type DeregisterImageOutput struct {
-	RequestID    string `json:"requestId" mapstructure:"requestId"`
-	ImageID      string `json:"imageId" mapstructure:"imageId"`
-	Region       string `json:"region" mapstructure:"region"`
-	Deregistered bool   `json:"deregistered" mapstructure:"deregistered"`
+	Region          string `json:"region" mapstructure:"region"`
+	ImageID         string `json:"imageId" mapstructure:"imageId"`
+	DeleteSnapshots bool   `json:"deleteSnapshots" mapstructure:"deleteSnapshots"`
 }
 
 func (c *DeregisterImage) Name() string {
@@ -49,7 +44,8 @@ func (c *DeregisterImage) Documentation() string {
 ## Configuration
 
 - **Region**: AWS region where the AMI exists
-- **Image ID**: AMI ID to deregister`
+- **Image ID**: AMI ID to deregister
+- **Delete Snapshots**: If enabled, delete the snapshots associated with the AMI`
 }
 
 func (c *DeregisterImage) Icon() string {
@@ -95,6 +91,10 @@ func (c *DeregisterImage) Configuration() []configuration.Field {
 								Field: "region",
 							},
 						},
+						{
+							Name:  "includeDisabled",
+							Value: aws.String("true"),
+						},
 					},
 				},
 			},
@@ -104,6 +104,14 @@ func (c *DeregisterImage) Configuration() []configuration.Field {
 					Values: []string{"*"},
 				},
 			},
+		},
+		{
+			Name:        "deleteSnapshots",
+			Label:       "Delete Snapshots",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Delete the snapshots associated with the AMI",
 		},
 	}
 }
@@ -149,17 +157,65 @@ func (c *DeregisterImage) Execute(ctx core.ExecutionContext) error {
 	}
 
 	client := NewClient(ctx.HTTP, creds, region)
+	snapshotIDs, err := c.getSnapshotIDs(config, client)
+	if err != nil {
+		return fmt.Errorf("failed to get snapshot IDs: %w", err)
+	}
+
 	requestID, err := client.DeregisterImage(imageID)
 	if err != nil {
 		return fmt.Errorf("failed to deregister image: %w", err)
 	}
 
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "aws.ec2.image.deregistered", []any{DeregisterImageOutput{
-		RequestID:    requestID,
-		ImageID:      imageID,
-		Region:       region,
-		Deregistered: true,
-	}})
+	for _, snapshotID := range snapshotIDs {
+		if _, err := client.DeleteSnapshot(snapshotID); err != nil {
+			return fmt.Errorf("failed to delete snapshot: %w", err)
+		}
+	}
+
+	output := map[string]any{
+		"requestId": requestID,
+		"image": map[string]any{
+			"imageId": imageID,
+		},
+	}
+
+	if len(snapshotIDs) > 0 {
+		output["deletedSnapshots"] = snapshotIDs
+	}
+
+	return ctx.ExecutionState.Emit(
+		core.DefaultOutputChannel.Name,
+		"aws.ec2.image.deregistered",
+		[]any{output},
+	)
+}
+
+func (c *DeregisterImage) getSnapshotIDs(config DeregisterImageConfiguration, client *Client) ([]string, error) {
+	//
+	// If deleting the snapshot is not enabled,
+	// nothing to do here.
+	//
+	if !config.DeleteSnapshots {
+		return nil, nil
+	}
+
+	//
+	// Otherwise, we need to describe the image to get the snapshot IDs.
+	//
+	image, err := client.DescribeImage(config.ImageID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe image: %w", err)
+	}
+
+	snapshotIDs := make([]string, 0)
+	for _, mapping := range image.BlockDeviceMappings {
+		if mapping.Ebs.SnapshotID != "" {
+			snapshotIDs = append(snapshotIDs, mapping.Ebs.SnapshotID)
+		}
+	}
+
+	return snapshotIDs, nil
 }
 
 func (c *DeregisterImage) Actions() []core.Action {

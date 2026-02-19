@@ -3,7 +3,6 @@ package ec2
 import (
 	"fmt"
 	"strings"
-	"time"
 )
 
 func requireRegion(value string) (string, error) {
@@ -22,18 +21,4 @@ func requireImageID(value string) (string, error) {
 	}
 
 	return imageID, nil
-}
-
-func requireDeprecateAt(value string) (string, error) {
-	deprecateAt := strings.TrimSpace(value)
-	if deprecateAt == "" {
-		return "", fmt.Errorf("deprecateAt is required")
-	}
-
-	parsed, err := time.Parse(time.RFC3339, deprecateAt)
-	if err != nil {
-		return "", fmt.Errorf("deprecateAt must be a valid RFC3339 timestamp")
-	}
-
-	return parsed.UTC().Format(time.RFC3339), nil
 }

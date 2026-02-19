@@ -41,11 +41,13 @@ func Test__DisableImageDeprecation__Execute(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, execState.Payloads, 1)
-	assert.Equal(t, "aws.ec2.image.deprecation.disabled", execState.Type)
+	assert.Equal(t, "aws.ec2.image.deprecationDisabled", execState.Type)
 
 	payload := execState.Payloads[0].(map[string]any)["data"]
-	output, ok := payload.(DisableImageDeprecationOutput)
+	output, ok := payload.(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "ami-123", output.ImageID)
-	assert.False(t, output.DeprecationEnabled)
+	image, ok := output["image"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "ami-123", image["imageId"])
+	assert.Equal(t, "req-disable-deprecation", output["requestId"])
 }

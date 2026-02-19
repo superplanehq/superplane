@@ -3,6 +3,7 @@ package ec2
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -17,14 +18,6 @@ type EnableImageDeprecationConfiguration struct {
 	Region      string `json:"region" mapstructure:"region"`
 	ImageID     string `json:"imageId" mapstructure:"imageId"`
 	DeprecateAt string `json:"deprecateAt" mapstructure:"deprecateAt"`
-}
-
-type EnableImageDeprecationResult struct {
-	RequestID          string `json:"requestId" mapstructure:"requestId"`
-	ImageID            string `json:"imageId" mapstructure:"imageId"`
-	Region             string `json:"region" mapstructure:"region"`
-	DeprecateAt        string `json:"deprecateAt" mapstructure:"deprecateAt"`
-	DeprecationEnabled bool   `json:"deprecationEnabled" mapstructure:"deprecationEnabled"`
 }
 
 func (c *EnableImageDeprecation) Name() string {
@@ -128,11 +121,13 @@ func (c *EnableImageDeprecation) Setup(ctx core.SetupContext) error {
 	if _, err := requireRegion(config.Region); err != nil {
 		return err
 	}
+
 	if _, err := requireImageID(config.ImageID); err != nil {
 		return err
 	}
-	if _, err := requireDeprecateAt(config.DeprecateAt); err != nil {
-		return err
+
+	if config.DeprecateAt == "" {
+		return fmt.Errorf("deprecateAt is required")
 	}
 
 	return nil
@@ -152,13 +147,15 @@ func (c *EnableImageDeprecation) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
+
 	imageID, err := requireImageID(config.ImageID)
 	if err != nil {
 		return err
 	}
-	deprecateAt, err := requireDeprecateAt(config.DeprecateAt)
+
+	deprecateAt, err := time.Parse(time.RFC3339, config.DeprecateAt)
 	if err != nil {
-		return err
+		return fmt.Errorf("deprecateAt must be a valid RFC3339 timestamp: %w", err)
 	}
 
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
@@ -167,18 +164,18 @@ func (c *EnableImageDeprecation) Execute(ctx core.ExecutionContext) error {
 	}
 
 	client := NewClient(ctx.HTTP, creds, region)
-	output, err := client.EnableImageDeprecation(imageID, deprecateAt)
+	output, err := client.EnableImageDeprecation(imageID, deprecateAt.Format(time.RFC3339))
 	if err != nil {
 		return fmt.Errorf("failed to enable image deprecation: %w", err)
 	}
 
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "aws.ec2.image.deprecation.enabled", []any{
-		EnableImageDeprecationResult{
-			RequestID:          output.RequestID,
-			ImageID:            output.ImageID,
-			Region:             output.Region,
-			DeprecateAt:        output.DeprecateAt,
-			DeprecationEnabled: true,
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "aws.ec2.image.deprecationEnabled", []any{
+		map[string]any{
+			"requestId":   output.RequestID,
+			"deprecateAt": output.DeprecateAt,
+			"image": map[string]any{
+				"imageId": output.ImageID,
+			},
 		},
 	})
 }

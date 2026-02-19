@@ -79,11 +79,33 @@ func Test__GetImage__Execute(t *testing.T) {
 							<imagesSet>
 								<item>
 									<imageId>ami-123</imageId>
+									<imageLocation>768979069867/lucaspin-testing-2026-02-19-2</imageLocation>
+									<isPublic>false</isPublic>
 									<name>my-ami</name>
 									<description>test image</description>
 									<imageState>available</imageState>
 									<creationDate>2026-02-18T12:00:00.000Z</creationDate>
 									<ownerId>123456789012</ownerId>
+									<platformDetails>Linux/UNIX</platformDetails>
+									<usageOperation>RunInstances</usageOperation>
+									<blockDeviceMapping>
+										<item>
+											<deviceName>/dev/xvda</deviceName>
+											<ebs>
+												<deleteOnTermination>true</deleteOnTermination>
+												<iops>3000</iops>
+												<snapshotId>snap-0db876b6075875953</snapshotId>
+												<volumeSize>8</volumeSize>
+												<volumeType>gp3</volumeType>
+												<throughput>125</throughput>
+												<encrypted>false</encrypted>
+											</ebs>
+										</item>
+									</blockDeviceMapping>
+									<enaSupport>true</enaSupport>
+									<sriovNetSupport>simple</sriovNetSupport>
+									<bootMode>uefi-preferred</bootMode>
+									<imdsSupport>v2.0</imdsSupport>
 									<architecture>x86_64</architecture>
 									<imageType>machine</imageType>
 									<rootDeviceType>ebs</rootDeviceType>
@@ -125,7 +147,24 @@ func Test__GetImage__Execute(t *testing.T) {
 		assert.Equal(t, "ami-123", image.ImageID)
 		assert.Equal(t, "my-ami", image.Name)
 		assert.Equal(t, "available", image.State)
-		assert.Equal(t, "us-east-1", image.Region)
+		assert.Equal(t, "123456789012", image.OwnerID)
+		assert.Equal(t, "768979069867/lucaspin-testing-2026-02-19-2", image.ImageLocation)
+		assert.False(t, image.Public)
+		assert.Equal(t, "Linux/UNIX", image.PlatformDetails)
+		assert.Equal(t, "RunInstances", image.UsageOperation)
+		assert.True(t, image.EnaSupport)
+		assert.Equal(t, "simple", image.SriovNetSupport)
+		assert.Equal(t, "uefi-preferred", image.BootMode)
+		assert.Equal(t, "v2.0", image.ImdsSupport)
+		require.Len(t, image.BlockDeviceMappings, 1)
+		assert.Equal(t, "/dev/xvda", image.BlockDeviceMappings[0].DeviceName)
+		assert.Equal(t, "snap-0db876b6075875953", image.BlockDeviceMappings[0].Ebs.SnapshotID)
+		assert.Equal(t, 3000, image.BlockDeviceMappings[0].Ebs.Iops)
+		assert.Equal(t, 8, image.BlockDeviceMappings[0].Ebs.VolumeSize)
+		assert.Equal(t, "gp3", image.BlockDeviceMappings[0].Ebs.VolumeType)
+		assert.Equal(t, 125, image.BlockDeviceMappings[0].Ebs.Throughput)
+		assert.True(t, image.BlockDeviceMappings[0].Ebs.DeleteOnTermination)
+		assert.False(t, image.BlockDeviceMappings[0].Ebs.Encrypted)
 
 		require.Len(t, httpContext.Requests, 1)
 		assert.Equal(t, "https://ec2.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())
@@ -134,5 +173,53 @@ func Test__GetImage__Execute(t *testing.T) {
 		requestBody := string(bodyBytes)
 		assert.Contains(t, requestBody, "Action=DescribeImages")
 		assert.Contains(t, requestBody, "ImageId.1=ami-123")
+	})
+
+	t.Run("ownerId missing -> infers owner from image location", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<DescribeImagesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+							<requestId>req-123</requestId>
+							<imagesSet>
+								<item>
+									<imageId>ami-123</imageId>
+									<imageLocation>768979069867/lucaspin-testing-2026-02-19-2</imageLocation>
+									<imageState>available</imageState>
+								</item>
+							</imagesSet>
+						</DescribeImagesResponse>
+					`)),
+				},
+			},
+		}
+
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":  "us-east-1",
+				"imageId": "ami-123",
+			},
+			HTTP:           httpContext,
+			ExecutionState: execState,
+			Integration: &contexts.IntegrationContext{
+				Secrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, execState.Payloads, 1)
+		payload := execState.Payloads[0].(map[string]any)["data"]
+		output, ok := payload.(map[string]any)
+		require.True(t, ok)
+		image, ok := output["image"].(*Image)
+		require.True(t, ok)
+		assert.Equal(t, "768979069867", image.OwnerID)
 	})
 }

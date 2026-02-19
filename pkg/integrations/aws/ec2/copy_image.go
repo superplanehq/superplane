@@ -48,6 +48,7 @@ type CopyImageExecutionMetadata struct {
 	SourceImageID string `json:"sourceImageId" mapstructure:"sourceImageId"`
 	SourceRegion  string `json:"sourceRegion" mapstructure:"sourceRegion"`
 	State         string `json:"state" mapstructure:"state"`
+	RequestID     string `json:"requestId" mapstructure:"requestId"`
 }
 
 func (c *CopyImage) Name() string {
@@ -317,6 +318,7 @@ func (c *CopyImage) Execute(ctx core.ExecutionContext) error {
 		Name:          name,
 		Description:   description,
 	})
+
 	if err != nil {
 		return fmt.Errorf("failed to copy image: %w", err)
 	}
@@ -326,7 +328,9 @@ func (c *CopyImage) Execute(ctx core.ExecutionContext) error {
 		SourceImageID: config.SourceImageID,
 		SourceRegion:  config.SourceRegion,
 		State:         output.State,
+		RequestID:     output.RequestID,
 	})
+
 	if err != nil {
 		return fmt.Errorf("failed to set execution metadata: %w", err)
 	}
@@ -398,7 +402,8 @@ func (c *CopyImage) OnIntegrationMessage(ctx core.IntegrationMessageContext) err
 		core.DefaultOutputChannel.Name,
 		"aws.ec2.image",
 		[]any{map[string]any{
-			"image": image,
+			"requestId": executionMetadata.RequestID,
+			"image":     image,
 		}},
 	)
 }

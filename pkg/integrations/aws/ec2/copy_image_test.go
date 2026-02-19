@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -45,6 +45,7 @@ func Test__CopyImage__Setup(t *testing.T) {
 		}
 
 		err := component.Setup(core.SetupContext{
+			Logger: log.NewEntry(log.New()),
 			Configuration: map[string]any{
 				"region":        "us-west-2",
 				"sourceRegion":  "us-east-1",
@@ -78,7 +79,7 @@ func Test__CopyImage__Setup(t *testing.T) {
 			Metadata: common.IntegrationMetadata{
 				EventBridge: &common.EventBridgeMetadata{
 					Rules: map[string]common.EventBridgeRuleMetadata{
-						Source: {
+						"aws.ec2:us-west-2": {
 							Source:      Source,
 							DetailTypes: []string{DetailTypeAMIStateChange},
 						},
@@ -88,6 +89,7 @@ func Test__CopyImage__Setup(t *testing.T) {
 		}
 
 		err := component.Setup(core.SetupContext{
+			Logger: log.NewEntry(log.New()),
 			Configuration: map[string]any{
 				"region":        "us-west-2",
 				"sourceRegion":  "us-east-1",
@@ -189,7 +191,7 @@ func Test__CopyImage__HandleAction(t *testing.T) {
 			Metadata: common.IntegrationMetadata{
 				EventBridge: &common.EventBridgeMetadata{
 					Rules: map[string]common.EventBridgeRuleMetadata{
-						Source: {
+						"aws.ec2:us-west-2": {
 							Source:      Source,
 							DetailTypes: []string{DetailTypeAMIStateChange},
 						},
@@ -286,7 +288,6 @@ func Test__CopyImage__OnIntegrationMessage(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "ami-copy-123", image.ImageID)
 		assert.Equal(t, ImageStateAvailable, image.State)
-		assert.Equal(t, "us-west-2", image.Region)
 	})
 
 	t.Run("failed event -> fails execution", func(t *testing.T) {

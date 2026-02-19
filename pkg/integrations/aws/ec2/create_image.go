@@ -27,7 +27,7 @@ type CreateImageConfiguration struct {
 	InstanceID  string `json:"instanceId" mapstructure:"instanceId"`
 	Name        string `json:"name" mapstructure:"name"`
 	Description string `json:"description" mapstructure:"description"`
-	Reboot      bool   `json:"reboot" mapstructure:"reboot"`
+	NoReboot    bool   `json:"noReboot" mapstructure:"noReboot"`
 }
 
 type CreateImageNodeMetadata struct {
@@ -144,12 +144,12 @@ func (c *CreateImage) Configuration() []configuration.Field {
 			Placeholder: "Optional image description",
 		},
 		{
-			Name:        "reboot",
-			Label:       "Reboot",
+			Name:        "noReboot",
+			Label:       "No Reboot",
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
 			Default:     false,
-			Description: "Create the AMI after rebooting the instance",
+			Description: "Do not reboot instance before creating the image",
 		},
 	}
 }
@@ -240,7 +240,7 @@ func (c *CreateImage) Execute(ctx core.ExecutionContext) error {
 		InstanceID:  config.InstanceID,
 		Name:        config.Name,
 		Description: config.Description,
-		NoReboot:    !config.Reboot,
+		NoReboot:    config.NoReboot,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create image: %w", err)

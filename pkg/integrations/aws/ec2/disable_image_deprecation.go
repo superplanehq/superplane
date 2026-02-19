@@ -18,13 +18,6 @@ type DisableImageDeprecationConfiguration struct {
 	ImageID string `json:"imageId" mapstructure:"imageId"`
 }
 
-type DisableImageDeprecationOutput struct {
-	RequestID          string `json:"requestId" mapstructure:"requestId"`
-	ImageID            string `json:"imageId" mapstructure:"imageId"`
-	Region             string `json:"region" mapstructure:"region"`
-	DeprecationEnabled bool   `json:"deprecationEnabled" mapstructure:"deprecationEnabled"`
-}
-
 func (c *DisableImageDeprecation) Name() string {
 	return "aws.ec2.disableImageDeprecation"
 }
@@ -154,12 +147,12 @@ func (c *DisableImageDeprecation) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to disable image deprecation: %w", err)
 	}
 
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "aws.ec2.image.deprecation.disabled", []any{
-		DisableImageDeprecationOutput{
-			RequestID:          requestID,
-			ImageID:            imageID,
-			Region:             region,
-			DeprecationEnabled: false,
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "aws.ec2.image.deprecationDisabled", []any{
+		map[string]any{
+			"requestId": requestID,
+			"image": map[string]any{
+				"imageId": imageID,
+			},
 		},
 	})
 }

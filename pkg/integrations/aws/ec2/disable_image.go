@@ -18,13 +18,6 @@ type DisableImageConfiguration struct {
 	ImageID string `json:"imageId" mapstructure:"imageId"`
 }
 
-type DisableImageOutput struct {
-	RequestID string `json:"requestId" mapstructure:"requestId"`
-	ImageID   string `json:"imageId" mapstructure:"imageId"`
-	Region    string `json:"region" mapstructure:"region"`
-	Disabled  bool   `json:"disabled" mapstructure:"disabled"`
-}
-
 func (c *DisableImage) Name() string {
 	return "aws.ec2.disableImage"
 }
@@ -154,11 +147,11 @@ func (c *DisableImage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to disable image: %w", err)
 	}
 
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "aws.ec2.image.disabled", []any{DisableImageOutput{
-		RequestID: requestID,
-		ImageID:   imageID,
-		Region:    region,
-		Disabled:  true,
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "aws.ec2.image.disabled", []any{map[string]any{
+		"requestId": requestID,
+		"image": map[string]any{
+			"imageId": imageID,
+		},
 	}})
 }
 

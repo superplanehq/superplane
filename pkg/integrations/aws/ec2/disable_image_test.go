@@ -44,8 +44,9 @@ func Test__DisableImage__Execute(t *testing.T) {
 	assert.Equal(t, "aws.ec2.image.disabled", execState.Type)
 
 	payload := execState.Payloads[0].(map[string]any)["data"]
-	output, ok := payload.(DisableImageOutput)
+	output, ok := payload.(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "ami-123", output.ImageID)
-	assert.True(t, output.Disabled)
+	image, ok := output["image"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "ami-123", image["imageId"])
 }
