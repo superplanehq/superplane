@@ -4,116 +4,23 @@ title: "ServiceNow"
 
 Manage and react to incidents in ServiceNow
 
-## Triggers
-
-<CardGrid>
-  <LinkCard title="On Incident" href="#on-incident" description="Listen to incident events from ServiceNow" />
-</CardGrid>
-
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
 
 <CardGrid>
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in ServiceNow" />
+  <LinkCard title="Get Incidents" href="#get-incidents" description="Query ServiceNow for incidents matching the specified filters" />
 </CardGrid>
 
 ## Instructions
 
-Requires a ServiceNow instance with API access. The following roles are needed on your ServiceNow instance:
+Requires a ServiceNow instance with OAuth API access. The following roles are needed on your ServiceNow instance:
 
-**Integration account** (for Basic Auth or OAuth):
+**Integration account** (for OAuth):
 - **itil** — read/write access to the Incident table
 
 Optionally, enable **Web Service Access Only** on the integration account to restrict it to API-only use.
-
-**On Incident trigger**: Setting up the Business Rule on ServiceNow requires the **admin** role. This is a one-time setup.
-
-<a id="on-incident"></a>
-
-## On Incident
-
-The On Incident trigger starts a workflow execution when ServiceNow incident events are received via webhook.
-
-### Use Cases
-
-- **Incident automation**: Automate responses when incidents are created or updated
-- **Notification workflows**: Send notifications when new incidents are created
-- **Integration workflows**: Sync incidents with external systems
-- **Escalation handling**: Handle incident updates automatically
-
-### Configuration
-
-- **Events**: Select which incident events to listen for (insert, update, delete)
-
-### Scoping
-
-Incident scoping (e.g. filtering by assignment group, category, or priority) is configured in the ServiceNow Business Rule conditions. This allows control over which incidents trigger the webhook.
-
-### Required Permissions
-
-Creating the Business Rule in ServiceNow requires the **admin** role. This is a one-time setup step.
-
-### Business Rule Setup
-
-This trigger provides a webhook URL and a ready-to-use Business Rule script:
-
-1. In ServiceNow, navigate to **System Definition > Business Rules** and create a new rule
-2. Set the table to `incident`, set **When** to **after**, and check **insert**, **update**, and/or **delete** as needed
-3. Check **Advanced** and paste the generated script into the **Script** field
-4. The script uses `sn_ws.RESTMessageV2` to send incident data to the webhook URL with the secret for authentication
-
-### Event Data
-
-Each incident event includes the full incident record from ServiceNow, including:
-- **sys_id**: Unique identifier
-- **number**: Human-readable incident number
-- **short_description**: Brief summary
-- **state**: Current state
-- **urgency**: Urgency level
-- **impact**: Impact level
-- **assignment_group**: Assigned group
-- **assigned_to**: Assigned user
-
-### Example Data
-
-```json
-{
-  "data": {
-    "assigned_to": {
-      "display_value": "John Smith",
-      "value": "681ccaf9c0a8016400b98a06818d57c7"
-    },
-    "assignment_group": {
-      "display_value": "Network",
-      "value": "d625dccec0a8016700a222a0f7900d06"
-    },
-    "caller_id": {
-      "display_value": "Jane Doe",
-      "value": "6816f79cc0a8016401c5a33be04be441"
-    },
-    "category": "Network",
-    "description": "The production web server is not responding to requests.",
-    "impact": "2",
-    "number": "INC0010001",
-    "opened_at": "2026-01-19 12:00:00",
-    "opened_by": {
-      "display_value": "Jane Doe",
-      "value": "6816f79cc0a8016401c5a33be04be441"
-    },
-    "priority": "3",
-    "short_description": "Server is unresponsive",
-    "state": "1",
-    "subcategory": "DNS",
-    "sys_created_on": "2026-01-19 12:00:00",
-    "sys_id": "a1b2c3d4e5f6g7h8i9j0",
-    "sys_updated_on": "2026-01-19 12:00:00",
-    "urgency": "2"
-  },
-  "timestamp": "2026-01-19T12:00:00Z",
-  "type": "servicenow.incident.insert"
-}
-```
 
 <a id="create-incident"></a>
 
@@ -159,40 +66,123 @@ Returns the created incident object from the ServiceNow Table API, including:
 ```json
 {
   "data": {
-    "result": {
-      "assigned_to": {
-        "link": "https://dev12345.service-now.com/api/now/table/sys_user/681ccaf9c0a8016400b98a06818d57c7",
-        "value": "681ccaf9c0a8016400b98a06818d57c7"
-      },
-      "assignment_group": {
-        "link": "https://dev12345.service-now.com/api/now/table/sys_user_group/d625dccec0a8016700a222a0f7900d06",
-        "value": "d625dccec0a8016700a222a0f7900d06"
-      },
-      "caller_id": {
-        "link": "https://dev12345.service-now.com/api/now/table/sys_user/6816f79cc0a8016401c5a33be04be441",
-        "value": "6816f79cc0a8016401c5a33be04be441"
-      },
-      "category": "Network",
-      "description": "The production web server is not responding to requests.",
-      "impact": "2",
-      "number": "INC0010001",
-      "opened_at": "2026-01-19 12:00:00",
-      "opened_by": {
-        "link": "https://dev12345.service-now.com/api/now/table/sys_user/6816f79cc0a8016401c5a33be04be441",
-        "value": "6816f79cc0a8016401c5a33be04be441"
-      },
-      "priority": "3",
-      "short_description": "Server is unresponsive",
-      "state": "1",
-      "subcategory": "DNS",
-      "sys_created_on": "2026-01-19 12:00:00",
-      "sys_id": "a1b2c3d4e5f6g7h8i9j0",
-      "sys_updated_on": "2026-01-19 12:00:00",
-      "urgency": "2"
-    }
+    "assigned_to": {
+      "link": "https://dev12345.service-now.com/api/now/table/sys_user/681ccaf9c0a8016400b98a06818d57c7",
+      "value": "681ccaf9c0a8016400b98a06818d57c7"
+    },
+    "assignment_group": {
+      "link": "https://dev12345.service-now.com/api/now/table/sys_user_group/d625dccec0a8016700a222a0f7900d06",
+      "value": "d625dccec0a8016700a222a0f7900d06"
+    },
+    "caller_id": {
+      "link": "https://dev12345.service-now.com/api/now/table/sys_user/6816f79cc0a8016401c5a33be04be441",
+      "value": "6816f79cc0a8016401c5a33be04be441"
+    },
+    "category": "Network",
+    "description": "The production web server is not responding to requests.",
+    "impact": "2",
+    "number": "INC0010001",
+    "opened_at": "2026-01-19 12:00:00",
+    "opened_by": {
+      "link": "https://dev12345.service-now.com/api/now/table/sys_user/6816f79cc0a8016401c5a33be04be441",
+      "value": "6816f79cc0a8016401c5a33be04be441"
+    },
+    "priority": "3",
+    "short_description": "Server is unresponsive",
+    "state": "1",
+    "subcategory": "DNS",
+    "sys_created_on": "2026-01-19 12:00:00",
+    "sys_id": "a1b2c3d4e5f6g7h8i9j0",
+    "sys_updated_on": "2026-01-19 12:00:00",
+    "urgency": "2"
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "servicenow.incident"
+}
+```
+
+<a id="get-incidents"></a>
+
+## Get Incidents
+
+The Get Incidents component queries ServiceNow for incidents and routes execution based on urgency levels.
+
+### Use Cases
+
+- **Health checks**: Check for active incidents and route based on severity
+- **Incident monitoring**: Monitor incident status across assignment groups
+- **Automated response**: Trigger workflows based on incident presence
+- **Reporting**: Collect incident data for reporting or analysis
+
+### Configuration
+
+All filters are optional. Leave empty to query all incidents.
+
+- **Assignment Group**: Filter by assignment group
+- **Assigned To**: Filter by assigned user
+- **Caller**: Filter by caller
+- **Category**: Filter by category
+- **Subcategory**: Filter by subcategory (depends on category)
+- **Service**: Filter by business service
+- **State**: Filter by incident state (supports expressions for comma-separated values)
+- **Urgency**: Filter by urgency level (supports expressions for comma-separated values)
+- **Impact**: Filter by impact level (supports expressions for comma-separated values)
+- **Priority**: Filter by priority level (supports expressions for comma-separated values)
+- **Limit**: Maximum number of incidents to return (default 10)
+
+### Output Channels
+
+- **Clear**: No incidents matched the filters
+- **Low**: Incidents found, but none are high urgency
+- **High**: At least one high-urgency incident found
+
+### Output
+
+Returns a list of incidents with:
+- **sys_id**: Unique identifier
+- **number**: Human-readable incident number
+- **short_description**: Incident summary
+- **state**: Current state
+- **urgency**: Urgency level
+- **impact**: Impact level
+
+### Example Output
+
+```json
+{
+  "data": {
+    "incidents": [
+      {
+        "category": "Network",
+        "impact": "2",
+        "number": "INC0010001",
+        "priority": "2",
+        "short_description": "Server is unresponsive",
+        "state": "1",
+        "subcategory": "DNS",
+        "sys_created_on": "2026-01-19 12:00:00",
+        "sys_id": "a1b2c3d4e5f6g7h8i9j0",
+        "sys_updated_on": "2026-01-19 12:00:00",
+        "urgency": "1"
+      },
+      {
+        "category": "Software",
+        "impact": "2",
+        "number": "INC0010002",
+        "priority": "3",
+        "short_description": "Email service degraded",
+        "state": "2",
+        "subcategory": "Email",
+        "sys_created_on": "2026-01-19 14:30:00",
+        "sys_id": "b2c3d4e5f6g7h8i9j0k1",
+        "sys_updated_on": "2026-01-19 15:00:00",
+        "urgency": "2"
+      }
+    ],
+    "total": 2
+  },
+  "timestamp": "2026-01-19T15:30:00Z",
+  "type": "servicenow.incidents.list"
 }
 ```
 

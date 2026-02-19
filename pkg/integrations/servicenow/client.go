@@ -2,7 +2,6 @@ package servicenow
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,10 +13,7 @@ import (
 )
 
 type Client struct {
-	AuthType    string
 	InstanceURL string
-	Username    string
-	Password    string
 	Token       string
 	http        core.HTTPContext
 }
@@ -25,70 +21,35 @@ type Client struct {
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
 	instanceURL, err := ctx.GetConfig("instanceUrl")
 	if err != nil {
-		return nil, fmt.Errorf("error getting instanceUrl: %v", err)
+		return nil, fmt.Errorf("error getting instanceUrl: %w", err)
 	}
 
-	authType, err := ctx.GetConfig("authType")
+	secrets, err := ctx.GetSecrets()
 	if err != nil {
-		return nil, fmt.Errorf("error getting authType: %v", err)
+		return nil, fmt.Errorf("failed to get secrets: %w", err)
 	}
 
-	switch string(authType) {
-	case AuthTypeBasicAuth:
-		username, err := ctx.GetConfig("username")
-		if err != nil {
-			return nil, fmt.Errorf("error getting username: %v", err)
+	var accessToken string
+	for _, secret := range secrets {
+		if secret.Name == OAuthAccessToken {
+			accessToken = string(secret.Value)
+			break
 		}
-
-		password, err := ctx.GetConfig("password")
-		if err != nil {
-			return nil, fmt.Errorf("error getting password: %v", err)
-		}
-
-		return &Client{
-			AuthType:    AuthTypeBasicAuth,
-			InstanceURL: string(instanceURL),
-			Username:    string(username),
-			Password:    string(password),
-			http:        http,
-		}, nil
-
-	case AuthTypeOAuth:
-		secrets, err := ctx.GetSecrets()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get secrets: %v", err)
-		}
-
-		var accessToken string
-		for _, secret := range secrets {
-			if secret.Name == OAuthAccessToken {
-				accessToken = string(secret.Value)
-				break
-			}
-		}
-
-		if accessToken == "" {
-			return nil, fmt.Errorf("OAuth access token not found")
-		}
-
-		return &Client{
-			AuthType:    AuthTypeOAuth,
-			InstanceURL: string(instanceURL),
-			Token:       accessToken,
-			http:        http,
-		}, nil
 	}
 
-	return nil, fmt.Errorf("unknown auth type %s", authType)
+	if accessToken == "" {
+		return nil, fmt.Errorf("OAuth access token not found")
+	}
+
+	return &Client{
+		InstanceURL: string(instanceURL),
+		Token:       accessToken,
+		http:        http,
+	}, nil
 }
 
 func (c *Client) authHeader() string {
-	if c.AuthType == AuthTypeOAuth {
-		return fmt.Sprintf("Bearer %s", c.Token)
-	}
-
-	credentials := fmt.Sprintf("%s:%s", c.Username, c.Password)
-	return "Basic " + base64.StdEncoding.EncodeToString([]byte(credentials))
+	return fmt.Sprintf("Bearer %s", c.Token)
 }
 
 func (c *Client) execRequest(method, path string, body io.Reader) ([]byte, error) {
@@ -96,7 +57,7 @@ func (c *Client) execRequest(method, path string, body io.Reader) ([]byte, error
 
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
+		return nil, fmt.Errorf("error building request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -105,13 +66,13 @@ func (c *Client) execRequest(method, path string, body io.Reader) ([]byte, error
 
 	res, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
+		return nil, fmt.Errorf("error executing request: %w", err)
 	}
 	defer res.Body.Close()
 
 	responseBody, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
+		return nil, fmt.Errorf("error reading body: %w", err)
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
@@ -140,7 +101,7 @@ type CreateIncidentParams struct {
 func (c *Client) CreateIncident(params CreateIncidentParams) (map[string]any, error) {
 	body, err := json.Marshal(params)
 	if err != nil {
-		return nil, fmt.Errorf("error marshaling request: %v", err)
+		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
 
 	responseBody, err := c.execRequest(http.MethodPost, "/api/now/table/incident", bytes.NewReader(body))
@@ -148,29 +109,42 @@ func (c *Client) CreateIncident(params CreateIncidentParams) (map[string]any, er
 		return nil, err
 	}
 
-	var response map[string]any
+	var response struct {
+		Result map[string]any `json:"result"`
+	}
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
+		return nil, fmt.Errorf("error parsing response: %w", err)
 	}
 
-	return response, nil
+	return response.Result, nil
 }
 
-func (c *Client) GetIncident(sysID string) (map[string]any, error) {
-	path := fmt.Sprintf("/api/now/table/incident/%s", sysID)
+func (c *Client) GetIncidents(query string, limit int) ([]IncidentRecord, error) {
+	params := url.Values{}
+	if query != "" {
+		params.Set("sysparm_query", query)
+	}
+	if limit > 0 {
+		params.Set("sysparm_limit", fmt.Sprintf("%d", limit))
+	}
+	params.Set("sysparm_fields", "sys_id,number,short_description,state,urgency,impact,priority,category,subcategory,sys_created_on,sys_updated_on")
+
+	path := fmt.Sprintf("/api/now/table/incident?%s", params.Encode())
 	responseBody, err := c.execRequest(http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var response map[string]any
+	var response struct {
+		Result []IncidentRecord `json:"result"`
+	}
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
+		return nil, fmt.Errorf("error parsing response: %w", err)
 	}
 
-	return response, nil
+	return response.Result, nil
 }
 
 func (c *Client) ValidateConnection() error {
@@ -191,7 +165,7 @@ func (c *Client) GetUser(sysID string) (*UserRecord, error) {
 
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
+		return nil, fmt.Errorf("error parsing response: %w", err)
 	}
 
 	return &response.Result, nil
@@ -210,7 +184,7 @@ func (c *Client) GetAssignmentGroup(sysID string) (*AssignmentGroupRecord, error
 
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
+		return nil, fmt.Errorf("error parsing response: %w", err)
 	}
 
 	return &response.Result, nil
@@ -235,15 +209,15 @@ func (c *Client) ListUsers() ([]UserRecord, error) {
 
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
+		return nil, fmt.Errorf("error parsing response: %w", err)
 	}
 
 	return response.Result, nil
 }
 
 type AssignmentGroupRecord struct {
-	SysID string `json:"sys_id"`
-	Name  string `json:"name"`
+	SysID string `json:"sys_id" mapstructure:"sys_id"`
+	Name  string `json:"name" mapstructure:"name"`
 }
 
 func (c *Client) ListGroupMembers(groupSysID string) ([]UserRecord, error) {
@@ -263,7 +237,7 @@ func (c *Client) ListGroupMembers(groupSysID string) ([]UserRecord, error) {
 
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
+		return nil, fmt.Errorf("error parsing response: %w", err)
 	}
 
 	if len(response.Result) == 0 {
@@ -294,7 +268,7 @@ func (c *Client) ListGroupMembers(groupSysID string) ([]UserRecord, error) {
 
 	err = json.Unmarshal(usersBody, &usersResponse)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing users response: %v", err)
+		return nil, fmt.Errorf("error parsing users response: %w", err)
 	}
 
 	return usersResponse.Result, nil
@@ -313,7 +287,7 @@ func (c *Client) ListAssignmentGroups() ([]AssignmentGroupRecord, error) {
 
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
+		return nil, fmt.Errorf("error parsing response: %w", err)
 	}
 
 	return response.Result, nil
@@ -337,7 +311,7 @@ func (c *Client) ListCategories() ([]ChoiceRecord, error) {
 
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
+		return nil, fmt.Errorf("error parsing response: %w", err)
 	}
 
 	return response.Result, nil
@@ -361,7 +335,31 @@ func (c *Client) ListSubcategories(category string) ([]ChoiceRecord, error) {
 
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
+		return nil, fmt.Errorf("error parsing response: %w", err)
+	}
+
+	return response.Result, nil
+}
+
+type ServiceRecord struct {
+	SysID string `json:"sys_id"`
+	Name  string `json:"name"`
+}
+
+func (c *Client) ListServices() ([]ServiceRecord, error) {
+	path := "/api/now/table/cmdb_ci_service?sysparm_query=active=true&sysparm_fields=sys_id,name&sysparm_limit=200"
+	responseBody, err := c.execRequest(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Result []ServiceRecord `json:"result"`
+	}
+
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %w", err)
 	}
 
 	return response.Result, nil
