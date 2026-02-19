@@ -126,6 +126,11 @@ import {
   eventStateRegistry as cursorEventStateRegistry,
 } from "./cursor/index";
 import {
+  componentMappers as statuspageComponentMappers,
+  triggerRenderers as statuspageTriggerRenderers,
+  eventStateRegistry as statuspageEventStateRegistry,
+} from "./statuspage";
+import {
   componentMappers as dockerhubComponentMappers,
   customFieldRenderers as dockerhubCustomFieldRenderers,
   triggerRenderers as dockerhubTriggerRenderers,
@@ -185,6 +190,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
   hetzner: hetznerComponentMappers,
+  statuspage: statuspageComponentMappers,
   dockerhub: dockerhubComponentMappers,
 };
 
@@ -211,6 +217,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   bitbucket: bitbucketTriggerRenderers,
   prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
+  statuspage: statuspageTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
 };
 
@@ -231,6 +238,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
+  statuspage: statuspageEventStateRegistry,
   aws: awsEventStateRegistry,
   grafana: grafanaEventStateRegistry,
   prometheus: prometheusEventStateRegistry,
