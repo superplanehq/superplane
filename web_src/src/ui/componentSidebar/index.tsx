@@ -294,7 +294,6 @@ export const ComponentSidebar = ({
     }
     return `/${domainId}/settings/integrations`;
   }, [domainId, integrationRef?.id, integrations, selectedIntegrationForDialog?.name]);
-
   const handleCopyNodeId = useCallback(async () => {
     if (nodeId) {
       await navigator.clipboard.writeText(nodeId);

@@ -98,6 +98,12 @@ import {
   eventStateRegistry as openaiEventStateRegistry,
 } from "./openai/index";
 import {
+  componentMappers as grafanaComponentMappers,
+  customFieldRenderers as grafanaCustomFieldRenderers,
+  triggerRenderers as grafanaTriggerRenderers,
+  eventStateRegistry as grafanaEventStateRegistry,
+} from "./grafana/index";
+import {
   componentMappers as circleCIComponentMappers,
   triggerRenderers as circleCITriggerRenderers,
   eventStateRegistry as circleCIEventStateRegistry,
@@ -179,6 +185,14 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cursor: cursorComponentMappers,
   hetzner: hetznerComponentMappers,
   dockerhub: dockerhubComponentMappers,
+  grafana: grafanaComponentMappers,
+  grafana: grafanaComponentMappers,
+  circleci: circleCIComponentMappers,
+  claude: claudeComponentMappers,
+  prometheus: prometheusComponentMappers,
+  cursor: cursorComponentMappers,
+  hetzner: hetznerComponentMappers,
+  dockerhub: dockerhubComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -204,6 +218,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
+  grafana: grafanaTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -218,12 +233,21 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   smtp: smtpEventStateRegistry,
   sendgrid: sendgridEventStateRegistry,
   render: renderEventStateRegistry,
+  render: renderEventStateRegistry,
   discord: discordEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
+  circleci: circleCIEventStateRegistry,
+  claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
+  prometheus: prometheusEventStateRegistry,
+  cursor: cursorEventStateRegistry,
+  gitlab: gitlabEventStateRegistry,
+  dockerhub: dockerhubEventStateRegistry,
+  grafana: grafanaEventStateRegistry,
+  grafana: grafanaEventStateRegistry,
   prometheus: prometheusEventStateRegistry,
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
@@ -253,6 +277,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  grafana: grafanaCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
 };
