@@ -10,6 +10,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   cursor: "Cursor",
   pagerduty: "PagerDuty",
   slack: "Slack",
+  digitalocean: "DigitalOcean",
   discord: "Discord",
   datadog: "DataDog",
   cloudflare: "Cloudflare",
