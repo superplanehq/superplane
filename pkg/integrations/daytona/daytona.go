@@ -36,7 +36,7 @@ func (d *Daytona) Icon() string {
 }
 
 func (d *Daytona) Description() string {
-	return "Execute code in isolated sandbox environments"
+	return "Execute code in isolated sandbox environments."
 }
 
 func (d *Daytona) Configuration() []configuration.Field {
