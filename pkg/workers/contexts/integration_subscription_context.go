@@ -3,6 +3,7 @@ package contexts
 import (
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -70,14 +71,48 @@ func (c *IntegrationSubscriptionContext) sendMessageToComponent(message any) err
 		return fmt.Errorf("component %s is not an app component", componentName)
 	}
 
+	node := c.node
+	tx := c.tx
+	httpCtx := c.registry.HTTPContext()
+	logger := logging.WithIntegration(logging.ForNode(*c.node), *c.integration)
+
 	return integrationComponent.OnIntegrationMessage(core.IntegrationMessageContext{
-		HTTP:          c.registry.HTTPContext(),
-		Configuration: c.node.Configuration.Data(),
-		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
+		HTTP:          httpCtx,
+		Configuration: node.Configuration.Data(),
+		NodeMetadata:  NewNodeMetadataContext(tx, node),
 		Integration:   c.integrationCtx,
-		Events:        NewEventContext(c.tx, c.node),
+		Events:        NewEventContext(tx, node),
 		Message:       message,
-		Logger:        logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
+		Logger:        logger,
+
+		// FindExecutionByKV allows integration components to locate an existing
+		// execution by a key-value pair. This enables components that receive
+		// async completion events through the integration message path (e.g.,
+		// AWS EventBridge) to resolve and finish running executions, rather than
+		// only being able to create new root events via Events.Emit().
+		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
+			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
+			if err != nil {
+				if err == gorm.ErrRecordNotFound {
+					return nil, nil
+				}
+				return nil, err
+			}
+
+			return &core.ExecutionContext{
+				ID:             execution.ID,
+				WorkflowID:     execution.WorkflowID.String(),
+				NodeID:         execution.NodeID,
+				Configuration:  execution.Configuration.Data(),
+				HTTP:           httpCtx,
+				Metadata:       NewExecutionMetadataContext(tx, execution),
+				NodeMetadata:   NewNodeMetadataContext(tx, node),
+				ExecutionState: NewExecutionStateContext(tx, execution),
+				Requests:       NewExecutionRequestContext(tx, execution),
+				Logger:         logging.WithExecution(logger, execution, nil),
+				Notifications:  NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
+			}, nil
+		},
 	})
 }
 
