@@ -19,6 +19,7 @@ import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
+import digitaloceanIcon from "@/assets/icons/integrations/digitalocean.svg";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
@@ -411,6 +412,7 @@ function CategorySection({
     dash0: dash0Icon,
     datadog: datadogIcon,
     daytona: daytonaIcon,
+    digitalocean: digitaloceanIcon,
     discord: discordIcon,
     github: githubIcon,
     gitlab: gitlabIcon,
@@ -497,6 +499,7 @@ function CategorySection({
             dash0: dash0Icon,
             daytona: daytonaIcon,
             datadog: datadogIcon,
+            digitalocean: digitaloceanIcon,
             discord: discordIcon,
             github: githubIcon,
             gitlab: gitlabIcon,
