@@ -7,12 +7,10 @@ import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
-import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
-import circleciIcon from "@/assets/icons/integrations/circleci.svg";
-import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
-import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
+import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
+import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
@@ -88,12 +86,15 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   rootly: rootlyIcon,
   semaphore: SemaphoreLogo,
   slack: slackIcon,
+  smtp: smtpIcon,
   sendgrid: sendgridIcon,
   prometheus: prometheusIcon,
   render: renderIcon,
   dockerhub: dockerIcon,
   aws: {
     cloudwatch: awsCloudwatchIcon,
+    codeArtifact: awsCodeArtifactIcon,
+    ecr: awsEcrIcon,
     lambda: awsLambdaIcon,
     ec2: awsEc2Icon,
     route53: awsRoute53Icon,
@@ -127,7 +128,7 @@ export function getHeaderIconSrc(blockName: string | undefined): string | undefi
     const nested = appLogo[nameParts[1]];
     if (nested) return nested;
   }
-  // AWS has a nested map (lambda only); use main AWS icon for other aws.* components
+  // Use main AWS icon for aws.* components without a dedicated sub-icon mapping.
   if (first === "aws") return getIntegrationIconSrc("aws");
   return undefined;
 }
