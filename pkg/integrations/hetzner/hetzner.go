@@ -33,7 +33,7 @@ func (h *Hetzner) Icon() string {
 }
 
 func (h *Hetzner) Description() string {
-	return "Create and delete Hetzner Cloud servers"
+	return "Create and delete Hetzner Cloud servers and load balancers"
 }
 
 func (h *Hetzner) Instructions() string {
@@ -59,6 +59,8 @@ func (h *Hetzner) Components() []core.Component {
 	return []core.Component{
 		&CreateServer{},
 		&DeleteServer{},
+		&CreateLoadBalancer{},
+		&DeleteLoadBalancer{},
 	}
 }
 
@@ -113,6 +115,21 @@ func (h *Hetzner) ListResources(resourceType string, ctx core.ListResourcesConte
 			resources = append(resources, core.IntegrationResource{Type: "server", Name: name, ID: id})
 		}
 		return resources, nil
+	case "load_balancer":
+		loadBalancers, err := client.ListLoadBalancers()
+		if err != nil {
+			return nil, err
+		}
+		resources := make([]core.IntegrationResource, 0, len(loadBalancers))
+		for _, lb := range loadBalancers {
+			id := lb.ID
+			name := lb.Name
+			if name == "" {
+				name = id
+			}
+			resources = append(resources, core.IntegrationResource{Type: "load_balancer", Name: name, ID: id})
+		}
+		return resources, nil
 	case "server_type":
 		types, err := client.ListServerTypes()
 		if err != nil {
@@ -130,6 +147,21 @@ func (h *Hetzner) ListResources(resourceType string, ctx core.ListResourcesConte
 			}
 			resources = append(resources, core.IntegrationResource{Type: "server_type", Name: displayName, ID: id})
 		}
+		return resources, nil
+	case "load_balancer_type":
+		types, err := client.ListLoadBalancerTypes()
+		if err != nil {
+			return nil, err
+		}
+		resources := make([]core.IntegrationResource, 0, len(types))
+		for _, t := range types {
+			id := t.Name
+			if id == "" {
+				id = fmt.Sprintf("%d", t.Id)
+			}
+			resources = append(resources, core.IntegrationResource{Type: "load_balancer_type", Name: t.Name, ID: id})
+		}
+
 		return resources, nil
 	case "image":
 		images, err := client.ListImages()
@@ -179,6 +211,19 @@ func (h *Hetzner) ListResources(resourceType string, ctx core.ListResourcesConte
 			resources = append(resources, core.IntegrationResource{Type: "location", Name: displayName, ID: id})
 		}
 		return resources, nil
+	case "load_balancing_algorithm":
+		return []core.IntegrationResource{
+			{
+				Type: "load_balancing_algorithm",
+				Name: "Round Robin",
+				ID:   "round_robin",
+			},
+			{
+				Type: "load_balancing_algorithm",
+				Name: "Least connections",
+				ID:   "least_connections",
+			},
+		}, nil
 	default:
 		return nil, nil
 	}
