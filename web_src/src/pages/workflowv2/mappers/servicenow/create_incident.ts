@@ -41,7 +41,8 @@ export const createIncidentMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    return buildIncidentExecutionDetails(context.execution);
+    const nodeMetadata = context.node.metadata as BaseNodeMetadata;
+    return buildIncidentExecutionDetails(context.execution, nodeMetadata?.instanceUrl);
   },
 
   subtitle(context: SubtitleContext): string {
@@ -91,10 +92,13 @@ function getIncidentFromExecution(execution: CanvasesCanvasNodeExecution): Servi
     return null;
   }
 
-  return outputs.default[0].data?.result as ServiceNowIncident;
+  return outputs.default[0].data as ServiceNowIncident;
 }
 
-function buildIncidentExecutionDetails(execution: CanvasesCanvasNodeExecution): Record<string, any> {
+function buildIncidentExecutionDetails(
+  execution: CanvasesCanvasNodeExecution,
+  instanceUrl?: string,
+): Record<string, any> {
   const details: Record<string, any> = {};
 
   if (execution.createdAt) {
@@ -104,7 +108,13 @@ function buildIncidentExecutionDetails(execution: CanvasesCanvasNodeExecution): 
   const incident = getIncidentFromExecution(execution);
   if (incident) {
     if (incident.number) details["Number"] = incident.number;
-    if (incident.sys_id) details["Sys ID"] = incident.sys_id;
+    if (incident.sys_id) {
+      if (instanceUrl) {
+        details["Incident URL"] = `${instanceUrl}/incident.do?sys_id=${incident.sys_id}`;
+      } else {
+        details["Sys ID"] = incident.sys_id;
+      }
+    }
     if (incident.short_description) details["Short Description"] = incident.short_description;
     if (incident.state) details["State"] = STATE_LABELS[incident.state] || incident.state;
     if (incident.urgency) details["Urgency"] = URGENCY_LABELS[incident.urgency] || incident.urgency;

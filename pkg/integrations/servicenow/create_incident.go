@@ -14,19 +14,19 @@ import (
 type CreateIncident struct{}
 
 type CreateIncidentSpec struct {
-	ShortDescription string  `json:"shortDescription"`
-	Description      string  `json:"description"`
-	State            string  `json:"state"`
-	Urgency          string  `json:"urgency"`
-	Impact           string  `json:"impact"`
-	Category         string  `json:"category"`
-	Subcategory      string  `json:"subcategory"`
-	AssignmentGroup  string  `json:"assignmentGroup"`
-	AssignedTo       string  `json:"assignedTo"`
-	Caller           string  `json:"caller"`
-	ResolutionCode   *string `json:"resolutionCode,omitempty"`
-	ResolutionNotes  *string `json:"resolutionNotes,omitempty"`
-	OnHoldReason     *string `json:"onHoldReason,omitempty"`
+	ShortDescription string  `json:"shortDescription" mapstructure:"shortDescription"`
+	Description      string  `json:"description" mapstructure:"description"`
+	State            string  `json:"state" mapstructure:"state"`
+	Urgency          string  `json:"urgency" mapstructure:"urgency"`
+	Impact           string  `json:"impact" mapstructure:"impact"`
+	Category         string  `json:"category" mapstructure:"category"`
+	Subcategory      string  `json:"subcategory" mapstructure:"subcategory"`
+	AssignmentGroup  string  `json:"assignmentGroup" mapstructure:"assignmentGroup"`
+	AssignedTo       string  `json:"assignedTo" mapstructure:"assignedTo"`
+	Caller           string  `json:"caller" mapstructure:"caller"`
+	ResolutionCode   *string `json:"resolutionCode,omitempty" mapstructure:"resolutionCode"`
+	ResolutionNotes  *string `json:"resolutionNotes,omitempty" mapstructure:"resolutionNotes"`
+	OnHoldReason     *string `json:"onHoldReason,omitempty" mapstructure:"onHoldReason"`
 }
 
 func (c *CreateIncident) Name() string {
@@ -102,49 +102,45 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 		{
 			Name:        "urgency",
 			Label:       "Urgency",
-			Type:        configuration.FieldTypeSelect,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Default:     "2",
 			Description: "How quickly the incident needs to be resolved",
+			Placeholder: "Select an urgency",
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "1 - High", Value: "1"},
-						{Label: "2 - Medium", Value: "2"},
-						{Label: "3 - Low", Value: "3"},
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "urgency",
 				},
 			},
 		},
 		{
 			Name:        "impact",
 			Label:       "Impact",
-			Type:        configuration.FieldTypeSelect,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Default:     "2",
 			Description: "The extent to which the incident affects the business",
+			Placeholder: "Select an impact",
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "1 - High", Value: "1"},
-						{Label: "2 - Medium", Value: "2"},
-						{Label: "3 - Low", Value: "3"},
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "impact",
 				},
 			},
 		},
 		{
-			Name:        "description",
-			Label:       "Description",
-			Type:        configuration.FieldTypeText,
-			Required:    false,
+			Name:     "description",
+			Label:    "Description",
+			Type:     configuration.FieldTypeText,
+			Required: false,
+
 			Description: "Detailed description of the incident",
 		},
 		{
-			Name:        "category",
-			Label:       "Category",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
+			Name:     "category",
+			Label:    "Category",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: false,
+
 			Description: "The classification of the incident",
 			Placeholder: "Select a category",
 			TypeOptions: &configuration.TypeOptions{
@@ -154,10 +150,11 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "subcategory",
-			Label:       "Subcategory",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
+			Name:     "subcategory",
+			Label:    "Subcategory",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: false,
+
 			Description: "Subcategory of the incident (depends on the selected category)",
 			Placeholder: "Select a subcategory",
 			TypeOptions: &configuration.TypeOptions{
@@ -175,10 +172,11 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "assignmentGroup",
-			Label:       "Assignment Group",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
+			Name:     "assignmentGroup",
+			Label:    "Assignment Group",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: false,
+
 			Description: "The group responsible for resolving the incident",
 			Placeholder: "Select an assignment group",
 			TypeOptions: &configuration.TypeOptions{
@@ -188,10 +186,11 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "assignedTo",
-			Label:       "Assigned To",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
+			Name:     "assignedTo",
+			Label:    "Assigned To",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: false,
+
 			Description: "The user assigned to resolve the incident",
 			Placeholder: "Select a user",
 			TypeOptions: &configuration.TypeOptions{
@@ -209,10 +208,11 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "caller",
-			Label:       "Caller",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
+			Name:     "caller",
+			Label:    "Caller",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: false,
+
 			Description: "The user reporting the incident",
 			Placeholder: "Select a user",
 			TypeOptions: &configuration.TypeOptions{
@@ -222,30 +222,26 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "state",
-			Label:       "State",
-			Type:        configuration.FieldTypeSelect,
-			Required:    false,
+			Name:     "state",
+			Label:    "State",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: false,
+
 			Description: "The current stage of the incident lifecycle",
+			Placeholder: "Select a state",
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "New", Value: "1"},
-						{Label: "In Progress", Value: "2"},
-						{Label: "On Hold", Value: "3"},
-						{Label: "Resolved", Value: "6"},
-						{Label: "Closed", Value: "7"},
-						{Label: "Canceled", Value: "8"},
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "state",
 				},
 			},
 		},
 		{
 			Name:        "onHoldReason",
 			Label:       "On Hold Reason",
-			Type:        configuration.FieldTypeSelect,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Description: "Reason the incident is on hold",
+			Placeholder: "Select a reason",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "state", Values: []string{"3"}},
 			},
@@ -253,22 +249,18 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 				{Field: "state", Values: []string{"3"}},
 			},
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Awaiting Caller", Value: "1"},
-						{Label: "Awaiting Change", Value: "3"},
-						{Label: "Awaiting Problem", Value: "4"},
-						{Label: "Awaiting Vendor", Value: "5"},
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "on_hold_reason",
 				},
 			},
 		},
 		{
 			Name:        "resolutionCode",
 			Label:       "Resolution Code",
-			Type:        configuration.FieldTypeSelect,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Description: "How the incident was resolved",
+			Placeholder: "Select a resolution code",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "state", Values: []string{"6", "7"}},
 			},
@@ -276,19 +268,8 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 				{Field: "state", Values: []string{"6", "7"}},
 			},
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Duplicate", Value: "Duplicate"},
-						{Label: "Known error", Value: "Known error"},
-						{Label: "No resolution provided", Value: "No resolution provided"},
-						{Label: "Resolved by caller", Value: "Resolved by caller"},
-						{Label: "Resolved by change", Value: "Resolved by change"},
-						{Label: "Resolved by problem", Value: "Resolved by problem"},
-						{Label: "Resolved by request", Value: "Resolved by request"},
-						{Label: "Solution provided", Value: "Solution provided"},
-						{Label: "Workaround provided", Value: "Workaround provided"},
-						{Label: "User error", Value: "User error"},
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "resolution_code",
 				},
 			},
 		},
@@ -309,10 +290,18 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 }
 
 func (c *CreateIncident) Setup(ctx core.SetupContext) error {
+	var existing NodeMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &existing); err != nil {
+		return fmt.Errorf("failed to decode node metadata: %w", err)
+	}
+
+	if existing.InstanceURL != "" {
+		return nil
+	}
+
 	spec := CreateIncidentSpec{}
-	err := mapstructure.Decode(ctx.Configuration, &spec)
-	if err != nil {
-		return fmt.Errorf("error decoding configuration: %v", err)
+	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+		return fmt.Errorf("error decoding configuration: %w", err)
 	}
 
 	if spec.ShortDescription == "" {
@@ -329,41 +318,16 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("error creating client: %v", err)
+		return fmt.Errorf("error creating client: %w", err)
 	}
 
-	err = client.ValidateConnection()
+	metadata, err := resolveResourceMetadata(client, resourceSpec{
+		AssignmentGroup: spec.AssignmentGroup,
+		AssignedTo:      spec.AssignedTo,
+		Caller:          spec.Caller,
+	})
 	if err != nil {
-		return fmt.Errorf("error validating ServiceNow connection: %v", err)
-	}
-
-	metadata := NodeMetadata{InstanceURL: client.InstanceURL}
-
-	if spec.AssignmentGroup != "" {
-		group, err := client.GetAssignmentGroup(spec.AssignmentGroup)
-		if err != nil {
-			return fmt.Errorf("error verifying assignment group: %v", err)
-		}
-
-		metadata.AssignmentGroup = &ResourceInfo{ID: group.SysID, Name: group.Name}
-	}
-
-	if spec.AssignedTo != "" {
-		user, err := client.GetUser(spec.AssignedTo)
-		if err != nil {
-			return fmt.Errorf("error verifying assigned user: %v", err)
-		}
-
-		metadata.AssignedTo = &ResourceInfo{ID: user.SysID, Name: user.Name}
-	}
-
-	if spec.Caller != "" {
-		user, err := client.GetUser(spec.Caller)
-		if err != nil {
-			return fmt.Errorf("error verifying caller: %v", err)
-		}
-
-		metadata.Caller = &ResourceInfo{ID: user.SysID, Name: user.Name}
+		return err
 	}
 
 	return ctx.Metadata.Set(metadata)
@@ -371,14 +335,13 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 
 func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 	spec := CreateIncidentSpec{}
-	err := mapstructure.Decode(ctx.Configuration, &spec)
-	if err != nil {
-		return fmt.Errorf("error decoding configuration: %v", err)
+	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+		return fmt.Errorf("error decoding configuration: %w", err)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("error creating client: %v", err)
+		return fmt.Errorf("error creating client: %w", err)
 	}
 
 	params := CreateIncidentParams{
@@ -408,7 +371,7 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 
 	result, err := client.CreateIncident(params)
 	if err != nil {
-		return fmt.Errorf("failed to create incident: %v", err)
+		return fmt.Errorf("failed to create incident: %w", err)
 	}
 
 	return ctx.ExecutionState.Emit(
