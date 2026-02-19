@@ -30,6 +30,15 @@ import { deleteTopicMapper } from "./sns/delete_topic";
 import { getSubscriptionMapper } from "./sns/get_subscription";
 import { getTopicMapper } from "./sns/get_topic";
 import { publishMessageMapper } from "./sns/publish_message";
+import { onImageTriggerRenderer } from "./ec2/on_image";
+import { createImageMapper } from "./ec2/create_image";
+import { getImageMapper as getEc2ImageMapper } from "./ec2/get_image";
+import { copyImageMapper } from "./ec2/copy_image";
+import { deregisterImageMapper } from "./ec2/deregister_image";
+import { enableImageMapper } from "./ec2/enable_image";
+import { disableImageMapper } from "./ec2/disable_image";
+import { enableImageDeprecationMapper } from "./ec2/enable_image_deprecation";
+import { disableImageDeprecationMapper } from "./ec2/disable_image_deprecation";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "lambda.runFunction": runFunctionMapper,
@@ -57,6 +66,14 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "sns.createTopic": createTopicMapper,
   "sns.deleteTopic": deleteTopicMapper,
   "sns.publishMessage": publishMessageMapper,
+  "ec2.copyImage": copyImageMapper,
+  "ec2.createImage": createImageMapper,
+  "ec2.deregisterImage": deregisterImageMapper,
+  "ec2.disableImage": disableImageMapper,
+  "ec2.disableImageDeprecation": disableImageDeprecationMapper,
+  "ec2.enableImage": enableImageMapper,
+  "ec2.enableImageDeprecation": enableImageDeprecationMapper,
+  "ec2.getImage": getEc2ImageMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -65,6 +82,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   "ecr.onImagePush": onImagePushTriggerRenderer,
   "ecr.onImageScan": onImageScanTriggerRenderer,
   "sns.onTopicMessage": onTopicMessageTriggerRenderer,
+  "ec2.onImage": onImageTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
@@ -92,4 +110,12 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "sns.createTopic": buildActionStateRegistry("created"),
   "sns.deleteTopic": buildActionStateRegistry("deleted"),
   "sns.publishMessage": buildActionStateRegistry("published"),
+  "ec2.copyImage": buildActionStateRegistry("copied"),
+  "ec2.createImage": buildActionStateRegistry("created"),
+  "ec2.deregisterImage": buildActionStateRegistry("deregistered"),
+  "ec2.disableImage": buildActionStateRegistry("disabled"),
+  "ec2.disableImageDeprecation": buildActionStateRegistry("disabled"),
+  "ec2.enableImage": buildActionStateRegistry("enabled"),
+  "ec2.enableImageDeprecation": buildActionStateRegistry("enabled"),
+  "ec2.getImage": buildActionStateRegistry("retrieved"),
 };
