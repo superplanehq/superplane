@@ -1,0 +1,65 @@
+{
+    "type": "dash0.syntheticCheck.updated",
+    "data": {
+        "kind": "Dash0SyntheticCheck",
+        "metadata": {
+            "annotations": {},
+            "labels": {
+                "dash0.com/dataset": "default",
+                "dash0.com/id": "64617368-3073-796e-7468-abc123def456",
+                "dash0.com/origin": "api-abc12345-6789-0123-4567-890abcdef012",
+                "dash0.com/version": "2"
+            },
+            "name": "login-api-health-check"
+        },
+        "spec": {
+            "enabled": true,
+            "schedule": {
+                "interval": "1m",
+                "locations": ["de-frankfurt", "us-oregon"],
+                "strategy": "all_locations"
+            },
+            "plugin": {
+                "display": {
+                    "name": "Login API health check"
+                },
+                "kind": "http",
+                "spec": {
+                    "request": {
+                        "method": "get",
+                        "url": "https://api.example.com/health",
+                        "headers": [],
+                        "queryParameters": [],
+                        "redirects": "follow",
+                        "tls": {
+                            "allowInsecure": false
+                        },
+                        "tracing": {
+                            "addTracingHeaders": true
+                        }
+                    },
+                    "assertions": {
+                        "criticalAssertions": [
+                            {
+                                "kind": "status_code",
+                                "spec": {
+                                    "operator": "is",
+                                    "value": "200"
+                                }
+                            }
+                        ],
+                        "degradedAssertions": []
+                    },
+                    "retries": {
+                        "kind": "fixed",
+                        "spec": {
+                            "attempts": 3,
+                            "delay": "1s"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

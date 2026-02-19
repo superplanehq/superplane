@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/cloudwatch"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/ec2"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecs"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/eventbridge"
@@ -144,6 +145,8 @@ func (a *AWS) Components() []core.Component {
 		&ecs.DescribeService{},
 		&ecs.RunTask{},
 		&ecs.StopTask{},
+		&ec2.CreateImage{},
+		&ec2.GetImage{},
 		&sns.GetTopic{},
 		&sns.GetSubscription{},
 		&sns.CreateTopic{},
@@ -163,6 +166,7 @@ func (a *AWS) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&cloudwatch.OnAlarm{},
 		&codeartifact.OnPackageVersion{},
+		&ec2.OnImage{},
 		&ecr.OnImageScan{},
 		&ecr.OnImagePush{},
 		&sns.OnTopicMessage{},
@@ -712,6 +716,10 @@ func (a *AWS) subscriptionApplies(subscription core.IntegrationSubscriptionConte
 		return false
 	}
 
+	if configuration.Region != event.Region {
+		return false
+	}
+
 	if configuration.DetailType != event.DetailType {
 		return false
 	}
@@ -847,10 +855,12 @@ func (a *AWS) provisionDestination(credentials *aws.Credentials, logger *logrus.
 }
 
 func (a *AWS) provisionRule(credentials *aws.Credentials, logger *logrus.Entry, integration core.IntegrationContext, http core.HTTPContext, metadata *common.IntegrationMetadata, destination *common.APIDestinationMetadata, source string, detailType string) error {
+	ruleKey := common.EventBridgeRuleKey(source, destination.Region)
+
 	//
 	// If the rule does not exist yet, we create it.
 	//
-	rule, ok := metadata.EventBridge.Rules[source]
+	rule, ok := metadata.EventBridge.Rules[ruleKey]
 	if !ok {
 		return a.createRule(credentials, logger, integration, http, metadata, destination, source, []string{detailType})
 	}
@@ -885,7 +895,8 @@ func (a *AWS) updateRule(credentials *aws.Credentials, logger *logrus.Entry, htt
 		return fmt.Errorf("error updating EventBridge rule %s: %v", rule.RuleArn, err)
 	}
 
-	metadata.EventBridge.Rules[rule.Source] = common.EventBridgeRuleMetadata{
+	ruleKey := common.EventBridgeRuleKey(rule.Source, rule.Region)
+	metadata.EventBridge.Rules[ruleKey] = common.EventBridgeRuleMetadata{
 		Name:        rule.Name,
 		Source:      rule.Source,
 		Region:      rule.Region,
@@ -944,7 +955,8 @@ func (a *AWS) createRule(
 		metadata.EventBridge.Rules = make(map[string]common.EventBridgeRuleMetadata)
 	}
 
-	metadata.EventBridge.Rules[source] = common.EventBridgeRuleMetadata{
+	ruleKey := common.EventBridgeRuleKey(source, destination.Region)
+	metadata.EventBridge.Rules[ruleKey] = common.EventBridgeRuleMetadata{
 		Name:        ruleName,
 		Source:      source,
 		Region:      destination.Region,
