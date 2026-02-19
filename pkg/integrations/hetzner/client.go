@@ -48,6 +48,27 @@ type createServerResponse struct {
 	Action *ActionResponse `json:"action"`
 }
 
+const (
+	LoadBalancerAlgorithmTypeRoundRobin       = "round_robin"
+	LoadBalancerAlgorithmTypeLeastConnections = "least_connections"
+)
+
+type LoadBalancerAlgorithmType struct {
+	Type string `json:"type"`
+}
+
+type createLoadBalancerRequest struct {
+	Name             string                    `json:"name"`
+	LoadBalancerType string                    `json:"load_balancer_type"`
+	Location         string                    `json:"location"`
+	Algorithm        LoadBalancerAlgorithmType `json:"algorithm"`
+}
+
+type createLoadBalancerResponse struct {
+	LoadBalancer *ServerResponse `json:"load_balancer"`
+	Action       *ActionResponse `json:"action"`
+}
+
 type ServerResponse struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
@@ -161,6 +182,8 @@ func (c *Client) parseError(resp *http.Response) error {
 	return apiErr
 }
 
+// server actions
+
 func (c *Client) CreateServer(name, serverType, image, location string, sshKeys []string, userData string) (*ServerResponse, *ActionResponse, error) {
 	req := createServerRequest{
 		Name:       name,
@@ -271,6 +294,74 @@ func (c *Client) ListServers() ([]ServerResponse, error) {
 	return out.Servers, nil
 }
 
+// load balancer actions
+
+func (c *Client) ListLoadBalancers() ([]ServerResponse, error) {
+	resp, err := c.do("GET", "/load_balancers?per_page=50", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var out struct {
+		LoadBalancers []ServerResponse `json:"load_balancers"`
+	}
+	if err := decodeJSON(resp.Body, &out); err != nil {
+		return nil, fmt.Errorf("decode list load balancers response: %w", err)
+	}
+	return out.LoadBalancers, nil
+}
+
+func (c *Client) CreateLoadBalancer(name, loadBalancerType, location, algorithm string) (*ServerResponse, *ActionResponse, error) {
+	req := createLoadBalancerRequest{
+		Name:             name,
+		LoadBalancerType: loadBalancerType,
+		Location:         location,
+		Algorithm: LoadBalancerAlgorithmType{
+			Type: algorithm,
+		},
+	}
+
+	resp, err := c.do("POST", "/load_balancers", req)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, nil, c.parseError(resp)
+	}
+
+	var out createLoadBalancerResponse
+	if err := decodeJSON(resp.Body, &out); err != nil {
+		return nil, nil, fmt.Errorf("decode create load balancer response: %w", err)
+	}
+	if out.LoadBalancer == nil || out.Action == nil {
+		return nil, nil, fmt.Errorf("create load balancer missing load_balancer or action")
+	}
+	return out.LoadBalancer, out.Action, nil
+}
+
+func (c *Client) DeleteLoadBalancer(loadBalancerID string) error {
+	resp, err := c.do("DELETE", "/load_balancers/"+loadBalancerID, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		return c.parseError(resp)
+	}
+
+	return nil
+}
+
+// server info actions
+
 type ServerTypePrice struct {
 	Location string `json:"location"`
 }
@@ -299,7 +390,7 @@ func (c *Client) ListServerTypes() ([]ServerTypeResponse, error) {
 	var out struct {
 		ServerTypes []ServerTypeResponse `json:"server_types"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := decodeJSON(resp.Body, &out); err != nil {
 		return nil, fmt.Errorf("decode list server types response: %w", err)
 	}
 	return out.ServerTypes, nil
@@ -429,6 +520,34 @@ func (c *Client) Verify() error {
 	return nil
 }
 
+// load balancer actions
+
+type LoadBalancerTypeResponse struct {
+	Id          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+func (c *Client) ListLoadBalancerTypes() ([]LoadBalancerTypeResponse, error) {
+	resp, err := c.do("GET", "/load_balancer_types", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var out struct {
+		LoadBalancerTypes []LoadBalancerTypeResponse `json:"load_balancer_types"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode list load balancer types response: %w", err)
+	}
+	return out.LoadBalancerTypes, nil
+}
+
 // resolveServerID extracts the server ID from the configuration map,
 // handling both string values and float64 values (which occur when
 // template expressions resolve to JSON numbers).
@@ -456,5 +575,35 @@ func resolveServerID(config any) (string, error) {
 		return fmt.Sprintf("%d", v), nil
 	default:
 		return "", fmt.Errorf("invalid server value: %v", raw)
+	}
+}
+
+// resolveLoadBalancerID extracts the load balancer ID from the configuration map,
+// handling both string values and float64 values (which occur when
+// template expressions resolve to JSON numbers).
+func resolveLoadBalancerID(config any) (string, error) {
+	m, ok := config.(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("invalid configuration type")
+	}
+
+	raw, ok := m["loadBalancer"]
+	if !ok {
+		return "", fmt.Errorf("loadBalancer is required")
+	}
+
+	switch v := raw.(type) {
+	case string:
+		s := strings.TrimSpace(v)
+		if s == "" {
+			return "", fmt.Errorf("loadBalancer is required")
+		}
+		return s, nil
+	case float64:
+		return fmt.Sprintf("%.0f", v), nil
+	case int:
+		return fmt.Sprintf("%d", v), nil
+	default:
+		return "", fmt.Errorf("invalid loadBalancer value: %v", raw)
 	}
 }
