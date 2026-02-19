@@ -1,0 +1,37 @@
+{
+  "type": "Deployment.deployed",
+  "severity": "INFO",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "details": {
+    "id": "deploy-abc123",
+    "status": "SUCCESS",
+    "source": "GitHub",
+    "branch": "main",
+    "commitHash": "abc123def456",
+    "commitMessage": "Update deployment",
+    "commitAuthor": "developer",
+    "serviceId": "srv-xyz789"
+  },
+  "resource": {
+    "workspace": {
+      "id": "ws-abc123",
+      "name": "My Workspace"
+    },
+    "project": {
+      "id": "proj-xyz789",
+      "name": "my-project"
+    },
+    "environment": {
+      "id": "env-def456",
+      "name": "production",
+      "isEphemeral": false
+    },
+    "service": {
+      "id": "srv-ghi012",
+      "name": "api-server"
+    },
+    "deployment": {
+      "id": "deploy-jkl345"
+    }
+  }
+}
