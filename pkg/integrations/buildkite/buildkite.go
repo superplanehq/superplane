@@ -125,6 +125,16 @@ func (b *Buildkite) Sync(ctx core.SyncContext) error {
 		return nil
 	}
 
+	// Validate the API token
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %v", err)
+	}
+	_, err = client.ValidateToken()
+	if err != nil {
+		return fmt.Errorf("Invalid API token: %v", err)
+	}
+
 	// Update metadata to track setup completion
 	metadata := Metadata{}
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {

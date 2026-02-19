@@ -141,3 +141,34 @@ func (c *Client) GetBuild(orgSlug, pipelineSlug string, buildNumber int) (*Build
 
 	return &build, nil
 }
+
+type AccessToken struct {
+	UUID        string   `json:"uuid"`
+	Scopes      []string `json:"scopes"`
+	Description string   `json:"description"`
+	CreatedAt   string   `json:"created_at"`
+	User        struct {
+		Email string `json:"email"`
+		Name  string `json:"name"`
+	} `json:"user"`
+}
+
+func (c *Client) ValidateToken() (*AccessToken, error) {
+	resp, err := c.makeRequest("GET", "/access-token", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API token validation failed with status %d", resp.StatusCode)
+	}
+
+	var token AccessToken
+	err = json.NewDecoder(resp.Body).Decode(&token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode access token response: %w", err)
+	}
+
+	return &token, nil
+}
