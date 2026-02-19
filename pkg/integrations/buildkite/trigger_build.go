@@ -438,15 +438,6 @@ func (r *TriggerBuild) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUI
 	return ctx.DefaultProcessing()
 }
 
-func (r *TriggerBuild) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {
-	var config struct{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	return nil
-}
-
 func (r *TriggerBuild) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }

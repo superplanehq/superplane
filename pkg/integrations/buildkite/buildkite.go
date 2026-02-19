@@ -49,7 +49,7 @@ func extractOrgSlug(orgInput string) (string, error) {
 	return "", fmt.Errorf("invalid organization format: %s. Expected format: https://buildkite.com/my-org or just 'my-org'", orgInput)
 }
 
-func (b *Buildkite) createTokenSetupAction(ctx core.SyncContext, orgSlug string) {
+func (b *Buildkite) createTokenSetupAction(ctx core.SyncContext) {
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
 		Description: "Generate API token for triggering builds. Required permissions: `read_organizations`, `read_user`, `read_pipelines`, `read_builds`, `write_builds`.",
 		URL:         "https://buildkite.com/user/api-access-tokens",
@@ -121,7 +121,7 @@ func (b *Buildkite) Sync(ctx core.SyncContext) error {
 
 	// Prompt user to create API token
 	if config.APIToken == "" {
-		b.createTokenSetupAction(ctx, orgSlug)
+		b.createTokenSetupAction(ctx)
 		return nil
 	}
 
