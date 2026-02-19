@@ -74,7 +74,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     const incidentLabel =
       configuration.incident === "__use_expression__"
         ? truncateForDisplay(configuration.incidentExpression ?? "expression")
-        : nodeMetadata?.incidentName ?? truncateForDisplay(configuration.incident);
+        : (nodeMetadata?.incidentName ?? truncateForDisplay(configuration.incident));
     metadata.push({ icon: "alert-triangle", label: "Incident: " + incidentLabel });
   }
 
