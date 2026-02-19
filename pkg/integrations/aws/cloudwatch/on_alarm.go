@@ -137,7 +137,8 @@ func (p *OnAlarm) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(config.Region) == "" {
+	region := strings.TrimSpace(config.Region)
+	if region == "" {
 		return fmt.Errorf("region is required")
 	}
 
@@ -145,26 +146,26 @@ func (p *OnAlarm) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
-	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, metadata.Region, DetailTypeAlarmStateChange)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, region, DetailTypeAlarmStateChange)
 	if err != nil {
 		return fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
 	if !hasRule {
-		if err := ctx.Metadata.Set(OnAlarmMetadata{Region: config.Region}); err != nil {
+		if err := ctx.Metadata.Set(OnAlarmMetadata{Region: region}); err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
 
-		return p.provisionRule(ctx.Integration, ctx.Requests, config.Region)
+		return p.provisionRule(ctx.Integration, ctx.Requests, region)
 	}
 
-	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(config.Region))
+	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(region))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
 	}
 
 	return ctx.Metadata.Set(OnAlarmMetadata{
-		Region:         config.Region,
+		Region:         region,
 		SubscriptionID: subscriptionID.String(),
 	})
 }

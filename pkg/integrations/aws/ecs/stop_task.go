@@ -192,7 +192,7 @@ func (c *StopTask) Setup(ctx core.SetupContext) error {
 		return nil
 	}
 
-	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, ecsEventBridgeSource, metadata.Region, ecsTaskStateChangeEventDetailType)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, ecsEventBridgeSource, config.Region, ecsTaskStateChangeEventDetailType)
 	if err != nil {
 		return fmt.Errorf("failed to check rule availability: %w", err)
 	}

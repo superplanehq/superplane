@@ -3,6 +3,7 @@ package codeartifact
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -130,6 +131,11 @@ func (p *OnPackageVersion) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	region := strings.TrimSpace(config.Region)
+	if region == "" {
+		return fmt.Errorf("region is required")
+	}
+
 	//
 	// If already subscribed to the integration events, nothing to do.
 	//
@@ -137,31 +143,31 @@ func (p *OnPackageVersion) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
-	repository, err := validateRepository(ctx.Integration, ctx.HTTP, config.Region, config.Repository)
+	repository, err := validateRepository(ctx.Integration, ctx.HTTP, region, config.Repository)
 	if err != nil {
 		return fmt.Errorf("failed to validate repository: %w", err)
 	}
 
-	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, metadata.Region, DetailTypePackageVersionStateChange)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, region, DetailTypePackageVersionStateChange)
 	if err != nil {
 		return fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
 	if !hasRule {
-		if err := ctx.Metadata.Set(OnPackageVersionMetadata{Region: config.Region, Repository: repository}); err != nil {
+		if err := ctx.Metadata.Set(OnPackageVersionMetadata{Region: region, Repository: repository}); err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
 
-		return p.provisionRule(ctx.Integration, ctx.Requests, config.Region)
+		return p.provisionRule(ctx.Integration, ctx.Requests, region)
 	}
 
-	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(config.Region))
+	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(region))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
 	}
 
 	return ctx.Metadata.Set(OnPackageVersionMetadata{
-		Region:         config.Region,
+		Region:         region,
 		Repository:     repository,
 		SubscriptionID: subscriptionID.String(),
 	})

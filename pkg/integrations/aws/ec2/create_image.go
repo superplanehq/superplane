@@ -165,34 +165,35 @@ func (c *CreateImage) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	if strings.TrimSpace(config.Region) == "" {
+	region := strings.TrimSpace(config.Region)
+	if region == "" {
 		return fmt.Errorf("region is required")
 	}
 
-	if nodeMetadata.SubscriptionID != "" && nodeMetadata.Region == config.Region {
+	if nodeMetadata.SubscriptionID != "" && nodeMetadata.Region == region {
 		return nil
 	}
 
-	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, config.Region, DetailTypeAMIStateChange)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, region, DetailTypeAMIStateChange)
 	if err != nil {
 		return fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
 	if !hasRule {
-		if err := ctx.Metadata.Set(CreateImageNodeMetadata{Region: config.Region}); err != nil {
+		if err := ctx.Metadata.Set(CreateImageNodeMetadata{Region: region}); err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
 
-		return c.provisionRule(ctx.Integration, ctx.Requests, config.Region)
+		return c.provisionRule(ctx.Integration, ctx.Requests, region)
 	}
 
-	subscriptionID, err := ctx.Integration.Subscribe(c.subscriptionPattern(config.Region))
+	subscriptionID, err := ctx.Integration.Subscribe(c.subscriptionPattern(region))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
 	}
 
 	return ctx.Metadata.Set(CreateImageNodeMetadata{
-		Region:         config.Region,
+		Region:         region,
 		SubscriptionID: subscriptionID.String(),
 	})
 }
