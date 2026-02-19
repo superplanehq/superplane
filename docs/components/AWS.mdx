@@ -9,6 +9,7 @@ Manage resources and execute AWS commands in workflows
 <CardGrid>
   <LinkCard title="CloudWatch • On Alarm" href="#cloud-watch-•-on-alarm" description="Listen to AWS CloudWatch alarm state change events" />
   <LinkCard title="CodeArtifact • On Package Version" href="#code-artifact-•-on-package-version" description="Listen to AWS CodeArtifact package version events" />
+  <LinkCard title="EC2 • On Image" href="#ec2-•-on-image" description="Listen to AWS EC2 AMI state change events" />
   <LinkCard title="ECR • On Image Push" href="#ecr-•-on-image-push" description="Listen to AWS ECR image push events" />
   <LinkCard title="ECR • On Image Scan" href="#ecr-•-on-image-scan" description="Listen to AWS ECR image scan events" />
   <LinkCard title="SNS • On Topic Message" href="#sns-•-on-topic-message" description="Listen to AWS SNS topic notifications" />
@@ -26,6 +27,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CodeArtifact • Dispose Package Versions" href="#code-artifact-•-dispose-package-versions" description="Delete assets and set package version status to Disposed (record remains)" />
   <LinkCard title="CodeArtifact • Get Package Version" href="#code-artifact-•-get-package-version" description="Describe an AWS CodeArtifact package version" />
   <LinkCard title="CodeArtifact • Update Package Versions Status" href="#code-artifact-•-update-package-versions-status" description="Update the status of one or more package versions (Archived, Published, Unlisted)" />
+  <LinkCard title="EC2 • Create Image" href="#ec2-•-create-image" description="Create a new AMI image from an EC2 instance" />
+  <LinkCard title="EC2 • Get Image" href="#ec2-•-get-image" description="Get an EC2 AMI image by ID" />
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
@@ -158,6 +161,55 @@ The On Package Version trigger starts a workflow execution when a package versio
   },
   "timestamp": "2026-03-10T14:25:30.31254162Z",
   "type": "aws.codeartifact.package.version"
+}
+```
+
+<a id="ec2-•-on-image"></a>
+
+## EC2 • On Image
+
+The On Image trigger starts a workflow execution when an EC2 AMI changes state.
+
+### Use Cases
+
+- **Image pipeline orchestration**: Continue workflows when a new AMI becomes available
+- **Failure handling**: Alert and remediate when AMI creation fails
+- **Compliance workflows**: Run validation and distribution after image creation
+
+### Configuration
+
+- **Region**: AWS region where AMI state changes are monitored
+- **Image State**: State to trigger on (pending, available, failed)
+
+### Event Data
+
+Each AMI state event includes:
+- **detail.ImageId**: AMI ID (for example: ami-1234567890abcdef0)
+- **detail.State**: AMI state
+- **detail.ErrorMessage**: Error message for failed states (if available)
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account": "123456789012",
+    "detail": {
+      "ImageId": "ami-07f0e4f3e9c123abc",
+      "State": "available"
+    },
+    "detail-type": "EC2 AMI State Change",
+    "id": "f74f3de5-f9b7-4f3d-909a-531fc3ff2f14",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:ec2:us-east-1::image/ami-07f0e4f3e9c123abc"
+    ],
+    "source": "aws.ec2",
+    "time": "2026-02-10T12:10:00Z",
+    "version": "0"
+  },
+  "timestamp": "2026-02-10T12:10:01Z",
+  "type": "aws.ec2.image"
 }
 ```
 
@@ -544,6 +596,101 @@ The Update Package Versions Status component sets the status of package versions
       "status": "Archived"
     }
   }
+}
+```
+
+<a id="ec2-•-create-image"></a>
+
+## EC2 • Create Image
+
+The Create Image component creates a new Amazon Machine Image (AMI) from an EC2 instance.
+
+### Use Cases
+
+- **Golden image pipelines**: Build immutable infrastructure images from validated instances
+- **Backup workflows**: Snapshot instance state before deployments or migrations
+- **Release automation**: Produce versioned AMIs as part of CI/CD
+
+### Configuration
+
+- **Region**: AWS region where the instance runs
+- **Instance**: EC2 instance ID to create an image from
+- **Image Name**: Name for the AMI
+- **Description**: Optional image description
+- **No Reboot**: If enabled, create the image without rebooting the instance
+
+### Completion behavior
+
+- The component waits for EventBridge `EC2 AMI State Change` events for the created AMI.
+- It completes when the AMI state becomes `available`.
+- It fails if the AMI state becomes `failed`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "architecture": "x86_64",
+      "creationDate": "2026-02-18T12:00:00.000Z",
+      "description": "Golden image for production",
+      "hypervisor": "xen",
+      "imageId": "ami-07f0e4f3e9c123abc",
+      "imageType": "machine",
+      "name": "my-app-2026-02-18",
+      "ownerId": "123456789012",
+      "region": "us-east-1",
+      "rootDeviceName": "/dev/xvda",
+      "rootDeviceType": "ebs",
+      "state": "available",
+      "virtualizationType": "hvm"
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00Z",
+  "type": "aws.ec2.image"
+}
+```
+
+<a id="ec2-•-get-image"></a>
+
+## EC2 • Get Image
+
+The Get Image component retrieves metadata for an EC2 AMI.
+
+### Use Cases
+
+- **Release automation**: Validate AMI metadata before deployment
+- **Operational checks**: Inspect AMI state and ownership in workflows
+- **Traceability**: Resolve AMI details by image ID
+
+### Configuration
+
+- **Region**: AWS region of the AMI
+- **Image ID**: AMI ID (for example: ami-1234567890abcdef0)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "architecture": "x86_64",
+      "creationDate": "2026-02-18T12:00:00.000Z",
+      "description": "Golden image for production",
+      "hypervisor": "xen",
+      "imageId": "ami-1234567890abcdef0",
+      "imageType": "machine",
+      "name": "my-app-2026-02-18",
+      "ownerId": "123456789012",
+      "region": "us-east-1",
+      "rootDeviceName": "/dev/xvda",
+      "rootDeviceType": "ebs",
+      "state": "available",
+      "virtualizationType": "hvm"
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00Z",
+  "type": "aws.ec2.image"
 }
 ```
 

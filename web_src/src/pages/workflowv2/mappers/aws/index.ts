@@ -27,6 +27,9 @@ import { deleteTopicMapper } from "./sns/delete_topic";
 import { getSubscriptionMapper } from "./sns/get_subscription";
 import { getTopicMapper } from "./sns/get_topic";
 import { publishMessageMapper } from "./sns/publish_message";
+import { onImageTriggerRenderer } from "./ec2/on_image";
+import { createImageMapper } from "./ec2/create_image";
+import { getImageMapper as getEc2ImageMapper } from "./ec2/get_image";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "lambda.runFunction": runFunctionMapper,
@@ -51,6 +54,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "sns.createTopic": createTopicMapper,
   "sns.deleteTopic": deleteTopicMapper,
   "sns.publishMessage": publishMessageMapper,
+  "ec2.createImage": createImageMapper,
+  "ec2.getImage": getEc2ImageMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -59,6 +64,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   "ecr.onImagePush": onImagePushTriggerRenderer,
   "ecr.onImageScan": onImageScanTriggerRenderer,
   "sns.onTopicMessage": onTopicMessageTriggerRenderer,
+  "ec2.onImage": onImageTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
@@ -83,4 +89,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "sns.createTopic": buildActionStateRegistry("created"),
   "sns.deleteTopic": buildActionStateRegistry("deleted"),
   "sns.publishMessage": buildActionStateRegistry("published"),
+  "ec2.createImage": buildActionStateRegistry("created"),
+  "ec2.getImage": buildActionStateRegistry("retrieved"),
 };

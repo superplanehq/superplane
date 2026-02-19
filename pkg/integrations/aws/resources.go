@@ -3,6 +3,7 @@ package aws
 import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/ec2"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecs"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
@@ -29,6 +30,9 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 
 	case "ecs.task":
 		return ecs.ListTasks(ctx, resourceType)
+
+	case "ec2.instance":
+		return ec2.ListInstances(ctx, resourceType)
 
 	case "codeartifact.repository":
 		return codeartifact.ListRepositories(ctx, resourceType)
