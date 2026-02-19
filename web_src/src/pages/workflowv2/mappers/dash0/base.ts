@@ -4,7 +4,7 @@ import { getState, getTriggerRenderer } from "..";
 import { ExecutionInfo, NodeInfo, OutputPayload } from "../types";
 
 // getFirstDefaultPayload returns the first payload emitted on the default channel.
-export function getFirstDefaultPayload(execution: ExecutionInfo): OutputPayload | null {
+function getFirstDefaultPayload(execution: ExecutionInfo): OutputPayload | null {
   const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
   if (!outputs?.default || outputs.default.length === 0) {
     return null;
