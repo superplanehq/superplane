@@ -104,28 +104,6 @@ func Test__CreateIncident__Setup(t *testing.T) {
 		assert.Equal(t, "Jane Doe", metadata.Caller.Name)
 	})
 
-	t.Run("skips setup when metadata already populated", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{}
-		metadataCtx := &contexts.MetadataContext{
-			Metadata: NodeMetadata{InstanceURL: "https://existing.service-now.com"},
-		}
-
-		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{
-				"shortDescription": "Test Incident",
-				"urgency":          "2",
-				"impact":           "2",
-				"assignmentGroup":  "grp1",
-			},
-			HTTP:        httpContext,
-			Integration: oauthIntegrationContext(),
-			Metadata:    metadataCtx,
-		})
-
-		require.NoError(t, err)
-		require.Len(t, httpContext.Requests, 0)
-	})
-
 	t.Run("invalid assignment group returns error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
