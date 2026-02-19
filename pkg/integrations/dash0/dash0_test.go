@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -150,58 +149,4 @@ func Test__Dash0__Sync(t *testing.T) {
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "/api/prometheus/api/v1/query")
 		assert.NotContains(t, httpContext.Requests[0].URL.String(), "/api/prometheus/api/prometheus")
 	})
-
-	t.Run("webhook URL is stored in metadata with /api/v1 prefix", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body: io.NopCloser(strings.NewReader(`
-						{
-							"status": "success",
-							"data": {
-								"resultType": "vector",
-								"result": []
-							}
-						}
-					`)),
-				},
-			},
-		}
-
-		webhookID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
-		integrationCtx := &syncIntegrationContext{
-			IntegrationContext: &contexts.IntegrationContext{
-				Configuration: map[string]any{
-					"apiToken": "token123",
-					"baseURL":  "https://api.us-west-2.aws.dash0.com",
-				},
-			},
-			webhookID: &webhookID,
-		}
-
-		err := d.Sync(core.SyncContext{
-			Configuration:   integrationCtx.IntegrationContext.Configuration,
-			HTTP:            httpContext,
-			Integration:     integrationCtx,
-			WebhooksBaseURL: "https://superplane.example.com",
-		})
-
-		require.NoError(t, err)
-		assert.Equal(t, "ready", integrationCtx.IntegrationContext.State)
-
-		metadata, ok := integrationCtx.IntegrationContext.Metadata.(Metadata)
-		require.True(t, ok)
-		assert.Equal(t, "https://superplane.example.com/api/v1/webhooks/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", metadata.WebhookURL)
-	})
-}
-
-// syncIntegrationContext wraps the test IntegrationContext to return a fixed webhook ID.
-type syncIntegrationContext struct {
-	*contexts.IntegrationContext
-	webhookID *uuid.UUID
-}
-
-func (c *syncIntegrationContext) EnsureIntegrationWebhook(_ any) (*uuid.UUID, error) {
-	return c.webhookID, nil
 }

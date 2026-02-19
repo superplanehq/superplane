@@ -4,12 +4,6 @@ title: "Dash0"
 
 Connect to Dash0 to query data using Prometheus API
 
-## Triggers
-
-<CardGrid>
-  <LinkCard title="On Notification" href="#on-notification" description="Trigger a workflow when Dash0 sends a notification" />
-</CardGrid>
-
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
@@ -21,51 +15,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
   <LinkCard title="Update HTTP Synthetic Check" href="#update-http-synthetic-check" description="Update an existing HTTP synthetic check in Dash0 by ID" />
 </CardGrid>
-
-## Instructions
-
-To set up the Dash0 integration:
-
-1. Go to your Dash0 dashboard -> **Organization Settings** -> **API Tokens**
-2. Click **Create API Token**, give it a name, and copy the token
-3. Paste the token in the **API Token** field below
-4. Copy your **Prometheus API Base URL** from **Organization Settings** -> **Endpoints** -> **Prometheus API**
-
-### Webhook Setup (for triggers)
-
-To receive Dash0 notifications:
-
-1. After connecting, copy the **Webhook URL** shown on the integration details page
-2. In your Dash0 dashboard, go to **Alerting** -> **Notification Channels**
-3. Create a new channel with type **Webhook**
-4. Paste the webhook URL and save
-
-<a id="on-notification"></a>
-
-## On Notification
-
-The On Notification trigger starts a workflow execution when Dash0 sends a notification to SuperPlane.
-
-### Setup
-
-1. Go to the Dash0 integration settings in SuperPlane and copy the webhook URL shown there.
-2. In your Dash0 account, configure a notification channel using that URL.
-3. When Dash0 sends a notification (e.g. a synthetic check failure), this trigger will fire.
-
-### Output
-
-Emits the raw Dash0 notification payload as `dash0.notification`.
-
-### Example Data
-
-```json
-{
-  "checkName": "Login API health check",
-  "severity": "critical",
-  "timestamp": "2026-01-19T12:00:00Z",
-  "type": "synthetic-check-failed"
-}
-```
 
 <a id="create-http-synthetic-check"></a>
 

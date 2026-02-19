@@ -63,13 +63,6 @@ export interface UpdateHttpSyntheticCheckConfiguration {
   retries?: { attempts: number; delay: string };
 }
 
-export interface OnNotificationPayload {
-  type?: string;
-  checkName?: string;
-  severity?: string;
-  timestamp?: string;
-}
-
 export interface CreateHttpSyntheticCheckConfiguration {
   name: string;
   dataset: string;

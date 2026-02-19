@@ -165,10 +165,6 @@ func (c *IntegrationContext) RequestWebhook(configuration any) error {
 	return nil
 }
 
-func (c *IntegrationContext) EnsureIntegrationWebhook(configuration any) (*uuid.UUID, error) {
-	return nil, nil
-}
-
 func (c *IntegrationContext) ScheduleResync(interval time.Duration) error {
 	c.ResyncRequests = append(c.ResyncRequests, interval)
 	return nil

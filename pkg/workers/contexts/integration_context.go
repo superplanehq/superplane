@@ -107,51 +107,6 @@ func (c *IntegrationContext) replaceMismatchedWebhook(configuration any, handler
 	return c.tx.Delete(webhook).Error
 }
 
-func (c *IntegrationContext) EnsureIntegrationWebhook(configuration any) (*uuid.UUID, error) {
-	handler, err := c.registry.GetWebhookHandler(c.integration.AppName)
-	if err != nil {
-		return nil, err
-	}
-
-	webhooks, err := models.ListIntegrationWebhooks(c.tx, c.integration.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list webhooks: %v", err)
-	}
-
-	for _, hook := range webhooks {
-		ok, err := handler.CompareConfig(hook.Configuration.Data(), configuration)
-		if err != nil {
-			return nil, err
-		}
-
-		if ok {
-			return &hook.ID, nil
-		}
-	}
-
-	webhookID := uuid.New()
-	_, encryptedKey, err := crypto.NewRandomKey(context.Background(), c.encryptor, webhookID.String())
-	if err != nil {
-		return nil, fmt.Errorf("error generating key for new webhook: %v", err)
-	}
-
-	now := time.Now()
-	webhook := models.Webhook{
-		ID:                webhookID,
-		State:             models.WebhookStatePending,
-		Secret:            encryptedKey,
-		Configuration:     datatypes.NewJSONType(configuration),
-		AppInstallationID: &c.integration.ID,
-		CreatedAt:         &now,
-	}
-
-	if err := c.tx.Create(&webhook).Error; err != nil {
-		return nil, err
-	}
-
-	return &webhookID, nil
-}
-
 func (c *IntegrationContext) createWebhook(configuration any) error {
 	webhookID := uuid.New()
 	_, encryptedKey, err := crypto.NewRandomKey(context.Background(), c.encryptor, webhookID.String())
