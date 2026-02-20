@@ -1,0 +1,15 @@
+{
+  "type": "aws.sqs.queue",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+    "attributes": {
+      "QueueArn": "arn:aws:sqs:us-east-1:123456789012:my-queue",
+      "VisibilityTimeout": "30",
+      "MessageRetentionPeriod": "345600",
+      "MaximumMessageSize": "262144",
+      "DelaySeconds": "0",
+      "ReceiveMessageWaitTimeSeconds": "0"
+    }
+  }
+}

@@ -50,6 +50,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="SNS • Get Subscription" href="#sns-•-get-subscription" description="Get an AWS SNS subscription by ARN" />
   <LinkCard title="SNS • Get Topic" href="#sns-•-get-topic" description="Get an AWS SNS topic by ARN" />
   <LinkCard title="SNS • Publish Message" href="#sns-•-publish-message" description="Publish a message to an AWS SNS topic" />
+  <LinkCard title="SQS • Create Queue" href="#sqs-•-create-queue" description="Create a new SQS queue" />
+  <LinkCard title="SQS • Delete Queue" href="#sqs-•-delete-queue" description="Delete an SQS queue" />
+  <LinkCard title="SQS • Get Queue" href="#sqs-•-get-queue" description="Get metadata and attributes for an SQS queue" />
+  <LinkCard title="SQS • Purge Queue" href="#sqs-•-purge-queue" description="Purge all messages from an SQS queue" />
+  <LinkCard title="SQS • Send Message" href="#sqs-•-send-message" description="Send a message to an SQS queue" />
 </CardGrid>
 
 ## Instructions
@@ -1568,6 +1573,134 @@ The Publish Message component sends a message to an AWS SNS topic.
   },
   "timestamp": "2026-01-10T10:00:02.000000000Z",
   "type": "aws.sns.message.published"
+}
+```
+
+<a id="sqs-•-create-queue"></a>
+
+## SQS • Create Queue
+
+The Create Queue component creates a new AWS SQS queue.
+
+### Configuration
+
+- **Region**: AWS region for the SQS queue
+- **Queue Name**: Name of the queue to create
+
+### Example Output
+
+```json
+{
+  "data": {
+    "queueName": "my-created-queue",
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-created-queue"
+  },
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.sqs.queue"
+}
+```
+
+<a id="sqs-•-delete-queue"></a>
+
+## SQS • Delete Queue
+
+The Delete Queue component deletes an AWS SQS queue.
+
+### Configuration
+
+- **Region**: AWS region of the SQS queue
+- **Queue**: Target SQS queue to delete
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+  },
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.sqs.queue.deleted"
+}
+```
+
+<a id="sqs-•-get-queue"></a>
+
+## SQS • Get Queue
+
+The Get Queue component retrieves metadata and attributes for an AWS SQS queue.
+
+### Configuration
+
+- **Region**: AWS region of the SQS queue
+- **Queue**: Target SQS queue
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attributes": {
+      "DelaySeconds": "0",
+      "MaximumMessageSize": "262144",
+      "MessageRetentionPeriod": "345600",
+      "QueueArn": "arn:aws:sqs:us-east-1:123456789012:my-queue",
+      "ReceiveMessageWaitTimeSeconds": "0",
+      "VisibilityTimeout": "30"
+    },
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+  },
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.sqs.queue"
+}
+```
+
+<a id="sqs-•-purge-queue"></a>
+
+## SQS • Purge Queue
+
+The Purge Queue component removes all messages from an AWS SQS queue.
+
+### Configuration
+
+- **Region**: AWS region of the SQS queue
+- **Queue**: Target SQS queue to purge
+
+### Example Output
+
+```json
+{
+  "data": {
+    "purged": true,
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+  },
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.sqs.queue.purged"
+}
+```
+
+<a id="sqs-•-send-message"></a>
+
+## SQS • Send Message
+
+The Send Message component publishes a message to an AWS SQS queue.
+
+### Configuration
+
+- **Region**: AWS region of the SQS queue
+- **Queue**: Target SQS queue
+- **Message Body**: The message payload to send
+
+### Example Output
+
+```json
+{
+  "data": {
+    "messageId": "d84c1b4d-1f3b-4b6c-9d9f-5c3a2b1f9e7a",
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+  },
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.sqs.message"
 }
 ```
 

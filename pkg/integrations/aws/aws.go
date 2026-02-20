@@ -27,6 +27,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/route53"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/sns"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/sqs"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -162,6 +163,11 @@ func (a *AWS) Components() []core.Component {
 		&ecr.GetImageScanFindings{},
 		&ecr.ScanImage{},
 		&lambda.RunFunction{},
+		&sqs.SendMessage{},
+		&sqs.GetQueue{},
+		&sqs.CreateQueue{},
+		&sqs.DeleteQueue{},
+		&sqs.PurgeQueue{},
 		&route53.CreateRecord{},
 		&route53.UpsertRecord{},
 		&route53.DeleteRecord{},
@@ -333,6 +339,7 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 - Select the identity provider created in step 1
 - Add permissions for the integration to manage EventBridge connections, API destinations, and rules. To get started, you can use the **AmazonEventBridgeFullAccess** managed policy
 - Add permissions for the integration manage IAM roles needed for itself. To get started, you can use the **IAMFullAccess** managed policy
+- Add permissions for the integration to manage SQS. To get started, you can use the **AmazonSQSFullAccess** managed policy
 - Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need.
 - Give it a name and description, and create it
 
