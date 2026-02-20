@@ -73,7 +73,6 @@ func (c *IntegrationSubscriptionContext) sendMessageToComponent(message any) err
 	node := c.node
 	tx := c.tx
 	httpCtx := c.registry.HTTPContext()
-	logger := logging.WithIntegration(logging.ForNode(*c.node), *c.integration)
 
 	return integrationComponent.OnIntegrationMessage(core.IntegrationMessageContext{
 		HTTP:          httpCtx,
