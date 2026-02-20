@@ -304,6 +304,208 @@ func Test__Client__ExecuteCode(t *testing.T) {
 	})
 }
 
+func Test__Client__CreateSession(t *testing.T) {
+	t.Run("successful session creation", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		err = client.CreateSession("sandbox-123", "session-abc")
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/toolbox/sandbox-123/process/session")
+		assert.Equal(t, http.MethodPost, httpContext.Requests[1].Method)
+	})
+
+	t.Run("session creation failure -> error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader(`{"message":"internal error"}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		err = client.CreateSession("sandbox-123", "session-abc")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "500")
+	})
+}
+
+func Test__Client__ExecuteSessionCommand(t *testing.T) {
+	t.Run("successful async command execution", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"cmdId":"cmd-001"}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		response, err := client.ExecuteSessionCommand("sandbox-123", "session-abc", "echo hello")
+
+		require.NoError(t, err)
+		assert.Equal(t, "cmd-001", response.CmdID)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/process/session/session-abc/exec")
+	})
+}
+
+func Test__Client__GetSession(t *testing.T) {
+	t.Run("session with running command", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"sessionId":"session-abc","commands":[{"id":"cmd-001"}]}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		session, err := client.GetSession("sandbox-123", "session-abc")
+
+		require.NoError(t, err)
+		assert.Equal(t, "session-abc", session.SessionID)
+		require.Len(t, session.Commands, 1)
+		assert.Equal(t, "cmd-001", session.Commands[0].ID)
+		assert.Nil(t, session.Commands[0].ExitCode)
+	})
+
+	t.Run("session with completed command", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"sessionId":"session-abc","commands":[{"id":"cmd-001","exitCode":0}]}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		session, err := client.GetSession("sandbox-123", "session-abc")
+
+		require.NoError(t, err)
+		cmd := session.FindCommand("cmd-001")
+		require.NotNil(t, cmd)
+		require.NotNil(t, cmd.ExitCode)
+		assert.Equal(t, 0, *cmd.ExitCode)
+	})
+
+	t.Run("FindCommand returns nil for unknown command", func(t *testing.T) {
+		session := &Session{
+			SessionID: "session-abc",
+			Commands:  []SessionCommand{{ID: "cmd-001"}},
+		}
+
+		assert.Nil(t, session.FindCommand("cmd-999"))
+	})
+}
+
+func Test__Client__GetSessionCommandLogs(t *testing.T) {
+	t.Run("successful log retrieval", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`hello world`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		logs, err := client.GetSessionCommandLogs("sandbox-123", "session-abc", "cmd-001")
+
+		require.NoError(t, err)
+		assert.Equal(t, "hello world", logs)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/process/session/session-abc/command/cmd-001/logs")
+	})
+}
+
 func Test__Client__DeleteSandbox(t *testing.T) {
 	t.Run("successful sandbox deletion", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{

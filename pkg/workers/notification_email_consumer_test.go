@@ -64,7 +64,7 @@ func Test__NotificationEmailConsumer(t *testing.T) {
 			"Please review the pending approval.",
 			"https://app.superplane.com/approvals/123",
 			"Review approval",
-			[]string{groupUser.Email, "external@example.com"},
+			[]string{groupUser.GetEmail(), "external@example.com"},
 			[]string{groupName},
 			[]string{models.RoleOrgAdmin},
 		)
@@ -82,7 +82,7 @@ func Test__NotificationEmailConsumer(t *testing.T) {
 		bcc := sentEmails[0].Bcc
 		sort.Strings(bcc)
 
-		expected := []string{groupUser.Email, roleUser.Email, "external@example.com"}
+		expected := []string{groupUser.GetEmail(), roleUser.GetEmail(), "external@example.com"}
 		sort.Strings(expected)
 
 		assert.Equal(t, expected, bcc)

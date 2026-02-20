@@ -244,7 +244,7 @@ func Test__NodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 				"user": map[string]any{
 					"id":    r.User.String(),
 					"name":  r.UserModel.Name,
-					"email": r.UserModel.Email,
+					"email": r.UserModel.GetEmail(),
 				},
 			},
 		},
