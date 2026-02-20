@@ -20,8 +20,7 @@ const (
 type OnIncident struct{}
 
 type OnIncidentConfiguration struct {
-	Events        []string `json:"events"`
-	SigningSecret string   `json:"signingSecret"`
+	Events []string `json:"events"`
 }
 
 // OnIncidentMetadata is stored after Setup and includes the webhook URL for the user to copy into incident.io.
@@ -53,7 +52,7 @@ func (t *OnIncident) Documentation() string {
 ## Configuration
 
 - **Events**: Select which events to listen for (Incident created, Incident updated)
-- **Signing secret**: Paste the signing secret from your incident.io webhook endpoint (Settings > Webhooks). Required to verify webhook authenticity; you can add it after creating the endpoint with the URL shown in the trigger settings.
+- **Signing secret**: Configure the webhook signing secret in the incident.io integration (Settings → Integrations). Paste the signing secret from your incident.io webhook endpoint (Settings > Webhooks). Required to verify webhook authenticity.
 
 ## Webhook Setup
 
@@ -62,7 +61,7 @@ incident.io does not provide an API to register webhook endpoints. After adding 
 1. Copy the webhook URL shown for this trigger (after saving the canvas).
 2. In incident.io go to **Settings > Webhooks** and create a new endpoint with that URL.
 3. Subscribe to exactly these events: **Public incident created (v2)** and **Public incident updated (v2)**.
-4. Copy the **Signing secret** from the endpoint and paste it into the trigger's Signing secret field.`
+4. Copy the **Signing secret** from the endpoint and add it to the incident.io integration (Settings → Integrations).`
 }
 
 func (t *OnIncident) Icon() string {
@@ -108,11 +107,9 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("integration is required to set up the incident.io webhook trigger")
 	}
 
-	signingSecret := config.SigningSecret
-	if signingSecret == "" {
-		if b, getErr := ctx.Integration.GetConfig("webhookSigningSecret"); getErr == nil && len(b) > 0 {
-			signingSecret = string(b)
-		}
+	var signingSecret string
+	if b, getErr := ctx.Integration.GetConfig("webhookSigningSecret"); getErr == nil && len(b) > 0 {
+		signingSecret = string(b)
 	}
 
 	// Pass only events and hash so the secret is never stored in plaintext in the webhook Configuration column.
@@ -175,7 +172,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 		}
 	}
 	if signingSecret == "" {
-		return http.StatusForbidden, fmt.Errorf("signing secret is required for webhook verification; add it in the integration (Settings → Integrations) or on the trigger")
+		return http.StatusForbidden, fmt.Errorf("signing secret is required for webhook verification; add it in the integration (Settings → Integrations)")
 	}
 
 	webhookID := ctx.Headers.Get("webhook-id")
