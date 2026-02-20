@@ -18,7 +18,7 @@ interface OnPipelineCompletedEventData {
 export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     const eventData = context.event?.data as OnPipelineCompletedEventData;
-    const title = eventData?.pipelineIdentifier || "Pipeline";
+    const title = "Pipeline Completed · " + (eventData?.pipelineIdentifier || "unknown");
     const status = eventData?.status || "";
     const timeAgo = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
     const subtitle = status && timeAgo ? `${status} · ${timeAgo}` : status || timeAgo;
