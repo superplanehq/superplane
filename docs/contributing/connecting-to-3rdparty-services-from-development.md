@@ -51,12 +51,6 @@ Set the `WEBHOOKS_BASE_URL` environment variable to your tunnel’s **HTTPS** UR
 WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app make dev.start
 ```
 
-Or use the target that checks the variable and prints usage if missing:
-
-```bash
-WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app make dev.start.with-webhook-tunnel
-```
-
 **Option B – In a `.env` file (project root)**
 
 ```env

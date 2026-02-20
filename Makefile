@@ -113,20 +113,6 @@ dev.start:
 	docker compose $(DOCKER_COMPOSE_OPTS) up -d
 	@bash ./scripts/wait-for-app
 
-# Start dev stack with webhook URLs pointing at an HTTPS tunnel (for incident.io, GitHub, etc.).
-# 1. In another terminal: ngrok http 8000
-# 2. Set WEBHOOKS_BASE_URL to the ngrok https URL, then run this target.
-dev.start.with-webhook-tunnel:
-	@if [ -z "$$WEBHOOKS_BASE_URL" ]; then \
-	  echo "Usage: WEBHOOKS_BASE_URL=https://your-ngrok-url make dev.start.with-webhook-tunnel"; \
-	  echo ""; \
-	  echo "1. In another terminal run: ngrok http 8000"; \
-	  echo "2. Copy the https:// URL ngrok shows"; \
-	  echo "3. Run: WEBHOOKS_BASE_URL=https://YOUR_URL make dev.start.with-webhook-tunnel"; \
-	  exit 1; \
-	fi
-	$(MAKE) dev.start
-
 dev.logs:
 	docker compose $(DOCKER_COMPOSE_OPTS) logs -f
 
