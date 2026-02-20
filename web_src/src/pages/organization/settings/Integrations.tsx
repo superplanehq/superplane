@@ -131,15 +131,8 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   }, [filterQuery, integrationCatalog]);
 
   const selectedInstructions = useMemo(() => {
-    const raw = selectedIntegration?.instructions?.trim();
-    if (!raw) return raw;
-    // For incident, modal shows only API integration; webhook is on the details page.
-    if (selectedIntegration?.name === "incident") {
-      const idx = raw.indexOf("## Webhook integration");
-      return idx >= 0 ? raw.slice(0, idx).trim() : raw;
-    }
-    return raw;
-  }, [selectedIntegration?.instructions, selectedIntegration?.name]);
+    return selectedIntegration?.instructions?.trim() ?? "";
+  }, [selectedIntegration?.instructions]);
 
   const getNextIntegrationName = (baseName?: string) => {
     const normalizedBaseName = baseName?.trim() || "integration";
@@ -405,15 +398,11 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       </p>
                     </div>
 
-                    {/* Configuration Fields - for incident, modal shows only API key; webhook is on details page */}
+                    {/* Configuration Fields */}
                     {selectedIntegration.configuration && selectedIntegration.configuration.length > 0 && (
                       <div className="space-y-4">
                         {selectedIntegration.configuration
-                          .filter((field) => {
-                            if (!field.name) return false;
-                            if (selectedIntegration.name === "incident") return field.name === "apiKey";
-                            return true;
-                          })
+                          .filter((field) => Boolean(field.name))
                           .map((field) => (
                             <ConfigurationFieldRenderer
                               key={field.name!}

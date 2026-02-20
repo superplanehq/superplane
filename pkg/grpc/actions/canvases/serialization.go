@@ -135,23 +135,9 @@ func serializeCanvasNodes(canvas *models.Canvas) ([]*compb.Node, error) {
 		pausedByID[node.NodeID] = node.State == models.CanvasNodeStatePaused
 	}
 
-	const incidentOnIncidentTriggerName = "incident.onIncident"
 	for _, node := range serialized {
 		if paused, ok := pausedByID[node.Id]; ok {
 			node.Paused = paused
-		}
-		// Add warning for incident trigger when webhook signing secret is not configured
-		if node.Trigger != nil && node.Trigger.Name == incidentOnIncidentTriggerName &&
-			node.Integration != nil && node.Integration.Id != "" && node.ErrorMessage == "" {
-			integrationID, parseErr := uuid.Parse(node.Integration.Id)
-			if parseErr == nil {
-				integration, findErr := models.FindIntegration(canvas.OrganizationID, integrationID)
-				if findErr == nil && integration.AppName == "incident" {
-					if v, _ := integration.Configuration.Data()["webhookSigningSecret"].(string); v == "" {
-						node.WarningMessage = "Webhook not configured. Complete setup in Settings → Integrations."
-					}
-				}
-			}
 		}
 	}
 

@@ -10,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-func ListIntegrations(ctx context.Context, registry *registry.Registry, orgID, webhooksBaseURL string) (*pb.ListIntegrationsResponse, error) {
+func ListIntegrations(ctx context.Context, registry *registry.Registry, orgID string) (*pb.ListIntegrationsResponse, error) {
 	integrations, err := models.ListIntegrations(uuid.MustParse(orgID))
 	if err != nil {
 		return nil, err
@@ -18,7 +18,7 @@ func ListIntegrations(ctx context.Context, registry *registry.Registry, orgID, w
 
 	protos := []*pb.Integration{}
 	for _, integration := range integrations {
-		proto, err := serializeIntegration(registry, &integration, []models.CanvasNodeReference{}, webhooksBaseURL)
+		proto, err := serializeIntegration(registry, &integration, []models.CanvasNodeReference{})
 
 		//
 		// If we have an issue serializing an integration,

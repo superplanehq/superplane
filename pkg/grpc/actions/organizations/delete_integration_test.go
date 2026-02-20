@@ -49,7 +49,7 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		// Verify integration is visible in the list
 		//
-		listResponse, err := ListIntegrations(ctx, r.Registry, r.Organization.ID.String(), baseURL)
+		listResponse, err := ListIntegrations(ctx, r.Registry, r.Organization.ID.String())
 		require.NoError(t, err)
 		found := slices.ContainsFunc(listResponse.Integrations, func(integration *pb.Integration) bool {
 			return integration.Metadata.Id == integrationID
@@ -66,7 +66,7 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		// Verify integration is no longer visible in the list
 		//
-		listResponse, err = ListIntegrations(ctx, r.Registry, r.Organization.ID.String(), baseURL)
+		listResponse, err = ListIntegrations(ctx, r.Registry, r.Organization.ID.String())
 		require.NoError(t, err)
 		found = slices.ContainsFunc(listResponse.Integrations, func(integration *pb.Integration) bool {
 			return integration.Metadata.Id == integrationID
