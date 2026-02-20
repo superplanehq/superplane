@@ -139,6 +139,24 @@ type IntegrationTrigger interface {
 }
 
 type IntegrationMessageContext struct {
+	Message       any
+	Configuration any
+	NodeMetadata  MetadataContext
+	Logger        *logrus.Entry
+	HTTP          HTTPContext
+	Integration   IntegrationContext
+	Events        EventContext
+
+	// FindExecutionByKV locates an existing execution by a key-value pair
+	// stored via ExecutionStateContext.SetKV().
+	//
+	// This is used by integration components (not triggers) that receive
+	// async events through the integration message path and need to resolve
+	// an existing execution — for example, an AWS CodePipeline component
+	// receiving an EventBridge completion event for a running pipeline.
+	//
+	// For triggers, this field is nil because each integration message
+	// starts a new event chain via Events.Emit().
 	Message           any
 	Configuration     any
 	NodeMetadata      MetadataContext
