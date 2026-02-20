@@ -58,6 +58,22 @@ type ExecutionMetadata struct {
 	Status string `json:"status"`
 }
 
+// terminalStatusFromEventBridgeState maps an EventBridge pipeline execution
+// state (uppercase, e.g. "SUCCEEDED") to the CodePipeline API status constant.
+// It returns ("", false) for non-terminal states such as STARTED or RESUMED.
+func terminalStatusFromEventBridgeState(state string) (string, bool) {
+	switch state {
+	case "SUCCEEDED":
+		return PipelineStatusSucceeded, true
+	case "FAILED":
+		return PipelineStatusFailed, true
+	case "CANCELED", "CANCELLED", "STOPPED":
+		return PipelineStatusStopped, true
+	default:
+		return "", false
+	}
+}
+
 func (r *RunPipeline) Name() string {
 	return "aws.codepipeline.runPipeline"
 }
@@ -111,16 +127,6 @@ func (r *RunPipeline) Icon() string {
 
 func (r *RunPipeline) Color() string {
 	return "orange"
-}
-
-func (r *RunPipeline) ExampleOutput() map[string]any {
-	return map[string]any{
-		"pipeline": map[string]any{
-			"name":        "my-pipeline",
-			"executionId": "1234-5678-abcd-efgh",
-			"status":      "Succeeded",
-		},
-	}
 }
 
 func (r *RunPipeline) OutputChannels(configuration any) []core.OutputChannel {
@@ -203,7 +209,7 @@ func (r *RunPipeline) Setup(ctx core.SetupContext) error {
 		metadata = RunPipelineNodeMetadata{}
 	}
 
-	if metadata.Pipeline != nil && spec.Pipeline == metadata.Pipeline.Name && spec.Region == metadata.Region {
+	if metadata.SubscriptionID != "" && metadata.Pipeline != nil && spec.Pipeline == metadata.Pipeline.Name && spec.Region == metadata.Region {
 		return nil
 	}
 
@@ -432,16 +438,8 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusOK, nil
 	}
 
-	// Map EventBridge state (uppercase) to CodePipeline API status (title case).
-	var status string
-	switch state {
-	case "SUCCEEDED":
-		status = PipelineStatusSucceeded
-	case "FAILED":
-		status = PipelineStatusFailed
-	case "CANCELED", "CANCELLED", "STOPPED":
-		status = PipelineStatusStopped
-	default:
+	status, terminal := terminalStatusFromEventBridgeState(state)
+	if !terminal {
 		return http.StatusOK, nil
 	}
 
@@ -676,15 +674,8 @@ func (r *RunPipeline) OnIntegrationMessage(ctx core.IntegrationMessageContext) e
 	}
 
 	// Only process terminal states; ignore STARTED, RESUMED, etc.
-	var status string
-	switch state {
-	case "SUCCEEDED":
-		status = PipelineStatusSucceeded
-	case "FAILED":
-		status = PipelineStatusFailed
-	case "CANCELED", "CANCELLED", "STOPPED":
-		status = PipelineStatusStopped
-	default:
+	status, terminal := terminalStatusFromEventBridgeState(state)
+	if !terminal {
 		return nil
 	}
 
