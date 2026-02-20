@@ -267,8 +267,10 @@ func (t *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {
 		ctx.Logger.Warnf("Harness webhook is unavailable, running in polling mode")
 	}
 
-	// Poll only when webhook delivery is not active.
-	if !webhookReady && ctx.Requests != nil {
+	// Always schedule polling as safety fallback even when webhook delivery
+	// appears ready. Some Harness accounts can silently miss webhook delivery
+	// due to account-level flags/configuration.
+	if ctx.Requests != nil {
 		if err := scheduleOnPipelineCompletedPoll(ctx.Requests); err != nil {
 			return fmt.Errorf("failed to schedule polling action: %w", err)
 		}
@@ -480,12 +482,10 @@ func (t *OnPipelineCompleted) collectExecutionsSinceCheckpoint(
 			if !isNewerExecution(metadata, execution) {
 				executionID := strings.TrimSpace(execution.ExecutionID)
 				executionEnded := executionOrderingTimestamp(execution)
-				// Allow checkpoint timestamp refresh for executions first seen
-				// without timestamp (or previously checkpointed by ID) even
-				// when the "newer" predicate returns false.
+				// Allow checkpoint timestamp refresh for executions already
+				// checkpointed by ID even when the "newer" predicate returns false.
 				if executionEnded > metadata.LastExecutionEnded &&
-					(executionID == strings.TrimSpace(metadata.LastExecutionID) ||
-						metadataHasTimestamplessExecutionID(metadata, executionID)) {
+					executionID == strings.TrimSpace(metadata.LastExecutionID) {
 					executions = append(executions, execution)
 				}
 				slices.SortFunc(executions, compareExecutionOrdering)

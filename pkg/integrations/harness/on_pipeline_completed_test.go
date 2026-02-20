@@ -93,7 +93,7 @@ func Test__OnPipelineCompleted__Setup(t *testing.T) {
 		assert.Equal(t, OnPipelineCompletedPollInterval, requestCtx.Duration)
 	})
 
-	t.Run("with pipeline filter -> webhook requested", func(t *testing.T) {
+	t.Run("with pipeline filter -> webhook requested and poll fallback scheduled", func(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
 		integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
 			"apiToken": "pat.acc.test",
@@ -147,7 +147,8 @@ func Test__OnPipelineCompleted__Setup(t *testing.T) {
 		assert.Equal(t, "default", requestConfig.OrgID)
 		assert.Equal(t, "default_project", requestConfig.ProjectID)
 		assert.Equal(t, []string{"PipelineEnd"}, requestConfig.EventTypes)
-		assert.Empty(t, requestCtx.Action)
+		assert.Equal(t, OnPipelineCompletedPollAction, requestCtx.Action)
+		assert.Equal(t, OnPipelineCompletedPollInterval, requestCtx.Duration)
 	})
 
 	t.Run("invalid pipeline selection fails setup", func(t *testing.T) {
