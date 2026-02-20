@@ -1,0 +1,9 @@
+{
+    "name": "server.cpu.usage",
+    "type": "gauge",
+    "value": 75.5,
+    "timestamp": 1707552000000,
+    "intervalMs": 0,
+    "status": "202 Accepted",
+    "statusCode": 202
+}
