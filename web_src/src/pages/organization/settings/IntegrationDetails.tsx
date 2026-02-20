@@ -295,6 +295,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
         )}
 
         {instructionsContent}
+        {metadataContent}
 
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
           <div className="p-6">
