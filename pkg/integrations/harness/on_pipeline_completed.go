@@ -24,6 +24,7 @@ const (
 	OnPipelineCompletedPollPageSize             = 100
 	OnPipelineCompletedPollMaxPages             = 100
 	OnPipelineCompletedMaxPollErrors            = 5
+	OnPipelineCompletedMaxTimestamplessIDs      = 64
 	OnPipelineCompletedCheckpointLockShardCount = 64
 	// When pipeline-scoped webhook delivery is configured, defer very recent
 	// poll items to avoid duplicate emits from webhook/poll races.
@@ -50,6 +51,7 @@ type OnPipelineCompletedConfiguration struct {
 type OnPipelineCompletedMetadata struct {
 	PipelineIdentifier                 string `json:"pipelineIdentifier,omitempty" mapstructure:"pipelineIdentifier"`
 	LastExecutionID                    string `json:"lastExecutionId,omitempty" mapstructure:"lastExecutionId"`
+	LastTimestamplessExecutionIDs      string `json:"lastTimestamplessExecutionIds,omitempty" mapstructure:"lastTimestamplessExecutionIds"`
 	LastTimestamplessExecutionID       string `json:"lastTimestamplessExecutionId,omitempty" mapstructure:"lastTimestamplessExecutionId"`
 	LastExecutionEnded                 int64  `json:"lastExecutionEnded,omitempty" mapstructure:"lastExecutionEnded"`
 	PollErrorCount                     int    `json:"pollErrorCount,omitempty" mapstructure:"pollErrorCount"`
@@ -483,7 +485,7 @@ func (t *OnPipelineCompleted) collectExecutionsSinceCheckpoint(
 				// when the "newer" predicate returns false.
 				if executionEnded > metadata.LastExecutionEnded &&
 					(executionID == strings.TrimSpace(metadata.LastExecutionID) ||
-						executionID == strings.TrimSpace(metadata.LastTimestamplessExecutionID)) {
+						metadataHasTimestamplessExecutionID(metadata, executionID)) {
 					executions = append(executions, execution)
 				}
 				slices.SortFunc(executions, compareExecutionOrdering)
@@ -522,7 +524,7 @@ func (t *OnPipelineCompleted) processPolledExecution(
 		// without re-emitting the event.
 		executionID := strings.TrimSpace(execution.ExecutionID)
 		if executionID == strings.TrimSpace(metadata.LastExecutionID) ||
-			executionID == strings.TrimSpace(metadata.LastTimestamplessExecutionID) {
+			metadataHasTimestamplessExecutionID(metadata, executionID) {
 			return t.updateCheckpointFromExecutionUnlocked(ctx.Metadata, execution)
 		}
 		return nil
@@ -531,7 +533,7 @@ func (t *OnPipelineCompleted) processPolledExecution(
 	status := canonicalStatus(execution.Status)
 	isTerminal := isTerminalStatus(status)
 	shouldEmit := isTerminal
-	if strings.TrimSpace(execution.ExecutionID) == strings.TrimSpace(metadata.LastTimestamplessExecutionID) {
+	if metadataHasTimestamplessExecutionID(metadata, execution.ExecutionID) {
 		// Same execution was already emitted from a timestampless webhook.
 		// Poll can refresh checkpoint timestamp, but must not emit again.
 		shouldEmit = false
@@ -591,6 +593,7 @@ func (t *OnPipelineCompleted) updateCheckpointFromExecutionUnlocked(
 	updated := updateCheckpoint(metadata, execution)
 	if updated.LastExecutionEnded == metadata.LastExecutionEnded &&
 		strings.TrimSpace(updated.LastExecutionID) == strings.TrimSpace(metadata.LastExecutionID) &&
+		strings.TrimSpace(updated.LastTimestamplessExecutionIDs) == strings.TrimSpace(metadata.LastTimestamplessExecutionIDs) &&
 		strings.TrimSpace(updated.LastTimestamplessExecutionID) == strings.TrimSpace(metadata.LastTimestamplessExecutionID) {
 		return nil
 	}
@@ -722,16 +725,12 @@ func updateCheckpoint(metadata OnPipelineCompletedMetadata, execution ExecutionS
 		return metadata
 	}
 	currentExecutionID := strings.TrimSpace(metadata.LastExecutionID)
-	currentTimestamplessExecutionID := strings.TrimSpace(metadata.LastTimestamplessExecutionID)
 
 	ended := executionOrderingTimestamp(execution)
 	if ended == 0 {
 		// Keep timestamped checkpoint dimensions untouched.
 		// Store timestampless execution IDs only for dedupe.
-		if executionID != currentTimestamplessExecutionID {
-			metadata.LastTimestamplessExecutionID = executionID
-		}
-		return metadata
+		return metadataWithTimestamplessExecutionID(metadata, executionID)
 	}
 
 	if executionID == currentExecutionID && ended > metadata.LastExecutionEnded {
@@ -759,17 +758,16 @@ func isNewerExecution(metadata OnPipelineCompletedMetadata, execution ExecutionS
 		return false
 	}
 	currentExecutionID := strings.TrimSpace(metadata.LastExecutionID)
-	currentTimestamplessExecutionID := strings.TrimSpace(metadata.LastTimestamplessExecutionID)
 	if executionID == currentExecutionID {
 		return false
 	}
 
 	ended := executionOrderingTimestamp(execution)
 	if ended == 0 {
-		return executionID != currentTimestamplessExecutionID
+		return !metadataHasTimestamplessExecutionID(metadata, executionID)
 	}
 
-	if executionID == currentTimestamplessExecutionID {
+	if metadataHasTimestamplessExecutionID(metadata, executionID) {
 		// Same execution first seen without timestamp should be revisited once
 		// when a timestamp becomes available to refresh checkpoint dimensions.
 		// Emission dedupe is handled in processPolledExecution.
@@ -933,11 +931,77 @@ func readWebhookSecret(ctx core.WebhookRequestContext) (string, error) {
 	return secret, nil
 }
 
+func metadataTimestamplessExecutionIDs(metadata OnPipelineCompletedMetadata) []string {
+	ids := make([]string, 0, OnPipelineCompletedMaxTimestamplessIDs)
+
+	appendID := func(value string) {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			return
+		}
+		if slices.Contains(ids, trimmed) {
+			return
+		}
+		ids = append(ids, trimmed)
+	}
+
+	for _, token := range strings.Split(strings.TrimSpace(metadata.LastTimestamplessExecutionIDs), ",") {
+		appendID(token)
+	}
+	appendID(metadata.LastTimestamplessExecutionID)
+
+	if len(ids) > OnPipelineCompletedMaxTimestamplessIDs {
+		ids = ids[len(ids)-OnPipelineCompletedMaxTimestamplessIDs:]
+	}
+
+	return ids
+}
+
+func metadataHasTimestamplessExecutionID(metadata OnPipelineCompletedMetadata, executionID string) bool {
+	executionID = strings.TrimSpace(executionID)
+	if executionID == "" {
+		return false
+	}
+
+	ids := metadataTimestamplessExecutionIDs(metadata)
+	return slices.Contains(ids, executionID)
+}
+
+func metadataWithTimestamplessExecutionID(
+	metadata OnPipelineCompletedMetadata,
+	executionID string,
+) OnPipelineCompletedMetadata {
+	executionID = strings.TrimSpace(executionID)
+	if executionID == "" {
+		return metadata
+	}
+
+	ids := metadataTimestamplessExecutionIDs(metadata)
+	if !slices.Contains(ids, executionID) {
+		ids = append(ids, executionID)
+		if len(ids) > OnPipelineCompletedMaxTimestamplessIDs {
+			ids = ids[len(ids)-OnPipelineCompletedMaxTimestamplessIDs:]
+		}
+	}
+
+	metadata.LastTimestamplessExecutionID = executionID
+	metadata.LastTimestamplessExecutionIDs = strings.Join(ids, ",")
+
+	return metadata
+}
+
 func decodeOnPipelineCompletedMetadata(value any) (OnPipelineCompletedMetadata, error) {
 	metadata := OnPipelineCompletedMetadata{}
 	if err := mapstructure.Decode(value, &metadata); err != nil {
 		return OnPipelineCompletedMetadata{}, fmt.Errorf("failed to decode metadata: %w", err)
 	}
+
+	ids := metadataTimestamplessExecutionIDs(metadata)
+	metadata.LastTimestamplessExecutionIDs = strings.Join(ids, ",")
+	if len(ids) > 0 {
+		metadata.LastTimestamplessExecutionID = ids[len(ids)-1]
+	}
+
 	return metadata, nil
 }
 

@@ -314,6 +314,7 @@ func (c *Client) ListOrganizations() ([]Organization, error) {
 			lastParseErr = parseErr
 			continue
 		}
+		lastParseErr = nil
 		if len(organizations) > 0 {
 			return organizations, nil
 		}
@@ -388,6 +389,7 @@ func (c *Client) ListProjects(orgID string) ([]Project, error) {
 			lastParseErr = parseErr
 			continue
 		}
+		lastParseErr = nil
 		if len(projects) > 0 {
 			return projects, nil
 		}
