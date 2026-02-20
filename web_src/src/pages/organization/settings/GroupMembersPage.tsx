@@ -256,7 +256,7 @@ export function GroupMembersPage() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{member.metadata?.email}</TableCell>
+                    <TableCell>{member.metadata?.email || "Service Account"}</TableCell>
                     <TableCell>
                       <div className="flex justify-end">
                         <PermissionTooltip

@@ -290,10 +290,11 @@ func (a *UsersAPIService) UsersListUserRolesExecute(r ApiUsersListUserRolesReque
 }
 
 type ApiUsersListUsersRequest struct {
-	ctx        context.Context
-	ApiService *UsersAPIService
-	domainType *string
-	domainId   *string
+	ctx                    context.Context
+	ApiService             *UsersAPIService
+	domainType             *string
+	domainId               *string
+	includeServiceAccounts *bool
 }
 
 func (r ApiUsersListUsersRequest) DomainType(domainType string) ApiUsersListUsersRequest {
@@ -303,6 +304,11 @@ func (r ApiUsersListUsersRequest) DomainType(domainType string) ApiUsersListUser
 
 func (r ApiUsersListUsersRequest) DomainId(domainId string) ApiUsersListUsersRequest {
 	r.domainId = &domainId
+	return r
+}
+
+func (r ApiUsersListUsersRequest) IncludeServiceAccounts(includeServiceAccounts bool) ApiUsersListUsersRequest {
+	r.includeServiceAccounts = &includeServiceAccounts
 	return r
 }
 
@@ -355,6 +361,9 @@ func (a *UsersAPIService) UsersListUsersExecute(r ApiUsersListUsersRequest) (*Us
 	}
 	if r.domainId != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
+	}
+	if r.includeServiceAccounts != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "includeServiceAccounts", r.includeServiceAccounts, "", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}

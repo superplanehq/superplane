@@ -59,7 +59,7 @@ func Test__OnAlarm__Setup(t *testing.T) {
 			Metadata: common.IntegrationMetadata{
 				EventBridge: &common.EventBridgeMetadata{
 					Rules: map[string]common.EventBridgeRuleMetadata{
-						Source: {
+						"aws.cloudwatch:us-east-1": {
 							Source:      Source,
 							DetailTypes: []string{DetailTypeAlarmStateChange},
 						},
@@ -120,7 +120,7 @@ func Test__OnAlarm__HandleAction(t *testing.T) {
 			Metadata: common.IntegrationMetadata{
 				EventBridge: &common.EventBridgeMetadata{
 					Rules: map[string]common.EventBridgeRuleMetadata{
-						Source: {
+						"aws.cloudwatch:us-east-1": {
 							Source:      Source,
 							DetailTypes: []string{DetailTypeAlarmStateChange},
 						},

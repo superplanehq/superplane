@@ -4,6 +4,7 @@ import { useOrganization } from "@/hooks/useOrganizationData";
 import { cn } from "@/lib/utils";
 import {
   ArrowRightLeft,
+  Bot,
   ChevronDown,
   CircleUser,
   Key,
@@ -96,6 +97,12 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
       href: organizationId ? `/${organizationId}/settings/members` : "#",
       Icon: UserIcon,
       permission: { resource: "members", action: "read" },
+    },
+    {
+      label: "Service Accounts",
+      href: organizationId ? `/${organizationId}/settings/service-accounts` : "#",
+      Icon: Bot,
+      permission: { resource: "service_accounts", action: "read" },
     },
     {
       label: "Groups",

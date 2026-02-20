@@ -411,6 +411,130 @@ func (c *Client) GetIncident(id string) (*Incident, error) {
 	return incidentFromData(response.Data), nil
 }
 
+// GetIncidentDetailed fetches an incident with related resources and returns
+// a flattened map containing attributes and resolved relationships.
+func (c *Client) GetIncidentDetailed(id string) (map[string]any, error) {
+	url := fmt.Sprintf("%s/incidents/%s?include=services,groups,events,action_items", c.BaseURL, id)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var raw map[string]any
+	err = json.Unmarshal(responseBody, &raw)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	data, ok := raw["data"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response format: missing data")
+	}
+
+	// Start with attributes as the base result
+	attributes, _ := data["attributes"].(map[string]any)
+	if attributes == nil {
+		attributes = make(map[string]any)
+	}
+
+	result := make(map[string]any, len(attributes)+1)
+	for k, v := range attributes {
+		result[k] = v
+	}
+
+	// Set the top-level ID from data
+	result["id"] = data["id"]
+
+	// Normalize severity to string for consistency with other components
+	if sev, ok := result["severity"]; ok {
+		result["severity"] = severityString(sev)
+	}
+
+	// Build an index from the "included" array: "type:id" -> resolved object
+	includedIndex := map[string]map[string]any{}
+	if included, ok := raw["included"].([]any); ok {
+		for _, item := range included {
+			inc, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			incType, _ := inc["type"].(string)
+			incID, _ := inc["id"].(string)
+			if incType == "" || incID == "" {
+				continue
+			}
+			resolved := map[string]any{"id": incID}
+			if attrs, ok := inc["attributes"].(map[string]any); ok {
+				for k, v := range attrs {
+					resolved[k] = v
+				}
+			}
+			includedIndex[incType+":"+incID] = resolved
+		}
+	}
+
+	// Only resolve the relationships we explicitly requested via the include
+	// parameter. The API response contains many more relationships (e.g.
+	// severity, user, started_by) that may have "data": null linkage. If we
+	// iterated over all of them, a null data value would overwrite a field
+	// already populated from attributes.
+	requestedRelationships := map[string]bool{
+		"services":     true,
+		"groups":       true,
+		"events":       true,
+		"action_items": true,
+	}
+
+	relationships, _ := data["relationships"].(map[string]any)
+	for relName, relValue := range relationships {
+		if !requestedRelationships[relName] {
+			continue
+		}
+
+		rel, ok := relValue.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		relData := rel["data"]
+		if relData == nil {
+			result[relName] = nil
+			continue
+		}
+
+		// Array relationship
+		if arr, ok := relData.([]any); ok {
+			resolved := make([]map[string]any, 0, len(arr))
+			for _, ref := range arr {
+				refMap, ok := ref.(map[string]any)
+				if !ok {
+					continue
+				}
+				refType, _ := refMap["type"].(string)
+				refID, _ := refMap["id"].(string)
+				key := refType + ":" + refID
+				if obj, found := includedIndex[key]; found {
+					resolved = append(resolved, obj)
+				}
+			}
+			result[relName] = resolved
+			continue
+		}
+
+		// Single relationship
+		if refMap, ok := relData.(map[string]any); ok {
+			refType, _ := refMap["type"].(string)
+			refID, _ := refMap["id"].(string)
+			key := refType + ":" + refID
+			if obj, found := includedIndex[key]; found {
+				result[relName] = obj
+			}
+		}
+	}
+
+	return result, nil
+}
+
 func (c *Client) ListIncidents() ([]Incident, error) {
 	url := fmt.Sprintf("%s/incidents", c.BaseURL)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)

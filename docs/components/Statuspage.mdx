@@ -1,0 +1,435 @@
+---
+title: "Statuspage"
+---
+
+Create and manage incidents on your Atlassian Statuspage
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident or scheduled maintenance on your Statuspage." />
+  <LinkCard title="Get Incident" href="#get-incident" description="Get the full details of an incident including its timeline and status on your Statuspage." />
+  <LinkCard title="Update Incident" href="#update-incident" description="Update the status and message of an existing incident on your Statuspage." />
+</CardGrid>
+
+## Instructions
+
+To get your API key: Open your Statuspage, click the icon in the top-right corner, select API info, then create an API key.
+
+<a id="create-incident"></a>
+
+## Create Incident
+
+The Create Incident component creates a new realtime or scheduled incident on your Atlassian Statuspage.
+
+### Use Cases
+
+- **Realtime incidents**: Create and notify subscribers when an unexpected outage occurs
+- **Scheduled maintenance**: Schedule maintenance windows with optional reminders and auto-transitions
+- **Integration workflows**: Create incidents from monitoring alerts or other workflow events
+
+### Configuration
+
+- **Page** (required): The Statuspage to create the incident on. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
+- **Incident type**: Realtime (active incident) or Scheduled (planned maintenance)
+- **Name** (required): Short title for the incident
+- **Body** (optional): Initial message shown as the first incident update
+- **Status** (realtime): investigating, identified, monitoring, or resolved
+- **Impact override** (realtime): none, minor, major, or critical
+- **Components** (optional): List of components and their status. Each item has Component ID (supports expressions) and Status (operational, degraded_performance, partial_outage, major_outage, under_maintenance)
+- **Scheduled For / Until** (scheduled): Start and end time for scheduled maintenance (ISO 8601, e.g. 2026-02-15T02:00)
+- **Scheduled timezone** (scheduled): Timezone for the scheduled times (default UTC). Output is converted to UTC for the API.
+- **Scheduled options** (scheduled): Remind prior, auto in-progress, auto completed
+- **Deliver notifications** (optional): Whether to send notifications for the initial update (default: true)
+
+### Output
+
+Returns the full Statuspage Incident object from the API. The payload has structure { type, timestamp, data } where data is the incident. Common expression paths (use $['Node Name'].data. as prefix):
+- data.id, data.name, data.status, data.impact
+- data.shortlink — link to the incident
+- data.created_at, data.updated_at
+- data.components — array of affected components
+- data.incident_updates — array of update messages
+
+### Example Output
+
+```json
+{
+  "data": {
+    "auto_transition_deliver_notifications_at_end": null,
+    "auto_transition_deliver_notifications_at_start": null,
+    "auto_transition_to_maintenance_state": null,
+    "auto_transition_to_operational_state": null,
+    "components": [
+      {
+        "automation_email": "component+example123...",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "description": null,
+        "group": false,
+        "group_id": null,
+        "id": "8kbf7d35c070",
+        "name": "API",
+        "only_show_if_degraded": false,
+        "page_id": "kctbh9vrtdwd",
+        "position": 1,
+        "showcase": true,
+        "start_date": "2026-02-12",
+        "status": "partial_outage",
+        "updated_at": "2026-02-12T10:30:00.000Z"
+      },
+      {
+        "automation_email": "component+example456...",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "description": null,
+        "group": false,
+        "group_id": null,
+        "id": "9kbf7d35c071",
+        "name": "Management Portal",
+        "only_show_if_degraded": false,
+        "page_id": "kctbh9vrtdwd",
+        "position": 2,
+        "showcase": true,
+        "start_date": "2026-02-12",
+        "status": "degraded_performance",
+        "updated_at": "2026-02-12T10:30:00.000Z"
+      }
+    ],
+    "created_at": "2026-02-12T10:30:00.000Z",
+    "id": "p31zjtct2jer",
+    "impact": "major",
+    "impact_override": "major",
+    "incident_updates": [
+      {
+        "affected_components": [
+          {
+            "code": "8kbf7d35c070",
+            "name": "API",
+            "new_status": "partial_outage",
+            "old_status": "partial_outage"
+          },
+          {
+            "code": "9kbf7d35c071",
+            "name": "Management Portal",
+            "new_status": "degraded_performance",
+            "old_status": "degraded_performance"
+          }
+        ],
+        "body": "We are investigating reports of slow database queries.",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "custom_tweet": null,
+        "deliver_notifications": true,
+        "display_at": "2026-02-12T10:30:00.000Z",
+        "id": "upd1",
+        "incident_id": "p31zjtct2jer",
+        "status": "investigating",
+        "tweet_id": null,
+        "twitter_updated_at": null,
+        "updated_at": "2026-02-12T10:30:00.000Z",
+        "wants_twitter_update": false
+      }
+    ],
+    "metadata": {},
+    "monitoring_at": null,
+    "name": "Database Connection Issues",
+    "page_id": "kctbh9vrtdwd",
+    "postmortem_body": null,
+    "postmortem_body_last_updated_at": null,
+    "postmortem_ignored": false,
+    "postmortem_notified_subscribers": false,
+    "postmortem_notified_twitter": false,
+    "postmortem_published_at": null,
+    "reminder_intervals": null,
+    "resolved_at": null,
+    "scheduled_auto_completed": false,
+    "scheduled_auto_in_progress": false,
+    "scheduled_for": null,
+    "scheduled_remind_prior": false,
+    "scheduled_reminded_at": null,
+    "scheduled_until": null,
+    "shortlink": "https://stspg.io/p31zjtct2jer",
+    "status": "investigating",
+    "updated_at": "2026-02-12T10:30:00.000Z"
+  },
+  "timestamp": "2026-02-12T10:30:00.000Z",
+  "type": "statuspage.incident"
+}
+```
+
+<a id="get-incident"></a>
+
+## Get Incident
+
+The Get Incident component fetches the full details of an existing incident on your Atlassian Statuspage.
+
+### Use Cases
+
+- **Incident lookup**: Fetch incident details for processing or display
+- **Workflow automation**: Get incident information to make decisions in workflows
+- **Timeline enrichment**: Retrieve the incident timeline (incident_updates) for reporting or notifications
+- **Status checking**: Check incident status before performing actions
+
+### Configuration
+
+- **Page** (required): The Statuspage containing the incident. Select from the dropdown, or switch to expression mode for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
+- **Incident** (required): Incident ID to fetch. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.id }}).
+
+### Output
+
+Returns the full Statuspage Incident object from the API. The payload has structure { type, timestamp, data } where data is the incident. Common expression paths (use $['Node Name'].data. as prefix):
+- data.id, data.name, data.status, data.impact
+- data.shortlink — link to the incident
+- data.created_at, data.updated_at, data.resolved_at
+- data.components — array of affected components
+- data.incident_updates — array of update messages (timeline), in API order
+
+### Example Output
+
+```json
+{
+  "data": {
+    "auto_transition_deliver_notifications_at_end": null,
+    "auto_transition_deliver_notifications_at_start": null,
+    "auto_transition_to_maintenance_state": null,
+    "auto_transition_to_operational_state": null,
+    "components": [
+      {
+        "automation_email": "component+example123...",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "description": null,
+        "group": false,
+        "group_id": null,
+        "id": "8kbf7d35c070",
+        "name": "API",
+        "only_show_if_degraded": false,
+        "page_id": "kctbh9vrtdwd",
+        "position": 1,
+        "showcase": true,
+        "status": "partial_outage",
+        "updated_at": "2026-02-12T10:30:00.000Z"
+      }
+    ],
+    "created_at": "2026-02-12T10:30:00.000Z",
+    "id": "p31zjtct2jer",
+    "impact": "major",
+    "impact_override": "major",
+    "incident_updates": [
+      {
+        "affected_components": null,
+        "body": "We are investigating reports of slow database queries.",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "custom_tweet": null,
+        "deliver_notifications": true,
+        "display_at": "2026-02-12T10:30:00.000Z",
+        "id": "upd1",
+        "incident_id": "p31zjtct2jer",
+        "status": "monitoring",
+        "tweet_id": null,
+        "twitter_updated_at": null,
+        "updated_at": "2026-02-12T10:30:00.000Z",
+        "wants_twitter_update": false
+      },
+      {
+        "affected_components": [
+          {
+            "code": "8kbf7d35c070",
+            "name": "API",
+            "new_status": "degraded_performance",
+            "old_status": "operational"
+          }
+        ],
+        "body": "We have identified the problem and are working on a fix.",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "custom_tweet": null,
+        "deliver_notifications": true,
+        "display_at": "2026-02-12T10:30:00.000Z",
+        "id": "upd2",
+        "incident_id": "p31zjtct2jer",
+        "status": "identified",
+        "tweet_id": null,
+        "twitter_updated_at": null,
+        "updated_at": "2026-02-12T10:30:00.000Z",
+        "wants_twitter_update": false
+      }
+    ],
+    "metadata": {},
+    "monitoring_at": "2026-02-12T10:30:00.000Z",
+    "name": "Database Connection Issues",
+    "page_id": "kctbh9vrtdwd",
+    "postmortem_body": null,
+    "postmortem_body_last_updated_at": null,
+    "postmortem_ignored": false,
+    "postmortem_notified_subscribers": false,
+    "postmortem_notified_twitter": false,
+    "postmortem_published_at": null,
+    "reminder_intervals": null,
+    "resolved_at": null,
+    "scheduled_auto_completed": false,
+    "scheduled_auto_in_progress": false,
+    "scheduled_for": null,
+    "scheduled_remind_prior": false,
+    "scheduled_reminded_at": null,
+    "scheduled_until": null,
+    "shortlink": "https://stspg.io/p31zjtct2jer",
+    "status": "monitoring",
+    "updated_at": "2026-02-12T10:30:00.000Z"
+  },
+  "timestamp": "2026-02-12T10:30:00.000Z",
+  "type": "statuspage.incident"
+}
+```
+
+<a id="update-incident"></a>
+
+## Update Incident
+
+The Update Incident component updates an existing incident on your Atlassian Statuspage.
+
+### Use Cases
+
+- **Status transitions**: Update incident status (e.g. investigating → identified → resolved)
+- **Maintenance updates**: Transition scheduled maintenance to in progress or completed
+- **Integration workflows**: Update incidents from monitoring systems or approval workflows
+
+### Configuration
+
+- **Page** (required): The Statuspage containing the incident. Select from the dropdown, or switch to expression mode for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
+- **Incident** (required): Incident ID to update. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.id }}).
+- **Incident type**: Realtime or Scheduled — determines which status options are shown. You cannot change an incident's type.
+- **Status** (optional): New status. Options depend on incident type: realtime (investigating, identified, monitoring, resolved) or scheduled (scheduled, in progress, verifying, completed)
+- **Body** (optional): Update message shown as the latest incident update
+- **Impact override** (optional, realtime only): Override displayed severity (none, maintenance, minor, major, critical)
+- **Components** (optional): List of components and their status. Each item has Component ID (supports expressions) and Status (operational, degraded_performance, partial_outage, major_outage, under_maintenance)
+- **Deliver notifications** (optional): Whether to send notifications for this update (default: true)
+
+At least one of Status, Body, Impact override, or Components must be provided.
+
+### Output
+
+Returns the full Statuspage Incident object from the API. The payload has structure { type, timestamp, data } where data is the incident. Common expression paths (use $['Node Name'].data. as prefix):
+- data.id, data.name, data.status, data.impact
+- data.shortlink — link to the incident
+- data.created_at, data.updated_at
+- data.components — array of affected components
+- data.incident_updates — array of update messages
+
+### Example Output
+
+```json
+{
+  "data": {
+    "auto_transition_deliver_notifications_at_end": null,
+    "auto_transition_deliver_notifications_at_start": null,
+    "auto_transition_to_maintenance_state": null,
+    "auto_transition_to_operational_state": null,
+    "components": [
+      {
+        "automation_email": "component+example123...",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "description": null,
+        "group": false,
+        "group_id": null,
+        "id": "8kbf7d35c070",
+        "name": "API",
+        "only_show_if_degraded": false,
+        "page_id": "kctbh9vrtdwd",
+        "position": 1,
+        "showcase": true,
+        "start_date": "2026-02-12",
+        "status": "partial_outage",
+        "updated_at": "2026-02-12T10:30:00.000Z"
+      },
+      {
+        "automation_email": "component+example456...",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "description": null,
+        "group": false,
+        "group_id": null,
+        "id": "9kbf7d35c071",
+        "name": "Management Portal",
+        "only_show_if_degraded": false,
+        "page_id": "kctbh9vrtdwd",
+        "position": 2,
+        "showcase": true,
+        "start_date": "2026-02-12",
+        "status": "degraded_performance",
+        "updated_at": "2026-02-12T10:30:00.000Z"
+      }
+    ],
+    "created_at": "2026-02-12T10:30:00.000Z",
+    "id": "p31zjtct2jer",
+    "impact": "minor",
+    "impact_override": "minor",
+    "incident_updates": [
+      {
+        "affected_components": null,
+        "body": "We're tracking the problem.",
+        "created_at": "2026-02-12T11:00:00.000Z",
+        "custom_tweet": null,
+        "deliver_notifications": true,
+        "display_at": "2026-02-12T11:00:00.000Z",
+        "id": "upd1",
+        "incident_id": "p31zjtct2jer",
+        "status": "monitoring",
+        "tweet_id": null,
+        "twitter_updated_at": null,
+        "updated_at": "2026-02-12T11:00:00.000Z",
+        "wants_twitter_update": false
+      },
+      {
+        "affected_components": [
+          {
+            "code": "8kbf7d35c070",
+            "name": "API",
+            "new_status": "partial_outage",
+            "old_status": "partial_outage"
+          },
+          {
+            "code": "9kbf7d35c071",
+            "name": "Management Portal",
+            "new_status": "degraded_performance",
+            "old_status": "degraded_performance"
+          }
+        ],
+        "body": "There is a problem.",
+        "created_at": "2026-02-12T10:30:00.000Z",
+        "custom_tweet": null,
+        "deliver_notifications": true,
+        "display_at": "2026-02-12T10:30:00.000Z",
+        "id": "upd2",
+        "incident_id": "p31zjtct2jer",
+        "status": "investigating",
+        "tweet_id": null,
+        "twitter_updated_at": null,
+        "updated_at": "2026-02-12T10:30:00.000Z",
+        "wants_twitter_update": false
+      }
+    ],
+    "metadata": {},
+    "monitoring_at": "2026-02-12T11:00:00.000Z",
+    "name": "Database Connection Issues",
+    "page_id": "kctbh9vrtdwd",
+    "postmortem_body": null,
+    "postmortem_body_last_updated_at": null,
+    "postmortem_ignored": false,
+    "postmortem_notified_subscribers": false,
+    "postmortem_notified_twitter": false,
+    "postmortem_published_at": null,
+    "reminder_intervals": null,
+    "resolved_at": null,
+    "scheduled_auto_completed": false,
+    "scheduled_auto_in_progress": false,
+    "scheduled_for": null,
+    "scheduled_remind_prior": false,
+    "scheduled_reminded_at": null,
+    "scheduled_until": null,
+    "shortlink": "https://stspg.io/p31zjtct2jer",
+    "status": "monitoring",
+    "updated_at": "2026-02-12T11:00:00.000Z"
+  },
+  "timestamp": "2026-02-12T11:00:00.000Z",
+  "type": "statuspage.incident"
+}
+```
+

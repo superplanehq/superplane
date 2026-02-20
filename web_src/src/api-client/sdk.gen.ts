@@ -207,6 +207,24 @@ import type {
   SecretsUpdateSecretNameErrors,
   SecretsUpdateSecretNameResponses,
   SecretsUpdateSecretResponses,
+  ServiceAccountsCreateServiceAccountData,
+  ServiceAccountsCreateServiceAccountErrors,
+  ServiceAccountsCreateServiceAccountResponses,
+  ServiceAccountsDeleteServiceAccountData,
+  ServiceAccountsDeleteServiceAccountErrors,
+  ServiceAccountsDeleteServiceAccountResponses,
+  ServiceAccountsDescribeServiceAccountData,
+  ServiceAccountsDescribeServiceAccountErrors,
+  ServiceAccountsDescribeServiceAccountResponses,
+  ServiceAccountsListServiceAccountsData,
+  ServiceAccountsListServiceAccountsErrors,
+  ServiceAccountsListServiceAccountsResponses,
+  ServiceAccountsRegenerateServiceAccountTokenData,
+  ServiceAccountsRegenerateServiceAccountTokenErrors,
+  ServiceAccountsRegenerateServiceAccountTokenResponses,
+  ServiceAccountsUpdateServiceAccountData,
+  ServiceAccountsUpdateServiceAccountErrors,
+  ServiceAccountsUpdateServiceAccountResponses,
   TriggersDescribeTriggerData,
   TriggersDescribeTriggerErrors,
   TriggersDescribeTriggerResponses,
@@ -1273,6 +1291,111 @@ export const secretsUpdateSecretName = <ThrowOnError extends boolean = true>(
 ) =>
   (options.client ?? client).patch<SecretsUpdateSecretNameResponses, SecretsUpdateSecretNameErrors, ThrowOnError>({
     url: "/api/v1/secrets/{idOrName}/name",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List service accounts
+ *
+ * Returns all service accounts in the organization
+ */
+export const serviceAccountsListServiceAccounts = <ThrowOnError extends boolean = true>(
+  options?: Options<ServiceAccountsListServiceAccountsData, ThrowOnError>,
+) =>
+  (options?.client ?? client).get<
+    ServiceAccountsListServiceAccountsResponses,
+    ServiceAccountsListServiceAccountsErrors,
+    ThrowOnError
+  >({ url: "/api/v1/service-accounts", ...options });
+
+/**
+ * Create a service account
+ *
+ * Creates a new service account in the organization
+ */
+export const serviceAccountsCreateServiceAccount = <ThrowOnError extends boolean = true>(
+  options: Options<ServiceAccountsCreateServiceAccountData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    ServiceAccountsCreateServiceAccountResponses,
+    ServiceAccountsCreateServiceAccountErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/service-accounts",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a service account
+ *
+ * Deletes a service account and removes its RBAC policies
+ */
+export const serviceAccountsDeleteServiceAccount = <ThrowOnError extends boolean = true>(
+  options: Options<ServiceAccountsDeleteServiceAccountData, ThrowOnError>,
+) =>
+  (options.client ?? client).delete<
+    ServiceAccountsDeleteServiceAccountResponses,
+    ServiceAccountsDeleteServiceAccountErrors,
+    ThrowOnError
+  >({ url: "/api/v1/service-accounts/{id}", ...options });
+
+/**
+ * Describe a service account
+ *
+ * Returns details of a specific service account
+ */
+export const serviceAccountsDescribeServiceAccount = <ThrowOnError extends boolean = true>(
+  options: Options<ServiceAccountsDescribeServiceAccountData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<
+    ServiceAccountsDescribeServiceAccountResponses,
+    ServiceAccountsDescribeServiceAccountErrors,
+    ThrowOnError
+  >({ url: "/api/v1/service-accounts/{id}", ...options });
+
+/**
+ * Update a service account
+ *
+ * Updates the name or description of a service account
+ */
+export const serviceAccountsUpdateServiceAccount = <ThrowOnError extends boolean = true>(
+  options: Options<ServiceAccountsUpdateServiceAccountData, ThrowOnError>,
+) =>
+  (options.client ?? client).patch<
+    ServiceAccountsUpdateServiceAccountResponses,
+    ServiceAccountsUpdateServiceAccountErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/service-accounts/{id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Regenerate service account token
+ *
+ * Regenerates the API token for a service account
+ */
+export const serviceAccountsRegenerateServiceAccountToken = <ThrowOnError extends boolean = true>(
+  options: Options<ServiceAccountsRegenerateServiceAccountTokenData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    ServiceAccountsRegenerateServiceAccountTokenResponses,
+    ServiceAccountsRegenerateServiceAccountTokenErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/service-accounts/{id}/token",
     ...options,
     headers: {
       "Content-Type": "application/json",
