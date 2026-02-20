@@ -157,13 +157,6 @@ type IntegrationMessageContext struct {
 	//
 	// For triggers, this field is nil because each integration message
 	// starts a new event chain via Events.Emit().
-	Message           any
-	Configuration     any
-	NodeMetadata      MetadataContext
-	Logger            *logrus.Entry
-	HTTP              HTTPContext
-	Integration       IntegrationContext
-	Events            EventContext
 	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
 }
 
