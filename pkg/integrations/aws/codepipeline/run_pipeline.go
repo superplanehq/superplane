@@ -427,6 +427,10 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusOK, nil
 	}
 
+	if executionCtx == nil {
+		return http.StatusOK, nil
+	}
+
 	metadata := RunPipelineExecutionMetadata{}
 	err = mapstructure.Decode(executionCtx.Metadata.Get(), &metadata)
 	if err != nil {
@@ -448,7 +452,7 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		status = PipelineStatusSucceeded
 	case "FAILED":
 		status = PipelineStatusFailed
-	case "CANCELED", "CANCELLED":
+	case "CANCELED", "CANCELLED", "STOPPED":
 		status = PipelineStatusStopped
 	default:
 		return http.StatusOK, nil
@@ -608,6 +612,10 @@ func (r *RunPipeline) finish(ctx core.ActionContext) error {
 		return fmt.Errorf("data parameter is invalid")
 	}
 
+	if metadata.Pipeline == nil {
+		return fmt.Errorf("pipeline metadata not found - component may not be properly set up")
+	}
+
 	metadata.Extra = dataMap
 	err = ctx.Metadata.Set(metadata)
 	if err != nil {
@@ -687,7 +695,7 @@ func (r *RunPipeline) OnIntegrationMessage(ctx core.IntegrationMessageContext) e
 		status = PipelineStatusSucceeded
 	case "FAILED":
 		status = PipelineStatusFailed
-	case "CANCELED", "CANCELLED":
+	case "CANCELED", "CANCELLED", "STOPPED":
 		status = PipelineStatusStopped
 	default:
 		return nil
