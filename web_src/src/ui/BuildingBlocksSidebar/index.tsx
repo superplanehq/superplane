@@ -46,6 +46,7 @@ import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
+import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
@@ -444,6 +445,7 @@ function CategorySection({
       cloudwatch: awsCloudwatchIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
+      sqs: awsSqsIcon,
       route53: awsRoute53Icon,
       ecs: awsEcsIcon,
       sns: awsSnsIcon,
@@ -533,6 +535,7 @@ function CategorySection({
               ecr: awsEcrIcon,
               ec2: awsEc2Icon,
               lambda: awsLambdaIcon,
+              sqs: awsSqsIcon,
               route53: awsRoute53Icon,
               ecs: awsEcsIcon,
               sns: awsSnsIcon,
