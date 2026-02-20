@@ -62,7 +62,8 @@ func Test__RunPipeline__Setup(t *testing.T) {
 			},
 			Metadata: &contexts.MetadataContext{
 				Metadata: RunPipelineNodeMetadata{
-					Region: "us-east-1",
+					SubscriptionID: "sub-123",
+					Region:         "us-east-1",
 					Pipeline: &PipelineMetadata{
 						Name: "my-pipeline",
 					},

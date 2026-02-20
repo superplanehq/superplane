@@ -647,11 +647,22 @@ The Run Pipeline component triggers an AWS CodePipeline execution and waits for 
 
 ```json
 {
-  "pipeline": {
-    "executionId": "1234-5678-abcd-efgh",
-    "name": "my-pipeline",
-    "status": "Succeeded"
-  }
+  "data": {
+    "detail": {
+      "execution-id": "a1b2c3d4-5678-90ab-cdef-111122223333",
+      "pipeline": "my-deploy-pipeline",
+      "state": "SUCCEEDED",
+      "version": 1
+    },
+    "pipeline": {
+      "executionId": "a1b2c3d4-5678-90ab-cdef-111122223333",
+      "name": "my-deploy-pipeline",
+      "state": "SUCCEEDED",
+      "status": "Succeeded"
+    }
+  },
+  "timestamp": "2026-02-10T14:35:22.518372841Z",
+  "type": "aws.codepipeline.pipeline.finished"
 }
 ```
 

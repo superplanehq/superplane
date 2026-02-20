@@ -62,9 +62,7 @@ export const runPipelineMapper: ComponentBaseMapper = {
       (failedOutputs?.failed?.[0]?.data as RunPipelineOutput | undefined);
 
     const details: Record<string, string> = {
-      "Started At": context.execution.createdAt
-        ? new Date(context.execution.createdAt).toLocaleString()
-        : "-",
+      "Started At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
     };
 
     if (!result?.pipeline) {
