@@ -127,6 +127,6 @@ func Test__PurgeQueue__Execute(t *testing.T) {
 		assert.True(t, purged)
 
 		require.Len(t, httpContext.Requests, 1)
-		assert.Equal(t, "https://sqs.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())
+		assert.Equal(t, "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue", httpContext.Requests[0].URL.String())
 	})
 }

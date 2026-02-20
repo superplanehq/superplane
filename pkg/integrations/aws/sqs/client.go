@@ -115,13 +115,13 @@ func (c *Client) ListQueues(prefix string) ([]Queue, error) {
 }
 
 func (c *Client) GetQueueAttributes(queueURL string) (map[string]string, error) {
+	queueURL = strings.TrimSpace(queueURL)
 	params := url.Values{}
 	params.Set("Action", "GetQueueAttributes")
 	params.Set("Version", "2012-11-05")
-	params.Set("QueueUrl", strings.TrimSpace(queueURL))
 	params.Set("AttributeName", "All")
 
-	body, err := c.postForm(c.endpoint(), params)
+	body, err := c.postForm(queueURL, params)
 	if err != nil {
 		return nil, err
 	}
@@ -140,13 +140,13 @@ func (c *Client) GetQueueAttributes(queueURL string) (map[string]string, error) 
 }
 
 func (c *Client) SendMessage(queueURL string, messageBody string) (string, error) {
+	queueURL = strings.TrimSpace(queueURL)
 	params := url.Values{}
 	params.Set("Action", "SendMessage")
 	params.Set("Version", "2012-11-05")
-	params.Set("QueueUrl", strings.TrimSpace(queueURL))
 	params.Set("MessageBody", messageBody)
 
-	body, err := c.postForm(c.endpoint(), params)
+	body, err := c.postForm(queueURL, params)
 	if err != nil {
 		return "", err
 	}
@@ -191,22 +191,22 @@ func (c *Client) CreateQueue(name string, attributes map[string]string) (string,
 }
 
 func (c *Client) DeleteQueue(queueURL string) error {
+	queueURL = strings.TrimSpace(queueURL)
 	params := url.Values{}
 	params.Set("Action", "DeleteQueue")
 	params.Set("Version", "2012-11-05")
-	params.Set("QueueUrl", strings.TrimSpace(queueURL))
 
-	_, err := c.postForm(c.endpoint(), params)
+	_, err := c.postForm(queueURL, params)
 	return err
 }
 
 func (c *Client) PurgeQueue(queueURL string) error {
+	queueURL = strings.TrimSpace(queueURL)
 	params := url.Values{}
 	params.Set("Action", "PurgeQueue")
 	params.Set("Version", "2012-11-05")
-	params.Set("QueueUrl", strings.TrimSpace(queueURL))
 
-	_, err := c.postForm(c.endpoint(), params)
+	_, err := c.postForm(queueURL, params)
 	return err
 }
 

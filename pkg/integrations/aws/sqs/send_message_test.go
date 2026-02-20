@@ -157,6 +157,6 @@ func Test__SendMessage__Execute(t *testing.T) {
 		assert.Equal(t, "12345-abc", data["messageId"])
 
 		require.Len(t, httpContext.Requests, 1)
-		assert.Equal(t, "https://sqs.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())
+		assert.Equal(t, "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue", httpContext.Requests[0].URL.String())
 	})
 }

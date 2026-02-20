@@ -127,6 +127,6 @@ func Test__DeleteQueue__Execute(t *testing.T) {
 		assert.True(t, deleted)
 
 		require.Len(t, httpContext.Requests, 1)
-		assert.Equal(t, "https://sqs.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())
+		assert.Equal(t, "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue", httpContext.Requests[0].URL.String())
 	})
 }
