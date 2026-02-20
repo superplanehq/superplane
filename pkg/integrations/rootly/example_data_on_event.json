@@ -1,0 +1,14 @@
+{
+  "data": {
+    "created_at": "2026-02-20T04:46:36.748-08:00",
+    "event": "this incident is still live, investigation ongoing",
+    "event_type": "incident_event.created",
+    "id": "d09e31d4-a884-4b48-a6cf-2549e47539a3",
+    "kind": "event",
+    "occurred_at": "2026-02-20T04:46:36.748-08:00",
+    "source": "web",
+    "visibility": "internal"
+  },
+  "timestamp": "2026-02-20T12:46:56.234164534Z",
+  "type": "rootly.onEvent"
+}
