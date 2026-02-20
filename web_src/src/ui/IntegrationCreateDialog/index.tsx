@@ -223,7 +223,10 @@ export function IntegrationCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto" showCloseButton={!isCreatePending}>
+      <DialogContent
+        className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
+        showCloseButton={!isCreatePending && !isUpdatePending}
+      >
         <DialogHeader>
           <div className="flex items-center gap-3">
             <IntegrationIcon
