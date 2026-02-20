@@ -50,17 +50,7 @@ func (t *Telegram) Description() string {
 }
 
 func (t *Telegram) Instructions() string {
-	return `To set up Telegram integration:
-
-1. Open Telegram and search for **@BotFather**
-2. Start a chat and send the command **/newbot**
-3. Follow the instructions to choose a name and username for your bot
-4. BotFather will provide you with a **Bot Token** - copy this token
-5. Paste the **Bot Token** in the field below
-6. To use your bot in groups:
-   - Add your bot to the desired group or channel
-   - Get the chat ID (you can use @getidsbot or other methods)
-   - Use the chat ID in your workflow components`
+	return `To set up Telegram integration: get a token from @BotFather and paste it in the field below`
 }
 
 func (t *Telegram) Configuration() []configuration.Field {
