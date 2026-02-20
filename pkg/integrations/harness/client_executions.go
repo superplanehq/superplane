@@ -268,6 +268,14 @@ func (c *Client) ListOrganizations() ([]Organization, error) {
 		return nil, err
 	}
 
+	ngQuery := c.accountQuery()
+	ngQuery.Set("page", "0")
+	ngQuery.Set("size", "100")
+
+	v1Query := c.accountQuery()
+	v1Query.Set("page", "0")
+	v1Query.Set("size", "100")
+
 	attempts := []struct {
 		method            string
 		endpoint          string
@@ -278,13 +286,13 @@ func (c *Client) ListOrganizations() ([]Organization, error) {
 		{
 			method:            http.MethodGet,
 			endpoint:          "/ng/api/organizations",
-			query:             c.accountQuery(),
+			query:             ngQuery,
 			includeJSONHeader: false,
 		},
 		{
 			method:            http.MethodGet,
 			endpoint:          "/v1/orgs",
-			query:             c.accountQuery(),
+			query:             v1Query,
 			includeJSONHeader: false,
 		},
 	}
@@ -342,6 +350,12 @@ func (c *Client) ListProjects(orgID string) ([]Project, error) {
 
 	accountQuery := c.accountQuery()
 	accountQuery.Set("orgIdentifier", orgID)
+	accountQuery.Set("page", "0")
+	accountQuery.Set("size", "100")
+
+	v1Query := c.accountQuery()
+	v1Query.Set("page", "0")
+	v1Query.Set("size", "100")
 
 	attempts := []struct {
 		method            string
@@ -359,7 +373,7 @@ func (c *Client) ListProjects(orgID string) ([]Project, error) {
 		{
 			method:            http.MethodGet,
 			endpoint:          fmt.Sprintf("/v1/orgs/%s/projects", url.PathEscape(orgID)),
-			query:             c.accountQuery(),
+			query:             v1Query,
 			includeJSONHeader: false,
 		},
 	}

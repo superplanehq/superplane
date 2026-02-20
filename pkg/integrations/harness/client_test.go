@@ -119,6 +119,9 @@ func Test__Client__ListOrganizations__ParsesTopLevelArray(t *testing.T) {
 	require.Len(t, organizations, 1)
 	assert.Equal(t, "default", organizations[0].Identifier)
 	assert.Equal(t, "Default Org", organizations[0].Name)
+	require.Len(t, httpCtx.Requests, 1)
+	assert.Contains(t, httpCtx.Requests[0].URL.RawQuery, "page=0")
+	assert.Contains(t, httpCtx.Requests[0].URL.RawQuery, "size=100")
 }
 
 func Test__Client__ListOrganizations__ParsesNestedHarnessShapes(t *testing.T) {
@@ -171,6 +174,10 @@ func Test__Client__ListProjects__ParsesTopLevelArray(t *testing.T) {
 	require.Len(t, projects, 1)
 	assert.Equal(t, "default_project", projects[0].Identifier)
 	assert.Equal(t, "Default Project", projects[0].Name)
+	require.Len(t, httpCtx.Requests, 1)
+	assert.Contains(t, httpCtx.Requests[0].URL.RawQuery, "orgIdentifier=default")
+	assert.Contains(t, httpCtx.Requests[0].URL.RawQuery, "page=0")
+	assert.Contains(t, httpCtx.Requests[0].URL.RawQuery, "size=100")
 }
 
 func Test__Client__ListProjects__ParsesNestedHarnessShapes(t *testing.T) {
