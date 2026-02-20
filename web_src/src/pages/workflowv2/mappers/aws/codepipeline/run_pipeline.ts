@@ -61,15 +61,21 @@ export const runPipelineMapper: ComponentBaseMapper = {
       (passedOutputs?.passed?.[0]?.data as RunPipelineOutput | undefined) ||
       (failedOutputs?.failed?.[0]?.data as RunPipelineOutput | undefined);
 
+    const details: Record<string, string> = {
+      "Started At": context.execution.createdAt
+        ? new Date(context.execution.createdAt).toLocaleString()
+        : "-",
+    };
+
     if (!result?.pipeline) {
-      return {};
+      return details;
     }
 
-    return {
-      Pipeline: stringOrDash(result.pipeline.name),
-      "Execution ID": stringOrDash(result.pipeline.executionId),
-      Status: stringOrDash(result.pipeline.status),
-    };
+    details["Pipeline"] = stringOrDash(result.pipeline.name);
+    details["Execution ID"] = stringOrDash(result.pipeline.executionId);
+    details["Status"] = stringOrDash(result.pipeline.status);
+
+    return details;
   },
 
   subtitle(context: SubtitleContext): string {
@@ -117,24 +123,16 @@ function getSpecs(node: NodeInfo): ComponentBaseSpec[] {
 
 function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({
-    event: {
-      nodeId: rootTriggerNode?.id!,
-      id: execution.rootEvent?.id!,
-      createdAt: execution.rootEvent?.createdAt!,
-      data: execution.rootEvent?.data || {},
-      type: execution.rootEvent?.type!,
-    },
-  });
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [
     {
-      receivedAt: new Date(execution.createdAt!),
+      receivedAt: new Date(execution.createdAt ?? 0),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: formatTimeAgo(new Date(execution.createdAt ?? 0)),
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id!,
+      eventId: execution.rootEvent?.id ?? "",
     },
   ];
 }
