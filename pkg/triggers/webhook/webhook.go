@@ -119,7 +119,6 @@ func (w *Webhook) Configuration() []configuration.Field {
 			Name:        "headerName",
 			Label:       "Header Name",
 			Type:        configuration.FieldTypeString,
-			Required:    true,
 			Default:     DefaultHeaderTokenName,
 			Placeholder: DefaultHeaderTokenName,
 			Description: "HTTP header that must contain the authentication token",
