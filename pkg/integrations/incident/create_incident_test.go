@@ -17,12 +17,24 @@ func Test__CreateIncident__Setup(t *testing.T) {
 	component := &CreateIncident{}
 
 	t.Run("valid configuration", func(t *testing.T) {
+		severitiesResp := `{"severities":[{"id":"sev_abc123","name":"Minor","description":"","rank":1}]}`
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"name":       "Test Incident",
 				"summary":    "Test summary",
 				"severityId": "sev_abc123",
 				"visibility": "public",
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(severitiesResp)),
+					},
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiKey": "test-key"},
 			},
 		})
 
@@ -62,10 +74,22 @@ func Test__CreateIncident__Setup(t *testing.T) {
 	})
 
 	t.Run("name and severity - minimal required fields", func(t *testing.T) {
+		severitiesResp := `{"severities":[{"id":"sev_abc123","name":"Minor","description":"","rank":1}]}`
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"name":       "Minimal Incident",
 				"severityId": "sev_abc123",
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(severitiesResp)),
+					},
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiKey": "test-key"},
 			},
 		})
 
@@ -78,6 +102,30 @@ func Test__CreateIncident__Setup(t *testing.T) {
 		})
 
 		require.ErrorContains(t, err, "error decoding configuration")
+	})
+
+	t.Run("severity not in list returns error", func(t *testing.T) {
+		severitiesResp := `{"severities":[{"id":"sev_other","name":"Major","description":"","rank":2}]}`
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":       "Test Incident",
+				"severityId": "sev_abc123",
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(severitiesResp)),
+					},
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiKey": "test-key"},
+			},
+		})
+
+		require.Error(t, err)
+		require.ErrorContains(t, err, "not found or no longer available")
 	})
 }
 

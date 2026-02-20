@@ -83,13 +83,6 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			Description: "A succinct name or title for the incident",
 		},
 		{
-			Name:        "summary",
-			Label:       "Summary",
-			Type:        configuration.FieldTypeText,
-			Required:    false,
-			Description: "Additional details about the incident",
-		},
-		{
 			Name:        "severityId",
 			Label:       "Severity",
 			Type:        configuration.FieldTypeIntegrationResource,
@@ -101,6 +94,13 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 					Type: "severity",
 				},
 			},
+		},
+		{
+			Name:        "summary",
+			Label:       "Summary",
+			Type:        configuration.FieldTypeText,
+			Required:    false,
+			Description: "Additional details about the incident",
 		},
 		{
 			Name:     "visibility",
@@ -132,6 +132,25 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 	}
 	if spec.SeverityID == "" {
 		return errors.New("severity is required")
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("error creating client: %w", err)
+	}
+	severities, err := client.ListSeverities()
+	if err != nil {
+		return fmt.Errorf("error listing severities: %w", err)
+	}
+	var found bool
+	for _, s := range severities {
+		if s.ID == spec.SeverityID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("severity with id %q not found or no longer available; select a severity from the list", spec.SeverityID)
 	}
 
 	return nil
