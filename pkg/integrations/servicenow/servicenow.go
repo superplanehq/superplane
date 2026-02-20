@@ -87,7 +87,7 @@ func (s *ServiceNow) Configuration() []configuration.Field {
 func (s *ServiceNow) Components() []core.Component {
 	return []core.Component{
 		&CreateIncident{},
-		&GetIncidents{},
+		&GetIncident{},
 	}
 }
 
@@ -207,7 +207,7 @@ func fetchMetadata(client *Client) (Metadata, error) {
 
 func (r *TokenResponse) GetExpiration() time.Duration {
 	if r.ExpiresIn > 0 {
-		return time.Duration(r.ExpiresIn) * time.Second / 2
+		return time.Duration(max(r.ExpiresIn/2, 1)) * time.Second
 	}
 
 	return time.Hour
