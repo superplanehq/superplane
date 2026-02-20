@@ -206,9 +206,7 @@ export function IntegrationCreateDialog({
               className="h-6 w-6 text-gray-500 dark:text-gray-400"
             />
             <div className="flex items-center gap-2">
-              <DialogTitle>
-                {pendingWebhookSetup ? "Complete webhook setup" : `Configure ${displayName}`}
-              </DialogTitle>
+              <DialogTitle>{pendingWebhookSetup ? "Complete webhook setup" : `Configure ${displayName}`}</DialogTitle>
               {integrationHomeHref && (
                 <a
                   href={integrationHomeHref}
@@ -241,12 +239,7 @@ export function IntegrationCreateDialog({
               <div>
                 <Label className="text-gray-800 dark:text-gray-100 mb-2">Webhook URL</Label>
                 <div className="flex gap-2">
-                  <Input
-                    type="text"
-                    readOnly
-                    value={pendingWebhookSetup.webhookUrl}
-                    className="font-mono text-sm"
-                  />
+                  <Input type="text" readOnly value={pendingWebhookSetup.webhookUrl} className="font-mono text-sm" />
                   <Button
                     type="button"
                     variant="outline"
