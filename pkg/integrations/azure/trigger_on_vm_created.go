@@ -1,6 +1,7 @@
 package azure
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -66,25 +67,14 @@ Each VM creation event includes:
 
 ## Azure Event Grid Setup
 
-**Important**: This trigger requires manual setup of an Azure Event Grid subscription.
+Event Grid subscriptions are created automatically when the trigger is set up. SuperPlane will:
 
-1. **Create an Event Grid System Topic** (if not already created):
-   - Go to Azure Portal → Event Grid System Topics
-   - Create a new topic for your subscription
-   - Topic Type: "Azure Subscriptions"
-   - Select your subscription
+1. Create an Event Grid subscription at the Azure subscription scope
+2. Configure it to forward ` + "`Microsoft.Resources.ResourceWriteSuccess`" + ` events to the trigger webhook
+3. Apply subject filters based on the configured resource group and resource type
+4. Handle the Event Grid validation handshake automatically
 
-2. **Create an Event Subscription**:
-   - In your Event Grid System Topic, create a new Event Subscription
-   - **Event Types**: Select "Resource Write Success"
-   - **Filters**: 
-     - Subject begins with: ` + "`/subscriptions/<subscription-id>/resourceGroups/`" + `
-     - Subject ends with: ` + "`/providers/Microsoft.Compute/virtualMachines/`" + `
-   - **Endpoint Type**: Webhook
-   - **Endpoint**: Use the webhook URL provided by SuperPlane for this trigger node
-
-3. **Validation**: Azure Event Grid will send a validation event to verify the endpoint.
-   SuperPlane will automatically respond to this validation request.
+No manual setup is required.
 
 ## Notes
 
@@ -131,7 +121,6 @@ func (t *OnVMCreatedTrigger) Configuration() []configuration.Field {
 
 // Setup configures trigger webhooks.
 func (t *OnVMCreatedTrigger) Setup(ctx core.TriggerContext) error {
-	// Decode configuration
 	config := OnVMCreatedConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
@@ -162,19 +151,16 @@ func (t *OnVMCreatedTrigger) Setup(ctx core.TriggerContext) error {
 
 // HandleWebhook processes Event Grid webhook requests.
 func (t *OnVMCreatedTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	// Authenticate webhook request if secret is configured
 	if err := t.authenticateWebhook(ctx); err != nil {
 		ctx.Logger.Warnf("Webhook authentication failed: %v", err)
 		return http.StatusUnauthorized, err
 	}
 
-	// Decode configuration
 	config := OnVMCreatedConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	// Parse Event Grid events
 	var events []EventGridEvent
 	if err := json.Unmarshal(ctx.Body, &events); err != nil {
 		ctx.Logger.Errorf("Failed to parse Event Grid events: %v", err)
@@ -188,10 +174,6 @@ func (t *OnVMCreatedTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int,
 			if err := t.handleSubscriptionValidation(ctx, event); err != nil {
 				return http.StatusInternalServerError, err
 			}
-			// Note: Azure Event Grid requires {"validationResponse": "<code>"} in response body.
-			// The framework's HandleWebhook interface only returns (int, error), so we cannot
-			// write a custom response body. Azure Event Grid will fail validation unless the
-			// validationUrl approach is used, or the server is modified to support custom response bodies.
 			return http.StatusOK, nil
 		}
 
@@ -206,11 +188,7 @@ func (t *OnVMCreatedTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int,
 	return http.StatusOK, nil
 }
 
-// handleSubscriptionValidation validates Event Grid subscription setup.
-// Note: Azure Event Grid requires {"validationResponse": "<code>"} in the response body.
-// Since the framework's HandleWebhook interface only returns (int, error), we cannot write
-// a custom response body. If validationUrl is provided, we could use it as an alternative,
-// but the standard approach requires the response body.
+// handleSubscriptionValidation validates Event Grid subscription via the validationUrl GET approach.
 func (t *OnVMCreatedTrigger) handleSubscriptionValidation(ctx core.WebhookRequestContext, event EventGridEvent) error {
 	var validationData SubscriptionValidationEventData
 	if err := mapstructure.Decode(event.Data, &validationData); err != nil {
@@ -223,14 +201,24 @@ func (t *OnVMCreatedTrigger) handleSubscriptionValidation(ctx core.WebhookReques
 
 	ctx.Logger.Infof("Event Grid subscription validation received with code: %s", validationData.ValidationCode)
 
-	// If validationUrl is provided, we could make a GET request to it as an alternative
-	// to returning the code in the response body. However, the standard approach is to
-	// return {"validationResponse": "<code>"} in the response body, which requires
-	// framework support for custom response bodies.
-	if validationData.ValidationURL != "" {
-		ctx.Logger.Infof("Validation URL provided: %s (not using - requires framework support for custom response bodies)", validationData.ValidationURL)
+	if validationData.ValidationURL == "" {
+		return fmt.Errorf("validation URL is empty; synchronous validation is not supported by the framework")
 	}
 
+	// Use the validationUrl GET approach since the framework's HandleWebhook
+	// interface cannot return a custom response body for the synchronous handshake.
+	ctx.Logger.Infof("Validating Event Grid subscription via validation URL")
+	resp, err := http.Get(validationData.ValidationURL)
+	if err != nil {
+		return fmt.Errorf("failed to validate subscription via validation URL: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("validation URL returned status %d", resp.StatusCode)
+	}
+
+	ctx.Logger.Info("Event Grid subscription validated successfully via validation URL")
 	return nil
 }
 
@@ -288,10 +276,6 @@ func (t *OnVMCreatedTrigger) handleVMCreationEvent(
 }
 
 // authenticateWebhook verifies the webhook secret if one is configured.
-// Azure Event Grid doesn't sign requests by default, but we can secure the webhook
-// by requiring a secret in the Authorization header that matches the webhook secret.
-// Note: Query parameter authentication is not available since we don't have access
-// to the full request URL in the trigger context.
 func (t *OnVMCreatedTrigger) authenticateWebhook(ctx core.WebhookRequestContext) error {
 	if ctx.Webhook == nil {
 		return nil
@@ -299,54 +283,34 @@ func (t *OnVMCreatedTrigger) authenticateWebhook(ctx core.WebhookRequestContext)
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		// If secret retrieval fails, allow the request (backward compatibility)
 		ctx.Logger.Debugf("Could not retrieve webhook secret: %v", err)
 		return nil
 	}
 
 	if len(secret) == 0 {
-		// No secret configured, allow the request
 		return nil
 	}
 
-	// Check for secret in Authorization header (Bearer token format)
+	// Check Authorization header (Bearer token)
 	authHeader := ctx.Headers.Get("Authorization")
-	if authHeader == "" {
-		// Check for Azure Event Grid SAS token header
-		sasToken := ctx.Headers.Get("aeg-sas-token")
-		if sasToken != "" {
-			// For SAS tokens, we'd need to validate the signature, which is more complex
-			// For now, if a SAS token is present, we'll allow it (this is a basic implementation)
-			ctx.Logger.Debug("Azure Event Grid SAS token found in header")
+	if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
+		providedSecret := strings.TrimPrefix(authHeader, "Bearer ")
+		if subtle.ConstantTimeCompare([]byte(providedSecret), secret) == 1 {
 			return nil
 		}
-
-		// Check for custom secret header
-		secretHeader := ctx.Headers.Get("X-Webhook-Secret")
-		if secretHeader != "" {
-			if secretHeader != string(secret) {
-				return fmt.Errorf("invalid webhook secret")
-			}
-			return nil
-		}
-
-		// If a secret is configured but not provided, reject the request
-		return fmt.Errorf("webhook secret required but not provided in Authorization header or X-Webhook-Secret header")
-	}
-
-	// Verify Bearer token format
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		return fmt.Errorf("invalid Authorization header format, expected Bearer token")
-	}
-
-	providedSecret := strings.TrimPrefix(authHeader, "Bearer ")
-
-	// Verify the secret matches
-	if providedSecret != string(secret) {
 		return fmt.Errorf("invalid webhook secret")
 	}
 
-	return nil
+	// Check custom header
+	secretHeader := ctx.Headers.Get("X-Webhook-Secret")
+	if secretHeader != "" {
+		if subtle.ConstantTimeCompare([]byte(secretHeader), secret) == 1 {
+			return nil
+		}
+		return fmt.Errorf("invalid webhook secret")
+	}
+
+	return fmt.Errorf("webhook secret required but not provided in Authorization or X-Webhook-Secret header")
 }
 
 func (t *OnVMCreatedTrigger) Actions() []core.Action {
@@ -361,4 +325,45 @@ func (t *OnVMCreatedTrigger) HandleAction(ctx core.TriggerActionContext) (map[st
 func (t *OnVMCreatedTrigger) Cleanup(ctx core.TriggerContext) error {
 	ctx.Logger.Info("Cleaning up Azure VM Created trigger")
 	return nil
+}
+
+// extractVMName returns VM name from ARM resource ID.
+func extractVMName(resourceID string) string {
+	parts := strings.Split(resourceID, "/")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return ""
+}
+
+// extractResourceGroup returns resource group from ARM resource ID.
+func extractResourceGroup(resourceID string) string {
+	parts := strings.Split(resourceID, "/")
+	for i, part := range parts {
+		if part == "resourceGroups" && i+1 < len(parts) {
+			return parts[i+1]
+		}
+	}
+	return ""
+}
+
+// extractSubscriptionID returns subscription ID from ARM resource ID.
+func extractSubscriptionID(resourceID string) string {
+	parts := strings.Split(resourceID, "/")
+	for i, part := range parts {
+		if part == "subscriptions" && i+1 < len(parts) {
+			return parts[i+1]
+		}
+	}
+	return ""
+}
+
+// isVirtualMachineEvent reports whether an event subject targets a VM.
+func isVirtualMachineEvent(subject string) bool {
+	return strings.Contains(subject, ResourceTypeVirtualMachine)
+}
+
+// isSuccessfulProvisioning reports whether provisioning succeeded.
+func isSuccessfulProvisioning(provisioningState string) bool {
+	return provisioningState == ProvisioningStateSucceeded
 }

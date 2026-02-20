@@ -3,6 +3,7 @@ package azure
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -128,6 +129,12 @@ func TestOnVMCreatedTrigger_HandleAction(t *testing.T) {
 func TestOnVMCreatedTrigger_HandleWebhook_SubscriptionValidation(t *testing.T) {
 	trigger := &OnVMCreatedTrigger{}
 
+	// Create a test server to serve as the validation URL
+	validationServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer validationServer.Close()
+
 	validationCode := "test-validation-code-12345"
 	events := []EventGridEvent{
 		{
@@ -140,6 +147,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_SubscriptionValidation(t *testing.T) {
 			MetadataVersion: "1",
 			Data: map[string]any{
 				"validationCode": validationCode,
+				"validationUrl":  validationServer.URL,
 			},
 		},
 	}
@@ -211,11 +219,9 @@ func TestOnVMCreatedTrigger_HandleWebhook_VMCreatedSuccess(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 
-		// Should emit one event
 		require.Equal(t, 1, eventsCtx.Count())
 		assert.Equal(t, "azure.vm.created", eventsCtx.Payloads[0].Type)
 
-		// Verify payload
 		payload, ok := eventsCtx.Payloads[0].Data.(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "test-vm", payload["vmName"])
@@ -265,11 +271,9 @@ func TestOnVMCreatedTrigger_HandleWebhook_VMCreatedSuccess(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 
-		// Should emit one event
 		require.Equal(t, 1, eventsCtx.Count())
 		assert.Equal(t, "azure.vm.created", eventsCtx.Payloads[0].Type)
 
-		// Verify resource group in payload
 		payload, ok := eventsCtx.Payloads[0].Data.(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "my-target-rg", payload["resourceGroup"])
@@ -309,7 +313,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_FilterMismatch(t *testing.T) {
 		Body:    body,
 		Headers: http.Header{},
 		Configuration: map[string]any{
-			"resourceGroup": "rg-target", // Different from rg-other
+			"resourceGroup": "rg-target",
 		},
 		Webhook: webhookCtx,
 		Events:  eventsCtx,
@@ -320,7 +324,6 @@ func TestOnVMCreatedTrigger_HandleWebhook_FilterMismatch(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code)
 
-	// Should NOT emit any events due to filter mismatch
 	assert.Equal(t, 0, eventsCtx.Count())
 }
 
@@ -367,7 +370,6 @@ func TestOnVMCreatedTrigger_HandleWebhook_NonVMResource(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 
-		// Should NOT emit any events - not a VM
 		assert.Equal(t, 0, eventsCtx.Count())
 	})
 
@@ -410,7 +412,6 @@ func TestOnVMCreatedTrigger_HandleWebhook_NonVMResource(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 
-		// Should NOT emit any events - not a VM
 		assert.Equal(t, 0, eventsCtx.Count())
 	})
 }
@@ -457,7 +458,6 @@ func TestOnVMCreatedTrigger_HandleWebhook_ProvisioningStateFailed(t *testing.T) 
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code)
 
-	// Should NOT emit any events - provisioning failed
 	assert.Equal(t, 0, eventsCtx.Count())
 }
 
@@ -527,7 +527,6 @@ func TestOnVMCreatedTrigger_HandleWebhook_MultipleEvents(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code)
 
-	// Should emit two events (only the VM events, not the storage account)
 	assert.Equal(t, 2, eventsCtx.Count())
 	assert.Equal(t, "azure.vm.created", eventsCtx.Payloads[0].Type)
 	assert.Equal(t, "azure.vm.created", eventsCtx.Payloads[1].Type)
@@ -596,4 +595,166 @@ func TestOnVMCreatedTrigger_HandleWebhook_InvalidConfiguration(t *testing.T) {
 	code, err := trigger.HandleWebhook(ctx)
 	assert.Error(t, err)
 	assert.Equal(t, http.StatusInternalServerError, code)
+}
+
+// Tests for helper functions (moved from webhook_events_test.go)
+
+func TestExtractVMName(t *testing.T) {
+	tests := []struct {
+		name       string
+		resourceID string
+		expected   string
+	}{
+		{
+			name:       "valid VM resource ID",
+			resourceID: "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+			expected:   "my-vm",
+		},
+		{
+			name:       "empty resource ID",
+			resourceID: "",
+			expected:   "",
+		},
+		{
+			name:       "single segment",
+			resourceID: "vm-name",
+			expected:   "vm-name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractVMName(tt.resourceID)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestExtractResourceGroup(t *testing.T) {
+	tests := []struct {
+		name       string
+		resourceID string
+		expected   string
+	}{
+		{
+			name:       "valid resource ID",
+			resourceID: "/subscriptions/test-sub/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+			expected:   "my-rg",
+		},
+		{
+			name:       "no resource group",
+			resourceID: "/subscriptions/test-sub",
+			expected:   "",
+		},
+		{
+			name:       "empty resource ID",
+			resourceID: "",
+			expected:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractResourceGroup(tt.resourceID)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestExtractSubscriptionID(t *testing.T) {
+	tests := []struct {
+		name       string
+		resourceID string
+		expected   string
+	}{
+		{
+			name:       "valid resource ID",
+			resourceID: "/subscriptions/my-subscription-id/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+			expected:   "my-subscription-id",
+		},
+		{
+			name:       "no subscription",
+			resourceID: "/resourceGroups/my-rg",
+			expected:   "",
+		},
+		{
+			name:       "empty resource ID",
+			resourceID: "",
+			expected:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractSubscriptionID(tt.resourceID)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIsVirtualMachineEvent(t *testing.T) {
+	tests := []struct {
+		name     string
+		subject  string
+		expected bool
+	}{
+		{
+			name:     "VM event",
+			subject:  "/subscriptions/test/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm1",
+			expected: true,
+		},
+		{
+			name:     "storage event",
+			subject:  "/subscriptions/test/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/storage1",
+			expected: false,
+		},
+		{
+			name:     "empty subject",
+			subject:  "",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isVirtualMachineEvent(tt.subject)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIsSuccessfulProvisioning(t *testing.T) {
+	tests := []struct {
+		name              string
+		provisioningState string
+		expected          bool
+	}{
+		{
+			name:              "succeeded",
+			provisioningState: ProvisioningStateSucceeded,
+			expected:          true,
+		},
+		{
+			name:              "failed",
+			provisioningState: ProvisioningStateFailed,
+			expected:          false,
+		},
+		{
+			name:              "creating",
+			provisioningState: ProvisioningStateCreating,
+			expected:          false,
+		},
+		{
+			name:              "empty",
+			provisioningState: "",
+			expected:          false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isSuccessfulProvisioning(tt.provisioningState)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

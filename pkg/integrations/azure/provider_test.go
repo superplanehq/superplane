@@ -2,8 +2,7 @@ package azure
 
 import (
 	"context"
-	"os"
-	"path/filepath"
+	"fmt"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -11,33 +10,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func mockAssertion(token string) func(context.Context) (string, error) {
+	return func(_ context.Context) (string, error) {
+		return token, nil
+	}
+}
+
+func failingAssertion(msg string) func(context.Context) (string, error) {
+	return func(_ context.Context) (string, error) {
+		return "", fmt.Errorf("%s", msg)
+	}
+}
+
 func TestNewAzureProvider(t *testing.T) {
 	logger := logrus.NewEntry(logrus.New())
 
 	t.Run("success with valid configuration", func(t *testing.T) {
-		// Create temporary OIDC token file
-		tmpDir := t.TempDir()
-		tokenFile := filepath.Join(tmpDir, "token")
-		tokenContent := "mock-oidc-token-content"
-		err := os.WriteFile(tokenFile, []byte(tokenContent), 0600)
-		require.NoError(t, err)
-
-		// Set environment variable
-		t.Setenv(AzureFederatedTokenFileEnv, tokenFile)
-
-		// Create provider
 		provider, err := NewAzureProvider(
 			context.Background(),
 			"test-tenant-id",
 			"test-client-id",
 			"test-subscription-id",
+			mockAssertion("mock-oidc-token-content"),
 			logger,
 		)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, provider)
 		assert.NotNil(t, provider.credential)
-		assert.NotNil(t, provider.computeClient)
+		assert.NotNil(t, provider.client)
 		assert.Equal(t, "test-subscription-id", provider.GetSubscriptionID())
 	})
 
@@ -47,6 +48,7 @@ func TestNewAzureProvider(t *testing.T) {
 			"",
 			"test-client-id",
 			"test-subscription-id",
+			mockAssertion("token"),
 			logger,
 		)
 
@@ -61,6 +63,7 @@ func TestNewAzureProvider(t *testing.T) {
 			"test-tenant-id",
 			"",
 			"test-subscription-id",
+			mockAssertion("token"),
 			logger,
 		)
 
@@ -75,6 +78,7 @@ func TestNewAzureProvider(t *testing.T) {
 			"test-tenant-id",
 			"test-client-id",
 			"",
+			mockAssertion("token"),
 			logger,
 		)
 
@@ -83,76 +87,29 @@ func TestNewAzureProvider(t *testing.T) {
 		assert.Contains(t, err.Error(), "subscription ID is required")
 	})
 
-	t.Run("error when token file environment variable is not set", func(t *testing.T) {
-		// Ensure environment variable is not set
-		os.Unsetenv(AzureFederatedTokenFileEnv)
-
+	t.Run("error when assertion callback fails", func(t *testing.T) {
 		provider, err := NewAzureProvider(
 			context.Background(),
 			"test-tenant-id",
 			"test-client-id",
 			"test-subscription-id",
+			failingAssertion("OIDC signing failed"),
 			logger,
 		)
 
 		assert.Error(t, err)
 		assert.Nil(t, provider)
-		assert.Contains(t, err.Error(), "environment variable")
-		assert.Contains(t, err.Error(), "is not set")
-	})
-
-	t.Run("error when token file does not exist", func(t *testing.T) {
-		// Set environment variable to non-existent file
-		t.Setenv(AzureFederatedTokenFileEnv, "/non/existent/path/token")
-
-		provider, err := NewAzureProvider(
-			context.Background(),
-			"test-tenant-id",
-			"test-client-id",
-			"test-subscription-id",
-			logger,
-		)
-
-		assert.Error(t, err)
-		assert.Nil(t, provider)
-	})
-
-	t.Run("error when token file is empty", func(t *testing.T) {
-		// Create empty token file
-		tmpDir := t.TempDir()
-		tokenFile := filepath.Join(tmpDir, "empty-token")
-		err := os.WriteFile(tokenFile, []byte(""), 0600)
-		require.NoError(t, err)
-
-		t.Setenv(AzureFederatedTokenFileEnv, tokenFile)
-
-		provider, err := NewAzureProvider(
-			context.Background(),
-			"test-tenant-id",
-			"test-client-id",
-			"test-subscription-id",
-			logger,
-		)
-
-		assert.Error(t, err)
-		assert.Nil(t, provider)
+		assert.Contains(t, err.Error(), "failed to obtain OIDC assertion")
 	})
 }
 
 func TestAzureProvider_GetCredential(t *testing.T) {
-	// Create temporary OIDC token file
-	tmpDir := t.TempDir()
-	tokenFile := filepath.Join(tmpDir, "token")
-	err := os.WriteFile(tokenFile, []byte("mock-token"), 0600)
-	require.NoError(t, err)
-
-	t.Setenv(AzureFederatedTokenFileEnv, tokenFile)
-
 	provider, err := NewAzureProvider(
 		context.Background(),
 		"test-tenant-id",
 		"test-client-id",
 		"test-subscription-id",
+		mockAssertion("mock-token"),
 		logrus.NewEntry(logrus.New()),
 	)
 	require.NoError(t, err)
@@ -161,43 +118,29 @@ func TestAzureProvider_GetCredential(t *testing.T) {
 	assert.NotNil(t, credential)
 }
 
-func TestAzureProvider_GetComputeClient(t *testing.T) {
-	// Create temporary OIDC token file
-	tmpDir := t.TempDir()
-	tokenFile := filepath.Join(tmpDir, "token")
-	err := os.WriteFile(tokenFile, []byte("mock-token"), 0600)
-	require.NoError(t, err)
-
-	t.Setenv(AzureFederatedTokenFileEnv, tokenFile)
-
+func TestAzureProvider_GetClient(t *testing.T) {
 	provider, err := NewAzureProvider(
 		context.Background(),
 		"test-tenant-id",
 		"test-client-id",
 		"test-subscription-id",
+		mockAssertion("mock-token"),
 		logrus.NewEntry(logrus.New()),
 	)
 	require.NoError(t, err)
 
-	computeClient := provider.GetComputeClient()
-	assert.NotNil(t, computeClient)
+	client := provider.GetClient()
+	assert.NotNil(t, client)
 }
 
 func TestAzureProvider_GetSubscriptionID(t *testing.T) {
-	// Create temporary OIDC token file
-	tmpDir := t.TempDir()
-	tokenFile := filepath.Join(tmpDir, "token")
-	err := os.WriteFile(tokenFile, []byte("mock-token"), 0600)
-	require.NoError(t, err)
-
-	t.Setenv(AzureFederatedTokenFileEnv, tokenFile)
-
 	expectedSubscriptionID := "test-subscription-123"
 	provider, err := NewAzureProvider(
 		context.Background(),
 		"test-tenant-id",
 		"test-client-id",
 		expectedSubscriptionID,
+		mockAssertion("mock-token"),
 		logrus.NewEntry(logrus.New()),
 	)
 	require.NoError(t, err)

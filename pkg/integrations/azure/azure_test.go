@@ -51,7 +51,6 @@ func TestAzureIntegration_Configuration(t *testing.T) {
 
 	require.Len(t, fields, 3, "Should have exactly 3 configuration fields")
 
-	// Check tenantId field
 	tenantField := fields[0]
 	assert.Equal(t, "tenantId", tenantField.Name)
 	assert.Equal(t, "Tenant ID", tenantField.Label)
@@ -59,7 +58,6 @@ func TestAzureIntegration_Configuration(t *testing.T) {
 	assert.True(t, tenantField.Required)
 	assert.NotEmpty(t, tenantField.Description)
 
-	// Check clientId field
 	clientField := fields[1]
 	assert.Equal(t, "clientId", clientField.Name)
 	assert.Equal(t, "Client ID", clientField.Label)
@@ -67,7 +65,6 @@ func TestAzureIntegration_Configuration(t *testing.T) {
 	assert.True(t, clientField.Required)
 	assert.NotEmpty(t, clientField.Description)
 
-	// Check subscriptionId field
 	subscriptionField := fields[2]
 	assert.Equal(t, "subscriptionId", subscriptionField.Name)
 	assert.Equal(t, "Subscription ID", subscriptionField.Label)
@@ -96,7 +93,6 @@ func TestAzureIntegration_Actions(t *testing.T) {
 	integration := &AzureIntegration{}
 	actions := integration.Actions()
 
-	// Currently returns empty list
 	assert.NotNil(t, actions)
 	assert.IsType(t, []core.Action{}, actions)
 }
@@ -104,7 +100,6 @@ func TestAzureIntegration_Actions(t *testing.T) {
 func TestAzureIntegration_HandleAction(t *testing.T) {
 	integration := &AzureIntegration{}
 
-	// Create mock context
 	ctx := core.IntegrationActionContext{
 		Name: "unknown-action",
 	}
@@ -219,47 +214,3 @@ func TestConfiguration_Struct(t *testing.T) {
 	assert.Equal(t, "test-client-id", config.ClientID)
 	assert.Equal(t, "test-subscription-id", config.SubscriptionID)
 }
-
-func TestMetadata_Struct(t *testing.T) {
-	// Test that Metadata struct exists and can be instantiated
-	metadata := Metadata{}
-	assert.NotNil(t, metadata)
-}
-
-// Note: Testing Sync() would require:
-// 1. Mock core.SyncContext
-// 2. Valid OIDC token file setup
-// 3. Mock Azure API responses
-// These should be tested in integration tests, not unit tests
-
-// Integration test example (commented out, requires real setup):
-/*
-func TestAzureIntegration_Sync_Integration(t *testing.T) {
-	t.Skip("Requires real Azure credentials and OIDC token")
-
-	// Setup OIDC token file
-	tmpDir := t.TempDir()
-	tokenFile := filepath.Join(tmpDir, "token")
-	err := os.WriteFile(tokenFile, []byte("mock-token"), 0600)
-	require.NoError(t, err)
-	t.Setenv("AZURE_FEDERATED_TOKEN_FILE", tokenFile)
-
-	integration := &AzureIntegration{}
-	logger := logrus.NewEntry(logrus.New())
-
-	// Mock SyncContext
-	ctx := core.SyncContext{
-		Logger: logger,
-		Configuration: map[string]any{
-			"tenantId":       "test-tenant-id",
-			"clientId":       "test-client-id",
-			"subscriptionId": "test-subscription-id",
-		},
-		Integration: mockIntegrationContext{},
-	}
-
-	err = integration.Sync(ctx)
-	assert.NoError(t, err)
-	assert.NotNil(t, integration.GetProvider())
-}
-*/

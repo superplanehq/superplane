@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -13,7 +13,8 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegrationWithWebhookHandler("azure", &AzureIntegration{}, &AzureWebhookHandler{})
+	integration := &AzureIntegration{}
+	registry.RegisterIntegrationWithWebhookHandler("azure", integration, &AzureWebhookHandler{integration: integration})
 }
 
 type AzureIntegration struct {
@@ -24,9 +25,6 @@ type Configuration struct {
 	TenantID       string `json:"tenantId" mapstructure:"tenantId"`
 	ClientID       string `json:"clientId" mapstructure:"clientId"`
 	SubscriptionID string `json:"subscriptionId" mapstructure:"subscriptionId"`
-}
-
-type Metadata struct {
 }
 
 func (a *AzureIntegration) Name() string {
@@ -56,34 +54,14 @@ To connect SuperPlane to Microsoft Azure using Workload Identity Federation:
 2. Create a new registration or select an existing app
 3. Note the **Application (client) ID** and **Directory (tenant) ID**
 
-### 2. Configure Federated Identity Credential
+### 2. Complete the Connection
 
-1. In your app registration, go to **Certificates & secrets** → **Federated credentials**
-2. Click **Add credential**
-3. Select **Other issuer**
-4. Configure the credential:
-   - **Issuer**: The SuperPlane OIDC issuer URL (provided after creation)
-   - **Subject identifier**: ` + "`app-installation:<integration-id>`" + ` (provided after creation)
-   - **Audience**: The integration ID (provided after creation)
-   - **Name**: ` + "`superplane-integration`" + ` (or any descriptive name)
-
-### 3. Grant Required Permissions
-
-Assign appropriate Azure RBAC roles to your app registration:
-
-- **Virtual Machine Contributor** - For VM management
-- **Network Contributor** - For network resource management
-- **Storage Account Contributor** - For storage operations (if needed)
-- **EventGrid Contributor** - For Event Grid subscriptions
-
-You can assign these roles at the subscription or resource group level.
-
-### 4. Complete the Connection
-
-Enter the following information below:
+Enter the following information below and create the integration:
 - **Tenant ID**: Your Azure AD tenant ID
 - **Client ID**: Your app registration's client ID
 - **Subscription ID**: Your Azure subscription ID
+
+After creation, you will be guided through configuring the Federated Identity Credential and granting the required permissions.
 
 SuperPlane will use Workload Identity Federation to authenticate without storing any credentials.`
 }
@@ -119,7 +97,7 @@ func (a *AzureIntegration) Configuration() []configuration.Field {
 
 func (a *AzureIntegration) Components() []core.Component {
 	return []core.Component{
-		&CreateVMComponent{},
+		&CreateVMComponent{integration: a},
 	}
 }
 
@@ -129,7 +107,11 @@ func (a *AzureIntegration) Triggers() []core.Trigger {
 	}
 }
 
-// Sync validates configuration and initializes Azure clients.
+// Sync validates configuration, initializes Azure clients, and verifies credentials.
+// On the first sync the federated identity credential is typically not yet configured
+// in Azure AD, so the verification call will fail and a BrowserAction with setup
+// instructions is shown. Once the user configures the credential and re-syncs,
+// verification succeeds and the integration transitions to Ready.
 func (a *AzureIntegration) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
@@ -151,11 +133,20 @@ func (a *AzureIntegration) Sync(ctx core.SyncContext) error {
 	ctx.Logger.Infof("Initializing Azure provider: tenant=%s, subscription=%s",
 		config.TenantID, config.SubscriptionID)
 
+	integrationID := ctx.Integration.ID().String()
+	oidcProvider := ctx.OIDC
+
+	getAssertion := func(_ context.Context) (string, error) {
+		subject := fmt.Sprintf("app-installation:%s", integrationID)
+		return oidcProvider.Sign(subject, 5*time.Minute, integrationID, nil)
+	}
+
 	provider, err := NewAzureProvider(
 		context.Background(),
 		config.TenantID,
 		config.ClientID,
 		config.SubscriptionID,
+		getAssertion,
 		ctx.Logger,
 	)
 	if err != nil {
@@ -164,9 +155,50 @@ func (a *AzureIntegration) Sync(ctx core.SyncContext) error {
 
 	a.provider = provider
 
-	ctx.Logger.Info("Azure integration synchronized successfully")
+	// Verify credentials by listing resource groups.
+	// This proves that the federated identity credential is configured correctly.
+	verifyURL := fmt.Sprintf("%s/subscriptions/%s/resourcegroups?api-version=%s",
+		armBaseURL, config.SubscriptionID, armAPIVersionResources)
+
+	_, err = provider.GetClient().listAll(context.Background(), verifyURL)
+	if err != nil {
+		ctx.Logger.Infof("Credential verification failed: %v", err)
+		ctx.Logger.Info("Showing setup instructions for federated identity credential")
+		return a.showBrowserAction(ctx)
+	}
 
 	ctx.Integration.Ready()
+	ctx.Integration.RemoveBrowserAction()
+	ctx.Logger.Info("Azure integration synchronized successfully")
+
+	return nil
+}
+
+func (a *AzureIntegration) showBrowserAction(ctx core.SyncContext) error {
+	ctx.Integration.NewBrowserAction(core.BrowserAction{
+		Description: fmt.Sprintf(`
+**1. Configure Federated Identity Credential**
+
+- In your app registration, go to **Certificates & secrets** → **Federated credentials**
+- Click **Add credential** → Select **Other issuer**
+- Issuer: **%s**
+- Subject identifier: **app-installation:%s**
+- Audience: **%s**
+- Name: **superplane-integration** (or any descriptive name)
+
+**2. Grant Required Permissions**
+
+Assign Azure RBAC roles to your app registration at the subscription or resource group level:
+
+- **Virtual Machine Contributor** – For VM management
+- **Network Contributor** – For network resource management
+- **EventGrid Contributor** – For Event Grid subscriptions
+
+**3. Complete Setup**
+
+After configuring the credential and permissions above, click **Save** to re-sync the integration. SuperPlane will verify the connection automatically.
+`, ctx.WebhooksBaseURL, ctx.Integration.ID().String(), ctx.Integration.ID().String()),
+	})
 
 	return nil
 }
@@ -223,31 +255,11 @@ func firstNonEmptyParameter(parameters map[string]string, keys ...string) string
 	return ""
 }
 
-// HandleRequest routes incoming webhook requests.
+// HandleRequest routes incoming HTTP requests.
 func (a *AzureIntegration) HandleRequest(ctx core.HTTPRequestContext) {
-	if ctx.Request.Method == http.MethodPost {
-		if strings.HasSuffix(ctx.Request.URL.Path, "/webhook") ||
-			strings.HasSuffix(ctx.Request.URL.Path, "/events") {
-			a.handleWebhook(ctx)
-			return
-		}
-	}
-
 	ctx.Logger.Warnf("Unknown request path: %s %s", ctx.Request.Method, ctx.Request.URL.Path)
 	ctx.Response.WriteHeader(http.StatusNotFound)
 	ctx.Response.Write([]byte("not found"))
-}
-
-// handleWebhook processes Azure Event Grid webhooks.
-func (a *AzureIntegration) handleWebhook(ctx core.HTTPRequestContext) {
-	ctx.Logger.Infof("Handling Azure Event Grid webhook: %s", ctx.Request.URL.Path)
-
-	if err := HandleWebhook(ctx.Response, ctx.Request, ctx.Logger); err != nil {
-		ctx.Logger.Errorf("Failed to handle webhook: %v", err)
-		return
-	}
-
-	ctx.Logger.Info("Webhook processed successfully")
 }
 
 // GetProvider returns the initialized provider.
