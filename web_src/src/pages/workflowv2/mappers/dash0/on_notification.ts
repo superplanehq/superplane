@@ -28,10 +28,7 @@ interface IssueLabelValue {
 }
 
 interface Dash0NotificationEventData {
-  type?: string;
-  data?: {
-    issue?: Dash0NotificationIssue;
-  };
+  issue?: Dash0NotificationIssue;
 }
 
 interface OnNotificationConfiguration {
@@ -41,7 +38,7 @@ interface OnNotificationConfiguration {
 export const onNotificationTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     const eventData = context.event?.data as Dash0NotificationEventData | undefined;
-    const issue = eventData?.data?.issue;
+    const issue = eventData?.issue;
     const title = issue?.summary || issue?.issueIdentifier || issue?.id || "Dash0 notification";
     const subtitleParts = [issue?.status].filter(Boolean).join(" · ");
     const timeAgo = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
@@ -57,14 +54,14 @@ export const onNotificationTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as Dash0NotificationEventData | undefined;
 
     return {
-      "Issue ID": stringOrDash(eventData?.data?.issue?.id),
-      "Issue Identifier": stringOrDash(eventData?.data?.issue?.issueIdentifier),
-      "URL": stringOrDash(eventData?.data?.issue?.url),
-      "Status": stringOrDash(eventData?.data?.issue?.status),
-      "Summary": stringOrDash(eventData?.data?.issue?.summary),
-      "Dataset": stringOrDash(eventData?.data?.issue?.dataset),
-      "Start": stringOrDash(eventData?.data?.issue?.start),
-      "Labels": stringOrDash(eventData?.data?.issue?.labels?.map((label) => `${label.key}: ${label.value?.stringValue}`).join(", ")),
+      "Issue ID": stringOrDash(eventData?.issue?.id),
+      "Issue Identifier": stringOrDash(eventData?.issue?.issueIdentifier),
+      "URL": stringOrDash(eventData?.issue?.url),
+      "Status": stringOrDash(eventData?.issue?.status),
+      "Summary": stringOrDash(eventData?.issue?.summary),
+      "Dataset": stringOrDash(eventData?.issue?.dataset),
+      "Start": stringOrDash(eventData?.issue?.start),
+      "Labels": stringOrDash(eventData?.issue?.labels?.map((label) => `${label.key}: ${label.value?.stringValue}`).join(", ")),
     };
   },
 

@@ -191,7 +191,7 @@ func (t *OnNotification) OnIntegrationMessage(ctx core.IntegrationMessageContext
 		return nil
 	}
 
-	return ctx.Events.Emit("dash0.notification", event)
+	return ctx.Events.Emit("dash0.notification", event.Data)
 }
 
 func (t *OnNotification) Cleanup(ctx core.TriggerContext) error {
