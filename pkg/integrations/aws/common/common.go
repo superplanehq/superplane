@@ -2,9 +2,12 @@ package common
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -138,6 +141,8 @@ type EventBridgeMetadata struct {
 	/*
 	 * List of EventBridge rules created by the integration.
 	 * This ensures that we reuse the same rule for the same source, e.g., aws.codeartifact, aws.ecr, etc.
+	 *
+	 * The key here is the source and region, e.g., "aws.ec2:us-east-1".
 	 */
 	Rules map[string]EventBridgeRuleMetadata `json:"rules" mapstructure:"rules"`
 }
@@ -164,10 +169,10 @@ type ProvisionRuleParameters struct {
 }
 
 type EventBridgeEvent struct {
-	Region     string         `json:"region"`
-	DetailType string         `json:"detail-type"`
-	Source     string         `json:"source"`
-	Detail     map[string]any `json:"detail"`
+	Region     string         `json:"region" mapstructure:"region"`
+	DetailType string         `json:"detail-type" mapstructure:"detail-type"`
+	Source     string         `json:"source" mapstructure:"source"`
+	Detail     map[string]any `json:"detail" mapstructure:"detail"`
 }
 
 type Tag struct {
@@ -280,4 +285,39 @@ func AccountIDFromRoleArn(roleArn string) (string, error) {
 	}
 
 	return strings.TrimSpace(parts[4]), nil
+}
+
+/*
+ * This is the key used to store the rule in the metadata.
+ * The key here is the source and region, e.g., "aws.ec2:us-east-1".
+ * This ensures that we have a rule per {source, region} combination.
+ */
+func EventBridgeRuleKey(source string, region string) string {
+	return fmt.Sprintf("%s:%s", source, region)
+}
+
+func HasEventBridgeRule(logger *logrus.Entry, integration core.IntegrationContext, source, region, detailType string) (bool, error) {
+	integrationMetadata := IntegrationMetadata{}
+	if err := mapstructure.Decode(integration.GetMetadata(), &integrationMetadata); err != nil {
+		return false, fmt.Errorf("failed to decode integration metadata: %w", err)
+	}
+
+	if integrationMetadata.EventBridge == nil {
+		logger.Infof("EventBridge metadata not found")
+		return false, nil
+	}
+
+	ruleKey := EventBridgeRuleKey(source, region)
+	rule, ok := integrationMetadata.EventBridge.Rules[ruleKey]
+	if !ok {
+		logger.Infof("Rule not found for %s", ruleKey)
+		return false, nil
+	}
+
+	if !slices.Contains(rule.DetailTypes, detailType) {
+		logger.Infof("Rule %s does not have detail type '%s'", ruleKey, detailType)
+		return false, nil
+	}
+
+	return true, nil
 }

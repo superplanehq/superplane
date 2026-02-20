@@ -14,14 +14,19 @@ import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.sv
 import { formatTimeAgo } from "@/utils/date";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { MetadataItem } from "@/ui/metadataList";
-import {
-  CodeArtifactPackageVersionConfiguration,
-  CodeArtifactPackageVersionDescription,
-  CodeArtifactPackageLicense,
-  CodeArtifactPackageVersionPayload,
-} from "./types";
-import { buildCodeArtifactPackageMetadataItems, formatPackageName } from "./utils";
+import { PackageVersionDescription, PackageLicense, PackageVersionPayload } from "./types";
+import { formatPackageName } from "./utils";
 import { stringOrDash } from "../../utils";
+
+export interface GetPackageVersionConfiguration {
+  region?: string;
+  domain?: string;
+  repository?: string;
+  package?: string;
+  format?: string;
+  namespace?: string;
+  version?: string;
+}
 
 export const getPackageVersionMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -48,8 +53,8 @@ export const getPackageVersionMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const payload = outputs?.default?.[0]?.data as CodeArtifactPackageVersionPayload | undefined;
-    const result = payload?.package as CodeArtifactPackageVersionDescription | undefined;
+    const payload = outputs?.default?.[0]?.data as PackageVersionPayload | undefined;
+    const result = payload?.package as PackageVersionDescription | undefined;
 
     if (!result) {
       return {};
@@ -79,8 +84,45 @@ export const getPackageVersionMapper: ComponentBaseMapper = {
 };
 
 function getPackageVersionMetadataList(node: NodeInfo): MetadataItem[] {
-  const configuration = node.configuration as CodeArtifactPackageVersionConfiguration | undefined;
-  return buildCodeArtifactPackageMetadataItems(configuration);
+  const configuration = node.configuration as GetPackageVersionConfiguration | undefined;
+  const items: MetadataItem[] = [];
+
+  if (configuration?.region) {
+    items.push({
+      icon: "globe",
+      label: configuration.region,
+    });
+  }
+
+  if (configuration?.domain) {
+    items.push({
+      icon: "database",
+      label: `Domain: ${configuration?.domain}`,
+    });
+  }
+
+  if (configuration?.repository) {
+    items.push({
+      icon: "boxes",
+      label: `Repository: ${configuration?.repository}`,
+    });
+  }
+
+  if (configuration?.package) {
+    items.push({
+      icon: "package",
+      label: configuration.package,
+    });
+  }
+
+  if (configuration?.version) {
+    items.push({
+      icon: "tag",
+      label: configuration.version,
+    });
+  }
+
+  return items;
 }
 
 function getPackageVersionEventSections(
@@ -103,7 +145,7 @@ function getPackageVersionEventSections(
   ];
 }
 
-function formatLicenses(licenses?: CodeArtifactPackageLicense[]): string {
+function formatLicenses(licenses?: PackageLicense[]): string {
   if (!licenses || licenses.length === 0) {
     return "-";
   }

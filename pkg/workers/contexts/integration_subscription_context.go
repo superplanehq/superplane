@@ -83,35 +83,9 @@ func (c *IntegrationSubscriptionContext) sendMessageToComponent(message any) err
 		Integration:   c.integrationCtx,
 		Events:        NewEventContext(tx, node),
 		Message:       message,
-		Logger:        logger,
-
-		// FindExecutionByKV allows integration components to locate an existing
-		// execution by a key-value pair. This enables components that receive
-		// async completion events through the integration message path (e.g.,
-		// AWS EventBridge) to resolve and finish running executions, rather than
-		// only being able to create new root events via Events.Emit().
+		Logger:        logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
-			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
-			if err != nil {
-				if err == gorm.ErrRecordNotFound {
-					return nil, nil
-				}
-				return nil, err
-			}
-
-			return &core.ExecutionContext{
-				ID:             execution.ID,
-				WorkflowID:     execution.WorkflowID.String(),
-				NodeID:         execution.NodeID,
-				Configuration:  execution.Configuration.Data(),
-				HTTP:           httpCtx,
-				Metadata:       NewExecutionMetadataContext(tx, execution),
-				NodeMetadata:   NewNodeMetadataContext(tx, node),
-				ExecutionState: NewExecutionStateContext(tx, execution),
-				Requests:       NewExecutionRequestContext(tx, execution),
-				Logger:         logging.WithExecution(logger, execution, nil),
-				Notifications:  NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
-			}, nil
+			return c.findExecutionByKV(key, value)
 		},
 	})
 }
@@ -134,12 +108,39 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 	}
 
 	return integrationTrigger.OnIntegrationMessage(core.IntegrationMessageContext{
-		HTTP:          c.registry.HTTPContext(),
-		Configuration: c.node.Configuration.Data(),
-		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
-		Integration:   c.integrationCtx,
-		Message:       message,
-		Events:        NewEventContext(c.tx, c.node),
-		Logger:        logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
+		HTTP:              c.registry.HTTPContext(),
+		Configuration:     c.node.Configuration.Data(),
+		NodeMetadata:      NewNodeMetadataContext(c.tx, c.node),
+		Integration:       c.integrationCtx,
+		Message:           message,
+		Events:            NewEventContext(c.tx, c.node),
+		Logger:            logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
+		FindExecutionByKV: c.findExecutionByKV,
 	})
+}
+
+func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value string) (*core.ExecutionContext, error) {
+	execution, err := models.FirstNodeExecutionByKVInTransaction(c.tx, c.node.WorkflowID, c.node.NodeID, key, value)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return &core.ExecutionContext{
+		ID:             execution.ID,
+		WorkflowID:     execution.WorkflowID.String(),
+		NodeID:         execution.NodeID,
+		Configuration:  execution.Configuration.Data(),
+		HTTP:           c.registry.HTTPContext(),
+		Metadata:       NewExecutionMetadataContext(c.tx, execution),
+		NodeMetadata:   NewNodeMetadataContext(c.tx, c.node),
+		ExecutionState: NewExecutionStateContext(c.tx, execution),
+		Requests:       NewExecutionRequestContext(c.tx, execution),
+		Integration:    c.integrationCtx,
+		Logger:         logging.WithExecution(logging.ForNode(*c.node), execution, nil),
+		Notifications:  NewNotificationContext(c.tx, c.integration.OrganizationID, execution.WorkflowID),
+	}, nil
 }
