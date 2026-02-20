@@ -84,6 +84,13 @@ func NewRegistry(encryptor crypto.Encryptor, httpOptions HTTPOptions) (*Registry
 
 	r.Init()
 
+	if err := r.registerTypeScriptComponentsFromEnv(); err != nil {
+		return nil, err
+	}
+	if err := r.registerTypeScriptIntegrationsFromEnv(); err != nil {
+		return nil, err
+	}
+
 	return r, nil
 }
 

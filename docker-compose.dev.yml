@@ -78,6 +78,8 @@ services:
       OTEL_SERVICE_NAME: "superplane-dev"
       OWNER_SETUP_ENABLED: "yes"
       VITE_ENABLE_CUSTOM_COMPONENTS: "true"
+      TYPESCRIPT_COMPONENTS_DIR: "/app/sdk/components"
+      TYPESCRIPT_INTEGRATIONS_DIR: "/app/sdk/integrations"
 
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}

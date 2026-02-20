@@ -1,0 +1,42 @@
+{
+  "name": "getIssue",
+  "label": "Get Issue",
+  "description": "Get a GitHub issue by owner/repo/number",
+  "documentation": "Fetches issue details from GitHub REST API.",
+  "icon": "github",
+  "color": "orange",
+  "configuration": [
+    {
+      "name": "owner",
+      "label": "Owner",
+      "type": "string",
+      "description": "Repository owner (user or org)",
+      "required": true
+    },
+    {
+      "name": "repository",
+      "label": "Repository",
+      "type": "string",
+      "description": "Repository name",
+      "required": true
+    },
+    {
+      "name": "issueNumber",
+      "label": "Issue Number",
+      "type": "number",
+      "description": "Issue number",
+      "required": true
+    }
+  ],
+  "output_channels": [
+    {
+      "name": "default",
+      "label": "Default",
+      "description": ""
+    }
+  ],
+  "example_output": {
+    "number": 1,
+    "title": "Example issue"
+  }
+}

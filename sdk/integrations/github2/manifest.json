@@ -1,0 +1,24 @@
+{
+  "name": "github2",
+  "label": "GitHub 2 (TypeScript)",
+  "icon": "github",
+  "description": "GitHub integration implemented in TypeScript",
+  "instructions": "Provide a GitHub API token to use github2 components.",
+  "configuration": [
+    {
+      "name": "apiToken",
+      "label": "API Token",
+      "type": "string",
+      "required": true,
+      "sensitive": true,
+      "description": "GitHub API token used to authenticate requests"
+    }
+  ],
+  "components": [
+    {
+      "name": "getIssue",
+      "directory": "components/getIssue"
+    }
+  ],
+  "triggers": []
+}

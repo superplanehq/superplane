@@ -36,13 +36,15 @@ type NodeExecutor struct {
 }
 
 func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, webhookBaseURL string) *NodeExecutor {
+	logger := logrus.WithFields(logrus.Fields{"worker": "NodeExecutor"})
+
 	return &NodeExecutor{
 		encryptor:      encryptor,
 		registry:       registry,
 		baseURL:        baseURL,
 		webhookBaseURL: webhookBaseURL,
 		semaphore:      semaphore.NewWeighted(25),
-		logger:         logrus.WithFields(logrus.Fields{"worker": "NodeExecutor"}),
+		logger:         logger,
 	}
 }
 
@@ -255,12 +257,6 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 	}
 
 	ref := node.Ref.Data()
-	component, err := w.registry.GetComponent(ref.Component.Name)
-	if err != nil {
-		logger.Errorf("component %s not found: %v", ref.Component.Name, err)
-		return fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
-	}
-
 	inputEvent, err := models.FindCanvasEventInTransaction(tx, execution.EventID)
 	if err != nil {
 		logger.Errorf("failed to find input event: %v", err)
@@ -322,6 +318,13 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 	}
 
 	ctx.Logger = logger
+
+	component, err := w.registry.GetComponent(ref.Component.Name)
+	if err != nil {
+		logger.Errorf("component %s not found: %v", ref.Component.Name, err)
+		return fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
+	}
+
 	if err := component.Execute(ctx); err != nil {
 		logger.Errorf("failed to execute component: %v", err)
 		err = execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, err.Error())

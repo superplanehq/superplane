@@ -1,4 +1,5 @@
 ARG GO_VERSION=1.25.3
+ARG DENO_VERSION=v2.5.0
 ARG UBUNTU_VERSION=22.04
 ARG BUILDER_IMAGE="ubuntu:${UBUNTU_VERSION}"
 ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
@@ -9,12 +10,14 @@ ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
 # ----------------------------------------------------------------------------------------------------------------------
 
 FROM ${BUILDER_IMAGE} AS base
+ARG DENO_VERSION=v2.5.0
 
 WORKDIR /tmp
 
 COPY scripts/docker scripts
 
 ENV GO_VERSION=1.25.3
+ENV DENO_VERSION=v2.5.0
 ENV PATH="/usr/local/go/bin:${PATH}"
 ENV GOPATH="/go"
 ENV GOBIN="/go/bin"
@@ -23,6 +26,7 @@ ENV GOPROXY="https://proxy.golang.org,direct"
 
 RUN bash scripts/install-go.sh ${GO_VERSION}
 RUN bash scripts/install-nodejs.sh
+RUN bash scripts/install-deno.sh ${DENO_VERSION}
 RUN bash scripts/install-postgresql-client.sh
 RUN bash scripts/install-gomigrate.sh
 RUN bash scripts/install-protoc.sh
@@ -93,6 +97,7 @@ RUN VITE_BASE_URL=$BASE_URL VITE_ENABLE_CUSTOM_COMPONENTS=$VITE_ENABLE_CUSTOM_CO
 # ----------------------------------------------------------------------------------------------------------------------
 
 FROM ${RUNNER_IMAGE} AS runner
+ARG DENO_VERSION=v2.5.0
 
 LABEL org.opencontainers.image.title="superplane" \
   org.opencontainers.image.description="SuperPlane" \
@@ -106,6 +111,8 @@ LABEL org.opencontainers.image.title="superplane" \
 # Install PostgreSQL 17.5 client tools
 COPY scripts/docker/install-postgresql-client.sh install-postgresql-client.sh
 RUN bash install-postgresql-client.sh
+COPY scripts/docker/install-deno.sh install-deno.sh
+RUN bash install-deno.sh ${DENO_VERSION}
 
 # We don't need Docker health checks, since these containers
 # are intended to run in Kubernetes pods, which have probes.
