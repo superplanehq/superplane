@@ -308,9 +308,18 @@ func normalizeNotificationRuleEventTypes(values []string) []string {
 }
 
 func normalizeHarnessIdentifier(value string) string {
+	identifier := normalizeHarnessIdentifierOrEmpty(value)
+	if identifier == "" {
+		return "superplane-harness"
+	}
+
+	return identifier
+}
+
+func normalizeHarnessIdentifierOrEmpty(value string) string {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
-		return "superplane-harness"
+		return ""
 	}
 
 	builder := strings.Builder{}
@@ -328,7 +337,7 @@ func normalizeHarnessIdentifier(value string) string {
 
 	identifier := strings.Trim(builder.String(), "-_")
 	if identifier == "" {
-		return "superplane-harness"
+		return ""
 	}
 
 	if len(identifier) > 127 {
@@ -339,8 +348,8 @@ func normalizeHarnessIdentifier(value string) string {
 }
 
 func normalizeHarnessName(name, fallback string) string {
-	if strings.TrimSpace(name) != "" {
-		return normalizeHarnessIdentifier(name)
+	if normalizedName := normalizeHarnessIdentifierOrEmpty(name); normalizedName != "" {
+		return normalizedName
 	}
 
 	return normalizeHarnessIdentifier(fallback)

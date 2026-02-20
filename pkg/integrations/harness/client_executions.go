@@ -444,13 +444,19 @@ func (c *Client) ListPipelines() ([]Pipeline, error) {
 
 func parseRef(ref string) (string, string) {
 	trimmed := strings.TrimSpace(ref)
+	if trimmed == "" {
+		return "", ""
+	}
+
 	switch {
 	case strings.HasPrefix(trimmed, "refs/heads/"):
 		return strings.TrimPrefix(trimmed, "refs/heads/"), ""
 	case strings.HasPrefix(trimmed, "refs/tags/"):
 		return "", strings.TrimPrefix(trimmed, "refs/tags/")
 	default:
-		return "", ""
+		// Treat plain ref values (e.g. "main") as branch names so ref input is
+		// never silently dropped.
+		return trimmed, ""
 	}
 }
 

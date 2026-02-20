@@ -224,3 +224,43 @@ func Test__Client__ListOrganizations__ReturnsErrorWhenCallsFail(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorContains(t, err, "request failed with 401")
 }
+
+func Test__ParseRef(t *testing.T) {
+	t.Run("parses full branch ref", func(t *testing.T) {
+		branch, tag := parseRef("refs/heads/main")
+		assert.Equal(t, "main", branch)
+		assert.Equal(t, "", tag)
+	})
+
+	t.Run("parses full tag ref", func(t *testing.T) {
+		branch, tag := parseRef("refs/tags/v1.2.3")
+		assert.Equal(t, "", branch)
+		assert.Equal(t, "v1.2.3", tag)
+	})
+
+	t.Run("treats plain ref as branch", func(t *testing.T) {
+		branch, tag := parseRef("main")
+		assert.Equal(t, "main", branch)
+		assert.Equal(t, "", tag)
+	})
+
+	t.Run("returns empty values for empty ref", func(t *testing.T) {
+		branch, tag := parseRef("   ")
+		assert.Equal(t, "", branch)
+		assert.Equal(t, "", tag)
+	})
+}
+
+func Test__NormalizeHarnessName(t *testing.T) {
+	t.Run("uses normalized name when valid", func(t *testing.T) {
+		assert.Equal(t, "my-rule", normalizeHarnessName("my rule", "fallback-rule"))
+	})
+
+	t.Run("uses fallback when name normalizes to empty", func(t *testing.T) {
+		assert.Equal(t, "fallback-rule", normalizeHarnessName("!!!", "fallback-rule"))
+	})
+
+	t.Run("uses default only when both name and fallback normalize to empty", func(t *testing.T) {
+		assert.Equal(t, "superplane-harness", normalizeHarnessName("!!!", "###"))
+	})
+}
