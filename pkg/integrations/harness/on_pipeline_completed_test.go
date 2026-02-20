@@ -200,6 +200,20 @@ func Test__OnPipelineCompleted__Setup(t *testing.T) {
 func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 	trigger := &OnPipelineCompleted{}
 
+	t.Run("unauthorized request returns forbidden before config validation", func(t *testing.T) {
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers: http.Header{},
+			Body:    []byte(`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-auth","pipelineIdentifier":"deploy","nodeStatus":"FAILED"}}`),
+			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			// Intentionally invalid/missing config.
+			Configuration: map[string]any{},
+			Events:        &contexts.EventContext{},
+		})
+
+		assert.Equal(t, http.StatusForbidden, code)
+		require.ErrorContains(t, err, "invalid webhook authorization")
+	})
+
 	t.Run("invalid webhook secret -> 403", func(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("Authorization", "Bearer wrong")
@@ -248,7 +262,8 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 
 		storedMetadata, ok := metadata.Get().(OnPipelineCompletedMetadata)
 		require.True(t, ok)
-		assert.Equal(t, "exec-1", storedMetadata.LastExecutionID)
+		assert.Equal(t, "exec-1", storedMetadata.LastTimestamplessExecutionID)
+		assert.Equal(t, "", storedMetadata.LastExecutionID)
 	})
 
 	t.Run("treats errored webhook status as failed terminal", func(t *testing.T) {
@@ -387,6 +402,76 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 		assert.Equal(t, 1, events.Count())
+	})
+
+	t.Run("webhook without timestamp is not re-emitted by poll for same execution", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set("Authorization", "Bearer expected")
+		events := &contexts.EventContext{}
+		oldCheckpoint := time.Now().Add(-10 * time.Minute).UnixMilli()
+		metadata := &contexts.MetadataContext{Metadata: OnPipelineCompletedMetadata{
+			LastExecutionEnded: oldCheckpoint,
+			LastExecutionID:    "exec-prev",
+		}}
+
+		webhookCode, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers: headers,
+			Body:    []byte(`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-no-end","pipelineIdentifier":"deploy","nodeStatus":"FAILED"}}`),
+			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Configuration: OnPipelineCompletedConfiguration{
+				OrgID:              "default",
+				ProjectID:          "default_project",
+				PipelineIdentifier: "deploy",
+				Statuses:           []string{"failed"},
+			},
+			Metadata: metadata,
+			Events:   events,
+		})
+		require.NoError(t, webhookErr)
+		assert.Equal(t, http.StatusOK, webhookCode)
+		assert.Equal(t, 1, events.Count())
+
+		endedTs := time.Now().Add(-5 * time.Minute).UnixMilli()
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						fmt.Sprintf(
+							`{"data":{"content":[{"planExecutionId":"exec-no-end","pipelineIdentifier":"deploy","status":"FAILED","endTs":"%d"}]}}`,
+							endedTs,
+						),
+					)),
+				},
+			},
+		}
+		requests := &contexts.RequestContext{}
+
+		_, pollErr := trigger.HandleAction(core.TriggerActionContext{
+			Name: OnPipelineCompletedPollAction,
+			Configuration: OnPipelineCompletedConfiguration{
+				OrgID:              "default",
+				ProjectID:          "default_project",
+				PipelineIdentifier: "deploy",
+				Statuses:           []string{"failed"},
+			},
+			HTTP:     httpCtx,
+			Metadata: metadata,
+			Requests: requests,
+			Events:   events,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "pat.acc-123.test",
+				},
+			},
+		})
+		require.NoError(t, pollErr)
+		assert.Equal(t, 1, events.Count())
+
+		storedMetadata, ok := metadata.Get().(OnPipelineCompletedMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "exec-no-end", storedMetadata.LastExecutionID)
+		assert.EqualValues(t, endedTs, storedMetadata.LastExecutionEnded)
 	})
 
 	t.Run("status-filtered webhook updates checkpoint to avoid reprocessing", func(t *testing.T) {
@@ -913,4 +998,48 @@ func Test__ParseEpochMilliseconds(t *testing.T) {
 	assert.EqualValues(t, nowRoundedToSecond, parseEpochMilliseconds(rfc3339))
 	assert.EqualValues(t, nowRoundedToSecond, parseEpochMilliseconds(textual))
 	assert.EqualValues(t, 0, parseEpochMilliseconds("not-a-time"))
+}
+
+func Test__OnPipelineCompleted__CheckpointHelpers(t *testing.T) {
+	t.Run("updateCheckpoint does not regress execution id without timestamp", func(t *testing.T) {
+		metadata := OnPipelineCompletedMetadata{
+			LastExecutionID:    "zzz",
+			LastExecutionEnded: 0,
+		}
+		execution := ExecutionSummary{ExecutionID: "aaa"}
+
+		updated := updateCheckpoint(metadata, execution)
+		assert.Equal(t, "zzz", updated.LastExecutionID)
+		assert.EqualValues(t, 0, updated.LastExecutionEnded)
+		assert.Equal(t, "aaa", updated.LastTimestamplessExecutionID)
+	})
+
+	t.Run("isNewerExecution dedupes same execution id even when timestamp becomes available", func(t *testing.T) {
+		endTs := time.Now().UnixMilli()
+		metadata := OnPipelineCompletedMetadata{
+			LastExecutionID:    "exec-1",
+			LastExecutionEnded: endTs - 60_000,
+		}
+		execution := ExecutionSummary{
+			ExecutionID: "exec-1",
+			EndedAt:     strconv.FormatInt(endTs, 10),
+		}
+
+		assert.False(t, isNewerExecution(metadata, execution))
+	})
+
+	t.Run("isNewerExecution allows checkpoint refresh for execution seen first without timestamp", func(t *testing.T) {
+		endTs := time.Now().UnixMilli()
+		metadata := OnPipelineCompletedMetadata{
+			LastExecutionID:              "exec-prev",
+			LastExecutionEnded:           endTs - 60_000,
+			LastTimestamplessExecutionID: "exec-1",
+		}
+		execution := ExecutionSummary{
+			ExecutionID: "exec-1",
+			EndedAt:     strconv.FormatInt(endTs, 10),
+		}
+
+		assert.True(t, isNewerExecution(metadata, execution))
+	})
 }

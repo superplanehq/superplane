@@ -50,6 +50,7 @@ type OnPipelineCompletedConfiguration struct {
 type OnPipelineCompletedMetadata struct {
 	PipelineIdentifier                 string `json:"pipelineIdentifier,omitempty" mapstructure:"pipelineIdentifier"`
 	LastExecutionID                    string `json:"lastExecutionId,omitempty" mapstructure:"lastExecutionId"`
+	LastTimestamplessExecutionID       string `json:"lastTimestamplessExecutionId,omitempty" mapstructure:"lastTimestamplessExecutionId"`
 	LastExecutionEnded                 int64  `json:"lastExecutionEnded,omitempty" mapstructure:"lastExecutionEnded"`
 	PollErrorCount                     int    `json:"pollErrorCount,omitempty" mapstructure:"pollErrorCount"`
 	DisableServerPipelineIDFilterInAPI bool   `json:"disableServerPipelineIdFilterInApi,omitempty" mapstructure:"disableServerPipelineIdFilterInApi"`
@@ -294,13 +295,13 @@ func (t *OnPipelineCompleted) HandleAction(ctx core.TriggerActionContext) (map[s
 }
 
 func (t *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	if err := authorizeWebhook(ctx); err != nil {
+		return http.StatusForbidden, err
+	}
+
 	config, err := decodeOnPipelineCompletedConfiguration(ctx.Configuration)
 	if err != nil {
 		return http.StatusBadRequest, err
-	}
-
-	if err := authorizeWebhook(ctx); err != nil {
-		return http.StatusForbidden, err
 	}
 
 	payload := map[string]any{}
@@ -475,6 +476,16 @@ func (t *OnPipelineCompleted) collectExecutionsSinceCheckpoint(
 
 		for _, execution := range pageExecutions {
 			if !isNewerExecution(metadata, execution) {
+				executionID := strings.TrimSpace(execution.ExecutionID)
+				executionEnded := executionOrderingTimestamp(execution)
+				// Allow checkpoint timestamp refresh for executions first seen
+				// without timestamp (or previously checkpointed by ID) even
+				// when the "newer" predicate returns false.
+				if executionEnded > metadata.LastExecutionEnded &&
+					(executionID == strings.TrimSpace(metadata.LastExecutionID) ||
+						executionID == strings.TrimSpace(metadata.LastTimestamplessExecutionID)) {
+					executions = append(executions, execution)
+				}
 				slices.SortFunc(executions, compareExecutionOrdering)
 				return executions, nil
 			}
@@ -506,12 +517,25 @@ func (t *OnPipelineCompleted) processPolledExecution(
 		return err
 	}
 	if !isNewerExecution(metadata, execution) {
+		// Same execution may first arrive without timestamps (webhook), then
+		// later via polling with endTs. Refresh checkpoint timestamp dimension
+		// without re-emitting the event.
+		executionID := strings.TrimSpace(execution.ExecutionID)
+		if executionID == strings.TrimSpace(metadata.LastExecutionID) ||
+			executionID == strings.TrimSpace(metadata.LastTimestamplessExecutionID) {
+			return t.updateCheckpointFromExecutionUnlocked(ctx.Metadata, execution)
+		}
 		return nil
 	}
 
 	status := canonicalStatus(execution.Status)
 	isTerminal := isTerminalStatus(status)
 	shouldEmit := isTerminal
+	if strings.TrimSpace(execution.ExecutionID) == strings.TrimSpace(metadata.LastTimestamplessExecutionID) {
+		// Same execution was already emitted from a timestampless webhook.
+		// Poll can refresh checkpoint timestamp, but must not emit again.
+		shouldEmit = false
+	}
 
 	// Never advance checkpoints for non-terminal executions.
 	// Their ordering can be based on start time and may jump ahead of
@@ -566,7 +590,8 @@ func (t *OnPipelineCompleted) updateCheckpointFromExecutionUnlocked(
 
 	updated := updateCheckpoint(metadata, execution)
 	if updated.LastExecutionEnded == metadata.LastExecutionEnded &&
-		strings.TrimSpace(updated.LastExecutionID) == strings.TrimSpace(metadata.LastExecutionID) {
+		strings.TrimSpace(updated.LastExecutionID) == strings.TrimSpace(metadata.LastExecutionID) &&
+		strings.TrimSpace(updated.LastTimestamplessExecutionID) == strings.TrimSpace(metadata.LastTimestamplessExecutionID) {
 		return nil
 	}
 
@@ -696,14 +721,21 @@ func updateCheckpoint(metadata OnPipelineCompletedMetadata, execution ExecutionS
 	if executionID == "" {
 		return metadata
 	}
+	currentExecutionID := strings.TrimSpace(metadata.LastExecutionID)
+	currentTimestamplessExecutionID := strings.TrimSpace(metadata.LastTimestamplessExecutionID)
 
 	ended := executionOrderingTimestamp(execution)
 	if ended == 0 {
-		// If webhook payload doesn't contain timestamps, keep the existing
-		// timestamp checkpoint and only advance execution ID to avoid drops.
-		if executionID != strings.TrimSpace(metadata.LastExecutionID) {
-			metadata.LastExecutionID = executionID
+		// Keep timestamped checkpoint dimensions untouched.
+		// Store timestampless execution IDs only for dedupe.
+		if executionID != currentTimestamplessExecutionID {
+			metadata.LastTimestamplessExecutionID = executionID
 		}
+		return metadata
+	}
+
+	if executionID == currentExecutionID && ended > metadata.LastExecutionEnded {
+		metadata.LastExecutionEnded = ended
 		return metadata
 	}
 
@@ -714,7 +746,7 @@ func updateCheckpoint(metadata OnPipelineCompletedMetadata, execution ExecutionS
 	}
 
 	if ended == metadata.LastExecutionEnded &&
-		strings.Compare(executionID, strings.TrimSpace(metadata.LastExecutionID)) > 0 {
+		strings.Compare(executionID, currentExecutionID) > 0 {
 		metadata.LastExecutionID = executionID
 	}
 
@@ -726,11 +758,22 @@ func isNewerExecution(metadata OnPipelineCompletedMetadata, execution ExecutionS
 	if executionID == "" {
 		return false
 	}
+	currentExecutionID := strings.TrimSpace(metadata.LastExecutionID)
+	currentTimestamplessExecutionID := strings.TrimSpace(metadata.LastTimestamplessExecutionID)
+	if executionID == currentExecutionID {
+		return false
+	}
 
 	ended := executionOrderingTimestamp(execution)
 	if ended == 0 {
-		// Without timestamp we can only dedupe by execution ID.
-		return executionID != strings.TrimSpace(metadata.LastExecutionID)
+		return executionID != currentTimestamplessExecutionID
+	}
+
+	if executionID == currentTimestamplessExecutionID {
+		// Same execution first seen without timestamp should be revisited once
+		// when a timestamp becomes available to refresh checkpoint dimensions.
+		// Emission dedupe is handled in processPolledExecution.
+		return ended > metadata.LastExecutionEnded
 	}
 
 	if ended > metadata.LastExecutionEnded {
@@ -741,7 +784,7 @@ func isNewerExecution(metadata OnPipelineCompletedMetadata, execution ExecutionS
 		return false
 	}
 
-	return strings.Compare(executionID, strings.TrimSpace(metadata.LastExecutionID)) > 0
+	return strings.Compare(executionID, currentExecutionID) > 0
 }
 
 func executionOrderingTimestamp(execution ExecutionSummary) int64 {
