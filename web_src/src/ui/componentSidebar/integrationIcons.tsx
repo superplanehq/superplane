@@ -2,11 +2,12 @@ import { resolveIcon } from "@/lib/utils";
 import React from "react";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
+import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
+import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
-import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
@@ -108,6 +109,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
     codeArtifact: awsCodeArtifactIcon,
     ecr: awsEcrIcon,
     lambda: awsLambdaIcon,
+    sqs: awsSqsIcon,
     ec2: awsEc2Icon,
     route53: awsRoute53Icon,
     ecs: awsEcsIcon,
