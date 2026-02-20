@@ -46,11 +46,11 @@ func Test__HeadObject__Execute(t *testing.T) {
 				{
 					StatusCode: http.StatusOK,
 					Header: http.Header{
-						"Content-Length":       []string{"1024"},
-						"Content-Type":         []string{"text/plain"},
-						"Etag":                 []string{"\"abc123\""},
-						"Last-Modified":        []string{"Thu, 10 Jan 2026 10:00:02 GMT"},
-						"X-Amz-Storage-Class":  []string{"STANDARD"},
+						"Content-Length":      []string{"1024"},
+						"Content-Type":        []string{"text/plain"},
+						"Etag":                []string{"\"abc123\""},
+						"Last-Modified":       []string{"Thu, 10 Jan 2026 10:00:02 GMT"},
+						"X-Amz-Storage-Class": []string{"STANDARD"},
 					},
 					Body: io.NopCloser(strings.NewReader("")),
 				},
