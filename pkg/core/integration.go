@@ -7,7 +7,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/oidc"
+	"gorm.io/gorm"
 )
 
 type Integration interface {
@@ -179,6 +181,10 @@ type SyncContext struct {
 	HTTP            HTTPContext
 	Integration     IntegrationContext
 	OIDC            oidc.Provider
+	Encryptor       crypto.Encryptor
+	// Tx is the database transaction when Sync is invoked from the integration request worker.
+	// When nil (e.g. from gRPC or tests), callers should use database.Conn() for DB access.
+	Tx *gorm.DB
 }
 
 type IntegrationCleanupContext struct {
