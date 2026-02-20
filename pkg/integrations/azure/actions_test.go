@@ -137,7 +137,6 @@ func TestValidateCreateVMRequest(t *testing.T) {
 }
 
 func TestCreateVMRequest_AllFields(t *testing.T) {
-	// Test that all fields can be set and accessed
 	req := CreateVMRequest{
 		ResourceGroup:      "my-rg",
 		VMName:             "my-vm",
@@ -166,7 +165,6 @@ func TestCreateVMRequest_AllFields(t *testing.T) {
 }
 
 func TestCreateVMResponse_AllFields(t *testing.T) {
-	// Test that all response fields can be set and accessed
 	resp := CreateVMResponse{
 		VMID:              "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute/virtualMachines/vm1",
 		Name:              "vm1",
@@ -188,50 +186,14 @@ func TestCreateVMResponse_AllFields(t *testing.T) {
 	assert.Equal(t, "azureuser", resp.AdminUsername)
 }
 
-func TestVMSizeConstants(t *testing.T) {
-	// Verify VM size constants are defined correctly
-	assert.Equal(t, "Standard_B1s", VMSizeStandardB1s)
-	assert.Equal(t, "Standard_B1ms", VMSizeStandardB1ms)
-	assert.Equal(t, "Standard_B2s", VMSizeStandardB2s)
-	assert.Equal(t, "Standard_D2s_v3", VMSizeStandardD2sV3)
-	assert.Equal(t, "Standard_D4s_v3", VMSizeStandardD4sV3)
-	assert.Equal(t, "Standard_D8s_v3", VMSizeStandardD8sV3)
-	assert.Equal(t, "Standard_F2s_v2", VMSizeStandardF2sV2)
-	assert.Equal(t, "Standard_F4s_v2", VMSizeStandardF4sV2)
-	assert.Equal(t, "Standard_F8s_v2", VMSizeStandardF8sV2)
-	assert.Equal(t, "Standard_E2s_v3", VMSizeStandardE2sV3)
-	assert.Equal(t, "Standard_E4s_v3", VMSizeStandardE4sV3)
-	assert.Equal(t, "Standard_E8s_v3", VMSizeStandardE8sV3)
-}
-
 func TestImageReferenceConstants(t *testing.T) {
-	// Test Ubuntu 18.04 LTS
-	assert.Equal(t, "Canonical", ImageUbuntu1804LTS.Publisher)
-	assert.Equal(t, "UbuntuServer", ImageUbuntu1804LTS.Offer)
-	assert.Equal(t, "18.04-LTS", ImageUbuntu1804LTS.SKU)
-	assert.Equal(t, "latest", ImageUbuntu1804LTS.Version)
-
-	// Test Ubuntu 20.04 LTS
 	assert.Equal(t, "Canonical", ImageUbuntu2004LTS.Publisher)
 	assert.Equal(t, "0001-com-ubuntu-server-focal", ImageUbuntu2004LTS.Offer)
 	assert.Equal(t, "20_04-lts-gen2", ImageUbuntu2004LTS.SKU)
 	assert.Equal(t, "latest", ImageUbuntu2004LTS.Version)
-
-	// Test Windows Server 2019
-	assert.Equal(t, "MicrosoftWindowsServer", ImageWindowsServer2019.Publisher)
-	assert.Equal(t, "WindowsServer", ImageWindowsServer2019.Offer)
-	assert.Equal(t, "2019-Datacenter", ImageWindowsServer2019.SKU)
-	assert.Equal(t, "latest", ImageWindowsServer2019.Version)
-
-	// Test Windows Server 2022
-	assert.Equal(t, "MicrosoftWindowsServer", ImageWindowsServer2022.Publisher)
-	assert.Equal(t, "WindowsServer", ImageWindowsServer2022.Offer)
-	assert.Equal(t, "2022-datacenter-azure-edition", ImageWindowsServer2022.SKU)
-	assert.Equal(t, "latest", ImageWindowsServer2022.Version)
 }
 
 func TestImageReference_StructFields(t *testing.T) {
-	// Test that ImageReference struct works correctly
 	img := ImageReference{
 		Publisher: "TestPublisher",
 		Offer:     "TestOffer",
@@ -245,94 +207,21 @@ func TestImageReference_StructFields(t *testing.T) {
 	assert.Equal(t, "1.0.0", img.Version)
 }
 
-func TestCreateVMRequest_WithCommonImages(t *testing.T) {
-	// Test that CreateVMRequest works with predefined image references
-	tests := []struct {
-		name  string
-		image ImageReference
-	}{
-		{
-			name:  "Ubuntu 18.04 LTS",
-			image: ImageUbuntu1804LTS,
-		},
-		{
-			name:  "Ubuntu 20.04 LTS",
-			image: ImageUbuntu2004LTS,
-		},
-		{
-			name:  "Windows Server 2019",
-			image: ImageWindowsServer2019,
-		},
-		{
-			name:  "Windows Server 2022",
-			image: ImageWindowsServer2022,
-		},
+func TestCreateVMRequest_WithUbuntuImage(t *testing.T) {
+	req := CreateVMRequest{
+		ResourceGroup:      "test-rg",
+		VMName:             "test-vm",
+		Location:           "eastus",
+		Size:               "Standard_B1s",
+		AdminUsername:      "azureuser",
+		AdminPassword:      "P@ssw0rd123!",
+		NetworkInterfaceID: "/subscriptions/test/resourceGroups/test-rg/providers/Microsoft.Network/networkInterfaces/test-nic",
+		ImagePublisher:     ImageUbuntu2004LTS.Publisher,
+		ImageOffer:         ImageUbuntu2004LTS.Offer,
+		ImageSku:           ImageUbuntu2004LTS.SKU,
+		ImageVersion:       ImageUbuntu2004LTS.Version,
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := CreateVMRequest{
-				ResourceGroup:      "test-rg",
-				VMName:             "test-vm",
-				Location:           "eastus",
-				Size:               VMSizeStandardB1s,
-				AdminUsername:      "azureuser",
-				AdminPassword:      "P@ssw0rd123!",
-				NetworkInterfaceID: "/subscriptions/test/resourceGroups/test-rg/providers/Microsoft.Network/networkInterfaces/test-nic",
-				ImagePublisher:     tt.image.Publisher,
-				ImageOffer:         tt.image.Offer,
-				ImageSku:           tt.image.SKU,
-				ImageVersion:       tt.image.Version,
-			}
-
-			err := validateCreateVMRequest(req)
-			assert.NoError(t, err)
-		})
-	}
+	err := validateCreateVMRequest(req)
+	assert.NoError(t, err)
 }
-
-func TestCreateVMRequest_WithCommonVMSizes(t *testing.T) {
-	// Test that CreateVMRequest works with predefined VM sizes
-	vmSizes := []string{
-		VMSizeStandardB1s,
-		VMSizeStandardB1ms,
-		VMSizeStandardB2s,
-		VMSizeStandardD2sV3,
-		VMSizeStandardD4sV3,
-		VMSizeStandardD8sV3,
-		VMSizeStandardF2sV2,
-		VMSizeStandardF4sV2,
-		VMSizeStandardF8sV2,
-		VMSizeStandardE2sV3,
-		VMSizeStandardE4sV3,
-		VMSizeStandardE8sV3,
-	}
-
-	for _, size := range vmSizes {
-		t.Run(size, func(t *testing.T) {
-			req := CreateVMRequest{
-				ResourceGroup:      "test-rg",
-				VMName:             "test-vm",
-				Location:           "eastus",
-				Size:               size,
-				AdminUsername:      "azureuser",
-				AdminPassword:      "P@ssw0rd123!",
-				NetworkInterfaceID: "/subscriptions/test/resourceGroups/test-rg/providers/Microsoft.Network/networkInterfaces/test-nic",
-				ImagePublisher:     "Canonical",
-				ImageOffer:         "UbuntuServer",
-				ImageSku:           "18.04-LTS",
-				ImageVersion:       "latest",
-			}
-
-			err := validateCreateVMRequest(req)
-			assert.NoError(t, err)
-		})
-	}
-}
-
-// Note: Integration tests for CreateVM would require:
-// 1. Valid Azure credentials
-// 2. Existing resource group
-// 3. Existing network interface
-// 4. Permissions to create VMs
-// These should be run separately as E2E tests, not unit tests

@@ -11,7 +11,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-type CreateVMComponent struct{}
+type CreateVMComponent struct {
+	integration *AzureIntegration
+}
 
 type CreateVMConfiguration struct {
 	ResourceGroup      string `json:"resourceGroup" mapstructure:"resourceGroup"`
@@ -397,34 +399,9 @@ func (c *CreateVMComponent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if ctx.Integration == nil {
-		return fmt.Errorf("integration context is required")
-	}
-
-	tenantID, err := ctx.Integration.GetConfig("tenantId")
-	if err != nil {
-		return fmt.Errorf("failed to get tenant ID: %w", err)
-	}
-
-	clientID, err := ctx.Integration.GetConfig("clientId")
-	if err != nil {
-		return fmt.Errorf("failed to get client ID: %w", err)
-	}
-
-	subscriptionID, err := ctx.Integration.GetConfig("subscriptionId")
-	if err != nil {
-		return fmt.Errorf("failed to get subscription ID: %w", err)
-	}
-
-	provider, err := NewAzureProvider(
-		context.Background(),
-		string(tenantID),
-		string(clientID),
-		string(subscriptionID),
-		ctx.Logger,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create Azure provider: %w", err)
+	provider := c.integration.GetProvider()
+	if provider == nil {
+		return fmt.Errorf("Azure provider not initialized; Sync must run before executing actions")
 	}
 
 	if config.ImagePublisher == "" {

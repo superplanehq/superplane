@@ -8,31 +8,23 @@ It currently provides:
 
 Website: https://azure.microsoft.com/
 
+## Architecture
+
+The integration uses a thin ARM REST client (`armClient`) instead of per-resource SDK packages.
+Only `azcore` and `azidentity` are used from the Azure SDK — for OIDC authentication and token management.
+All resource operations (VMs, NICs, Public IPs, Resource Groups, SKUs, Event Grid subscriptions) go through
+direct ARM REST API calls with automatic LRO polling and pagination.
+
 ## Authentication
 
-The integration follows a dual-mode authentication strategy.
+The integration uses Azure Workload Identity Federation with no client secret storage.
 
-### Production Mode (Workload Identity Federation / OIDC)
+- SuperPlane signs OIDC JWTs using its own keys (`ctx.OIDC.Sign()`)
+- The signed JWT is used as a client assertion via `azidentity.NewClientAssertionCredential`
+- Azure AD exchanges the assertion for an Azure access token
 
-Production uses Azure Workload Identity Federation with no client secret storage.
-
-- Provider reads a signed OIDC assertion from `AZURE_FEDERATED_TOKEN_FILE`
-- Provider authenticates using `azidentity.NewClientAssertionCredential`
-- Azure AD exchanges assertion for Azure access token
-
-This is the secure default for hosted and production environments.
-
-### Local Development Mode (`az login`)
-
-For local development, setup and iteration can use Azure CLI authentication (`az login`), while SuperPlane keeps the same federated flow at runtime.
-
-Typical local flow:
-
-1. Run `az login` (for portal/CLI setup and quick validation)
-2. Set a reachable public issuer URL for your local app (tunnel)
-3. Regenerate/update the OIDC token file referenced by `AZURE_FEDERATED_TOKEN_FILE`
-
-This provides a seamless developer workflow without switching production auth architecture.
+The OIDC issuer is the SuperPlane base URL. The subject is `app-installation:<integration-id>`
+and the audience is the integration ID.
 
 ## Components
 
@@ -42,13 +34,15 @@ Starts workflows when Azure emits `Microsoft.Resources.ResourceWriteSuccess` for
 
 Key behavior:
 
-- Handles Event Grid subscription validation handshake
+- Automatically creates Event Grid subscriptions at the Azure subscription scope
+- Handles Event Grid subscription validation handshake (via validationUrl GET)
 - Filters to VM resources (`Microsoft.Compute/virtualMachines`)
 - Emits event payload when provisioning state is `Succeeded`
+- Cleans up Event Grid subscriptions when the trigger is removed
 
 ## Action: `azure.createVirtualMachine`
 
-Creates a new Azure VM using Azure SDK long-running operations.
+Creates a new Azure VM using ARM REST API long-running operations.
 
 ### UX and Networking Model (Important)
 
@@ -105,16 +99,9 @@ Or use least-privilege split roles:
 
 - `Virtual Machine Contributor`
 - `Network Contributor`
-
-If using Event Grid provisioning externally, include corresponding Event Grid role(s).
+- `EventGrid EventSubscription Contributor`
 
 ## Troubleshooting
-
-### `failed to read OIDC token ... AZURE_FEDERATED_TOKEN_FILE ... no such file or directory`
-
-- Ensure env var is set in the running app container/process
-- Ensure token file exists and is readable at that path
-- In local dev, run `az login` and refresh your local federation setup/token generation flow
 
 ### `AADSTS90061` / `AADSTS50166` External OIDC endpoint failed
 
@@ -122,7 +109,7 @@ If using Event Grid provisioning externally, include corresponding Event Grid ro
 - Refresh tunnel URL
 - Update app `BASE_URL`/`WEBHOOKS_BASE_URL`
 - Update Azure federated credential issuer to match exactly
-- Regenerate token file and restart app
+- Restart the app to re-sync the integration
 
 ## Development Validation
 
@@ -131,4 +118,3 @@ Run Azure integration tests:
 ```bash
 go test ./pkg/integrations/azure/...
 ```
-

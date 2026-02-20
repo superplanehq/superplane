@@ -1,7 +1,9 @@
 package azure
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"slices"
 
 	"github.com/mitchellh/mapstructure"
@@ -16,16 +18,118 @@ type AzureWebhookConfiguration struct {
 }
 
 // AzureWebhookHandler manages webhook lifecycle for Azure integration triggers.
-// Event Grid subscription setup is currently manual, so setup/cleanup are no-ops.
-type AzureWebhookHandler struct{}
+type AzureWebhookHandler struct {
+	integration *AzureIntegration
+}
 
 func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
-	ctx.Logger.Infof("Azure webhook ready at %s (manual Event Grid setup required)", ctx.Webhook.GetURL())
-	return map[string]any{"mode": "manual", "url": ctx.Webhook.GetURL()}, nil
+	webhookURL := ctx.Webhook.GetURL()
+	ctx.Logger.Infof("Setting up Azure Event Grid subscription for webhook: %s", webhookURL)
+
+	provider := h.integration.GetProvider()
+	if provider == nil {
+		return nil, fmt.Errorf("Azure provider not initialized; Sync must run before webhook setup")
+	}
+
+	config, err := decodeAzureWebhookConfiguration(ctx.Webhook.GetConfiguration())
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode webhook configuration: %w", err)
+	}
+
+	subName := fmt.Sprintf("superplane-%s", ctx.Webhook.GetID())
+	scope := fmt.Sprintf("/subscriptions/%s", provider.GetSubscriptionID())
+
+	// Build subject filter if resource type is specified
+	var subjectBeginsWith, subjectEndsWith string
+	if config.ResourceType != "" {
+		subjectEndsWith = "/providers/" + config.ResourceType
+		if config.ResourceGroup != "" {
+			subjectBeginsWith = fmt.Sprintf(
+				"/subscriptions/%s/resourceGroups/%s",
+				provider.GetSubscriptionID(), config.ResourceGroup,
+			)
+		}
+	}
+
+	// Get webhook secret for delivery authentication
+	secret, _ := ctx.Webhook.GetSecret()
+	var deliveryAttributes []map[string]any
+	if len(secret) > 0 {
+		deliveryAttributes = []map[string]any{
+			{
+				"name": "X-Webhook-Secret",
+				"type": "Static",
+				"properties": map[string]any{
+					"value":    string(secret),
+					"isSecret": true,
+				},
+			},
+		}
+	}
+
+	body := map[string]any{
+		"properties": map[string]any{
+			"destination": map[string]any{
+				"endpointType": "WebHook",
+				"properties": map[string]any{
+					"endpointUrl":              webhookURL,
+					"deliveryAttributeMappings": deliveryAttributes,
+				},
+			},
+			"filter": map[string]any{
+				"includedEventTypes": config.EventTypes,
+				"subjectBeginsWith":  subjectBeginsWith,
+				"subjectEndsWith":    subjectEndsWith,
+			},
+		},
+	}
+
+	url := fmt.Sprintf("%s%s/providers/Microsoft.EventGrid/eventSubscriptions/%s?api-version=%s",
+		armBaseURL, scope, subName, armAPIVersionEventGrid)
+
+	_, err = provider.GetClient().putAndPoll(context.Background(), url, body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Event Grid subscription: %w", err)
+	}
+
+	ctx.Logger.Infof("Event Grid subscription created: %s", subName)
+
+	return map[string]any{
+		"mode":             "automatic",
+		"subscriptionName": subName,
+		"scope":            scope,
+		"url":              webhookURL,
+	}, nil
 }
 
 func (h *AzureWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
-	ctx.Logger.Info("Azure webhook cleanup completed (no external resources to remove)")
+	ctx.Logger.Info("Cleaning up Azure Event Grid subscription")
+
+	provider := h.integration.GetProvider()
+	if provider == nil {
+		ctx.Logger.Warn("Azure provider not initialized; skipping Event Grid cleanup")
+		return nil
+	}
+
+	subName := fmt.Sprintf("superplane-%s", ctx.Webhook.GetID())
+	scope := fmt.Sprintf("/subscriptions/%s", provider.GetSubscriptionID())
+
+	url := fmt.Sprintf("%s%s/providers/Microsoft.EventGrid/eventSubscriptions/%s?api-version=%s",
+		armBaseURL, scope, subName, armAPIVersionEventGrid)
+
+	resp, err := provider.GetClient().doRequest(context.Background(), http.MethodDelete, url, nil)
+	if err != nil {
+		ctx.Logger.Warnf("Failed to delete Event Grid subscription: %v", err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 && resp.StatusCode != 404 {
+		ctx.Logger.Warnf("Failed to delete Event Grid subscription, status: %d", resp.StatusCode)
+	} else {
+		ctx.Logger.Info("Event Grid subscription deleted successfully")
+	}
+
 	return nil
 }
 
@@ -75,7 +179,6 @@ func (h *AzureWebhookHandler) Merge(current, requested any) (merged any, changed
 		return nil, false, err
 	}
 
-	// Keep webhook semantics deterministic: if configs differ, prefer requested.
 	equal, err := h.CompareConfig(currentConfig, requestedConfig)
 	if err != nil {
 		return nil, false, err

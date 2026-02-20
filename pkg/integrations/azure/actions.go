@@ -3,14 +3,10 @@ package azure
 import (
 	"context"
 	"encoding/base64"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v6"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5"
 	"github.com/sirupsen/logrus"
 )
 
@@ -46,6 +42,68 @@ type CreateVMResponse struct {
 	AdminUsername     string
 }
 
+// ARM REST response structs for unmarshaling
+
+type armVM struct {
+	ID         string           `json:"id"`
+	Name       string           `json:"name"`
+	Location   string           `json:"location"`
+	Properties *armVMProperties `json:"properties"`
+}
+
+type armVMProperties struct {
+	ProvisioningState string              `json:"provisioningState"`
+	HardwareProfile   *armHardwareProfile `json:"hardwareProfile"`
+	NetworkProfile    *armNetworkProfile  `json:"networkProfile"`
+}
+
+type armHardwareProfile struct {
+	VMSize string `json:"vmSize"`
+}
+
+type armNetworkProfile struct {
+	NetworkInterfaces []armNetworkInterfaceRef `json:"networkInterfaces"`
+}
+
+type armNetworkInterfaceRef struct {
+	ID string `json:"id"`
+}
+
+type armNIC struct {
+	ID         string            `json:"id"`
+	Properties *armNICProperties `json:"properties"`
+}
+
+type armNICProperties struct {
+	IPConfigurations []armIPConfiguration `json:"ipConfigurations"`
+}
+
+type armIPConfiguration struct {
+	Properties *armIPConfigProperties `json:"properties"`
+}
+
+type armIPConfigProperties struct {
+	PrivateIPAddress string          `json:"privateIPAddress"`
+	PublicIPAddress  *armPublicIPRef `json:"publicIPAddress"`
+}
+
+type armPublicIPRef struct {
+	ID string `json:"id"`
+}
+
+type armPublicIP struct {
+	ID         string                 `json:"id"`
+	Properties *armPublicIPProperties `json:"properties"`
+}
+
+type armPublicIPProperties struct {
+	IPAddress string `json:"ipAddress"`
+}
+
+type armSubnetResponse struct {
+	ID string `json:"id"`
+}
+
 // CreateVM creates a VM and waits for provisioning completion.
 func CreateVM(ctx context.Context, provider *AzureProvider, req CreateVMRequest, logger *logrus.Entry) (*CreateVMResponse, error) {
 	if err := validateCreateVMRequest(req); err != nil {
@@ -60,49 +118,48 @@ func CreateVM(ctx context.Context, provider *AzureProvider, req CreateVMRequest,
 		return nil, fmt.Errorf("failed to ensure network interface: %w", err)
 	}
 
-	osDiskType := armcompute.StorageAccountTypes(req.OSDiskType)
+	osDiskType := req.OSDiskType
 	if osDiskType == "" {
-		osDiskType = armcompute.StorageAccountTypesStandardSSDLRS
+		osDiskType = "StandardSSD_LRS"
 	}
 
-	var customData *string
+	osProfile := map[string]any{
+		"computerName":  req.VMName,
+		"adminUsername": req.AdminUsername,
+		"adminPassword": req.AdminPassword,
+	}
+
 	if strings.TrimSpace(req.CustomData) != "" {
-		encoded := base64.StdEncoding.EncodeToString([]byte(req.CustomData))
-		customData = to.Ptr(encoded)
+		osProfile["customData"] = base64.StdEncoding.EncodeToString([]byte(req.CustomData))
 	}
 
-	vmParameters := armcompute.VirtualMachine{
-		Location: to.Ptr(req.Location),
-		Properties: &armcompute.VirtualMachineProperties{
-			HardwareProfile: &armcompute.HardwareProfile{
-				VMSize: to.Ptr(armcompute.VirtualMachineSizeTypes(req.Size)),
+	vmBody := map[string]any{
+		"location": req.Location,
+		"properties": map[string]any{
+			"hardwareProfile": map[string]any{
+				"vmSize": req.Size,
 			},
-			StorageProfile: &armcompute.StorageProfile{
-				ImageReference: &armcompute.ImageReference{
-					Publisher: to.Ptr(req.ImagePublisher),
-					Offer:     to.Ptr(req.ImageOffer),
-					SKU:       to.Ptr(req.ImageSku),
-					Version:   to.Ptr(req.ImageVersion),
+			"storageProfile": map[string]any{
+				"imageReference": map[string]any{
+					"publisher": req.ImagePublisher,
+					"offer":     req.ImageOffer,
+					"sku":       req.ImageSku,
+					"version":   req.ImageVersion,
 				},
-				OSDisk: &armcompute.OSDisk{
-					CreateOption: to.Ptr(armcompute.DiskCreateOptionTypesFromImage),
-					ManagedDisk: &armcompute.ManagedDiskParameters{
-						StorageAccountType: to.Ptr(osDiskType),
+				"osDisk": map[string]any{
+					"createOption": "FromImage",
+					"managedDisk": map[string]any{
+						"storageAccountType": osDiskType,
 					},
 				},
 			},
-			OSProfile: &armcompute.OSProfile{
-				ComputerName:  to.Ptr(req.VMName),
-				AdminUsername: to.Ptr(req.AdminUsername),
-				AdminPassword: to.Ptr(req.AdminPassword),
-				CustomData:    customData,
-			},
-			NetworkProfile: &armcompute.NetworkProfile{
-				NetworkInterfaces: []*armcompute.NetworkInterfaceReference{
+			"osProfile": osProfile,
+			"networkProfile": map[string]any{
+				"networkInterfaces": []map[string]any{
 					{
-						ID: to.Ptr(networkInterfaceID),
-						Properties: &armcompute.NetworkInterfaceReferenceProperties{
-							Primary: to.Ptr(true),
+						"id": networkInterfaceID,
+						"properties": map[string]any{
+							"primary": true,
 						},
 					},
 				},
@@ -112,43 +169,34 @@ func CreateVM(ctx context.Context, provider *AzureProvider, req CreateVMRequest,
 
 	logger.Infof("Initiating VM creation with Azure Compute API")
 
-	client := provider.GetComputeClient()
-	poller, err := client.BeginCreateOrUpdate(
-		ctx,
-		req.ResourceGroup,
-		req.VMName,
-		vmParameters,
-		nil,
-	)
+	vmURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s?api-version=%s",
+		armBaseURL, provider.GetSubscriptionID(), req.ResourceGroup, req.VMName, armAPIVersionCompute)
+
+	result, err := provider.GetClient().putAndPoll(ctx, vmURL, vmBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to begin VM creation: %w", err)
+		return nil, fmt.Errorf("VM creation failed: %w", err)
 	}
 
-	logger.Infof("VM creation initiated, polling until completion...")
-
-	result, err := poller.PollUntilDone(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("VM creation failed during provisioning: %w", err)
+	var vm armVM
+	if err := json.Unmarshal(result, &vm); err != nil {
+		return nil, fmt.Errorf("failed to parse VM response: %w", err)
 	}
 
-	vm := result.VirtualMachine
-	if vm.ID == nil || vm.Name == nil {
+	if vm.ID == "" || vm.Name == "" {
 		return nil, fmt.Errorf("invalid VM response: missing ID or Name")
 	}
 
 	provisioningState := "Unknown"
-	if vm.Properties != nil && vm.Properties.ProvisioningState != nil {
-		provisioningState = *vm.Properties.ProvisioningState
-	}
-
 	location := ""
-	if vm.Location != nil {
-		location = *vm.Location
-	}
-
 	size := ""
-	if vm.Properties != nil && vm.Properties.HardwareProfile != nil && vm.Properties.HardwareProfile.VMSize != nil {
-		size = string(*vm.Properties.HardwareProfile.VMSize)
+	if vm.Properties != nil {
+		provisioningState = vm.Properties.ProvisioningState
+		if vm.Properties.HardwareProfile != nil {
+			size = vm.Properties.HardwareProfile.VMSize
+		}
+	}
+	if vm.Location != "" {
+		location = vm.Location
 	}
 
 	privateIP, publicIP, err := getPrimaryNICIPAddresses(ctx, provider, vm)
@@ -157,8 +205,8 @@ func CreateVM(ctx context.Context, provider *AzureProvider, req CreateVMRequest,
 	}
 
 	response := &CreateVMResponse{
-		VMID:              *vm.ID,
-		Name:              *vm.Name,
+		VMID:              vm.ID,
+		Name:              vm.Name,
 		ProvisioningState: provisioningState,
 		Location:          location,
 		Size:              size,
@@ -182,84 +230,94 @@ func ensureNetworkInterface(ctx context.Context, provider *AzureProvider, req Cr
 		return "", fmt.Errorf("either networkInterfaceId or (virtualNetworkName and subnetName) must be provided")
 	}
 
-	subnetResp, err := provider.GetSubnetsClient().Get(ctx, req.ResourceGroup, virtualNetworkName, subnetName, nil)
-	if err != nil {
+	// Get subnet ID
+	subnetURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks/%s/subnets/%s?api-version=%s",
+		armBaseURL, provider.GetSubscriptionID(), req.ResourceGroup, virtualNetworkName, subnetName, armAPIVersionNetwork)
+
+	var subnet armSubnetResponse
+	if err := provider.GetClient().get(ctx, subnetURL, &subnet); err != nil {
 		return "", fmt.Errorf("failed to resolve subnet %s in virtual network %s: %w", subnetName, virtualNetworkName, err)
 	}
-	if subnetResp.Subnet.ID == nil {
+	if subnet.ID == "" {
 		return "", fmt.Errorf("resolved subnet %s in virtual network %s has no resource ID", subnetName, virtualNetworkName)
 	}
 
-	var publicIPAddress *armnetwork.PublicIPAddress
+	// Optionally create public IP
+	var publicIPAddress map[string]any
 	if strings.TrimSpace(req.PublicIPName) != "" {
 		publicIPID, err := ensurePublicIP(ctx, provider, req.ResourceGroup, req.Location, req.PublicIPName)
 		if err != nil {
 			return "", err
 		}
-		publicIPAddress = &armnetwork.PublicIPAddress{
-			ID: to.Ptr(publicIPID),
-		}
+		publicIPAddress = map[string]any{"id": publicIPID}
 	}
 
 	nicName := fmt.Sprintf("%s-nic", req.VMName)
-	nicParams := armnetwork.Interface{
-		Location: to.Ptr(req.Location),
-		Properties: &armnetwork.InterfacePropertiesFormat{
-			IPConfigurations: []*armnetwork.InterfaceIPConfiguration{
+	ipConfig := map[string]any{
+		"privateIPAllocationMethod": "Dynamic",
+		"subnet":                    map[string]any{"id": subnet.ID},
+	}
+	if publicIPAddress != nil {
+		ipConfig["publicIPAddress"] = publicIPAddress
+	}
+
+	nicBody := map[string]any{
+		"location": req.Location,
+		"properties": map[string]any{
+			"ipConfigurations": []map[string]any{
 				{
-					Name: to.Ptr("ipconfig1"),
-					Properties: &armnetwork.InterfaceIPConfigurationPropertiesFormat{
-						PrivateIPAllocationMethod: to.Ptr(armnetwork.IPAllocationMethod(IPAllocationMethodDynamic)),
-						Subnet:                    &armnetwork.Subnet{ID: subnetResp.Subnet.ID},
-						PublicIPAddress:           publicIPAddress,
-					},
+					"name":       "ipconfig1",
+					"properties": ipConfig,
 				},
 			},
 		},
 	}
 
 	logger.Infof("Creating network interface %s using subnet %s/%s", nicName, virtualNetworkName, subnetName)
-	poller, err := provider.GetNetworkInterfacesClient().BeginCreateOrUpdate(ctx, req.ResourceGroup, nicName, nicParams, nil)
+
+	nicURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkInterfaces/%s?api-version=%s",
+		armBaseURL, provider.GetSubscriptionID(), req.ResourceGroup, nicName, armAPIVersionNetwork)
+
+	result, err := provider.GetClient().putAndPoll(ctx, nicURL, nicBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to create network interface %s: %w", nicName, err)
 	}
 
-	nicResult, err := poller.PollUntilDone(ctx, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed while creating network interface %s: %w", nicName, err)
+	var nic armNIC
+	if err := json.Unmarshal(result, &nic); err != nil {
+		return "", fmt.Errorf("failed to parse NIC response: %w", err)
 	}
-	if nicResult.Interface.ID == nil {
+	if nic.ID == "" {
 		return "", fmt.Errorf("created network interface %s has no resource ID", nicName)
 	}
 
-	return *nicResult.Interface.ID, nil
+	return nic.ID, nil
 }
 
-func getPrimaryNICIPAddresses(ctx context.Context, provider *AzureProvider, vm armcompute.VirtualMachine) (string, string, error) {
+func getPrimaryNICIPAddresses(ctx context.Context, provider *AzureProvider, vm armVM) (string, string, error) {
 	if vm.Properties == nil || vm.Properties.NetworkProfile == nil || len(vm.Properties.NetworkProfile.NetworkInterfaces) == 0 {
 		return "", "", nil
 	}
 
-	primaryNIC := vm.Properties.NetworkProfile.NetworkInterfaces[0]
-	if primaryNIC == nil || primaryNIC.ID == nil || strings.TrimSpace(*primaryNIC.ID) == "" {
+	primaryNICID := vm.Properties.NetworkProfile.NetworkInterfaces[0].ID
+	if strings.TrimSpace(primaryNICID) == "" {
 		return "", "", nil
 	}
 
-	nicResourceGroup, nicName, err := resourceGroupAndNameFromResourceID(
-		*primaryNIC.ID,
-		fmt.Sprintf("%s/%s", ResourceProviderNetwork, "networkInterfaces"),
-	)
+	nicResourceGroup, nicName, err := resourceGroupAndNameFromResourceID(primaryNICID, "Microsoft.Network/networkInterfaces")
 	if err != nil {
 		return "", "", fmt.Errorf("failed to parse primary NIC ID: %w", err)
 	}
 
-	nicResp, err := provider.GetNetworkInterfacesClient().Get(ctx, nicResourceGroup, nicName, nil)
-	if err != nil {
+	nicURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkInterfaces/%s?api-version=%s",
+		armBaseURL, provider.GetSubscriptionID(), nicResourceGroup, nicName, armAPIVersionNetwork)
+
+	var nic armNIC
+	if err := provider.GetClient().get(ctx, nicURL, &nic); err != nil {
 		return "", "", fmt.Errorf("failed to get primary network interface %s: %w", nicName, err)
 	}
 
-	nic := nicResp.Interface
-	if nic.Properties == nil || len(nic.Properties.IPConfigurations) == 0 || nic.Properties.IPConfigurations[0] == nil {
+	if nic.Properties == nil || len(nic.Properties.IPConfigurations) == 0 {
 		return "", "", nil
 	}
 
@@ -268,30 +326,28 @@ func getPrimaryNICIPAddresses(ctx context.Context, provider *AzureProvider, vm a
 		return "", "", nil
 	}
 
-	privateIP := ""
-	if ipConfig.Properties.PrivateIPAddress != nil {
-		privateIP = *ipConfig.Properties.PrivateIPAddress
-	}
+	privateIP := ipConfig.Properties.PrivateIPAddress
 
 	publicIP := ""
-	if ipConfig.Properties.PublicIPAddress != nil &&
-		ipConfig.Properties.PublicIPAddress.ID != nil &&
-		strings.TrimSpace(*ipConfig.Properties.PublicIPAddress.ID) != "" {
+	if ipConfig.Properties.PublicIPAddress != nil && strings.TrimSpace(ipConfig.Properties.PublicIPAddress.ID) != "" {
 		publicIPResourceGroup, publicIPName, err := resourceGroupAndNameFromResourceID(
-			*ipConfig.Properties.PublicIPAddress.ID,
-			fmt.Sprintf("%s/%s", ResourceProviderNetwork, "publicIPAddresses"),
+			ipConfig.Properties.PublicIPAddress.ID,
+			"Microsoft.Network/publicIPAddresses",
 		)
 		if err != nil {
 			return privateIP, "", fmt.Errorf("failed to parse public IP resource ID: %w", err)
 		}
 
-		publicIPResp, err := provider.GetPublicIPClient().Get(ctx, publicIPResourceGroup, publicIPName, nil)
-		if err != nil {
+		pipURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/publicIPAddresses/%s?api-version=%s",
+			armBaseURL, provider.GetSubscriptionID(), publicIPResourceGroup, publicIPName, armAPIVersionNetwork)
+
+		var pip armPublicIP
+		if err := provider.GetClient().get(ctx, pipURL, &pip); err != nil {
 			return privateIP, "", fmt.Errorf("failed to get public IP resource %s: %w", publicIPName, err)
 		}
 
-		if publicIPResp.PublicIPAddress.Properties != nil && publicIPResp.PublicIPAddress.Properties.IPAddress != nil {
-			publicIP = *publicIPResp.PublicIPAddress.Properties.IPAddress
+		if pip.Properties != nil {
+			publicIP = pip.Properties.IPAddress
 		}
 	}
 
@@ -337,47 +393,43 @@ func resourceGroupAndNameFromResourceID(resourceID, expectedResourceType string)
 }
 
 func ensurePublicIP(ctx context.Context, provider *AzureProvider, resourceGroup, location, publicIPName string) (string, error) {
-	publicIPResp, err := provider.GetPublicIPClient().Get(ctx, resourceGroup, publicIPName, nil)
-	if err == nil && publicIPResp.PublicIPAddress.ID != nil {
-		return *publicIPResp.PublicIPAddress.ID, nil
+	pipURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/publicIPAddresses/%s?api-version=%s",
+		armBaseURL, provider.GetSubscriptionID(), resourceGroup, publicIPName, armAPIVersionNetwork)
+
+	var existing armPublicIP
+	err := provider.GetClient().get(ctx, pipURL, &existing)
+	if err == nil && existing.ID != "" {
+		return existing.ID, nil
 	}
-	if err != nil && !isAzureNotFound(err) {
+	if err != nil && !isARMNotFound(err) {
 		return "", fmt.Errorf("failed to get public IP %s: %w", publicIPName, err)
 	}
 
-	params := armnetwork.PublicIPAddress{
-		Location: to.Ptr(location),
-		SKU: &armnetwork.PublicIPAddressSKU{
-			Name: to.Ptr(armnetwork.PublicIPAddressSKUName(SKUStandard)),
+	pipBody := map[string]any{
+		"location": location,
+		"sku": map[string]any{
+			"name": "Standard",
 		},
-		Properties: &armnetwork.PublicIPAddressPropertiesFormat{
-			PublicIPAllocationMethod: to.Ptr(armnetwork.IPAllocationMethod(IPAllocationMethodStatic)),
-			PublicIPAddressVersion:   to.Ptr(armnetwork.IPVersionIPv4),
+		"properties": map[string]any{
+			"publicIPAllocationMethod": "Static",
+			"publicIPAddressVersion":   "IPv4",
 		},
 	}
 
-	poller, err := provider.GetPublicIPClient().BeginCreateOrUpdate(ctx, resourceGroup, publicIPName, params, nil)
+	result, err := provider.GetClient().putAndPoll(ctx, pipURL, pipBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to create public IP %s: %w", publicIPName, err)
 	}
-	publicIPResult, err := poller.PollUntilDone(ctx, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed while creating public IP %s: %w", publicIPName, err)
+
+	var pip armPublicIP
+	if err := json.Unmarshal(result, &pip); err != nil {
+		return "", fmt.Errorf("failed to parse public IP response: %w", err)
 	}
-	if publicIPResult.PublicIPAddress.ID == nil {
+	if pip.ID == "" {
 		return "", fmt.Errorf("created public IP has no resource ID")
 	}
 
-	return *publicIPResult.PublicIPAddress.ID, nil
-}
-
-func isAzureNotFound(err error) bool {
-	var responseErr *azcore.ResponseError
-	if errors.As(err, &responseErr) {
-		return strings.EqualFold(responseErr.ErrorCode, "NotFound") || strings.EqualFold(responseErr.ErrorCode, "ResourceNotFound")
-	}
-	normalized := strings.ToLower(err.Error())
-	return strings.Contains(normalized, "notfound") || strings.Contains(normalized, "not found")
+	return pip.ID, nil
 }
 
 // validateCreateVMRequest validates required VM request fields.
@@ -385,23 +437,18 @@ func validateCreateVMRequest(req CreateVMRequest) error {
 	if req.ResourceGroup == "" {
 		return fmt.Errorf("resource group is required")
 	}
-
 	if req.VMName == "" {
 		return fmt.Errorf("VM name is required")
 	}
-
 	if req.Location == "" {
 		return fmt.Errorf("location is required")
 	}
-
 	if req.Size == "" {
 		return fmt.Errorf("VM size is required")
 	}
-
 	if req.AdminUsername == "" {
 		return fmt.Errorf("admin username is required")
 	}
-
 	if req.AdminPassword == "" {
 		return fmt.Errorf("admin password is required")
 	}
@@ -414,73 +461,25 @@ func validateCreateVMRequest(req CreateVMRequest) error {
 	if req.ImagePublisher == "" {
 		return fmt.Errorf("image publisher is required")
 	}
-
 	if req.ImageOffer == "" {
 		return fmt.Errorf("image offer is required")
 	}
-
 	if req.ImageSku == "" {
 		return fmt.Errorf("image SKU is required")
 	}
-
 	if req.ImageVersion == "" {
 		return fmt.Errorf("image version is required")
 	}
 
 	if req.OSDiskType != "" &&
-		req.OSDiskType != string(armcompute.StorageAccountTypesStandardLRS) &&
-		req.OSDiskType != string(armcompute.StorageAccountTypesStandardSSDLRS) &&
-		req.OSDiskType != string(armcompute.StorageAccountTypesPremiumLRS) {
+		req.OSDiskType != "Standard_LRS" &&
+		req.OSDiskType != "StandardSSD_LRS" &&
+		req.OSDiskType != "Premium_LRS" {
 		return fmt.Errorf("unsupported OS disk type: %s", req.OSDiskType)
 	}
 
 	return nil
 }
-
-const (
-	VMSizeStandardB1s   = "Standard_B1s"
-	VMSizeStandardB1ms  = "Standard_B1ms"
-	VMSizeStandardB2s   = "Standard_B2s"
-	VMSizeStandardD2sV3 = "Standard_D2s_v3"
-	VMSizeStandardD4sV3 = "Standard_D4s_v3"
-	VMSizeStandardD8sV3 = "Standard_D8s_v3"
-	VMSizeStandardF2sV2 = "Standard_F2s_v2"
-	VMSizeStandardF4sV2 = "Standard_F4s_v2"
-	VMSizeStandardF8sV2 = "Standard_F8s_v2"
-	VMSizeStandardE2sV3 = "Standard_E2s_v3"
-	VMSizeStandardE4sV3 = "Standard_E4s_v3"
-	VMSizeStandardE8sV3 = "Standard_E8s_v3"
-)
-
-var (
-	ImageUbuntu1804LTS = ImageReference{
-		Publisher: "Canonical",
-		Offer:     "UbuntuServer",
-		SKU:       "18.04-LTS",
-		Version:   "latest",
-	}
-
-	ImageUbuntu2004LTS = ImageReference{
-		Publisher: "Canonical",
-		Offer:     "0001-com-ubuntu-server-focal",
-		SKU:       "20_04-lts-gen2",
-		Version:   "latest",
-	}
-
-	ImageWindowsServer2019 = ImageReference{
-		Publisher: "MicrosoftWindowsServer",
-		Offer:     "WindowsServer",
-		SKU:       "2019-Datacenter",
-		Version:   "latest",
-	}
-
-	ImageWindowsServer2022 = ImageReference{
-		Publisher: "MicrosoftWindowsServer",
-		Offer:     "WindowsServer",
-		SKU:       "2022-datacenter-azure-edition",
-		Version:   "latest",
-	}
-)
 
 // ImageReference defines an image publisher/offer/sku/version tuple.
 type ImageReference struct {
@@ -488,4 +487,11 @@ type ImageReference struct {
 	Offer     string
 	SKU       string
 	Version   string
+}
+
+var ImageUbuntu2004LTS = ImageReference{
+	Publisher: "Canonical",
+	Offer:     "0001-com-ubuntu-server-focal",
+	SKU:       "20_04-lts-gen2",
+	Version:   "latest",
 }

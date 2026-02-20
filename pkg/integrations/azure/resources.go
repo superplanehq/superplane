@@ -2,13 +2,13 @@ package azure
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"path"
 	"sort"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v6"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -19,37 +19,61 @@ const (
 	ResourceTypeSubnetDropdown         = "azure.subnet"
 )
 
+type armResourceGroup struct {
+	Name string `json:"name"`
+	ID   string `json:"id"`
+}
+
+type armSKU struct {
+	Name         string   `json:"name"`
+	ResourceType string   `json:"resourceType"`
+	Locations    []string `json:"locations"`
+}
+
+type armVirtualNetwork struct {
+	Name string `json:"name"`
+	ID   string `json:"id"`
+}
+
+type armSubnet struct {
+	Name string `json:"name"`
+	ID   string `json:"id"`
+}
+
 func (a *AzureIntegration) ListResourceGroups(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	provider, err := a.providerFromListResourcesContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	pager := provider.GetResourceGroupsClient().NewListPager(nil)
+	listURL := fmt.Sprintf("%s/subscriptions/%s/resourcegroups?api-version=%s",
+		armBaseURL, provider.GetSubscriptionID(), armAPIVersionResources)
+
+	items, err := provider.GetClient().listAll(context.Background(), listURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list resource groups: %w", err)
+	}
+
 	resources := []core.IntegrationResource{}
-
-	for pager.More() {
-		page, err := pager.NextPage(context.Background())
-		if err != nil {
-			return nil, fmt.Errorf("failed to list resource groups: %w", err)
+	for _, raw := range items {
+		var group armResourceGroup
+		if err := json.Unmarshal(raw, &group); err != nil {
+			continue
+		}
+		if group.Name == "" {
+			continue
 		}
 
-		for _, group := range page.Value {
-			if group == nil || group.Name == nil {
-				continue
-			}
-
-			id := *group.Name
-			if group.ID != nil {
-				id = *group.ID
-			}
-
-			resources = append(resources, core.IntegrationResource{
-				Type: ResourceTypeResourceGroupDropdown,
-				Name: *group.Name,
-				ID:   id,
-			})
+		id := group.Name
+		if group.ID != "" {
+			id = group.ID
 		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeResourceGroupDropdown,
+			Name: group.Name,
+			ID:   id,
+		})
 	}
 
 	sort.Slice(resources, func(i, j int) bool {
@@ -69,28 +93,29 @@ func (a *AzureIntegration) ListVMSizes(ctx core.ListResourcesContext, location s
 		return nil, err
 	}
 
-	filter := fmt.Sprintf("location eq '%s'", strings.ToLower(location))
-	pager := provider.GetResourceSKUsClient().NewListPager(&armcompute.ResourceSKUsClientListOptions{
-		Filter: &filter,
-	})
-	resourcesByID := map[string]core.IntegrationResource{}
+	listURL := fmt.Sprintf("%s/subscriptions/%s/providers/Microsoft.Compute/skus?api-version=%s&$filter=location eq '%s'",
+		armBaseURL, provider.GetSubscriptionID(), armAPIVersionCompute, strings.ToLower(location))
 
-	for pager.More() {
-		page, err := pager.NextPage(context.Background())
-		if err != nil {
-			return nil, fmt.Errorf("failed to list VM sizes: %w", err)
+	items, err := provider.GetClient().listAll(context.Background(), listURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list VM sizes: %w", err)
+	}
+
+	resourcesByID := map[string]core.IntegrationResource{}
+	for _, raw := range items {
+		var sku armSKU
+		if err := json.Unmarshal(raw, &sku); err != nil {
+			continue
 		}
 
-		for _, sku := range page.Value {
-			if !isVirtualMachineSKU(sku) || !isSKUAvailableInLocation(sku, location) || sku.Name == nil {
-				continue
-			}
+		if !isVirtualMachineSKU(sku) || !isSKUAvailableInLocation(sku, location) || sku.Name == "" {
+			continue
+		}
 
-			resourcesByID[*sku.Name] = core.IntegrationResource{
-				Type: ResourceTypeVMSizeDropdown,
-				Name: *sku.Name,
-				ID:   *sku.Name,
-			}
+		resourcesByID[sku.Name] = core.IntegrationResource{
+			Type: ResourceTypeVMSizeDropdown,
+			Name: sku.Name,
+			ID:   sku.Name,
 		}
 	}
 
@@ -117,31 +142,34 @@ func (a *AzureIntegration) ListVirtualNetworks(ctx core.ListResourcesContext, re
 		return nil, err
 	}
 
-	pager := provider.GetVirtualNetworksClient().NewListPager(resourceGroup, nil)
+	listURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks?api-version=%s",
+		armBaseURL, provider.GetSubscriptionID(), resourceGroup, armAPIVersionNetwork)
+
+	items, err := provider.GetClient().listAll(context.Background(), listURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list virtual networks: %w", err)
+	}
+
 	resources := []core.IntegrationResource{}
-
-	for pager.More() {
-		page, err := pager.NextPage(context.Background())
-		if err != nil {
-			return nil, fmt.Errorf("failed to list virtual networks: %w", err)
+	for _, raw := range items {
+		var vnet armVirtualNetwork
+		if err := json.Unmarshal(raw, &vnet); err != nil {
+			continue
+		}
+		if vnet.Name == "" {
+			continue
 		}
 
-		for _, vnet := range page.Value {
-			if vnet.Name == nil {
-				continue
-			}
-
-			id := *vnet.Name
-			if vnet.ID != nil {
-				id = *vnet.ID
-			}
-
-			resources = append(resources, core.IntegrationResource{
-				Type: ResourceTypeVirtualNetworkDropdown,
-				Name: *vnet.Name,
-				ID:   id,
-			})
+		id := vnet.Name
+		if vnet.ID != "" {
+			id = vnet.ID
 		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeVirtualNetworkDropdown,
+			Name: vnet.Name,
+			ID:   id,
+		})
 	}
 
 	sort.Slice(resources, func(i, j int) bool {
@@ -163,31 +191,34 @@ func (a *AzureIntegration) ListSubnets(ctx core.ListResourcesContext, resourceGr
 		return nil, err
 	}
 
-	pager := provider.GetSubnetsClient().NewListPager(resourceGroup, vnetName, nil)
+	listURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks/%s/subnets?api-version=%s",
+		armBaseURL, provider.GetSubscriptionID(), resourceGroup, vnetName, armAPIVersionNetwork)
+
+	items, err := provider.GetClient().listAll(context.Background(), listURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list subnets: %w", err)
+	}
+
 	resources := []core.IntegrationResource{}
-
-	for pager.More() {
-		page, err := pager.NextPage(context.Background())
-		if err != nil {
-			return nil, fmt.Errorf("failed to list subnets: %w", err)
+	for _, raw := range items {
+		var subnet armSubnet
+		if err := json.Unmarshal(raw, &subnet); err != nil {
+			continue
+		}
+		if subnet.Name == "" {
+			continue
 		}
 
-		for _, subnet := range page.Value {
-			if subnet.Name == nil {
-				continue
-			}
-
-			id := *subnet.Name
-			if subnet.ID != nil {
-				id = *subnet.ID
-			}
-
-			resources = append(resources, core.IntegrationResource{
-				Type: ResourceTypeSubnetDropdown,
-				Name: *subnet.Name,
-				ID:   id,
-			})
+		id := subnet.Name
+		if subnet.ID != "" {
+			id = subnet.ID
 		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeSubnetDropdown,
+			Name: subnet.Name,
+			ID:   id,
+		})
 	}
 
 	sort.Slice(resources, func(i, j int) bool {
@@ -197,64 +228,24 @@ func (a *AzureIntegration) ListSubnets(ctx core.ListResourcesContext, resourceGr
 	return resources, nil
 }
 
-func (a *AzureIntegration) providerFromListResourcesContext(ctx core.ListResourcesContext) (*AzureProvider, error) {
-	if a.provider != nil {
-		return a.provider, nil
+func (a *AzureIntegration) providerFromListResourcesContext(_ core.ListResourcesContext) (*AzureProvider, error) {
+	if a.provider == nil {
+		return nil, fmt.Errorf("Azure provider not initialized; Sync must run before listing resources")
 	}
 
-	if ctx.Integration == nil {
-		return nil, fmt.Errorf("integration context is required")
-	}
-
-	tenantID, err := ctx.Integration.GetConfig("tenantId")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get tenant ID: %w", err)
-	}
-
-	clientID, err := ctx.Integration.GetConfig("clientId")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get client ID: %w", err)
-	}
-
-	subscriptionID, err := ctx.Integration.GetConfig("subscriptionId")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get subscription ID: %w", err)
-	}
-
-	provider, err := NewAzureProvider(
-		context.Background(),
-		string(tenantID),
-		string(clientID),
-		string(subscriptionID),
-		ctx.Logger,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	a.provider = provider
-	return provider, nil
+	return a.provider, nil
 }
 
-func isVirtualMachineSKU(sku *armcompute.ResourceSKU) bool {
-	if sku == nil || sku.ResourceType == nil {
-		return false
-	}
-
-	return strings.EqualFold(*sku.ResourceType, "virtualMachines")
+func isVirtualMachineSKU(sku armSKU) bool {
+	return strings.EqualFold(sku.ResourceType, "virtualMachines")
 }
 
-func isSKUAvailableInLocation(sku *armcompute.ResourceSKU, location string) bool {
-	if sku == nil {
-		return false
-	}
-
+func isSKUAvailableInLocation(sku armSKU, location string) bool {
 	for _, skuLocation := range sku.Locations {
-		if skuLocation != nil && strings.EqualFold(*skuLocation, location) {
+		if strings.EqualFold(skuLocation, location) {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -267,7 +258,6 @@ func azureResourceName(value string) string {
 	}
 
 	// URL-decode first to handle values that arrive encoded from the query parser
-	// (e.g. %2Fsubscriptions%2F... instead of /subscriptions/...).
 	if decoded, err := url.QueryUnescape(trimmed); err == nil {
 		trimmed = decoded
 	}
