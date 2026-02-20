@@ -26,8 +26,6 @@ type Configuration struct {
 	WebhookSigningSecret string `json:"webhookSigningSecret"`
 }
 
-type Metadata struct{}
-
 func (i *IncidentIO) Name() string {
 	return "incident"
 }
