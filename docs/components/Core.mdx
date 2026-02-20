@@ -6,6 +6,8 @@ sidebar:
 
 Built-in SuperPlane components.
 
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
 ## Triggers
 
 <CardGrid>
@@ -13,8 +15,6 @@ Built-in SuperPlane components.
   <LinkCard title="Manual Run" href="#manual-run" description="Start a new execution chain manually" />
   <LinkCard title="Webhook" href="#webhook" description="Start a new execution chain when a webhook is called" />
 </CardGrid>
-
-import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
 
@@ -151,6 +151,7 @@ The Webhook trigger starts a new workflow execution when an HTTP request is rece
 
 - **Signature (HMAC)**: Verify requests using HMAC-SHA256 signature in the `X-Signature-256` header
 - **Bearer Token**: Require a Bearer token in the `Authorization` header
+- **Header Token**: Require a raw token in a custom header (default: `X-Webhook-Token`)
 - **None (unsafe)**: No authentication (not recommended for production)
 
 ### Request Data

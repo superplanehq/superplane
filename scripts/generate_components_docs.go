@@ -76,6 +76,7 @@ func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger
 	coreOrder := 1
 	writeFrontMatter(&buf, "Core", &coreOrder)
 	writeOverviewSection(&buf, "Built-in SuperPlane components.")
+	writeCardGridImport(&buf, triggers, components)
 	writeCardGridTriggers(&buf, triggers)
 	writeCardGridComponents(&buf, components)
 	writeTriggerSection(&buf, triggers)
@@ -94,6 +95,7 @@ func writeIntegrationIndex(
 	writeFrontMatter(&buf, integration.Label(), nil)
 
 	writeOverviewSection(&buf, sanitizeHTMLTags(integration.Description()))
+	writeCardGridImport(&buf, triggers, components)
 	writeCardGridTriggers(&buf, triggers)
 	writeCardGridComponents(&buf, components)
 
@@ -163,12 +165,19 @@ func writeTriggerSection(buf *bytes.Buffer, triggers []core.Trigger) {
 	}
 }
 
+func writeCardGridImport(buf *bytes.Buffer, triggers []core.Trigger, components []core.Component) {
+	if len(triggers) == 0 && len(components) == 0 {
+		return
+	}
+
+	buf.WriteString("import { CardGrid, LinkCard } from \"@astrojs/starlight/components\";\n\n")
+}
+
 func writeCardGridComponents(buf *bytes.Buffer, components []core.Component) {
 	if len(components) == 0 {
 		return
 	}
 
-	buf.WriteString("import { CardGrid, LinkCard } from \"@astrojs/starlight/components\";\n\n")
 	buf.WriteString("## Actions\n\n")
 	buf.WriteString("<CardGrid>\n")
 	for _, component := range components {
