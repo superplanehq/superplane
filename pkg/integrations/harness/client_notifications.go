@@ -342,6 +342,7 @@ func normalizeHarnessIdentifierOrEmpty(value string) string {
 
 	if len(identifier) > 127 {
 		identifier = identifier[:127]
+		identifier = strings.Trim(identifier, "-_")
 	}
 
 	return identifier
