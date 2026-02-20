@@ -11,8 +11,11 @@ import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { showErrorToast } from "@/utils/toast";
 
+const DEFAULT_HEADER_TOKEN_NAME = "X-Webhook-Token";
+
 interface WebhookConfiguration {
   authentication?: string;
+  headerName?: string;
 }
 
 interface WebhookMetadata {
@@ -20,7 +23,7 @@ interface WebhookMetadata {
   authentication?: string;
 }
 
-function formatAuthenticationMethod(auth: string): string {
+function formatAuthenticationMethod(auth: string, headerName?: string): string {
   switch (auth) {
     case "none":
       return "No authentication";
@@ -28,6 +31,8 @@ function formatAuthenticationMethod(auth: string): string {
       return "HMAC signature";
     case "bearer":
       return "Bearer token";
+    case "header_token":
+      return `Header token (${headerName || DEFAULT_HEADER_TOKEN_NAME})`;
     default:
       return "Unknown authentication";
   }
@@ -125,7 +130,10 @@ export const webhookTriggerRenderer: TriggerRenderer = {
         },
         {
           icon: "shield-check",
-          label: formatAuthenticationMethod(metadata?.authentication || configuration?.authentication || "none"),
+          label: formatAuthenticationMethod(
+            metadata?.authentication || configuration?.authentication || "none",
+            configuration?.headerName,
+          ),
         },
       ],
     };
@@ -203,6 +211,14 @@ const ResetAuthButton: React.FC<{
           successTitle: "New bearer token generated",
           successDescription:
             "Please update your webhook client with the new bearer token. This will only be shown once.",
+        };
+      case "header_token":
+        return {
+          buttonText: "Reset Header Token",
+          resettingText: "Resetting Header Token...",
+          successTitle: "New header token generated",
+          successDescription:
+            "Please update your webhook client with the new header token. This will only be shown once.",
         };
       default:
         return {
@@ -297,6 +313,7 @@ export const webhookCustomFieldRenderer: CustomFieldRenderer = {
     const metadata = node.metadata as WebhookMetadata | undefined;
     const config = node.configuration as WebhookConfiguration | undefined;
     const authMethod = config?.authentication || "none";
+    const headerName = config?.headerName || DEFAULT_HEADER_TOKEN_NAME;
     const webhookUrl = metadata?.url || "[URL GENERATED ONCE THE CANVAS IS SAVED]";
 
     // State to track the currently displayed secret
@@ -337,6 +354,20 @@ export PAYLOAD='{"hello":"world"}'
 
 curl -X POST \\
   -H "Authorization: Bearer $BEARER_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  --data "$PAYLOAD" \\
+  ${webhookUrl}`;
+          break;
+
+        case "header_token":
+          title = "Header Token Authentication";
+          description = `Use a raw token in the ${headerName} header to authenticate webhook requests.`;
+          signatureKey = secret || "<your-header-token>";
+          code = `export HEADER_TOKEN="${signatureKey}"
+export PAYLOAD='{"hello":"world"}'
+
+curl -X POST \\
+  -H "${headerName}: $HEADER_TOKEN" \\
   -H "Content-Type: application/json" \\
   --data "$PAYLOAD" \\
   ${webhookUrl}`;
