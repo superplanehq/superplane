@@ -4,6 +4,8 @@ title: "AWS"
 
 Manage resources and execute AWS commands in workflows
 
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
 ## Triggers
 
 <CardGrid>
@@ -15,8 +17,6 @@ Manage resources and execute AWS commands in workflows
   <LinkCard title="SNS • On Topic Message" href="#sns-•-on-topic-message" description="Listen to AWS SNS topic notifications" />
 </CardGrid>
 
-import { CardGrid, LinkCard } from "@astrojs/starlight/components";
-
 ## Actions
 
 <CardGrid>
@@ -27,6 +27,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CodeArtifact • Dispose Package Versions" href="#code-artifact-•-dispose-package-versions" description="Delete assets and set package version status to Disposed (record remains)" />
   <LinkCard title="CodeArtifact • Get Package Version" href="#code-artifact-•-get-package-version" description="Describe an AWS CodeArtifact package version" />
   <LinkCard title="CodeArtifact • Update Package Versions Status" href="#code-artifact-•-update-package-versions-status" description="Update the status of one or more package versions (Archived, Published, Unlisted)" />
+  <LinkCard title="CodePipeline • Run Pipeline" href="#code-pipeline-•-run-pipeline" description="Start an AWS CodePipeline execution and wait for it to complete" />
   <LinkCard title="EC2 • Copy Image" href="#ec2-•-copy-image" description="Copy an EC2 AMI image to another region" />
   <LinkCard title="EC2 • Create Image" href="#ec2-•-create-image" description="Create a new AMI image from an EC2 instance" />
   <LinkCard title="EC2 • Deregister Image" href="#ec2-•-deregister-image" description="Deregister an EC2 AMI image" />
@@ -38,9 +39,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
+  <LinkCard title="ECS • Create Service" href="#ecs-•-create-service" description="Create an AWS ECS service" />
   <LinkCard title="ECS • Describe Service" href="#ecs-•-describe-service" description="Describe an AWS ECS service" />
+  <LinkCard title="ECS • Execute Command" href="#ecs-•-execute-command" description="Execute a command in a running AWS ECS task container" />
   <LinkCard title="ECS • Run Task" href="#ecs-•-run-task" description="Run a task in AWS ECS" />
   <LinkCard title="ECS • Stop Task" href="#ecs-•-stop-task" description="Stop a running AWS ECS task" />
+  <LinkCard title="ECS • Update Service" href="#ecs-•-update-service" description="Update an AWS ECS service configuration" />
   <LinkCard title="Lambda • Run Function" href="#lambda-•-run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
   <LinkCard title="Route 53 • Create DNS Record" href="#route-53-•-create-dns-record" description="Create a DNS record in an AWS Route 53 hosted zone" />
   <LinkCard title="Route 53 • Delete DNS Record" href="#route-53-•-delete-dns-record" description="Delete a DNS record from an AWS Route 53 hosted zone" />
@@ -50,6 +54,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="SNS • Get Subscription" href="#sns-•-get-subscription" description="Get an AWS SNS subscription by ARN" />
   <LinkCard title="SNS • Get Topic" href="#sns-•-get-topic" description="Get an AWS SNS topic by ARN" />
   <LinkCard title="SNS • Publish Message" href="#sns-•-publish-message" description="Publish a message to an AWS SNS topic" />
+  <LinkCard title="SQS • Create Queue" href="#sqs-•-create-queue" description="Create a new SQS queue" />
+  <LinkCard title="SQS • Delete Queue" href="#sqs-•-delete-queue" description="Delete an SQS queue" />
+  <LinkCard title="SQS • Get Queue" href="#sqs-•-get-queue" description="Get metadata and attributes for an SQS queue" />
+  <LinkCard title="SQS • Purge Queue" href="#sqs-•-purge-queue" description="Purge all messages from an SQS queue" />
+  <LinkCard title="SQS • Send Message" href="#sqs-•-send-message" description="Send a message to an SQS queue" />
 </CardGrid>
 
 ## Instructions
@@ -605,6 +614,66 @@ The Update Package Versions Status component sets the status of package versions
 }
 ```
 
+<a id="code-pipeline-•-run-pipeline"></a>
+
+## CodePipeline • Run Pipeline
+
+The Run Pipeline component triggers an AWS CodePipeline execution and waits for it to complete.
+
+### Use Cases
+
+- **CI/CD orchestration**: Trigger deployments from SuperPlane workflows
+- **Pipeline automation**: Run CodePipeline pipelines as part of workflow automation
+- **Multi-stage deployments**: Coordinate complex deployment pipelines
+- **Workflow chaining**: Chain multiple CodePipeline pipelines together
+
+### How It Works
+
+1. Starts a CodePipeline execution with the specified pipeline name
+2. Waits for the pipeline to complete (monitored via EventBridge webhook and polling)
+3. Routes execution based on pipeline result:
+   - **Passed channel**: Pipeline completed successfully
+   - **Failed channel**: Pipeline failed or was cancelled
+
+### Configuration
+
+- **Region**: AWS region where the pipeline exists
+- **Pipeline**: Pipeline name or ARN to execute
+
+### Output Channels
+
+- **Passed**: Emitted when pipeline completes successfully
+- **Failed**: Emitted when pipeline fails or is cancelled
+
+### Notes
+
+- The component automatically sets up EventBridge monitoring for pipeline completion
+- Falls back to polling if webhook doesn't arrive
+- Can be cancelled, which will stop the running pipeline execution
+
+### Example Output
+
+```json
+{
+  "data": {
+    "detail": {
+      "execution-id": "a1b2c3d4-5678-90ab-cdef-111122223333",
+      "pipeline": "my-deploy-pipeline",
+      "state": "SUCCEEDED",
+      "version": 1
+    },
+    "pipeline": {
+      "executionId": "a1b2c3d4-5678-90ab-cdef-111122223333",
+      "name": "my-deploy-pipeline",
+      "state": "SUCCEEDED",
+      "status": "Succeeded"
+    }
+  },
+  "timestamp": "2026-02-10T14:35:22.518372841Z",
+  "type": "aws.codepipeline.pipeline.finished"
+}
+```
+
 <a id="ec2-•-copy-image"></a>
 
 ## EC2 • Copy Image
@@ -1092,6 +1161,51 @@ At least one of **Image Digest** or **Image Tag** is required. If both are provi
 }
 ```
 
+<a id="ecs-•-create-service"></a>
+
+## ECS • Create Service
+
+The Create Service component creates a new ECS service in a cluster.
+
+### Use Cases
+
+- **Provisioning workflows**: Create a service during environment setup
+- **Deployment automation**: Roll out new workloads from workflows
+- **Infrastructure orchestration**: Configure ECS service settings as part of release pipelines
+
+### Notes
+
+- You can pass advanced ECS CreateService fields through **Additional ECS API Arguments**.
+- Do not combine **Launch Type** with **Capacity Provider Strategy**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "service": {
+      "clusterArn": "arn:aws:ecs:us-east-1:111122223333:cluster/superplane-demo-cluster",
+      "createdAt": "2026-02-12T08:15:10Z",
+      "desiredCount": 2,
+      "enableExecuteCommand": true,
+      "launchType": "FARGATE",
+      "pendingCount": 0,
+      "platformVersion": "1.4.0",
+      "propagateTags": "SERVICE",
+      "runningCount": 2,
+      "schedulingStrategy": "REPLICA",
+      "serviceArn": "arn:aws:ecs:us-east-1:111122223333:service/superplane-demo-cluster/superplane-api",
+      "serviceName": "superplane-api",
+      "status": "ACTIVE",
+      "taskDefinition": "arn:aws:ecs:us-east-1:111122223333:task-definition/superplane-api:5",
+      "taskSets": []
+    }
+  },
+  "timestamp": "2026-02-12T08:15:32.101112131Z",
+  "type": "aws.ecs.service"
+}
+```
+
 <a id="ecs-•-describe-service"></a>
 
 ## ECS • Describe Service
@@ -1171,6 +1285,46 @@ The Describe Service component fetches details about a single ECS service.
   },
   "timestamp": "2026-01-20T12:45:09.123456789Z",
   "type": "aws.ecs.service"
+}
+```
+
+<a id="ecs-•-execute-command"></a>
+
+## ECS • Execute Command
+
+The Execute Command component runs ECS Exec against a running task container.
+
+### Use Cases
+
+- **Operational debugging**: Run diagnostics inside a live task
+- **Runtime inspection**: Check process state or config from workflows
+- **Automated remediation**: Trigger one-off commands in containerized services
+
+### Notes
+
+- ECS Exec must be enabled and properly configured for the task/service.
+- Interactive mode opens an ECS session and returns session connection details.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "command": {
+      "clusterArn": "arn:aws:ecs:us-east-1:111122223333:cluster/superplane-demo-cluster",
+      "containerArn": "arn:aws:ecs:us-east-1:111122223333:container/superplane-demo-cluster/aaaaaaaa11111111bbbbbbbb22222222/2d7f98c1e4d14f98a4d1f36e6f4f5d23",
+      "containerName": "api",
+      "interactive": false,
+      "session": {
+        "sessionId": "ecs-execute-command-0f2ea5a931534f9f8f37f7e706a2c100",
+        "streamUrl": "wss://ssmmessages.us-east-1.amazonaws.com/v1/data-channel/ecs-execute-command-0f2ea5a931534f9f8f37f7e706a2c100?role=publish_subscribe",
+        "tokenValue": "AQoDYXdzEJr//////////wEaDAi4cUd2QqXQwq2NAiD3rWkK9mYc9..."
+      },
+      "taskArn": "arn:aws:ecs:us-east-1:111122223333:task/superplane-demo-cluster/aaaaaaaa11111111bbbbbbbb22222222"
+    }
+  },
+  "timestamp": "2026-02-12T09:10:21.445566778Z",
+  "type": "aws.ecs.executeCommand"
 }
 ```
 
@@ -1262,6 +1416,51 @@ The Stop Task component requests ECS to stop a running task and waits for the ta
   },
   "timestamp": "2026-02-10T14:31:19.987196041Z",
   "type": "aws.ecs.task"
+}
+```
+
+<a id="ecs-•-update-service"></a>
+
+## ECS • Update Service
+
+The Update Service component updates configuration for an existing ECS service.
+
+### Use Cases
+
+- **Deployments**: Roll out a new task definition
+- **Scaling workflows**: Change desired count dynamically
+- **Operational tuning**: Update deployment, network, or tag behavior
+
+### Notes
+
+- You can pass advanced ECS UpdateService fields through **Additional ECS API Arguments**.
+- Do not combine **Launch Type** with **Capacity Provider Strategy**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "service": {
+      "clusterArn": "arn:aws:ecs:us-east-1:111122223333:cluster/superplane-demo-cluster",
+      "createdAt": "2026-02-12T08:15:10Z",
+      "desiredCount": 3,
+      "enableExecuteCommand": true,
+      "launchType": "FARGATE",
+      "pendingCount": 1,
+      "platformVersion": "1.4.0",
+      "propagateTags": "SERVICE",
+      "runningCount": 2,
+      "schedulingStrategy": "REPLICA",
+      "serviceArn": "arn:aws:ecs:us-east-1:111122223333:service/superplane-demo-cluster/superplane-api",
+      "serviceName": "superplane-api",
+      "status": "ACTIVE",
+      "taskDefinition": "arn:aws:ecs:us-east-1:111122223333:task-definition/superplane-api:6",
+      "taskSets": []
+    }
+  },
+  "timestamp": "2026-02-12T09:00:03.987654321Z",
+  "type": "aws.ecs.service"
 }
 ```
 
@@ -1568,6 +1767,134 @@ The Publish Message component sends a message to an AWS SNS topic.
   },
   "timestamp": "2026-01-10T10:00:02.000000000Z",
   "type": "aws.sns.message.published"
+}
+```
+
+<a id="sqs-•-create-queue"></a>
+
+## SQS • Create Queue
+
+The Create Queue component creates a new AWS SQS queue.
+
+### Configuration
+
+- **Region**: AWS region for the SQS queue
+- **Queue Name**: Name of the queue to create
+
+### Example Output
+
+```json
+{
+  "data": {
+    "queueName": "my-created-queue",
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-created-queue"
+  },
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.sqs.queue"
+}
+```
+
+<a id="sqs-•-delete-queue"></a>
+
+## SQS • Delete Queue
+
+The Delete Queue component deletes an AWS SQS queue.
+
+### Configuration
+
+- **Region**: AWS region of the SQS queue
+- **Queue**: Target SQS queue to delete
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+  },
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.sqs.queue.deleted"
+}
+```
+
+<a id="sqs-•-get-queue"></a>
+
+## SQS • Get Queue
+
+The Get Queue component retrieves metadata and attributes for an AWS SQS queue.
+
+### Configuration
+
+- **Region**: AWS region of the SQS queue
+- **Queue**: Target SQS queue
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attributes": {
+      "DelaySeconds": "0",
+      "MaximumMessageSize": "262144",
+      "MessageRetentionPeriod": "345600",
+      "QueueArn": "arn:aws:sqs:us-east-1:123456789012:my-queue",
+      "ReceiveMessageWaitTimeSeconds": "0",
+      "VisibilityTimeout": "30"
+    },
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+  },
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.sqs.queue"
+}
+```
+
+<a id="sqs-•-purge-queue"></a>
+
+## SQS • Purge Queue
+
+The Purge Queue component removes all messages from an AWS SQS queue.
+
+### Configuration
+
+- **Region**: AWS region of the SQS queue
+- **Queue**: Target SQS queue to purge
+
+### Example Output
+
+```json
+{
+  "data": {
+    "purged": true,
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+  },
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.sqs.queue.purged"
+}
+```
+
+<a id="sqs-•-send-message"></a>
+
+## SQS • Send Message
+
+The Send Message component publishes a message to an AWS SQS queue.
+
+### Configuration
+
+- **Region**: AWS region of the SQS queue
+- **Queue**: Target SQS queue
+- **Message Body**: The message payload to send
+
+### Example Output
+
+```json
+{
+  "data": {
+    "messageId": "d84c1b4d-1f3b-4b6c-9d9f-5c3a2b1f9e7a",
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+  },
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.sqs.message"
 }
 ```
 
