@@ -34,6 +34,7 @@ import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
+import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 
 /** Integration type name (e.g. "github") → logo src. Used for Settings tab and header. */
@@ -65,6 +66,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   prometheus: prometheusIcon,
   render: renderIcon,
   dockerhub: dockerIcon,
+  harness: harnessIcon,
   statuspage: statuspageIcon,
 };
 
@@ -96,6 +98,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   prometheus: prometheusIcon,
   render: renderIcon,
   dockerhub: dockerIcon,
+  harness: harnessIcon,
   statuspage: statuspageIcon,
   aws: {
     cloudwatch: awsCloudwatchIcon,
