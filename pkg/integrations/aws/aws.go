@@ -16,12 +16,17 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/cloudwatch"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/ec2"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/ecs"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/eventbridge"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/iam"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/route53"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/sns"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -32,7 +37,7 @@ const (
 )
 
 func init() {
-	registry.RegisterIntegration("aws", &AWS{})
+	registry.RegisterIntegrationWithWebhookHandler("aws", &AWS{}, &WebhookHandler{})
 }
 
 type AWS struct{}
@@ -130,19 +135,47 @@ func (a *AWS) Configuration() []configuration.Field {
 
 func (a *AWS) Components() []core.Component {
 	return []core.Component{
+		&codeartifact.CopyPackageVersions{},
+		&codeartifact.CreateRepository{},
+		&codeartifact.DeletePackageVersions{},
+		&codeartifact.DeleteRepository{},
+		&codeartifact.DisposePackageVersions{},
 		&codeartifact.GetPackageVersion{},
+		&codeartifact.UpdatePackageVersionsStatus{},
+		&ecs.DescribeService{},
+		&ecs.RunTask{},
+		&ecs.StopTask{},
+		&ec2.CopyImage{},
+		&ec2.CreateImage{},
+		&ec2.DeregisterImage{},
+		&ec2.DisableImage{},
+		&ec2.DisableImageDeprecation{},
+		&ec2.EnableImage{},
+		&ec2.EnableImageDeprecation{},
+		&ec2.GetImage{},
+		&sns.GetTopic{},
+		&sns.GetSubscription{},
+		&sns.CreateTopic{},
+		&sns.DeleteTopic{},
+		&sns.PublishMessage{},
 		&ecr.GetImage{},
 		&ecr.GetImageScanFindings{},
 		&ecr.ScanImage{},
 		&lambda.RunFunction{},
+		&route53.CreateRecord{},
+		&route53.UpsertRecord{},
+		&route53.DeleteRecord{},
 	}
 }
 
 func (a *AWS) Triggers() []core.Trigger {
 	return []core.Trigger{
+		&cloudwatch.OnAlarm{},
 		&codeartifact.OnPackageVersion{},
+		&ec2.OnImage{},
 		&ecr.OnImageScan{},
 		&ecr.OnImagePush{},
+		&sns.OnTopicMessage{},
 	}
 }
 
@@ -300,7 +333,7 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 - Select the identity provider created in step 1
 - Add permissions for the integration to manage EventBridge connections, API destinations, and rules. To get started, you can use the **AmazonEventBridgeFullAccess** managed policy
 - Add permissions for the integration manage IAM roles needed for itself. To get started, you can use the **IAMFullAccess** managed policy
-- Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need
+- Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need.
 - Give it a name and description, and create it
 
 **3. Complete the installation setup**
@@ -689,6 +722,10 @@ func (a *AWS) subscriptionApplies(subscription core.IntegrationSubscriptionConte
 		return false
 	}
 
+	if configuration.Region != event.Region {
+		return false
+	}
+
 	if configuration.DetailType != event.DetailType {
 		return false
 	}
@@ -824,10 +861,12 @@ func (a *AWS) provisionDestination(credentials *aws.Credentials, logger *logrus.
 }
 
 func (a *AWS) provisionRule(credentials *aws.Credentials, logger *logrus.Entry, integration core.IntegrationContext, http core.HTTPContext, metadata *common.IntegrationMetadata, destination *common.APIDestinationMetadata, source string, detailType string) error {
+	ruleKey := common.EventBridgeRuleKey(source, destination.Region)
+
 	//
 	// If the rule does not exist yet, we create it.
 	//
-	rule, ok := metadata.EventBridge.Rules[source]
+	rule, ok := metadata.EventBridge.Rules[ruleKey]
 	if !ok {
 		return a.createRule(credentials, logger, integration, http, metadata, destination, source, []string{detailType})
 	}
@@ -862,7 +901,8 @@ func (a *AWS) updateRule(credentials *aws.Credentials, logger *logrus.Entry, htt
 		return fmt.Errorf("error updating EventBridge rule %s: %v", rule.RuleArn, err)
 	}
 
-	metadata.EventBridge.Rules[rule.Source] = common.EventBridgeRuleMetadata{
+	ruleKey := common.EventBridgeRuleKey(rule.Source, rule.Region)
+	metadata.EventBridge.Rules[ruleKey] = common.EventBridgeRuleMetadata{
 		Name:        rule.Name,
 		Source:      rule.Source,
 		Region:      rule.Region,
@@ -921,7 +961,8 @@ func (a *AWS) createRule(
 		metadata.EventBridge.Rules = make(map[string]common.EventBridgeRuleMetadata)
 	}
 
-	metadata.EventBridge.Rules[source] = common.EventBridgeRuleMetadata{
+	ruleKey := common.EventBridgeRuleKey(source, destination.Region)
+	metadata.EventBridge.Rules[ruleKey] = common.EventBridgeRuleMetadata{
 		Name:        ruleName,
 		Source:      source,
 		Region:      destination.Region,

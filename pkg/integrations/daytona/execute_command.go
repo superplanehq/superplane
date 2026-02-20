@@ -3,6 +3,7 @@ package daytona
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -10,7 +11,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const ExecuteCommandPayloadType = "daytona.command.response"
+const (
+	ExecuteCommandPayloadType  = "daytona.command.response"
+	ExecuteCommandPollInterval = 5 * time.Second
+)
 
 type ExecuteCommand struct{}
 
@@ -19,6 +23,14 @@ type ExecuteCommandSpec struct {
 	Command   string `json:"command"`
 	Cwd       string `json:"cwd,omitempty"`
 	Timeout   int    `json:"timeout,omitempty"`
+}
+
+type ExecuteCommandMetadata struct {
+	SandboxID string `json:"sandboxId" mapstructure:"sandboxId"`
+	SessionID string `json:"sessionId" mapstructure:"sessionId"`
+	CmdID     string `json:"cmdId" mapstructure:"cmdId"`
+	StartedAt int64  `json:"startedAt" mapstructure:"startedAt"`
+	Timeout   int    `json:"timeout" mapstructure:"timeout"`
 }
 
 func (e *ExecuteCommand) Name() string {
@@ -140,22 +152,39 @@ func (e *ExecuteCommand) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %v", err)
 	}
 
-	req := &ExecuteCommandRequest{
-		Command: spec.Command,
-		Cwd:     spec.Cwd,
-		Timeout: spec.Timeout,
+	sessionID := uuid.New().String()
+	if err := client.CreateSession(spec.SandboxID, sessionID); err != nil {
+		return fmt.Errorf("failed to create session: %v", err)
 	}
 
-	response, err := client.ExecuteCommand(spec.SandboxID, req)
+	command := spec.Command
+	if spec.Cwd != "" {
+		command = fmt.Sprintf("cd %s && %s", spec.Cwd, spec.Command)
+	}
+
+	response, err := client.ExecuteSessionCommand(spec.SandboxID, sessionID, command)
 	if err != nil {
 		return fmt.Errorf("failed to execute command: %v", err)
 	}
 
-	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
-		ExecuteCommandPayloadType,
-		[]any{response},
-	)
+	timeout := spec.Timeout
+	if timeout == 0 {
+		timeout = 60
+	}
+
+	metadata := ExecuteCommandMetadata{
+		SandboxID: spec.SandboxID,
+		SessionID: sessionID,
+		CmdID:     response.CmdID,
+		StartedAt: time.Now().Unix(),
+		Timeout:   timeout,
+	}
+
+	if err := ctx.Metadata.Set(metadata); err != nil {
+		return err
+	}
+
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, ExecuteCommandPollInterval)
 }
 
 func (e *ExecuteCommand) Cancel(ctx core.ExecutionContext) error {
@@ -167,11 +196,62 @@ func (e *ExecuteCommand) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.U
 }
 
 func (e *ExecuteCommand) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{Name: "poll", UserAccessible: false},
+	}
 }
 
 func (e *ExecuteCommand) HandleAction(ctx core.ActionContext) error {
-	return nil
+	if ctx.Name == "poll" {
+		return e.poll(ctx)
+	}
+	return fmt.Errorf("unknown action: %s", ctx.Name)
+}
+
+func (e *ExecuteCommand) poll(ctx core.ActionContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	var metadata ExecuteCommandMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %v", err)
+	}
+
+	if time.Now().Unix()-metadata.StartedAt > int64(metadata.Timeout) {
+		return fmt.Errorf("command timed out after %d seconds", metadata.Timeout)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	session, err := client.GetSession(metadata.SandboxID, metadata.SessionID)
+	if err != nil {
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, ExecuteCommandPollInterval)
+	}
+
+	cmd := session.FindCommand(metadata.CmdID)
+	if cmd == nil || cmd.ExitCode == nil {
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, ExecuteCommandPollInterval)
+	}
+
+	logs, err := client.GetSessionCommandLogs(metadata.SandboxID, metadata.SessionID, metadata.CmdID)
+	if err != nil {
+		logs = ""
+	}
+
+	result := &ExecuteCommandResponse{
+		ExitCode: *cmd.ExitCode,
+		Result:   logs,
+	}
+
+	return ctx.ExecutionState.Emit(
+		core.DefaultOutputChannel.Name,
+		ExecuteCommandPayloadType,
+		[]any{result},
+	)
 }
 
 func (e *ExecuteCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

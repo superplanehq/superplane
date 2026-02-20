@@ -1,0 +1,54 @@
+{
+    "type": "pagerduty.log_entries.list",
+    "data": {
+        "log_entries": [
+            {
+                "id": "Q02JTSNZWHSEKV",
+                "type": "trigger_log_entry",
+                "summary": "Triggered through the API",
+                "created_at": "2024-01-15T10:00:00Z",
+                "agent": {
+                    "id": "PLH1HKV",
+                    "type": "service_reference",
+                    "summary": "API Service",
+                    "html_url": "https://acme.pagerduty.com/services/PLH1HKV"
+                },
+                "channel": {
+                    "type": "api"
+                }
+            },
+            {
+                "id": "Q02JTSNZWHSEKW",
+                "type": "acknowledge_log_entry",
+                "summary": "Acknowledged by John Smith",
+                "created_at": "2024-01-15T10:15:00Z",
+                "agent": {
+                    "id": "PUSER01",
+                    "type": "user_reference",
+                    "summary": "John Smith",
+                    "html_url": "https://acme.pagerduty.com/users/PUSER01"
+                },
+                "channel": {
+                    "type": "web_ui"
+                }
+            },
+            {
+                "id": "Q02JTSNZWHSEKX",
+                "type": "annotate_log_entry",
+                "summary": "John Smith added a note",
+                "created_at": "2024-01-15T10:30:00Z",
+                "agent": {
+                    "id": "PUSER01",
+                    "type": "user_reference",
+                    "summary": "John Smith",
+                    "html_url": "https://acme.pagerduty.com/users/PUSER01"
+                },
+                "channel": {
+                    "type": "web_ui"
+                }
+            }
+        ],
+        "total": 3
+    },
+    "timestamp": "2024-01-15T11:00:00Z"
+}

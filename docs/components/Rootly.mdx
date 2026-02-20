@@ -15,7 +15,10 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Event" href="#create-event" description="Add a timeline event to a Rootly incident" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in Rootly" />
+  <LinkCard title="Get Incident" href="#get-incident" description="Get incident details from Rootly" />
+  <LinkCard title="Update Incident" href="#update-incident" description="Update an existing incident in Rootly" />
 </CardGrid>
 
 <a id="on-incident"></a>
@@ -68,6 +71,49 @@ This trigger automatically sets up a Rootly webhook endpoint when configured. Th
 }
 ```
 
+<a id="create-event"></a>
+
+## Create Event
+
+The Create Event component adds a timeline event (note/annotation) to a Rootly incident.
+
+### Use Cases
+
+- **Investigation notes**: Add detailed investigation notes to the incident timeline
+- **Status updates**: Post automated status updates as workflows progress
+- **Cross-system sync**: Sync comments from external tools into the incident timeline
+
+### Configuration
+
+- **Incident ID**: The Rootly incident UUID to add the event to (required, supports expressions)
+- **Event**: The note/annotation text (required, supports expressions)
+- **Visibility**: Internal or external visibility (optional, default per Rootly)
+
+### Output
+
+Returns the created incident event with:
+- **id**: Event ID
+- **event**: Event content
+- **visibility**: Event visibility
+- **occurred_at**: Event timestamp
+- **created_at**: Creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "created_at": "2026-02-10T07:34:35.902-8:00",
+    "event": "Investigation update: database connections stabilized.",
+    "id": "a2d32bb7-0417-4d0d-8483-a583c3-7853",
+    "occurred_at": "2026-02-10T07:34:35.902-8:00",
+    "visibility": "internal"
+  },
+  "timestamp": "2026-02-10T15:34:36.09877478Z",
+  "type": "rootly.incident.event"
+}
+```
+
 <a id="create-incident"></a>
 
 ## Create Incident
@@ -102,17 +148,172 @@ Returns the created incident object including:
 ```json
 {
   "data": {
-    "incident": {
-      "id": "abc123-def456",
-      "severity": "sev1",
-      "started_at": "2026-01-19T12:00:00Z",
-      "status": "started",
-      "summary": "Users are experiencing slow database queries and connection timeouts.",
-      "title": "Database connection issues",
-      "url": "https://app.rootly.com/incidents/abc123-def456"
-    }
+    "id": "abc123-def456",
+    "severity": "sev1",
+    "started_at": "2026-01-19T12:00:00Z",
+    "status": "started",
+    "summary": "Users are experiencing slow database queries and connection timeouts.",
+    "title": "Database connection issues",
+    "url": "https://app.rootly.com/incidents/abc123-def456"
   },
   "timestamp": "2026-01-19T12:00:00Z",
+  "type": "rootly.incident"
+}
+```
+
+<a id="get-incident"></a>
+
+## Get Incident
+
+The Get Incident component retrieves a single incident from Rootly by ID, including related resources.
+
+### Use Cases
+
+- **Incident enrichment**: Fetch full incident details including services, groups, and action items
+- **Status checks**: Check the current status and severity of an incident
+- **Post-incident analysis**: Retrieve incident timeline events and action items
+- **Cross-system sync**: Get incident data to sync with external systems
+
+### Configuration
+
+- **Incident ID**: The ID of the incident to retrieve (required, supports expressions)
+
+### Output
+
+Returns the incident object including:
+- **id**: Incident ID
+- **sequential_id**: Sequential incident number
+- **title**: Incident title
+- **slug**: URL-friendly incident identifier
+- **status**: Current incident status
+- **summary**: Incident summary
+- **severity**: Incident severity slug
+- **url**: Link to the incident in Rootly
+- **started_at**: When the incident started
+- **mitigated_at**: When the incident was mitigated
+- **resolved_at**: When the incident was resolved
+- **user**: User who created the incident
+- **started_by**: User who started the incident
+- **services**: Affected services
+- **groups**: Associated groups
+- **events**: Incident timeline events
+- **action_items**: Follow-up action items
+
+### Example Output
+
+```json
+{
+  "data": {
+    "action_items": [
+      {
+        "id": "ai-001",
+        "status": "open",
+        "summary": "Investigate root cause of latency increase"
+      }
+    ],
+    "events": [
+      {
+        "created_at": "2026-01-19T12:00:00Z",
+        "id": "evt-001",
+        "kind": "incident_created",
+        "visibility": "internal"
+      }
+    ],
+    "groups": [
+      {
+        "id": "grp-001",
+        "name": "Backend Team",
+        "slug": "backend-team"
+      }
+    ],
+    "id": "abc123-def456",
+    "mitigated_at": "2026-01-19T12:30:00Z",
+    "resolved_at": null,
+    "sequential_id": 42,
+    "services": [
+      {
+        "id": "svc-001",
+        "name": "Production API",
+        "slug": "production-api"
+      }
+    ],
+    "severity": "sev1",
+    "slug": "api-latency-spike-detected",
+    "started_at": "2026-01-19T12:00:00Z",
+    "started_by": {
+      "email": "john@example.com",
+      "full_name": "John Doe",
+      "id": "user-002"
+    },
+    "status": "mitigated",
+    "summary": "The API response times have increased significantly across all endpoints.",
+    "title": "API latency spike detected",
+    "url": "https://app.rootly.com/incidents/abc123-def456",
+    "user": {
+      "email": "jane@example.com",
+      "full_name": "Jane Smith",
+      "id": "user-001"
+    }
+  },
+  "timestamp": "2026-01-19T12:05:00Z",
+  "type": "rootly.incident"
+}
+```
+
+<a id="update-incident"></a>
+
+## Update Incident
+
+The Update Incident component updates an existing incident in Rootly.
+
+### Use Cases
+
+- **Status updates**: Update incident status when new information arrives
+- **Severity changes**: Adjust severity based on impact assessment
+- **Service association**: Attach affected services to an incident
+- **Team assignment**: Assign teams to respond to an incident
+- **Metadata updates**: Add labels to categorize incidents
+
+### Configuration
+
+- **Incident ID**: The UUID of the incident to update (required, supports expressions)
+- **Title**: Update the incident title (optional, supports expressions)
+- **Summary**: Update the incident summary (optional, supports expressions)
+- **Status**: Update the incident status (optional)
+- **Sub-Status**: Update the incident sub-status (optional, required by some Rootly accounts when changing status)
+- **Severity**: Update the incident severity level (optional)
+- **Services**: Services to attach to the incident (optional)
+- **Teams**: Teams to attach to the incident (optional)
+- **Labels**: Key-value labels for the incident (optional)
+
+### Output
+
+Returns the updated incident object including:
+- **id**: Incident UUID
+- **sequential_id**: Sequential incident number
+- **title**: Incident title
+- **slug**: URL-friendly slug
+- **status**: Current incident status
+- **updated_at**: Last update timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "abc123-def456",
+    "mitigated_at": "2026-01-19T13:30:00Z",
+    "sequential_id": 42,
+    "severity": "sev1",
+    "slug": "database-connection-issues",
+    "started_at": "2026-01-19T12:00:00Z",
+    "status": "mitigated",
+    "summary": "Root cause identified. Connection pool exhausted.",
+    "title": "Database connection issues - Updated",
+    "updated_at": "2026-01-19T13:30:00Z",
+    "url": "https://app.rootly.com/incidents/abc123-def456"
+  },
+  "timestamp": "2026-01-19T13:30:00Z",
   "type": "rootly.incident"
 }
 ```

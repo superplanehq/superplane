@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -28,6 +29,10 @@ func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName, user
 
 	if user.ID.String() == requesterID {
 		return nil, status.Error(codes.PermissionDenied, "cannot change your own role")
+	}
+
+	if user.IsServiceAccount() && roleName == models.RoleOrgOwner {
+		return nil, status.Error(codes.InvalidArgument, "service accounts cannot be assigned the org_owner role")
 	}
 
 	err = authService.AssignRole(user.ID.String(), roleName, domainID, domainType)

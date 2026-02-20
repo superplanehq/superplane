@@ -43,6 +43,7 @@ import (
 	pbOrg "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
+	pbServiceAccounts "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
@@ -233,6 +234,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
+	err = pbServiceAccounts.RegisterServiceAccountsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -258,6 +264,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/triggers").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/widgets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/blueprints").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/service-accounts").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
 
 	return nil
@@ -409,7 +416,6 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	//
 	publicRoute.
 		HandleFunc(s.BasePath+"/webhooks/{webhookID}", s.HandleWebhook).
-		HeadersRegexp("Content-Type", `^application/json(?:;\s*charset=utf-8)?$`).
 		Methods("POST")
 
 	//
@@ -447,7 +453,7 @@ type jwksResponse struct {
 }
 
 func (s *Server) handleOIDCConfiguration(w http.ResponseWriter, _ *http.Request) {
-	baseURL := strings.TrimRight(s.BaseURL, "/")
+	baseURL := strings.TrimRight(s.WebhooksBaseURL, "/")
 	response := oidcDiscoveryResponse{
 		Issuer:                           baseURL,
 		JWKSURI:                          baseURL + "/.well-known/jwks.json",
@@ -788,15 +794,31 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		return http.StatusInternalServerError, fmt.Errorf("trigger not found: %w", err)
 	}
 
+	logger := logging.ForNode(node)
 	tx := database.Conn()
+	var integrationCtx core.IntegrationContext
+	if node.AppInstallationID != nil {
+		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+		if integrationErr != nil {
+			return http.StatusInternalServerError, integrationErr
+		}
+
+		logger = logging.WithIntegration(logger, *integration)
+		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry)
+	}
+
 	return trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
+		Metadata:      contexts.NewNodeMetadataContext(tx, &node),
+		Logger:        logger,
+		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        contexts.NewEventContext(tx, &node),
+		Integration:   integrationCtx,
 	})
 }
 
@@ -807,15 +829,31 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 		return http.StatusInternalServerError, fmt.Errorf("component not found: %w", err)
 	}
 
+	logger := logging.ForNode(node)
 	tx := database.Conn()
+	var integrationCtx core.IntegrationContext
+	if node.AppInstallationID != nil {
+		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+		if integrationErr != nil {
+			return http.StatusInternalServerError, integrationErr
+		}
+
+		logger = logging.WithIntegration(logger, *integration)
+		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry)
+	}
+
 	return component.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
+		Metadata:      contexts.NewNodeMetadataContext(tx, &node),
+		Logger:        logger,
+		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        contexts.NewEventContext(tx, &node),
+		Integration:   integrationCtx,
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
 			if err != nil {

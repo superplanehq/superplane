@@ -35,7 +35,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 
 	t.Run("remove user from group with user email", func(t *testing.T) {
 		require.NoError(t, r.AuthService.AddUserToGroup(orgID, models.DomainTypeOrganization, newUser.ID.String(), groupName))
-		_, err := RemoveUserFromGroup(ctx, orgID, models.DomainTypeOrganization, orgID, "", newUser.Email, groupName, r.AuthService)
+		_, err := RemoveUserFromGroup(ctx, orgID, models.DomainTypeOrganization, orgID, "", newUser.GetEmail(), groupName, r.AuthService)
 		require.NoError(t, err)
 	})
 

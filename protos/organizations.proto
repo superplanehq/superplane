@@ -375,6 +375,7 @@ message UpdateIntegrationRequest {
   string id = 1;
   string integration_id = 2;
   google.protobuf.Struct configuration = 3;
+  string name = 4;
 }
 
 message UpdateIntegrationResponse {

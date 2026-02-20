@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 
@@ -18,9 +19,20 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
-func UpdateIntegration(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string, orgID string, integrationID string, configuration map[string]any) (*pb.UpdateIntegrationResponse, error) {
+func UpdateIntegration(
+	ctx context.Context,
+	registry *registry.Registry,
+	oidcProvider oidc.Provider,
+	baseURL string,
+	webhooksBaseURL string,
+	orgID string,
+	integrationID string,
+	configuration map[string]any,
+	name string,
+) (*pb.UpdateIntegrationResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid organization ID: %v", err)
@@ -36,9 +48,26 @@ func UpdateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 		return nil, status.Errorf(codes.NotFound, "integration not found: %v", err)
 	}
 
+	if name != "" && name != instance.InstallationName {
+		existing, err := models.FindIntegrationByName(org, name)
+		if err == nil && existing.ID != instance.ID {
+			return nil, status.Errorf(codes.AlreadyExists, "an integration with the name %s already exists in this organization", name)
+		}
+
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, status.Error(codes.Internal, "failed to verify integration name uniqueness")
+		}
+
+		instance.InstallationName = name
+	}
+
 	integration, err := registry.GetIntegration(instance.AppName)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "integration %s not found", instance.AppName)
+	}
+
+	if configuration == nil {
+		configuration = map[string]any{}
 	}
 
 	existingConfig := instance.Configuration.Data()

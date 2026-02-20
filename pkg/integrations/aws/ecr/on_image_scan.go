@@ -3,7 +3,7 @@ package ecr
 import (
 	"fmt"
 	"net/http"
-	"slices"
+	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -133,6 +133,11 @@ func (p *OnImageScan) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to validate repository: %w", err)
 	}
 
+	region := strings.TrimSpace(config.Region)
+	if region == "" {
+		return fmt.Errorf("region is required")
+	}
+
 	//
 	// EventBridge rule and target have been setup already.
 	//
@@ -140,23 +145,14 @@ func (p *OnImageScan) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
-	//
-	// Create EventBridge rule and target
-	//
-	integrationMetadata := common.IntegrationMetadata{}
-	err = mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, region, DetailTypeECRImageScan)
 	if err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
+		return fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
-	//
-	// If an EventBridge rule does not yet exist yet in this region, for this source,
-	// we ask the integration to provision it for us.
-	//
-	rule, ok := integrationMetadata.EventBridge.Rules[Source]
-	if !ok || !slices.Contains(rule.DetailTypes, DetailTypeECRImageScan) {
-		err = ctx.Metadata.Set(OnImagePushMetadata{
-			Region:     config.Region,
+	if !hasRule {
+		err = ctx.Metadata.Set(OnImageScanMetadata{
+			Region:     region,
 			Repository: repository,
 		})
 
@@ -164,19 +160,19 @@ func (p *OnImageScan) Setup(ctx core.TriggerContext) error {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
 
-		return p.provisionRule(ctx.Integration, ctx.Requests, config.Region)
+		return p.provisionRule(ctx.Integration, ctx.Requests, region)
 	}
 
 	//
 	// If the rule exists, subscribe to the integration with the proper pattern.
 	//
-	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(config.Region))
+	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(region))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
 	}
 
 	return ctx.Metadata.Set(OnImageScanMetadata{
-		Region:         config.Region,
+		Region:         region,
 		SubscriptionID: subscriptionID.String(),
 		Repository:     repository,
 	})
@@ -241,35 +237,13 @@ func (p *OnImageScan) checkRuleAvailability(ctx core.TriggerActionContext) (map[
 		return nil, fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	integrationMetadata := common.IntegrationMetadata{}
-	err = mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, metadata.Region, DetailTypeECRImageScan)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode integration metadata: %w", err)
+		return nil, fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
-	//
-	// If the rule was not provisioned yet, check again in 10 seconds.
-	//
-	rule, ok := integrationMetadata.EventBridge.Rules[Source]
-	if !ok {
-		ctx.Logger.Infof("Rule not found for source %s - checking again in 10 seconds", Source)
-		return nil, ctx.Requests.ScheduleActionCall(
-			"checkRuleAvailability",
-			map[string]any{},
-			10*time.Second,
-		)
-	}
-
-	//
-	// If the rule does not have the detail type we are interested in, check again in 10 seconds.
-	//
-	if !slices.Contains(rule.DetailTypes, DetailTypeECRImageScan) {
-		ctx.Logger.Infof("Rule does not have detail type '%s' - checking again in 10 seconds", DetailTypeECRImageScan)
-		return nil, ctx.Requests.ScheduleActionCall(
-			"checkRuleAvailability",
-			map[string]any{},
-			10*time.Second,
-		)
+	if !hasRule {
+		return nil, ctx.Requests.ScheduleActionCall(ctx.Name, map[string]any{}, 10*time.Second)
 	}
 
 	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(metadata.Region))

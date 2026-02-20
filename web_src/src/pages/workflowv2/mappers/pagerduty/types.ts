@@ -46,3 +46,47 @@ export interface ListIncidentsResponse {
   incidents: Incident[];
   total: number;
 }
+
+export interface Note {
+  id?: string;
+  content?: string;
+  created_at?: string;
+  user?: ResourceRef;
+  channel?: NoteChannel;
+}
+
+export interface NoteChannel {
+  type?: string;
+}
+
+export interface ListNotesConfiguration {
+  incidentId?: string;
+}
+
+export interface ListNotesResponse {
+  notes: Note[];
+  total: number;
+}
+
+export interface LogEntry {
+  id?: string;
+  type?: string;
+  summary?: string;
+  created_at?: string;
+  agent?: ResourceRef;
+  channel?: LogChannel;
+}
+
+export interface LogChannel {
+  type?: string;
+}
+
+export interface ListLogEntriesConfiguration {
+  incidentId?: string;
+  limit?: number;
+}
+
+export interface ListLogEntriesResponse {
+  log_entries: LogEntry[];
+  total: number;
+}
