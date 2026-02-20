@@ -1,0 +1,13 @@
+{
+  "notification": {
+    "id": "notif_123",
+    "title": "High error rate",
+    "severity": "critical",
+    "status": "open"
+  },
+  "checkRule": {
+    "id": "check_456",
+    "name": "API availability"
+  },
+  "timestamp": "2026-02-20T12:00:00Z"
+}
