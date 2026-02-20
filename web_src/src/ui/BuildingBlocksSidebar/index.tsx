@@ -47,6 +47,7 @@ import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
+import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 
 export interface BuildingBlock {
@@ -433,6 +434,7 @@ function CategorySection({
     render: renderIcon,
     dockerhub: dockerIcon,
     harness: harnessIcon,
+    servicenow: servicenowIcon,
     statuspage: statuspageIcon,
     aws: {
       ec2: awsEc2Icon,
@@ -520,6 +522,7 @@ function CategorySection({
             render: renderIcon,
             dockerhub: dockerIcon,
             harness: harnessIcon,
+            servicenow: servicenowIcon,
             statuspage: statuspageIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,

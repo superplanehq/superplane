@@ -13,7 +13,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-const MaxEventSize = 64 * 1024
+const (
+	MaxEventSize           = 64 * 1024
+	DefaultHeaderTokenName = "X-Webhook-Token"
+)
 
 func init() {
 	registry.RegisterTrigger("webhook", &Webhook{})
@@ -28,6 +31,7 @@ type Metadata struct {
 
 type Configuration struct {
 	Authentication string `json:"authentication"`
+	HeaderName     string `json:"headerName" mapstructure:"headerName"`
 }
 
 func (w *Webhook) Name() string {
@@ -63,6 +67,7 @@ func (w *Webhook) Documentation() string {
 
 - **Signature (HMAC)**: Verify requests using HMAC-SHA256 signature in the ` + "`X-Signature-256`" + ` header
 - **Bearer Token**: Require a Bearer token in the ` + "`Authorization`" + ` header
+- **Header Token**: Require a raw token in a custom header (default: ` + "`X-Webhook-Token`" + `)
 - **None (unsafe)**: No authentication (not recommended for production)
 
 ## Request Data
@@ -104,9 +109,24 @@ func (w *Webhook) Configuration() []configuration.Field {
 					Options: []configuration.FieldOption{
 						{Label: "Signature (HMAC)", Value: "signature"},
 						{Label: "Bearer Token", Value: "bearer"},
+						{Label: "Header Token", Value: "header_token"},
 						{Label: "None (unsafe)", Value: "none"},
 					},
 				},
+			},
+		},
+		{
+			Name:        "headerName",
+			Label:       "Header Name",
+			Type:        configuration.FieldTypeString,
+			Default:     DefaultHeaderTokenName,
+			Placeholder: DefaultHeaderTokenName,
+			Description: "HTTP header that must contain the authentication token",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "authentication", Values: []string{"header_token"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "authentication", Values: []string{"header_token"}},
 			},
 		},
 	}
@@ -187,6 +207,8 @@ func (w *Webhook) resetAuthentication(ctx core.TriggerActionContext) (map[string
 		plainKey, _, err = ctx.Webhook.ResetSecret()
 	case "bearer":
 		plainKey, _, err = ctx.Webhook.ResetSecret()
+	case "header_token":
+		plainKey, _, err = ctx.Webhook.ResetSecret()
 	default:
 		return nil, fmt.Errorf("unsupported authentication method: %s", metadata.Authentication)
 	}
@@ -207,8 +229,8 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusRequestEntityTooLarge, fmt.Errorf("payload too large")
 	}
 
-	var metadata Metadata
-	err := mapstructure.Decode(ctx.Configuration, &metadata)
+	var config Configuration
+	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to parse configuration: %w", err)
 	}
@@ -218,7 +240,7 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
 	}
 
-	switch metadata.Authentication {
+	switch config.Authentication {
 	case "signature":
 		signature := ctx.Headers.Get("X-Signature-256")
 		if signature == "" {
@@ -245,6 +267,18 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		}
 
 		ctx.Headers.Set("Authorization", "Bearer ********")
+	case "header_token":
+		headerName := config.HeaderTokenName()
+		headerToken := ctx.Headers.Get(headerName)
+		if headerToken == "" {
+			return http.StatusUnauthorized, fmt.Errorf("missing %s header", headerName)
+		}
+
+		if headerToken != string(secret) {
+			return http.StatusUnauthorized, fmt.Errorf("invalid header token")
+		}
+
+		ctx.Headers.Set(headerName, "********")
 	}
 
 	var parsedData any
@@ -268,4 +302,12 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 
 func (w *Webhook) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+func (c Configuration) HeaderTokenName() string {
+	if c.HeaderName != "" {
+		return c.HeaderName
+	}
+
+	return DefaultHeaderTokenName
 }
