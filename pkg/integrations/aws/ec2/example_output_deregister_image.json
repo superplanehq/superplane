@@ -1,0 +1,10 @@
+{
+  "data": {
+    "requestId": "req-deregister",
+    "imageId": "ami-07f0e4f3e9c123abc",
+    "region": "us-east-1",
+    "deregistered": true
+  },
+  "timestamp": "2026-02-19T09:10:00Z",
+  "type": "aws.ec2.image.deregistered"
+}

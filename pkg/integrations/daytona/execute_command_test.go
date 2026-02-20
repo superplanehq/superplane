@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -77,17 +78,17 @@ func Test__ExecuteCommand__Setup(t *testing.T) {
 func Test__ExecuteCommand__Execute(t *testing.T) {
 	component := ExecuteCommand{}
 
-	t.Run("successful command execution", func(t *testing.T) {
+	t.Run("schedules poll after async kickoff", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
-				},
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"exitCode":0,"result":"hello world"}`)),
-				},
+				// FetchConfig for CreateSession
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				// CreateSession
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				// FetchConfig for ExecuteSessionCommand
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				// ExecuteSessionCommand
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"cmdId":"cmd-001"}`))},
 			},
 		}
 
@@ -97,35 +98,42 @@ func Test__ExecuteCommand__Execute(t *testing.T) {
 			},
 		}
 
+		metadataCtx := &contexts.MetadataContext{}
+		requestCtx := &contexts.RequestContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
 				"sandboxId": "sandbox-123",
 				"command":   "echo hello world",
+				"timeout":   120,
 			},
 			HTTP:           httpContext,
 			Integration:    appCtx,
 			ExecutionState: execCtx,
+			Metadata:       metadataCtx,
+			Requests:       requestCtx,
 		})
 
 		require.NoError(t, err)
-		assert.True(t, execCtx.Finished)
-		assert.True(t, execCtx.Passed)
-		assert.Equal(t, ExecuteCommandPayloadType, execCtx.Type)
-		require.Len(t, execCtx.Payloads, 1)
+		assert.False(t, execCtx.Finished, "execution should not be finished yet")
+		assert.Equal(t, "poll", requestCtx.Action)
+		assert.Equal(t, ExecuteCommandPollInterval, requestCtx.Duration)
+
+		metadata, ok := metadataCtx.Metadata.(ExecuteCommandMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "sandbox-123", metadata.SandboxID)
+		assert.Equal(t, "cmd-001", metadata.CmdID)
+		assert.Equal(t, 120, metadata.Timeout)
+		assert.NotEmpty(t, metadata.SessionID)
 	})
 
-	t.Run("command execution with working directory", func(t *testing.T) {
+	t.Run("prepends cd when cwd is set", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
-				},
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"exitCode":0,"result":"/home/daytona"}`)),
-				},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"cmdId":"cmd-001"}`))},
 			},
 		}
 
@@ -135,6 +143,8 @@ func Test__ExecuteCommand__Execute(t *testing.T) {
 			},
 		}
 
+		metadataCtx := &contexts.MetadataContext{}
+		requestCtx := &contexts.RequestContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -145,24 +155,29 @@ func Test__ExecuteCommand__Execute(t *testing.T) {
 			HTTP:           httpContext,
 			Integration:    appCtx,
 			ExecutionState: execCtx,
+			Metadata:       metadataCtx,
+			Requests:       requestCtx,
 		})
 
 		require.NoError(t, err)
-		assert.True(t, execCtx.Finished)
-		assert.True(t, execCtx.Passed)
+
+		// The 4th request (index 3) is the ExecuteSessionCommand call
+		require.Len(t, httpContext.Requests, 4)
+		body, _ := io.ReadAll(httpContext.Requests[3].Body)
+		// Go's json.Marshal escapes & as \u0026, so check for both forms
+		bodyStr := string(body)
+		assert.True(t,
+			strings.Contains(bodyStr, "cd /home/daytona && pwd") ||
+				strings.Contains(bodyStr, `cd /home/daytona \u0026\u0026 pwd`),
+			"expected command with cd prefix, got: %s", bodyStr,
+		)
 	})
 
-	t.Run("command with non-zero exit code", func(t *testing.T) {
+	t.Run("create session failure -> error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
-				},
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"exitCode":127,"result":"command not found"}`)),
-				},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"message":"sandbox not found"}`))},
 			},
 		}
 
@@ -172,38 +187,6 @@ func Test__ExecuteCommand__Execute(t *testing.T) {
 			},
 		}
 
-		execCtx := &contexts.ExecutionStateContext{}
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"command":   "nonexistent-command",
-			},
-			HTTP:           httpContext,
-			Integration:    appCtx,
-			ExecutionState: execCtx,
-		})
-
-		require.NoError(t, err)
-		assert.True(t, execCtx.Finished)
-	})
-
-	t.Run("command execution failure -> error", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusNotFound,
-					Body:       io.NopCloser(strings.NewReader(`{"message":"sandbox not found"}`)),
-				},
-			},
-		}
-
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"apiKey": "test-api-key",
-			},
-		}
-
-		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
 				"sandboxId": "invalid-sandbox",
@@ -211,11 +194,183 @@ func Test__ExecuteCommand__Execute(t *testing.T) {
 			},
 			HTTP:           httpContext,
 			Integration:    appCtx,
-			ExecutionState: execCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       &contexts.RequestContext{},
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to execute command")
+		assert.Contains(t, err.Error(), "failed to create session")
+	})
+}
+
+func Test__ExecuteCommand__HandleAction(t *testing.T) {
+	component := ExecuteCommand{}
+
+	t.Run("poll reschedules when command is still running", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-abc","commands":[{"id":"cmd-001"}]}`))},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		requestCtx := &contexts.RequestContext{}
+		err := component.HandleAction(core.ActionContext{
+			Name: "poll",
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+			HTTP:        httpContext,
+			Integration: appCtx,
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{
+					"sandboxId": "sandbox-123",
+					"sessionId": "session-abc",
+					"cmdId":     "cmd-001",
+					"startedAt": time.Now().Unix(),
+					"timeout":   300,
+				},
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Requests:       requestCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "poll", requestCtx.Action)
+	})
+
+	t.Run("poll emits result when command completes", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// FetchConfig for GetSession
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				// GetSession - command completed with exit code 0
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-abc","commands":[{"id":"cmd-001","exitCode":0}]}`))},
+				// FetchConfig for GetSessionCommandLogs
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				// GetSessionCommandLogs
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`hello world`))},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.HandleAction(core.ActionContext{
+			Name: "poll",
+			HTTP: httpContext,
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{
+					"sandboxId": "sandbox-123",
+					"sessionId": "session-abc",
+					"cmdId":     "cmd-001",
+					"startedAt": time.Now().Unix(),
+					"timeout":   300,
+				},
+			},
+			ExecutionState: execCtx,
+			Requests:       &contexts.RequestContext{},
+			Integration:    appCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+		assert.Equal(t, ExecuteCommandPayloadType, execCtx.Type)
+		require.Len(t, execCtx.Payloads, 1)
+	})
+
+	t.Run("poll times out", func(t *testing.T) {
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		err := component.HandleAction(core.ActionContext{
+			Name: "poll",
+			HTTP: &contexts.HTTPContext{},
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{
+					"sandboxId": "sandbox-123",
+					"sessionId": "session-abc",
+					"cmdId":     "cmd-001",
+					"startedAt": time.Now().Add(-10 * time.Minute).Unix(),
+					"timeout":   60,
+				},
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Requests:       &contexts.RequestContext{},
+			Integration:    appCtx,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "timed out")
+	})
+
+	t.Run("poll reschedules on GetSession API error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"message":"server error"}`))},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		requestCtx := &contexts.RequestContext{}
+		err := component.HandleAction(core.ActionContext{
+			Name: "poll",
+			HTTP: httpContext,
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{
+					"sandboxId": "sandbox-123",
+					"sessionId": "session-abc",
+					"cmdId":     "cmd-001",
+					"startedAt": time.Now().Unix(),
+					"timeout":   300,
+				},
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Requests:       requestCtx,
+			Integration:    appCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "poll", requestCtx.Action)
+	})
+
+	t.Run("skips when execution already finished", func(t *testing.T) {
+		err := component.HandleAction(core.ActionContext{
+			Name:           "poll",
+			ExecutionState: &contexts.ExecutionStateContext{Finished: true},
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("unknown action -> error", func(t *testing.T) {
+		err := component.HandleAction(core.ActionContext{
+			Name: "unknown",
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown action")
 	})
 }
 
