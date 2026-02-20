@@ -234,47 +234,26 @@ func (r *RunPipeline) Setup(ctx core.SetupContext) error {
 	}
 
 	// Provision EventBridge rule if not already present for CodePipeline events.
-	integrationMetadata := common.IntegrationMetadata{}
-	err = mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata)
-	if err == nil {
-		source := "aws.codepipeline"
-		detailType := "CodePipeline Pipeline Execution State Change"
+	source := "aws.codepipeline"
+	detailType := "CodePipeline Pipeline Execution State Change"
 
-		needsProvisioning := false
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, source, spec.Region, detailType)
+	if err != nil {
+		ctx.Logger.Warnf("Failed to check EventBridge rule availability: %v", err)
+	}
 
-		if integrationMetadata.EventBridge == nil || integrationMetadata.EventBridge.Rules == nil {
-			needsProvisioning = true
-		} else {
-			rule, exists := integrationMetadata.EventBridge.Rules[source]
-			if !exists {
-				needsProvisioning = true
-			} else {
-				hasDetailType := false
-				for _, dt := range rule.DetailTypes {
-					if dt == detailType {
-						hasDetailType = true
-						break
-					}
-				}
-				if !hasDetailType {
-					needsProvisioning = true
-				}
-			}
-		}
-
-		if needsProvisioning {
-			err = ctx.Integration.ScheduleActionCall(
-				"provisionRule",
-				common.ProvisionRuleParameters{
-					Region:     spec.Region,
-					Source:     source,
-					DetailType: detailType,
-				},
-				time.Second,
-			)
-			if err != nil {
-				ctx.Logger.Warnf("Failed to schedule EventBridge rule provisioning: %v", err)
-			}
+	if !hasRule {
+		err = ctx.Integration.ScheduleActionCall(
+			"provisionRule",
+			common.ProvisionRuleParameters{
+				Region:     spec.Region,
+				Source:     source,
+				DetailType: detailType,
+			},
+			time.Second,
+		)
+		if err != nil {
+			ctx.Logger.Warnf("Failed to schedule EventBridge rule provisioning: %v", err)
 		}
 	}
 
@@ -366,6 +345,10 @@ func (r *RunPipeline) Cancel(ctx core.ExecutionContext) error {
 		return nil
 	}
 
+	if metadata.Pipeline == nil {
+		return nil
+	}
+
 	if metadata.Execution.Status == PipelineStatusSucceeded ||
 		metadata.Execution.Status == PipelineStatusFailed ||
 		metadata.Execution.Status == PipelineStatusStopped {
@@ -438,6 +421,10 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	}
 
 	if metadata.Execution == nil {
+		return http.StatusOK, nil
+	}
+
+	if metadata.Pipeline == nil {
 		return http.StatusOK, nil
 	}
 
