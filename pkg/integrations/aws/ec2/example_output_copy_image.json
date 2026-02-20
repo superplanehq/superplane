@@ -1,0 +1,21 @@
+{
+  "data": {
+    "image": {
+      "imageId": "ami-0c0ffee1234567890",
+      "name": "my-app-2026-02-19",
+      "description": "Copied for disaster recovery",
+      "state": "available",
+      "creationDate": "2026-02-19T09:00:00.000Z",
+      "ownerId": "123456789012",
+      "architecture": "x86_64",
+      "imageType": "machine",
+      "rootDeviceType": "ebs",
+      "rootDeviceName": "/dev/xvda",
+      "virtualizationType": "hvm",
+      "hypervisor": "xen",
+      "region": "us-west-2"
+    }
+  },
+  "timestamp": "2026-02-19T09:00:00Z",
+  "type": "aws.ec2.image"
+}

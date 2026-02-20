@@ -56,3 +56,17 @@ func FindIntegrationDefinition(ctx CommandContext, name string) (openapi_client.
 
 	return openapi_client.IntegrationsIntegrationDefinition{}, fmt.Errorf("integration %q not found", name)
 }
+
+func ResolveCanvasID(ctx CommandContext, canvasID string) (string, error) {
+	canvasID = strings.TrimSpace(canvasID)
+	if canvasID != "" {
+		return canvasID, nil
+	}
+
+	activeCanvas := strings.TrimSpace(ctx.Config.GetActiveCanvas())
+	if activeCanvas == "" {
+		return "", fmt.Errorf("canvas id is required; pass --canvas-id or set one with \"superplane canvases active\"")
+	}
+
+	return activeCanvas, nil
+}

@@ -319,11 +319,21 @@ func validateList(field Field, value any) error {
 		return fmt.Errorf("must contain at least one item")
 	}
 
-	if field.TypeOptions.List == nil {
+	if field.TypeOptions == nil || field.TypeOptions.List == nil {
 		return nil
 	}
 
 	listOptions := field.TypeOptions.List
+
+	if listOptions.MaxItems != nil {
+		if *listOptions.MaxItems <= 0 {
+			return fmt.Errorf("invalid max_items configuration: must be greater than 0")
+		}
+		if len(list) > *listOptions.MaxItems {
+			return fmt.Errorf("must contain at most %d items", *listOptions.MaxItems)
+		}
+	}
+
 	if listOptions.ItemDefinition == nil {
 		return nil
 	}

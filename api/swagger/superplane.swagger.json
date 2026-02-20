@@ -45,6 +45,9 @@
     },
     {
       "name": "Canvases"
+    },
+    {
+      "name": "ServiceAccounts"
     }
   ],
   "schemes": [
@@ -2757,6 +2760,202 @@
         ]
       }
     },
+    "/api/v1/service-accounts": {
+      "get": {
+        "summary": "List service accounts",
+        "description": "Returns all service accounts in the organization",
+        "operationId": "ServiceAccounts_ListServiceAccounts",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ServiceAccountsListServiceAccountsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "ServiceAccounts"
+        ]
+      },
+      "post": {
+        "summary": "Create a service account",
+        "description": "Creates a new service account in the organization",
+        "operationId": "ServiceAccounts_CreateServiceAccount",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ServiceAccountsCreateServiceAccountResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ServiceAccountsCreateServiceAccountRequest"
+            }
+          }
+        ],
+        "tags": [
+          "ServiceAccounts"
+        ]
+      }
+    },
+    "/api/v1/service-accounts/{id}": {
+      "get": {
+        "summary": "Describe a service account",
+        "description": "Returns details of a specific service account",
+        "operationId": "ServiceAccounts_DescribeServiceAccount",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ServiceAccountsDescribeServiceAccountResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ServiceAccounts"
+        ]
+      },
+      "delete": {
+        "summary": "Delete a service account",
+        "description": "Deletes a service account and removes its RBAC policies",
+        "operationId": "ServiceAccounts_DeleteServiceAccount",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ServiceAccountsDeleteServiceAccountResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ServiceAccounts"
+        ]
+      },
+      "patch": {
+        "summary": "Update a service account",
+        "description": "Updates the name or description of a service account",
+        "operationId": "ServiceAccounts_UpdateServiceAccount",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ServiceAccountsUpdateServiceAccountResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ServiceAccountsUpdateServiceAccountBody"
+            }
+          }
+        ],
+        "tags": [
+          "ServiceAccounts"
+        ]
+      }
+    },
+    "/api/v1/service-accounts/{id}/token": {
+      "post": {
+        "summary": "Regenerate service account token",
+        "description": "Regenerates the API token for a service account",
+        "operationId": "ServiceAccounts_RegenerateServiceAccountToken",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ServiceAccountsRegenerateServiceAccountTokenResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ServiceAccountsRegenerateServiceAccountTokenBody"
+            }
+          }
+        ],
+        "tags": [
+          "ServiceAccounts"
+        ]
+      }
+    },
     "/api/v1/triggers": {
       "get": {
         "summary": "List triggers",
@@ -2849,6 +3048,12 @@
             "in": "query",
             "required": false,
             "type": "string"
+          },
+          {
+            "name": "includeServiceAccounts",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
           }
         ],
         "tags": [
@@ -3989,6 +4194,10 @@
         },
         "itemLabel": {
           "type": "string"
+        },
+        "maxItems": {
+          "type": "integer",
+          "format": "int32"
         }
       }
     },
@@ -5149,6 +5358,115 @@
       "properties": {
         "secret": {
           "$ref": "#/definitions/SecretsSecret"
+        }
+      }
+    },
+    "ServiceAccountsCreateServiceAccountRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        }
+      }
+    },
+    "ServiceAccountsCreateServiceAccountResponse": {
+      "type": "object",
+      "properties": {
+        "serviceAccount": {
+          "$ref": "#/definitions/ServiceAccountsServiceAccount"
+        },
+        "token": {
+          "type": "string"
+        }
+      }
+    },
+    "ServiceAccountsDeleteServiceAccountResponse": {
+      "type": "object"
+    },
+    "ServiceAccountsDescribeServiceAccountResponse": {
+      "type": "object",
+      "properties": {
+        "serviceAccount": {
+          "$ref": "#/definitions/ServiceAccountsServiceAccount"
+        }
+      }
+    },
+    "ServiceAccountsListServiceAccountsResponse": {
+      "type": "object",
+      "properties": {
+        "serviceAccounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ServiceAccountsServiceAccount"
+          }
+        }
+      }
+    },
+    "ServiceAccountsRegenerateServiceAccountTokenBody": {
+      "type": "object"
+    },
+    "ServiceAccountsRegenerateServiceAccountTokenResponse": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        }
+      }
+    },
+    "ServiceAccountsServiceAccount": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string"
+        },
+        "createdBy": {
+          "type": "string"
+        },
+        "hasToken": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "ServiceAccountsUpdateServiceAccountBody": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "ServiceAccountsUpdateServiceAccountResponse": {
+      "type": "object",
+      "properties": {
+        "serviceAccount": {
+          "$ref": "#/definitions/ServiceAccountsServiceAccount"
         }
       }
     },

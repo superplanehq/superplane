@@ -157,6 +157,13 @@ type IntegrationMessageContext struct {
 	//
 	// For triggers, this field is nil because each integration message
 	// starts a new event chain via Events.Emit().
+	Message           any
+	Configuration     any
+	NodeMetadata      MetadataContext
+	Logger            *logrus.Entry
+	HTTP              HTTPContext
+	Integration       IntegrationContext
+	Events            EventContext
 	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
 }
 
@@ -264,6 +271,12 @@ type IntegrationContext interface {
 	 * List integration subscriptions from nodes.
 	 */
 	ListSubscriptions() ([]IntegrationSubscriptionContext, error)
+
+	/*
+	 * Find a subscription by a predicate function.
+	 * Returns the first subscription that matches the predicate, or nil if none found.
+	 */
+	FindSubscription(predicate func(IntegrationSubscriptionContext) bool) (IntegrationSubscriptionContext, error)
 }
 
 type IntegrationSubscriptionContext interface {

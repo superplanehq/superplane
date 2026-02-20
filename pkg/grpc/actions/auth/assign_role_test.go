@@ -44,7 +44,7 @@ func Test_AssignRole(t *testing.T) {
 
 	t.Run("assign role with user email", func(t *testing.T) {
 		newUser := support.CreateUser(t, r, r.Organization.ID)
-		resp, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", newUser.Email, r.AuthService)
+		resp, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", newUser.GetEmail(), r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})

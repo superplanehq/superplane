@@ -179,6 +179,10 @@ func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscription
 	return nil, nil
 }
 
+func (c *IntegrationContext) FindSubscription(predicate func(core.IntegrationSubscriptionContext) bool) (core.IntegrationSubscriptionContext, error) {
+	return nil, nil
+}
+
 func (c *IntegrationContext) Subscribe(subscription any) (*uuid.UUID, error) {
 	s := Subscription{ID: uuid.New(), Configuration: subscription}
 	c.Subscriptions = append(c.Subscriptions, s)

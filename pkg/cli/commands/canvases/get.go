@@ -24,17 +24,17 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	resource := models.CanvasResourceFromCanvas(*response.Canvas)
-	if ctx.Renderer.IsText() {
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			_, _ = fmt.Fprintf(stdout, "ID: %s\n", resource.Metadata.GetId())
-			_, _ = fmt.Fprintf(stdout, "Name: %s\n", resource.Metadata.GetName())
-			_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(resource.Spec.GetNodes()))
-			_, err := fmt.Fprintf(stdout, "Edges: %d\n", len(resource.Spec.GetEdges()))
-			return err
-		})
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(resource)
 	}
 
-	return ctx.Renderer.Render(resource)
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		_, _ = fmt.Fprintf(stdout, "ID: %s\n", resource.Metadata.GetId())
+		_, _ = fmt.Fprintf(stdout, "Name: %s\n", resource.Metadata.GetName())
+		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(resource.Spec.GetNodes()))
+		_, err := fmt.Fprintf(stdout, "Edges: %d\n", len(resource.Spec.GetEdges()))
+		return err
+	})
 }
 
 func findCanvasID(ctx core.CommandContext, client *openapi_client.APIClient, nameOrID string) (string, error) {

@@ -233,6 +233,28 @@ func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
 	return c.encryptor.Decrypt(context.Background(), []byte(decoded), []byte(c.integration.ID.String()))
 }
 
+func (c *IntegrationContext) GetOptionalConfig(name string) ([]byte, error) {
+	config := c.integration.Configuration.Data()
+	_, ok := config[name]
+	if !ok {
+		impl, err := c.registry.GetIntegration(c.integration.AppName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get integration %s: %w", c.integration.AppName, err)
+		}
+
+		configDef, err := findConfigDef(impl.Configuration(), name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find config %s: %w", name, err)
+		}
+
+		if !configDef.Required {
+			return nil, nil
+		}
+	}
+
+	return c.GetConfig(name)
+}
+
 func findConfigDef(configs []configuration.Field, name string) (configuration.Field, error) {
 	for _, config := range configs {
 		if config.Name == name {
@@ -399,4 +421,23 @@ func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscription
 	}
 
 	return contexts, nil
+}
+
+// FindSubscription finds the first subscription matching the predicate.
+// Note: This loads all subscriptions via ListSubscriptions() and iterates through them.
+// For installations with many subscriptions, this may be inefficient. Consider adding
+// an index-based lookup if performance becomes an issue.
+func (c *IntegrationContext) FindSubscription(predicate func(core.IntegrationSubscriptionContext) bool) (core.IntegrationSubscriptionContext, error) {
+	subscriptions, err := c.ListSubscriptions()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, subscription := range subscriptions {
+		if predicate(subscription) {
+			return subscription, nil
+		}
+	}
+
+	return nil, nil
 }

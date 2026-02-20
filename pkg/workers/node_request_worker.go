@@ -102,19 +102,36 @@ func (w *NodeRequestWorker) processRequest(tx *gorm.DB, request *models.CanvasNo
 
 func (w *NodeRequestWorker) invokeAction(tx *gorm.DB, request *models.CanvasNodeRequest) error {
 	if request.ExecutionID == nil {
-		return w.invokeTriggerAction(tx, request)
+		return w.invokeNodeAction(tx, request)
 	}
 
 	return w.invokeComponentAction(tx, request)
 }
 
-func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.CanvasNodeRequest) error {
+func (w *NodeRequestWorker) invokeNodeAction(tx *gorm.DB, request *models.CanvasNodeRequest) error {
 	node, err := models.FindCanvasNode(tx, request.WorkflowID, request.NodeID)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
 	}
 
-	trigger, err := w.registry.GetTrigger(node.Ref.Data().Trigger.Name)
+	switch node.Type {
+	case models.NodeTypeTrigger:
+		return w.invokeTriggerAction(tx, request, node)
+
+	case models.NodeTypeComponent:
+		return w.invokeNodeComponentAction(tx, request, node)
+	}
+
+	return fmt.Errorf("unsupported node type %s for node action", node.Type)
+}
+
+func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode) error {
+	nodeRef := node.Ref.Data()
+	if nodeRef.Trigger == nil {
+		return fmt.Errorf("node %s is not a trigger", node.NodeID)
+	}
+
+	trigger, err := w.registry.GetTrigger(nodeRef.Trigger.Name)
 	if err != nil {
 		return fmt.Errorf("trigger not found: %w", err)
 	}
@@ -156,6 +173,68 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 	}
 
 	_, err = trigger.HandleAction(actionCtx)
+	if err != nil {
+		return fmt.Errorf("action execution failed: %w", err)
+	}
+
+	err = tx.Save(&node).Error
+	if err != nil {
+		return fmt.Errorf("error saving node after action handler: %v", err)
+	}
+
+	return request.Complete(tx)
+}
+
+func (w *NodeRequestWorker) invokeNodeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode) error {
+	nodeRef := node.Ref.Data()
+	if nodeRef.Component == nil {
+		return fmt.Errorf("node %s is not a component", node.NodeID)
+	}
+
+	component, err := w.registry.GetComponent(nodeRef.Component.Name)
+	if err != nil {
+		return fmt.Errorf("component not found: %w", err)
+	}
+
+	spec := request.Spec.Data()
+	if spec.InvokeAction == nil {
+		return fmt.Errorf("spec is not specified")
+	}
+
+	actionName := spec.InvokeAction.ActionName
+	actionDef := findAction(component.Actions(), actionName)
+	if actionDef == nil {
+		return fmt.Errorf("action '%s' not found for component '%s'", actionName, component.Name())
+	}
+
+	logger := logging.ForNode(*node)
+	actionCtx := core.ActionContext{
+		Name:          actionName,
+		Configuration: node.Configuration.Data(),
+		Parameters:    spec.InvokeAction.Parameters,
+		Logger:        logger,
+		HTTP:          w.registry.HTTPContext(),
+		Metadata:      contexts.NewNodeMetadataContext(tx, node),
+		Requests:      contexts.NewNodeRequestContext(tx, node),
+	}
+
+	if node.AppInstallationID != nil {
+		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				w.log("integration %s not found - completing request", *node.AppInstallationID)
+				return request.Complete(tx)
+			}
+
+			return fmt.Errorf("failed to find integration: %v", err)
+		}
+
+		logger = logging.WithIntegration(logger, *instance)
+		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry)
+		actionCtx.Logger = logger
+	}
+
+	err = component.HandleAction(actionCtx)
 	if err != nil {
 		return fmt.Errorf("action execution failed: %w", err)
 	}
