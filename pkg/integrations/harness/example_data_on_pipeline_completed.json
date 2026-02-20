@@ -1,0 +1,18 @@
+{
+  "data": {
+    "executionId": "3y9YlBC9SrOn6W7bPT5nCw",
+    "pipelineIdentifier": "deploy_prod",
+    "status": "failed",
+    "eventType": "PIPELINE_END",
+    "raw": {
+      "eventType": "PIPELINE_END",
+      "data": {
+        "planExecutionId": "3y9YlBC9SrOn6W7bPT5nCw",
+        "pipelineIdentifier": "deploy_prod",
+        "status": "FAILED"
+      }
+    }
+  },
+  "timestamp": "2026-02-12T18:45:55Z",
+  "type": "harness.pipeline.completed"
+}
