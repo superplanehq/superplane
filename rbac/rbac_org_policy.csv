@@ -6,6 +6,7 @@ p,/roles/org_viewer,/org/*,groups,read
 p,/roles/org_viewer,/org/*,members,read
 p,/roles/org_viewer,/org/*,canvases,read
 p,/roles/org_viewer,/org/*,blueprints,read
+p,/roles/org_viewer,/org/*,service_accounts,read
 p,/roles/org_admin,/org/*,canvases,create
 p,/roles/org_admin,/org/*,canvases,update
 p,/roles/org_admin,/org/*,canvases,delete
@@ -29,6 +30,9 @@ p,/roles/org_admin,/org/*,roles,delete
 p,/roles/org_admin,/org/*,blueprints,create
 p,/roles/org_admin,/org/*,blueprints,update
 p,/roles/org_admin,/org/*,blueprints,delete
+p,/roles/org_admin,/org/*,service_accounts,create
+p,/roles/org_admin,/org/*,service_accounts,update
+p,/roles/org_admin,/org/*,service_accounts,delete
 p,/roles/org_owner,/org/*,integrations,delete
 p,/roles/org_owner,/org/*,org,update
 p,/roles/org_owner,/org/*,org,delete

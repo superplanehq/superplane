@@ -84,6 +84,53 @@ func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
+func Test__NodeRequestWorker_InvokeNodeComponentActionWithoutExecution(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry)
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
+
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	request := models.CanvasNodeRequest{
+		ID:         uuid.New(),
+		WorkflowID: canvas.ID,
+		NodeID:     componentNode,
+		Type:       models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "non-existent-action",
+				Parameters: map[string]interface{}{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	err := worker.LockAndProcessRequest(request)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "action 'non-existent-action' not found for component 'noop'")
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
+}
+
 func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

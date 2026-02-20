@@ -2,22 +2,31 @@ import { getBackgroundColorClass } from "@/utils/colors";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
 import { TriggerProps } from "@/ui/trigger";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
-import {
-  CodeArtifactPackageVersionDetail,
-  CodeArtifactPackageVersionEvent,
-  CodeArtifactTriggerConfiguration,
-  CodeArtifactTriggerMetadata,
-} from "./types";
-import { buildCodeArtifactMetadataItems, formatPackageLabel, formatPackageName } from "./utils";
+import { PackageVersionDetail, PackageVersionEvent, Repository } from "./types";
+import { formatPackageLabel, formatPackageName } from "./utils";
 import { formatTimeAgo } from "@/utils/date";
-import { numberOrZero, stringOrDash } from "../../utils";
+import { formatPredicate, numberOrZero, Predicate, stringOrDash } from "../../utils";
+import { MetadataItem } from "@/ui/metadataList";
+
+export interface Configuration {
+  region?: string;
+  domain?: string;
+  repository?: string;
+  packages?: Predicate[];
+  versions?: Predicate[];
+}
+
+export interface Metadata {
+  region?: string;
+  repository?: Repository;
+}
 
 /**
  * Renderer for the "aws.codeArtifact.onPackageVersion" trigger
  */
 export const onPackageVersionTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event?.data?.data as CodeArtifactPackageVersionEvent;
+    const eventData = context.event?.data as PackageVersionEvent;
     const detail = eventData?.detail;
     const packageLabel = formatPackageLabel(detail);
     const title = packageLabel || "CodeArtifact package version";
@@ -27,8 +36,8 @@ export const onPackageVersionTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data?.data as CodeArtifactPackageVersionEvent;
-    const detail = eventData?.detail as CodeArtifactPackageVersionDetail;
+    const eventData = context.event?.data as PackageVersionEvent;
+    const detail = eventData?.detail as PackageVersionDetail;
 
     const values: Record<string, string> = {
       Domain: stringOrDash(detail?.domainName),
@@ -57,9 +66,8 @@ export const onPackageVersionTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const metadata = node.metadata as CodeArtifactTriggerMetadata | undefined;
-    const configuration = node.configuration as CodeArtifactTriggerConfiguration | undefined;
-    const metadataItems = buildCodeArtifactMetadataItems(metadata, configuration);
+    const configuration = node.configuration as Configuration | undefined;
+    const metadataItems = buildMetadataItems(configuration);
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
@@ -82,3 +90,44 @@ export const onPackageVersionTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function buildMetadataItems(configuration?: Configuration): MetadataItem[] {
+  const items: MetadataItem[] = [];
+
+  if (configuration?.region) {
+    items.push({
+      icon: "globe",
+      label: configuration.region,
+    });
+  }
+
+  if (configuration?.domain) {
+    items.push({
+      icon: "database",
+      label: `Domain: ${configuration?.domain}`,
+    });
+  }
+
+  if (configuration?.repository) {
+    items.push({
+      icon: "boxes",
+      label: `Repository: ${configuration?.repository}`,
+    });
+  }
+
+  if (configuration?.packages) {
+    items.push({
+      icon: "package",
+      label: `${configuration.packages.map((predicate) => formatPredicate(predicate)).join(", ")}`,
+    });
+  }
+
+  if (configuration?.versions) {
+    items.push({
+      icon: "tag",
+      label: `${configuration.versions.map((predicate) => formatPredicate(predicate)).join(", ")}`,
+    });
+  }
+
+  return items;
+}

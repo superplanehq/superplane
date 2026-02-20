@@ -33,6 +33,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/timegate"
 	_ "github.com/superplanehq/superplane/pkg/components/wait"
 	_ "github.com/superplanehq/superplane/pkg/integrations/aws"
+	_ "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	_ "github.com/superplanehq/superplane/pkg/integrations/circleci"
 	_ "github.com/superplanehq/superplane/pkg/integrations/claude"
 	_ "github.com/superplanehq/superplane/pkg/integrations/cloudflare"
@@ -40,10 +41,12 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/dash0"
 	_ "github.com/superplanehq/superplane/pkg/integrations/datadog"
 	_ "github.com/superplanehq/superplane/pkg/integrations/daytona"
+	_ "github.com/superplanehq/superplane/pkg/integrations/digitalocean"
 	_ "github.com/superplanehq/superplane/pkg/integrations/discord"
 	_ "github.com/superplanehq/superplane/pkg/integrations/dockerhub"
 	_ "github.com/superplanehq/superplane/pkg/integrations/github"
 	_ "github.com/superplanehq/superplane/pkg/integrations/gitlab"
+	_ "github.com/superplanehq/superplane/pkg/integrations/grafana"
 	_ "github.com/superplanehq/superplane/pkg/integrations/hetzner"
 	_ "github.com/superplanehq/superplane/pkg/integrations/incident"
 	_ "github.com/superplanehq/superplane/pkg/integrations/jira"
@@ -56,6 +59,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/sendgrid"
 	_ "github.com/superplanehq/superplane/pkg/integrations/slack"
 	_ "github.com/superplanehq/superplane/pkg/integrations/smtp"
+	_ "github.com/superplanehq/superplane/pkg/integrations/statuspage"
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
@@ -343,7 +347,8 @@ func Start() {
 	}
 
 	jwtSigner := jwt.NewSigner(jwtSecret)
-	oidcProvider, err := oidc.NewProviderFromKeyDir(baseURL, oidcKeysPath)
+	webhooksBaseURL := getWebhookBaseURL(baseURL)
+	oidcProvider, err := oidc.NewProviderFromKeyDir(webhooksBaseURL, oidcKeysPath)
 	if err != nil {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
 	}
@@ -365,7 +370,6 @@ func Start() {
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		webhooksBaseURL := getWebhookBaseURL(baseURL)
 		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, authService, registry, oidcProvider)
 	}
 
