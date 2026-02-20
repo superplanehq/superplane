@@ -5,17 +5,32 @@ import { formatTimeAgo } from "@/utils/date";
 import { Incident } from "./types";
 
 export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
+  const rootEvent = execution.rootEvent;
+  const createdAt = execution.createdAt;
+
+  if (!rootEvent || createdAt == null) {
+    return [
+      {
+        receivedAt: createdAt ? new Date(createdAt) : new Date(),
+        eventTitle: "Event",
+        eventSubtitle: createdAt ? formatTimeAgo(new Date(createdAt)) : "",
+        eventState: getState(componentName)(execution),
+        eventId: execution.id ?? rootEvent?.id ?? "",
+      },
+    ];
+  }
+
+  const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
 
   return [
     {
-      receivedAt: new Date(execution.createdAt!),
+      receivedAt: new Date(createdAt),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: formatTimeAgo(new Date(createdAt)),
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
+      eventId: rootEvent.id ?? execution.id ?? "",
     },
   ];
 }
