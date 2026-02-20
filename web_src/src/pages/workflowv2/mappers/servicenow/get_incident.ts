@@ -11,10 +11,10 @@ import {
 import { MetadataItem } from "@/ui/metadataList";
 import snIcon from "@/assets/icons/integrations/servicenow.svg";
 import { formatTimeAgo } from "@/utils/date";
-import { BaseNodeMetadata, CreateIncidentConfiguration, URGENCY_LABELS } from "./types";
-import { baseEventSections, buildIncidentExecutionDetails, instanceUrlToLabel } from "./base";
+import { BaseNodeMetadata } from "./types";
+import { baseEventSections, buildIncidentExecutionDetails, getIncidentFromExecution, instanceUrlToLabel } from "./base";
 
-export const createIncidentMapper: ComponentBaseMapper = {
+export const getIncidentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name ?? "servicenow";
@@ -31,29 +31,28 @@ export const createIncidentMapper: ComponentBaseMapper = {
     };
   },
 
+  subtitle(context: SubtitleContext): string {
+    if (!context.execution.createdAt) return "";
+    const timeAgo = formatTimeAgo(new Date(context.execution.createdAt));
+    const incident = getIncidentFromExecution(context.execution);
+    if (incident?.number) {
+      return `${incident.number} · ${timeAgo}`;
+    }
+    return timeAgo;
+  },
+
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const nodeMetadata = context.node.metadata as BaseNodeMetadata;
     return buildIncidentExecutionDetails(context.execution, nodeMetadata?.instanceUrl);
-  },
-
-  subtitle(context: SubtitleContext): string {
-    if (!context.execution.createdAt) return "";
-    return formatTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as BaseNodeMetadata;
-  const configuration = node.configuration as CreateIncidentConfiguration;
+  const nodeMetadata = node.metadata as BaseNodeMetadata | undefined;
 
   if (nodeMetadata?.instanceUrl) {
     metadata.push({ icon: "globe", label: instanceUrlToLabel(nodeMetadata.instanceUrl) });
-  }
-
-  if (configuration.urgency) {
-    const urgencyLabel = URGENCY_LABELS[configuration.urgency] || configuration.urgency;
-    metadata.push({ icon: "funnel", label: `Urgency: ${urgencyLabel}` });
   }
 
   return metadata;

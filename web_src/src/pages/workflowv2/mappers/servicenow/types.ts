@@ -12,39 +12,12 @@ export interface IncidentRecord {
   sys_updated_on?: string;
 }
 
-export interface ServiceNowIncident {
-  sys_id?: string;
-  number?: string;
-  short_description?: string;
-  description?: string;
-  state?: string;
-  urgency?: string;
-  impact?: string;
-  priority?: string;
-  category?: string;
-  subcategory?: string;
-  assignment_group?: ServiceNowReference;
-  assigned_to?: ServiceNowReference;
-  caller_id?: ServiceNowReference;
-  opened_by?: ServiceNowReference;
-  sys_created_on?: string;
-  sys_updated_on?: string;
-  opened_at?: string;
-  closed_at?: string;
-  resolved_at?: string;
-}
-
-export interface ServiceNowReference {
-  display_value?: string;
-  value?: string;
-  link?: string;
-}
-
 export interface BaseNodeMetadata {
   instanceUrl?: string;
   assignmentGroup?: { id: string; name: string };
   assignedTo?: { id: string; name: string };
   caller?: { id: string; name: string };
+  incident?: { id: string; name: string };
 }
 
 export interface CreateIncidentConfiguration {
@@ -61,20 +34,6 @@ export interface CreateIncidentConfiguration {
   onHoldReason?: string;
   resolutionCode?: string;
   resolutionNotes?: string;
-}
-
-export interface GetIncidentsConfiguration {
-  assignmentGroup?: string;
-  assignedTo?: string;
-  caller?: string;
-  category?: string;
-  subcategory?: string;
-  service?: string;
-  state?: string;
-  urgency?: string;
-  impact?: string;
-  priority?: string;
-  limit?: number;
 }
 
 export const STATE_LABELS: Record<string, string> = {
