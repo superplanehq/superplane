@@ -56,12 +56,14 @@ export const onNotificationTriggerRenderer: TriggerRenderer = {
     return {
       "Issue ID": stringOrDash(eventData?.issue?.id),
       "Issue Identifier": stringOrDash(eventData?.issue?.issueIdentifier),
-      "URL": stringOrDash(eventData?.issue?.url),
-      "Status": stringOrDash(eventData?.issue?.status),
-      "Summary": stringOrDash(eventData?.issue?.summary),
-      "Dataset": stringOrDash(eventData?.issue?.dataset),
-      "Start": stringOrDash(eventData?.issue?.start),
-      "Labels": stringOrDash(eventData?.issue?.labels?.map((label) => `${label.key}: ${label.value?.stringValue}`).join(", ")),
+      URL: stringOrDash(eventData?.issue?.url),
+      Status: stringOrDash(eventData?.issue?.status),
+      Summary: stringOrDash(eventData?.issue?.summary),
+      Dataset: stringOrDash(eventData?.issue?.dataset),
+      Start: stringOrDash(eventData?.issue?.start),
+      Labels: stringOrDash(
+        eventData?.issue?.labels?.map((label) => `${label.key}: ${label.value?.stringValue}`).join(", "),
+      ),
     };
   },
 
