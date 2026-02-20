@@ -82,7 +82,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   }, [integration?.status?.usedIn]);
 
   const metadataContent = useMemo(
-    () => renderIntegrationMetadata(integration?.spec?.integrationName, integration),
+    () => renderIntegrationMetadata(integration?.spec?.integrationName, integration!),
     [integration],
   );
 
