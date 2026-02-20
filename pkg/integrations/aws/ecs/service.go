@@ -30,6 +30,13 @@ var serviceAvailabilityZoneRebalancingOptions = []configuration.FieldOption{
 	{Label: "DISABLED", Value: "DISABLED"},
 }
 
+var serviceCapacityProviderOptions = []configuration.FieldOption{
+	{Label: "EC2", Value: "EC2"},
+	{Label: "FARGATE", Value: "FARGATE"},
+	{Label: "EXTERNAL", Value: "EXTERNAL"},
+	{Label: "MANAGED_INSTANCES", Value: "MANAGED_INSTANCES"},
+}
+
 type ServiceMutationConfiguration struct {
 	Region                            string                                `json:"region" mapstructure:"region"`
 	Cluster                           string                                `json:"cluster" mapstructure:"cluster"`
@@ -285,8 +292,13 @@ func ecsServiceMutationFields(defaultDesiredCount any, desiredCountTogglable boo
 							{
 								Name:     "capacityProvider",
 								Label:    "Capacity Provider",
-								Type:     configuration.FieldTypeString,
+								Type:     configuration.FieldTypeSelect,
 								Required: true,
+								TypeOptions: &configuration.TypeOptions{
+									Select: &configuration.SelectTypeOptions{
+										Options: serviceCapacityProviderOptions,
+									},
+								},
 							},
 							{
 								Name:     "weight",

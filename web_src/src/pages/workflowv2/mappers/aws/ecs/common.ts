@@ -7,13 +7,6 @@ import { formatTimeAgo } from "@/utils/date";
 import { MetadataItem } from "@/ui/metadataList";
 
 export const MAX_METADATA_ITEMS = 3;
-const TRUNCATE_LENGTH = 24;
-
-/** Truncate long values (e.g. ARNs) for at-a-glance display. */
-export function truncateForDisplay(value: string, maxLen = TRUNCATE_LENGTH): string {
-  if (!value || value.length <= maxLen) return value;
-  return value.slice(-maxLen).replace(/^[^/]+/, "…");
-}
 
 /** ECS Console URL for a cluster (and optional service or task). */
 export function ecsConsoleUrl(region: string, cluster: string, service?: string, taskArn?: string): string {
@@ -77,4 +70,9 @@ export function ecsSubtitle(context: SubtitleContext): string {
     return "";
   }
   return formatTimeAgo(new Date(context.execution.createdAt));
+}
+
+export function truncateForDisplay(value: string, maxLen = 40): string {
+  if (!value || value.length <= maxLen) return value;
+  return value.substring(0, maxLen) + "...";
 }
