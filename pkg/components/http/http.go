@@ -494,7 +494,7 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 func (e *HTTP) executeHTTPRequest(ctx core.ExecutionContext, spec Spec, retryMetadata RetryMetadata) error {
 	currentTimeout := e.calculateTimeoutForAttempt(retryMetadata.TimeoutStrategy, retryMetadata.TimeoutSeconds, retryMetadata.Attempt)
 
-	resp, err := e.executeRequest(ctx.HTTP, spec, currentTimeout)
+	resp, cancel, err := e.executeRequest(ctx.HTTP, spec, currentTimeout)
 	if err != nil {
 		if retryMetadata.Attempt < retryMetadata.MaxRetries {
 			return e.scheduleRetry(ctx, err.Error(), retryMetadata)
@@ -502,6 +502,7 @@ func (e *HTTP) executeHTTPRequest(ctx core.ExecutionContext, spec Spec, retryMet
 
 		return e.handleRequestError(ctx, err, retryMetadata.Attempt+1)
 	}
+	defer cancel()
 
 	var isSuccess bool
 	if spec.SuccessCodes != nil && *spec.SuccessCodes != "" {
@@ -511,7 +512,7 @@ func (e *HTTP) executeHTTPRequest(ctx core.ExecutionContext, spec Spec, retryMet
 	}
 
 	if !isSuccess && retryMetadata.Attempt < retryMetadata.MaxRetries {
-
+		_ = resp.Body.Close()
 		return e.scheduleRetry(ctx, fmt.Sprintf("HTTP status %d", resp.StatusCode), retryMetadata)
 	}
 
@@ -578,25 +579,25 @@ func (e *HTTP) calculateTimeoutForAttempt(strategy string, timeoutSeconds int, a
 	return baseTimeout
 }
 
-func (e *HTTP) executeRequest(httpCtx core.HTTPContext, spec Spec, timeout time.Duration) (*http.Response, error) {
+func (e *HTTP) executeRequest(httpCtx core.HTTPContext, spec Spec, timeout time.Duration) (*http.Response, context.CancelFunc, error) {
 	var body io.Reader
 	var contentType string
 	var err error
 	if spec.ContentType != nil && (spec.Method == "POST" || spec.Method == "PUT" || spec.Method == "PATCH") {
 		body, contentType, err = e.serializePayload(spec)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	reqCtx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
 
 	requestURL := spec.URL
 	if spec.QueryParams != nil && len(*spec.QueryParams) > 0 {
 		parsedURL, parseErr := url.Parse(spec.URL)
 		if parseErr != nil {
-			return nil, fmt.Errorf("failed to parse url: %w", parseErr)
+			cancel()
+			return nil, nil, fmt.Errorf("failed to parse url: %w", parseErr)
 		}
 
 		query := parsedURL.Query()
@@ -610,7 +611,8 @@ func (e *HTTP) executeRequest(httpCtx core.HTTPContext, spec Spec, timeout time.
 
 	req, err := http.NewRequestWithContext(reqCtx, spec.Method, requestURL, body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		cancel()
+		return nil, nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	if contentType != "" {
@@ -625,10 +627,11 @@ func (e *HTTP) executeRequest(httpCtx core.HTTPContext, spec Spec, timeout time.
 
 	resp, err := httpCtx.Do(req)
 	if err != nil {
-		return nil, err
+		cancel()
+		return nil, nil, err
 	}
 
-	return resp, nil
+	return resp, cancel, nil
 }
 
 func (e *HTTP) handleRequestError(ctx core.ExecutionContext, err error, totalAttempts int) error {
