@@ -1,12 +1,17 @@
 import * as path from "path";
-import * as Module from "module";
 import { RpcTransport } from "./rpc";
+import * as sdk from "./sdk";
 import {
   PluginContextImpl,
   buildExecutionContext,
   buildSetupContext,
   buildTriggerSetupContext,
   buildWebhookContext,
+  buildIntegrationSyncContext,
+  buildIntegrationRequestContext,
+  buildIntegrationCleanupContext,
+  buildWebhookHandlerSetupContext,
+  buildWebhookHandlerCleanupContext,
 } from "./sdk";
 
 interface LoadedPlugin {
@@ -18,21 +23,12 @@ interface LoadedPlugin {
 
 const plugins = new Map<string, LoadedPlugin>();
 
-// Set up module resolution so that `require("@superplane/sdk")` resolves
-// to the SDK bundled in the Plugin Host.
-const sdkPath = path.resolve(__dirname, "sdk");
-const originalResolveFilename = (Module as any)._resolveFilename;
-(Module as any)._resolveFilename = function (
-  request: string,
-  parent: any,
-  isMain: boolean,
-  options: any
-) {
-  if (request === "@superplane/sdk") {
-    return originalResolveFilename.call(this, sdkPath, parent, isMain, options);
-  }
-  return originalResolveFilename.call(this, request, parent, isMain, options);
-};
+// Pre-populate the require cache so that `require("@superplane/sdk")`
+// resolves to the SDK bundled in the Plugin Host.
+// This avoids monkey-patching Module._resolveFilename which is
+// read-only in Node.js v22+.
+const sdkCacheKey = require.resolve("./sdk");
+require.cache["@superplane/sdk"] = require.cache[sdkCacheKey]!;
 
 const rpc = new RpcTransport(async (method: string, params: any) => {
   switch (method) {
@@ -43,12 +39,17 @@ const rpc = new RpcTransport(async (method: string, params: any) => {
       return handleDeactivate(params);
 
     default: {
-      // Route component/* and trigger/* methods to the appropriate handler
       if (method.startsWith("component/")) {
         return handleComponentCall(method, params);
       }
       if (method.startsWith("trigger/")) {
         return handleTriggerCall(method, params);
+      }
+      if (method.startsWith("integration/")) {
+        return handleIntegrationCall(method, params);
+      }
+      if (method.startsWith("webhookHandler/")) {
+        return handleWebhookHandlerCall(method, params);
       }
 
       throw new Error(`Unknown method: ${method}`);
@@ -220,6 +221,109 @@ async function handleTriggerCall(
 
     default:
       throw new Error(`Unknown trigger action: ${action}`);
+  }
+}
+
+async function handleIntegrationCall(
+  method: string,
+  params: { pluginId: string; integration: string; context: any }
+): Promise<any> {
+  const plugin = plugins.get(params.pluginId);
+  if (!plugin) {
+    throw new Error(`Plugin ${params.pluginId} is not activated`);
+  }
+
+  const handler = plugin.context.integrations.getHandler(params.integration);
+  if (!handler) {
+    throw new Error(
+      `Integration handler ${params.integration} not registered by plugin ${params.pluginId}`
+    );
+  }
+
+  const action = method.replace("integration/", "");
+
+  switch (action) {
+    case "sync": {
+      const ctx = buildIntegrationSyncContext(
+        params.context,
+        rpc,
+        params.pluginId
+      );
+      await handler.sync?.(ctx);
+      return null;
+    }
+
+    case "handleRequest": {
+      const ctx = buildIntegrationRequestContext(
+        params.context,
+        rpc,
+        params.pluginId
+      );
+      return (await handler.handleRequest?.(ctx)) ?? null;
+    }
+
+    case "cleanup": {
+      const ctx = buildIntegrationCleanupContext(
+        params.context,
+        rpc,
+        params.pluginId
+      );
+      await handler.cleanup?.(ctx);
+      return null;
+    }
+
+    default:
+      throw new Error(`Unknown integration action: ${action}`);
+  }
+}
+
+async function handleWebhookHandlerCall(
+  method: string,
+  params: { pluginId: string; integration: string; context: any }
+): Promise<any> {
+  const plugin = plugins.get(params.pluginId);
+  if (!plugin) {
+    throw new Error(`Plugin ${params.pluginId} is not activated`);
+  }
+
+  const handler = plugin.context.integrations.getHandler(params.integration);
+  if (!handler?.webhookHandler) {
+    throw new Error(
+      `Webhook handler not registered for integration ${params.integration} by plugin ${params.pluginId}`
+    );
+  }
+
+  const action = method.replace("webhookHandler/", "");
+
+  switch (action) {
+    case "setup": {
+      const ctx = buildWebhookHandlerSetupContext(
+        params.context,
+        rpc,
+        params.pluginId
+      );
+      return await handler.webhookHandler.setup(ctx);
+    }
+
+    case "cleanup": {
+      const ctx = buildWebhookHandlerCleanupContext(
+        params.context,
+        rpc,
+        params.pluginId
+      );
+      await handler.webhookHandler.cleanup(ctx);
+      return null;
+    }
+
+    case "compareConfig": {
+      return await handler.webhookHandler.compareConfig(
+        params.context.a,
+        params.context.b
+      );
+    }
+
+    default:
+      throw new Error(`Unknown webhookHandler action: ${action}`);
   }
 }
 

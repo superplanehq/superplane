@@ -90,6 +90,7 @@ type TriggerContext struct {
 	Events        EventContext
 	Webhook       NodeWebhookContext
 	Integration   IntegrationContext
+	Secrets       SecretsContext
 }
 
 type EventContext interface {
