@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -71,6 +72,31 @@ func terminalStatusFromEventBridgeState(state string) (string, bool) {
 		return PipelineStatusStopped, true
 	default:
 		return "", false
+	}
+}
+
+func eventBridgeStateFromPipelineStatus(status string) string {
+	switch status {
+	case PipelineStatusSucceeded:
+		return "SUCCEEDED"
+	case PipelineStatusFailed:
+		return "FAILED"
+	case PipelineStatusStopped:
+		return "STOPPED"
+	default:
+		return strings.ToUpper(status)
+	}
+}
+
+func pipelineExecutionOutputPayload(pipelineName, executionID, status, state string, detail map[string]any) map[string]any {
+	return map[string]any{
+		"pipeline": map[string]any{
+			"name":        pipelineName,
+			"executionId": executionID,
+			"status":      status,
+			"state":       state,
+		},
+		"detail": detail,
 	}
 }
 
@@ -449,15 +475,7 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	outputPayload := map[string]any{
-		"pipeline": map[string]any{
-			"name":        metadata.Pipeline.Name,
-			"executionId": executionID,
-			"status":      status,
-			"state":       state,
-		},
-		"detail": detail,
-	}
+	outputPayload := pipelineExecutionOutputPayload(metadata.Pipeline.Name, executionID, status, state, detail)
 
 	if status == PipelineStatusSucceeded {
 		err = executionCtx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{outputPayload})
@@ -557,13 +575,20 @@ func (r *RunPipeline) poll(ctx core.ActionContext) error {
 		return fmt.Errorf("failed to set metadata: %w", err)
 	}
 
-	outputPayload := map[string]any{
-		"pipeline": map[string]any{
-			"name":        metadata.Pipeline.Name,
-			"executionId": execution.PipelineExecutionID,
-			"status":      execution.Status,
-		},
+	state := eventBridgeStateFromPipelineStatus(execution.Status)
+	detail := map[string]any{
+		"pipeline":     metadata.Pipeline.Name,
+		"execution-id": execution.PipelineExecutionID,
+		"state":        state,
 	}
+
+	outputPayload := pipelineExecutionOutputPayload(
+		metadata.Pipeline.Name,
+		execution.PipelineExecutionID,
+		execution.Status,
+		state,
+		detail,
+	)
 
 	if execution.Status == PipelineStatusSucceeded {
 		return ctx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{outputPayload})
@@ -729,15 +754,7 @@ func (r *RunPipeline) OnIntegrationMessage(ctx core.IntegrationMessageContext) e
 		return fmt.Errorf("failed to update execution metadata: %w", err)
 	}
 
-	outputPayload := map[string]any{
-		"pipeline": map[string]any{
-			"name":        metadata.Pipeline.Name,
-			"executionId": executionID,
-			"status":      status,
-			"state":       state,
-		},
-		"detail": event.Detail,
-	}
+	outputPayload := pipelineExecutionOutputPayload(metadata.Pipeline.Name, executionID, status, state, event.Detail)
 
 	if status == PipelineStatusSucceeded {
 		return executionCtx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{outputPayload})
