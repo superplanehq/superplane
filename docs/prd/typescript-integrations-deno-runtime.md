@@ -1,14 +1,14 @@
-# TypeScript Integrations + Deno Runtime
+# TypeScript Integrations + Runtime Runner
 
 ## Overview
 
-This PRD defines the current implementation for TypeScript integrations executed by Deno in SuperPlane.
+This PRD defines the current implementation for TypeScript integrations executed through the Runtime Runner in SuperPlane.
 
 The implemented model includes:
 
 1. TypeScript integration discovery and registration through the same `pkg/registry` mechanism as Go integrations.
-2. TypeScript integration runtime operations (`sync`, `handleAction`, `listResources`, `handleRequest`) executed via Deno.
-3. TypeScript integration components discovered from integration manifests and executed in Deno through existing `core.Component` paths.
+2. TypeScript integration runtime operations (`sync`, `cleanup`) executed via the runtime runner.
+3. TypeScript integration components discovered from integration manifests and executed through existing `core.Component` paths.
 
 ## Goals
 
@@ -68,12 +68,10 @@ Behavior currently implemented:
 
 ## Runtime Contract (Implemented)
 
-Integration entrypoint operations implemented in `pkg/runtime/typescript/contract.go` and executed via `pkg/runtime/typescript/runner.go`:
+Integration operations currently delegated to the runtime runner:
 
 1. `integration.sync`
-2. `integration.handleAction`
-3. `integration.listResources`
-4. `integration.handleRequest`
+2. `integration.cleanup`
 
 Integration runtime response supports:
 
@@ -84,7 +82,11 @@ Integration runtime response supports:
 - optional `resources`
 - optional HTTP response payload (`http`)
 
-Integration cleanup currently remains a no-op in the Go wrapper and does not invoke a TypeScript operation.
+Current Go wrapper behavior for operations not yet delegated:
+
+1. `HandleAction`: returns `nil` (no-op).
+2. `ListResources`: returns an empty list.
+3. `HandleRequest`: returns HTTP 404.
 
 ## Integration Component Runtime
 
@@ -107,19 +109,19 @@ Runtime-specific behavior lives in registry wrappers:
 
 1. `typeScriptRuntimeIntegration` maps integration lifecycle calls to Deno runtime calls.
 2. `typeScriptRuntimeIntegrationComponent` maps `Setup()` and `Execute()` to Deno component runtime calls.
-3. `typeScriptRuntimeIntegrationTrigger` currently provides discoverability only; runtime methods are not implemented yet.
+3. `typeScriptRuntimeIntegrationTrigger` supports runtime `Setup()` through `SetupTrigger`; trigger actions remain unimplemented.
 
 ## Environment and Runtime Controls
 
 - `TYPESCRIPT_INTEGRATIONS_DIR`: integration discovery root.
-- `DENO_BINARY`: Deno binary path (default `deno`).
-- `DENO_EXECUTION_TIMEOUT`: subprocess timeout (default `30s`).
+- `TYPESCRIPT_RUNNER_TRANSPORT`: runner transport (`http` or `grpc`, default `http`).
+- `TYPESCRIPT_RUNNER_HTTP_BASE_URL`: runner HTTP base URL.
+- `TYPESCRIPT_RUNNER_GRPC_ADDRESS`: runner gRPC address.
+- `TYPESCRIPT_RUNNER_TIMEOUT`: request timeout.
+- `TYPESCRIPT_RUNNER_AUTH_TOKEN`: optional shared bearer token.
+- `TYPESCRIPT_RUNNER_VERSION`: request version.
 
-Current Deno invocation includes:
-
-- `deno run --quiet --no-prompt --allow-net <entrypoint>`
-
-Docker images now install Deno via `scripts/docker/install-deno.sh`.
+The runtime runner service hosts Deno execution. Docker images install Deno via `scripts/docker/install-deno.sh`.
 
 ## Reference Implementation
 
@@ -128,9 +130,10 @@ Docker images now install Deno via `scripts/docker/install-deno.sh`.
 1. Integration config: sensitive `apiToken`.
 2. Integration operations:
    - `integration.sync`: validates token against GitHub API and sets integration state.
-   - `integration.listResources`: returns empty list.
-   - `integration.handleAction`: no-op.
-   - `integration.handleRequest`: returns HTTP 404.
+   - `integration.cleanup`: supported through runner contract.
+   - `integration.listResources`: currently returns empty list from Go wrapper.
+   - `integration.handleAction`: currently no-op in Go wrapper.
+   - `integration.handleRequest`: currently returns HTTP 404 from Go wrapper.
 3. Integration component:
    - `github2.getIssue` fetches a GitHub issue using integration `apiToken`.
 
@@ -139,14 +142,14 @@ Docker images now install Deno via `scripts/docker/install-deno.sh`.
 Completed:
 
 1. Integration discovery from filesystem and registry registration.
-2. Integration runtime ops (`sync`, `handleAction`, `listResources`, `handleRequest`) via Deno.
+2. Integration runtime ops (`sync`, `cleanup`) via runtime runner.
 3. Integration component setup/execute in Deno with injected integration configuration.
 4. Initial TypeScript integration (`github2`) and component (`github2.getIssue`).
 
 Pending:
 
-1. TypeScript integration trigger runtime (`Setup`, `HandleAction`) implementation.
-2. Integration cleanup runtime op in TypeScript (if required).
+1. TypeScript integration trigger `HandleAction` implementation.
+2. TypeScript integration runtime support for `handleAction`, `listResources`, and `handleRequest` where needed.
 3. Runtime hardening (`--allow-*` minimization, sandbox policy, and parity tests).
 
 ## Acceptance Criteria

@@ -1,4 +1,4 @@
-# TypeScript Contract + SDK + Deno Runtime Components
+# TypeScript Contract + SDK + Runtime Runner Components
 
 ## Overview
 
@@ -6,7 +6,7 @@ This PRD defines the current first phase of TypeScript support in SuperPlane:
 
 1. A stable TypeScript execution contract.
 2. A TypeScript SDK for implementation authors.
-3. Deno execution of TypeScript components through the same `core.Component` interface used by Go components.
+3. TypeScript component execution through the Runtime Runner service using the same `core.Component` interface used by Go components.
 
 This phase explicitly excludes implementation artifact storage, version publishing workflows, and alias management.
 
@@ -33,8 +33,8 @@ In scope:
 - SDK types/runtime helper.
 - Filesystem discovery of TypeScript components.
 - Registry registration and API discoverability.
-- Deno execution for `component.setup` and `component.execute`.
-- Timeout control for Deno subprocesses.
+- Runtime runner execution for `component.setup` and `component.execute`.
+- Timeout/version controls on runtime runner requests.
 
 Out of scope:
 
@@ -93,16 +93,21 @@ Worker flow is unchanged:
 
 For TypeScript components:
 
-- `Setup()` builds a `component.setup` runtime request and invokes Deno.
-- `Execute()` builds a `component.execute` runtime request and invokes Deno.
+- `Setup()` builds a runtime request and calls the runtime runner `SetupComponent` operation.
+- `Execute()` builds a runtime request and calls the runtime runner `ExecuteComponent` operation.
+- The TypeScript runtime runner service executes Deno handlers and returns the same contract envelope.
 - Runtime responses are mapped back into existing execution state operations (`Pass`, `Emit`, `Fail`, metadata/KV updates).
 
 There is no special runtime branch in the node execution worker.
 
 ## Runtime Controls
 
-- `DENO_BINARY` (default: `deno`)
-- `DENO_EXECUTION_TIMEOUT` (default: `30s`)
+- `TYPESCRIPT_RUNNER_TRANSPORT` (`http` or `grpc`, default `http`)
+- `TYPESCRIPT_RUNNER_HTTP_BASE_URL` (default `http://127.0.0.1:7761`)
+- `TYPESCRIPT_RUNNER_GRPC_ADDRESS` (default `127.0.0.1:7762`)
+- `TYPESCRIPT_RUNNER_TIMEOUT` (default `30s`)
+- `TYPESCRIPT_RUNNER_AUTH_TOKEN`
+- `TYPESCRIPT_RUNNER_VERSION` (default `v1`)
 
 Current gap:
 
@@ -122,7 +127,7 @@ Completed:
 
 1. Contract + SDK baseline.
 2. Filesystem discovery and registry registration.
-3. Deno runtime invocation for setup/execute in component implementation.
+3. Runtime runner invocation for setup/execute in component implementation.
 4. Initial TypeScript component example (`noop2`).
 
 Pending:

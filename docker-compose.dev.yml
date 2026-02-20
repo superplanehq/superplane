@@ -124,6 +124,7 @@ services:
       TYPESCRIPT_RUNNER_HTTP_HOST: "0.0.0.0"
       TYPESCRIPT_RUNNER_HTTP_PORT: "7761"
       TYPESCRIPT_RUNNER_ENABLE_GRPC: "false"
+      TYPESCRIPT_RUNNER_LOG_REQUESTS: "true"
       TYPESCRIPT_RUNNER_AUTH_TOKEN: "dev-typescript-runner-token"
       TYPESCRIPT_RUNNER_PROTO_PATH: "/app/pkg/runtime/runner/proto/runtime_runner.proto"
 
@@ -133,7 +134,6 @@ services:
           "CMD",
           "deno",
           "eval",
-          "--allow-net",
           "const response = await fetch('http://127.0.0.1:7761/healthz'); if (!response.ok) Deno.exit(1);",
         ]
       interval: 3s

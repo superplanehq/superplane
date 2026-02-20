@@ -75,6 +75,23 @@ HTTP status and gRPC status should map from the same canonical code.
 
 This enables startup-time validation and compatibility checks from the Go side.
 
+## Operational Controls
+
+Runtime runner behavior is controlled by environment variables:
+
+- `TYPESCRIPT_RUNNER_ENABLE_HTTP`
+- `TYPESCRIPT_RUNNER_HTTP_HOST`
+- `TYPESCRIPT_RUNNER_HTTP_PORT`
+- `TYPESCRIPT_RUNNER_ENABLE_GRPC`
+- `TYPESCRIPT_RUNNER_GRPC_ADDRESS`
+- `TYPESCRIPT_RUNNER_AUTH_TOKEN`
+- `TYPESCRIPT_RUNNER_LOG_REQUESTS`
+
+Authentication behavior:
+
+- `GET /healthz` and `GET /readyz` are unauthenticated.
+- Other HTTP and gRPC operations require `Authorization: Bearer <token>` when `TYPESCRIPT_RUNNER_AUTH_TOKEN` is set.
+
 ## Source of Truth
 
 The contract source of truth is:

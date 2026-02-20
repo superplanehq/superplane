@@ -43,6 +43,7 @@ type ServerOptions = {
   grpcAddress: string;
   grpcEnabled: boolean;
   httpEnabled: boolean;
+  requestLoggingEnabled: boolean;
   protoPath: string;
 };
 
@@ -62,6 +63,7 @@ function readOptionsFromEnv(): ServerOptions {
     grpcAddress: (Deno.env.get("TYPESCRIPT_RUNNER_GRPC_ADDRESS") ?? "0.0.0.0:7762").trim(),
     grpcEnabled: parseBoolean(Deno.env.get("TYPESCRIPT_RUNNER_ENABLE_GRPC"), false),
     httpEnabled: parseBoolean(Deno.env.get("TYPESCRIPT_RUNNER_ENABLE_HTTP"), true),
+    requestLoggingEnabled: parseBoolean(Deno.env.get("TYPESCRIPT_RUNNER_LOG_REQUESTS"), false),
     protoPath: (Deno.env.get("TYPESCRIPT_RUNNER_PROTO_PATH") ??
       "pkg/runtime/runner/proto/runtime_runner.proto")
       .trim(),
@@ -94,6 +96,18 @@ function authAllowed(options: ServerOptions, headerValue: string): boolean {
   }
 
   return headerValue === `Bearer ${options.authToken}`;
+}
+
+function logRequest(options: ServerOptions, fields: Record<string, unknown>) {
+  if (!options.requestLoggingEnabled) {
+    return;
+  }
+
+  console.log(JSON.stringify({
+    ts: new Date().toISOString(),
+    service: "typescript-runner",
+    ...fields,
+  }));
 }
 
 function createLogger(logs: Array<{ level: string; message: string; fields?: Record<string, unknown> }>) {
@@ -355,24 +369,36 @@ async function readRequestBody(request: Request): Promise<OperationRequest> {
 
 async function handleHTTP(service: RunnerService, options: ServerOptions, request: Request): Promise<Response> {
   const url = new URL(request.url);
+  const startedAt = performance.now();
+  const respond = (response: Response): Response => {
+    logRequest(options, {
+      transport: "http",
+      method: request.method,
+      path: url.pathname,
+      status: response.status,
+      durationMs: Number((performance.now() - startedAt).toFixed(2)),
+    });
+    return response;
+  };
+
   if (request.method === "GET" && url.pathname === "/healthz") {
-    return new Response("ok", { status: 200 });
+    return respond(new Response("ok", { status: 200 }));
   }
   if (request.method === "GET" && url.pathname === "/readyz") {
-    return new Response("ready", { status: 200 });
+    return respond(new Response("ready", { status: 200 }));
   }
 
   if (!authAllowed(options, getAuthorizationHeader(request))) {
-    return jsonResponse(401, err("UNAVAILABLE", "Unauthorized"));
+    return respond(jsonResponse(401, err("UNAVAILABLE", "Unauthorized")));
   }
 
   if (request.method === "GET" && url.pathname === "/v1/capabilities") {
-    return jsonResponse(200, { capabilities: service.listCapabilities() });
+    return respond(jsonResponse(200, { capabilities: service.listCapabilities() }));
   }
 
   try {
     if (request.method !== "POST") {
-      return jsonResponse(405, err("INVALID_INPUT", "Unsupported HTTP method"));
+      return respond(jsonResponse(405, err("INVALID_INPUT", "Unsupported HTTP method")));
     }
 
     const payload = await readRequestBody(request);
@@ -384,36 +410,36 @@ async function handleHTTP(service: RunnerService, options: ServerOptions, reques
     match = path.match(/^\/v1\/triggers\/([^/]+)\/setup$/);
     if (match) {
       response = await service.setupTrigger(decodeURIComponent(match[1]), payload);
-      return jsonResponse(response.ok ? 200 : mapErrorCodeToHTTPStatus(response.error?.code ?? "EXECUTION_ERROR"), response);
+      return respond(jsonResponse(response.ok ? 200 : mapErrorCodeToHTTPStatus(response.error?.code ?? "EXECUTION_ERROR"), response));
     }
 
     match = path.match(/^\/v1\/components\/([^/]+)\/setup$/);
     if (match) {
       response = await service.setupComponent(decodeURIComponent(match[1]), payload);
-      return jsonResponse(response.ok ? 200 : mapErrorCodeToHTTPStatus(response.error?.code ?? "EXECUTION_ERROR"), response);
+      return respond(jsonResponse(response.ok ? 200 : mapErrorCodeToHTTPStatus(response.error?.code ?? "EXECUTION_ERROR"), response));
     }
 
     match = path.match(/^\/v1\/components\/([^/]+)\/execute$/);
     if (match) {
       response = await service.executeComponent(decodeURIComponent(match[1]), payload);
-      return jsonResponse(response.ok ? 200 : mapErrorCodeToHTTPStatus(response.error?.code ?? "EXECUTION_ERROR"), response);
+      return respond(jsonResponse(response.ok ? 200 : mapErrorCodeToHTTPStatus(response.error?.code ?? "EXECUTION_ERROR"), response));
     }
 
     match = path.match(/^\/v1\/integrations\/([^/]+)\/sync$/);
     if (match) {
       response = await service.syncIntegration(decodeURIComponent(match[1]), payload);
-      return jsonResponse(response.ok ? 200 : mapErrorCodeToHTTPStatus(response.error?.code ?? "EXECUTION_ERROR"), response);
+      return respond(jsonResponse(response.ok ? 200 : mapErrorCodeToHTTPStatus(response.error?.code ?? "EXECUTION_ERROR"), response));
     }
 
     match = path.match(/^\/v1\/integrations\/([^/]+)\/cleanup$/);
     if (match) {
       response = await service.cleanupIntegration(decodeURIComponent(match[1]), payload);
-      return jsonResponse(response.ok ? 200 : mapErrorCodeToHTTPStatus(response.error?.code ?? "EXECUTION_ERROR"), response);
+      return respond(jsonResponse(response.ok ? 200 : mapErrorCodeToHTTPStatus(response.error?.code ?? "EXECUTION_ERROR"), response));
     }
 
-    return jsonResponse(404, err("NOT_FOUND", "Route not found"));
+    return respond(jsonResponse(404, err("NOT_FOUND", "Route not found")));
   } catch (error) {
-    return jsonResponse(500, err("EXECUTION_ERROR", errorMessage(error)));
+    return respond(jsonResponse(500, err("EXECUTION_ERROR", errorMessage(error))));
   }
 }
 
@@ -440,6 +466,40 @@ function grpcResponseFromRunner(response: RunnerResponse): Record<string, unknow
   return grpcResponse;
 }
 
+function runGRPCOperation(
+  options: ServerOptions,
+  method: string,
+  name: string,
+  operation: Promise<RunnerResponse>,
+  callback: grpc.sendUnaryData<unknown>,
+): void {
+  const startedAt = performance.now();
+  operation
+    .then((response) => {
+      logRequest(options, {
+        transport: "grpc",
+        method,
+        name,
+        ok: response.ok,
+        errorCode: response.error?.code ?? null,
+        durationMs: Number((performance.now() - startedAt).toFixed(2)),
+      });
+      callback(null, grpcResponseFromRunner(response));
+    })
+    .catch((error) => {
+      const response = err("EXECUTION_ERROR", errorMessage(error));
+      logRequest(options, {
+        transport: "grpc",
+        method,
+        name,
+        ok: false,
+        errorCode: response.error?.code ?? null,
+        durationMs: Number((performance.now() - startedAt).toFixed(2)),
+      });
+      callback(null, grpcResponseFromRunner(response));
+    });
+}
+
 async function startGRPC(service: RunnerService, options: ServerOptions): Promise<void> {
   const packageDefinition = protoLoader.loadSync(options.protoPath, {
     keepCase: false,
@@ -460,56 +520,90 @@ async function startGRPC(service: RunnerService, options: ServerOptions): Promis
   const server = new grpc.Server();
   server.addService(runtimeRunner.service, {
     SetupTrigger: (call: GrpcHandlerCall, callback: grpc.sendUnaryData<unknown>) => {
+      const name = String(call.request.name ?? "");
       if (!authAllowed(options, String(call.metadata?.get("authorization")?.[0] ?? ""))) {
-        callback(null, grpcResponseFromRunner(err("UNAVAILABLE", "Unauthorized")));
+        const response = err("UNAVAILABLE", "Unauthorized");
+        logRequest(options, {
+          transport: "grpc",
+          method: "SetupTrigger",
+          name,
+          ok: false,
+          errorCode: response.error?.code ?? null,
+        });
+        callback(null, grpcResponseFromRunner(response));
         return;
       }
-      service
-        .setupTrigger(String(call.request.name ?? ""), call.request as OperationRequest)
-        .then((response) => callback(null, grpcResponseFromRunner(response)))
-        .catch((error) => callback(null, grpcResponseFromRunner(err("EXECUTION_ERROR", errorMessage(error)))));
+      runGRPCOperation(options, "SetupTrigger", name, service.setupTrigger(name, call.request as OperationRequest), callback);
     },
     SetupComponent: (call: GrpcHandlerCall, callback: grpc.sendUnaryData<unknown>) => {
+      const name = String(call.request.name ?? "");
       if (!authAllowed(options, String(call.metadata?.get("authorization")?.[0] ?? ""))) {
-        callback(null, grpcResponseFromRunner(err("UNAVAILABLE", "Unauthorized")));
+        const response = err("UNAVAILABLE", "Unauthorized");
+        logRequest(options, {
+          transport: "grpc",
+          method: "SetupComponent",
+          name,
+          ok: false,
+          errorCode: response.error?.code ?? null,
+        });
+        callback(null, grpcResponseFromRunner(response));
         return;
       }
-      service
-        .setupComponent(String(call.request.name ?? ""), call.request as OperationRequest)
-        .then((response) => callback(null, grpcResponseFromRunner(response)))
-        .catch((error) => callback(null, grpcResponseFromRunner(err("EXECUTION_ERROR", errorMessage(error)))));
+      runGRPCOperation(options, "SetupComponent", name, service.setupComponent(name, call.request as OperationRequest), callback);
     },
     ExecuteComponent: (call: GrpcHandlerCall, callback: grpc.sendUnaryData<unknown>) => {
+      const name = String(call.request.name ?? "");
       if (!authAllowed(options, String(call.metadata?.get("authorization")?.[0] ?? ""))) {
-        callback(null, grpcResponseFromRunner(err("UNAVAILABLE", "Unauthorized")));
+        const response = err("UNAVAILABLE", "Unauthorized");
+        logRequest(options, {
+          transport: "grpc",
+          method: "ExecuteComponent",
+          name,
+          ok: false,
+          errorCode: response.error?.code ?? null,
+        });
+        callback(null, grpcResponseFromRunner(response));
         return;
       }
-      service
-        .executeComponent(String(call.request.name ?? ""), call.request as OperationRequest)
-        .then((response) => callback(null, grpcResponseFromRunner(response)))
-        .catch((error) => callback(null, grpcResponseFromRunner(err("EXECUTION_ERROR", errorMessage(error)))));
+      runGRPCOperation(options, "ExecuteComponent", name, service.executeComponent(name, call.request as OperationRequest), callback);
     },
     SyncIntegration: (call: GrpcHandlerCall, callback: grpc.sendUnaryData<unknown>) => {
+      const name = String(call.request.name ?? "");
       if (!authAllowed(options, String(call.metadata?.get("authorization")?.[0] ?? ""))) {
-        callback(null, grpcResponseFromRunner(err("UNAVAILABLE", "Unauthorized")));
+        const response = err("UNAVAILABLE", "Unauthorized");
+        logRequest(options, {
+          transport: "grpc",
+          method: "SyncIntegration",
+          name,
+          ok: false,
+          errorCode: response.error?.code ?? null,
+        });
+        callback(null, grpcResponseFromRunner(response));
         return;
       }
-      service
-        .syncIntegration(String(call.request.name ?? ""), call.request as OperationRequest)
-        .then((response) => callback(null, grpcResponseFromRunner(response)))
-        .catch((error) => callback(null, grpcResponseFromRunner(err("EXECUTION_ERROR", errorMessage(error)))));
+      runGRPCOperation(options, "SyncIntegration", name, service.syncIntegration(name, call.request as OperationRequest), callback);
     },
     CleanupIntegration: (call: GrpcHandlerCall, callback: grpc.sendUnaryData<unknown>) => {
+      const name = String(call.request.name ?? "");
       if (!authAllowed(options, String(call.metadata?.get("authorization")?.[0] ?? ""))) {
-        callback(null, grpcResponseFromRunner(err("UNAVAILABLE", "Unauthorized")));
+        const response = err("UNAVAILABLE", "Unauthorized");
+        logRequest(options, {
+          transport: "grpc",
+          method: "CleanupIntegration",
+          name,
+          ok: false,
+          errorCode: response.error?.code ?? null,
+        });
+        callback(null, grpcResponseFromRunner(response));
         return;
       }
-      service
-        .cleanupIntegration(String(call.request.name ?? ""), call.request as OperationRequest)
-        .then((response) => callback(null, grpcResponseFromRunner(response)))
-        .catch((error) => callback(null, grpcResponseFromRunner(err("EXECUTION_ERROR", errorMessage(error)))));
+      runGRPCOperation(options, "CleanupIntegration", name, service.cleanupIntegration(name, call.request as OperationRequest), callback);
     },
     ListCapabilities: (_call: GrpcHandlerCall, callback: grpc.sendUnaryData<unknown>) => {
+      logRequest(options, {
+        transport: "grpc",
+        method: "ListCapabilities",
+      });
       callback(null, {
         capabilities: service.listCapabilities().map((capability) => ({
           kind: mapCapabilityKindToGRPC(capability.kind),

@@ -122,6 +122,9 @@ dev.logs.app:
 dev.logs.otel:
 	docker compose $(DOCKER_COMPOSE_OPTS) logs -f otel
 
+dev.logs.runner:
+	docker compose $(DOCKER_COMPOSE_OPTS) logs -f typescript-runner
+
 dev.down:
 	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans
 
