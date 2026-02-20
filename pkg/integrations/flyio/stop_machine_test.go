@@ -36,6 +36,7 @@ func Test__StopMachine__Execute__SchedulesPoll(t *testing.T) {
 		Integration:    mockIntegration,
 		ExecutionState: executionState,
 		Requests:       requests,
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":     "my-fly-app",
 			"machine": "my-fly-app/machine-abc123",
@@ -82,6 +83,7 @@ func Test__StopMachine__Execute__WithSignal(t *testing.T) {
 		Integration:    mockIntegration,
 		ExecutionState: executionState,
 		Requests:       requests,
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":     "my-fly-app",
 			"machine": "my-fly-app/machine-abc123",
@@ -118,6 +120,7 @@ func Test__StopMachine__Poll__EmitsSuccessWhenStopped(t *testing.T) {
 		Integration:    mockIntegration,
 		ExecutionState: executionState,
 		Requests:       &contexts.RequestContext{},
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":     "my-fly-app",
 			"machine": "my-fly-app/machine-abc123",
@@ -162,6 +165,7 @@ func Test__StopMachine__Poll__EmitsFailedWhenStarted(t *testing.T) {
 		Integration:    mockIntegration,
 		ExecutionState: executionState,
 		Requests:       &contexts.RequestContext{},
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":     "my-fly-app",
 			"machine": "my-fly-app/machine-abc123",
@@ -173,6 +177,47 @@ func Test__StopMachine__Poll__EmitsFailedWhenStarted(t *testing.T) {
 
 	require.True(t, executionState.Finished)
 	assert.Equal(t, StopMachineFailedOutputChannel, executionState.Channel)
+}
+
+func Test__StopMachine__Poll__EmitsFailedWhenDestroyed(t *testing.T) {
+	for _, state := range []string{"destroying", "destroyed"} {
+		t.Run(state, func(t *testing.T) {
+			c := &StopMachine{}
+
+			mockHTTP := &contexts.HTTPContext{
+				Responses: []*http.Response{
+					buildMachineResp(state),
+				},
+			}
+
+			mockIntegration := &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "test-token",
+				},
+			}
+
+			executionState := &contexts.ExecutionStateContext{}
+
+			ctx := core.ActionContext{
+				Name:           "poll",
+				HTTP:           mockHTTP,
+				Integration:    mockIntegration,
+				ExecutionState: executionState,
+				Requests:       &contexts.RequestContext{},
+				Logger:         testLogger(),
+				Configuration: map[string]any{
+					"app":     "my-fly-app",
+					"machine": "my-fly-app/machine-abc123",
+				},
+			}
+
+			err := c.HandleAction(ctx)
+			require.NoError(t, err)
+
+			require.True(t, executionState.Finished)
+			assert.Equal(t, StopMachineFailedOutputChannel, executionState.Channel)
+		})
+	}
 }
 
 func Test__StopMachine__Poll__ReschedulesWhenTransitioning(t *testing.T) {
@@ -199,6 +244,7 @@ func Test__StopMachine__Poll__ReschedulesWhenTransitioning(t *testing.T) {
 		Integration:    mockIntegration,
 		ExecutionState: executionState,
 		Requests:       requests,
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":     "my-fly-app",
 			"machine": "my-fly-app/machine-abc123",
@@ -236,6 +282,7 @@ func Test__StopMachine__Poll__ReschedulesOnAPIError(t *testing.T) {
 		Integration:    mockIntegration,
 		ExecutionState: executionState,
 		Requests:       requests,
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":     "my-fly-app",
 			"machine": "my-fly-app/machine-abc123",

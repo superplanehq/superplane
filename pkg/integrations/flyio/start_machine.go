@@ -145,15 +145,16 @@ func decodeStartMachineSpec(configuration any) (StartMachineSpec, error) {
 	return spec, nil
 }
 
-// machineIDFromSpec resolves the machine ID from the spec.
-// The machine resource ID is stored as "appName/machineID" (see ListResources).
-func machineIDFromSpec(spec StartMachineSpec) string {
-	parts := strings.SplitN(spec.Machine, "/", 2)
+// parseMachineID extracts the bare machine ID from a composite "appName/machineID"
+// string that the IntegrationResource picker stores as the resource ID.
+// If the string isn't compound, it is returned as-is.
+func parseMachineID(compound string) string {
+	parts := strings.SplitN(compound, "/", 2)
 	if len(parts) == 2 {
 		return parts[1]
 	}
 
-	return spec.Machine
+	return compound
 }
 
 func (c *StartMachine) Setup(ctx core.SetupContext) error {
@@ -176,7 +177,7 @@ func (c *StartMachine) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	machineID := machineIDFromSpec(spec)
+	machineID := parseMachineID(spec.Machine)
 	if err := client.StartMachine(spec.App, machineID); err != nil {
 		return fmt.Errorf("failed to start machine: %w", err)
 	}
@@ -215,7 +216,7 @@ func (c *StartMachine) poll(ctx core.ActionContext) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	machineID := machineIDFromSpec(spec)
+	machineID := parseMachineID(spec.Machine)
 	machine, err := client.GetMachine(spec.App, machineID)
 	if err != nil {
 		ctx.Logger.Warnf("Failed to get machine state, will retry: %v", err)

@@ -25,7 +25,6 @@ func Test__CreateMachine__Execute__SchedulesPoll(t *testing.T) {
 
 	mockHTTP := &contexts.HTTPContext{
 		Responses: []*http.Response{
-			// CreateMachine POST response
 			{
 				StatusCode: 200,
 				Body:       io.NopCloser(bytes.NewBufferString(createMachineResponseJSON)),
@@ -49,6 +48,7 @@ func Test__CreateMachine__Execute__SchedulesPoll(t *testing.T) {
 		ExecutionState: executionState,
 		Requests:       requests,
 		Metadata:       metadata,
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":   "my-fly-app",
 			"image": "registry.fly.io/my-app:v2",
@@ -105,6 +105,7 @@ func Test__CreateMachine__Execute__WithAllOptions(t *testing.T) {
 		ExecutionState: executionState,
 		Requests:       requests,
 		Metadata:       metadata,
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":      "my-fly-app",
 			"image":    "registry.fly.io/my-app:v2",
@@ -146,6 +147,7 @@ func Test__CreateMachine__Poll__EmitsSuccessWhenStarted(t *testing.T) {
 		ExecutionState: executionState,
 		Requests:       &contexts.RequestContext{},
 		Metadata:       &contexts.MetadataContext{Metadata: CreateMachineExecutionMetadata{MachineID: "machine-abc123"}},
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":   "my-fly-app",
 			"image": "registry.fly.io/my-app:v2",
@@ -191,6 +193,7 @@ func Test__CreateMachine__Poll__EmitsFailedWhenStopped(t *testing.T) {
 		ExecutionState: executionState,
 		Requests:       &contexts.RequestContext{},
 		Metadata:       &contexts.MetadataContext{Metadata: CreateMachineExecutionMetadata{MachineID: "machine-abc123"}},
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":   "my-fly-app",
 			"image": "registry.fly.io/my-app:v2",
@@ -229,6 +232,7 @@ func Test__CreateMachine__Poll__ReschedulesWhenCreated(t *testing.T) {
 		ExecutionState: executionState,
 		Requests:       requests,
 		Metadata:       &contexts.MetadataContext{Metadata: CreateMachineExecutionMetadata{MachineID: "machine-abc123"}},
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":   "my-fly-app",
 			"image": "registry.fly.io/my-app:v2",
@@ -267,6 +271,7 @@ func Test__CreateMachine__Poll__ReschedulesOnAPIError(t *testing.T) {
 		ExecutionState: executionState,
 		Requests:       requests,
 		Metadata:       &contexts.MetadataContext{Metadata: CreateMachineExecutionMetadata{MachineID: "machine-abc123"}},
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":   "my-fly-app",
 			"image": "registry.fly.io/my-app:v2",
@@ -335,6 +340,7 @@ func Test__CreateMachine__Execute__APIError(t *testing.T) {
 		ExecutionState: &contexts.ExecutionStateContext{},
 		Requests:       &contexts.RequestContext{},
 		Metadata:       &contexts.MetadataContext{},
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":   "my-fly-app",
 			"image": "bad-image",

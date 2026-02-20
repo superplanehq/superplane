@@ -154,6 +154,27 @@ func (f *FlyIO) ListResources(resourceType string, ctx core.ListResourcesContext
 			return nil, fmt.Errorf("failed to create client: %w", err)
 		}
 
+		// If the UI provides an "app" parameter (from the ParameterRef on the machine field),
+		// only list machines for that specific app. Otherwise fall back to all synced apps.
+		if appParam := ctx.Parameters["app"]; appParam != "" {
+			machines, err := client.ListMachines(appParam)
+			if err != nil {
+				return nil, fmt.Errorf("failed to list machines for app %s: %w", appParam, err)
+			}
+
+			resources := make([]core.IntegrationResource, 0, len(machines))
+			for _, machine := range machines {
+				resources = append(resources, core.IntegrationResource{
+					Type: resourceType,
+					Name: fmt.Sprintf("%s - %s (%s)", appParam, machine.Name, machine.ID),
+					ID:   fmt.Sprintf("%s/%s", appParam, machine.ID),
+				})
+			}
+
+			return resources, nil
+		}
+
+		// Fallback: no app filter — list machines for all synced apps
 		metadata := Metadata{}
 		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
 			return nil, fmt.Errorf("failed to decode application metadata: %w", err)
@@ -177,6 +198,7 @@ func (f *FlyIO) ListResources(resourceType string, ctx core.ListResourcesContext
 			}
 		}
 		return resources, nil
+
 
 	default:
 		return []core.IntegrationResource{}, nil

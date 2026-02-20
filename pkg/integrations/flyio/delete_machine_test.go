@@ -34,6 +34,7 @@ func Test__DeleteMachine__Execute__Success(t *testing.T) {
 		HTTP:           mockHTTP,
 		Integration:    mockIntegration,
 		ExecutionState: executionState,
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":     "my-fly-app",
 			"machine": "my-fly-app/machine-abc123",
@@ -85,6 +86,7 @@ func Test__DeleteMachine__Execute__ForceFlag(t *testing.T) {
 		HTTP:           mockHTTP,
 		Integration:    mockIntegration,
 		ExecutionState: executionState,
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":     "my-fly-app",
 			"machine": "my-fly-app/machine-abc123",
@@ -123,6 +125,7 @@ func Test__DeleteMachine__Execute__APIError(t *testing.T) {
 		HTTP:           mockHTTP,
 		Integration:    mockIntegration,
 		ExecutionState: &contexts.ExecutionStateContext{},
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":     "my-fly-app",
 			"machine": "my-fly-app/nonexistent",

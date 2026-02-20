@@ -142,14 +142,6 @@ func decodeDeleteMachineSpec(configuration any) (DeleteMachineSpec, error) {
 	return spec, nil
 }
 
-func machineIDFromDeleteSpec(spec DeleteMachineSpec) string {
-	parts := strings.SplitN(spec.Machine, "/", 2)
-	if len(parts) == 2 {
-		return parts[1]
-	}
-
-	return spec.Machine
-}
 
 func (c *DeleteMachine) Setup(ctx core.SetupContext) error {
 	_, err := decodeDeleteMachineSpec(ctx.Configuration)
@@ -171,7 +163,7 @@ func (c *DeleteMachine) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	machineID := machineIDFromDeleteSpec(spec)
+	machineID := parseMachineID(spec.Machine)
 	if err := client.DeleteMachine(spec.App, machineID, spec.Force); err != nil {
 		return fmt.Errorf("failed to delete machine: %w", err)
 	}

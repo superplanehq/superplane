@@ -182,7 +182,7 @@ func (c *StopMachine) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	machineID := machineIDFromStopSpec(spec)
+	machineID := parseMachineID(spec.Machine)
 
 	var req *StopMachineRequest
 	if spec.Signal != "" {
@@ -227,7 +227,7 @@ func (c *StopMachine) poll(ctx core.ActionContext) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	machineID := machineIDFromStopSpec(spec)
+	machineID := parseMachineID(spec.Machine)
 	machine, err := client.GetMachine(spec.App, machineID)
 	if err != nil {
 		ctx.Logger.Warnf("Failed to get machine state, will retry: %v", err)
@@ -240,8 +240,8 @@ func (c *StopMachine) poll(ctx core.ActionContext) error {
 	case "stopped":
 		payload := machinePayload(spec.App, machine)
 		return ctx.ExecutionState.Emit(StopMachineSuccessOutputChannel, StopMachinePayloadType, []any{payload})
-	case "starting", "started":
-		// something went wrong - it's running when it should be stopping
+	case "starting", "started", "destroying", "destroyed":
+		// Machine went to a non-stopped terminal state — treat as failure
 		payload := machinePayload(spec.App, machine)
 		return ctx.ExecutionState.Emit(StopMachineFailedOutputChannel, StopMachinePayloadType, []any{payload})
 	default:
@@ -262,11 +262,3 @@ func (c *StopMachine) HandleWebhook(_ core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
 
-func machineIDFromStopSpec(spec StopMachineSpec) string {
-	parts := strings.SplitN(spec.Machine, "/", 2)
-	if len(parts) == 2 {
-		return parts[1]
-	}
-
-	return spec.Machine
-}
