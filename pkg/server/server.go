@@ -48,7 +48,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/gitlab"
 	_ "github.com/superplanehq/superplane/pkg/integrations/grafana"
 	_ "github.com/superplanehq/superplane/pkg/integrations/harness"
-  _ "github.com/superplanehq/superplane/pkg/integrations/hetzner"
+	_ "github.com/superplanehq/superplane/pkg/integrations/hetzner"
 	_ "github.com/superplanehq/superplane/pkg/integrations/jira"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
 	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
