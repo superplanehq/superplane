@@ -124,7 +124,11 @@ func (i *IncidentIO) Sync(ctx core.SyncContext) error {
 	}
 
 	if ctx.Encryptor != nil {
-		if ensureErr := EnsureWebhookExists(database.Conn(), ctx.Integration.ID(), ctx.Encryptor); ensureErr != nil {
+		tx := ctx.Tx
+		if tx == nil {
+			tx = database.Conn()
+		}
+		if ensureErr := EnsureWebhookExists(tx, ctx.Integration.ID()); ensureErr != nil {
 			ctx.Logger.WithError(ensureErr).Warn("failed to ensure incident webhook")
 		}
 	}
@@ -149,7 +153,11 @@ func setIncidentIntegrationMetadata(ctx core.SyncContext) {
 	}
 
 	if ctx.WebhooksBaseURL != "" {
-		webhooks, err := models.ListIntegrationWebhooks(database.Conn(), ctx.Integration.ID())
+		tx := ctx.Tx
+		if tx == nil {
+			tx = database.Conn()
+		}
+		webhooks, err := models.ListIntegrationWebhooks(tx, ctx.Integration.ID())
 		if err == nil && len(webhooks) > 0 {
 			m["webhookUrl"] = ctx.WebhooksBaseURL + "/api/v1/webhooks/" + webhooks[0].ID.String()
 		}
