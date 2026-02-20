@@ -20,17 +20,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-To set up Telegram integration:
-
-1. Open Telegram and search for **@BotFather**
-2. Start a chat and send the command **/newbot**
-3. Follow the instructions to choose a name and username for your bot
-4. BotFather will provide you with a **Bot Token** - copy this token
-5. Paste the **Bot Token** in the field below
-6. To use your bot in groups:
-   - Add your bot to the desired group or channel
-   - Get the chat ID (you can use @getidsbot or other methods)
-   - Use the chat ID in your workflow components
+To set up Telegram integration: get a token from @BotFather and paste it in the field below
 
 <a id="on-mention"></a>
 
@@ -89,7 +79,6 @@ This trigger automatically sets up a webhook subscription when configured. The s
     "message_id": 1234,
     "text": "@mybot hello!"
   },
-  "timestamp": "2026-01-16T12:00:00Z",
   "type": "telegram.message.mention"
 }
 ```
