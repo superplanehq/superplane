@@ -319,7 +319,7 @@ func validateList(field Field, value any) error {
 		return fmt.Errorf("must contain at least one item")
 	}
 
-	if field.TypeOptions.List == nil {
+	if field.TypeOptions == nil || field.TypeOptions.List == nil {
 		return nil
 	}
 
