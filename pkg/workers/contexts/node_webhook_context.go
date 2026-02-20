@@ -42,6 +42,25 @@ func (c *NodeWebhookContext) GetSecret() ([]byte, error) {
 	return c.encryptor.Decrypt(c.ctx, webhook.Secret, []byte(webhook.ID.String()))
 }
 
+func (c *NodeWebhookContext) SetSecret(secret []byte) error {
+	if c.node.WebhookID == nil {
+		return fmt.Errorf("node does not have a webhook")
+	}
+
+	webhook, err := models.FindWebhookInTransaction(c.tx, *c.node.WebhookID)
+	if err != nil {
+		return err
+	}
+
+	encrypted, err := c.encryptor.Encrypt(c.ctx, secret, []byte(webhook.ID.String()))
+	if err != nil {
+		return err
+	}
+
+	webhook.Secret = encrypted
+	return c.tx.Model(webhook).Update("secret", webhook.Secret).Error
+}
+
 func (c *NodeWebhookContext) ResetSecret() ([]byte, []byte, error) {
 	if c.node.WebhookID == nil {
 		return nil, nil, fmt.Errorf("node does not have a webhook")
@@ -73,7 +92,8 @@ func (c *NodeWebhookContext) Setup() (string, error) {
 	}
 
 	c.node.WebhookID = &webhook.ID
-	return fmt.Sprintf("%s/webhooks/%s", c.GetBaseURL(), webhook.ID.String()), nil
+	// Must include /api/v1 to match the public route; WebhookContext.GetURL uses the same pattern
+	return fmt.Sprintf("%s/api/v1/webhooks/%s", c.GetBaseURL(), webhook.ID.String()), nil
 }
 
 func (c *NodeWebhookContext) findOrCreateWebhook() (*models.Webhook, error) {

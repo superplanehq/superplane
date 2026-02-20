@@ -131,7 +131,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   }, [filterQuery, integrationCatalog]);
 
   const selectedInstructions = useMemo(() => {
-    return selectedIntegration?.instructions?.trim();
+    return selectedIntegration?.instructions?.trim() ?? "";
   }, [selectedIntegration?.instructions]);
 
   const getNextIntegrationName = (baseName?: string) => {
@@ -401,21 +401,20 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     {/* Configuration Fields */}
                     {selectedIntegration.configuration && selectedIntegration.configuration.length > 0 && (
                       <div className="space-y-4">
-                        {selectedIntegration.configuration.map((field) => {
-                          if (!field.name) return null;
-                          return (
+                        {selectedIntegration.configuration
+                          .filter((field) => Boolean(field.name))
+                          .map((field) => (
                             <ConfigurationFieldRenderer
-                              key={field.name}
+                              key={field.name!}
                               field={field}
-                              value={configuration[field.name]}
-                              onChange={(value) => setConfiguration({ ...configuration, [field.name || ""]: value })}
+                              value={configuration[field.name!]}
+                              onChange={(value) => setConfiguration({ ...configuration, [field.name!]: value })}
                               allValues={configuration}
                               domainId={organizationId}
                               domainType="DOMAIN_TYPE_ORGANIZATION"
                               organizationId={organizationId}
                             />
-                          );
-                        })}
+                          ))}
                       </div>
                     )}
                   </div>
