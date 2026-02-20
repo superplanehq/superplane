@@ -46,7 +46,7 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		// Describe the integration
 		//
-		describeResponse, err := DescribeIntegration(ctx, r.Registry, r.Organization.ID.String(), integrationID, baseURL)
+		describeResponse, err := DescribeIntegration(ctx, r.Registry, r.Organization.ID.String(), integrationID)
 		require.NoError(t, err)
 		require.NotNil(t, describeResponse)
 		require.NotNil(t, describeResponse.Integration)
@@ -64,7 +64,7 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		// Try to describe with an invalid organization ID
 		//
-		_, err := DescribeIntegration(ctx, r.Registry, "invalid-uuid", uuid.NewString(), "")
+		_, err := DescribeIntegration(ctx, r.Registry, "invalid-uuid", uuid.NewString())
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -76,7 +76,7 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		// Try to describe with an invalid integration ID
 		//
-		_, err := DescribeIntegration(ctx, r.Registry, r.Organization.ID.String(), "invalid-uuid", "")
+		_, err := DescribeIntegration(ctx, r.Registry, r.Organization.ID.String(), "invalid-uuid")
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -89,7 +89,7 @@ func Test__DescribeIntegration(t *testing.T) {
 		// Try to describe a non-existent integration
 		//
 		fakeIntegrationID := uuid.NewString()
-		_, err := DescribeIntegration(ctx, r.Registry, r.Organization.ID.String(), fakeIntegrationID, "")
+		_, err := DescribeIntegration(ctx, r.Registry, r.Organization.ID.String(), fakeIntegrationID)
 		require.Error(t, err)
 	})
 
@@ -124,7 +124,7 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		// Try to describe the integration using the second organization's ID
 		//
-		_, err = DescribeIntegration(ctx, r.Registry, org2.ID.String(), integrationID, "")
+		_, err = DescribeIntegration(ctx, r.Registry, org2.ID.String(), integrationID)
 		require.Error(t, err)
 	})
 
@@ -157,7 +157,7 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		// Describe the integration
 		//
-		describeResponse, err := DescribeIntegration(ctx, r.Registry, r.Organization.ID.String(), integrationID, baseURL)
+		describeResponse, err := DescribeIntegration(ctx, r.Registry, r.Organization.ID.String(), integrationID)
 		require.NoError(t, err)
 		require.NotNil(t, describeResponse)
 		require.NotNil(t, describeResponse.Integration)

@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/oidc"
 )
 
@@ -178,6 +179,7 @@ type SyncContext struct {
 	HTTP            HTTPContext
 	Integration     IntegrationContext
 	OIDC            oidc.Provider
+	Encryptor       crypto.Encryptor
 }
 
 type IntegrationCleanupContext struct {

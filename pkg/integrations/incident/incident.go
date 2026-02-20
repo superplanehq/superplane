@@ -1,11 +1,17 @@
 package incident
 
 import (
+	"context"
+	"encoding/base64"
 	"fmt"
+	"maps"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -75,7 +81,7 @@ func (i *IncidentIO) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Sensitive:   true,
-			Description: "From your incident.io webhook endpoint (Settings → Webhooks). Paste the signing secret here so the On Incident trigger can verify requests. Optional if you set it on the trigger.",
+			Description: "From your incident.io webhook endpoint (Settings → Webhooks). Paste the signing secret here so the On Incident trigger can verify requests.",
 			Placeholder: "whsec_...",
 		},
 	}
@@ -119,8 +125,67 @@ func (i *IncidentIO) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error validating API key (listing severities): %w", err)
 	}
 
+	if ctx.Encryptor != nil {
+		if ensureErr := EnsureWebhookExists(database.Conn(), ctx.Integration.ID(), ctx.Encryptor); ensureErr != nil {
+			ctx.Logger.WithError(ensureErr).Warn("failed to ensure incident webhook")
+		}
+	}
+
+	setIncidentIntegrationMetadata(ctx)
+
 	ctx.Integration.Ready()
 	return nil
+}
+
+// setIncidentIntegrationMetadata sets webhookUrl and webhookSigningSecretConfigured on the integration metadata
+// so the UI can show the webhook URL and secret status without organization-layer logic.
+func setIncidentIntegrationMetadata(ctx core.SyncContext) {
+	var m map[string]any
+	if meta := ctx.Integration.GetMetadata(); meta != nil {
+		if mm, ok := meta.(map[string]any); ok {
+			m = maps.Clone(mm)
+		}
+	}
+	if m == nil {
+		m = make(map[string]any)
+	}
+
+	if ctx.WebhooksBaseURL != "" {
+		webhooks, err := models.ListIntegrationWebhooks(database.Conn(), ctx.Integration.ID())
+		if err == nil && len(webhooks) > 0 {
+			m["webhookUrl"] = ctx.WebhooksBaseURL + "/api/v1/webhooks/" + webhooks[0].ID.String()
+		}
+	}
+
+	configured := isWebhookSigningSecretConfigured(ctx)
+	m["webhookSigningSecretConfigured"] = configured
+
+	ctx.Integration.SetMetadata(m)
+}
+
+// isWebhookSigningSecretConfigured returns true only if the integration has a non-empty webhook signing secret
+// (decrypted and trimmed). Encrypting an empty string yields non-empty ciphertext, so we must decrypt to check.
+func isWebhookSigningSecretConfigured(ctx core.SyncContext) bool {
+	if ctx.Encryptor == nil {
+		return false
+	}
+	configMap, ok := ctx.Configuration.(map[string]any)
+	if !ok {
+		return false
+	}
+	raw, _ := configMap["webhookSigningSecret"].(string)
+	if raw == "" || raw == "<redacted>" {
+		return false
+	}
+	ciphertext, err := base64.StdEncoding.DecodeString(raw)
+	if err != nil || len(ciphertext) == 0 {
+		return false
+	}
+	plaintext, err := ctx.Encryptor.Decrypt(context.Background(), ciphertext, []byte(ctx.Integration.ID().String()))
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(plaintext)) != ""
 }
 
 func (i *IncidentIO) HandleRequest(ctx core.HTTPRequestContext) {}

@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func DescribeIntegration(ctx context.Context, registry *registry.Registry, orgID, integrationID, webhooksBaseURL string) (*pb.DescribeIntegrationResponse, error) {
+func DescribeIntegration(ctx context.Context, registry *registry.Registry, orgID, integrationID string) (*pb.DescribeIntegrationResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
@@ -32,7 +32,7 @@ func DescribeIntegration(ctx context.Context, registry *registry.Registry, orgID
 		return nil, err
 	}
 
-	proto, err := serializeIntegration(registry, instance, nodeRefs, webhooksBaseURL)
+	proto, err := serializeIntegration(registry, instance, nodeRefs)
 	if err != nil {
 		return nil, err
 	}

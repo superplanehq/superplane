@@ -56,37 +56,15 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     setIntegrationName(integration?.metadata?.name || integration?.spec?.integrationName || "");
   }, [integration?.metadata?.name, integration?.spec?.integrationName]);
 
-  // Incident: split instructions into API vs webhook and optionally hide webhook when configured
+  // Full instructions (same for all integrations)
   const instructionsContent = useMemo(() => {
     const raw = integrationDef?.instructions?.trim();
     if (!raw) return null;
-    if (integration?.spec?.integrationName !== "incident") {
-      return <IntegrationInstructions description={raw} />;
-    }
-    const webhookHeading = "## Webhook integration";
-    const idx = raw.indexOf(webhookHeading);
-    const apiInstructions = idx >= 0 ? raw.slice(0, idx).trim() : raw;
-    const webhookBody = idx >= 0 ? raw.slice(idx + webhookHeading.length).trimStart() : "";
-    const webhookInstructions = idx >= 0 && webhookBody ? webhookHeading + "\n\n" + webhookBody : null;
-    const webhookConfigured =
-      integration?.status?.metadata &&
-      typeof integration.status.metadata.webhookSigningSecretConfigured === "boolean" &&
-      integration.status.metadata.webhookSigningSecretConfigured === true;
-    return (
-      <>
-        {apiInstructions && <IntegrationInstructions description={apiInstructions} />}
-        {webhookInstructions && !webhookConfigured && <IntegrationInstructions description={webhookInstructions} />}
-      </>
-    );
-  }, [
-    integrationDef?.instructions,
-    integration?.spec?.integrationName,
-    integration?.status?.metadata?.webhookSigningSecretConfigured,
-  ]);
+    return <IntegrationInstructions description={raw} />;
+  }, [integrationDef?.instructions]);
 
-  // Incident: webhook URL block (only when we have a URL)
-  const incidentWebhookSection = useMemo(() => {
-    if (integration?.spec?.integrationName !== "incident") return null;
+  // Webhook block: show when integration exposes a webhook URL in metadata (generic, no integration name check)
+  const webhookSection = useMemo(() => {
     const webhookUrl =
       integration?.status?.metadata && typeof integration.status.metadata.webhookUrl === "string"
         ? integration.status.metadata.webhookUrl
@@ -101,14 +79,9 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
         <div className="p-6">
           <h2 className="text-lg font-medium mb-4">Webhook</h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-            {webhookConfigured ? (
-              "Webhook is configured. You can copy the URL below if needed."
-            ) : (
-              <>
-                Add this URL in incident.io <strong>Settings → Webhooks</strong> and subscribe to{" "}
-                <strong>Public incident created (v2)</strong> and <strong>Public incident updated (v2)</strong>.
-              </>
-            )}
+            {webhookConfigured
+              ? "Webhook is configured. You can copy the URL below if needed."
+              : "Add this URL in your external service to receive webhooks. Complete any setup steps described in the instructions above."}
           </p>
           <div className="flex items-center gap-2">
             <Input type="text" value={webhookUrl} readOnly className="font-mono text-sm flex-1" />
@@ -127,11 +100,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
         </div>
       </div>
     );
-  }, [
-    integration?.spec?.integrationName,
-    integration?.status?.metadata?.webhookUrl,
-    integration?.status?.metadata?.webhookSigningSecretConfigured,
-  ]);
+  }, [integration?.status?.metadata?.webhookUrl, integration?.status?.metadata?.webhookSigningSecretConfigured]);
 
   // Group usedIn nodes by workflow
   const workflowGroups = useMemo(() => {
@@ -389,7 +358,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
           </div>
         </div>
 
-        {incidentWebhookSection}
+        {webhookSection}
 
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
           <div className="p-6">
