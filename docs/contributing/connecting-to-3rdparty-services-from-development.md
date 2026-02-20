@@ -18,21 +18,55 @@ ngrok config add-authtoken YOUR_AUTH_TOKEN
 
 ### 2. Start ngrok Tunnel
 
-Start an ngrok tunnel pointing to your local SuperPlane instance:
+**Option A – Stable URL (recommended; no redo on restart)**
+
+ngrok’s free plan includes **one static domain** that stays the same across restarts:
+
+1. In the [ngrok dashboard](https://dashboard.ngrok.com/) go to **Cloud Edge → Domains** and claim your free domain (e.g. `yourname.ngrok-free.app`).
+2. Start the tunnel with that domain:
+
+   ```bash
+   ngrok http --domain=yourname.ngrok-free.app 8000
+   ```
+
+3. Set `WEBHOOKS_BASE_URL=https://yourname.ngrok-free.app` once (e.g. in `.env`). After that you can restart app and tunnel without changing URLs or re-saving workflows.
+
+**Option B – Random URL (changes every run)**
+
+If you don’t use a static domain:
 
 ```bash
 ngrok http 8000
 ```
 
-This outputs a public URL like `https://abc123.ngrok-free.app` that forwards to `http://localhost:8000`.
+This outputs a new public URL each time (e.g. `https://abc123.ngrok-free.app`). You must update `WEBHOOKS_BASE_URL`, restart the app, re-save workflows that use webhooks, and update the URL in third-party services (e.g. incident.io) whenever the URL changes.
 
 ### 3. Set WEBHOOKS_BASE_URL
 
-Set the `WEBHOOKS_BASE_URL` environment variable to your ngrok URL when starting SuperPlane:
+Set the `WEBHOOKS_BASE_URL` environment variable to your tunnel’s **HTTPS** URL (no trailing slash). The app uses it when generating webhook URLs so they are reachable by third-party services.
+
+**Option A – Inline when running Make**
 
 ```bash
-make dev.start WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app
+WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app make dev.start
 ```
+
+**Option B – In a `.env` file (project root)**
+
+```env
+WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app
+```
+
+Then run `make dev.start` as usual. Docker Compose reads `.env` and passes the value into the app container.
+
+**Option C – Export in the shell**
+
+```bash
+export WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app
+make dev.start
+```
+
+After changing `WEBHOOKS_BASE_URL`, restart the app (`make dev.down` then start again) and **re-save any workflow** that uses webhooks so the URL is regenerated with the new base.
 
 ## AWS IAM OIDC (Identity Provider)
 
