@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"path"
 	"strings"
 )
 
@@ -108,7 +107,19 @@ func buildURLFromBase(baseURLValue, endpoint string, query url.Values) (string, 
 		return "", fmt.Errorf("invalid base URL: %w", err)
 	}
 
-	baseURL.Path = path.Join(baseURL.Path, endpoint)
+	basePath := strings.TrimRight(baseURL.Path, "/")
+	endpointPath := strings.TrimLeft(endpoint, "/")
+	switch {
+	case basePath == "" && endpointPath == "":
+		baseURL.Path = "/"
+	case basePath == "":
+		baseURL.Path = "/" + endpointPath
+	case endpointPath == "":
+		baseURL.Path = basePath
+	default:
+		baseURL.Path = basePath + "/" + endpointPath
+	}
+
 	if query != nil {
 		baseURL.RawQuery = query.Encode()
 	}
