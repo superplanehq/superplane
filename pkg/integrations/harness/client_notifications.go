@@ -215,10 +215,12 @@ func decodePipelineYAML(raw string) (*yaml.Node, error) {
 func encodePipelineYAML(root *yaml.Node) (string, error) {
 	buffer := &bytes.Buffer{}
 	encoder := yaml.NewEncoder(buffer)
-	defer encoder.Close()
 
 	if err := encoder.Encode(root); err != nil {
 		return "", fmt.Errorf("failed to encode pipeline yaml: %w", err)
+	}
+	if err := encoder.Close(); err != nil {
+		return "", fmt.Errorf("failed to finalize pipeline yaml: %w", err)
 	}
 
 	encoded := buffer.String()
