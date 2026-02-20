@@ -78,6 +78,8 @@ services:
       OTEL_SERVICE_NAME: "superplane-dev"
       OWNER_SETUP_ENABLED: "yes"
       VITE_ENABLE_CUSTOM_COMPONENTS: "true"
+      SUPERPLANE_PLUGINS_DIR: "/app/plugins"
+      SUPERPLANE_PLUGIN_HOST_PATH: "/app/plugin-host/dist/index.js"
 
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}

@@ -16,3 +16,7 @@ vendor/bundle
 CLAUDE.local.md
 .env
 .idea/
+plugin-host/dist/
+plugin-host/node_modules/
+plugins/
+*.spx

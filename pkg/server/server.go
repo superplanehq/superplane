@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -18,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/public"
 	registry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/services"
+	"github.com/superplanehq/superplane/pkg/plugins"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/templates"
 	"github.com/superplanehq/superplane/pkg/workers"
@@ -371,6 +374,25 @@ func Start() {
 	}
 
 	templates.Setup(registry)
+
+	pluginsDir := os.Getenv("SUPERPLANE_PLUGINS_DIR")
+	if pluginsDir == "" {
+		pluginsDir = "plugins"
+	}
+
+	pluginManager, err := plugins.NewManager(pluginsDir, registry)
+	if err != nil {
+		log.Infof("Plugin system: %v", err)
+	} else {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGHUP)
+		go func() {
+			for range sigCh {
+				log.Info("Received SIGHUP, reloading plugins")
+				pluginManager.Reload()
+			}
+		}()
+	}
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcProvider, authService)

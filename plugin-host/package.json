@@ -1,0 +1,15 @@
+{
+  "name": "@superplane/plugin-host",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SuperPlane Plugin Host - runs plugins in an isolated Node.js process",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/node": "^22.0.0"
+  }
+}
