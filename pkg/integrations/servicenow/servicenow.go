@@ -87,7 +87,7 @@ func (s *ServiceNow) Configuration() []configuration.Field {
 func (s *ServiceNow) Components() []core.Component {
 	return []core.Component{
 		&CreateIncident{},
-		&GetIncidents{},
+		&GetIncident{},
 	}
 }
 

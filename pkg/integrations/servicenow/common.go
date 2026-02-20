@@ -12,6 +12,7 @@ type NodeMetadata struct {
 	AssignmentGroup *ResourceInfo `json:"assignmentGroup,omitempty" mapstructure:"assignmentGroup"`
 	AssignedTo      *ResourceInfo `json:"assignedTo,omitempty" mapstructure:"assignedTo"`
 	Caller          *ResourceInfo `json:"caller,omitempty" mapstructure:"caller"`
+	Incident        *ResourceInfo `json:"incident,omitempty" mapstructure:"incident"`
 }
 
 type ResourceInfo struct {

@@ -177,6 +177,32 @@ func (s *ServiceNow) ListResources(resourceType string, ctx core.ListResourcesCo
 
 		return resources, nil
 
+	case "incident":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		incidents, err := client.ListIncidents(200)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list incidents: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(incidents))
+		for _, incident := range incidents {
+			name := incident.Number
+			if incident.ShortDescription != "" {
+				name = fmt.Sprintf("%s - %s", incident.Number, incident.ShortDescription)
+			}
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: name,
+				ID:   incident.SysID,
+			})
+		}
+
+		return resources, nil
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}

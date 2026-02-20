@@ -120,6 +120,40 @@ func (c *Client) CreateIncident(params CreateIncidentParams) (map[string]any, er
 	return response.Result, nil
 }
 
+func (c *Client) GetIncident(sysID string) (*IncidentRecord, error) {
+	path := fmt.Sprintf("/api/now/table/incident/%s?sysparm_fields=sys_id,number,short_description,state,urgency,impact,priority,category,subcategory,sys_created_on,sys_updated_on", sysID)
+	responseBody, err := c.execRequest(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	var response struct {
+		Result IncidentRecord `json:"result"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %w", err)
+	}
+	return &response.Result, nil
+}
+
+func (c *Client) ListIncidents(limit int) ([]IncidentRecord, error) {
+	params := url.Values{}
+	params.Set("sysparm_fields", "sys_id,number,short_description")
+	params.Set("sysparm_limit", fmt.Sprintf("%d", limit))
+	params.Set("sysparm_query", "active=true")
+	path := "/api/now/table/incident?" + params.Encode()
+	responseBody, err := c.execRequest(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	var response struct {
+		Result []IncidentRecord `json:"result"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %w", err)
+	}
+	return response.Result, nil
+}
+
 func (c *Client) GetIncidents(query string, limit int) ([]IncidentRecord, error) {
 	params := url.Values{}
 	if query != "" {
