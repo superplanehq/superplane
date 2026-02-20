@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Settings } from "lucide-react";
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
@@ -21,6 +22,12 @@ export interface IntegrationCreateDialogProps {
   defaultName?: string;
   integrationHomeHref?: string;
   onCreated?: (integrationId: string) => void;
+  /** If set, instructions are truncated at this heading (e.g. "## Webhook integration") so only the part before is shown in the create step. */
+  instructionsEndBeforeHeading?: string;
+  /** If set, only these configuration field names are shown in the initial create step; the rest are shown in the webhook completion step. */
+  initialStepFieldNames?: string[];
+  /** Optional custom description for the webhook completion step. */
+  webhookStepDescription?: ReactNode;
 }
 
 export function IntegrationCreateDialog({
@@ -31,45 +38,43 @@ export function IntegrationCreateDialog({
   defaultName = "",
   integrationHomeHref,
   onCreated,
+  instructionsEndBeforeHeading,
+  initialStepFieldNames,
+  webhookStepDescription,
 }: IntegrationCreateDialogProps) {
   const [integrationName, setIntegrationName] = useState(defaultName);
   const [configuration, setConfiguration] = useState<Record<string, unknown>>({});
   const [createIntegrationBrowserAction, setCreateIntegrationBrowserAction] = useState<
     OrganizationsBrowserAction | undefined
   >(undefined);
-  const [createdIncidentIntegration, setCreatedIncidentIntegration] = useState<{
+  const [pendingWebhookSetup, setPendingWebhookSetup] = useState<{
     id: string;
     webhookUrl: string;
     config: Record<string, unknown>;
   } | null>(null);
 
   const createIntegrationMutation = useCreateIntegration(organizationId);
-  const updateIntegrationMutation = useUpdateIntegration(organizationId, createdIncidentIntegration?.id ?? "");
+  const updateIntegrationMutation = useUpdateIntegration(organizationId, pendingWebhookSetup?.id ?? "");
 
   const selectedInstructions = useMemo(() => {
     const raw = integrationDefinition?.instructions?.trim();
-    if (!raw) return raw ?? "";
-    if (integrationDefinition?.name === "incident") {
-      const idx = raw.indexOf("## Webhook integration");
-      return idx >= 0 ? raw.slice(0, idx).trim() : raw;
-    }
-    return raw;
-  }, [integrationDefinition?.instructions, integrationDefinition?.name]);
+    if (!raw || !instructionsEndBeforeHeading) return raw ?? "";
+    const idx = raw.indexOf(instructionsEndBeforeHeading);
+    return idx >= 0 ? raw.slice(0, idx).trim() : raw;
+  }, [integrationDefinition?.instructions, instructionsEndBeforeHeading]);
 
   const configurationFields = useMemo(() => {
     const fields = integrationDefinition?.configuration ?? [];
-    if (integrationDefinition?.name === "incident") {
-      return fields.filter((f) => f.name === "apiKey");
-    }
-    return fields;
-  }, [integrationDefinition?.configuration, integrationDefinition?.name]);
+    if (!initialStepFieldNames?.length) return fields;
+    return fields.filter((f) => f.name && initialStepFieldNames.includes(f.name));
+  }, [integrationDefinition?.configuration, initialStepFieldNames]);
 
   useEffect(() => {
     if (open) {
       setIntegrationName(defaultName);
       setConfiguration({});
       setCreateIntegrationBrowserAction(undefined);
-      setCreatedIncidentIntegration(null);
+      setPendingWebhookSetup(null);
     }
   }, [open, defaultName]);
 
@@ -79,7 +84,7 @@ export function IntegrationCreateDialog({
         setIntegrationName("");
         setConfiguration({});
         setCreateIntegrationBrowserAction(undefined);
-        setCreatedIncidentIntegration(null);
+        setPendingWebhookSetup(null);
         createIntegrationMutation.reset();
       }
       onOpenChange(next);
@@ -109,7 +114,6 @@ export function IntegrationCreateDialog({
       const integration = result.data?.integration;
       const browserAction = integration?.status?.browserAction;
       const webhookUrl =
-        integration?.spec?.integrationName === "incident" &&
         integration?.status?.metadata &&
         typeof integration.status.metadata === "object" &&
         "webhookUrl" in integration.status.metadata
@@ -120,8 +124,8 @@ export function IntegrationCreateDialog({
         setCreateIntegrationBrowserAction(browserAction);
         return;
       }
-      if (integration?.metadata?.id && webhookUrl && integrationDefinition.name === "incident") {
-        setCreatedIncidentIntegration({
+      if (integration?.metadata?.id && webhookUrl) {
+        setPendingWebhookSetup({
           id: integration.metadata.id,
           webhookUrl,
           config: { ...configuration },
@@ -145,19 +149,19 @@ export function IntegrationCreateDialog({
     onCreated,
   ]);
 
-  const handleCompleteIncidentSetup = useCallback(async () => {
-    if (!createdIncidentIntegration) return;
+  const handleCompleteWebhookSetup = useCallback(async () => {
+    if (!pendingWebhookSetup) return;
 
     try {
       await updateIntegrationMutation.mutateAsync({
-        configuration: { ...createdIncidentIntegration.config, ...configuration },
+        configuration: { ...pendingWebhookSetup.config, ...configuration },
       });
       handleClose();
-      onCreated?.(createdIncidentIntegration.id);
+      onCreated?.(pendingWebhookSetup.id);
     } catch {
       showErrorToast("Failed to complete setup");
     }
-  }, [createdIncidentIntegration, configuration, updateIntegrationMutation, handleClose, onCreated]);
+  }, [pendingWebhookSetup, configuration, updateIntegrationMutation, handleClose, onCreated]);
 
   const handleBrowserActionContinue = useCallback(() => {
     if (!createIntegrationBrowserAction) return;
@@ -203,7 +207,7 @@ export function IntegrationCreateDialog({
             />
             <div className="flex items-center gap-2">
               <DialogTitle>
-                {createdIncidentIntegration ? "Complete webhook setup" : `Configure ${displayName}`}
+                {pendingWebhookSetup ? "Complete webhook setup" : `Configure ${displayName}`}
               </DialogTitle>
               {integrationHomeHref && (
                 <a
@@ -216,7 +220,7 @@ export function IntegrationCreateDialog({
               )}
             </div>
           </div>
-          {!createdIncidentIntegration && (createIntegrationBrowserAction?.description || selectedInstructions) && (
+          {!pendingWebhookSetup && (createIntegrationBrowserAction?.description || selectedInstructions) && (
             <IntegrationInstructions
               description={(createIntegrationBrowserAction?.description || selectedInstructions) ?? ""}
               onContinue={createIntegrationBrowserAction?.url ? handleBrowserActionContinue : undefined}
@@ -226,19 +230,21 @@ export function IntegrationCreateDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {createdIncidentIntegration ? (
+          {pendingWebhookSetup ? (
             <>
-              <p className="text-sm text-gray-800 dark:text-gray-200">
-                Copy the webhook URL below, add it in incident.io Settings → Webhooks, subscribe to Public incident
-                created (v2) and Public incident updated (v2), then paste the signing secret.
-              </p>
+              {webhookStepDescription ?? (
+                <p className="text-sm text-gray-800 dark:text-gray-200">
+                  Copy the webhook URL below and complete the required steps in your integration provider. Then enter
+                  any required secrets below.
+                </p>
+              )}
               <div>
                 <Label className="text-gray-800 dark:text-gray-100 mb-2">Webhook URL</Label>
                 <div className="flex gap-2">
                   <Input
                     type="text"
                     readOnly
-                    value={createdIncidentIntegration.webhookUrl}
+                    value={pendingWebhookSetup.webhookUrl}
                     className="font-mono text-sm"
                   />
                   <Button
@@ -246,7 +252,7 @@ export function IntegrationCreateDialog({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      void navigator.clipboard.writeText(createdIncidentIntegration.webhookUrl);
+                      void navigator.clipboard.writeText(pendingWebhookSetup.webhookUrl);
                       showSuccessToast("Copied to clipboard");
                     }}
                   >
@@ -255,7 +261,11 @@ export function IntegrationCreateDialog({
                 </div>
               </div>
               {(integrationDefinition?.configuration ?? [])
-                .filter((f: ConfigurationField) => f.name === "signingSecret" || f.name === "webhookSigningSecret")
+                .filter((f: ConfigurationField) => {
+                  if (!f.name) return false;
+                  if (initialStepFieldNames?.length) return !initialStepFieldNames.includes(f.name);
+                  return f.name === "signingSecret" || f.name === "webhookSigningSecret";
+                })
                 .map((field) => (
                   <ConfigurationFieldRenderer
                     key={field.name}
@@ -318,11 +328,11 @@ export function IntegrationCreateDialog({
         </div>
 
         <DialogFooter className="gap-2 sm:justify-start mt-6">
-          {createdIncidentIntegration ? (
+          {pendingWebhookSetup ? (
             <>
               <Button
                 color="blue"
-                onClick={() => void handleCompleteIncidentSetup()}
+                onClick={() => void handleCompleteWebhookSetup()}
                 disabled={updateIntegrationMutation.isPending}
                 className="flex items-center gap-2"
               >

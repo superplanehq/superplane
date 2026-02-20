@@ -872,6 +872,18 @@ export const ComponentSidebar = ({
         defaultName={createIntegrationDefinition?.name ?? ""}
         integrationHomeHref={integrationHomeHref}
         onCreated={() => handleCloseCreateIntegrationDialog()}
+        instructionsEndBeforeHeading={
+          createIntegrationDefinition?.name === "incident" ? "## Webhook integration" : undefined
+        }
+        initialStepFieldNames={createIntegrationDefinition?.name === "incident" ? ["apiKey"] : undefined}
+        webhookStepDescription={
+          createIntegrationDefinition?.name === "incident" ? (
+            <p className="text-sm text-gray-800 dark:text-gray-200">
+              Copy the webhook URL below, add it in incident.io Settings → Webhooks, subscribe to Public incident
+              created (v2) and Public incident updated (v2), then paste the signing secret.
+            </p>
+          ) : undefined
+        }
       />
 
       <Dialog open={!!configureIntegrationId} onOpenChange={(open) => !open && handleCloseConfigureIntegrationDialog()}>
