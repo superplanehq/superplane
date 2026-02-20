@@ -111,11 +111,19 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		}
 	}
 
+	// Pass only events and hash so the secret is never stored in plaintext in the webhook Configuration column.
 	if err := ctx.Integration.RequestWebhook(WebhookConfiguration{
-		Events:        config.Events,
-		SigningSecret: signingSecret,
+		Events:            config.Events,
+		SigningSecretHash: SigningSecretHash(signingSecret),
 	}); err != nil {
 		return err
+	}
+
+	// Persist the signing secret in the encrypted webhook.Secret field (same as Grafana, PagerDuty, etc.).
+	if ctx.Webhook != nil && signingSecret != "" {
+		if err := ctx.Webhook.SetSecret([]byte(signingSecret)); err != nil {
+			return fmt.Errorf("failed to persist webhook signing secret: %w", err)
+		}
 	}
 
 	// Store webhook URL in metadata so the UI can show it for the user to copy into incident.io.
@@ -150,7 +158,13 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	signingSecret := config.SigningSecret
+	// Prefer the secret from the encrypted webhook.Secret field; fall back to integration for backwards compatibility.
+	var signingSecret string
+	if ctx.Webhook != nil {
+		if b, err := ctx.Webhook.GetSecret(); err == nil && len(b) > 0 {
+			signingSecret = string(b)
+		}
+	}
 	if signingSecret == "" && ctx.Integration != nil {
 		if b, getErr := ctx.Integration.GetConfig("webhookSigningSecret"); getErr == nil && len(b) > 0 {
 			signingSecret = string(b)

@@ -27,8 +27,8 @@ func EnsureWebhookExists(tx *gorm.DB, integrationID uuid.UUID, encryptor crypto.
 
 	now := time.Now()
 	config := WebhookConfiguration{
-		Events:        []string{EventIncidentCreatedV2, EventIncidentUpdatedV2},
-		SigningSecret: "",
+		Events:            []string{EventIncidentCreatedV2, EventIncidentUpdatedV2},
+		SigningSecretHash: "",
 	}
 
 	webhook := models.Webhook{

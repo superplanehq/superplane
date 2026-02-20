@@ -19,9 +19,9 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 	trigger := &OnIncident{}
 
 	validConfig := map[string]any{
-		"events":        []string{EventIncidentCreatedV2},
-		"signingSecret": "test-secret-32-bytes-long-enough!!",
+		"events": []string{EventIncidentCreatedV2},
 	}
+	validSecret := "test-secret-32-bytes-long-enough!!"
 
 	// Svix-style: signed = id + "." + timestamp + "." + body, sig = base64(HMAC-SHA256(signed, key))
 	svixSignatureFor := func(secret, id, timestamp string, body []byte) string {
@@ -31,11 +31,12 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		return "v1," + base64.StdEncoding.EncodeToString(mac.Sum(nil))
 	}
 
-	t.Run("missing signing secret in config -> 403", func(t *testing.T) {
+	t.Run("missing signing secret (no webhook secret nor integration) -> 403", func(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
-			Configuration: map[string]any{"events": []string{EventIncidentCreatedV2}}, // no signingSecret
-			Webhook:       &contexts.WebhookContext{},
+			Configuration: map[string]any{"events": []string{EventIncidentCreatedV2}},
+			Webhook:       &contexts.WebhookContext{}, // no SetSecret called
+			Integration:   nil,                        // no integration fallback
 			Events:        &contexts.EventContext{},
 		})
 
@@ -44,10 +45,12 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("missing webhook headers -> 403", func(t *testing.T) {
+		wc := &contexts.WebhookContext{}
+		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{},
+			Webhook:       wc,
 			Events:        &contexts.EventContext{},
 		})
 
@@ -63,11 +66,13 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers.Set("webhook-timestamp", ts)
 		headers.Set("webhook-signature", "v1,invalid")
 
+		wc := &contexts.WebhookContext{}
+		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{},
+			Webhook:       wc,
 			Events:        &contexts.EventContext{},
 		})
 
@@ -79,18 +84,19 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		body := []byte(`{"event_type":"public_incident.incident_updated_v2","public_incident.incident_updated_v2":{"id":"inc-1","name":"Test"}}`)
 		ts := strconv.FormatInt(time.Now().Unix(), 10)
 		id := "msg_456"
-		secret := "test-secret-32-bytes-long-enough!!"
 		headers := http.Header{}
 		headers.Set("webhook-id", id)
 		headers.Set("webhook-timestamp", ts)
-		headers.Set("webhook-signature", svixSignatureFor(secret, id, ts, body))
+		headers.Set("webhook-signature", svixSignatureFor(validSecret, id, ts, body))
 
+		wc := &contexts.WebhookContext{}
+		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
-			Configuration: map[string]any{"events": []string{EventIncidentCreatedV2}, "signingSecret": secret},
-			Webhook:       &contexts.WebhookContext{},
+			Configuration: map[string]any{"events": []string{EventIncidentCreatedV2}},
+			Webhook:       wc,
 			Events:        eventContext,
 		})
 
@@ -99,22 +105,23 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 0, eventContext.Count())
 	})
 
-	t.Run("valid signature and event -> emit", func(t *testing.T) {
+	t.Run("valid signature and event -> emit (secret from webhook)", func(t *testing.T) {
 		body := []byte(`{"event_type":"public_incident.incident_created_v2","public_incident.incident_created_v2":{"id":"01FDAG4SAP5TYPT98WGR2N7W91","name":"Database sad","reference":"INC-123"}}`)
 		ts := strconv.FormatInt(time.Now().Unix(), 10)
 		id := "msg_789"
-		secret := "test-secret-32-bytes-long-enough!!"
 		headers := http.Header{}
 		headers.Set("webhook-id", id)
 		headers.Set("webhook-timestamp", ts)
-		headers.Set("webhook-signature", svixSignatureFor(secret, id, ts, body))
+		headers.Set("webhook-signature", svixSignatureFor(validSecret, id, ts, body))
 
+		wc := &contexts.WebhookContext{}
+		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{},
+			Webhook:       wc,
 			Events:        eventContext,
 		})
 
@@ -135,18 +142,19 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		body := []byte(`{"type":"incident.incident.created","data":{"event_type":"public_incident.incident_created_v2","incident":{"id":"01FDAG4SAP5TYPT98WGR2N7W91","name":"Our database is sad","reference":"INC-123"}},"timestamp":"2026-01-19T12:00:00Z"}`)
 		ts := strconv.FormatInt(time.Now().Unix(), 10)
 		id := "msg_svix"
-		secret := "test-secret-32-bytes-long-enough!!"
 		headers := http.Header{}
 		headers.Set("webhook-id", id)
 		headers.Set("webhook-timestamp", ts)
-		headers.Set("webhook-signature", svixSignatureFor(secret, id, ts, body))
+		headers.Set("webhook-signature", svixSignatureFor(validSecret, id, ts, body))
 
+		wc := &contexts.WebhookContext{}
+		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{},
+			Webhook:       wc,
 			Events:        eventContext,
 		})
 

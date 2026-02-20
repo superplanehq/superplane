@@ -42,6 +42,25 @@ func (c *NodeWebhookContext) GetSecret() ([]byte, error) {
 	return c.encryptor.Decrypt(c.ctx, webhook.Secret, []byte(webhook.ID.String()))
 }
 
+func (c *NodeWebhookContext) SetSecret(secret []byte) error {
+	if c.node.WebhookID == nil {
+		return fmt.Errorf("node does not have a webhook")
+	}
+
+	webhook, err := models.FindWebhookInTransaction(c.tx, *c.node.WebhookID)
+	if err != nil {
+		return err
+	}
+
+	encrypted, err := c.encryptor.Encrypt(c.ctx, secret, []byte(webhook.ID.String()))
+	if err != nil {
+		return err
+	}
+
+	webhook.Secret = encrypted
+	return c.tx.Model(webhook).Update("secret", webhook.Secret).Error
+}
+
 func (c *NodeWebhookContext) ResetSecret() ([]byte, []byte, error) {
 	if c.node.WebhookID == nil {
 		return nil, nil, fmt.Errorf("node does not have a webhook")
