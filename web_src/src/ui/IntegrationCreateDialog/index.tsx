@@ -11,14 +11,30 @@ import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { useCreateIntegration, useUpdateIntegration } from "@/hooks/useIntegrations";
-import type { ConfigurationField, IntegrationsIntegrationDefinition, OrganizationsBrowserAction } from "@/api-client";
+import type {
+  ConfigurationField,
+  IntegrationsIntegrationDefinition,
+  OrganizationsBrowserAction,
+  OrganizationsCreateIntegrationResponse,
+} from "@/api-client";
+
+export type IntegrationCreatePayload = {
+  integrationName: string;
+  name: string;
+  configuration?: Record<string, unknown>;
+};
 
 export interface IntegrationCreateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   integrationDefinition: IntegrationsIntegrationDefinition | null | undefined;
   organizationId: string;
+  /** Called to create the integration. Returns the API response (integration id, browser action, webhook url, etc.). */
+  onCreateIntegration: (payload: IntegrationCreatePayload) => Promise<OrganizationsCreateIntegrationResponse>;
+  /** Called to update the integration (e.g. complete webhook setup). */
+  onUpdateIntegration: (integrationId: string, payload: { configuration: Record<string, unknown> }) => Promise<void>;
+  /** Optional: called when dialog closes so parent can reset mutation state. */
+  onReset?: () => void;
   defaultName?: string;
   integrationHomeHref?: string;
   onCreated?: (integrationId: string) => void;
@@ -35,6 +51,9 @@ export function IntegrationCreateDialog({
   onOpenChange,
   integrationDefinition,
   organizationId,
+  onCreateIntegration,
+  onUpdateIntegration,
+  onReset,
   defaultName = "",
   integrationHomeHref,
   onCreated,
@@ -52,9 +71,9 @@ export function IntegrationCreateDialog({
     webhookUrl: string;
     config: Record<string, unknown>;
   } | null>(null);
-
-  const createIntegrationMutation = useCreateIntegration(organizationId);
-  const updateIntegrationMutation = useUpdateIntegration(organizationId, pendingWebhookSetup?.id ?? "");
+  const [isCreatePending, setIsCreatePending] = useState(false);
+  const [isUpdatePending, setIsUpdatePending] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const selectedInstructions = useMemo(() => {
     const raw = integrationDefinition?.instructions?.trim();
@@ -85,11 +104,12 @@ export function IntegrationCreateDialog({
         setConfiguration({});
         setCreateIntegrationBrowserAction(undefined);
         setPendingWebhookSetup(null);
-        createIntegrationMutation.reset();
+        setCreateError(null);
+        onReset?.();
       }
       onOpenChange(next);
     },
-    [onOpenChange, createIntegrationMutation],
+    [onOpenChange, onReset],
   );
 
   const handleClose = useCallback(() => {
@@ -104,14 +124,16 @@ export function IntegrationCreateDialog({
       return;
     }
 
+    setCreateError(null);
+    setIsCreatePending(true);
     try {
-      const result = await createIntegrationMutation.mutateAsync({
+      const result = await onCreateIntegration({
         integrationName: integrationDefinition.name,
         name: nextName,
         configuration,
       });
 
-      const integration = result.data?.integration;
+      const integration = result.integration;
       const browserAction = integration?.status?.browserAction;
       const webhookUrl =
         integration?.status?.metadata &&
@@ -137,14 +159,18 @@ export function IntegrationCreateDialog({
         onCreated?.(integration.metadata.id);
       }
     } catch (error) {
-      showErrorToast(`Failed to create integration: ${getApiErrorMessage(error)}`);
+      const message = getApiErrorMessage(error);
+      setCreateError(message);
+      showErrorToast(`Failed to create integration: ${message}`);
+    } finally {
+      setIsCreatePending(false);
     }
   }, [
     integrationDefinition?.name,
     organizationId,
     integrationName,
     configuration,
-    createIntegrationMutation,
+    onCreateIntegration,
     handleClose,
     onCreated,
   ]);
@@ -152,16 +178,19 @@ export function IntegrationCreateDialog({
   const handleCompleteWebhookSetup = useCallback(async () => {
     if (!pendingWebhookSetup) return;
 
+    setIsUpdatePending(true);
     try {
-      await updateIntegrationMutation.mutateAsync({
+      await onUpdateIntegration(pendingWebhookSetup.id, {
         configuration: { ...pendingWebhookSetup.config, ...configuration },
       });
       handleClose();
       onCreated?.(pendingWebhookSetup.id);
     } catch {
       showErrorToast("Failed to complete setup");
+    } finally {
+      setIsUpdatePending(false);
     }
-  }, [pendingWebhookSetup, configuration, updateIntegrationMutation, handleClose, onCreated]);
+  }, [pendingWebhookSetup, configuration, onUpdateIntegration, handleClose, onCreated]);
 
   const handleBrowserActionContinue = useCallback(() => {
     if (!createIntegrationBrowserAction) return;
@@ -194,10 +223,7 @@ export function IntegrationCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent
-        className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
-        showCloseButton={!createIntegrationMutation.isPending}
-      >
+      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto" showCloseButton={!isCreatePending}>
         <DialogHeader>
           <div className="flex items-center gap-3">
             <IntegrationIcon
@@ -326,10 +352,10 @@ export function IntegrationCreateDialog({
               <Button
                 color="blue"
                 onClick={() => void handleCompleteWebhookSetup()}
-                disabled={updateIntegrationMutation.isPending}
+                disabled={isUpdatePending}
                 className="flex items-center gap-2"
               >
-                {updateIntegrationMutation.isPending ? (
+                {isUpdatePending ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Completing...
@@ -338,7 +364,7 @@ export function IntegrationCreateDialog({
                   "Complete setup"
                 )}
               </Button>
-              <Button variant="outline" onClick={handleClose} disabled={updateIntegrationMutation.isPending}>
+              <Button variant="outline" onClick={handleClose} disabled={isUpdatePending}>
                 Done
               </Button>
             </>
@@ -356,10 +382,10 @@ export function IntegrationCreateDialog({
               <Button
                 color="blue"
                 onClick={() => void handleSubmit()}
-                disabled={createIntegrationMutation.isPending || !integrationName?.trim()}
+                disabled={isCreatePending || !integrationName?.trim()}
                 className="flex items-center gap-2"
               >
-                {createIntegrationMutation.isPending ? (
+                {isCreatePending ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Connecting...
@@ -368,18 +394,16 @@ export function IntegrationCreateDialog({
                   "Connect"
                 )}
               </Button>
-              <Button variant="outline" onClick={handleClose} disabled={createIntegrationMutation.isPending}>
+              <Button variant="outline" onClick={handleClose} disabled={isCreatePending}>
                 Cancel
               </Button>
             </>
           )}
         </DialogFooter>
 
-        {createIntegrationMutation.isError && (
+        {createError && (
           <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-            <p className="text-sm text-red-800 dark:text-red-200">
-              Failed to create integration: {getApiErrorMessage(createIntegrationMutation.error)}
-            </p>
+            <p className="text-sm text-red-800 dark:text-red-200">Failed to create integration: {createError}</p>
           </div>
         )}
       </DialogContent>

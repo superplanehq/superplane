@@ -8,8 +8,17 @@ import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { resolveIcon } from "@/lib/utils";
 import { Check, Copy, Loader2, Settings, TriangleAlert, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { organizationsUpdateIntegration } from "@/api-client";
+import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getHeaderIconSrc, IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { useAvailableIntegrations, useIntegration, useUpdateIntegration } from "@/hooks/useIntegrations";
+import {
+  integrationKeys,
+  useAvailableIntegrations,
+  useCreateIntegration,
+  useIntegration,
+  useUpdateIntegration,
+} from "@/hooks/useIntegrations";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast } from "@/utils/toast";
@@ -253,11 +262,35 @@ export const ComponentSidebar = ({
   const resolvedAutocompleteExampleObj = autocompleteExampleObj ?? null;
 
   const { data: availableIntegrationDefinitions = [] } = useAvailableIntegrations();
+  const queryClient = useQueryClient();
   const { data: configureIntegration, isLoading: configureIntegrationLoading } = useIntegration(
     domainId ?? "",
     configureIntegrationId ?? "",
   );
   const updateIntegrationMutation = useUpdateIntegration(domainId ?? "", configureIntegrationId ?? "");
+  const createIntegrationMutation = useCreateIntegration(domainId ?? "");
+  const completeWebhookUpdateMutation = useMutation({
+    mutationFn: async ({
+      integrationId,
+      configuration,
+    }: {
+      integrationId: string;
+      configuration: Record<string, unknown>;
+    }) => {
+      const orgId = domainId ?? "";
+      return organizationsUpdateIntegration(
+        withOrganizationHeader({
+          path: { id: orgId, integrationId },
+          body: { configuration },
+        }),
+      );
+    },
+    onSuccess: (_, variables) => {
+      const orgId = domainId ?? "";
+      queryClient.invalidateQueries({ queryKey: integrationKeys.connected(orgId) });
+      queryClient.invalidateQueries({ queryKey: integrationKeys.integration(orgId, variables.integrationId) });
+    },
+  });
   const configureIntegrationDefinition = useMemo(
     () =>
       configureIntegration?.spec?.integrationName
@@ -869,6 +902,17 @@ export const ComponentSidebar = ({
         onOpenChange={(open) => !open && handleCloseCreateIntegrationDialog()}
         integrationDefinition={createIntegrationDefinition}
         organizationId={domainId ?? ""}
+        onCreateIntegration={async (payload) => {
+          const res = await createIntegrationMutation.mutateAsync(payload);
+          return res.data;
+        }}
+        onUpdateIntegration={async (integrationId, payload) => {
+          await completeWebhookUpdateMutation.mutateAsync({ integrationId, ...payload });
+        }}
+        onReset={() => {
+          createIntegrationMutation.reset();
+          completeWebhookUpdateMutation.reset();
+        }}
         defaultName={createIntegrationDefinition?.name ?? ""}
         integrationHomeHref={integrationHomeHref}
         onCreated={() => handleCloseCreateIntegrationDialog()}
