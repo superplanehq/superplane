@@ -1591,8 +1591,10 @@ The Create Queue component creates a new AWS SQS queue.
 
 ```json
 {
-  "queueName": "my-created-queue",
-  "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-created-queue",
+  "data": {
+    "queueName": "my-created-queue",
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-created-queue"
+  },
   "timestamp": "2026-02-11T12:00:00Z",
   "type": "aws.sqs.queue"
 }
@@ -1613,8 +1615,10 @@ The Delete Queue component deletes an AWS SQS queue.
 
 ```json
 {
-  "deleted": true,
-  "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+  "data": {
+    "deleted": true,
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+  },
   "timestamp": "2026-02-11T12:00:00Z",
   "type": "aws.sqs.queue.deleted"
 }
@@ -1635,15 +1639,17 @@ The Get Queue component retrieves metadata and attributes for an AWS SQS queue.
 
 ```json
 {
-  "attributes": {
-    "DelaySeconds": "0",
-    "MaximumMessageSize": "262144",
-    "MessageRetentionPeriod": "345600",
-    "QueueArn": "arn:aws:sqs:us-east-1:123456789012:my-queue",
-    "ReceiveMessageWaitTimeSeconds": "0",
-    "VisibilityTimeout": "30"
+  "data": {
+    "attributes": {
+      "DelaySeconds": "0",
+      "MaximumMessageSize": "262144",
+      "MessageRetentionPeriod": "345600",
+      "QueueArn": "arn:aws:sqs:us-east-1:123456789012:my-queue",
+      "ReceiveMessageWaitTimeSeconds": "0",
+      "VisibilityTimeout": "30"
+    },
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
   },
-  "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
   "timestamp": "2026-02-11T12:00:00Z",
   "type": "aws.sqs.queue"
 }
@@ -1664,8 +1670,10 @@ The Purge Queue component removes all messages from an AWS SQS queue.
 
 ```json
 {
-  "purged": true,
-  "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+  "data": {
+    "purged": true,
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+  },
   "timestamp": "2026-02-11T12:00:00Z",
   "type": "aws.sqs.queue.purged"
 }
@@ -1687,8 +1695,12 @@ The Send Message component publishes a message to an AWS SQS queue.
 
 ```json
 {
-  "messageId": "d84c1b4d-1f3b-4b6c-9d9f-5c3a2b1f9e7a",
-  "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+  "data": {
+    "messageId": "d84c1b4d-1f3b-4b6c-9d9f-5c3a2b1f9e7a",
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+  },
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.sqs.message"
 }
 ```
 

@@ -75,7 +75,7 @@ function createQueueMetadataList(node: NodeInfo): MetadataItem[] {
 
   const queueName = configuration?.queueName?.trim();
   if (queueName) {
-    metadata.push({ icon: "message-square", label: queueName });
+    metadata.push({ icon: "hash", label: queueName });
   }
 
   return metadata;

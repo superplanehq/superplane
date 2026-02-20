@@ -7,7 +7,7 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../../types";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
@@ -19,7 +19,10 @@ import { getQueueNameFromUrl } from "./utils";
 interface SendMessageConfiguration {
   region?: string;
   queue?: string;
-  messageBody?: string;
+  format?: string;
+  json?: any;
+  xml?: string;
+  text?: string;
 }
 
 interface SendMessageOutput {
@@ -45,6 +48,7 @@ export const sendMessageMapper: ComponentBaseMapper = {
       eventSections: lastExecution ? sendMessageEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: sendMessageMetadataList(context.node),
+      specs: sendMessageSpecs(context.node),
       eventStateMap: getStateMap(componentName),
     };
   },
@@ -77,7 +81,11 @@ function sendMessageMetadataList(node: NodeInfo): MetadataItem[] {
 
   const queueName = getQueueNameFromUrl(configuration?.queue);
   if (queueName) {
-    metadata.push({ icon: "message-square", label: queueName });
+    metadata.push({ icon: "hash", label: queueName });
+  }
+
+  if (configuration?.format) {
+    metadata.push({ icon: "code", label: `Message format: ${configuration.format}` });
   }
 
   return metadata;
@@ -97,4 +105,41 @@ function sendMessageEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
       eventId: execution.rootEvent!.id!,
     },
   ];
+}
+
+function sendMessageSpecs(node: NodeInfo): ComponentBaseSpec[] {
+  const specs: ComponentBaseSpec[] = [];
+  const configuration = node.configuration as SendMessageConfiguration | undefined;
+
+  if (configuration?.json) {
+    specs.push({
+      title: "JSON message",
+      tooltipTitle: "JSON message",
+      iconSlug: "file-json",
+      value: configuration.json,
+      contentType: "json",
+    });
+  }
+
+  if (configuration?.xml) {
+    specs.push({
+      title: "XML message",
+      tooltipTitle: "XML message",
+      iconSlug: "file-code",
+      value: configuration.xml,
+      contentType: "xml",
+    });
+  }
+
+  if (configuration?.text) {
+    specs.push({
+      title: "Text message",
+      tooltipTitle: "Text message",
+      iconSlug: "file-text",
+      value: configuration.text,
+      contentType: "text",
+    });
+  }
+
+  return specs;
 }

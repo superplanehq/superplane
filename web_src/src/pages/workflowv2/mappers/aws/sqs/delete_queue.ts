@@ -76,7 +76,7 @@ function deleteQueueMetadataList(node: NodeInfo): MetadataItem[] {
 
   const queueName = getQueueNameFromUrl(configuration?.queue);
   if (queueName) {
-    metadata.push({ icon: "message-square", label: queueName });
+    metadata.push({ icon: "hash", label: queueName });
   }
 
   return metadata;
