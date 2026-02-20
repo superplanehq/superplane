@@ -266,12 +266,8 @@ func writeFile(path string, data []byte) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-var htmlTagRe = regexp.MustCompile(`<([a-zA-Z][a-zA-Z0-9-]*)>`)
-var htmlEntityTagRe = regexp.MustCompile(`&lt;([a-zA-Z][a-zA-Z0-9-]*)&gt;`)
+var htmlTagRe = regexp.MustCompile(`<([a-zA-Z/][^>]*)>`)
 
-// sanitizeHTMLTags escapes HTML tags and HTML-entity-encoded tags in
-// documentation content so they are not interpreted as JSX by MDX.
-// Tags inside code blocks and inline code spans are left untouched.
 func sanitizeHTMLTags(content string) string {
 	lines := strings.Split(content, "\n")
 	inCodeBlock := false
@@ -289,22 +285,16 @@ func sanitizeHTMLTags(content string) string {
 			continue
 		}
 
-		result = append(result, sanitizeLineTags(line))
+		parts := strings.Split(line, "`")
+		for i := range parts {
+			if i%2 == 0 {
+				parts[i] = htmlTagRe.ReplaceAllString(parts[i], "&lt;$1&gt;")
+			}
+		}
+		result = append(result, strings.Join(parts, "`"))
 	}
 
 	return strings.Join(result, "\n")
-}
-
-func sanitizeLineTags(line string) string {
-	parts := strings.Split(line, "`")
-	for i := range parts {
-		if i%2 == 0 {
-			parts[i] = htmlEntityTagRe.ReplaceAllString(parts[i], `\<$1\>`)
-			parts[i] = htmlTagRe.ReplaceAllString(parts[i], `\<$1\>`)
-		}
-	}
-
-	return strings.Join(parts, "`")
 }
 
 func slugify(value string) string {
