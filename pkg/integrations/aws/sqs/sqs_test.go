@@ -656,4 +656,3 @@ func Test__QueueNameFromURL(t *testing.T) {
 		assert.Equal(t, "not-a-url", name)
 	})
 }
-

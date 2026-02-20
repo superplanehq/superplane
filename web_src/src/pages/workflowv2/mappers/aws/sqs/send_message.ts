@@ -42,9 +42,7 @@ export const sendMessageMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? sendMessageEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? sendMessageEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: sendMessageMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -85,11 +83,7 @@ function sendMessageMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function sendMessageEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function sendMessageEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });

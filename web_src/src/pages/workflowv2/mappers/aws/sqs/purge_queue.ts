@@ -41,9 +41,7 @@ export const purgeQueueMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? purgeQueueEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? purgeQueueEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: purgeQueueMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -84,11 +82,7 @@ function purgeQueueMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function purgeQueueEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function purgeQueueEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });

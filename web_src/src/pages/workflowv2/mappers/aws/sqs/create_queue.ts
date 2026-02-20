@@ -40,9 +40,7 @@ export const createQueueMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? createQueueEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? createQueueEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: createQueueMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -83,11 +81,7 @@ function createQueueMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function createQueueEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function createQueueEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });

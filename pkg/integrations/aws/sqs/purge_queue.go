@@ -177,4 +177,3 @@ func (c *PurgeQueue) Cancel(ctx core.ExecutionContext) error {
 func (c *PurgeQueue) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
-

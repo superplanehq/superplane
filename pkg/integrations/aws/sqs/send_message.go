@@ -198,4 +198,3 @@ func (c *SendMessage) Cancel(ctx core.ExecutionContext) error {
 func (c *SendMessage) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
-

@@ -9,6 +9,7 @@ Manage resources and execute AWS commands in workflows
 <CardGrid>
   <LinkCard title="CloudWatch • On Alarm" href="#cloud-watch-•-on-alarm" description="Listen to AWS CloudWatch alarm state change events" />
   <LinkCard title="CodeArtifact • On Package Version" href="#code-artifact-•-on-package-version" description="Listen to AWS CodeArtifact package version events" />
+  <LinkCard title="EC2 • On Image" href="#ec2-•-on-image" description="Listen to AWS EC2 AMI state change events" />
   <LinkCard title="ECR • On Image Push" href="#ecr-•-on-image-push" description="Listen to AWS ECR image push events" />
   <LinkCard title="ECR • On Image Scan" href="#ecr-•-on-image-scan" description="Listen to AWS ECR image scan events" />
   <LinkCard title="SNS • On Topic Message" href="#sns-•-on-topic-message" description="Listen to AWS SNS topic notifications" />
@@ -26,6 +27,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CodeArtifact • Dispose Package Versions" href="#code-artifact-•-dispose-package-versions" description="Delete assets and set package version status to Disposed (record remains)" />
   <LinkCard title="CodeArtifact • Get Package Version" href="#code-artifact-•-get-package-version" description="Describe an AWS CodeArtifact package version" />
   <LinkCard title="CodeArtifact • Update Package Versions Status" href="#code-artifact-•-update-package-versions-status" description="Update the status of one or more package versions (Archived, Published, Unlisted)" />
+  <LinkCard title="EC2 • Copy Image" href="#ec2-•-copy-image" description="Copy an EC2 AMI image to another region" />
+  <LinkCard title="EC2 • Create Image" href="#ec2-•-create-image" description="Create a new AMI image from an EC2 instance" />
+  <LinkCard title="EC2 • Deregister Image" href="#ec2-•-deregister-image" description="Deregister an EC2 AMI image" />
+  <LinkCard title="EC2 • Disable Image" href="#ec2-•-disable-image" description="Disable an EC2 AMI image" />
+  <LinkCard title="EC2 • Disable Image Deprecation" href="#ec2-•-disable-image-deprecation" description="Disable deprecation for an EC2 AMI image" />
+  <LinkCard title="EC2 • Enable Image" href="#ec2-•-enable-image" description="Enable an EC2 AMI image" />
+  <LinkCard title="EC2 • Enable Image Deprecation" href="#ec2-•-enable-image-deprecation" description="Enable deprecation for an EC2 AMI image" />
+  <LinkCard title="EC2 • Get Image" href="#ec2-•-get-image" description="Get an EC2 AMI image by ID" />
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
@@ -34,11 +43,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="ECS • Stop Task" href="#ecs-•-stop-task" description="Stop a running AWS ECS task" />
   <LinkCard title="Lambda • Run Function" href="#lambda-•-run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
   <LinkCard title="Route 53 • Create DNS Record" href="#route-53-•-create-dns-record" description="Create a DNS record in an AWS Route 53 hosted zone" />
-  <LinkCard title="SQS • Create Queue" href="#sqs-•-create-queue" description="Create an SQS queue" />
-  <LinkCard title="SQS • Delete Queue" href="#sqs-•-delete-queue" description="Delete an SQS queue" />
-  <LinkCard title="SQS • Get Queue" href="#sqs-•-get-queue" description="Retrieve an existing SQS queue" />
-  <LinkCard title="SQS • Purge Queue" href="#sqs-•-purge-queue" description="Purge all messages from an SQS queue" />
-  <LinkCard title="SQS • Send Message" href="#sqs-•-send-message" description="Send a message to an SQS queue" />
   <LinkCard title="Route 53 • Delete DNS Record" href="#route-53-•-delete-dns-record" description="Delete a DNS record from an AWS Route 53 hosted zone" />
   <LinkCard title="Route 53 • Upsert DNS Record" href="#route-53-•-upsert-dns-record" description="Create or update a DNS record in an AWS Route 53 hosted zone" />
   <LinkCard title="SNS • Create Topic" href="#sns-•-create-topic" description="Create an AWS SNS topic" />
@@ -46,6 +50,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="SNS • Get Subscription" href="#sns-•-get-subscription" description="Get an AWS SNS subscription by ARN" />
   <LinkCard title="SNS • Get Topic" href="#sns-•-get-topic" description="Get an AWS SNS topic by ARN" />
   <LinkCard title="SNS • Publish Message" href="#sns-•-publish-message" description="Publish a message to an AWS SNS topic" />
+  <LinkCard title="SQS • Create Queue" href="#sqs-•-create-queue" description="Create a new SQS queue" />
+  <LinkCard title="SQS • Delete Queue" href="#sqs-•-delete-queue" description="Delete an SQS queue" />
+  <LinkCard title="SQS • Get Queue" href="#sqs-•-get-queue" description="Get metadata and attributes for an SQS queue" />
+  <LinkCard title="SQS • Purge Queue" href="#sqs-•-purge-queue" description="Purge all messages from an SQS queue" />
+  <LinkCard title="SQS • Send Message" href="#sqs-•-send-message" description="Send a message to an SQS queue" />
 </CardGrid>
 
 ## Instructions
@@ -163,6 +172,55 @@ The On Package Version trigger starts a workflow execution when a package versio
   },
   "timestamp": "2026-03-10T14:25:30.31254162Z",
   "type": "aws.codeartifact.package.version"
+}
+```
+
+<a id="ec2-•-on-image"></a>
+
+## EC2 • On Image
+
+The On Image trigger starts a workflow execution when an EC2 AMI changes state.
+
+### Use Cases
+
+- **Image pipeline orchestration**: Continue workflows when a new AMI becomes available
+- **Failure handling**: Alert and remediate when AMI creation fails
+- **Compliance workflows**: Run validation and distribution after image creation
+
+### Configuration
+
+- **Region**: AWS region where AMI state changes are monitored
+- **Image State**: State to trigger on (pending, available, failed)
+
+### Event Data
+
+Each AMI state event includes:
+- **detail.ImageId**: AMI ID (for example: ami-1234567890abcdef0)
+- **detail.State**: AMI state
+- **detail.ErrorMessage**: Error message for failed states (if available)
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account": "123456789012",
+    "detail": {
+      "ImageId": "ami-07f0e4f3e9c123abc",
+      "State": "available"
+    },
+    "detail-type": "EC2 AMI State Change",
+    "id": "f74f3de5-f9b7-4f3d-909a-531fc3ff2f14",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:ec2:us-east-1::image/ami-07f0e4f3e9c123abc"
+    ],
+    "source": "aws.ec2",
+    "time": "2026-02-10T12:10:00Z",
+    "version": "0"
+  },
+  "timestamp": "2026-02-10T12:10:01Z",
+  "type": "aws.ec2.image"
 }
 ```
 
@@ -549,6 +607,316 @@ The Update Package Versions Status component sets the status of package versions
       "status": "Archived"
     }
   }
+}
+```
+
+<a id="ec2-•-copy-image"></a>
+
+## EC2 • Copy Image
+
+The Copy Image component copies an AMI to another AWS region.
+
+### Use Cases
+
+- **Multi-region rollouts**: Replicate golden images to deployment regions
+- **Disaster recovery**: Keep AMI backups in secondary regions
+- **Promotion workflows**: Copy validated images across environments
+
+### Configuration
+
+- **Destination Region**: AWS region where the copied AMI is created
+- **Source Region**: AWS region where the source AMI exists
+- **Source Image ID**: AMI ID to copy
+- **Image Name**: Name for the copied AMI
+- **Description**: Optional AMI description
+
+### Completion behavior
+
+- The component waits for EventBridge `EC2 AMI State Change` events for the copied AMI.
+- It completes when the AMI state becomes `available`.
+- It fails if the AMI state becomes `failed`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "architecture": "x86_64",
+      "creationDate": "2026-02-19T09:00:00.000Z",
+      "description": "Copied for disaster recovery",
+      "hypervisor": "xen",
+      "imageId": "ami-0c0ffee1234567890",
+      "imageType": "machine",
+      "name": "my-app-2026-02-19",
+      "ownerId": "123456789012",
+      "region": "us-west-2",
+      "rootDeviceName": "/dev/xvda",
+      "rootDeviceType": "ebs",
+      "state": "available",
+      "virtualizationType": "hvm"
+    }
+  },
+  "timestamp": "2026-02-19T09:00:00Z",
+  "type": "aws.ec2.image"
+}
+```
+
+<a id="ec2-•-create-image"></a>
+
+## EC2 • Create Image
+
+The Create Image component creates a new Amazon Machine Image (AMI) from an EC2 instance.
+
+### Use Cases
+
+- **Golden image pipelines**: Build immutable infrastructure images from validated instances
+- **Backup workflows**: Snapshot instance state before deployments or migrations
+- **Release automation**: Produce versioned AMIs as part of CI/CD
+
+### Configuration
+
+- **Region**: AWS region where the instance runs
+- **Instance**: EC2 instance ID to create an image from
+- **Image Name**: Name for the AMI
+- **Description**: Optional image description
+- **No Reboot**: If enabled, create the image without rebooting the instance
+
+### Completion behavior
+
+- The component waits for EventBridge `EC2 AMI State Change` events for the created AMI.
+- It completes when the AMI state becomes `available`.
+- It fails if the AMI state becomes `failed`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "architecture": "x86_64",
+      "creationDate": "2026-02-18T12:00:00.000Z",
+      "description": "Golden image for production",
+      "hypervisor": "xen",
+      "imageId": "ami-07f0e4f3e9c123abc",
+      "imageType": "machine",
+      "name": "my-app-2026-02-18",
+      "ownerId": "123456789012",
+      "region": "us-east-1",
+      "rootDeviceName": "/dev/xvda",
+      "rootDeviceType": "ebs",
+      "state": "available",
+      "virtualizationType": "hvm"
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00Z",
+  "type": "aws.ec2.image"
+}
+```
+
+<a id="ec2-•-deregister-image"></a>
+
+## EC2 • Deregister Image
+
+The Deregister Image component removes an AMI from your account in a region.
+
+### Use Cases
+
+- **Image lifecycle cleanup**: Remove unused AMIs after promotion
+- **Compliance operations**: Retire images that should no longer be launched
+- **Automation rollback**: Clean up AMIs created by failed workflows
+
+### Configuration
+
+- **Region**: AWS region where the AMI exists
+- **Image ID**: AMI ID to deregister
+- **Delete Snapshots**: If enabled, delete the snapshots associated with the AMI
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deregistered": true,
+    "imageId": "ami-07f0e4f3e9c123abc",
+    "region": "us-east-1",
+    "requestId": "req-deregister"
+  },
+  "timestamp": "2026-02-19T09:10:00Z",
+  "type": "aws.ec2.image.deregistered"
+}
+```
+
+<a id="ec2-•-disable-image"></a>
+
+## EC2 • Disable Image
+
+The Disable Image component disables an AMI so it cannot be launched.
+
+### Use Cases
+
+- **Risk containment**: Prevent new launches from vulnerable images
+- **Release control**: Temporarily block image usage during maintenance
+- **Lifecycle governance**: Enforce policies before image retirement
+
+### Configuration
+
+- **Region**: AWS region where the AMI exists
+- **Image ID**: AMI ID to disable
+
+### Example Output
+
+```json
+{
+  "data": {
+    "disabled": true,
+    "imageId": "ami-07f0e4f3e9c123abc",
+    "region": "us-east-1",
+    "requestId": "req-disable"
+  },
+  "timestamp": "2026-02-19T09:30:00Z",
+  "type": "aws.ec2.image.disabled"
+}
+```
+
+<a id="ec2-•-disable-image-deprecation"></a>
+
+## EC2 • Disable Image Deprecation
+
+The Disable Image Deprecation component removes the deprecation schedule from an AMI.
+
+### Use Cases
+
+- **Release extension**: Keep an image available longer than planned
+- **Rollback support**: Reopen older images for temporary use
+- **Policy exceptions**: Remove deprecation when operational needs change
+
+### Configuration
+
+- **Region**: AWS region where the AMI exists
+- **Image ID**: AMI ID to remove deprecation from
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deprecationEnabled": false,
+    "imageId": "ami-07f0e4f3e9c123abc",
+    "region": "us-east-1",
+    "requestId": "req-disable-deprecation"
+  },
+  "timestamp": "2026-02-19T09:50:00Z",
+  "type": "aws.ec2.image.deprecation.disabled"
+}
+```
+
+<a id="ec2-•-enable-image"></a>
+
+## EC2 • Enable Image
+
+The Enable Image component enables a previously disabled AMI.
+
+### Use Cases
+
+- **Release promotion**: Re-enable AMIs after staged validation
+- **Operational recovery**: Restore image availability after temporary restrictions
+- **Lifecycle workflows**: Toggle image launchability based on policy checks
+
+### Configuration
+
+- **Region**: AWS region where the AMI exists
+- **Image ID**: AMI ID to enable
+
+### Example Output
+
+```json
+{
+  "data": {
+    "enabled": true,
+    "imageId": "ami-07f0e4f3e9c123abc",
+    "region": "us-east-1",
+    "requestId": "req-enable"
+  },
+  "timestamp": "2026-02-19T09:20:00Z",
+  "type": "aws.ec2.image.enabled"
+}
+```
+
+<a id="ec2-•-enable-image-deprecation"></a>
+
+## EC2 • Enable Image Deprecation
+
+The Enable Image Deprecation component sets a deprecation time for an AMI.
+
+### Use Cases
+
+- **Release lifecycle**: Schedule AMI retirement dates
+- **Compliance enforcement**: Ensure images expire on policy deadlines
+- **Operational hygiene**: Phase out outdated images in a controlled window
+
+### Configuration
+
+- **Region**: AWS region where the AMI exists
+- **Image ID**: AMI ID to deprecate
+- **Deprecate At**: RFC3339 timestamp when deprecation takes effect
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deprecateAt": "2026-04-01T00:00:00Z",
+    "deprecationEnabled": true,
+    "imageId": "ami-07f0e4f3e9c123abc",
+    "region": "us-east-1",
+    "requestId": "req-enable-deprecation"
+  },
+  "timestamp": "2026-02-19T09:40:00Z",
+  "type": "aws.ec2.image.deprecation.enabled"
+}
+```
+
+<a id="ec2-•-get-image"></a>
+
+## EC2 • Get Image
+
+The Get Image component retrieves metadata for an EC2 AMI.
+
+### Use Cases
+
+- **Release automation**: Validate AMI metadata before deployment
+- **Operational checks**: Inspect AMI state and ownership in workflows
+- **Traceability**: Resolve AMI details by image ID
+
+### Configuration
+
+- **Region**: AWS region of the AMI
+- **Image ID**: AMI ID (for example: ami-1234567890abcdef0)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "architecture": "x86_64",
+      "creationDate": "2026-02-18T12:00:00.000Z",
+      "description": "Golden image for production",
+      "hypervisor": "xen",
+      "imageId": "ami-1234567890abcdef0",
+      "imageType": "machine",
+      "name": "my-app-2026-02-18",
+      "ownerId": "123456789012",
+      "region": "us-east-1",
+      "rootDeviceName": "/dev/xvda",
+      "rootDeviceType": "ebs",
+      "state": "available",
+      "virtualizationType": "hvm"
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00Z",
+  "type": "aws.ec2.image"
 }
 ```
 
@@ -939,166 +1307,6 @@ The Run Lambda component invokes a Lambda function.
 }
 ```
 
-<a id="sqs-•-create-queue"></a>
-
-## SQS • Create Queue
-
-The Create Queue component creates a new SQS queue.
-
-### Use Cases
-
-- **New workflows**: Create a dedicated queue for a new workflow or service
-- **Ephemeral queues**: Spin up short-lived queues for temporary processing
-- **Environment isolation**: Create separate queues per environment or tenant
-
-### Configuration
-
-- **Region**: AWS region where the queue will be created
-- **Queue Name**: Name of the SQS queue
-- **Queue Type**: Standard or FIFO
-- **Attributes**: Optional SQS attributes (visibility timeout, message retention, etc.)
-
-### Example Output
-
-```json
-{
-  "data": {
-    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
-    "queueArn": "arn:aws:sqs:us-east-1:123456789012:my-queue"
-  },
-  "timestamp": "2026-02-18T12:00:00Z",
-  "type": "aws.sqs.queue.created"
-}
-```
-
-<a id="sqs-•-get-queue"></a>
-
-## SQS • Get Queue
-
-The Get Queue component retrieves metadata and configuration for an existing SQS queue.
-
-### Use Cases
-
-- **Health checks**: Verify that a queue exists before sending messages
-- **Configuration audits**: Inspect attributes like visibility timeout or retention period
-- **Dynamic routing**: Resolve queue URLs from names at runtime
-
-### Configuration
-
-- **Region**: AWS region of the queue
-- **Queue URL or Name**: URL or name of the SQS queue
-
-### Example Output
-
-```json
-{
-  "data": {
-    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
-    "queueArn": "arn:aws:sqs:us-east-1:123456789012:my-queue",
-    "attributes": {
-      "VisibilityTimeout": "30",
-      "MessageRetentionPeriod": "345600",
-      "FifoQueue": "false"
-    }
-  },
-  "timestamp": "2026-02-18T12:00:00Z",
-  "type": "aws.sqs.queue"
-}
-```
-
-<a id="sqs-•-send-message"></a>
-
-## SQS • Send Message
-
-The Send Message component sends a message to an SQS queue.
-
-### Use Cases
-
-- **Event fan-out**: Push events into queues for downstream workers
-- **Asynchronous processing**: Offload long-running work from synchronous flows
-- **Retries and buffering**: Use SQS as a durable buffer between services
-
-### Configuration
-
-- **Region**: AWS region of the queue
-- **Queue URL or Name**: Target SQS queue
-- **Message Body**: JSON payload to send
-- **Message Attributes**: Optional typed attributes for routing and filtering
-- **Delay Seconds**: Optional delay before the message becomes visible
-
-### Example Output
-
-```json
-{
-  "data": {
-    "messageId": "7c8b9d10-1112-1314-1516-171819202122",
-    "md5OfMessageBody": "5eb63bbbe01eeed093cb22bb8f5acdc3"
-  },
-  "timestamp": "2026-02-18T12:00:00Z",
-  "type": "aws.sqs.message.sent"
-}
-```
-
-<a id="sqs-•-delete-queue"></a>
-
-## SQS • Delete Queue
-
-The Delete Queue component deletes an SQS queue.
-
-### Use Cases
-
-- **Cleanup**: Remove queues created for temporary environments or tests
-- **Decommissioning**: Delete queues that are no longer used
-- **Cost control**: Reduce clutter and avoid accidental usage
-
-### Configuration
-
-- **Region**: AWS region of the queue
-- **Queue URL or Name**: SQS queue to delete
-
-### Example Output
-
-```json
-{
-  "data": {
-    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
-    "status": "DELETED"
-  },
-  "timestamp": "2026-02-18T12:00:00Z",
-  "type": "aws.sqs.queue.deleted"
-}
-```
-
-<a id="sqs-•-purge-queue"></a>
-
-## SQS • Purge Queue
-
-The Purge Queue component removes all messages from an SQS queue.
-
-### Use Cases
-
-- **Reset state**: Clear stuck or invalid messages before reprocessing
-- **Test environments**: Clean up test data between runs
-- **Operational recovery**: Quickly clear a backlog after a bad deployment
-
-### Configuration
-
-- **Region**: AWS region of the queue
-- **Queue URL or Name**: SQS queue to purge
-
-### Example Output
-
-```json
-{
-  "data": {
-    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
-    "status": "PURGED"
-  },
-  "timestamp": "2026-02-18T12:00:00Z",
-  "type": "aws.sqs.queue.purged"
-}
-```
-
 <a id="route-53-•-create-dns-record"></a>
 
 ## Route 53 • Create DNS Record
@@ -1365,6 +1573,122 @@ The Publish Message component sends a message to an AWS SNS topic.
   },
   "timestamp": "2026-01-10T10:00:02.000000000Z",
   "type": "aws.sns.message.published"
+}
+```
+
+<a id="sqs-•-create-queue"></a>
+
+## SQS • Create Queue
+
+The Create Queue component creates a new AWS SQS queue.
+
+### Configuration
+
+- **Region**: AWS region for the SQS queue
+- **Queue Name**: Name of the queue to create
+
+### Example Output
+
+```json
+{
+  "queueName": "my-created-queue",
+  "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-created-queue",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.sqs.queue"
+}
+```
+
+<a id="sqs-•-delete-queue"></a>
+
+## SQS • Delete Queue
+
+The Delete Queue component deletes an AWS SQS queue.
+
+### Configuration
+
+- **Region**: AWS region of the SQS queue
+- **Queue**: Target SQS queue to delete
+
+### Example Output
+
+```json
+{
+  "deleted": true,
+  "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.sqs.queue.deleted"
+}
+```
+
+<a id="sqs-•-get-queue"></a>
+
+## SQS • Get Queue
+
+The Get Queue component retrieves metadata and attributes for an AWS SQS queue.
+
+### Configuration
+
+- **Region**: AWS region of the SQS queue
+- **Queue**: Target SQS queue
+
+### Example Output
+
+```json
+{
+  "attributes": {
+    "DelaySeconds": "0",
+    "MaximumMessageSize": "262144",
+    "MessageRetentionPeriod": "345600",
+    "QueueArn": "arn:aws:sqs:us-east-1:123456789012:my-queue",
+    "ReceiveMessageWaitTimeSeconds": "0",
+    "VisibilityTimeout": "30"
+  },
+  "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.sqs.queue"
+}
+```
+
+<a id="sqs-•-purge-queue"></a>
+
+## SQS • Purge Queue
+
+The Purge Queue component removes all messages from an AWS SQS queue.
+
+### Configuration
+
+- **Region**: AWS region of the SQS queue
+- **Queue**: Target SQS queue to purge
+
+### Example Output
+
+```json
+{
+  "purged": true,
+  "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.sqs.queue.purged"
+}
+```
+
+<a id="sqs-•-send-message"></a>
+
+## SQS • Send Message
+
+The Send Message component publishes a message to an AWS SQS queue.
+
+### Configuration
+
+- **Region**: AWS region of the SQS queue
+- **Queue**: Target SQS queue
+- **Message Body**: The message payload to send
+
+### Example Output
+
+```json
+{
+  "messageId": "d84c1b4d-1f3b-4b6c-9d9f-5c3a2b1f9e7a",
+  "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
 }
 ```
 
