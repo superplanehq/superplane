@@ -114,22 +114,15 @@ func (n *Newrelic) Triggers() []core.Trigger {
 }
 
 func (n *Newrelic) Sync(ctx core.SyncContext) error {
-	config := Configuration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	if config.UserAPIKey == "" && config.LicenseKey == "" {
-		return fmt.Errorf("at least one API key is required: provide a User API Key (for NRQL/triggers) and/or a License Key (for metrics)")
-	}
-
+	// Create the client first — it decrypts config via GetConfig(),
+	// trims whitespace, and validates that at least one key is present.
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
 	// Validate and fetch accounts only when a User API Key is provided
-	if config.UserAPIKey != "" {
+	if client.UserAPIKey != "" {
 		err = client.ValidateAPIKey(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to validate User API Key: %w", err)
