@@ -1,0 +1,9 @@
+{
+  "data": {
+    "bucket": "my-example-bucket",
+    "key": "path/to/object.txt",
+    "deleted": true
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.s3.object.deleted"
+}

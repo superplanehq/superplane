@@ -1,0 +1,8 @@
+{
+  "data": {
+    "bucketName": "my-example-bucket",
+    "region": "us-east-1"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.s3.bucket.head"
+}

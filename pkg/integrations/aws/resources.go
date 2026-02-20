@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecs"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/route53"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/s3"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/sns"
 )
 
@@ -45,6 +46,9 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 
 	case "route53.hostedZone":
 		return route53.ListHostedZones(ctx, resourceType)
+
+	case "s3.bucket":
+		return s3.ListBuckets(ctx, resourceType)
 
 	case "sns.topic":
 		return sns.ListTopics(ctx, resourceType)

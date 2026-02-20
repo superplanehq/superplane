@@ -1,0 +1,12 @@
+{
+  "data": {
+    "sourceBucket": "source-bucket",
+    "sourceKey": "path/to/source.txt",
+    "bucket": "dest-bucket",
+    "key": "path/to/dest.txt",
+    "etag": "d41d8cd98f00b204e9800998ecf8427e",
+    "lastModified": "2026-01-10T10:00:02.000Z"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.s3.object.copied"
+}

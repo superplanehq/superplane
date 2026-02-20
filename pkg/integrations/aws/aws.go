@@ -26,6 +26,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/iam"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/route53"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/s3"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/sns"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -162,6 +163,15 @@ func (a *AWS) Components() []core.Component {
 		&ecr.GetImageScanFindings{},
 		&ecr.ScanImage{},
 		&lambda.RunFunction{},
+		&s3.CreateBucket{},
+		&s3.CopyObject{},
+		&s3.DeleteObject{},
+		&s3.HeadObject{},
+		&s3.HeadBucket{},
+		&s3.GetObjectAttributes{},
+		&s3.PutObject{},
+		&s3.DeleteBucket{},
+		&s3.EmptyBucket{},
 		&route53.CreateRecord{},
 		&route53.UpsertRecord{},
 		&route53.DeleteRecord{},
