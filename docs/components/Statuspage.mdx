@@ -32,7 +32,7 @@ The Create Incident component creates a new realtime or scheduled incident on yo
 
 ### Configuration
 
-- **Page** (required): The Statuspage to create the incident on. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
+- **Page** (required): The Statuspage to create the incident on. Supports expressions for workflow chaining (e.g. &lbrace;&lbrace; $['Create Incident'].data.page_id &rbrace;&rbrace;).
 - **Incident type**: Realtime (active incident) or Scheduled (planned maintenance)
 - **Name** (required): Short title for the incident
 - **Body** (optional): Initial message shown as the first incident update
@@ -46,7 +46,7 @@ The Create Incident component creates a new realtime or scheduled incident on yo
 
 ### Output
 
-Returns the full Statuspage Incident object from the API. The payload has structure { type, timestamp, data } where data is the incident. Common expression paths (use $['Node Name'].data. as prefix):
+Returns the full Statuspage Incident object from the API. The payload has structure &lbrace; type, timestamp, data &rbrace; where data is the incident. Common expression paths (use $['Node Name'].data. as prefix):
 - data.id, data.name, data.status, data.impact
 - data.shortlink — link to the incident
 - data.created_at, data.updated_at
@@ -172,12 +172,12 @@ The Get Incident component fetches the full details of an existing incident on y
 
 ### Configuration
 
-- **Page** (required): The Statuspage containing the incident. Select from the dropdown, or switch to expression mode for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
-- **Incident** (required): Incident ID to fetch. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.id }}).
+- **Page** (required): The Statuspage containing the incident. Select from the dropdown, or switch to expression mode for workflow chaining (e.g. &lbrace;&lbrace; $['Create Incident'].data.page_id &rbrace;&rbrace;).
+- **Incident** (required): Incident ID to fetch. Supports expressions for workflow chaining (e.g. &lbrace;&lbrace; $['Create Incident'].data.id &rbrace;&rbrace;).
 
 ### Output
 
-Returns the full Statuspage Incident object from the API. The payload has structure { type, timestamp, data } where data is the incident. Common expression paths (use $['Node Name'].data. as prefix):
+Returns the full Statuspage Incident object from the API. The payload has structure &lbrace; type, timestamp, data &rbrace; where data is the incident. Common expression paths (use $['Node Name'].data. as prefix):
 - data.id, data.name, data.status, data.impact
 - data.shortlink — link to the incident
 - data.created_at, data.updated_at, data.resolved_at
@@ -294,8 +294,8 @@ The Update Incident component updates an existing incident on your Atlassian Sta
 
 ### Configuration
 
-- **Page** (required): The Statuspage containing the incident. Select from the dropdown, or switch to expression mode for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
-- **Incident** (required): Incident ID to update. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.id }}).
+- **Page** (required): The Statuspage containing the incident. Select from the dropdown, or switch to expression mode for workflow chaining (e.g. &lbrace;&lbrace; $['Create Incident'].data.page_id &rbrace;&rbrace;).
+- **Incident** (required): Incident ID to update. Supports expressions for workflow chaining (e.g. &lbrace;&lbrace; $['Create Incident'].data.id &rbrace;&rbrace;).
 - **Incident type**: Realtime or Scheduled — determines which status options are shown. You cannot change an incident's type.
 - **Status** (optional): New status. Options depend on incident type: realtime (investigating, identified, monitoring, resolved) or scheduled (scheduled, in progress, verifying, completed)
 - **Body** (optional): Update message shown as the latest incident update
@@ -307,7 +307,7 @@ At least one of Status, Body, Impact override, or Components must be provided.
 
 ### Output
 
-Returns the full Statuspage Incident object from the API. The payload has structure { type, timestamp, data } where data is the incident. Common expression paths (use $['Node Name'].data. as prefix):
+Returns the full Statuspage Incident object from the API. The payload has structure &lbrace; type, timestamp, data &rbrace; where data is the incident. Common expression paths (use $['Node Name'].data. as prefix):
 - data.id, data.name, data.status, data.impact
 - data.shortlink — link to the incident
 - data.created_at, data.updated_at
