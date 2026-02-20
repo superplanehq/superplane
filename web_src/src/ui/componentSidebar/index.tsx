@@ -46,6 +46,27 @@ import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
 
+/** Optional create-dialog overrides per integration (two-step API + webhook flow). Key = integration name. */
+const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
+  string,
+  {
+    instructionsEndBeforeHeading?: string;
+    initialStepFieldNames?: string[];
+    webhookStepDescription?: ReactNode;
+  }
+> = {
+  incident: {
+    instructionsEndBeforeHeading: "## Webhook integration",
+    initialStepFieldNames: ["apiKey"],
+    webhookStepDescription: (
+      <p className="text-sm text-gray-800 dark:text-gray-200">
+        Copy the webhook URL below, add it in incident.io Settings → Webhooks, subscribe to Public incident created (v2)
+        and Public incident updated (v2), then paste the signing secret.
+      </p>
+    ),
+  },
+};
+
 interface ComponentSidebarProps {
   isOpen?: boolean;
   setIsOpen?: (isOpen: boolean) => void;
@@ -917,16 +938,13 @@ export const ComponentSidebar = ({
         integrationHomeHref={integrationHomeHref}
         onCreated={() => handleCloseCreateIntegrationDialog()}
         instructionsEndBeforeHeading={
-          createIntegrationDefinition?.name === "incident" ? "## Webhook integration" : undefined
+          CREATE_INTEGRATION_DIALOG_OPTIONS[createIntegrationDefinition?.name ?? ""]?.instructionsEndBeforeHeading
         }
-        initialStepFieldNames={createIntegrationDefinition?.name === "incident" ? ["apiKey"] : undefined}
+        initialStepFieldNames={
+          CREATE_INTEGRATION_DIALOG_OPTIONS[createIntegrationDefinition?.name ?? ""]?.initialStepFieldNames
+        }
         webhookStepDescription={
-          createIntegrationDefinition?.name === "incident" ? (
-            <p className="text-sm text-gray-800 dark:text-gray-200">
-              Copy the webhook URL below, add it in incident.io Settings → Webhooks, subscribe to Public incident
-              created (v2) and Public incident updated (v2), then paste the signing secret.
-            </p>
-          ) : undefined
+          CREATE_INTEGRATION_DIALOG_OPTIONS[createIntegrationDefinition?.name ?? ""]?.webhookStepDescription
         }
       />
 
