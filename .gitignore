@@ -18,5 +18,5 @@ CLAUDE.local.md
 .idea/
 plugin-host/dist/
 plugin-host/node_modules/
-plugins/
+/plugins/
 *.spx
