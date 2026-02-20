@@ -66,6 +66,34 @@ func Test__OnIssue__Setup(t *testing.T) {
 func Test__OnIssue__HandleWebhook(t *testing.T) {
 	trigger := &OnIssue{}
 
+	t.Run("missing auth header -> 401 Unauthorized", func(t *testing.T) {
+		ctx := core.WebhookRequestContext{
+			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Headers: http.Header{},
+			Body:    []byte(`{}`),
+		}
+
+		status, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusUnauthorized, status)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "missing X-Superplane-Secret header")
+	})
+
+	t.Run("invalid secret -> 401 Unauthorized", func(t *testing.T) {
+		ctx := core.WebhookRequestContext{
+			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Headers: http.Header{
+				"X-Superplane-Secret": {"wrong-secret"},
+			},
+			Body: []byte(`{}`),
+		}
+
+		status, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusUnauthorized, status)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid webhook secret")
+	})
+
 	t.Run("filters out non-matching priority", func(t *testing.T) {
 		payload := map[string]any{
 			"issue_id": "123",
@@ -77,6 +105,10 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		ctx := core.WebhookRequestContext{
 			Configuration: map[string]any{
 				"priorities": []string{"CRITICAL"},
+			},
+			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Headers: http.Header{
+				"X-Superplane-Secret": {"test-secret"},
 			},
 			Body:   body,
 			Events: &contexts.EventContext{},
@@ -102,6 +134,10 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"priorities": []string{"CRITICAL"},
 			},
+			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Headers: http.Header{
+				"X-Superplane-Secret": {"test-secret"},
+			},
 			Body:   body,
 			Events: &contexts.EventContext{},
 		}
@@ -118,11 +154,16 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "123", data["issueId"])
 	})
+
 	t.Run("garbage payload -> 200 OK (no error)", func(t *testing.T) {
 		ctx := core.WebhookRequestContext{
 			Configuration: map[string]any{},
-			Body:          []byte(`{"test": "notification"}`), // Simulate Newrelic Test Notification
-			Events:        &contexts.EventContext{},
+			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Headers: http.Header{
+				"X-Superplane-Secret": {"test-secret"},
+			},
+			Body:   []byte(`{"test": "notification"}`), // Simulate Newrelic Test Notification
+			Events: &contexts.EventContext{},
 		}
 
 		status, err := trigger.HandleWebhook(ctx)
@@ -135,8 +176,12 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 	t.Run("empty body -> 200 OK (ping)", func(t *testing.T) {
 		ctx := core.WebhookRequestContext{
 			Configuration: map[string]any{},
-			Body:          []byte(""),
-			Events:        &contexts.EventContext{},
+			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Headers: http.Header{
+				"X-Superplane-Secret": {"test-secret"},
+			},
+			Body:   []byte(""),
+			Events: &contexts.EventContext{},
 		}
 
 		status, err := trigger.HandleWebhook(ctx)

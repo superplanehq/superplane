@@ -1,6 +1,7 @@
 package newrelic
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -46,9 +47,12 @@ func (t *OnIssue) Documentation() string {
 
 ## Webhook Setup
 
-This trigger generates a webhook URL. You must configure a **Workflow** in New Relic to send a webhook to this URL.
+This trigger generates a webhook URL and a Secret. You must configure a **Workflow** in New Relic to send a webhook to this URL.
 
-**IMPORTANT**: You must use the following JSON payload template in your New Relic Webhook configuration:
+**IMPORTANT**: You must add a custom header ` + "`X-Superplane-Secret`" + ` in your New Relic Webhook configuration, using the Secret provided by Superplane.
+
+**Payload**:
+You must use the following JSON payload template in your New Relic Webhook configuration:
 
 ` + "```json" + `
 {
@@ -180,6 +184,21 @@ type NewrelicIssue struct {
 // 2. Mapstructure decoding
 // 3. Event processing
 func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	// 0. Verify Authentication
+	secret, err := ctx.Webhook.GetSecret()
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to get webhook secret: %w", err)
+	}
+
+	providedSecret := ctx.Headers.Get("X-Superplane-Secret")
+	if providedSecret == "" {
+		return http.StatusUnauthorized, fmt.Errorf("missing X-Superplane-Secret header")
+	}
+
+	if subtle.ConstantTimeCompare([]byte(providedSecret), secret) != 1 {
+		return http.StatusUnauthorized, fmt.Errorf("invalid webhook secret")
+	}
+
 	// 1. Decode Configuration
 	config := OnIssueConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {

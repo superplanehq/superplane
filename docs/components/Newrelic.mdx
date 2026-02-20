@@ -53,9 +53,12 @@ The On Issue trigger starts a workflow execution when New Relic issues are creat
 
 ### Webhook Setup
 
-This trigger generates a webhook URL. You must configure a **Workflow** in New Relic to send a webhook to this URL.
+This trigger generates a webhook URL and a Secret. You must configure a **Workflow** in New Relic to send a webhook to this URL.
 
-**IMPORTANT**: You must use the following JSON payload template in your New Relic Webhook configuration:
+**IMPORTANT**: You must add a custom header `X-Superplane-Secret` in your New Relic Webhook configuration, using the Secret provided by Superplane.
+
+**Payload**:
+You must use the following JSON payload template in your New Relic Webhook configuration:
 
 ```json
 {
