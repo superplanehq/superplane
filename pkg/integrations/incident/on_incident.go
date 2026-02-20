@@ -104,8 +104,12 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("at least one event type must be chosen")
 	}
 
+	if ctx.Integration == nil {
+		return fmt.Errorf("integration is required to set up the incident.io webhook trigger")
+	}
+
 	signingSecret := config.SigningSecret
-	if signingSecret == "" && ctx.Integration != nil {
+	if signingSecret == "" {
 		if b, getErr := ctx.Integration.GetConfig("webhookSigningSecret"); getErr == nil && len(b) > 0 {
 			signingSecret = string(b)
 		}
