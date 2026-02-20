@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -107,31 +108,30 @@ func (c *Client) UpsertPipelineNotificationRule(request UpsertPipelineNotificati
 		return err
 	}
 
-	rules := notificationRulesFromPipeline(pipeline)
-	newRule := buildPipelineNotificationRule(request)
+	rules, err := ensureNotificationRulesNode(pipeline)
+	if err != nil {
+		return err
+	}
+	newRule, err := buildPipelineNotificationRuleNode(request)
+	if err != nil {
+		return err
+	}
 	replaced := false
 
-	for idx, item := range rules {
-		rule, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		identifier := firstNonEmpty(readString(rule["identifier"]), readString(rule["name"]))
+	for idx, rule := range rules.Content {
+		identifier := notificationRuleIdentifier(rule)
 		if identifier != request.RuleIdentifier {
 			continue
 		}
 
-		rules[idx] = newRule
+		rules.Content[idx] = newRule
 		replaced = true
 		break
 	}
 
 	if !replaced {
-		rules = append(rules, newRule)
+		rules.Content = append(rules.Content, newRule)
 	}
-
-	pipeline["notificationRules"] = rules
 
 	updatedYAML, err := encodePipelineYAML(root)
 	if err != nil {
@@ -167,31 +167,29 @@ func (c *Client) DeletePipelineNotificationRule(pipelineIdentifier, ruleIdentifi
 		return err
 	}
 
-	rules := notificationRulesFromPipeline(pipeline)
-	filtered := make([]any, 0, len(rules))
+	rules := notificationRulesNode(pipeline)
+	if rules == nil || len(rules.Content) == 0 {
+		return nil
+	}
+
+	filtered := make([]*yaml.Node, 0, len(rules.Content))
 	removed := false
 
-	for _, item := range rules {
-		rule, ok := item.(map[string]any)
-		if !ok {
-			filtered = append(filtered, item)
-			continue
-		}
-
-		identifier := firstNonEmpty(readString(rule["identifier"]), readString(rule["name"]))
+	for _, rule := range rules.Content {
+		identifier := notificationRuleIdentifier(rule)
 		if identifier == ruleIdentifier {
 			removed = true
 			continue
 		}
 
-		filtered = append(filtered, item)
+		filtered = append(filtered, rule)
 	}
 
 	if !removed {
 		return nil
 	}
 
-	pipeline["notificationRules"] = filtered
+	rules.Content = filtered
 
 	updatedYAML, err := encodePipelineYAML(root)
 	if err != nil {
@@ -201,36 +199,162 @@ func (c *Client) DeletePipelineNotificationRule(pipelineIdentifier, ruleIdentifi
 	return c.updatePipelineYAML(pipelineIdentifier, updatedYAML)
 }
 
-func decodePipelineYAML(raw string) (map[string]any, error) {
-	root := map[string]any{}
-	if err := yaml.Unmarshal([]byte(raw), &root); err != nil {
+func decodePipelineYAML(raw string) (*yaml.Node, error) {
+	root := &yaml.Node{}
+	if err := yaml.Unmarshal([]byte(raw), root); err != nil {
 		return nil, fmt.Errorf("failed to decode pipeline yaml: %w", err)
 	}
+
+	if root.Kind != yaml.DocumentNode || len(root.Content) == 0 || root.Content[0] == nil {
+		return nil, fmt.Errorf("pipeline yaml is empty or invalid")
+	}
+
 	return root, nil
 }
 
-func encodePipelineYAML(root map[string]any) (string, error) {
-	encoded, err := yaml.Marshal(root)
-	if err != nil {
+func encodePipelineYAML(root *yaml.Node) (string, error) {
+	buffer := &bytes.Buffer{}
+	encoder := yaml.NewEncoder(buffer)
+	defer encoder.Close()
+
+	if err := encoder.Encode(root); err != nil {
 		return "", fmt.Errorf("failed to encode pipeline yaml: %w", err)
 	}
-	return string(encoded), nil
+
+	encoded := buffer.String()
+	if strings.TrimSpace(encoded) == "" {
+		return "", fmt.Errorf("failed to encode pipeline yaml: empty document")
+	}
+
+	return encoded, nil
 }
 
-func ensurePipelineDocument(root map[string]any) (map[string]any, error) {
-	pipeline, ok := root["pipeline"].(map[string]any)
-	if !ok || pipeline == nil {
+func ensurePipelineDocument(root *yaml.Node) (*yaml.Node, error) {
+	if root == nil || root.Kind != yaml.DocumentNode || len(root.Content) == 0 || root.Content[0] == nil {
+		return nil, fmt.Errorf("pipeline yaml does not contain root document")
+	}
+
+	document := root.Content[0]
+	if document.Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("pipeline yaml root must be a mapping")
+	}
+
+	pipeline := mappingNodeValue(document, "pipeline")
+	if pipeline == nil || pipeline.Kind != yaml.MappingNode {
 		return nil, fmt.Errorf("pipeline yaml does not contain root pipeline field")
 	}
+
 	return pipeline, nil
 }
 
-func notificationRulesFromPipeline(pipeline map[string]any) []any {
-	items, ok := pipeline["notificationRules"].([]any)
-	if !ok {
-		return []any{}
+func notificationRulesNode(pipeline *yaml.Node) *yaml.Node {
+	rules := mappingNodeValue(pipeline, "notificationRules")
+	if rules == nil || rules.Kind != yaml.SequenceNode {
+		return nil
 	}
-	return items
+
+	return rules
+}
+
+func ensureNotificationRulesNode(pipeline *yaml.Node) (*yaml.Node, error) {
+	if pipeline == nil || pipeline.Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("pipeline yaml does not contain root pipeline field")
+	}
+
+	rules := mappingNodeValue(pipeline, "notificationRules")
+	if rules == nil {
+		rules = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+		setMappingNodeValue(pipeline, "notificationRules", rules)
+		return rules, nil
+	}
+
+	if rules.Kind != yaml.SequenceNode {
+		replacement := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+		setMappingNodeValue(pipeline, "notificationRules", replacement)
+		return replacement, nil
+	}
+
+	return rules, nil
+}
+
+func mappingNodeValue(node *yaml.Node, key string) *yaml.Node {
+	if node == nil || node.Kind != yaml.MappingNode {
+		return nil
+	}
+
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		keyNode := node.Content[i]
+		if keyNode == nil || keyNode.Kind != yaml.ScalarNode {
+			continue
+		}
+		if keyNode.Value == key {
+			return node.Content[i+1]
+		}
+	}
+
+	return nil
+}
+
+func setMappingNodeValue(node *yaml.Node, key string, value *yaml.Node) {
+	if node == nil || node.Kind != yaml.MappingNode {
+		return
+	}
+
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		keyNode := node.Content[i]
+		if keyNode == nil || keyNode.Kind != yaml.ScalarNode {
+			continue
+		}
+		if keyNode.Value == key {
+			node.Content[i+1] = value
+			return
+		}
+	}
+
+	node.Content = append(node.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+		value,
+	)
+}
+
+func notificationRuleIdentifier(rule *yaml.Node) string {
+	if rule == nil || rule.Kind != yaml.MappingNode {
+		return ""
+	}
+
+	identifier := strings.TrimSpace(mappingNodeString(rule, "identifier"))
+	if identifier != "" {
+		return identifier
+	}
+
+	return strings.TrimSpace(mappingNodeString(rule, "name"))
+}
+
+func mappingNodeString(node *yaml.Node, key string) string {
+	valueNode := mappingNodeValue(node, key)
+	if valueNode == nil || valueNode.Kind != yaml.ScalarNode {
+		return ""
+	}
+	return strings.TrimSpace(valueNode.Value)
+}
+
+func buildPipelineNotificationRuleNode(request UpsertPipelineNotificationRuleRequest) (*yaml.Node, error) {
+	rule := buildPipelineNotificationRule(request)
+	encoded, err := yaml.Marshal(rule)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode notification rule yaml: %w", err)
+	}
+
+	decoded := &yaml.Node{}
+	if err := yaml.Unmarshal(encoded, decoded); err != nil {
+		return nil, fmt.Errorf("failed to decode notification rule yaml: %w", err)
+	}
+
+	if decoded.Kind != yaml.DocumentNode || len(decoded.Content) == 0 || decoded.Content[0] == nil {
+		return nil, fmt.Errorf("failed to decode notification rule yaml")
+	}
+
+	return decoded.Content[0], nil
 }
 
 func buildPipelineNotificationRule(request UpsertPipelineNotificationRuleRequest) map[string]any {
