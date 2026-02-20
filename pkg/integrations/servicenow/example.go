@@ -13,16 +13,16 @@ var exampleOutputCreateIncidentBytes []byte
 var exampleOutputCreateIncidentOnce sync.Once
 var exampleOutputCreateIncident map[string]any
 
-//go:embed example_output_get_incidents.json
-var exampleOutputGetIncidentsBytes []byte
+//go:embed example_output_get_incident.json
+var exampleOutputGetIncidentBytes []byte
 
-var exampleOutputGetIncidentsOnce sync.Once
-var exampleOutputGetIncidents map[string]any
+var exampleOutputGetIncidentOnce sync.Once
+var exampleOutputGetIncident map[string]any
 
 func (c *CreateIncident) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIncidentOnce, exampleOutputCreateIncidentBytes, &exampleOutputCreateIncident)
 }
 
-func (c *GetIncidents) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetIncidentsOnce, exampleOutputGetIncidentsBytes, &exampleOutputGetIncidents)
+func (c *GetIncident) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetIncidentOnce, exampleOutputGetIncidentBytes, &exampleOutputGetIncident)
 }

@@ -45,6 +45,7 @@ export interface BaseNodeMetadata {
   assignmentGroup?: { id: string; name: string };
   assignedTo?: { id: string; name: string };
   caller?: { id: string; name: string };
+  incident?: { id: string; name: string };
 }
 
 export interface CreateIncidentConfiguration {
@@ -75,6 +76,10 @@ export interface GetIncidentsConfiguration {
   impact?: string;
   priority?: string;
   limit?: number;
+}
+
+export interface GetIncidentConfiguration {
+  incident?: string;
 }
 
 export const STATE_LABELS: Record<string, string> = {
