@@ -6,11 +6,19 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+// testLogger returns a silent logrus entry suitable for tests.
+func testLogger() *logrus.Entry {
+	l := logrus.New()
+	l.SetOutput(io.Discard)
+	return logrus.NewEntry(l)
+}
 
 const (
 	machineJSON = `{
@@ -60,6 +68,7 @@ func Test__StartMachine__Execute__SchedulesPoll(t *testing.T) {
 		Integration:    mockIntegration,
 		ExecutionState: executionState,
 		Requests:       requests,
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":     "my-fly-app",
 			"machine": "my-fly-app/machine-abc123",
@@ -107,6 +116,7 @@ func Test__StartMachine__Poll__EmitsSuccessWhenStarted(t *testing.T) {
 		Integration:    mockIntegration,
 		ExecutionState: executionState,
 		Requests:       requests,
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":     "my-fly-app",
 			"machine": "my-fly-app/machine-abc123",
@@ -152,6 +162,7 @@ func Test__StartMachine__Poll__EmitsFailedWhenStopped(t *testing.T) {
 		Integration:    mockIntegration,
 		ExecutionState: executionState,
 		Requests:       &contexts.RequestContext{},
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":     "my-fly-app",
 			"machine": "my-fly-app/machine-abc123",
@@ -189,6 +200,7 @@ func Test__StartMachine__Poll__ReschedulesWhenTransitioning(t *testing.T) {
 		Integration:    mockIntegration,
 		ExecutionState: executionState,
 		Requests:       requests,
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":     "my-fly-app",
 			"machine": "my-fly-app/machine-abc123",
@@ -227,6 +239,7 @@ func Test__StartMachine__Poll__ReschedulesOnAPIError(t *testing.T) {
 		Integration:    mockIntegration,
 		ExecutionState: executionState,
 		Requests:       requests,
+		Logger:         testLogger(),
 		Configuration: map[string]any{
 			"app":     "my-fly-app",
 			"machine": "my-fly-app/machine-abc123",
