@@ -531,11 +531,7 @@ func (t *OnPipelineCompleted) processPolledExecution(
 	}
 
 	status := canonicalStatus(execution.Status)
-	isTerminal := false
-	switch status {
-	case "succeeded", "failed", "aborted", "expired":
-		isTerminal = true
-	}
+	isTerminal := isCanonicalTerminalStatus(status)
 	shouldEmit := isTerminal
 	if metadataHasTimestamplessExecutionID(metadata, execution.ExecutionID) {
 		// Same execution was already emitted from a timestampless webhook.

@@ -33,7 +33,11 @@ func canonicalStatus(status string) string {
 
 func isTerminalStatus(status string) bool {
 	normalized := canonicalStatus(status)
-	switch normalized {
+	return isCanonicalTerminalStatus(normalized)
+}
+
+func isCanonicalTerminalStatus(status string) bool {
+	switch status {
 	case "succeeded", "failed", "aborted", "expired":
 		return true
 	default:
