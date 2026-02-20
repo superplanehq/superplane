@@ -1,55 +1,23 @@
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
+import { runIntegrationCLI } from "../../typescript/mod.ts";
+import type { IntegrationImplementation } from "../../typescript/mod.ts";
 
-type IntegrationRequest = {
-  operation: string;
-  integration: string;
-  context: {
-    configuration?: Record<string, unknown>;
-    metadata?: Record<string, unknown>;
-    actionName?: string;
-    actionParameters?: unknown;
-    resourceType?: string;
-    resourceParameters?: Record<string, string>;
-    request?: {
-      method: string;
-      path: string;
-      query?: string;
-      headers?: Record<string, string[]>;
-      body?: number[];
-    };
-  };
+type IntegrationConfiguration = {
+  apiToken?: string;
 };
 
-async function readStdin(): Promise<string> {
-  const chunks: Uint8Array[] = [];
-  const reader = Deno.stdin.readable.getReader();
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
+function asObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object") {
+    return {};
   }
 
-  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-  const bytes = new Uint8Array(totalLength);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  return decoder.decode(bytes);
+  return value as Record<string, unknown>;
 }
 
-function writeOutput(payload: unknown): void {
-  Deno.stdout.writeSync(encoder.encode(JSON.stringify(payload)));
+function parseConfiguration(value: unknown): IntegrationConfiguration {
+  const input = asObject(value);
+  return {
+    apiToken: typeof input.apiToken === "string" ? input.apiToken.trim() : "",
+  };
 }
 
 async function validateToken(apiToken: string): Promise<{ login: string }> {
@@ -71,63 +39,47 @@ async function validateToken(apiToken: string): Promise<{ login: string }> {
   return { login: data.login ?? "" };
 }
 
-const input = await readStdin();
-const request = JSON.parse(input) as IntegrationRequest;
+export const integration: IntegrationImplementation = {
+  async sync(ctx) {
+    const config = parseConfiguration(ctx.configuration);
+    if (!config.apiToken) {
+      return {
+        outcome: "fail",
+        errorReason: "error",
+        error: "apiToken is required",
+        state: "error",
+        stateDescription: "apiToken is required",
+      };
+    }
 
-const config = request.context.configuration ?? {};
-const apiTokenValue = config.apiToken;
-const apiToken = typeof apiTokenValue === "string" ? apiTokenValue.trim() : "";
-
-if (request.operation === "integration.sync") {
-  if (!apiToken) {
-    writeOutput({
-      outcome: "fail",
-      errorReason: "error",
-      error: "apiToken is required",
-      state: "error",
-      stateDescription: "apiToken is required",
-    });
-  } else {
     try {
-      const user = await validateToken(apiToken);
-      writeOutput({
+      const user = await validateToken(config.apiToken);
+      return {
         outcome: "pass",
         state: "ready",
         metadata: {
           accountLogin: user.login,
         },
-      });
+      };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Token validation failed";
-      writeOutput({
+      return {
         outcome: "fail",
         errorReason: "error",
         error: message,
         state: "error",
         stateDescription: message,
-      });
+      };
     }
-  }
-} else if (request.operation === "integration.listResources") {
-  writeOutput({
-    outcome: "pass",
-    resources: [],
-  });
-} else if (request.operation === "integration.handleAction") {
-  writeOutput({
-    outcome: "noop",
-  });
-} else if (request.operation === "integration.handleRequest") {
-  writeOutput({
-    outcome: "pass",
-    http: {
-      statusCode: 404
-    },
-  });
-} else {
-  writeOutput({
-    outcome: "fail",
-    errorReason: "error",
-    error: `Unsupported operation: ${request.operation}`,
-  });
+  },
+
+  cleanup() {
+    return {
+      outcome: "noop",
+    };
+  },
+};
+
+if (import.meta.main) {
+  await runIntegrationCLI(integration);
 }

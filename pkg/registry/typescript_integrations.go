@@ -5,20 +5,21 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/runtime/runner"
 	runtimeTS "github.com/superplanehq/superplane/pkg/runtime/typescript"
 )
 
 type typeScriptRuntimeIntegration struct {
 	definition runtimeTS.IntegrationDefinition
-	binary     string
+	runner     runner.Client
 	timeout    time.Duration
+	version    string
 }
 
 func (i *typeScriptRuntimeIntegration) Name() string {
@@ -51,8 +52,9 @@ func (i *typeScriptRuntimeIntegration) Components() []core.Component {
 		components = append(components, &typeScriptRuntimeIntegrationComponent{
 			definition:               component,
 			integrationConfiguration: i.definition.Manifest.Configuration,
-			binary:                   i.binary,
+			runner:                   i.runner,
 			timeout:                  i.timeout,
+			version:                  i.version,
 		})
 	}
 
@@ -64,6 +66,9 @@ func (i *typeScriptRuntimeIntegration) Triggers() []core.Trigger {
 	for _, trigger := range i.definition.Triggers {
 		triggers = append(triggers, &typeScriptRuntimeIntegrationTrigger{
 			definition: trigger,
+			runner:     i.runner,
+			timeout:    i.timeout,
+			version:    i.version,
 		})
 	}
 
@@ -71,36 +76,85 @@ func (i *typeScriptRuntimeIntegration) Triggers() []core.Trigger {
 }
 
 func (i *typeScriptRuntimeIntegration) Sync(ctx core.SyncContext) error {
-	request := runtimeTS.IntegrationRuntimeRequest{
-		Operation:   runtimeTS.OperationIntegrationSync,
-		Integration: i.definition.Name,
-		Context: runtimeTS.IntegrationRuntimeContext{
-			Configuration:   resolveIntegrationConfiguration(i.definition.Manifest.Configuration, ctx.Integration),
-			OrganizationID:  ctx.OrganizationID,
-			BaseURL:         ctx.BaseURL,
-			WebhooksBaseURL: ctx.WebhooksBaseURL,
-		},
+	input := runtimeTS.IntegrationRuntimeContext{
+		Configuration:   resolveIntegrationConfiguration(i.definition.Manifest.Configuration, ctx.Integration),
+		OrganizationID:  ctx.OrganizationID,
+		BaseURL:         ctx.BaseURL,
+		WebhooksBaseURL: ctx.WebhooksBaseURL,
 	}
 
 	if metadata, ok := ctx.Integration.GetMetadata().(map[string]any); ok {
-		request.Context.Metadata = metadata
+		input.Metadata = metadata
 	}
 
-	response, err := runtimeTS.ExecuteIntegrationEntrypoint(i.binary, i.timeout, i.definition.Entrypoint, request)
+	runnerCtx, cancel := withTimeout(i.timeout)
+	defer cancel()
+
+	response, err := i.runner.SyncIntegration(
+		runnerCtx,
+		i.definition.Name,
+		newTypeScriptRunnerRequest(
+			i.version,
+			i.timeout,
+			runner.RuntimeContext{
+				OrganizationID: ctx.OrganizationID,
+			},
+			input,
+		),
+	)
 	if err != nil {
 		return err
 	}
+	if !response.OK {
+		return typeScriptRunnerResponseError(response, "TypeScript integration sync failed")
+	}
 
-	applyIntegrationRuntimeResponse(ctx.Integration, response)
-	if response.Outcome == runtimeTS.OutcomeFail {
-		return runtimeResponseError(response, "TypeScript integration sync failed")
+	var runtimeResponse runtimeTS.IntegrationRuntimeResponse
+	if err := decodeTypeScriptRunnerOutput(response.Output, &runtimeResponse); err != nil {
+		return err
+	}
+
+	applyIntegrationRuntimeResponse(ctx.Integration, &runtimeResponse)
+	if runtimeResponse.Outcome == runtimeTS.OutcomeFail {
+		return runtimeResponseError(&runtimeResponse, "TypeScript integration sync failed")
 	}
 
 	ctx.Integration.Ready()
 	return nil
 }
 
-func (i *typeScriptRuntimeIntegration) Cleanup(_ core.IntegrationCleanupContext) error {
+func (i *typeScriptRuntimeIntegration) Cleanup(ctx core.IntegrationCleanupContext) error {
+	input := runtimeTS.IntegrationRuntimeContext{
+		Configuration:  resolveIntegrationConfiguration(i.definition.Manifest.Configuration, ctx.Integration),
+		OrganizationID: ctx.OrganizationID,
+		BaseURL:        ctx.BaseURL,
+	}
+	if metadata, ok := ctx.Integration.GetMetadata().(map[string]any); ok {
+		input.Metadata = metadata
+	}
+
+	runnerCtx, cancel := withTimeout(i.timeout)
+	defer cancel()
+
+	response, err := i.runner.CleanupIntegration(
+		runnerCtx,
+		i.definition.Name,
+		newTypeScriptRunnerRequest(
+			i.version,
+			i.timeout,
+			runner.RuntimeContext{
+				OrganizationID: ctx.OrganizationID,
+			},
+			input,
+		),
+	)
+	if err != nil {
+		return err
+	}
+	if !response.OK {
+		return typeScriptRunnerResponseError(response, "TypeScript integration cleanup failed")
+	}
+
 	return nil
 }
 
@@ -109,126 +163,28 @@ func (i *typeScriptRuntimeIntegration) Actions() []core.Action {
 }
 
 func (i *typeScriptRuntimeIntegration) HandleAction(ctx core.IntegrationActionContext) error {
-	request := runtimeTS.IntegrationRuntimeRequest{
-		Operation:   runtimeTS.OperationIntegrationHandleAction,
-		Integration: i.definition.Name,
-		Context: runtimeTS.IntegrationRuntimeContext{
-			Configuration:    resolveIntegrationConfiguration(i.definition.Manifest.Configuration, ctx.Integration),
-			ActionName:       ctx.Name,
-			ActionParameters: ctx.Parameters,
-		},
-	}
-
-	if metadata, ok := ctx.Integration.GetMetadata().(map[string]any); ok {
-		request.Context.Metadata = metadata
-	}
-
-	response, err := runtimeTS.ExecuteIntegrationEntrypoint(i.binary, i.timeout, i.definition.Entrypoint, request)
-	if err != nil {
-		return err
-	}
-
-	applyIntegrationRuntimeResponse(ctx.Integration, response)
-	if response.Outcome == runtimeTS.OutcomeFail {
-		return runtimeResponseError(response, "TypeScript integration action failed")
-	}
-
+	_ = ctx
 	return nil
 }
 
 func (i *typeScriptRuntimeIntegration) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	request := runtimeTS.IntegrationRuntimeRequest{
-		Operation:   runtimeTS.OperationIntegrationListResources,
-		Integration: i.definition.Name,
-		Context: runtimeTS.IntegrationRuntimeContext{
-			Configuration:      resolveIntegrationConfiguration(i.definition.Manifest.Configuration, ctx.Integration),
-			ResourceType:       resourceType,
-			ResourceParameters: ctx.Parameters,
-		},
-	}
-
-	if metadata, ok := ctx.Integration.GetMetadata().(map[string]any); ok {
-		request.Context.Metadata = metadata
-	}
-
-	response, err := runtimeTS.ExecuteIntegrationEntrypoint(i.binary, i.timeout, i.definition.Entrypoint, request)
-	if err != nil {
-		return nil, err
-	}
-
-	applyIntegrationRuntimeResponse(ctx.Integration, response)
-	if response.Outcome == runtimeTS.OutcomeFail {
-		return nil, runtimeResponseError(response, "TypeScript integration listResources failed")
-	}
-
-	resources := make([]core.IntegrationResource, 0, len(response.Resources))
-	for _, resource := range response.Resources {
-		resources = append(resources, core.IntegrationResource{
-			Type: resource.Type,
-			Name: resource.Name,
-			ID:   resource.ID,
-		})
-	}
-
-	return resources, nil
+	_ = resourceType
+	_ = ctx
+	return []core.IntegrationResource{}, nil
 }
 
 func (i *typeScriptRuntimeIntegration) HandleRequest(ctx core.HTTPRequestContext) {
-	body, _ := io.ReadAll(ctx.Request.Body)
-	request := runtimeTS.IntegrationRuntimeRequest{
-		Operation:   runtimeTS.OperationIntegrationHandleRequest,
-		Integration: i.definition.Name,
-		Context: runtimeTS.IntegrationRuntimeContext{
-			Configuration:   resolveIntegrationConfiguration(i.definition.Manifest.Configuration, ctx.Integration),
-			OrganizationID:  ctx.OrganizationID,
-			BaseURL:         ctx.BaseURL,
-			WebhooksBaseURL: ctx.WebhooksBaseURL,
-			Request: &runtimeTS.IntegrationHTTPRequest{
-				Method:  ctx.Request.Method,
-				Path:    ctx.Request.URL.Path,
-				Query:   ctx.Request.URL.RawQuery,
-				Headers: map[string][]string(ctx.Request.Header),
-				Body:    body,
-			},
-		},
-	}
-	if metadata, ok := ctx.Integration.GetMetadata().(map[string]any); ok {
-		request.Context.Metadata = metadata
-	}
-
-	response, err := runtimeTS.ExecuteIntegrationEntrypoint(i.binary, i.timeout, i.definition.Entrypoint, request)
-	if err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		_, _ = ctx.Response.Write([]byte(err.Error()))
-		return
-	}
-
-	if response.HTTP == nil {
-		ctx.Response.WriteHeader(http.StatusNoContent)
-		return
-	}
-
-	for header, values := range response.HTTP.Headers {
-		for _, value := range values {
-			ctx.Response.Header().Add(header, value)
-		}
-	}
-
-	statusCode := response.HTTP.StatusCode
-	if statusCode <= 0 {
-		statusCode = http.StatusOK
-	}
-	ctx.Response.WriteHeader(statusCode)
-	if len(response.HTTP.Body) > 0 {
-		_, _ = ctx.Response.Write(response.HTTP.Body)
-	}
+	_ = i
+	_, _ = io.Copy(io.Discard, ctx.Request.Body)
+	ctx.Response.WriteHeader(http.StatusNotFound)
 }
 
 type typeScriptRuntimeIntegrationComponent struct {
 	definition               runtimeTS.IntegrationComponentDefinition
 	integrationConfiguration []configuration.Field
-	binary                   string
+	runner                   runner.Client
 	timeout                  time.Duration
+	version                  string
 }
 
 func (c *typeScriptRuntimeIntegrationComponent) Name() string {
@@ -268,36 +224,47 @@ func (c *typeScriptRuntimeIntegrationComponent) Configuration() []configuration.
 }
 
 func (c *typeScriptRuntimeIntegrationComponent) Setup(ctx core.SetupContext) error {
-	request := runtimeTS.ComponentExecutionRequest{
-		Operation: runtimeTS.OperationComponentSetup,
-		Component: c.definition.Name,
-		Context: runtimeTS.ComponentExecutionInput{
-			Configuration:            ctx.Configuration,
-			IntegrationConfiguration: resolveIntegrationConfiguration(c.integrationConfiguration, ctx.Integration),
-		},
+	input := runtimeTS.ComponentExecutionInput{
+		Configuration:            ctx.Configuration,
+		IntegrationConfiguration: resolveIntegrationConfiguration(c.integrationConfiguration, ctx.Integration),
 	}
 
 	if ctx.Metadata != nil {
 		if metadata, ok := ctx.Metadata.Get().(map[string]any); ok {
-			request.Context.Metadata = metadata
+			input.Metadata = metadata
 		}
 	}
 
-	response, err := runtimeTS.ExecuteComponentEntrypoint(c.binary, c.timeout, c.definition.Entrypoint, request)
+	runnerCtx, cancel := withTimeout(c.timeout)
+	defer cancel()
+
+	response, err := c.runner.SetupComponent(
+		runnerCtx,
+		c.definition.Name,
+		newTypeScriptRunnerRequest(c.version, c.timeout, runner.RuntimeContext{}, input),
+	)
 	if err != nil {
 		return err
 	}
+	if !response.OK {
+		return typeScriptRunnerResponseError(response, "TypeScript integration component setup failed")
+	}
 
-	if response.Outcome == runtimeTS.OutcomeFail {
-		message := response.Error
+	var runtimeResponse runtimeTS.ComponentExecutionResponse
+	if err := decodeTypeScriptRunnerOutput(response.Output, &runtimeResponse); err != nil {
+		return err
+	}
+
+	if runtimeResponse.Outcome == runtimeTS.OutcomeFail {
+		message := runtimeResponse.Error
 		if message == "" {
 			message = "TypeScript integration component setup failed"
 		}
 		return fmt.Errorf("%s", message)
 	}
 
-	if ctx.Metadata != nil && response.Metadata != nil {
-		if err := ctx.Metadata.Set(response.Metadata); err != nil {
+	if ctx.Metadata != nil && runtimeResponse.Metadata != nil {
+		if err := ctx.Metadata.Set(runtimeResponse.Metadata); err != nil {
 			return err
 		}
 	}
@@ -310,66 +277,85 @@ func (c *typeScriptRuntimeIntegrationComponent) ProcessQueueItem(ctx core.Proces
 }
 
 func (c *typeScriptRuntimeIntegrationComponent) Execute(ctx core.ExecutionContext) error {
-	request := runtimeTS.ComponentExecutionRequest{
-		Operation: runtimeTS.OperationComponentExecute,
-		Component: c.definition.Name,
-		Context: runtimeTS.ComponentExecutionInput{
-			ExecutionID:               ctx.ID.String(),
-			WorkflowID:                ctx.WorkflowID,
-			OrganizationID:            ctx.OrganizationID,
-			NodeID:                    ctx.NodeID,
-			SourceNodeID:              ctx.SourceNodeID,
-			Configuration:             ctx.Configuration,
-			IntegrationConfiguration:  resolveIntegrationConfiguration(c.integrationConfiguration, ctx.Integration),
-			Data:                      ctx.Data,
-		},
+	input := runtimeTS.ComponentExecutionInput{
+		ExecutionID:              ctx.ID.String(),
+		WorkflowID:               ctx.WorkflowID,
+		OrganizationID:           ctx.OrganizationID,
+		NodeID:                   ctx.NodeID,
+		SourceNodeID:             ctx.SourceNodeID,
+		Configuration:            ctx.Configuration,
+		IntegrationConfiguration: resolveIntegrationConfiguration(c.integrationConfiguration, ctx.Integration),
+		Data:                     ctx.Data,
 	}
 
 	if metadata, ok := ctx.Metadata.Get().(map[string]any); ok {
-		request.Context.Metadata = metadata
+		input.Metadata = metadata
 	}
 	if metadata, ok := ctx.NodeMetadata.Get().(map[string]any); ok {
-		request.Context.NodeMetadata = metadata
+		input.NodeMetadata = metadata
 	}
 
-	response, err := runtimeTS.ExecuteComponentEntrypoint(c.binary, c.timeout, c.definition.Entrypoint, request)
+	runnerCtx, cancel := withTimeout(c.timeout)
+	defer cancel()
+
+	response, err := c.runner.ExecuteComponent(
+		runnerCtx,
+		c.definition.Name,
+		newTypeScriptRunnerRequest(
+			c.version,
+			c.timeout,
+			runner.RuntimeContext{
+				OrganizationID: ctx.OrganizationID,
+				NodeID:         ctx.NodeID,
+			},
+			input,
+		),
+	)
 	if err != nil {
 		return err
 	}
+	if !response.OK {
+		return typeScriptRunnerResponseError(response, "TypeScript integration component execution failed")
+	}
 
-	if response.Metadata != nil {
-		if err := ctx.Metadata.Set(response.Metadata); err != nil {
+	var runtimeResponse runtimeTS.ComponentExecutionResponse
+	if err := decodeTypeScriptRunnerOutput(response.Output, &runtimeResponse); err != nil {
+		return err
+	}
+
+	if runtimeResponse.Metadata != nil {
+		if err := ctx.Metadata.Set(runtimeResponse.Metadata); err != nil {
 			return err
 		}
 	}
-	if response.NodeMetadata != nil {
-		if err := ctx.NodeMetadata.Set(response.NodeMetadata); err != nil {
+	if runtimeResponse.NodeMetadata != nil {
+		if err := ctx.NodeMetadata.Set(runtimeResponse.NodeMetadata); err != nil {
 			return err
 		}
 	}
-	for _, kv := range response.KVs {
+	for _, kv := range runtimeResponse.KVs {
 		if err := ctx.ExecutionState.SetKV(kv.Key, kv.Value); err != nil {
 			return err
 		}
 	}
 
-	switch response.Outcome {
+	switch runtimeResponse.Outcome {
 	case runtimeTS.OutcomePass:
-		if len(response.Outputs) == 0 {
+		if len(runtimeResponse.Outputs) == 0 {
 			return ctx.ExecutionState.Pass()
 		}
-		for _, output := range response.Outputs {
+		for _, output := range runtimeResponse.Outputs {
 			if err := ctx.ExecutionState.Emit(output.Channel, output.PayloadType, []any{output.Payload}); err != nil {
 				return err
 			}
 		}
 		return nil
 	case runtimeTS.OutcomeFail:
-		reason := response.ErrorReason
+		reason := runtimeResponse.ErrorReason
 		if reason == "" {
 			reason = "error"
 		}
-		message := response.Error
+		message := runtimeResponse.Error
 		if message == "" {
 			message = "TypeScript integration component failed"
 		}
@@ -377,7 +363,7 @@ func (c *typeScriptRuntimeIntegrationComponent) Execute(ctx core.ExecutionContex
 	case runtimeTS.OutcomeNoop:
 		return nil
 	default:
-		return fmt.Errorf("unsupported TypeScript integration component outcome: %s", response.Outcome)
+		return fmt.Errorf("unsupported TypeScript integration component outcome: %s", runtimeResponse.Outcome)
 	}
 }
 
@@ -403,6 +389,9 @@ func (c *typeScriptRuntimeIntegrationComponent) Cleanup(_ core.SetupContext) err
 
 type typeScriptRuntimeIntegrationTrigger struct {
 	definition runtimeTS.IntegrationTriggerDefinition
+	runner     runner.Client
+	timeout    time.Duration
+	version    string
 }
 
 func (t *typeScriptRuntimeIntegrationTrigger) Name() string {
@@ -441,8 +430,38 @@ func (t *typeScriptRuntimeIntegrationTrigger) HandleWebhook(_ core.WebhookReques
 	return http.StatusOK, nil
 }
 
-func (t *typeScriptRuntimeIntegrationTrigger) Setup(_ core.TriggerContext) error {
-	return fmt.Errorf("typescript integration trigger setup not implemented yet for %s", t.definition.Name)
+func (t *typeScriptRuntimeIntegrationTrigger) Setup(ctx core.TriggerContext) error {
+	input := map[string]any{
+		"configuration": ctx.Configuration,
+	}
+
+	if ctx.Metadata != nil {
+		if metadata, ok := ctx.Metadata.Get().(map[string]any); ok {
+			input["metadata"] = metadata
+		}
+	}
+
+	runnerCtx, cancel := withTimeout(t.timeout)
+	defer cancel()
+
+	response, err := t.runner.SetupTrigger(
+		runnerCtx,
+		t.definition.Name,
+		newTypeScriptRunnerRequest(
+			t.version,
+			t.timeout,
+			runner.RuntimeContext{},
+			input,
+		),
+	)
+	if err != nil {
+		return err
+	}
+	if !response.OK {
+		return typeScriptRunnerResponseError(response, fmt.Sprintf("TypeScript trigger setup failed for %s", t.definition.Name))
+	}
+
+	return nil
 }
 
 func (t *typeScriptRuntimeIntegrationTrigger) Actions() []core.Action {
@@ -463,17 +482,9 @@ func (r *Registry) registerTypeScriptIntegrationsFromEnv() error {
 		return err
 	}
 
-	binary := strings.TrimSpace(os.Getenv("DENO_BINARY"))
-	if binary == "" {
-		binary = runtimeTS.DefaultDenoBinary
-	}
-
-	timeout := runtimeTS.DefaultDenoExecutionTimeout
-	timeoutValue := strings.TrimSpace(os.Getenv("DENO_EXECUTION_TIMEOUT"))
-	if timeoutValue != "" {
-		if parsed, err := time.ParseDuration(timeoutValue); err == nil && parsed > 0 {
-			timeout = parsed
-		}
+	runnerClient, cfg, err := newTypeScriptRunner()
+	if err != nil {
+		return err
 	}
 
 	for _, definition := range definitions {
@@ -483,8 +494,9 @@ func (r *Registry) registerTypeScriptIntegrationsFromEnv() error {
 
 		r.Integrations[definition.Name] = NewPanicableIntegration(&typeScriptRuntimeIntegration{
 			definition: definition,
-			binary:     binary,
-			timeout:    timeout,
+			runner:     runnerClient,
+			timeout:    cfg.Timeout,
+			version:    cfg.Version,
 		})
 	}
 

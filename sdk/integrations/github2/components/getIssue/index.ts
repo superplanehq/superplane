@@ -1,4 +1,5 @@
 import { runComponentCLI } from "../../../../typescript/mod.ts";
+import type { ComponentImplementation } from "../../../../typescript/mod.ts";
 
 type GetIssueConfig = {
   owner?: string;
@@ -36,7 +37,7 @@ function parseIntegrationConfig(value: unknown): IntegrationConfig {
   };
 }
 
-await runComponentCLI({
+export const component: ComponentImplementation = {
   setup(ctx) {
     const config = parseComponentConfig(ctx.configuration);
     if (!config.owner) {
@@ -99,4 +100,8 @@ await runComponentCLI({
       ],
     };
   },
-});
+};
+
+if (import.meta.main) {
+  await runComponentCLI(component);
+}

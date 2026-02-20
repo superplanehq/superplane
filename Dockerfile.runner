@@ -1,0 +1,15 @@
+ARG DENO_VERSION=v2.5.0
+ARG UBUNTU_VERSION=22.04
+ARG BASE_IMAGE="ubuntu:${UBUNTU_VERSION}"
+
+FROM ${BASE_IMAGE}
+ARG DENO_VERSION=v2.5.0
+
+WORKDIR /tmp
+
+COPY scripts/docker/install-deno.sh install-deno.sh
+RUN bash install-deno.sh ${DENO_VERSION}
+
+WORKDIR /app
+
+CMD ["deno", "run", "--allow-env", "--allow-read", "--allow-net", "/app/sdk/typescript/runner/server.ts"]

@@ -3,15 +3,15 @@ package typescript
 import "fmt"
 
 const (
-	OperationComponentExecute = "component.execute"
-	OperationComponentSetup   = "component.setup"
-	OperationIntegrationSync        = "integration.sync"
-	OperationIntegrationHandleAction = "integration.handleAction"
+	OperationComponentExecute         = "component.execute"
+	OperationComponentSetup           = "component.setup"
+	OperationIntegrationSync          = "integration.sync"
+	OperationIntegrationHandleAction  = "integration.handleAction"
 	OperationIntegrationListResources = "integration.listResources"
 	OperationIntegrationHandleRequest = "integration.handleRequest"
-	OutcomePass              = "pass"
-	OutcomeFail              = "fail"
-	OutcomeNoop              = "noop"
+	OutcomePass                       = "pass"
+	OutcomeFail                       = "fail"
+	OutcomeNoop                       = "noop"
 )
 
 type ComponentExecutionRequest struct {
@@ -21,16 +21,16 @@ type ComponentExecutionRequest struct {
 }
 
 type ComponentExecutionInput struct {
-	ExecutionID               string         `json:"executionId"`
-	WorkflowID                string         `json:"workflowId"`
-	OrganizationID            string         `json:"organizationId"`
-	NodeID                    string         `json:"nodeId"`
-	SourceNodeID              string         `json:"sourceNodeId"`
-	Configuration             any            `json:"configuration"`
-	IntegrationConfiguration  map[string]any `json:"integrationConfiguration,omitempty"`
-	Data                      any            `json:"data"`
-	Metadata                  map[string]any `json:"metadata,omitempty"`
-	NodeMetadata              map[string]any `json:"nodeMetadata,omitempty"`
+	ExecutionID              string         `json:"executionId"`
+	WorkflowID               string         `json:"workflowId"`
+	OrganizationID           string         `json:"organizationId"`
+	NodeID                   string         `json:"nodeId"`
+	SourceNodeID             string         `json:"sourceNodeId"`
+	Configuration            any            `json:"configuration"`
+	IntegrationConfiguration map[string]any `json:"integrationConfiguration,omitempty"`
+	Data                     any            `json:"data"`
+	Metadata                 map[string]any `json:"metadata,omitempty"`
+	NodeMetadata             map[string]any `json:"nodeMetadata,omitempty"`
 }
 
 type ComponentExecutionResponse struct {
@@ -44,9 +44,9 @@ type ComponentExecutionResponse struct {
 }
 
 type ComponentOutput struct {
-	Channel     string      `json:"channel"`
-	PayloadType string      `json:"payloadType"`
-	Payload     any         `json:"payload"`
+	Channel     string `json:"channel"`
+	PayloadType string `json:"payloadType"`
+	Payload     any    `json:"payload"`
 }
 
 type ComponentExecutionKV struct {
@@ -61,16 +61,16 @@ type IntegrationRuntimeRequest struct {
 }
 
 type IntegrationRuntimeContext struct {
-	Configuration       any               `json:"configuration"`
-	Metadata            map[string]any    `json:"metadata,omitempty"`
-	OrganizationID      string            `json:"organizationId,omitempty"`
-	BaseURL             string            `json:"baseUrl,omitempty"`
-	WebhooksBaseURL     string            `json:"webhooksBaseUrl,omitempty"`
-	ActionName          string            `json:"actionName,omitempty"`
-	ActionParameters    any               `json:"actionParameters,omitempty"`
-	ResourceType        string            `json:"resourceType,omitempty"`
-	ResourceParameters  map[string]string `json:"resourceParameters,omitempty"`
-	Request             *IntegrationHTTPRequest  `json:"request,omitempty"`
+	Configuration      any                     `json:"configuration"`
+	Metadata           map[string]any          `json:"metadata,omitempty"`
+	OrganizationID     string                  `json:"organizationId,omitempty"`
+	BaseURL            string                  `json:"baseUrl,omitempty"`
+	WebhooksBaseURL    string                  `json:"webhooksBaseUrl,omitempty"`
+	ActionName         string                  `json:"actionName,omitempty"`
+	ActionParameters   any                     `json:"actionParameters,omitempty"`
+	ResourceType       string                  `json:"resourceType,omitempty"`
+	ResourceParameters map[string]string       `json:"resourceParameters,omitempty"`
+	Request            *IntegrationHTTPRequest `json:"request,omitempty"`
 }
 
 type IntegrationRuntimeResponse struct {
@@ -105,9 +105,9 @@ type IntegrationHTTPResponse struct {
 }
 
 type EmittedPayload struct {
-	Type      string      `json:"type"`
-	Timestamp string      `json:"timestamp"`
-	Data      any         `json:"data"`
+	Type      string `json:"type"`
+	Timestamp string `json:"timestamp"`
+	Data      any    `json:"data"`
 }
 
 func (r *ComponentExecutionResponse) Validate() error {

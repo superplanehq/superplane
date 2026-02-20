@@ -1,7 +1,9 @@
 import type {
-  ActionImplementation,
+  ComponentImplementation,
   ComponentExecutionRequest,
   ComponentExecutionResponse,
+  IntegrationExecutionResponse,
+  IntegrationImplementation,
   RuntimeLogger,
 } from "./types.ts";
 
@@ -72,7 +74,7 @@ function writeStdout(payload: ComponentExecutionResponse): void {
   Deno.stdout.writeSync(textEncoder.encode(JSON.stringify(payload)));
 }
 
-export async function runComponentCLI(implementation: ActionImplementation): Promise<void> {
+export async function runComponentCLI(implementation: ComponentImplementation): Promise<void> {
   try {
     const input = await readStdin();
     const request = JSON.parse(input) as ComponentExecutionRequest;
@@ -109,6 +111,61 @@ export async function runComponentCLI(implementation: ActionImplementation): Pro
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown runtime error";
     writeStdout({
+      outcome: "fail",
+      errorReason: "error",
+      error: message,
+    });
+  }
+}
+
+function writeIntegrationStdout(payload: IntegrationExecutionResponse): void {
+  Deno.stdout.writeSync(textEncoder.encode(JSON.stringify(payload)));
+}
+
+export async function runIntegrationCLI(implementation: IntegrationImplementation): Promise<void> {
+  try {
+    const input = await readStdin();
+    const request = JSON.parse(input) as {
+      operation: string;
+      context: {
+        configuration?: Record<string, unknown>;
+        metadata?: Record<string, unknown>;
+        organizationId?: string;
+        baseUrl?: string;
+        webhooksBaseUrl?: string;
+      };
+    };
+
+    if (request.operation === "integration.sync") {
+      if (!implementation.sync) {
+        writeIntegrationStdout({ outcome: "noop" });
+        return;
+      }
+
+      const response = await implementation.sync(request.context ?? {});
+      writeIntegrationStdout(response);
+      return;
+    }
+
+    if (request.operation === "integration.cleanup") {
+      if (!implementation.cleanup) {
+        writeIntegrationStdout({ outcome: "noop" });
+        return;
+      }
+
+      const response = await implementation.cleanup(request.context ?? {});
+      writeIntegrationStdout(response);
+      return;
+    }
+
+    writeIntegrationStdout({
+      outcome: "fail",
+      errorReason: "error",
+      error: `Unsupported operation: ${request.operation}`,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown runtime error";
+    writeIntegrationStdout({
       outcome: "fail",
       errorReason: "error",
       error: message,

@@ -3,20 +3,20 @@ package registry
 import (
 	"fmt"
 	"net/http"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/runtime/runner"
 	runtimeTS "github.com/superplanehq/superplane/pkg/runtime/typescript"
 )
 
 type typeScriptRuntimeComponent struct {
 	definition runtimeTS.ComponentDefinition
-	binary     string
+	runner     runner.Client
 	timeout    time.Duration
+	version    string
 }
 
 func (c *typeScriptRuntimeComponent) Name() string {
@@ -56,39 +56,50 @@ func (c *typeScriptRuntimeComponent) Configuration() []configuration.Field {
 }
 
 func (c *typeScriptRuntimeComponent) Setup(ctx core.SetupContext) error {
-	request := runtimeTS.ComponentExecutionRequest{
-		Operation: runtimeTS.OperationComponentSetup,
-		Component: c.definition.Name,
-		Context: runtimeTS.ComponentExecutionInput{
-			ExecutionID:    "",
-			WorkflowID:     "",
-			OrganizationID: "",
-			NodeID:         "",
-			SourceNodeID:   "",
-			Configuration:  ctx.Configuration,
-			Data:           nil,
-		},
+	input := runtimeTS.ComponentExecutionInput{
+		ExecutionID:    "",
+		WorkflowID:     "",
+		OrganizationID: "",
+		NodeID:         "",
+		SourceNodeID:   "",
+		Configuration:  ctx.Configuration,
+		Data:           nil,
 	}
 
 	if ctx.Metadata != nil {
 		if metadata, ok := ctx.Metadata.Get().(map[string]any); ok {
-			request.Context.Metadata = metadata
+			input.Metadata = metadata
 		}
 	}
 
-	response, err := runtimeTS.ExecuteComponentEntrypoint(c.binary, c.timeout, c.definition.Entrypoint, request)
+	runnerCtx, cancel := withTimeout(c.timeout)
+	defer cancel()
+
+	response, err := c.runner.SetupComponent(
+		runnerCtx,
+		c.definition.Name,
+		newTypeScriptRunnerRequest(c.version, c.timeout, runner.RuntimeContext{}, input),
+	)
 	if err != nil {
 		return err
 	}
+	if !response.OK {
+		return typeScriptRunnerResponseError(response, "TypeScript component setup failed")
+	}
 
-	if ctx.Metadata != nil && response.Metadata != nil {
-		if err := ctx.Metadata.Set(response.Metadata); err != nil {
+	var runtimeResponse runtimeTS.ComponentExecutionResponse
+	if err := decodeTypeScriptRunnerOutput(response.Output, &runtimeResponse); err != nil {
+		return err
+	}
+
+	if ctx.Metadata != nil && runtimeResponse.Metadata != nil {
+		if err := ctx.Metadata.Set(runtimeResponse.Metadata); err != nil {
 			return err
 		}
 	}
 
-	if response.Outcome == runtimeTS.OutcomeFail {
-		message := response.Error
+	if runtimeResponse.Outcome == runtimeTS.OutcomeFail {
+		message := runtimeResponse.Error
 		if message == "" {
 			message = "TypeScript component setup failed"
 		}
@@ -103,65 +114,84 @@ func (c *typeScriptRuntimeComponent) ProcessQueueItem(ctx core.ProcessQueueConte
 }
 
 func (c *typeScriptRuntimeComponent) Execute(ctx core.ExecutionContext) error {
-	request := runtimeTS.ComponentExecutionRequest{
-		Operation: runtimeTS.OperationComponentExecute,
-		Component: c.definition.Name,
-		Context: runtimeTS.ComponentExecutionInput{
-			ExecutionID:    ctx.ID.String(),
-			WorkflowID:     ctx.WorkflowID,
-			OrganizationID: ctx.OrganizationID,
-			NodeID:         ctx.NodeID,
-			SourceNodeID:   ctx.SourceNodeID,
-			Configuration:  ctx.Configuration,
-			Data:           ctx.Data,
-		},
+	input := runtimeTS.ComponentExecutionInput{
+		ExecutionID:    ctx.ID.String(),
+		WorkflowID:     ctx.WorkflowID,
+		OrganizationID: ctx.OrganizationID,
+		NodeID:         ctx.NodeID,
+		SourceNodeID:   ctx.SourceNodeID,
+		Configuration:  ctx.Configuration,
+		Data:           ctx.Data,
 	}
 
 	if metadata, ok := ctx.Metadata.Get().(map[string]any); ok {
-		request.Context.Metadata = metadata
+		input.Metadata = metadata
 	}
 	if metadata, ok := ctx.NodeMetadata.Get().(map[string]any); ok {
-		request.Context.NodeMetadata = metadata
+		input.NodeMetadata = metadata
 	}
 
-	response, err := runtimeTS.ExecuteComponentEntrypoint(c.binary, c.timeout, c.definition.Entrypoint, request)
+	runnerCtx, cancel := withTimeout(c.timeout)
+	defer cancel()
+
+	response, err := c.runner.ExecuteComponent(
+		runnerCtx,
+		c.definition.Name,
+		newTypeScriptRunnerRequest(
+			c.version,
+			c.timeout,
+			runner.RuntimeContext{
+				OrganizationID: ctx.OrganizationID,
+				NodeID:         ctx.NodeID,
+			},
+			input,
+		),
+	)
 	if err != nil {
 		return err
 	}
+	if !response.OK {
+		return typeScriptRunnerResponseError(response, "TypeScript component execution failed")
+	}
 
-	if response.Metadata != nil {
-		if err := ctx.Metadata.Set(response.Metadata); err != nil {
+	var runtimeResponse runtimeTS.ComponentExecutionResponse
+	if err := decodeTypeScriptRunnerOutput(response.Output, &runtimeResponse); err != nil {
+		return err
+	}
+
+	if runtimeResponse.Metadata != nil {
+		if err := ctx.Metadata.Set(runtimeResponse.Metadata); err != nil {
 			return err
 		}
 	}
-	if response.NodeMetadata != nil {
-		if err := ctx.NodeMetadata.Set(response.NodeMetadata); err != nil {
+	if runtimeResponse.NodeMetadata != nil {
+		if err := ctx.NodeMetadata.Set(runtimeResponse.NodeMetadata); err != nil {
 			return err
 		}
 	}
-	for _, kv := range response.KVs {
+	for _, kv := range runtimeResponse.KVs {
 		if err := ctx.ExecutionState.SetKV(kv.Key, kv.Value); err != nil {
 			return err
 		}
 	}
 
-	switch response.Outcome {
+	switch runtimeResponse.Outcome {
 	case runtimeTS.OutcomePass:
-		if len(response.Outputs) == 0 {
+		if len(runtimeResponse.Outputs) == 0 {
 			return ctx.ExecutionState.Pass()
 		}
-		for _, output := range response.Outputs {
+		for _, output := range runtimeResponse.Outputs {
 			if err := ctx.ExecutionState.Emit(output.Channel, output.PayloadType, []any{output.Payload}); err != nil {
 				return err
 			}
 		}
 		return nil
 	case runtimeTS.OutcomeFail:
-		reason := response.ErrorReason
+		reason := runtimeResponse.ErrorReason
 		if reason == "" {
 			reason = "error"
 		}
-		message := response.Error
+		message := runtimeResponse.Error
 		if message == "" {
 			message = "TypeScript component failed"
 		}
@@ -169,7 +199,7 @@ func (c *typeScriptRuntimeComponent) Execute(ctx core.ExecutionContext) error {
 	case runtimeTS.OutcomeNoop:
 		return nil
 	default:
-		return fmt.Errorf("unsupported TypeScript component outcome: %s", response.Outcome)
+		return fmt.Errorf("unsupported TypeScript component outcome: %s", runtimeResponse.Outcome)
 	}
 }
 
@@ -199,17 +229,9 @@ func (r *Registry) registerTypeScriptComponentsFromEnv() error {
 		return err
 	}
 
-	binary := strings.TrimSpace(os.Getenv("DENO_BINARY"))
-	if binary == "" {
-		binary = runtimeTS.DefaultDenoBinary
-	}
-
-	timeout := runtimeTS.DefaultDenoExecutionTimeout
-	timeoutValue := strings.TrimSpace(os.Getenv("DENO_EXECUTION_TIMEOUT"))
-	if timeoutValue != "" {
-		if parsed, err := time.ParseDuration(timeoutValue); err == nil && parsed > 0 {
-			timeout = parsed
-		}
+	runnerClient, cfg, err := newTypeScriptRunner()
+	if err != nil {
+		return err
 	}
 
 	for _, definition := range definitions {
@@ -219,8 +241,9 @@ func (r *Registry) registerTypeScriptComponentsFromEnv() error {
 
 		r.Components[definition.Name] = NewPanicableComponent(&typeScriptRuntimeComponent{
 			definition: definition,
-			binary:     binary,
-			timeout:    timeout,
+			runner:     runnerClient,
+			timeout:    cfg.Timeout,
+			version:    cfg.Version,
 		})
 	}
 

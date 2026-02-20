@@ -14,14 +14,14 @@ import (
 const IntegrationsDirEnv = "TYPESCRIPT_INTEGRATIONS_DIR"
 
 type IntegrationManifest struct {
-	Name          string                `json:"name"`
-	Label         string                `json:"label"`
-	Icon          string                `json:"icon"`
-	Description   string                `json:"description"`
-	Instructions  string                `json:"instructions"`
-	Configuration []configuration.Field  `json:"configuration"`
+	Name          string                    `json:"name"`
+	Label         string                    `json:"label"`
+	Icon          string                    `json:"icon"`
+	Description   string                    `json:"description"`
+	Instructions  string                    `json:"instructions"`
+	Configuration []configuration.Field     `json:"configuration"`
 	Components    []IntegrationComponentRef `json:"components"`
-	Triggers      []IntegrationTriggerRef `json:"triggers"`
+	Triggers      []IntegrationTriggerRef   `json:"triggers"`
 }
 
 type TriggerManifest struct {

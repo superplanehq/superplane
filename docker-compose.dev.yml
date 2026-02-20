@@ -80,6 +80,9 @@ services:
       VITE_ENABLE_CUSTOM_COMPONENTS: "true"
       TYPESCRIPT_COMPONENTS_DIR: "/app/sdk/components"
       TYPESCRIPT_INTEGRATIONS_DIR: "/app/sdk/integrations"
+      TYPESCRIPT_RUNNER_TRANSPORT: "http"
+      TYPESCRIPT_RUNNER_HTTP_BASE_URL: "http://typescript-runner:7761"
+      TYPESCRIPT_RUNNER_AUTH_TOKEN: "dev-typescript-runner-token"
 
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}
@@ -98,9 +101,46 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      typescript-runner:
+        condition: service_healthy
 
     volumes:
       - go-pkg-cache:/go
+      - .:/app
+      - /tmp:/tmp
+
+  typescript-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.runner
+
+    tty: true
+
+    command: deno run --allow-env --allow-read --allow-net /app/sdk/typescript/runner/server.ts
+    environment:
+      TYPESCRIPT_COMPONENTS_DIR: "/app/sdk/components"
+      TYPESCRIPT_INTEGRATIONS_DIR: "/app/sdk/integrations"
+      TYPESCRIPT_RUNNER_ENABLE_HTTP: "true"
+      TYPESCRIPT_RUNNER_HTTP_HOST: "0.0.0.0"
+      TYPESCRIPT_RUNNER_HTTP_PORT: "7761"
+      TYPESCRIPT_RUNNER_ENABLE_GRPC: "false"
+      TYPESCRIPT_RUNNER_AUTH_TOKEN: "dev-typescript-runner-token"
+      TYPESCRIPT_RUNNER_PROTO_PATH: "/app/pkg/runtime/runner/proto/runtime_runner.proto"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "deno",
+          "eval",
+          "--allow-net",
+          "const response = await fetch('http://127.0.0.1:7761/healthz'); if (!response.ok) Deno.exit(1);",
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+    volumes:
       - .:/app
       - /tmp:/tmp
 

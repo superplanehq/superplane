@@ -1,4 +1,8 @@
-export type RuntimeOperation = "component.execute" | "component.setup";
+export type RuntimeOperation =
+  | "component.execute"
+  | "component.setup"
+  | "integration.sync"
+  | "integration.cleanup";
 
 export type ComponentExecutionRequest = {
   operation: RuntimeOperation;
@@ -58,7 +62,54 @@ export type RuntimeLogger = {
   error(message: string, fields?: Record<string, unknown>): void;
 };
 
-export type ActionImplementation = {
+export type ComponentImplementation = {
   setup?(ctx: SetupContext): Promise<void> | void;
   execute(ctx: ExecuteContext): Promise<ComponentExecutionResponse> | ComponentExecutionResponse;
+};
+
+export type IntegrationContext = {
+  configuration?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  organizationId?: string;
+  baseUrl?: string;
+  webhooksBaseUrl?: string;
+};
+
+export type IntegrationExecutionOutcome = "pass" | "fail" | "noop";
+
+export type IntegrationResource = {
+  type: string;
+  name: string;
+  id: string;
+};
+
+export type IntegrationHTTPResponse = {
+  statusCode: number;
+  headers?: Record<string, string[]>;
+  body?: number[];
+};
+
+export type IntegrationExecutionResponse = {
+  outcome: IntegrationExecutionOutcome;
+  errorReason?: string;
+  error?: string;
+  metadata?: Record<string, unknown>;
+  state?: string;
+  stateDescription?: string;
+  resources?: IntegrationResource[];
+  http?: IntegrationHTTPResponse;
+};
+
+export type IntegrationImplementation = {
+  sync?(ctx: IntegrationContext): Promise<IntegrationExecutionResponse> | IntegrationExecutionResponse;
+  cleanup?(ctx: IntegrationContext): Promise<IntegrationExecutionResponse> | IntegrationExecutionResponse;
+};
+
+export type TriggerSetupContext = {
+  configuration?: unknown;
+  metadata?: Record<string, unknown>;
+};
+
+export type TriggerImplementation = {
+  setup?(ctx: TriggerSetupContext): Promise<void> | void;
 };

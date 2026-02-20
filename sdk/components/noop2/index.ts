@@ -1,4 +1,5 @@
 import { runComponentCLI } from "../../typescript/mod.ts";
+import type { ComponentImplementation } from "../../typescript/mod.ts";
 
 type Noop2Config = {
   message?: string;
@@ -13,7 +14,7 @@ function parseConfig(value: unknown): Noop2Config {
   return value as Noop2Config;
 }
 
-await runComponentCLI({
+export const component: ComponentImplementation = {
   setup(ctx) {
     const config = parseConfig(ctx.configuration);
     const message = (config.message ?? "").trim();
@@ -56,4 +57,8 @@ await runComponentCLI({
       ],
     };
   },
-});
+};
+
+if (import.meta.main) {
+  await runComponentCLI(component);
+}

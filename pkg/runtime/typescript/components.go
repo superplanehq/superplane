@@ -15,16 +15,16 @@ import (
 const ComponentsDirEnv = "TYPESCRIPT_COMPONENTS_DIR"
 
 type ComponentManifest struct {
-	Name          string                `json:"name"`
-	Label         string                `json:"label"`
-	Description   string                `json:"description"`
-	Documentation string                `json:"documentation"`
-	File          string                `json:"file,omitempty"`
-	Icon          string                `json:"icon"`
-	Color         string                `json:"color"`
-	Configuration []configuration.Field `json:"configuration"`
-	OutputChannels []core.OutputChannel `json:"output_channels"`
-	ExampleOutput map[string]any        `json:"example_output"`
+	Name           string                `json:"name"`
+	Label          string                `json:"label"`
+	Description    string                `json:"description"`
+	Documentation  string                `json:"documentation"`
+	File           string                `json:"file,omitempty"`
+	Icon           string                `json:"icon"`
+	Color          string                `json:"color"`
+	Configuration  []configuration.Field `json:"configuration"`
+	OutputChannels []core.OutputChannel  `json:"output_channels"`
+	ExampleOutput  map[string]any        `json:"example_output"`
 }
 
 type ComponentDefinition struct {

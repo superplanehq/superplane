@@ -1,0 +1,151 @@
+syntax = "proto3";
+
+package Superplane.RuntimeRunner;
+
+import "google/api/annotations.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/runtime/runner/proto";
+
+service RuntimeRunner {
+  rpc SetupTrigger(SetupTriggerRequest) returns (RuntimeResponse) {
+    option (google.api.http) = {
+      post: "/v1/triggers/{name}/setup"
+      body: "*"
+    };
+  }
+
+  rpc SetupComponent(SetupComponentRequest) returns (RuntimeResponse) {
+    option (google.api.http) = {
+      post: "/v1/components/{name}/setup"
+      body: "*"
+    };
+  }
+
+  rpc ExecuteComponent(ExecuteComponentRequest) returns (RuntimeResponse) {
+    option (google.api.http) = {
+      post: "/v1/components/{name}/execute"
+      body: "*"
+    };
+  }
+
+  rpc SyncIntegration(SyncIntegrationRequest) returns (RuntimeResponse) {
+    option (google.api.http) = {
+      post: "/v1/integrations/{name}/sync"
+      body: "*"
+    };
+  }
+
+  rpc CleanupIntegration(CleanupIntegrationRequest) returns (RuntimeResponse) {
+    option (google.api.http) = {
+      post: "/v1/integrations/{name}/cleanup"
+      body: "*"
+    };
+  }
+
+  rpc ListCapabilities(ListCapabilitiesRequest) returns (ListCapabilitiesResponse) {
+    option (google.api.http) = {
+      get: "/v1/capabilities"
+    };
+  }
+}
+
+message RequestEnvelope {
+  string request_id = 1;
+  string version = 2;
+  int64 timeout_ms = 3;
+}
+
+message RuntimeContext {
+  string organization_id = 1;
+  string workspace_id = 2;
+  string user_id = 3;
+  string canvas_id = 4;
+  string node_id = 5;
+  map<string, string> labels = 6;
+  google.protobuf.Struct metadata = 7;
+}
+
+message SetupTriggerRequest {
+  string name = 1;
+  RequestEnvelope request = 2;
+  RuntimeContext context = 3;
+  google.protobuf.Struct input = 4;
+}
+
+message SetupComponentRequest {
+  string name = 1;
+  RequestEnvelope request = 2;
+  RuntimeContext context = 3;
+  google.protobuf.Struct input = 4;
+}
+
+message ExecuteComponentRequest {
+  string name = 1;
+  RequestEnvelope request = 2;
+  RuntimeContext context = 3;
+  google.protobuf.Struct input = 4;
+}
+
+message SyncIntegrationRequest {
+  string name = 1;
+  RequestEnvelope request = 2;
+  RuntimeContext context = 3;
+  google.protobuf.Struct input = 4;
+}
+
+message CleanupIntegrationRequest {
+  string name = 1;
+  RequestEnvelope request = 2;
+  RuntimeContext context = 3;
+  google.protobuf.Struct input = 4;
+}
+
+enum RuntimeErrorCode {
+  RUNTIME_ERROR_CODE_UNSPECIFIED = 0;
+  RUNTIME_ERROR_CODE_INVALID_INPUT = 1;
+  RUNTIME_ERROR_CODE_NOT_FOUND = 2;
+  RUNTIME_ERROR_CODE_TIMEOUT = 3;
+  RUNTIME_ERROR_CODE_EXECUTION_ERROR = 4;
+  RUNTIME_ERROR_CODE_UNAVAILABLE = 5;
+}
+
+message RuntimeError {
+  RuntimeErrorCode code = 1;
+  string message = 2;
+  google.protobuf.Struct details = 3;
+}
+
+message RuntimeLog {
+  string level = 1;
+  string message = 2;
+  google.protobuf.Struct fields = 3;
+}
+
+message RuntimeResponse {
+  bool ok = 1;
+  google.protobuf.Struct output = 2;
+  repeated RuntimeLog logs = 3;
+  RuntimeError error = 4;
+  map<string, double> metrics = 5;
+}
+
+message ListCapabilitiesRequest {}
+
+message ListCapabilitiesResponse {
+  repeated Capability capabilities = 1;
+}
+
+enum CapabilityKind {
+  CAPABILITY_KIND_UNSPECIFIED = 0;
+  CAPABILITY_KIND_TRIGGER = 1;
+  CAPABILITY_KIND_COMPONENT = 2;
+  CAPABILITY_KIND_INTEGRATION = 3;
+}
+
+message Capability {
+  CapabilityKind kind = 1;
+  string name = 2;
+  repeated string operations = 3;
+  string schema_hash = 4;
+}
