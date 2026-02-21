@@ -27,6 +27,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CodeArtifact • Dispose Package Versions" href="#code-artifact-•-dispose-package-versions" description="Delete assets and set package version status to Disposed (record remains)" />
   <LinkCard title="CodeArtifact • Get Package Version" href="#code-artifact-•-get-package-version" description="Describe an AWS CodeArtifact package version" />
   <LinkCard title="CodeArtifact • Update Package Versions Status" href="#code-artifact-•-update-package-versions-status" description="Update the status of one or more package versions (Archived, Published, Unlisted)" />
+  <LinkCard title="CodePipeline • Run Pipeline" href="#code-pipeline-•-run-pipeline" description="Start an AWS CodePipeline execution and wait for it to complete" />
   <LinkCard title="EC2 • Copy Image" href="#ec2-•-copy-image" description="Copy an EC2 AMI image to another region" />
   <LinkCard title="EC2 • Create Image" href="#ec2-•-create-image" description="Create a new AMI image from an EC2 instance" />
   <LinkCard title="EC2 • Deregister Image" href="#ec2-•-deregister-image" description="Deregister an EC2 AMI image" />
@@ -610,6 +611,66 @@ The Update Package Versions Status component sets the status of package versions
       "status": "Archived"
     }
   }
+}
+```
+
+<a id="code-pipeline-•-run-pipeline"></a>
+
+## CodePipeline • Run Pipeline
+
+The Run Pipeline component triggers an AWS CodePipeline execution and waits for it to complete.
+
+### Use Cases
+
+- **CI/CD orchestration**: Trigger deployments from SuperPlane workflows
+- **Pipeline automation**: Run CodePipeline pipelines as part of workflow automation
+- **Multi-stage deployments**: Coordinate complex deployment pipelines
+- **Workflow chaining**: Chain multiple CodePipeline pipelines together
+
+### How It Works
+
+1. Starts a CodePipeline execution with the specified pipeline name
+2. Waits for the pipeline to complete (monitored via EventBridge webhook and polling)
+3. Routes execution based on pipeline result:
+   - **Passed channel**: Pipeline completed successfully
+   - **Failed channel**: Pipeline failed or was cancelled
+
+### Configuration
+
+- **Region**: AWS region where the pipeline exists
+- **Pipeline**: Pipeline name or ARN to execute
+
+### Output Channels
+
+- **Passed**: Emitted when pipeline completes successfully
+- **Failed**: Emitted when pipeline fails or is cancelled
+
+### Notes
+
+- The component automatically sets up EventBridge monitoring for pipeline completion
+- Falls back to polling if webhook doesn't arrive
+- Can be cancelled, which will stop the running pipeline execution
+
+### Example Output
+
+```json
+{
+  "data": {
+    "detail": {
+      "execution-id": "a1b2c3d4-5678-90ab-cdef-111122223333",
+      "pipeline": "my-deploy-pipeline",
+      "state": "SUCCEEDED",
+      "version": 1
+    },
+    "pipeline": {
+      "executionId": "a1b2c3d4-5678-90ab-cdef-111122223333",
+      "name": "my-deploy-pipeline",
+      "state": "SUCCEEDED",
+      "status": "Succeeded"
+    }
+  },
+  "timestamp": "2026-02-10T14:35:22.518372841Z",
+  "type": "aws.codepipeline.pipeline.finished"
 }
 ```
 
