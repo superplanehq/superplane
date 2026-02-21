@@ -1,0 +1,8 @@
+{
+  "type": "jfrogArtifactory.artifact.deleted",
+  "data": {
+    "repo": "libs-release-local",
+    "path": "/com/example/artifact/1.0/artifact-1.0.jar"
+  },
+  "timestamp": "2026-01-23T12:00:00Z"
+}
