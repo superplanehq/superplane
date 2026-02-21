@@ -7,6 +7,7 @@ import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
+import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.svg";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
@@ -107,6 +108,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   aws: {
     cloudwatch: awsCloudwatchIcon,
     codeArtifact: awsCodeArtifactIcon,
+    codepipeline: awsCodePipelineIcon,
     ecr: awsEcrIcon,
     lambda: awsLambdaIcon,
     sqs: awsSqsIcon,
