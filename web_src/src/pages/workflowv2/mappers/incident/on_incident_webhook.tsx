@@ -24,9 +24,8 @@ export const onIncidentCustomFieldRenderer: CustomFieldRenderer = {
               This trigger is not operational until the webhook is set up.
             </p>
             <p className="text-xs text-amber-700 dark:text-amber-300">
-              Complete the setup in <strong>Settings → Integrations</strong>: open your incident integration, copy the
-              webhook URL, add it in incident.io, and paste the signing secret there. Until then, no events will be
-              received.
+              Save the canvas to generate this trigger webhook URL, add it in incident.io, and configure the signing
+              secret in <strong>Settings → Integrations</strong>. Until then, no events will be received.
             </p>
             <a
               href={getIntegrationsPath()}

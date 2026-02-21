@@ -10,8 +10,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -56,9 +54,10 @@ func (i *IncidentIO) Instructions() string {
 
 Required for the **On Incident** trigger. Until this is done, the trigger will not receive events.
 
-1. Copy the **webhook URL** from the Webhook section below.
-2. In incident.io go to **Settings → Webhooks**, create a new endpoint, and paste that URL. Subscribe to **Public incident created (v2)** and **Public incident updated (v2)**.
-3. Copy the **Signing secret** from the endpoint and paste it in **Webhook signing secret** in the Configuration section above, then save.
+1. Add the **On Incident** trigger to a workflow and save the canvas to generate the webhook URL.
+2. Copy the webhook URL from the trigger setup panel.
+3. In incident.io go to **Settings → Webhooks**, create a new endpoint, and paste that URL. Subscribe to **Public incident created (v2)** and **Public incident updated (v2)**.
+4. Copy the **Signing secret** from the endpoint and paste it in **Webhook signing secret** in the Configuration section above, then save.
 
 The On Incident trigger becomes operational once the URL is registered in incident.io and the signing secret is saved here.`
 }
@@ -123,24 +122,14 @@ func (i *IncidentIO) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error validating API key (listing severities): %w", err)
 	}
 
-	if ctx.Encryptor != nil {
-		tx := ctx.Tx
-		if tx == nil {
-			tx = database.Conn()
-		}
-		if ensureErr := EnsureWebhookExists(tx, ctx.Integration.ID()); ensureErr != nil {
-			ctx.Logger.WithError(ensureErr).Warn("failed to ensure incident webhook")
-		}
-	}
-
 	setIncidentIntegrationMetadata(ctx)
 
 	ctx.Integration.Ready()
 	return nil
 }
 
-// setIncidentIntegrationMetadata sets webhookUrl and webhookSigningSecretConfigured on the integration metadata
-// so the UI can show the webhook URL and secret status without organization-layer logic.
+// setIncidentIntegrationMetadata sets webhookSigningSecretConfigured on the integration metadata
+// so the UI can show setup status without organization-layer logic.
 func setIncidentIntegrationMetadata(ctx core.SyncContext) {
 	var m map[string]any
 	if meta := ctx.Integration.GetMetadata(); meta != nil {
@@ -150,17 +139,6 @@ func setIncidentIntegrationMetadata(ctx core.SyncContext) {
 	}
 	if m == nil {
 		m = make(map[string]any)
-	}
-
-	if ctx.WebhooksBaseURL != "" {
-		tx := ctx.Tx
-		if tx == nil {
-			tx = database.Conn()
-		}
-		webhooks, err := models.ListIntegrationWebhooks(tx, ctx.Integration.ID())
-		if err == nil && len(webhooks) > 0 {
-			m["webhookUrl"] = ctx.WebhooksBaseURL + "/api/v1/webhooks/" + webhooks[0].ID.String()
-		}
 	}
 
 	configured := isWebhookSigningSecretConfigured(ctx)
