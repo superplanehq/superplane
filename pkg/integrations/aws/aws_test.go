@@ -340,6 +340,251 @@ func Test__AWS__ListResources(t *testing.T) {
 		require.Len(t, httpContext.Requests, 1)
 		assert.Equal(t, "https://api.ecr.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())
 	})
+
+	t.Run("ecs.cluster returns clusters", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"clusterArns": [
+								"arn:aws:ecs:us-east-1:123456789012:cluster/demo"
+							]
+						}
+					`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Secrets: map[string]core.IntegrationSecret{
+				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+			},
+		}
+
+		resources, err := a.ListResources("ecs.cluster", core.ListResourcesContext{
+			Integration: integrationCtx,
+			Logger:      logrus.NewEntry(logrus.New()),
+			HTTP:        httpContext,
+			Parameters:  map[string]string{"region": "us-east-1"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "ecs.cluster", resources[0].Type)
+		assert.Equal(t, "demo", resources[0].Name)
+		assert.Equal(t, "arn:aws:ecs:us-east-1:123456789012:cluster/demo", resources[0].ID)
+
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://ecs.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())
+	})
+
+	t.Run("ecs.service returns services", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"serviceArns": [
+								"arn:aws:ecs:us-east-1:123456789012:service/demo/web"
+							]
+						}
+					`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Secrets: map[string]core.IntegrationSecret{
+				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+			},
+		}
+
+		resources, err := a.ListResources("ecs.service", core.ListResourcesContext{
+			Integration: integrationCtx,
+			Logger:      logrus.NewEntry(logrus.New()),
+			HTTP:        httpContext,
+			Parameters: map[string]string{
+				"region":  "us-east-1",
+				"cluster": "demo",
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "ecs.service", resources[0].Type)
+		assert.Equal(t, "web", resources[0].Name)
+		assert.Equal(t, "arn:aws:ecs:us-east-1:123456789012:service/demo/web", resources[0].ID)
+
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://ecs.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())
+	})
+
+	t.Run("ecs.taskDefinition returns task definitions", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"taskDefinitionArns": [
+								"arn:aws:ecs:us-east-1:123456789012:task-definition/worker:7"
+							]
+						}
+					`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Secrets: map[string]core.IntegrationSecret{
+				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+			},
+		}
+
+		resources, err := a.ListResources("ecs.taskDefinition", core.ListResourcesContext{
+			Integration: integrationCtx,
+			Logger:      logrus.NewEntry(logrus.New()),
+			HTTP:        httpContext,
+			Parameters:  map[string]string{"region": "us-east-1"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "ecs.taskDefinition", resources[0].Type)
+		assert.Equal(t, "worker:7", resources[0].Name)
+		assert.Equal(t, "arn:aws:ecs:us-east-1:123456789012:task-definition/worker:7", resources[0].ID)
+
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://ecs.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())
+	})
+
+	t.Run("ec2.image without account ID returns error", func(t *testing.T) {
+		_, err := a.ListResources("ec2.image", core.ListResourcesContext{
+			Integration: &contexts.IntegrationContext{
+				Metadata: common.IntegrationMetadata{},
+				Secrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+			Logger:     logrus.NewEntry(logrus.New()),
+			Parameters: map[string]string{"region": "us-east-1"},
+		})
+
+		require.ErrorContains(t, err, "integration account ID is not configured")
+	})
+
+	t.Run("ec2.image returns account owned images", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<DescribeImagesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+						  <requestId>req-123</requestId>
+						  <imagesSet>
+							<item>
+							  <imageId>ami-123</imageId>
+							  <name>my-image</name>
+							  <ownerId>123456789012</ownerId>
+							  <imageState>available</imageState>
+							</item>
+						  </imagesSet>
+						</DescribeImagesResponse>
+					`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Metadata: common.IntegrationMetadata{
+				Session: &common.SessionMetadata{
+					AccountID: "123456789012",
+				},
+			},
+			Secrets: map[string]core.IntegrationSecret{
+				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+			},
+		}
+
+		resources, err := a.ListResources("ec2.image", core.ListResourcesContext{
+			Integration: integrationCtx,
+			Logger:      logrus.NewEntry(logrus.New()),
+			HTTP:        httpContext,
+			Parameters:  map[string]string{"region": "us-east-1"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "ec2.image", resources[0].Type)
+		assert.Equal(t, "my-image (ami-123)", resources[0].Name)
+		assert.Equal(t, "ami-123", resources[0].ID)
+
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://ec2.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())
+		bodyBytes, readErr := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, readErr)
+		requestBody := string(bodyBytes)
+		assert.Contains(t, requestBody, "Action=DescribeImages")
+		assert.Contains(t, requestBody, "Owner.1=123456789012")
+	})
+
+	t.Run("sns.topic returns topics", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<ListTopicsResponse>
+						  <ListTopicsResult>
+							<Topics>
+							  <member>
+								<TopicArn>arn:aws:sns:us-east-1:123456789012:orders-events</TopicArn>
+							  </member>
+							</Topics>
+						  </ListTopicsResult>
+						</ListTopicsResponse>
+					`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Secrets: map[string]core.IntegrationSecret{
+				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+			},
+		}
+
+		resources, err := a.ListResources("sns.topic", core.ListResourcesContext{
+			Integration: integrationCtx,
+			Logger:      logrus.NewEntry(logrus.New()),
+			HTTP:        httpContext,
+			Parameters:  map[string]string{"region": "us-east-1"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "sns.topic", resources[0].Type)
+		assert.Equal(t, "orders-events", resources[0].Name)
+		assert.Equal(t, "arn:aws:sns:us-east-1:123456789012:orders-events", resources[0].ID)
+
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://sns.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())
+	})
 }
 
 func stsResponse(token string, expiration string) string {

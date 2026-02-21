@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -11,7 +12,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const SandboxPayloadType = "daytona.sandbox"
+const (
+	SandboxPayloadType        = "daytona.sandbox"
+	CreateSandboxPollInterval = 5 * time.Second
+	CreateSandboxTimeout      = 5 * time.Minute
+)
 
 type CreateSandbox struct{}
 
@@ -20,6 +25,11 @@ type CreateSandboxSpec struct {
 	Target           string        `json:"target,omitempty"`
 	AutoStopInterval int           `json:"autoStopInterval,omitempty"`
 	Env              []EnvVariable `json:"env,omitempty"`
+}
+
+type CreateSandboxMetadata struct {
+	SandboxID string `json:"sandboxId" mapstructure:"sandboxId"`
+	StartedAt int64  `json:"startedAt" mapstructure:"startedAt"`
 }
 
 type EnvVariable struct {
@@ -63,7 +73,7 @@ Returns the sandbox information including:
 
 ## Notes
 
-- Sandboxes are created in sub-90ms
+- The component polls the sandbox state until it reaches "started"
 - Each sandbox is fully isolated
 - Remember to delete sandboxes when done to free resources`
 }
@@ -195,11 +205,16 @@ func (c *CreateSandbox) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create sandbox: %v", err)
 	}
 
-	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
-		SandboxPayloadType,
-		[]any{sandbox},
-	)
+	metadata := CreateSandboxMetadata{
+		SandboxID: sandbox.ID,
+		StartedAt: time.Now().UnixNano(),
+	}
+
+	if err := ctx.Metadata.Set(metadata); err != nil {
+		return err
+	}
+
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateSandboxPollInterval)
 }
 
 func (c *CreateSandbox) Cancel(ctx core.ExecutionContext) error {
@@ -211,11 +226,54 @@ func (c *CreateSandbox) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UU
 }
 
 func (c *CreateSandbox) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{Name: "poll", UserAccessible: false},
+	}
 }
 
 func (c *CreateSandbox) HandleAction(ctx core.ActionContext) error {
-	return nil
+	if ctx.Name == "poll" {
+		return c.poll(ctx)
+	}
+	return fmt.Errorf("unknown action: %s", ctx.Name)
+}
+
+func (c *CreateSandbox) poll(ctx core.ActionContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	var metadata CreateSandboxMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %v", err)
+	}
+
+	if time.Since(time.Unix(0, metadata.StartedAt)) > CreateSandboxTimeout {
+		return fmt.Errorf("sandbox %s timed out waiting to start", metadata.SandboxID)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	sandbox, err := client.GetSandbox(metadata.SandboxID)
+	if err != nil {
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateSandboxPollInterval)
+	}
+
+	switch sandbox.State {
+	case "started":
+		return ctx.ExecutionState.Emit(
+			core.DefaultOutputChannel.Name,
+			SandboxPayloadType,
+			[]any{sandbox},
+		)
+	case "error":
+		return fmt.Errorf("sandbox %s failed to start", metadata.SandboxID)
+	default:
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateSandboxPollInterval)
+	}
 }
 
 func (c *CreateSandbox) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

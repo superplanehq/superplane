@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,12 +59,12 @@ func Test__CreateSandbox__Setup(t *testing.T) {
 func Test__CreateSandbox__Execute(t *testing.T) {
 	component := CreateSandbox{}
 
-	t.Run("successful sandbox creation", func(t *testing.T) {
+	t.Run("schedules poll after sandbox creation", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"id":"sandbox-123","state":"started"}`)),
+					Body:       io.NopCloser(strings.NewReader(`{"id":"sandbox-123","state":"creating"}`)),
 				},
 			},
 		}
@@ -74,6 +75,8 @@ func Test__CreateSandbox__Execute(t *testing.T) {
 			},
 		}
 
+		metadataCtx := &contexts.MetadataContext{}
+		requestCtx := &contexts.RequestContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -82,21 +85,27 @@ func Test__CreateSandbox__Execute(t *testing.T) {
 			HTTP:           httpContext,
 			Integration:    appCtx,
 			ExecutionState: execCtx,
+			Metadata:       metadataCtx,
+			Requests:       requestCtx,
 		})
 
 		require.NoError(t, err)
-		assert.True(t, execCtx.Finished)
-		assert.True(t, execCtx.Passed)
-		assert.Equal(t, SandboxPayloadType, execCtx.Type)
-		require.Len(t, execCtx.Payloads, 1)
+		assert.False(t, execCtx.Finished, "execution should not be finished yet")
+		assert.Equal(t, "poll", requestCtx.Action)
+		assert.Equal(t, CreateSandboxPollInterval, requestCtx.Duration)
+
+		metadata, ok := metadataCtx.Metadata.(CreateSandboxMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "sandbox-123", metadata.SandboxID)
+		assert.NotZero(t, metadata.StartedAt)
 	})
 
-	t.Run("sandbox creation with env variables", func(t *testing.T) {
+	t.Run("sandbox creation with env variables schedules poll", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"id":"sandbox-789","state":"started"}`)),
+					Body:       io.NopCloser(strings.NewReader(`{"id":"sandbox-789","state":"creating"}`)),
 				},
 			},
 		}
@@ -107,6 +116,7 @@ func Test__CreateSandbox__Execute(t *testing.T) {
 			},
 		}
 
+		requestCtx := &contexts.RequestContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -118,43 +128,13 @@ func Test__CreateSandbox__Execute(t *testing.T) {
 			HTTP:           httpContext,
 			Integration:    appCtx,
 			ExecutionState: execCtx,
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       requestCtx,
 		})
 
 		require.NoError(t, err)
-		assert.True(t, execCtx.Finished)
-		assert.True(t, execCtx.Passed)
-	})
-
-	t.Run("sandbox creation with snapshot", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"id":"sandbox-456","state":"started"}`)),
-				},
-			},
-		}
-
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"apiKey": "test-api-key",
-			},
-		}
-
-		execCtx := &contexts.ExecutionStateContext{}
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"snapshot":         "custom-snapshot",
-				"autoStopInterval": 30,
-			},
-			HTTP:           httpContext,
-			Integration:    appCtx,
-			ExecutionState: execCtx,
-		})
-
-		require.NoError(t, err)
-		assert.True(t, execCtx.Finished)
-		assert.True(t, execCtx.Passed)
+		assert.False(t, execCtx.Finished)
+		assert.Equal(t, "poll", requestCtx.Action)
 	})
 
 	t.Run("sandbox creation failure -> error", func(t *testing.T) {
@@ -179,10 +159,202 @@ func Test__CreateSandbox__Execute(t *testing.T) {
 			HTTP:           httpContext,
 			Integration:    appCtx,
 			ExecutionState: execCtx,
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       &contexts.RequestContext{},
 		})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create sandbox")
+	})
+}
+
+func Test__CreateSandbox__HandleAction(t *testing.T) {
+	component := CreateSandbox{}
+
+	t.Run("poll reschedules when sandbox is still creating", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"sandbox-123","state":"creating"}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		requestCtx := &contexts.RequestContext{}
+		err := component.HandleAction(core.ActionContext{
+			Name:        "poll",
+			HTTP:        httpContext,
+			Integration: appCtx,
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{
+					"sandboxId": "sandbox-123",
+					"startedAt": time.Now().UnixNano(),
+				},
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Requests:       requestCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "poll", requestCtx.Action)
+		assert.Equal(t, CreateSandboxPollInterval, requestCtx.Duration)
+	})
+
+	t.Run("poll emits result when sandbox is started", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"sandbox-123","state":"started"}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.HandleAction(core.ActionContext{
+			Name:        "poll",
+			HTTP:        httpContext,
+			Integration: appCtx,
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{
+					"sandboxId": "sandbox-123",
+					"startedAt": time.Now().UnixNano(),
+				},
+			},
+			ExecutionState: execCtx,
+			Requests:       &contexts.RequestContext{},
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+		assert.Equal(t, SandboxPayloadType, execCtx.Type)
+		require.Len(t, execCtx.Payloads, 1)
+	})
+
+	t.Run("poll errors when sandbox state is error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"sandbox-123","state":"error"}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		err := component.HandleAction(core.ActionContext{
+			Name:        "poll",
+			HTTP:        httpContext,
+			Integration: appCtx,
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{
+					"sandboxId": "sandbox-123",
+					"startedAt": time.Now().UnixNano(),
+				},
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Requests:       &contexts.RequestContext{},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to start")
+	})
+
+	t.Run("poll reschedules on GetSandbox API error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader(`{"message":"server error"}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		requestCtx := &contexts.RequestContext{}
+		err := component.HandleAction(core.ActionContext{
+			Name:        "poll",
+			HTTP:        httpContext,
+			Integration: appCtx,
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{
+					"sandboxId": "sandbox-123",
+					"startedAt": time.Now().UnixNano(),
+				},
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Requests:       requestCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "poll", requestCtx.Action)
+	})
+
+	t.Run("poll times out", func(t *testing.T) {
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		err := component.HandleAction(core.ActionContext{
+			Name:        "poll",
+			HTTP:        &contexts.HTTPContext{},
+			Integration: appCtx,
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{
+					"sandboxId": "sandbox-123",
+					"startedAt": time.Now().Add(-10 * time.Minute).UnixNano(),
+				},
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Requests:       &contexts.RequestContext{},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "timed out")
+	})
+
+	t.Run("skips when execution already finished", func(t *testing.T) {
+		err := component.HandleAction(core.ActionContext{
+			Name:           "poll",
+			ExecutionState: &contexts.ExecutionStateContext{Finished: true},
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("unknown action -> error", func(t *testing.T) {
+		err := component.HandleAction(core.ActionContext{
+			Name: "unknown",
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown action")
 	})
 }
 

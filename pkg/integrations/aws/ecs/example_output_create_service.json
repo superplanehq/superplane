@@ -1,0 +1,23 @@
+{
+  "data": {
+    "service": {
+      "clusterArn": "arn:aws:ecs:us-east-1:111122223333:cluster/superplane-demo-cluster",
+      "createdAt": "2026-02-12T08:15:10Z",
+      "desiredCount": 2,
+      "enableExecuteCommand": true,
+      "launchType": "FARGATE",
+      "pendingCount": 0,
+      "platformVersion": "1.4.0",
+      "propagateTags": "SERVICE",
+      "runningCount": 2,
+      "schedulingStrategy": "REPLICA",
+      "serviceArn": "arn:aws:ecs:us-east-1:111122223333:service/superplane-demo-cluster/superplane-api",
+      "serviceName": "superplane-api",
+      "status": "ACTIVE",
+      "taskDefinition": "arn:aws:ecs:us-east-1:111122223333:task-definition/superplane-api:5",
+      "taskSets": []
+    }
+  },
+  "timestamp": "2026-02-12T08:15:32.101112131Z",
+  "type": "aws.ecs.service"
+}

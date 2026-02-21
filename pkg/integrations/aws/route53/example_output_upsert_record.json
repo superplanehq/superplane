@@ -1,0 +1,15 @@
+{
+  "data": {
+    "change": {
+      "id": "/change/C9876543210DEF",
+      "status": "INSYNC",
+      "submittedAt": "2026-01-28T10:30:00.000Z"
+    },
+    "record": {
+      "name": "api.example.com",
+      "type": "A"
+    }
+  },
+  "timestamp": "2026-01-28T10:30:00.000Z",
+  "type": "aws.route53.change"
+}
