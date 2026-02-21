@@ -1,0 +1,18 @@
+{
+  "data": {
+    "id": "01FDAG4SAP5TYPT98WGR2N7W91",
+    "name": "Database connectivity issues",
+    "summary": "Users are experiencing slow queries and connection timeouts.",
+    "reference": "INC-123",
+    "permalink": "https://app.incident.io/incidents/123",
+    "visibility": "public",
+    "created_at": "2021-08-17T13:28:57.801578Z",
+    "updated_at": "2021-08-17T13:28:57.801578Z",
+    "severity": {
+      "id": "01FCNDV6P870EA6S7TK1DSYDG0",
+      "name": "Minor"
+    }
+  },
+  "type": "incident.incident",
+  "timestamp": "2026-01-19T12:00:00Z"
+}
