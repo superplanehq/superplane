@@ -115,6 +115,11 @@ import {
   eventStateRegistry as circleCIEventStateRegistry,
 } from "./circleci/index";
 import {
+  componentMappers as harnessComponentMappers,
+  triggerRenderers as harnessTriggerRenderers,
+  eventStateRegistry as harnessEventStateRegistry,
+} from "./harness";
+import {
   componentMappers as claudeComponentMappers,
   triggerRenderers as claudeTriggerRenderers,
   eventStateRegistry as claudeEventStateRegistry,
@@ -141,6 +146,13 @@ import {
   triggerRenderers as dockerhubTriggerRenderers,
   eventStateRegistry as dockerhubEventStateRegistry,
 } from "./dockerhub";
+import {
+  componentMappers as servicenowComponentMappers,
+  customFieldRenderers as servicenowCustomFieldRenderers,
+  triggerRenderers as servicenowTriggerRenderers,
+  eventStateRegistry as servicenowEventStateRegistry,
+} from "./servicenow/index";
+
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
@@ -198,6 +210,8 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   hetzner: hetznerComponentMappers,
   statuspage: statuspageComponentMappers,
   dockerhub: dockerhubComponentMappers,
+  harness: harnessComponentMappers,
+  servicenow: servicenowComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -226,6 +240,8 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   cursor: cursorTriggerRenderers,
   statuspage: statuspageTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
+  harness: harnessTriggerRenderers,
+  servicenow: servicenowTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -253,6 +269,8 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
+  harness: harnessEventStateRegistry,
+  servicenow: servicenowEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -281,6 +299,7 @@ const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer
   grafana: grafanaCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
+  servicenow: servicenowCustomFieldRenderers,
 };
 
 /**

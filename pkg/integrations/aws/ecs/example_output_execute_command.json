@@ -1,0 +1,18 @@
+{
+  "data": {
+    "command": {
+      "clusterArn": "arn:aws:ecs:us-east-1:111122223333:cluster/superplane-demo-cluster",
+      "containerArn": "arn:aws:ecs:us-east-1:111122223333:container/superplane-demo-cluster/aaaaaaaa11111111bbbbbbbb22222222/2d7f98c1e4d14f98a4d1f36e6f4f5d23",
+      "containerName": "api",
+      "interactive": false,
+      "session": {
+        "sessionId": "ecs-execute-command-0f2ea5a931534f9f8f37f7e706a2c100",
+        "streamUrl": "wss://ssmmessages.us-east-1.amazonaws.com/v1/data-channel/ecs-execute-command-0f2ea5a931534f9f8f37f7e706a2c100?role=publish_subscribe",
+        "tokenValue": "AQoDYXdzEJr//////////wEaDAi4cUd2QqXQwq2NAiD3rWkK9mYc9..."
+      },
+      "taskArn": "arn:aws:ecs:us-east-1:111122223333:task/superplane-demo-cluster/aaaaaaaa11111111bbbbbbbb22222222"
+    }
+  },
+  "timestamp": "2026-02-12T09:10:21.445566778Z",
+  "type": "aws.ecs.executeCommand"
+}

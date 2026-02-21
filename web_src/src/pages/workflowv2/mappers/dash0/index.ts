@@ -7,6 +7,7 @@ import { createHttpSyntheticCheckMapper } from "./create_http_synthetic_check";
 import { updateHttpSyntheticCheckMapper } from "./update_http_synthetic_check";
 import { deleteHttpSyntheticCheckMapper } from "./delete_http_synthetic_check";
 import { buildActionStateRegistry } from "../utils";
+import { onNotificationTriggerRenderer } from "./on_notification";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   queryPrometheus: queryPrometheusMapper,
@@ -16,7 +17,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   deleteHttpSyntheticCheck: deleteHttpSyntheticCheckMapper,
 };
 
-export const triggerRenderers: Record<string, TriggerRenderer> = {};
+export const triggerRenderers: Record<string, TriggerRenderer> = {
+  onNotification: onNotificationTriggerRenderer,
+};
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   listIssues: LIST_ISSUES_STATE_REGISTRY,
