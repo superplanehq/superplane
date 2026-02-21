@@ -54,18 +54,7 @@ const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
     initialStepFieldNames?: string[];
     webhookStepDescription?: ReactNode;
   }
-> = {
-  incident: {
-    instructionsEndBeforeHeading: "## Webhook integration",
-    initialStepFieldNames: ["apiKey"],
-    webhookStepDescription: (
-      <p className="text-sm text-gray-800 dark:text-gray-200">
-        Copy the webhook URL below, add it in incident.io Settings → Webhooks, subscribe to Public incident created (v2)
-        and Public incident updated (v2), then paste the signing secret.
-      </p>
-    ),
-  },
-};
+> = {};
 
 interface ComponentSidebarProps {
   isOpen?: boolean;

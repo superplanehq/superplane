@@ -62,12 +62,11 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		return "v1," + base64.StdEncoding.EncodeToString(mac.Sum(nil))
 	}
 
-	t.Run("missing signing secret (no webhook secret nor integration) -> 403", func(t *testing.T) {
+	t.Run("missing signing secret (no webhook secret) -> 403", func(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
 			Configuration: map[string]any{"events": []string{EventIncidentCreatedV2}},
 			Webhook:       &contexts.WebhookContext{}, // no SetSecret called
-			Integration:   nil,                        // no integration fallback
 			Events:        &contexts.EventContext{},
 		})
 
@@ -229,20 +228,16 @@ func Test__OnIncident__Setup(t *testing.T) {
 		assert.Equal(t, []string{EventIncidentCreatedV2}, req.Events)
 	})
 
-	t.Run("setup webhook before setting secret", func(t *testing.T) {
+	t.Run("setup webhook and set secret from trigger config", func(t *testing.T) {
 		webhookCtx := &setupFirstWebhookContext{}
 		metadataCtx := &contexts.MetadataContext{}
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"webhookSigningSecret": "whsec_test_secret",
-			},
-		}
+		integrationCtx := &contexts.IntegrationContext{}
 
 		err := trigger.Setup(core.TriggerContext{
 			Integration:   integrationCtx,
 			Webhook:       webhookCtx,
 			Metadata:      metadataCtx,
-			Configuration: OnIncidentConfiguration{Events: []string{EventIncidentCreatedV2}},
+			Configuration: OnIncidentConfiguration{Events: []string{EventIncidentCreatedV2}, WebhookSigningSecret: "whsec_test_secret"},
 		})
 
 		require.NoError(t, err)
@@ -253,5 +248,6 @@ func Test__OnIncident__Setup(t *testing.T) {
 		metadata, ok := metadataCtx.Metadata.(OnIncidentMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "https://example.com/api/v1/webhooks/webhook-123", metadata.WebhookURL)
+		assert.True(t, metadata.SigningSecretConfigured)
 	})
 }

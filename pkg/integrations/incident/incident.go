@@ -1,11 +1,7 @@
 package incident
 
 import (
-	"context"
-	"encoding/base64"
 	"fmt"
-	"maps"
-	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -20,8 +16,7 @@ func init() {
 type IncidentIO struct{}
 
 type Configuration struct {
-	APIKey               string `json:"apiKey"`
-	WebhookSigningSecret string `json:"webhookSigningSecret"`
+	APIKey string `json:"apiKey"`
 }
 
 func (i *IncidentIO) Name() string {
@@ -48,18 +43,7 @@ func (i *IncidentIO) Instructions() string {
    - **View data, like public incidents and organisation settings** (needed to read severities)
    - **Create incidents** (needed for the Create Incident action)
    - **View all incident data, including private incidents** (only if you use private incidents)
-3. Create the key and **paste the API key** in the Configuration section below.
-
-## Webhook integration
-
-Required for the **On Incident** trigger. Until this is done, the trigger will not receive events.
-
-1. Add the **On Incident** trigger to a workflow and save the canvas to generate the webhook URL.
-2. Copy the webhook URL from the trigger setup panel.
-3. In incident.io go to **Settings → Webhooks**, create a new endpoint, and paste that URL. Subscribe to **Public incident created (v2)** and **Public incident updated (v2)**.
-4. Copy the **Signing secret** from the endpoint and paste it in **Webhook signing secret** in the Configuration section above, then save.
-
-The On Incident trigger becomes operational once the URL is registered in incident.io and the signing secret is saved here.`
+3. Create the key and **paste the API key** in the Configuration section below.`
 }
 
 func (i *IncidentIO) Configuration() []configuration.Field {
@@ -71,15 +55,6 @@ func (i *IncidentIO) Configuration() []configuration.Field {
 			Required:    true,
 			Sensitive:   true,
 			Description: "API key from incident.io. Create one in Settings > API keys with permissions: View data (public incidents and organisation settings), Create incidents; optionally View all incident data (private incidents).",
-		},
-		{
-			Name:        "webhookSigningSecret",
-			Label:       "Webhook signing secret",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Sensitive:   true,
-			Description: "From your incident.io webhook endpoint (Settings → Webhooks). Paste the signing secret here so the On Incident trigger can verify requests.",
-			Placeholder: "whsec_...",
 		},
 	}
 }
@@ -122,54 +97,8 @@ func (i *IncidentIO) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error validating API key (listing severities): %w", err)
 	}
 
-	setIncidentIntegrationMetadata(ctx)
-
 	ctx.Integration.Ready()
 	return nil
-}
-
-// setIncidentIntegrationMetadata sets webhookSigningSecretConfigured on the integration metadata
-// so the UI can show setup status without organization-layer logic.
-func setIncidentIntegrationMetadata(ctx core.SyncContext) {
-	var m map[string]any
-	if meta := ctx.Integration.GetMetadata(); meta != nil {
-		if mm, ok := meta.(map[string]any); ok {
-			m = maps.Clone(mm)
-		}
-	}
-	if m == nil {
-		m = make(map[string]any)
-	}
-
-	configured := isWebhookSigningSecretConfigured(ctx)
-	m["webhookSigningSecretConfigured"] = configured
-
-	ctx.Integration.SetMetadata(m)
-}
-
-// isWebhookSigningSecretConfigured returns true only if the integration has a non-empty webhook signing secret
-// (decrypted and trimmed). Encrypting an empty string yields non-empty ciphertext, so we must decrypt to check.
-func isWebhookSigningSecretConfigured(ctx core.SyncContext) bool {
-	if ctx.Encryptor == nil {
-		return false
-	}
-	configMap, ok := ctx.Configuration.(map[string]any)
-	if !ok {
-		return false
-	}
-	raw, _ := configMap["webhookSigningSecret"].(string)
-	if raw == "" || raw == "<redacted>" {
-		return false
-	}
-	ciphertext, err := base64.StdEncoding.DecodeString(raw)
-	if err != nil || len(ciphertext) == 0 {
-		return false
-	}
-	plaintext, err := ctx.Encryptor.Decrypt(context.Background(), ciphertext, []byte(ctx.Integration.ID().String()))
-	if err != nil {
-		return false
-	}
-	return strings.TrimSpace(string(plaintext)) != ""
 }
 
 func (i *IncidentIO) HandleRequest(ctx core.HTTPRequestContext) {}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -20,12 +21,14 @@ const (
 type OnIncident struct{}
 
 type OnIncidentConfiguration struct {
-	Events []string `json:"events"`
+	Events               []string `json:"events" mapstructure:"events"`
+	WebhookSigningSecret string   `json:"webhookSigningSecret" mapstructure:"webhookSigningSecret"`
 }
 
-// OnIncidentMetadata is stored after Setup and includes the webhook URL for the user to copy into incident.io.
+// OnIncidentMetadata is stored after Setup and includes the webhook URL and signing-secret status for the UI.
 type OnIncidentMetadata struct {
-	WebhookURL string `json:"webhookUrl" mapstructure:"webhookUrl"`
+	WebhookURL              string `json:"webhookUrl" mapstructure:"webhookUrl"`
+	SigningSecretConfigured bool   `json:"signingSecretConfigured" mapstructure:"signingSecretConfigured"`
 }
 
 func (t *OnIncident) Name() string {
@@ -52,16 +55,16 @@ func (t *OnIncident) Documentation() string {
 ## Configuration
 
 - **Events**: Select which events to listen for (Incident created, Incident updated)
-- **Signing secret**: Configure the webhook signing secret in the incident.io integration (Settings → Integrations). Paste the signing secret from your incident.io webhook endpoint (Settings > Webhooks). Required to verify webhook authenticity.
+- **Webhook signing secret**: Paste the signing secret from your incident.io webhook endpoint (Settings → Webhooks). Required to verify webhook authenticity. Configure it in this trigger's configuration below.
 
 ## Webhook Setup
 
 incident.io does not provide an API to register webhook endpoints. After adding this trigger:
 
-1. Copy the webhook URL shown for this trigger (after saving the canvas).
+1. Save the canvas to generate the webhook URL, then copy it from this panel.
 2. In incident.io go to **Settings > Webhooks** and create a new endpoint with that URL.
-3. Subscribe to exactly these events: **Public incident created (v2)** and **Public incident updated (v2)**.
-4. Copy the **Signing secret** from the endpoint and add it to the incident.io integration (Settings → Integrations).`
+3. Subscribe to **Public incident created (v2)** and **Public incident updated (v2)**.
+4. Copy the **Signing secret** from the endpoint and paste it in **Webhook signing secret** in this trigger's configuration.`
 }
 
 func (t *OnIncident) Icon() string {
@@ -79,7 +82,7 @@ func (t *OnIncident) Configuration() []configuration.Field {
 			Label:    "Events",
 			Type:     configuration.FieldTypeMultiSelect,
 			Required: true,
-			Default:  []string{EventIncidentCreatedV2},
+			Default:  []string{EventIncidentCreatedV2, EventIncidentUpdatedV2},
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -88,6 +91,15 @@ func (t *OnIncident) Configuration() []configuration.Field {
 					},
 				},
 			},
+		},
+		{
+			Name:        "webhookSigningSecret",
+			Label:       "Webhook signing secret",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Sensitive:   true,
+			Description: "From your incident.io webhook endpoint (Settings → Webhooks). Paste the signing secret here so this trigger can verify requests.",
+			Placeholder: "whsec_...",
 		},
 	}
 }
@@ -107,10 +119,7 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("integration is required to set up the incident.io webhook trigger")
 	}
 
-	var signingSecret string
-	if b, getErr := ctx.Integration.GetConfig("webhookSigningSecret"); getErr == nil && len(b) > 0 {
-		signingSecret = string(b)
-	}
+	signingSecret := strings.TrimSpace(config.WebhookSigningSecret)
 
 	// Pass only events and hash so the secret is never stored in plaintext in the webhook Configuration column.
 	if err := ctx.Integration.RequestWebhook(WebhookConfiguration{
@@ -136,13 +145,14 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		}
 	}
 
-	// Store webhook URL in metadata so the UI can show it for the user to copy into incident.io.
-	if webhookURL != "" {
-		metadata := OnIncidentMetadata{WebhookURL: webhookURL}
-		if ctx.Metadata != nil {
-			if err := ctx.Metadata.Set(metadata); err != nil {
-				return fmt.Errorf("failed to set metadata: %w", err)
-			}
+	// Store webhook URL and signing-secret status in metadata for the UI.
+	if ctx.Metadata != nil {
+		metadata := OnIncidentMetadata{
+			WebhookURL:              webhookURL,
+			SigningSecretConfigured: signingSecret != "",
+		}
+		if err := ctx.Metadata.Set(metadata); err != nil {
+			return fmt.Errorf("failed to set metadata: %w", err)
 		}
 	}
 
@@ -158,26 +168,19 @@ func (t *OnIncident) HandleAction(ctx core.TriggerActionContext) (map[string]any
 }
 
 func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	if ctx.Logger != nil {
+		ctx.Logger.Infof("incident webhook: received for workflow %s", ctx.WorkflowID)
+	}
+
 	config := OnIncidentConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	// Prefer the secret from the encrypted webhook.Secret field; fall back to integration for backwards compatibility.
-	var signingSecret string
-	if ctx.Webhook != nil {
-		if b, err := ctx.Webhook.GetSecret(); err == nil && len(b) > 0 {
-			signingSecret = string(b)
-		}
-	}
-	if signingSecret == "" && ctx.Integration != nil {
-		if b, getErr := ctx.Integration.GetConfig("webhookSigningSecret"); getErr == nil && len(b) > 0 {
-			signingSecret = string(b)
-		}
-	}
+	signingSecret := resolveSigningSecret(ctx)
 	if signingSecret == "" {
-		return http.StatusForbidden, fmt.Errorf("signing secret is required for webhook verification; add it in the integration (Settings → Integrations)")
+		return http.StatusForbidden, fmt.Errorf("signing secret is required for webhook verification; add it in this trigger's configuration (Webhook signing secret)")
 	}
 
 	webhookID := ctx.Headers.Get("webhook-id")
@@ -216,7 +219,15 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 		return http.StatusBadRequest, fmt.Errorf("missing event_type in payload")
 	}
 
-	if !slices.Contains(config.Events, eventType) {
+	// Accept if event type is in config; if config.Events is empty (e.g. old node), accept both known event types so we don't silently drop
+	acceptedEvents := config.Events
+	if len(acceptedEvents) == 0 {
+		acceptedEvents = []string{EventIncidentCreatedV2, EventIncidentUpdatedV2}
+	}
+	if !slices.Contains(acceptedEvents, eventType) {
+		if ctx.Logger != nil {
+			ctx.Logger.Infof("incident webhook: event type %q not in trigger config (configured: %v), acknowledging without emitting", eventType, config.Events)
+		}
 		return http.StatusOK, nil
 	}
 
@@ -231,10 +242,13 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	}
 
 	eventName := eventTypeToEventName(eventType)
-	if err := ctx.Events.Emit("incident."+eventName, emitPayload); err != nil {
+	payloadType := "incident." + eventName
+	if err := ctx.Events.Emit(payloadType, emitPayload); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %w", err)
 	}
-
+	if ctx.Logger != nil {
+		ctx.Logger.Infof("incident webhook: emitted %s for workflow %s", payloadType, ctx.WorkflowID)
+	}
 	return http.StatusOK, nil
 }
 
@@ -251,4 +265,26 @@ func eventTypeToEventName(eventType string) string {
 
 func (t *OnIncident) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+// resolveSigningSecret returns the webhook signing secret for verification.
+// It prefers the secret stored in the webhook (set during trigger Setup); if missing, falls back to the trigger's configuration (same pattern as Grafana's resolveWebhookSharedSecret).
+func resolveSigningSecret(ctx core.WebhookRequestContext) string {
+	if ctx.Webhook != nil {
+		if b, err := ctx.Webhook.GetSecret(); err == nil && len(b) > 0 {
+			s := strings.TrimSpace(string(b))
+			if s != "" {
+				return s
+			}
+		}
+	}
+	config := OnIncidentConfiguration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return ""
+	}
+	s := strings.TrimSpace(config.WebhookSigningSecret)
+	if s == "" || s == "<redacted>" {
+		return ""
+	}
+	return s
 }
