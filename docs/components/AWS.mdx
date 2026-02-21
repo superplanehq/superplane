@@ -38,9 +38,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
+  <LinkCard title="ECS • Create Service" href="#ecs-•-create-service" description="Create an AWS ECS service" />
   <LinkCard title="ECS • Describe Service" href="#ecs-•-describe-service" description="Describe an AWS ECS service" />
+  <LinkCard title="ECS • Execute Command" href="#ecs-•-execute-command" description="Execute a command in a running AWS ECS task container" />
   <LinkCard title="ECS • Run Task" href="#ecs-•-run-task" description="Run a task in AWS ECS" />
   <LinkCard title="ECS • Stop Task" href="#ecs-•-stop-task" description="Stop a running AWS ECS task" />
+  <LinkCard title="ECS • Update Service" href="#ecs-•-update-service" description="Update an AWS ECS service configuration" />
   <LinkCard title="Lambda • Run Function" href="#lambda-•-run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
   <LinkCard title="Route 53 • Create DNS Record" href="#route-53-•-create-dns-record" description="Create a DNS record in an AWS Route 53 hosted zone" />
   <LinkCard title="Route 53 • Delete DNS Record" href="#route-53-•-delete-dns-record" description="Delete a DNS record from an AWS Route 53 hosted zone" />
@@ -1097,6 +1100,51 @@ At least one of **Image Digest** or **Image Tag** is required. If both are provi
 }
 ```
 
+<a id="ecs-•-create-service"></a>
+
+## ECS • Create Service
+
+The Create Service component creates a new ECS service in a cluster.
+
+### Use Cases
+
+- **Provisioning workflows**: Create a service during environment setup
+- **Deployment automation**: Roll out new workloads from workflows
+- **Infrastructure orchestration**: Configure ECS service settings as part of release pipelines
+
+### Notes
+
+- You can pass advanced ECS CreateService fields through **Additional ECS API Arguments**.
+- Do not combine **Launch Type** with **Capacity Provider Strategy**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "service": {
+      "clusterArn": "arn:aws:ecs:us-east-1:111122223333:cluster/superplane-demo-cluster",
+      "createdAt": "2026-02-12T08:15:10Z",
+      "desiredCount": 2,
+      "enableExecuteCommand": true,
+      "launchType": "FARGATE",
+      "pendingCount": 0,
+      "platformVersion": "1.4.0",
+      "propagateTags": "SERVICE",
+      "runningCount": 2,
+      "schedulingStrategy": "REPLICA",
+      "serviceArn": "arn:aws:ecs:us-east-1:111122223333:service/superplane-demo-cluster/superplane-api",
+      "serviceName": "superplane-api",
+      "status": "ACTIVE",
+      "taskDefinition": "arn:aws:ecs:us-east-1:111122223333:task-definition/superplane-api:5",
+      "taskSets": []
+    }
+  },
+  "timestamp": "2026-02-12T08:15:32.101112131Z",
+  "type": "aws.ecs.service"
+}
+```
+
 <a id="ecs-•-describe-service"></a>
 
 ## ECS • Describe Service
@@ -1176,6 +1224,46 @@ The Describe Service component fetches details about a single ECS service.
   },
   "timestamp": "2026-01-20T12:45:09.123456789Z",
   "type": "aws.ecs.service"
+}
+```
+
+<a id="ecs-•-execute-command"></a>
+
+## ECS • Execute Command
+
+The Execute Command component runs ECS Exec against a running task container.
+
+### Use Cases
+
+- **Operational debugging**: Run diagnostics inside a live task
+- **Runtime inspection**: Check process state or config from workflows
+- **Automated remediation**: Trigger one-off commands in containerized services
+
+### Notes
+
+- ECS Exec must be enabled and properly configured for the task/service.
+- Interactive mode opens an ECS session and returns session connection details.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "command": {
+      "clusterArn": "arn:aws:ecs:us-east-1:111122223333:cluster/superplane-demo-cluster",
+      "containerArn": "arn:aws:ecs:us-east-1:111122223333:container/superplane-demo-cluster/aaaaaaaa11111111bbbbbbbb22222222/2d7f98c1e4d14f98a4d1f36e6f4f5d23",
+      "containerName": "api",
+      "interactive": false,
+      "session": {
+        "sessionId": "ecs-execute-command-0f2ea5a931534f9f8f37f7e706a2c100",
+        "streamUrl": "wss://ssmmessages.us-east-1.amazonaws.com/v1/data-channel/ecs-execute-command-0f2ea5a931534f9f8f37f7e706a2c100?role=publish_subscribe",
+        "tokenValue": "AQoDYXdzEJr//////////wEaDAi4cUd2QqXQwq2NAiD3rWkK9mYc9..."
+      },
+      "taskArn": "arn:aws:ecs:us-east-1:111122223333:task/superplane-demo-cluster/aaaaaaaa11111111bbbbbbbb22222222"
+    }
+  },
+  "timestamp": "2026-02-12T09:10:21.445566778Z",
+  "type": "aws.ecs.executeCommand"
 }
 ```
 
@@ -1267,6 +1355,51 @@ The Stop Task component requests ECS to stop a running task and waits for the ta
   },
   "timestamp": "2026-02-10T14:31:19.987196041Z",
   "type": "aws.ecs.task"
+}
+```
+
+<a id="ecs-•-update-service"></a>
+
+## ECS • Update Service
+
+The Update Service component updates configuration for an existing ECS service.
+
+### Use Cases
+
+- **Deployments**: Roll out a new task definition
+- **Scaling workflows**: Change desired count dynamically
+- **Operational tuning**: Update deployment, network, or tag behavior
+
+### Notes
+
+- You can pass advanced ECS UpdateService fields through **Additional ECS API Arguments**.
+- Do not combine **Launch Type** with **Capacity Provider Strategy**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "service": {
+      "clusterArn": "arn:aws:ecs:us-east-1:111122223333:cluster/superplane-demo-cluster",
+      "createdAt": "2026-02-12T08:15:10Z",
+      "desiredCount": 3,
+      "enableExecuteCommand": true,
+      "launchType": "FARGATE",
+      "pendingCount": 1,
+      "platformVersion": "1.4.0",
+      "propagateTags": "SERVICE",
+      "runningCount": 2,
+      "schedulingStrategy": "REPLICA",
+      "serviceArn": "arn:aws:ecs:us-east-1:111122223333:service/superplane-demo-cluster/superplane-api",
+      "serviceName": "superplane-api",
+      "status": "ACTIVE",
+      "taskDefinition": "arn:aws:ecs:us-east-1:111122223333:task-definition/superplane-api:6",
+      "taskSets": []
+    }
+  },
+  "timestamp": "2026-02-12T09:00:03.987654321Z",
+  "type": "aws.ecs.service"
 }
 ```
 

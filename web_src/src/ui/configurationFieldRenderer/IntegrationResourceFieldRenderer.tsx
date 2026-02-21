@@ -175,20 +175,11 @@ export const IntegrationResourceFieldRenderer = ({
   if (resourcesError) {
     return <div className="text-sm text-red-500 dark:text-red-400">Failed to load resources</div>;
   }
-
-  if (!resources || resources.length === 0) {
-    return (
-      <Select disabled>
-        <SelectTrigger className="w-full">
-          <SelectValue placeholder="No resources available" />
-        </SelectTrigger>
-      </Select>
-    );
-  }
+  const hasResources = Boolean(resources && resources.length > 0);
 
   // Single select mode
   if (!isMulti) {
-    const options: AutoCompleteOption[] = resources
+    const options: AutoCompleteOption[] = (resources ?? [])
       .map((resource) => {
         const optionValue = useNameAsValue
           ? (resource.name ?? resource.id ?? "")
@@ -201,20 +192,26 @@ export const IntegrationResourceFieldRenderer = ({
 
     const selectedValue =
       useNameAsValue && typeof value === "string" && value
-        ? (resources.find((r) => r.id === value)?.name ?? value)
+        ? ((resources ?? []).find((r) => r.id === value)?.name ?? value)
         : typeof value === "string"
           ? value
           : "";
 
     const expressionValue = typeof value === "string" ? value : "";
 
-    const picker = (
+    const picker = hasResources ? (
       <AutoCompleteSelect
         options={options}
         value={selectedValue}
         onChange={(val) => onChange(val || undefined)}
         placeholder={field.placeholder ?? `Select ${resourceType}`}
       />
+    ) : (
+      <Select disabled>
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="No resources available" />
+        </SelectTrigger>
+      </Select>
     );
 
     const expressionInput = (
@@ -270,6 +267,16 @@ export const IntegrationResourceFieldRenderer = ({
   }
 
   // Multi-select mode
+  if (!hasResources) {
+    return (
+      <Select disabled>
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="No resources available" />
+        </SelectTrigger>
+      </Select>
+    );
+  }
+
   // Convert selected values to SelectOption objects
   const selectedOptions: SelectOption[] = currentValue
     .map((val: string) => {
