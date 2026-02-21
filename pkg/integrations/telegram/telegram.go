@@ -50,7 +50,13 @@ func (t *Telegram) Description() string {
 }
 
 func (t *Telegram) Instructions() string {
-	return `To set up Telegram integration: get a token from @BotFather and paste it in the field below`
+	return `To set up Telegram integration:
+
+1. Get a bot token from @BotFather and paste it in the field below
+2. Disable privacy mode so the bot can receive messages in groups: send /setprivacy to @BotFather, select your bot, and choose Disable
+3. Add the bot to your group or channel
+
+Note: if the bot was already in a group before disabling privacy mode, remove and re-add it for the change to take effect.`
 }
 
 func (t *Telegram) Configuration() []configuration.Field {

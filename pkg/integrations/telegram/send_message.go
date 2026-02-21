@@ -81,7 +81,7 @@ func (c *SendMessage) Configuration() []configuration.Field {
 			Label:       "Chat ID",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Telegram chat ID (user, group, or channel)",
+			Description: "Telegram chat ID (user, group, or channel). Message @userinfobot on Telegram to find your chat ID, or add it to a group to get the group's ID.",
 		},
 		{
 			Name:        "text",
