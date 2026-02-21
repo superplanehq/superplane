@@ -56,6 +56,19 @@ func Test__SendMessage__Setup(t *testing.T) {
 	})
 
 	t.Run("valid configuration -> stores metadata", func(t *testing.T) {
+		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
+			assert.Contains(t, req.URL.String(), "/getChat")
+
+			return jsonResponse(http.StatusOK, `{
+				"ok": true,
+				"result": {
+					"id": 123456789,
+					"type": "private",
+					"first_name": "Test"
+				}
+			}`), nil
+		})
+
 		metadata := &contexts.MetadataContext{}
 
 		err := component.Setup(core.SetupContext{
