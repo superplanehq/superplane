@@ -327,7 +327,6 @@ func (c *RunTask) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
 			Default:     false,
-			Togglable:   true,
 			Description: "Enable ECS Exec support for the task",
 		},
 		{
