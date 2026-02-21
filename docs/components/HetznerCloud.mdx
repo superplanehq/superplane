@@ -2,20 +2,50 @@
 title: "Hetzner Cloud"
 ---
 
-Create and delete Hetzner Cloud servers
+Create and delete Hetzner Cloud servers and load balancers
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a Hetzner Cloud Load Balancer." />
   <LinkCard title="Create Server" href="#create-server" description="Create a Hetzner Cloud server and wait for the action to complete" />
+  <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a Hetzner Cloud Load Balancer" />
   <LinkCard title="Delete Server" href="#delete-server" description="Delete a Hetzner Cloud server and wait for the action to complete" />
 </CardGrid>
 
 ## Instructions
 
 **API Token:** Create a token in [Hetzner Cloud Console](https://console.hetzner.cloud/) → Project → Security → API Tokens. Use **Read & Write** scope.
+
+<a id="create-load-balancer"></a>
+
+## Create Load Balancer
+
+The Create Load Balancer component creates a load balancer in Hetzner Cloud.
+
+### How It Works
+
+1. Creates a load balancer with the specified name, type, location, and algorithm via the Hetzner API
+2. Emits the created load balancer details on the default output channel
+
+### Configuration
+
+- **Name**: The name for the new load balancer (supports expressions)
+- **Type**: The load balancer type (e.g. lb11, lb21, lb31)
+- **Location**: The location where the load balancer will be created
+- **Algorithm**: The load balancing algorithm — Round Robin (default) or Least Connections
+
+### Example Output
+
+```json
+{
+  "id": "12345",
+  "name": "my-load-balancer",
+  "status": "running"
+}
+```
 
 <a id="create-server"></a>
 
@@ -47,6 +77,25 @@ The Create Server component creates a new server in Hetzner Cloud and waits for 
   "name": "my-server",
   "publicIp": "1.2.3.4",
   "status": "running"
+}
+```
+
+<a id="delete-load-balancer"></a>
+
+## Delete Load Balancer
+
+The Delete Load Balancer component deletes a load balancer in Hetzner Cloud.
+
+### How It Works
+
+1. Deletes the selected load balancer via the Hetzner API
+2. Emits on the default output when the load balancer is deleted. If deletion fails, the execution errors.
+
+### Example Output
+
+```json
+{
+  "loadBalancerId": "12345"
 }
 ```
 

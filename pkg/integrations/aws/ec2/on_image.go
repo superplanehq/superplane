@@ -119,45 +119,42 @@ func (p *OnImage) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(config.Region) == "" {
+	region := strings.TrimSpace(config.Region)
+	if region == "" {
 		return fmt.Errorf("region is required")
 	}
 
-	if metadata.SubscriptionID != "" && metadata.Region == config.Region {
+	if metadata.SubscriptionID != "" && metadata.Region == region {
 		return nil
 	}
 
-	integrationMetadata := common.IntegrationMetadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, region, DetailTypeAMIStateChange)
+	if err != nil {
+		return fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
-	if integrationMetadata.EventBridge == nil {
-		return fmt.Errorf("event bridge metadata is not configured")
-	}
-
-	rule, ok := integrationMetadata.EventBridge.Rules[Source]
-	if !ok || !slices.Contains(rule.DetailTypes, DetailTypeAMIStateChange) {
-		if err := ctx.Metadata.Set(OnImageMetadata{Region: config.Region}); err != nil {
+	if !hasRule {
+		if err := ctx.Metadata.Set(OnImageMetadata{Region: region}); err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
 
-		return p.provisionRule(ctx.Integration, ctx.Requests, config.Region)
+		return p.provisionRule(ctx, region)
 	}
 
-	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(config.Region))
+	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(region))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
 	}
 
 	return ctx.Metadata.Set(OnImageMetadata{
-		Region:         config.Region,
+		Region:         region,
 		SubscriptionID: subscriptionID.String(),
 	})
 }
 
-func (p *OnImage) provisionRule(integration core.IntegrationContext, requests core.RequestContext, region string) error {
-	err := integration.ScheduleActionCall(
+func (p *OnImage) provisionRule(ctx core.TriggerContext, region string) error {
+	ctx.Logger.Infof("Requesting rule provisioning for source %s and detail type %s in region %s", Source, DetailTypeAMIStateChange, region)
+	err := ctx.Integration.ScheduleActionCall(
 		"provisionRule",
 		common.ProvisionRuleParameters{
 			Region:     region,
@@ -166,11 +163,14 @@ func (p *OnImage) provisionRule(integration core.IntegrationContext, requests co
 		},
 		time.Second,
 	)
+
 	if err != nil {
 		return fmt.Errorf("failed to schedule rule provisioning for integration: %w", err)
 	}
 
-	return requests.ScheduleActionCall(
+	ctx.Logger.Infof("Scheduling rule availability check in %v", copyImageInitialRuleAvailabilityTimeout)
+
+	return ctx.Requests.ScheduleActionCall(
 		"checkRuleAvailability",
 		map[string]any{},
 		5*time.Second,
@@ -209,24 +209,12 @@ func (p *OnImage) checkRuleAvailability(ctx core.TriggerActionContext) (map[stri
 		return nil, fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	integrationMetadata := common.IntegrationMetadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
-		return nil, fmt.Errorf("failed to decode integration metadata: %w", err)
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, Source, metadata.Region, DetailTypeAMIStateChange)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
-	if integrationMetadata.EventBridge == nil {
-		ctx.Logger.Infof("EventBridge metadata not found - checking again in 10 seconds")
-		return nil, ctx.Requests.ScheduleActionCall("checkRuleAvailability", map[string]any{}, 10*time.Second)
-	}
-
-	rule, ok := integrationMetadata.EventBridge.Rules[Source]
-	if !ok {
-		ctx.Logger.Infof("Rule not found for source %s - checking again in 10 seconds", Source)
-		return nil, ctx.Requests.ScheduleActionCall("checkRuleAvailability", map[string]any{}, 10*time.Second)
-	}
-
-	if !slices.Contains(rule.DetailTypes, DetailTypeAMIStateChange) {
-		ctx.Logger.Infof("Rule does not have detail type '%s' - checking again in 10 seconds", DetailTypeAMIStateChange)
+	if !hasRule {
 		return nil, ctx.Requests.ScheduleActionCall("checkRuleAvailability", map[string]any{}, 10*time.Second)
 	}
 

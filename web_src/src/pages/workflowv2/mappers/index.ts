@@ -85,8 +85,14 @@ import {
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
+import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
 import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
+import {
+  componentMappers as digitaloceanComponentMappers,
+  triggerRenderers as digitaloceanTriggerRenderers,
+  eventStateRegistry as digitaloceanEventStateRegistry,
+} from "./digitalocean/index";
 import {
   componentMappers as discordComponentMappers,
   triggerRenderers as discordTriggerRenderers,
@@ -98,16 +104,26 @@ import {
   eventStateRegistry as openaiEventStateRegistry,
 } from "./openai/index";
 import {
+  componentMappers as grafanaComponentMappers,
+  customFieldRenderers as grafanaCustomFieldRenderers,
+  triggerRenderers as grafanaTriggerRenderers,
+  eventStateRegistry as grafanaEventStateRegistry,
+} from "./grafana/index";
+import {
   componentMappers as circleCIComponentMappers,
   triggerRenderers as circleCITriggerRenderers,
   eventStateRegistry as circleCIEventStateRegistry,
 } from "./circleci/index";
 import {
+  componentMappers as harnessComponentMappers,
+  triggerRenderers as harnessTriggerRenderers,
+  eventStateRegistry as harnessEventStateRegistry,
+} from "./harness";
+import {
   componentMappers as claudeComponentMappers,
   triggerRenderers as claudeTriggerRenderers,
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
-import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
 import {
   componentMappers as prometheusComponentMappers,
   customFieldRenderers as prometheusCustomFieldRenderers,
@@ -120,11 +136,29 @@ import {
   eventStateRegistry as cursorEventStateRegistry,
 } from "./cursor/index";
 import {
+  componentMappers as statuspageComponentMappers,
+  triggerRenderers as statuspageTriggerRenderers,
+  eventStateRegistry as statuspageEventStateRegistry,
+} from "./statuspage";
+import {
   componentMappers as dockerhubComponentMappers,
   customFieldRenderers as dockerhubCustomFieldRenderers,
   triggerRenderers as dockerhubTriggerRenderers,
   eventStateRegistry as dockerhubEventStateRegistry,
 } from "./dockerhub";
+import {
+  componentMappers as gcpComponentMappers,
+  customFieldRenderers as gcpCustomFieldRenderers,
+  triggerRenderers as gcpTriggerRenderers,
+  eventStateRegistry as gcpEventStateRegistry,
+} from "./gcp";
+import {
+  componentMappers as servicenowComponentMappers,
+  customFieldRenderers as servicenowCustomFieldRenderers,
+  triggerRenderers as servicenowTriggerRenderers,
+  eventStateRegistry as servicenowEventStateRegistry,
+} from "./servicenow/index";
+
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
@@ -158,9 +192,11 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cloudflare: cloudflareComponentMappers,
+  digitalocean: digitaloceanComponentMappers,
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
   gitlab: gitlabComponentMappers,
+  grafana: grafanaComponentMappers,
   pagerduty: pagerdutyComponentMappers,
   dash0: dash0ComponentMappers,
   daytona: daytonaComponentMappers,
@@ -175,14 +211,19 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
+  gcp: gcpComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
   hetzner: hetznerComponentMappers,
+  statuspage: statuspageComponentMappers,
   dockerhub: dockerhubComponentMappers,
+  harness: harnessComponentMappers,
+  servicenow: servicenowComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   cloudflare: cloudflareTriggerRenderers,
+  digitalocean: digitaloceanTriggerRenderers,
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
   gitlab: gitlabTriggerRenderers,
@@ -200,14 +241,20 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
+  gcp: gcpTriggerRenderers,
+  grafana: grafanaTriggerRenderers,
   bitbucket: bitbucketTriggerRenderers,
   prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
+  statuspage: statuspageTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
+  harness: harnessTriggerRenderers,
+  servicenow: servicenowTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
   cloudflare: cloudflareEventStateRegistry,
+  digitalocean: digitaloceanEventStateRegistry,
   semaphore: semaphoreEventStateRegistry,
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
@@ -223,11 +270,16 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
+  gcp: gcpEventStateRegistry,
+  statuspage: statuspageEventStateRegistry,
   aws: awsEventStateRegistry,
+  grafana: grafanaEventStateRegistry,
   prometheus: prometheusEventStateRegistry,
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
+  harness: harnessEventStateRegistry,
+  servicenow: servicenowEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -253,8 +305,11 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  grafana: grafanaCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
+  gcp: gcpCustomFieldRenderers,
+  servicenow: servicenowCustomFieldRenderers,
 };
 
 /**

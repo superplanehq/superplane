@@ -26,11 +26,11 @@ type ExecuteCodeSpec struct {
 }
 
 type ExecuteCodeMetadata struct {
-	SandboxID string    `json:"sandboxId" mapstructure:"sandboxId"`
-	SessionID string    `json:"sessionId" mapstructure:"sessionId"`
-	CmdID     string    `json:"cmdId" mapstructure:"cmdId"`
-	StartedAt time.Time `json:"startedAt" mapstructure:"startedAt"`
-	Timeout   int       `json:"timeout" mapstructure:"timeout"`
+	SandboxID string `json:"sandboxId" mapstructure:"sandboxId"`
+	SessionID string `json:"sessionId" mapstructure:"sessionId"`
+	CmdID     string `json:"cmdId" mapstructure:"cmdId"`
+	StartedAt int64  `json:"startedAt" mapstructure:"startedAt"`
+	Timeout   int    `json:"timeout" mapstructure:"timeout"`
 }
 
 func (e *ExecuteCode) Name() string {
@@ -205,7 +205,7 @@ func (e *ExecuteCode) Execute(ctx core.ExecutionContext) error {
 		SandboxID: spec.SandboxID,
 		SessionID: sessionID,
 		CmdID:     response.CmdID,
-		StartedAt: time.Now(),
+		StartedAt: time.Now().Unix(),
 		Timeout:   timeout,
 	}
 
@@ -247,7 +247,7 @@ func (e *ExecuteCode) poll(ctx core.ActionContext) error {
 		return fmt.Errorf("failed to decode metadata: %v", err)
 	}
 
-	if time.Since(metadata.StartedAt) > time.Duration(metadata.Timeout)*time.Second {
+	if time.Now().Unix()-metadata.StartedAt > int64(metadata.Timeout) {
 		return fmt.Errorf("code execution timed out after %d seconds", metadata.Timeout)
 	}
 

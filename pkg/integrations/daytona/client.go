@@ -353,6 +353,22 @@ func (c *Client) GetSessionCommandLogs(sandboxID, sessionID, commandID string) (
 	return string(responseBody), nil
 }
 
+// GetSandbox retrieves the current state of a sandbox
+func (c *Client) GetSandbox(sandboxID string) (*Sandbox, error) {
+	url := fmt.Sprintf("%s/sandbox/%s", c.BaseURL, sandboxID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var sandbox Sandbox
+	if err := json.Unmarshal(responseBody, &sandbox); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal sandbox response: %v", err)
+	}
+
+	return &sandbox, nil
+}
+
 // DeleteSandbox deletes a sandbox
 func (c *Client) DeleteSandbox(sandboxID string, force bool) error {
 	url := fmt.Sprintf("%s/sandbox/%s?force=%t", c.BaseURL, sandboxID, force)

@@ -20,6 +20,7 @@ import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { Alert, AlertDescription } from "@/ui/alert";
+import { renderIntegrationMetadata } from "./integrationMetadataRenderers";
 
 interface IntegrationDetailsProps {
   organizationId: string;
@@ -79,6 +80,11 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
       nodes: data.nodes,
     }));
   }, [integration?.status?.usedIn]);
+
+  const metadataContent = useMemo(
+    () => renderIntegrationMetadata(integration?.spec?.integrationName, integration!),
+    [integration],
+  );
 
   const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -241,6 +247,8 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
             onContinue={integration.status.browserAction.url ? handleBrowserAction : undefined}
           />
         )}
+
+        {metadataContent}
 
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
           <div className="p-6">

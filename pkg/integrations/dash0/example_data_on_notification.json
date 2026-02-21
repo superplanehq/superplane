@@ -1,0 +1,53 @@
+{
+  "type": "dash0.notification",
+  "timestamp": "2026-02-20T12:00:00Z",
+  "data": {
+    "issue": {
+      "id": "issue_123",
+      "issueIdentifier": "availability-api-high-error-rate",
+      "start": "2026-02-20T12:00:00Z",
+      "end": "",
+      "status": "critical",
+      "summary": "High error rate on API availability check",
+      "url": "https://app.dash0.com/issues/issue_123",
+      "dataset": "default",
+      "description": "Error rate exceeded threshold for API availability check.",
+      "checkrules": [
+        {
+          "id": "check_456",
+          "name": "API availability",
+          "for": "5m",
+          "keepFiringFor": "10m",
+          "interval": "1m",
+          "description": "Alert when API error rate is high",
+          "url": "https://app.dash0.com/check-rules/check_456",
+          "expression": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) > 0.05",
+          "annotations": {
+            "summary": "High error rate detected"
+          },
+          "labels": {
+            "service": "api",
+            "env": "prod"
+          },
+          "thresholds": {
+            "critical": 0.05
+          }
+        }
+      ],
+      "labels": [
+        {
+          "key": "service",
+          "value": {
+            "stringValue": "api"
+          }
+        },
+        {
+          "key": "env",
+          "value": {
+            "stringValue": "prod"
+          }
+        }
+      ]
+    }
+  }
+}

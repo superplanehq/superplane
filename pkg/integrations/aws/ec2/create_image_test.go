@@ -49,6 +49,7 @@ func Test__CreateImage__Setup(t *testing.T) {
 		}
 
 		err := component.Setup(core.SetupContext{
+			Logger: log.NewEntry(log.New()),
 			Configuration: map[string]any{
 				"region":     "us-east-1",
 				"instanceId": "i-123",
@@ -76,7 +77,7 @@ func Test__CreateImage__Setup(t *testing.T) {
 			Metadata: common.IntegrationMetadata{
 				EventBridge: &common.EventBridgeMetadata{
 					Rules: map[string]common.EventBridgeRuleMetadata{
-						Source: {
+						"aws.ec2:us-east-1": {
 							Source:      Source,
 							DetailTypes: []string{DetailTypeAMIStateChange},
 						},
@@ -182,7 +183,7 @@ func Test__CreateImage__HandleAction(t *testing.T) {
 			Metadata: common.IntegrationMetadata{
 				EventBridge: &common.EventBridgeMetadata{
 					Rules: map[string]common.EventBridgeRuleMetadata{
-						Source: {
+						"aws.ec2:us-east-1": {
 							Source:      Source,
 							DetailTypes: []string{DetailTypeAMIStateChange},
 						},

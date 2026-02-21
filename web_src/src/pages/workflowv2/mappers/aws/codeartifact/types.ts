@@ -1,25 +1,10 @@
-import { Predicate } from "../../utils";
-
-export interface CodeArtifactRepository {
+export interface Repository {
   name?: string;
   arn?: string;
   domainName?: string;
 }
 
-export interface CodeArtifactTriggerConfiguration {
-  region?: string;
-  repository?: string;
-  packages?: Predicate[];
-  versions?: Predicate[];
-}
-
-export interface CodeArtifactTriggerMetadata {
-  region?: string;
-  subscriptionId?: string;
-  repository?: CodeArtifactRepository;
-}
-
-export interface CodeArtifactPackageVersionChanges {
+export interface PackageVersionChanges {
   assetsAdded?: number;
   assetsRemoved?: number;
   assetsUpdated?: number;
@@ -27,7 +12,7 @@ export interface CodeArtifactPackageVersionChanges {
   statusChanged?: boolean;
 }
 
-export interface CodeArtifactPackageVersionDetail {
+export interface PackageVersionDetail {
   domainName?: string;
   domainOwner?: string;
   repositoryName?: string;
@@ -38,46 +23,36 @@ export interface CodeArtifactPackageVersionDetail {
   packageVersion?: string;
   packageVersionState?: string;
   packageVersionRevision?: string;
-  changes?: CodeArtifactPackageVersionChanges;
+  changes?: PackageVersionChanges;
   operationType?: string;
   sequenceNumber?: number;
   eventDeduplicationId?: string;
 }
 
-export interface CodeArtifactPackageVersionEvent {
+export interface PackageVersionEvent {
   account?: string;
   region?: string;
   time?: string;
   "detail-type"?: string;
-  detail?: CodeArtifactPackageVersionDetail;
+  detail?: PackageVersionDetail;
 }
 
-export interface CodeArtifactPackageVersionConfiguration {
-  region?: string;
-  domain?: string;
-  repository?: string;
-  package?: string;
-  format?: string;
-  namespace?: string;
-  version?: string;
-}
-
-export interface CodeArtifactPackageLicense {
+export interface PackageLicense {
   name?: string;
   url?: string;
 }
 
-export interface CodeArtifactPackageVersionAsset {
+export interface PackageVersionAsset {
   hashes?: Record<string, string>;
   name?: string;
   size?: number;
 }
 
-export interface CodeArtifactPackageVersionDescription {
+export interface PackageVersionDescription {
   displayName?: string;
   format?: string;
   homePage?: string;
-  licenses?: CodeArtifactPackageLicense[];
+  licenses?: PackageLicense[];
   namespace?: string;
   packageName?: string;
   publishedTime?: string;
@@ -88,7 +63,7 @@ export interface CodeArtifactPackageVersionDescription {
   version?: string;
 }
 
-export interface CodeArtifactPackageVersionPayload {
-  package?: CodeArtifactPackageVersionDescription;
-  assets?: CodeArtifactPackageVersionAsset[];
+export interface PackageVersionPayload {
+  package?: PackageVersionDescription;
+  assets?: PackageVersionAsset[];
 }

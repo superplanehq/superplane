@@ -37,6 +37,12 @@ var exampleOutputDeleteHTTPSyntheticCheckBytes []byte
 var exampleOutputDeleteHTTPSyntheticCheckOnce sync.Once
 var exampleOutputDeleteHTTPSyntheticCheck map[string]any
 
+//go:embed example_data_on_notification.json
+var exampleDataOnNotificationBytes []byte
+
+var exampleDataOnNotificationOnce sync.Once
+var exampleDataOnNotification map[string]any
+
 func (c *QueryPrometheus) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryPrometheusOnce, exampleOutputQueryPrometheusBytes, &exampleOutputQueryPrometheus)
 }
@@ -55,4 +61,8 @@ func (c *UpdateHTTPSyntheticCheck) ExampleOutput() map[string]any {
 
 func (c *DeleteHTTPSyntheticCheck) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteHTTPSyntheticCheckOnce, exampleOutputDeleteHTTPSyntheticCheckBytes, &exampleOutputDeleteHTTPSyntheticCheck)
+}
+
+func onNotificationExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnNotificationOnce, exampleDataOnNotificationBytes, &exampleDataOnNotification)
 }
