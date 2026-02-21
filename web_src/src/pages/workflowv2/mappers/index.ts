@@ -81,6 +81,12 @@ import {
   eventStateRegistry as rootlyEventStateRegistry,
 } from "./rootly/index";
 import {
+  componentMappers as incidentComponentMappers,
+  triggerRenderers as incidentTriggerRenderers,
+  eventStateRegistry as incidentEventStateRegistry,
+  customFieldRenderers as incidentCustomFieldRenderers,
+} from "./incident/index";
+import {
   componentMappers as awsComponentMappers,
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
@@ -206,6 +212,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   sendgrid: sendgridComponentMappers,
   render: renderComponentMappers,
   rootly: rootlyComponentMappers,
+  incident: incidentComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
   openai: openaiComponentMappers,
@@ -236,6 +243,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   sendgrid: sendgridTriggerRenderers,
   render: renderTriggerRenderers,
   rootly: rootlyTriggerRenderers,
+  incident: incidentTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
   openai: openaiTriggerRenderers,
@@ -267,6 +275,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   render: renderEventStateRegistry,
   discord: discordEventStateRegistry,
   rootly: rootlyEventStateRegistry,
+  incident: incidentEventStateRegistry,
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
@@ -308,6 +317,7 @@ const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer
   grafana: grafanaCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
+  incident: incidentCustomFieldRenderers,
   gcp: gcpCustomFieldRenderers,
   servicenow: servicenowCustomFieldRenderers,
 };
