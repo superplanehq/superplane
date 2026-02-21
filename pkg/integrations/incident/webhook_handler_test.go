@@ -60,13 +60,13 @@ func Test__IncidentIOWebhookHandler__CompareConfig(t *testing.T) {
 		assert.True(t, equal)
 	})
 
-	t.Run("A subset of B -> false", func(t *testing.T) {
+	t.Run("A subset of B -> true (reuse so URL stays same when user adds events)", func(t *testing.T) {
 		equal, err := handler.CompareConfig(
 			WebhookConfiguration{Events: []string{EventIncidentCreatedV2}, SigningSecretHash: hashK},
 			WebhookConfiguration{Events: []string{EventIncidentCreatedV2, EventIncidentUpdatedV2}, SigningSecretHash: hashK},
 		)
 		require.NoError(t, err)
-		assert.False(t, equal)
+		assert.True(t, equal)
 	})
 
 	t.Run("same events, A has no hash and B has hash -> true (reuse so URL stays same when user adds secret)", func(t *testing.T) {
@@ -99,5 +99,15 @@ func Test__IncidentIOWebhookHandler__CompareConfig(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, changed)
 		assert.Equal(t, WebhookConfiguration{Events: []string{EventIncidentCreatedV2}, SigningSecretHash: hashNew}, merged)
+	})
+
+	t.Run("Merge adds events when requested is superset of current", func(t *testing.T) {
+		merged, changed, err := handler.Merge(
+			WebhookConfiguration{Events: []string{EventIncidentCreatedV2}, SigningSecretHash: ""},
+			WebhookConfiguration{Events: []string{EventIncidentCreatedV2, EventIncidentUpdatedV2}, SigningSecretHash: ""},
+		)
+		require.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, WebhookConfiguration{Events: []string{EventIncidentCreatedV2, EventIncidentUpdatedV2}, SigningSecretHash: ""}, merged)
 	})
 }

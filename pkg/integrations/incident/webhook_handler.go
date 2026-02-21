@@ -47,10 +47,11 @@ func (h *IncidentIOWebhookHandler) CompareConfig(a, b any) (bool, error) {
 		return false, err
 	}
 
-	for _, eventB := range configB.Events {
-		if !slices.Contains(configA.Events, eventB) {
-			return false, nil
-		}
+	// Reuse same webhook when requested events are subset of existing (user narrowed) or
+	// existing events are subset of requested (user expanded). That keeps the URL stable.
+	eventsMatch := subsetOrEqual(configA.Events, configB.Events) || subsetOrEqual(configB.Events, configA.Events)
+	if !eventsMatch {
+		return false, nil
 	}
 
 	// Allow reuse when secret hashes match, or when the existing webhook has no hash yet
@@ -60,6 +61,16 @@ func (h *IncidentIOWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// subsetOrEqual returns true when a is subset of or equal to b (every element of a is in b).
+func subsetOrEqual(a, b []string) bool {
+	for _, x := range a {
+		if !slices.Contains(b, x) {
+			return false
+		}
+	}
+	return true
 }
 
 func (h *IncidentIOWebhookHandler) Merge(current, requested any) (any, bool, error) {
@@ -73,12 +84,23 @@ func (h *IncidentIOWebhookHandler) Merge(current, requested any) (any, bool, err
 		return nil, false, err
 	}
 
-	// Merge signing secret hash only when the existing webhook had none (user added it after creating the trigger).
+	changed := false
+
+	// Merge signing secret hash when the existing webhook had none (user added it after creating the trigger).
 	if cur.SigningSecretHash == "" && req.SigningSecretHash != "" {
 		cur.SigningSecretHash = req.SigningSecretHash
-		return cur, true, nil
+		changed = true
 	}
 
+	// Merge events when requested is superset of current (user added more events) so we update in place and keep same URL.
+	if subsetOrEqual(cur.Events, req.Events) && !slices.Equal(cur.Events, req.Events) {
+		cur.Events = req.Events
+		changed = true
+	}
+
+	if changed {
+		return cur, true, nil
+	}
 	return current, false, nil
 }
 
