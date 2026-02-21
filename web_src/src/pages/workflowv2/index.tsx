@@ -21,6 +21,7 @@ import {
   CanvasesCanvasNodeQueueItem,
   canvasesEmitNodeEvent,
   canvasesUpdateNodePause,
+  OrganizationsIntegration,
 } from "@/api-client";
 import { useOrganizationGroups, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
@@ -2699,11 +2700,7 @@ export function WorkflowPageV2() {
   );
 
   const getCustomField = useCallback(
-    (
-      nodeId: string,
-      onRun?: (initialData?: string) => void,
-      integration?: import("@/api-client").OrganizationsIntegration,
-    ) => {
+    (nodeId: string, onRun?: (initialData?: string) => void, integration?: OrganizationsIntegration) => {
       const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return null;
 
@@ -2721,7 +2718,7 @@ export function WorkflowPageV2() {
 
       const context: {
         onRun?: (initialData?: string) => void;
-        integration?: import("@/api-client").OrganizationsIntegration;
+        integration?: OrganizationsIntegration;
       } = onRun ? { onRun } : {};
       if (integration) context.integration = integration;
 

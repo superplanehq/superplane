@@ -16,6 +16,3 @@ vendor/bundle
 CLAUDE.local.md
 .env
 .idea/
-# Local dev / tunnel artifacts
-.local/
-ngrok.tgz
