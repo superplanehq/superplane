@@ -191,15 +191,18 @@ func (c *Client) ListSeverities() ([]Severity, error) {
 
 // Incident represents a Rootly incident
 type Incident struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Summary     string `json:"summary"`
-	Status      string `json:"status"`
-	Severity    string `json:"severity"`
-	StartedAt   string `json:"started_at"`
-	ResolvedAt  string `json:"resolved_at"`
-	MitigatedAt string `json:"mitigated_at"`
-	URL         string `json:"url"`
+	ID           string `json:"id"`
+	SequentialID int    `json:"sequential_id"`
+	Title        string `json:"title"`
+	Slug         string `json:"slug"`
+	Summary      string `json:"summary"`
+	Status       string `json:"status"`
+	Severity     string `json:"severity"`
+	StartedAt    string `json:"started_at"`
+	ResolvedAt   string `json:"resolved_at"`
+	MitigatedAt  string `json:"mitigated_at"`
+	UpdatedAt    string `json:"updated_at"`
+	URL          string `json:"url"`
 }
 
 type IncidentData struct {
@@ -209,14 +212,17 @@ type IncidentData struct {
 }
 
 type IncidentAttributes struct {
-	Title       string `json:"title"`
-	Summary     string `json:"summary"`
-	Status      string `json:"status"`
-	Severity    string `json:"severity"`
-	StartedAt   string `json:"started_at"`
-	ResolvedAt  string `json:"resolved_at"`
-	MitigatedAt string `json:"mitigated_at"`
-	URL         string `json:"url"`
+	Title        string `json:"title"`
+	SequentialID int    `json:"sequential_id"`
+	Slug         string `json:"slug"`
+	Summary      string `json:"summary"`
+	Status       string `json:"status"`
+	Severity     any    `json:"severity"`
+	StartedAt    string `json:"started_at"`
+	ResolvedAt   string `json:"resolved_at"`
+	MitigatedAt  string `json:"mitigated_at"`
+	UpdatedAt    string `json:"updated_at"`
+	URL          string `json:"url"`
 }
 
 type IncidentResponse struct {
@@ -225,6 +231,68 @@ type IncidentResponse struct {
 
 type IncidentsResponse struct {
 	Data []IncidentData `json:"data"`
+}
+
+// IncidentEvent represents a Rootly incident event (timeline note).
+type IncidentEvent struct {
+	ID         string `json:"id"`
+	Event      string `json:"event"`
+	Visibility string `json:"visibility"`
+	OccurredAt string `json:"occurred_at"`
+	CreatedAt  string `json:"created_at"`
+}
+
+type IncidentEventData struct {
+	ID         string                  `json:"id"`
+	Type       string                  `json:"type"`
+	Attributes IncidentEventAttributes `json:"attributes"`
+}
+
+type IncidentEventAttributes struct {
+	Event      string `json:"event"`
+	Visibility string `json:"visibility"`
+	OccurredAt string `json:"occurred_at"`
+	CreatedAt  string `json:"created_at"`
+}
+
+type IncidentEventResponse struct {
+	Data IncidentEventData `json:"data"`
+}
+
+// severityString extracts the severity slug from the API response.
+// Rootly returns severity as a string (slug) or an object with slug/name fields.
+func severityString(v any) string {
+	switch s := v.(type) {
+	case string:
+		return s
+	case map[string]any:
+		if slug, ok := s["slug"].(string); ok {
+			return slug
+		}
+		if name, ok := s["name"].(string); ok {
+			return name
+		}
+	}
+
+	return ""
+}
+
+// incidentFromData converts a JSON:API IncidentData to a flat Incident struct.
+func incidentFromData(data IncidentData) *Incident {
+	return &Incident{
+		ID:           data.ID,
+		SequentialID: data.Attributes.SequentialID,
+		Title:        data.Attributes.Title,
+		Slug:         data.Attributes.Slug,
+		Summary:      data.Attributes.Summary,
+		Status:       data.Attributes.Status,
+		Severity:     severityString(data.Attributes.Severity),
+		StartedAt:    data.Attributes.StartedAt,
+		ResolvedAt:   data.Attributes.ResolvedAt,
+		MitigatedAt:  data.Attributes.MitigatedAt,
+		UpdatedAt:    data.Attributes.UpdatedAt,
+		URL:          data.Attributes.URL,
+	}
 }
 
 // CreateIncidentRequest represents the request to create an incident
@@ -272,16 +340,58 @@ func (c *Client) CreateIncident(title, summary, severity string) (*Incident, err
 		return nil, fmt.Errorf("error parsing response: %v", err)
 	}
 
-	return &Incident{
-		ID:          response.Data.ID,
-		Title:       response.Data.Attributes.Title,
-		Summary:     response.Data.Attributes.Summary,
-		Status:      response.Data.Attributes.Status,
-		Severity:    response.Data.Attributes.Severity,
-		StartedAt:   response.Data.Attributes.StartedAt,
-		ResolvedAt:  response.Data.Attributes.ResolvedAt,
-		MitigatedAt: response.Data.Attributes.MitigatedAt,
-		URL:         response.Data.Attributes.URL,
+	return incidentFromData(response.Data), nil
+}
+
+// CreateIncidentEventRequest represents the request to create an incident event.
+type CreateIncidentEventRequest struct {
+	Data CreateIncidentEventData `json:"data"`
+}
+
+type CreateIncidentEventData struct {
+	Type       string                        `json:"type"`
+	Attributes CreateIncidentEventAttributes `json:"attributes"`
+}
+
+type CreateIncidentEventAttributes struct {
+	Event      string `json:"event"`
+	Visibility string `json:"visibility,omitempty"`
+}
+
+func (c *Client) CreateIncidentEvent(incidentID, event, visibility string) (*IncidentEvent, error) {
+	request := CreateIncidentEventRequest{
+		Data: CreateIncidentEventData{
+			Type: "incident_events",
+			Attributes: CreateIncidentEventAttributes{
+				Event:      event,
+				Visibility: visibility,
+			},
+		},
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/incidents/%s/events", c.BaseURL, incidentID)
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response IncidentEventResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &IncidentEvent{
+		ID:         response.Data.ID,
+		Event:      response.Data.Attributes.Event,
+		Visibility: response.Data.Attributes.Visibility,
+		OccurredAt: response.Data.Attributes.OccurredAt,
+		CreatedAt:  response.Data.Attributes.CreatedAt,
 	}, nil
 }
 
@@ -298,17 +408,131 @@ func (c *Client) GetIncident(id string) (*Incident, error) {
 		return nil, fmt.Errorf("error parsing response: %v", err)
 	}
 
-	return &Incident{
-		ID:          response.Data.ID,
-		Title:       response.Data.Attributes.Title,
-		Summary:     response.Data.Attributes.Summary,
-		Status:      response.Data.Attributes.Status,
-		Severity:    response.Data.Attributes.Severity,
-		StartedAt:   response.Data.Attributes.StartedAt,
-		ResolvedAt:  response.Data.Attributes.ResolvedAt,
-		MitigatedAt: response.Data.Attributes.MitigatedAt,
-		URL:         response.Data.Attributes.URL,
-	}, nil
+	return incidentFromData(response.Data), nil
+}
+
+// GetIncidentDetailed fetches an incident with related resources and returns
+// a flattened map containing attributes and resolved relationships.
+func (c *Client) GetIncidentDetailed(id string) (map[string]any, error) {
+	url := fmt.Sprintf("%s/incidents/%s?include=services,groups,events,action_items", c.BaseURL, id)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var raw map[string]any
+	err = json.Unmarshal(responseBody, &raw)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	data, ok := raw["data"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response format: missing data")
+	}
+
+	// Start with attributes as the base result
+	attributes, _ := data["attributes"].(map[string]any)
+	if attributes == nil {
+		attributes = make(map[string]any)
+	}
+
+	result := make(map[string]any, len(attributes)+1)
+	for k, v := range attributes {
+		result[k] = v
+	}
+
+	// Set the top-level ID from data
+	result["id"] = data["id"]
+
+	// Normalize severity to string for consistency with other components
+	if sev, ok := result["severity"]; ok {
+		result["severity"] = severityString(sev)
+	}
+
+	// Build an index from the "included" array: "type:id" -> resolved object
+	includedIndex := map[string]map[string]any{}
+	if included, ok := raw["included"].([]any); ok {
+		for _, item := range included {
+			inc, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			incType, _ := inc["type"].(string)
+			incID, _ := inc["id"].(string)
+			if incType == "" || incID == "" {
+				continue
+			}
+			resolved := map[string]any{"id": incID}
+			if attrs, ok := inc["attributes"].(map[string]any); ok {
+				for k, v := range attrs {
+					resolved[k] = v
+				}
+			}
+			includedIndex[incType+":"+incID] = resolved
+		}
+	}
+
+	// Only resolve the relationships we explicitly requested via the include
+	// parameter. The API response contains many more relationships (e.g.
+	// severity, user, started_by) that may have "data": null linkage. If we
+	// iterated over all of them, a null data value would overwrite a field
+	// already populated from attributes.
+	requestedRelationships := map[string]bool{
+		"services":     true,
+		"groups":       true,
+		"events":       true,
+		"action_items": true,
+	}
+
+	relationships, _ := data["relationships"].(map[string]any)
+	for relName, relValue := range relationships {
+		if !requestedRelationships[relName] {
+			continue
+		}
+
+		rel, ok := relValue.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		relData := rel["data"]
+		if relData == nil {
+			result[relName] = nil
+			continue
+		}
+
+		// Array relationship
+		if arr, ok := relData.([]any); ok {
+			resolved := make([]map[string]any, 0, len(arr))
+			for _, ref := range arr {
+				refMap, ok := ref.(map[string]any)
+				if !ok {
+					continue
+				}
+				refType, _ := refMap["type"].(string)
+				refID, _ := refMap["id"].(string)
+				key := refType + ":" + refID
+				if obj, found := includedIndex[key]; found {
+					resolved = append(resolved, obj)
+				}
+			}
+			result[relName] = resolved
+			continue
+		}
+
+		// Single relationship
+		if refMap, ok := relData.(map[string]any); ok {
+			refType, _ := refMap["type"].(string)
+			refID, _ := refMap["id"].(string)
+			key := refType + ":" + refID
+			if obj, found := includedIndex[key]; found {
+				result[relName] = obj
+			}
+		}
+	}
+
+	return result, nil
 }
 
 func (c *Client) ListIncidents() ([]Incident, error) {
@@ -326,20 +550,161 @@ func (c *Client) ListIncidents() ([]Incident, error) {
 
 	incidents := make([]Incident, 0, len(response.Data))
 	for _, data := range response.Data {
-		incidents = append(incidents, Incident{
-			ID:          data.ID,
-			Title:       data.Attributes.Title,
-			Summary:     data.Attributes.Summary,
-			Status:      data.Attributes.Status,
-			Severity:    data.Attributes.Severity,
-			StartedAt:   data.Attributes.StartedAt,
-			ResolvedAt:  data.Attributes.ResolvedAt,
-			MitigatedAt: data.Attributes.MitigatedAt,
-			URL:         data.Attributes.URL,
-		})
+		incidents = append(incidents, *incidentFromData(data))
 	}
 
 	return incidents, nil
+}
+
+// Team represents a Rootly team (group)
+type Team struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	Description string `json:"description"`
+}
+
+type TeamData struct {
+	ID         string         `json:"id"`
+	Type       string         `json:"type"`
+	Attributes TeamAttributes `json:"attributes"`
+}
+
+type TeamAttributes struct {
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	Description string `json:"description"`
+}
+
+type TeamsResponse struct {
+	Data []TeamData `json:"data"`
+}
+
+func (c *Client) ListTeams() ([]Team, error) {
+	url := fmt.Sprintf("%s/teams", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response TeamsResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	teams := make([]Team, 0, len(response.Data))
+	for _, data := range response.Data {
+		teams = append(teams, Team{
+			ID:          data.ID,
+			Name:        data.Attributes.Name,
+			Slug:        data.Attributes.Slug,
+			Description: data.Attributes.Description,
+		})
+	}
+
+	return teams, nil
+}
+
+// SubStatus represents a Rootly sub-status (custom status)
+type SubStatus struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	ParentStatus string `json:"parent_status"`
+}
+
+type SubStatusData struct {
+	ID         string              `json:"id"`
+	Type       string              `json:"type"`
+	Attributes SubStatusAttributes `json:"attributes"`
+}
+
+type SubStatusAttributes struct {
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	ParentStatus string `json:"parent_status"`
+}
+
+type SubStatusesResponse struct {
+	Data []SubStatusData `json:"data"`
+}
+
+func (c *Client) ListSubStatuses() ([]SubStatus, error) {
+	url := fmt.Sprintf("%s/sub_statuses", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response SubStatusesResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	subStatuses := make([]SubStatus, 0, len(response.Data))
+	for _, data := range response.Data {
+		subStatuses = append(subStatuses, SubStatus{
+			ID:           data.ID,
+			Name:         data.Attributes.Name,
+			Slug:         data.Attributes.Slug,
+			ParentStatus: data.Attributes.ParentStatus,
+		})
+	}
+
+	return subStatuses, nil
+}
+
+// UpdateIncidentRequest represents the JSON:API request to update an incident
+type UpdateIncidentRequest struct {
+	Data UpdateIncidentData `json:"data"`
+}
+
+type UpdateIncidentData struct {
+	ID         string                   `json:"id"`
+	Type       string                   `json:"type"`
+	Attributes UpdateIncidentAttributes `json:"attributes"`
+}
+
+type UpdateIncidentAttributes struct {
+	Title       string            `json:"title,omitempty"`
+	Summary     string            `json:"summary,omitempty"`
+	Status      string            `json:"status,omitempty"`
+	SubStatusID string            `json:"sub_status_id,omitempty"`
+	SeverityID  string            `json:"severity_id,omitempty"`
+	ServiceIDs  []string          `json:"service_ids,omitempty"`
+	GroupIDs    []string          `json:"group_ids,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+}
+
+func (c *Client) UpdateIncident(id string, attrs UpdateIncidentAttributes) (*Incident, error) {
+	request := UpdateIncidentRequest{
+		Data: UpdateIncidentData{
+			ID:         id,
+			Type:       "incidents",
+			Attributes: attrs,
+		},
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/incidents/%s", c.BaseURL, id)
+	responseBody, err := c.execRequest(http.MethodPatch, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response IncidentResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return incidentFromData(response.Data), nil
 }
 
 // WebhookEndpoint represents a Rootly webhook endpoint

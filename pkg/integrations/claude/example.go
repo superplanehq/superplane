@@ -2,16 +2,17 @@ package claude
 
 import (
 	_ "embed"
-	"github.com/superplanehq/superplane/pkg/utils"
 	"sync"
+
+	"github.com/superplanehq/superplane/pkg/utils"
 )
 
-//go:embed example_output_create_message.json
-var exampleOutputCreateMessageBytes []byte
+//go:embed example_output_text_prompt.json
+var exampleOutputTextPromptBytes []byte
 
-var exampleOutputCreateMessageOnce sync.Once
-var exampleOutputCreateMessage map[string]any
+var exampleOutputTextPromptOnce sync.Once
+var exampleOutputTextPrompt map[string]any
 
-func (c *CreateMessage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateMessageOnce, exampleOutputCreateMessageBytes, &exampleOutputCreateMessage)
+func (c *TextPrompt) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputTextPromptOnce, exampleOutputTextPromptBytes, &exampleOutputTextPrompt)
 }

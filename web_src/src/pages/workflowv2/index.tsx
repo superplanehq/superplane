@@ -68,6 +68,7 @@ import {
   getStateMap,
 } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
@@ -3075,7 +3076,7 @@ function prepareTriggerNode(
   const lastEvent = nodeEventsMap[node.id!]?.[0];
   const triggerProps = renderer.getTriggerProps({
     node: buildNodeInfo(node),
-    definition: buildComponentDefinition(triggerMetadata!),
+    definition: buildComponentDefinition(triggerMetadata),
     lastEvent: buildEventInfo(lastEvent),
   });
 
@@ -3386,6 +3387,14 @@ function prepareComponentBaseNode(
     nodeQueueItems: nodeQueueItems?.map((q) => buildQueueItemInfo(q)),
     additionalData: additionalData,
   });
+
+  // If the mapper didn't provide a custom icon, resolve from the app logo map
+  if (!componentBaseProps.iconSrc) {
+    const resolvedIconSrc = getHeaderIconSrc(node.component?.name);
+    if (resolvedIconSrc) {
+      componentBaseProps.iconSrc = resolvedIconSrc;
+    }
+  }
 
   // If there's an error and empty state is shown, customize the message
   const hasError = !!node.errorMessage;

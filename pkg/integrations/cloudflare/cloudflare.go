@@ -198,18 +198,6 @@ func (c *Cloudflare) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (c *Cloudflare) CompareWebhookConfig(a, b any) (bool, error) {
-	return false, nil
-}
-
-func (c *Cloudflare) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
-}
-
-func (c *Cloudflare) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	return nil
-}
-
 func (c *Cloudflare) Actions() []core.Action {
 	return []core.Action{}
 }

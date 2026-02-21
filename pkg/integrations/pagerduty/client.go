@@ -200,6 +200,7 @@ type UpdateIncidentPayload struct {
 	Title            string               `json:"title,omitempty"`
 	Priority         *PriorityReference   `json:"priority,omitempty"`
 	EscalationPolicy *EscalationPolicyRef `json:"escalation_policy,omitempty"`
+	EscalationLevel  int                  `json:"escalation_level,omitempty"`
 	Assignments      []AssignmentPayload  `json:"assignments,omitempty"`
 	Body             *IncidentBody        `json:"body,omitempty"`
 }
@@ -231,6 +232,7 @@ func (c *Client) UpdateIncident(
 	title string,
 	description string,
 	escalationPolicy string,
+	escalationLevel int,
 	assignees []string,
 ) (any, error) {
 	request := UpdateIncidentRequest{
@@ -267,6 +269,10 @@ func (c *Client) UpdateIncident(
 			ID:   escalationPolicy,
 			Type: "escalation_policy_reference",
 		}
+	}
+
+	if escalationLevel > 0 {
+		request.Incident.EscalationLevel = escalationLevel
 	}
 
 	if len(assignees) > 0 {
@@ -707,4 +713,73 @@ func (c *Client) SnoozeIncident(incidentID string, fromEmail string, duration in
 	}
 
 	return response, nil
+}
+
+// Note represents a note on a PagerDuty incident
+type Note struct {
+	ID        string       `json:"id"`
+	User      *ServiceRef  `json:"user"`
+	Channel   *NoteChannel `json:"channel"`
+	Content   string       `json:"content"`
+	CreatedAt string       `json:"created_at"`
+}
+
+// NoteChannel represents the channel through which a note was created
+type NoteChannel struct {
+	Type string `json:"type"`
+}
+
+// ListIncidentNotes retrieves all notes for a given incident
+func (c *Client) ListIncidentNotes(incidentID string) ([]Note, error) {
+	apiURL := fmt.Sprintf("%s/incidents/%s/notes", c.BaseURL, incidentID)
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Notes []Note `json:"notes"`
+	}
+
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Notes, nil
+}
+
+// LogEntry represents a log entry for a PagerDuty incident
+type LogEntry struct {
+	ID        string      `json:"id"`
+	Type      string      `json:"type"`
+	Summary   string      `json:"summary"`
+	CreatedAt string      `json:"created_at"`
+	Agent     *ServiceRef `json:"agent"`
+	Channel   *LogChannel `json:"channel"`
+}
+
+// LogChannel represents the channel through which a log entry was created
+type LogChannel struct {
+	Type string `json:"type"`
+}
+
+// ListIncidentLogEntries retrieves log entries for a given incident
+func (c *Client) ListIncidentLogEntries(incidentID string, limit int) ([]LogEntry, error) {
+	apiURL := fmt.Sprintf("%s/incidents/%s/log_entries?limit=%d", c.BaseURL, incidentID, limit)
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		LogEntries []LogEntry `json:"log_entries"`
+	}
+
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.LogEntries, nil
 }

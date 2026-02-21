@@ -221,15 +221,10 @@ export function AutoCompleteSelect({
                         role="option"
                         aria-selected={isSelected}
                         className="relative cursor-pointer select-none px-3 py-2 text-sm hover:bg-blue-500 hover:text-white text-gray-800 dark:text-gray-100"
-                        onClick={(e) => {
-                          e.preventDefault(); // Prevent blur from firing
-                          handleOptionSelect(option.value);
-                        }}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleOptionSelect(option.value)}
                       >
-                        <div
-                          className="flex items-center justify-between"
-                          onClick={() => handleOptionSelect(option.value)}
-                        >
+                        <div className="flex items-center justify-between">
                           <span className={twMerge("block truncate", isSelected ? "font-medium" : "font-normal")}>
                             {option.label}
                           </span>

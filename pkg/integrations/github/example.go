@@ -10,6 +10,9 @@ import (
 //go:embed example_output_create_issue.json
 var exampleOutputCreateIssueBytes []byte
 
+//go:embed example_output_create_issue_comment.json
+var exampleOutputCreateIssueCommentBytes []byte
+
 //go:embed example_output_get_issue.json
 var exampleOutputGetIssueBytes []byte
 
@@ -33,6 +36,9 @@ var exampleOutputDeleteReleaseBytes []byte
 
 //go:embed example_output_run_workflow.json
 var exampleOutputRunWorkflowBytes []byte
+
+//go:embed example_output_create_review.json
+var exampleOutputCreateReviewBytes []byte
 
 //go:embed example_data_on_issue_comment.json
 var exampleDataOnIssueCommentBytes []byte
@@ -61,8 +67,14 @@ var exampleDataOnBranchCreatedBytes []byte
 //go:embed example_data_on_workflow_run.json
 var exampleDataOnWorkflowRunBytes []byte
 
+//go:embed example_output_get_workflow_usage.json
+var exampleOutputGetWorkflowUsageBytes []byte
+
 var exampleOutputCreateIssueOnce sync.Once
 var exampleOutputCreateIssue map[string]any
+
+var exampleOutputCreateIssueCommentOnce sync.Once
+var exampleOutputCreateIssueComment map[string]any
 
 var exampleOutputGetIssueOnce sync.Once
 var exampleOutputGetIssue map[string]any
@@ -87,6 +99,9 @@ var exampleOutputDeleteRelease map[string]any
 
 var exampleOutputRunWorkflowOnce sync.Once
 var exampleOutputRunWorkflow map[string]any
+
+var exampleOutputCreateReviewOnce sync.Once
+var exampleOutputCreateReview map[string]any
 
 var exampleDataOnIssueCommentOnce sync.Once
 var exampleDataOnIssueComment map[string]any
@@ -115,8 +130,15 @@ var exampleDataOnBranchCreated map[string]any
 var exampleDataOnWorkflowRunOnce sync.Once
 var exampleDataOnWorkflowRun map[string]any
 
+var exampleOutputGetWorkflowUsageOnce sync.Once
+var exampleOutputGetWorkflowUsage map[string]any
+
 func (c *CreateIssue) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIssueOnce, exampleOutputCreateIssueBytes, &exampleOutputCreateIssue)
+}
+
+func (c *CreateIssueComment) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIssueCommentOnce, exampleOutputCreateIssueCommentBytes, &exampleOutputCreateIssueComment)
 }
 
 func (c *GetIssue) ExampleOutput() map[string]any {
@@ -153,6 +175,14 @@ func (c *DeleteRelease) ExampleOutput() map[string]any {
 
 func (c *RunWorkflow) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputRunWorkflowOnce, exampleOutputRunWorkflowBytes, &exampleOutputRunWorkflow)
+}
+
+func (c *CreateReview) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputCreateReviewOnce,
+		exampleOutputCreateReviewBytes,
+		&exampleOutputCreateReview,
+	)
 }
 
 func (t *OnIssueComment) ExampleData() map[string]any {
@@ -193,4 +223,8 @@ func (t *OnBranchCreated) ExampleData() map[string]any {
 
 func (t *OnWorkflowRun) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnWorkflowRunOnce, exampleDataOnWorkflowRunBytes, &exampleDataOnWorkflowRun)
+}
+
+func (g *GetWorkflowUsage) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetWorkflowUsageOnce, exampleOutputGetWorkflowUsageBytes, &exampleOutputGetWorkflowUsage)
 }

@@ -41,8 +41,8 @@ func main() {
 		exitWithError(err)
 	}
 
-	for i, integration := range integrations {
-		if err := writeIntegrationDocs(integration, i+2); err != nil {
+	for _, integration := range integrations {
+		if err := writeIntegrationDocs(integration); err != nil {
 			exitWithError(err)
 		}
 	}
@@ -54,14 +54,14 @@ func createOutputDirectory() {
 	}
 }
 
-func writeIntegrationDocs(integration core.Integration, order int) error {
+func writeIntegrationDocs(integration core.Integration) error {
 	components := integration.Components()
 	triggers := integration.Triggers()
 
 	sort.Slice(components, func(i, j int) bool { return components[i].Name() < components[j].Name() })
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
-	return writeIntegrationIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", integrationFilename(integration))), integration, components, triggers, order)
+	return writeIntegrationIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", integrationFilename(integration))), integration, components, triggers)
 }
 
 func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger) error {
@@ -73,8 +73,10 @@ func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
 	var buf bytes.Buffer
-	writeFrontMatter(&buf, "Core", 1)
+	coreOrder := 1
+	writeFrontMatter(&buf, "Core", &coreOrder)
 	writeOverviewSection(&buf, "Built-in SuperPlane components.")
+	writeCardGridImport(&buf, triggers, components)
 	writeCardGridTriggers(&buf, triggers)
 	writeCardGridComponents(&buf, components)
 	writeTriggerSection(&buf, triggers)
@@ -88,18 +90,18 @@ func writeIntegrationIndex(
 	integration core.Integration,
 	components []core.Component,
 	triggers []core.Trigger,
-	order int,
 ) error {
 	var buf bytes.Buffer
-	writeFrontMatter(&buf, integration.Label(), order)
+	writeFrontMatter(&buf, integration.Label(), nil)
 
-	writeOverviewSection(&buf, integration.Description())
+	writeOverviewSection(&buf, sanitizeHTMLTags(integration.Description()))
+	writeCardGridImport(&buf, triggers, components)
 	writeCardGridTriggers(&buf, triggers)
 	writeCardGridComponents(&buf, components)
 
 	if instructions := strings.TrimSpace(integration.Instructions()); instructions != "" {
 		buf.WriteString("## Instructions\n\n")
-		buf.WriteString(instructions)
+		buf.WriteString(sanitizeHTMLTags(instructions))
 		buf.WriteString("\n\n")
 	}
 
@@ -109,11 +111,13 @@ func writeIntegrationIndex(
 	return writeFile(path, buf.Bytes())
 }
 
-func writeFrontMatter(buf *bytes.Buffer, title string, order int) {
+func writeFrontMatter(buf *bytes.Buffer, title string, order *int) {
 	buf.WriteString("---\n")
 	buf.WriteString(fmt.Sprintf("title: \"%s\"\n", escapeQuotes(title)))
-	buf.WriteString("sidebar:\n")
-	buf.WriteString(fmt.Sprintf("  order: %d\n", order))
+	if order != nil {
+		buf.WriteString("sidebar:\n")
+		buf.WriteString(fmt.Sprintf("  order: %d\n", *order))
+	}
 	buf.WriteString("---\n\n")
 }
 
@@ -161,12 +165,19 @@ func writeTriggerSection(buf *bytes.Buffer, triggers []core.Trigger) {
 	}
 }
 
+func writeCardGridImport(buf *bytes.Buffer, triggers []core.Trigger, components []core.Component) {
+	if len(triggers) == 0 && len(components) == 0 {
+		return
+	}
+
+	buf.WriteString("import { CardGrid, LinkCard } from \"@astrojs/starlight/components\";\n\n")
+}
+
 func writeCardGridComponents(buf *bytes.Buffer, components []core.Component) {
 	if len(components) == 0 {
 		return
 	}
 
-	buf.WriteString("import { CardGrid, LinkCard } from \"@astrojs/starlight/components\";\n\n")
 	buf.WriteString("## Actions\n\n")
 	buf.WriteString("<CardGrid>\n")
 	for _, component := range components {
@@ -203,7 +214,7 @@ func writeParagraph(buf *bytes.Buffer, text string) {
 	if trimmed == "" {
 		return
 	}
-	buf.WriteString(trimmed)
+	buf.WriteString(sanitizeHTMLTags(trimmed))
 	buf.WriteString("\n\n")
 }
 
@@ -264,6 +275,39 @@ func writeFile(path string, data []byte) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
+var htmlTagRe = regexp.MustCompile(`<([a-zA-Z/][^>]*)>`)
+
+func sanitizeHTMLTags(content string) string {
+	lines := strings.Split(content, "\n")
+	inCodeBlock := false
+	var result []string
+
+	for _, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "```") {
+			inCodeBlock = !inCodeBlock
+			result = append(result, line)
+			continue
+		}
+
+		if inCodeBlock {
+			result = append(result, line)
+			continue
+		}
+
+		parts := strings.Split(line, "`")
+		for i := range parts {
+			if i%2 == 0 {
+				parts[i] = htmlTagRe.ReplaceAllString(parts[i], "&lt;$1&gt;")
+				parts[i] = strings.ReplaceAll(parts[i], "{", "&lbrace;")
+				parts[i] = strings.ReplaceAll(parts[i], "}", "&rbrace;")
+			}
+		}
+		result = append(result, strings.Join(parts, "`"))
+	}
+
+	return strings.Join(result, "\n")
+}
+
 func slugify(value string) string {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
@@ -278,9 +322,12 @@ func slugify(value string) string {
 
 func integrationFilename(integration core.Integration) string {
 	label := strings.TrimSpace(integration.Label())
+	label = strings.ReplaceAll(label, " ", "")
+
 	if label == "" {
 		return slugify(integration.Name())
 	}
+
 	return label
 }
 

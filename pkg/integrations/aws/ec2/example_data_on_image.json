@@ -1,0 +1,20 @@
+{
+  "data": {
+    "version": "0",
+    "id": "f74f3de5-f9b7-4f3d-909a-531fc3ff2f14",
+    "detail-type": "EC2 AMI State Change",
+    "source": "aws.ec2",
+    "account": "123456789012",
+    "time": "2026-02-10T12:10:00Z",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:ec2:us-east-1::image/ami-07f0e4f3e9c123abc"
+    ],
+    "detail": {
+      "ImageId": "ami-07f0e4f3e9c123abc",
+      "State": "available"
+    }
+  },
+  "timestamp": "2026-02-10T12:10:01Z",
+  "type": "aws.ec2.image"
+}

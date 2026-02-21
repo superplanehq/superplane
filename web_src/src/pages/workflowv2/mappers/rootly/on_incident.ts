@@ -35,7 +35,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     const eventData = context.event?.data as OnIncidentEventData;
     const incident = eventData?.incident;
-    const contentParts = [incident?.severity?.name, incident?.status].filter(Boolean).join(" · ");
+    const contentParts = [incident?.severity, incident?.status].filter(Boolean).join(" · ");
     const subtitle = buildSubtitle(contentParts, context.event?.createdAt);
 
     return {
@@ -72,7 +72,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       const eventData = lastEvent.data as OnIncidentEventData;
       const incident = eventData?.incident;
-      const contentParts = [incident?.severity?.name, incident?.status].filter(Boolean).join(" · ");
+      const contentParts = [incident?.severity, incident?.status].filter(Boolean).join(" · ");
       const subtitle = buildSubtitle(contentParts, lastEvent.createdAt);
 
       props.lastEventData = {

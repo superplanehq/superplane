@@ -1,10 +1,10 @@
 ---
 title: "GitHub"
-sidebar:
-  order: 9
 ---
 
 Manage and react to changes in your GitHub repositories
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Triggers
 
@@ -20,16 +20,17 @@ Manage and react to changes in your GitHub repositories
   <LinkCard title="On Workflow Run" href="#on-workflow-run" description="Listen to workflow run events" />
 </CardGrid>
 
-import { CardGrid, LinkCard } from "@astrojs/starlight/components";
-
 ## Actions
 
 <CardGrid>
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitHub repository" />
+  <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a GitHub issue or pull request" />
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
+  <LinkCard title="Create Review" href="#create-review" description="Submit a pull request review on GitHub" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
+  <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Retrieve billable GitHub Actions usage (minutes) for the organization" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
@@ -985,6 +986,53 @@ Returns the created issue object with details including:
 }
 ```
 
+<a id="create-issue-comment"></a>
+
+## Create Issue Comment
+
+The Create Issue Comment component adds a comment to an existing GitHub issue or pull request.
+Issues and pull requests share the same comment API in GitHub.
+
+### Use Cases
+
+- **Deployment updates**: Post deployment status or remediation updates to GitHub issues
+- **Runbook linking**: Add runbook links, error details, or status for responders
+- **Cross-platform sync**: Sync Slack or PagerDuty notes into GitHub as comments
+- **Automated comments**: Add automated comments based on workflow events
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the issue
+- **Issue Number**: The issue or PR number to comment on (supports expressions)
+- **Body**: The comment text (supports Markdown and expressions)
+
+### Output
+
+Returns the created comment object including:
+- Comment ID and URL
+- Comment body
+- Author information
+- Created timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "body": "Deployment to production completed successfully.",
+    "created_at": "2026-01-16T17:56:16Z",
+    "html_url": "https://github.com/acme/widgets/issues/42#issuecomment-5001",
+    "id": 5001,
+    "updated_at": "2026-01-16T17:56:16Z",
+    "user": {
+      "login": "superplane-app[bot]"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issueComment"
+}
+```
+
 <a id="create-release"></a>
 
 ## Create Release
@@ -1027,6 +1075,52 @@ Returns the created release object with all release information including tag, a
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="create-review"></a>
+
+## Create Review
+
+The Create Review component submits a pull request review (approve, request changes, or comment) on a GitHub pull request.
+
+### Use Cases
+
+- **Automation**: Auto-approve when checks pass
+- **Quality gates**: Request changes when checks fail
+- **Bots**: Post review feedback
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Pull Number**: Pull request number
+- **Event**: APPROVE, REQUEST_CHANGES, or COMMENT
+- **Body**: Optional review body (required for REQUEST_CHANGES and COMMENT)
+
+### Output
+
+Emits the submitted review object including:
+- id, state, submitted_at
+- body and user
+
+### Example Output
+
+```json
+{
+  "data": {
+    "body": "LGTM. Approving after successful CI.",
+    "html_url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9001",
+    "id": 9001,
+    "state": "APPROVED",
+    "submitted_at": "2026-01-25T12:34:56Z",
+    "user": {
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-01-25T12:34:56.000000000Z",
+  "type": "github.pullRequestReview"
 }
 ```
 
@@ -1185,6 +1279,88 @@ Returns release information including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="get-workflow-usage"></a>
+
+## Get Workflow Usage
+
+The Get Workflow Usage component retrieves billable GitHub Actions usage (minutes) for the installation's organization.
+
+### Prerequisites
+
+This action calls GitHub's **billing usage** API, which requires the GitHub App to have **Organization permission: Organization administration (read)**. 
+
+**Important**: Existing installations will need to approve the new permission when prompted by GitHub. Until the permission is granted, this action will return a 403 error.
+
+**Note**: This component uses GitHub's enhanced billing usage report API, which provides detailed usage information.
+
+### Behavior
+
+- Returns billing data for the **current billing cycle** 
+- Only private repositories on GitHub-hosted runners accrue billable minutes
+- Public repositories and self-hosted runners show zero billable usage
+- Can filter by specific repositories when selected
+- Uses enhanced billing platform API for accurate reporting
+
+### Configuration
+
+- **Repositories** (optional, multiselect): Select one or more specific repositories to track. These will be included in the output for reference (max 5) and stored in node metadata with full repository details (ID, name, URL). When repositories are selected, only usage for those repositories is included in the totals.
+
+### Output
+
+Returns usage data with:
+- `minutes_used`: Total billable minutes used in the current billing cycle
+- `minutes_used_breakdown`: Map of minutes by runner SKU (e.g., "Actions Linux": 120, "Actions Windows": 60, "Actions macOS": 30)
+- `included_minutes`: Always 0 (not provided by enhanced billing API)
+- `total_paid_minutes_used`: Estimated paid minutes based on cost data
+- `repositories`: List of selected repositories for tracking (max 5)
+
+**Note**: Breakdown is by runner SKU (OS and type), not by individual workflow.
+
+### Node Metadata
+
+The component stores repository information in node metadata:
+- Repository ID, name, and URL for each selected repository (max 5)
+- This metadata is displayed in the workflow canvas for easy reference
+
+### Use Cases
+
+- **Billing Monitoring**: Track GitHub Actions usage for billing purposes
+- **Quota Management**: Monitor usage to avoid exceeding billing quotas
+- **Cost Control**: Alert when usage approaches limits or budget thresholds
+- **Usage Reporting**: Generate monthly or periodic usage reports for compliance
+- **Resource Planning**: Analyze runner usage patterns by OS type
+
+### References
+
+- [GitHub Billing Usage API](https://docs.github.com/rest/billing/usage)
+- [GitHub Enhanced Billing Platform](https://docs.github.com/billing/using-the-new-billing-platform)
+- [Permissions required for GitHub Apps - Organization Administration](https://docs.github.com/en/rest/overview/permissions-required-for-github-apps#organization-permissions-for-administration)
+- [Viewing your usage of metered products](https://docs.github.com/en/billing/managing-billing-for-github-actions/viewing-your-github-actions-usage)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "included_minutes": 0,
+    "minutes_used": 1840.5,
+    "minutes_used_breakdown": {
+      "Actions Linux": 1200,
+      "Actions Windows": 400.5,
+      "Actions macOS": 240
+    },
+    "repositories": [
+      "repo1",
+      "repo2",
+      "repo3"
+    ],
+    "total_paid_minutes_used": 150
+  },
+  "timestamp": "2026-02-17T20:00:00Z",
+  "type": "github.workflowUsage"
 }
 ```
 

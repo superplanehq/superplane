@@ -128,34 +128,3 @@ func (s *PanicableIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 	}()
 	s.underlying.HandleRequest(ctx)
 }
-
-func (s *PanicableIntegration) CompareWebhookConfig(a, b any) (result bool, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			result = false
-			err = fmt.Errorf("integration %s panicked in CompareWebhookConfig(): %v",
-				s.underlying.Name(), r)
-		}
-	}()
-	return s.underlying.CompareWebhookConfig(a, b)
-}
-
-func (s *PanicableIntegration) SetupWebhook(ctx core.SetupWebhookContext) (metadata any, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("integration %s panicked in SetupWebhook(): %v",
-				s.underlying.Name(), r)
-		}
-	}()
-	return s.underlying.SetupWebhook(ctx)
-}
-
-func (s *PanicableIntegration) CleanupWebhook(ctx core.CleanupWebhookContext) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("integration %s panicked in CleanupWebhook(): %v",
-				s.underlying.Name(), r)
-		}
-	}()
-	return s.underlying.CleanupWebhook(ctx)
-}

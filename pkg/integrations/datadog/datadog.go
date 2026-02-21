@@ -140,24 +140,8 @@ func (d *Datadog) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op - webhooks are handled by triggers
 }
 
-func (d *Datadog) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	// no-op - Datadog webhooks are manually configured by users
-	return nil
-}
-
-func (d *Datadog) CompareWebhookConfig(a, b any) (bool, error) {
-	// Datadog webhooks are manually configured, so we don't compare configurations
-	return true, nil
-}
-
 func (d *Datadog) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	return []core.IntegrationResource{}, nil
-}
-
-func (d *Datadog) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	// Datadog webhooks are manually configured by users in the Datadog UI
-	// No automatic provisioning is supported
-	return nil, nil
 }
 
 func (d *Datadog) Actions() []core.Action {

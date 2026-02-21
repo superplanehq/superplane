@@ -1,0 +1,96 @@
+---
+title: "DigitalOcean"
+---
+
+Manage and monitor your DigitalOcean infrastructure
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Droplet" href="#create-droplet" description="Create a new DigitalOcean Droplet" />
+</CardGrid>
+
+## Instructions
+
+## Create a DigitalOcean Personal Access Token
+
+1. Open the [DigitalOcean API Tokens page](https://cloud.digitalocean.com/account/api/tokens)
+2. Click **Generate New Token**
+3. Configure the token:
+   - **Token name**: SuperPlane Integration
+   - **Expiration**: No expiry (or choose an appropriate expiration)
+   - **Scopes**: Select **Full Access** (or customize as needed)
+4. Click **Generate Token**
+5. Copy the token and paste it below
+
+> **Note**: The token is only shown once. Store it securely if needed elsewhere.
+
+<a id="create-droplet"></a>
+
+## Create Droplet
+
+The Create Droplet component creates a new droplet in DigitalOcean.
+
+### Use Cases
+
+- **Infrastructure provisioning**: Automatically provision droplets from workflow events
+- **Scaling**: Create new instances in response to load or alerts
+- **Environment setup**: Spin up droplets for testing or staging environments
+
+### Configuration
+
+- **Name**: The hostname for the droplet (required, supports expressions)
+- **Region**: Region slug where the droplet will be created (required)
+- **Size**: Size slug for the droplet (required)
+- **Image**: Image slug or ID for the droplet OS (required)
+- **SSH Keys**: SSH key fingerprints or IDs to add to the droplet (optional)
+- **Tags**: Tags to apply to the droplet (optional)
+- **User Data**: Cloud-init user data script (optional)
+
+### Output
+
+Returns the created droplet object including:
+- **id**: Droplet ID
+- **name**: Droplet hostname
+- **status**: Current droplet status
+- **region**: Region information
+- **networks**: Network information including IP addresses
+
+### Example Output
+
+```json
+{
+  "data": {
+    "disk": 25,
+    "id": 98765432,
+    "image": {
+      "id": 12345,
+      "name": "Ubuntu 24.04 (LTS) x64",
+      "slug": "ubuntu-24-04-x64"
+    },
+    "memory": 1024,
+    "name": "my-droplet",
+    "networks": {
+      "v4": [
+        {
+          "ip_address": "104.131.186.241",
+          "type": "public"
+        }
+      ]
+    },
+    "region": {
+      "name": "New York 3",
+      "slug": "nyc3"
+    },
+    "size_slug": "s-1vcpu-1gb",
+    "status": "new",
+    "tags": [
+      "web"
+    ],
+    "vcpus": 1
+  }
+}
+```
+

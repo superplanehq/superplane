@@ -283,11 +283,12 @@ func (x *ListUserRolesResponse) GetRoles() []*roles.Role {
 }
 
 type ListUsersRequest struct {
-	state         protoimpl.MessageState   `protogen:"open.v1"`
-	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
-	DomainId      string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                  protoimpl.MessageState   `protogen:"open.v1"`
+	DomainType             authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId               string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	IncludeServiceAccounts bool                     `protobuf:"varint,3,opt,name=include_service_accounts,json=includeServiceAccounts,proto3" json:"include_service_accounts,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *ListUsersRequest) Reset() {
@@ -332,6 +333,13 @@ func (x *ListUsersRequest) GetDomainId() string {
 		return x.DomainId
 	}
 	return ""
+}
+
+func (x *ListUsersRequest) GetIncludeServiceAccounts() bool {
+	if x != nil {
+		return x.IncludeServiceAccounts
+	}
+	return false
 }
 
 type ListUsersResponse struct {
@@ -804,11 +812,12 @@ const file_users_proto_rawDesc = "" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\x12,\n" +
-	"\x05roles\x18\x04 \x03(\v2\x16.Superplane.Roles.RoleR\x05roles\"v\n" +
+	"\x05roles\x18\x04 \x03(\v2\x16.Superplane.Roles.RoleR\x05roles\"\xb0\x01\n" +
 	"\x10ListUsersRequest\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
-	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\"A\n" +
+	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x128\n" +
+	"\x18include_service_accounts\x18\x03 \x01(\bR\x16includeServiceAccounts\"A\n" +
 	"\x11ListUsersResponse\x12,\n" +
 	"\x05users\x18\x01 \x03(\v2\x16.Superplane.Users.UserR\x05users\"\xaa\x04\n" +
 	"\x04User\x12;\n" +

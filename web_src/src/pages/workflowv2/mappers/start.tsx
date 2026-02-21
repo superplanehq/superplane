@@ -111,6 +111,7 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
             </div>
             <Button
               size="sm"
+              data-testid="start-template-run"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
