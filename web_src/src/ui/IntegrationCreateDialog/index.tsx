@@ -273,9 +273,13 @@ export function IntegrationCreateDialog({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      void navigator.clipboard.writeText(pendingWebhookSetup.webhookUrl);
-                      showSuccessToast("Copied to clipboard");
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(pendingWebhookSetup.webhookUrl);
+                        showSuccessToast("Copied to clipboard");
+                      } catch {
+                        showErrorToast("Failed to copy to clipboard");
+                      }
                     }}
                   >
                     Copy
