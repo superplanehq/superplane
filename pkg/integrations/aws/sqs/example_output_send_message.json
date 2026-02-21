@@ -1,0 +1,8 @@
+{
+  "type": "aws.sqs.message",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+    "messageId": "d84c1b4d-1f3b-4b6c-9d9f-5c3a2b1f9e7a"
+  }
+}

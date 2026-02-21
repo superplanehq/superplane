@@ -153,9 +153,9 @@ func (c *Client) FetchConfig() (*APIConfig, error) {
 	return &config, nil
 }
 
-// toolboxURL returns the toolbox execute URL for a given sandbox.
+// toolboxBaseURL returns the toolbox base URL for a given sandbox.
 // It fetches the proxyToolboxUrl from /api/config and constructs the URL.
-func (c *Client) toolboxURL(sandboxID string) (string, error) {
+func (c *Client) toolboxBaseURL(sandboxID string) (string, error) {
 	config, err := c.FetchConfig()
 	if err != nil {
 		return "", err
@@ -165,12 +165,12 @@ func (c *Client) toolboxURL(sandboxID string) (string, error) {
 		return "", fmt.Errorf("proxyToolboxUrl not found in config")
 	}
 
-	return fmt.Sprintf("%s/%s/process/execute", config.ProxyToolboxURL, sandboxID), nil
+	return fmt.Sprintf("%s/%s", config.ProxyToolboxURL, sandboxID), nil
 }
 
 // ExecuteCode executes code in a sandbox (uses the execute command endpoint)
 func (c *Client) ExecuteCode(sandboxID string, req *ExecuteCodeRequest) (*ExecuteCodeResponse, error) {
-	url, err := c.toolboxURL(sandboxID)
+	url, err := c.toolboxBaseURL(sandboxID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve toolbox URL: %v", err)
 	}
@@ -198,7 +198,7 @@ func (c *Client) ExecuteCode(sandboxID string, req *ExecuteCodeRequest) (*Execut
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	responseBody, err := c.execRequest(http.MethodPost, url+"/process/execute", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func (c *Client) ExecuteCode(sandboxID string, req *ExecuteCodeRequest) (*Execut
 
 // ExecuteCommand executes a shell command in a sandbox
 func (c *Client) ExecuteCommand(sandboxID string, req *ExecuteCommandRequest) (*ExecuteCommandResponse, error) {
-	url, err := c.toolboxURL(sandboxID)
+	url, err := c.toolboxBaseURL(sandboxID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve toolbox URL: %v", err)
 	}
@@ -223,7 +223,7 @@ func (c *Client) ExecuteCommand(sandboxID string, req *ExecuteCommandRequest) (*
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	responseBody, err := c.execRequest(http.MethodPost, url+"/process/execute", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -234,6 +234,139 @@ func (c *Client) ExecuteCommand(sandboxID string, req *ExecuteCommandRequest) (*
 	}
 
 	return &response, nil
+}
+
+// SessionExecuteRequest is the request body for executing a command in a session
+type SessionExecuteRequest struct {
+	Command  string `json:"command"`
+	RunAsync bool   `json:"runAsync"`
+}
+
+// SessionExecuteResponse is the response from executing a command in a session
+type SessionExecuteResponse struct {
+	CmdID string `json:"cmdId"`
+}
+
+// SessionCommand represents a command within a session
+type SessionCommand struct {
+	ID       string `json:"id"`
+	ExitCode *int   `json:"exitCode"`
+}
+
+// Session represents a Daytona session with its commands
+type Session struct {
+	SessionID string           `json:"sessionId"`
+	Commands  []SessionCommand `json:"commands"`
+}
+
+// FindCommand returns the command with the given ID, or nil if not found
+func (s *Session) FindCommand(cmdID string) *SessionCommand {
+	for i := range s.Commands {
+		if s.Commands[i].ID == cmdID {
+			return &s.Commands[i]
+		}
+	}
+	return nil
+}
+
+// CreateSession creates a new session on the sandbox toolbox
+func (c *Client) CreateSession(sandboxID, sessionID string) error {
+	baseURL, err := c.toolboxBaseURL(sandboxID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve toolbox URL: %v", err)
+	}
+
+	body, err := json.Marshal(map[string]string{"sessionId": sessionID})
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	_, err = c.execRequest(http.MethodPost, baseURL+"/process/session", bytes.NewReader(body))
+	return err
+}
+
+// ExecuteSessionCommand executes a command asynchronously in a session
+func (c *Client) ExecuteSessionCommand(sandboxID, sessionID, command string) (*SessionExecuteResponse, error) {
+	baseURL, err := c.toolboxBaseURL(sandboxID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve toolbox URL: %v", err)
+	}
+
+	reqBody := SessionExecuteRequest{
+		Command:  command,
+		RunAsync: true,
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/process/session/%s/exec", baseURL, sessionID)
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response SessionExecuteResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal session execute response: %v", err)
+	}
+
+	return &response, nil
+}
+
+// GetSession retrieves the session state including command statuses
+func (c *Client) GetSession(sandboxID, sessionID string) (*Session, error) {
+	baseURL, err := c.toolboxBaseURL(sandboxID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve toolbox URL: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/process/session/%s", baseURL, sessionID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var session Session
+	if err := json.Unmarshal(responseBody, &session); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal session response: %v", err)
+	}
+
+	return &session, nil
+}
+
+// GetSessionCommandLogs retrieves the logs for a specific command in a session
+func (c *Client) GetSessionCommandLogs(sandboxID, sessionID, commandID string) (string, error) {
+	baseURL, err := c.toolboxBaseURL(sandboxID)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve toolbox URL: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/process/session/%s/command/%s/logs", baseURL, sessionID, commandID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return string(responseBody), nil
+}
+
+// GetSandbox retrieves the current state of a sandbox
+func (c *Client) GetSandbox(sandboxID string) (*Sandbox, error) {
+	url := fmt.Sprintf("%s/sandbox/%s", c.BaseURL, sandboxID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var sandbox Sandbox
+	if err := json.Unmarshal(responseBody, &sandbox); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal sandbox response: %v", err)
+	}
+
+	return &sandbox, nil
 }
 
 // DeleteSandbox deletes a sandbox
