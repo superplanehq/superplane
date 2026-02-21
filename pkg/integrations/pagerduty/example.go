@@ -49,12 +49,6 @@ var exampleOutputEscalateIncidentBytes []byte
 var exampleOutputEscalateIncidentOnce sync.Once
 var exampleOutputEscalateIncident map[string]any
 
-//go:embed example_output_reassign_escalation_policy.json
-var exampleOutputReassignEscalationPolicyBytes []byte
-
-var exampleOutputReassignEscalationPolicyOnce sync.Once
-var exampleOutputReassignEscalationPolicy map[string]any
-
 //go:embed example_data_on_incident.json
 var exampleDataOnIncidentBytes []byte
 
@@ -117,10 +111,6 @@ func (c *ResolveIncident) ExampleOutput() map[string]any {
 
 func (c *EscalateIncident) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputEscalateIncidentOnce, exampleOutputEscalateIncidentBytes, &exampleOutputEscalateIncident)
-}
-
-func (c *ReassignEscalationPolicy) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputReassignEscalationPolicyOnce, exampleOutputReassignEscalationPolicyBytes, &exampleOutputReassignEscalationPolicy)
 }
 
 func (l *ListIncidents) ExampleOutput() map[string]any {

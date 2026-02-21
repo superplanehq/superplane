@@ -7,7 +7,6 @@ import { updateIncidentMapper } from "./update_incident";
 import { acknowledgeIncidentMapper } from "./acknowledge_incident";
 import { resolveIncidentMapper } from "./resolve_incident";
 import { escalateIncidentMapper } from "./escalate_incident";
-import { reassignEscalationPolicyMapper } from "./reassign_escalation_policy";
 import { annotateIncidentMapper } from "./annotate_incident";
 import { listIncidentsMapper, LIST_INCIDENTS_STATE_REGISTRY } from "./list_incidents";
 import { listNotesMapper } from "./list_notes";
@@ -21,7 +20,6 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   acknowledgeIncident: acknowledgeIncidentMapper,
   resolveIncident: resolveIncidentMapper,
   escalateIncident: escalateIncidentMapper,
-  reassignEscalationPolicy: reassignEscalationPolicyMapper,
   annotateIncident: annotateIncidentMapper,
   listIncidents: listIncidentsMapper,
   listNotes: listNotesMapper,
@@ -41,7 +39,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   acknowledgeIncident: buildActionStateRegistry("acknowledged"),
   resolveIncident: buildActionStateRegistry("resolved"),
   escalateIncident: buildActionStateRegistry("escalated"),
-  reassignEscalationPolicy: buildActionStateRegistry("reassigned"),
   annotateIncident: buildActionStateRegistry("annotated"),
   listIncidents: LIST_INCIDENTS_STATE_REGISTRY,
   listNotes: buildActionStateRegistry("listed"),
