@@ -25,6 +25,7 @@ import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
+import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
@@ -69,6 +70,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   prometheus: prometheusIcon,
   render: renderIcon,
   dockerhub: dockerIcon,
+  gcp: gcpIcon,
   harness: harnessIcon,
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
@@ -117,6 +119,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
     ecs: awsEcsIcon,
     sns: awsSnsIcon,
   },
+  gcp: gcpIcon,
 };
 
 /**
