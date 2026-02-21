@@ -152,6 +152,12 @@ import {
   eventStateRegistry as dockerhubEventStateRegistry,
 } from "./dockerhub";
 import {
+  componentMappers as gcpComponentMappers,
+  customFieldRenderers as gcpCustomFieldRenderers,
+  triggerRenderers as gcpTriggerRenderers,
+  eventStateRegistry as gcpEventStateRegistry,
+} from "./gcp";
+import {
   componentMappers as servicenowComponentMappers,
   customFieldRenderers as servicenowCustomFieldRenderers,
   triggerRenderers as servicenowTriggerRenderers,
@@ -211,6 +217,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
+  gcp: gcpComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
   hetzner: hetznerComponentMappers,
@@ -241,6 +248,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
+  gcp: gcpTriggerRenderers,
   grafana: grafanaTriggerRenderers,
   bitbucket: bitbucketTriggerRenderers,
   prometheus: prometheusTriggerRenderers,
@@ -270,6 +278,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
+  gcp: gcpEventStateRegistry,
   statuspage: statuspageEventStateRegistry,
   aws: awsEventStateRegistry,
   grafana: grafanaEventStateRegistry,
@@ -307,6 +316,7 @@ const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer
   grafana: grafanaCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
+  gcp: gcpCustomFieldRenderers,
   servicenow: servicenowCustomFieldRenderers,
 };
 
