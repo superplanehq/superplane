@@ -50,6 +50,7 @@ import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
+import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
@@ -423,6 +424,7 @@ function CategorySection({
     github: githubIcon,
     gitlab: gitlabIcon,
     hetzner: hetznerIcon,
+    jfrogArtifactory: jfrogArtifactoryIcon,
     grafana: grafanaIcon,
     jira: jiraIcon,
     openai: openAiIcon,
@@ -515,6 +517,7 @@ function CategorySection({
             github: githubIcon,
             gitlab: gitlabIcon,
             hetzner: hetznerIcon,
+            jfrogArtifactory: jfrogArtifactoryIcon,
             grafana: grafanaIcon,
             openai: openAiIcon,
             "open-ai": openAiIcon,
