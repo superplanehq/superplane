@@ -72,7 +72,7 @@ func Test__SendMessage__Setup(t *testing.T) {
 		require.NoError(t, err)
 		stored, ok := metadata.Metadata.(SendMessageMetadata)
 		require.True(t, ok)
-		assert.Equal(t, "123456789", stored.ChatID)
+		assert.Equal(t, "123456789", stored.Chat.ID)
 	})
 }
 
