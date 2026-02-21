@@ -8,6 +8,11 @@ interface OnMentionConfiguration {
   chatId?: string;
 }
 
+interface OnMentionMetadata {
+  chatId?: string;
+  chatName?: string;
+}
+
 interface OnMentionEventData {
   message_id?: number;
   text?: string;
@@ -51,10 +56,12 @@ export const onMentionTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
     const configuration = node.configuration as OnMentionConfiguration | undefined;
+    const nodeMetadata = node.metadata as OnMentionMetadata | undefined;
     const metadataItems = [];
 
-    if (configuration?.chatId) {
-      metadataItems.push({ icon: "message-circle", label: configuration.chatId });
+    const chatLabel = nodeMetadata?.chatName || configuration?.chatId;
+    if (chatLabel) {
+      metadataItems.push({ icon: "message-circle", label: chatLabel });
     }
 
     const props: TriggerProps = {

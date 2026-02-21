@@ -19,7 +19,12 @@ type SendMessageConfiguration struct {
 }
 
 type SendMessageMetadata struct {
-	ChatID string `json:"chatId" mapstructure:"chatId"`
+	Chat *SendMessageChatMetadata `json:"chat" mapstructure:"chat"`
+}
+
+type SendMessageChatMetadata struct {
+	ID   string `json:"id" mapstructure:"id"`
+	Name string `json:"name" mapstructure:"name"`
 }
 
 func (c *SendMessage) Name() string {
@@ -126,8 +131,21 @@ func (c *SendMessage) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("invalid parseMode %q: must be none or Markdown", config.ParseMode)
 	}
 
+	client, err := NewClient(ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create Telegram client: %w", err)
+	}
+
+	chatInfo, err := client.GetChat(config.ChatID)
+	if err != nil {
+		return fmt.Errorf("chat validation failed: %w", err)
+	}
+
 	metadata := SendMessageMetadata{
-		ChatID: config.ChatID,
+		Chat: &SendMessageChatMetadata{
+			ID:   config.ChatID,
+			Name: ChatDisplayName(chatInfo),
+		},
 	}
 
 	return ctx.Metadata.Set(metadata)

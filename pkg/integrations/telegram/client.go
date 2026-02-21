@@ -71,6 +71,52 @@ func (c *Client) SetWebhook(url string) error {
 	return nil
 }
 
+type ChatDetail struct {
+	ID        int64  `json:"id"`
+	Type      string `json:"type"`
+	Title     string `json:"title,omitempty"`
+	Username  string `json:"username,omitempty"`
+	FirstName string `json:"first_name,omitempty"`
+	LastName  string `json:"last_name,omitempty"`
+}
+
+func (c *Client) GetChat(chatID string) (*ChatDetail, error) {
+	payload := map[string]string{
+		"chat_id": chatID,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	responseBody, err := c.doRequest(http.MethodPost, "/getChat", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var chat ChatDetail
+	if err := json.Unmarshal(responseBody, &chat); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &chat, nil
+}
+
+func ChatDisplayName(chat *ChatDetail) string {
+	if chat.Title != "" {
+		return chat.Title
+	}
+	if chat.Username != "" {
+		return "@" + chat.Username
+	}
+	name := chat.FirstName
+	if chat.LastName != "" {
+		name += " " + chat.LastName
+	}
+	return name
+}
+
 // SendMessage sends a text message to a chat
 func (c *Client) SendMessage(chatID string, text string, parseMode string) (*TelegramMessage, error) {
 	payload := map[string]any{

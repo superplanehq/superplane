@@ -20,8 +20,13 @@ interface SendMessageConfiguration {
   parseMode?: string;
 }
 
+interface ChatMetadata {
+  id?: string;
+  name?: string;
+}
+
 interface SendMessageMetadata {
-  chatId?: string;
+  chat?: ChatMetadata;
 }
 
 export const sendMessageMapper: ComponentBaseMapper = {
@@ -70,9 +75,9 @@ function sendMessageMetadataList(node: NodeInfo): MetadataItem[] {
   const nodeMetadata = node.metadata as SendMessageMetadata | undefined;
   const configuration = node.configuration as SendMessageConfiguration | undefined;
 
-  const chatId = nodeMetadata?.chatId || configuration?.chatId;
-  if (chatId) {
-    metadata.push({ icon: "message-circle", label: chatId });
+  const chatLabel = nodeMetadata?.chat?.name || configuration?.chatId;
+  if (chatLabel) {
+    metadata.push({ icon: "message-circle", label: chatLabel });
   }
 
   if (configuration?.parseMode) {

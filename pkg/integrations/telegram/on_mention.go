@@ -19,6 +19,7 @@ type OnMentionConfiguration struct {
 type OnMentionMetadata struct {
 	AppSubscriptionID *string `json:"appSubscriptionID,omitempty" mapstructure:"appSubscriptionID,omitempty"`
 	ChatID            *string `json:"chatId,omitempty" mapstructure:"chatId,omitempty"`
+	ChatName          *string `json:"chatName,omitempty" mapstructure:"chatName,omitempty"`
 }
 
 func (t *OnMention) Name() string {
@@ -101,13 +102,25 @@ func (t *OnMention) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to subscribe to message events: %w", err)
 	}
 
-	// Store metadata
 	newMetadata := OnMentionMetadata{
 		AppSubscriptionID: subscriptionID,
 	}
 
 	if config.ChatID != "" {
 		newMetadata.ChatID = &config.ChatID
+
+		client, err := NewClient(ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create Telegram client: %w", err)
+		}
+
+		chatInfo, err := client.GetChat(config.ChatID)
+		if err != nil {
+			return fmt.Errorf("chat validation failed: %w", err)
+		}
+
+		name := ChatDisplayName(chatInfo)
+		newMetadata.ChatName = &name
 	}
 
 	return ctx.Metadata.Set(newMetadata)
