@@ -120,6 +120,15 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
+	var webhookURL string
+	if ctx.Webhook != nil {
+		var err error
+		webhookURL, err = ctx.Webhook.Setup()
+		if err != nil {
+			return fmt.Errorf("failed to get webhook URL: %w", err)
+		}
+	}
+
 	// Persist the signing secret in the encrypted webhook.Secret field (same as Grafana, PagerDuty, etc.).
 	if ctx.Webhook != nil && signingSecret != "" {
 		if err := ctx.Webhook.SetSecret([]byte(signingSecret)); err != nil {
@@ -128,11 +137,7 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 	}
 
 	// Store webhook URL in metadata so the UI can show it for the user to copy into incident.io.
-	if ctx.Webhook != nil {
-		webhookURL, err := ctx.Webhook.Setup()
-		if err != nil {
-			return fmt.Errorf("failed to get webhook URL: %w", err)
-		}
+	if webhookURL != "" {
 		metadata := OnIncidentMetadata{WebhookURL: webhookURL}
 		if ctx.Metadata != nil {
 			if err := ctx.Metadata.Set(metadata); err != nil {

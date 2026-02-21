@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"strconv"
 	"testing"
@@ -14,6 +15,36 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+type setupFirstWebhookContext struct {
+	setupCalled bool
+	secret      []byte
+}
+
+func (w *setupFirstWebhookContext) Setup() (string, error) {
+	w.setupCalled = true
+	return "https://example.com/api/v1/webhooks/webhook-123", nil
+}
+
+func (w *setupFirstWebhookContext) SetSecret(secret []byte) error {
+	if !w.setupCalled {
+		return fmt.Errorf("set secret called before setup")
+	}
+	w.secret = secret
+	return nil
+}
+
+func (w *setupFirstWebhookContext) GetSecret() ([]byte, error) {
+	return w.secret, nil
+}
+
+func (w *setupFirstWebhookContext) ResetSecret() ([]byte, []byte, error) {
+	return w.secret, w.secret, nil
+}
+
+func (w *setupFirstWebhookContext) GetBaseURL() string {
+	return "https://example.com"
+}
 
 func Test__OnIncident__HandleWebhook(t *testing.T) {
 	trigger := &OnIncident{}
@@ -196,5 +227,31 @@ func Test__OnIncident__Setup(t *testing.T) {
 		require.Len(t, integrationCtx.WebhookRequests, 1)
 		req := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
 		assert.Equal(t, []string{EventIncidentCreatedV2}, req.Events)
+	})
+
+	t.Run("setup webhook before setting secret", func(t *testing.T) {
+		webhookCtx := &setupFirstWebhookContext{}
+		metadataCtx := &contexts.MetadataContext{}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"webhookSigningSecret": "whsec_test_secret",
+			},
+		}
+
+		err := trigger.Setup(core.TriggerContext{
+			Integration:   integrationCtx,
+			Webhook:       webhookCtx,
+			Metadata:      metadataCtx,
+			Configuration: OnIncidentConfiguration{Events: []string{EventIncidentCreatedV2}},
+		})
+
+		require.NoError(t, err)
+		assert.True(t, webhookCtx.setupCalled)
+		assert.Equal(t, "whsec_test_secret", string(webhookCtx.secret))
+		require.Len(t, integrationCtx.WebhookRequests, 1)
+
+		metadata, ok := metadataCtx.Metadata.(OnIncidentMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "https://example.com/api/v1/webhooks/webhook-123", metadata.WebhookURL)
 	})
 }
