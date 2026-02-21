@@ -21,6 +21,7 @@ import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import digitaloceanIcon from "@/assets/icons/integrations/digitalocean.svg";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
+import telegramIcon from "@/assets/icons/integrations/telegram.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
@@ -432,6 +433,7 @@ function CategorySection({
     rootly: rootlyIcon,
     semaphore: SemaphoreLogo,
     slack: slackIcon,
+    telegram: telegramIcon,
     sendgrid: sendgridIcon,
     prometheus: prometheusIcon,
     render: renderIcon,
@@ -522,6 +524,7 @@ function CategorySection({
             rootly: rootlyIcon,
             semaphore: SemaphoreLogo,
             slack: slackIcon,
+            telegram: telegramIcon,
             sendgrid: sendgridIcon,
             prometheus: prometheusIcon,
             render: renderIcon,
