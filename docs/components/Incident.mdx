@@ -33,9 +33,10 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 Required for the **On Incident** trigger. Until this is done, the trigger will not receive events.
 
-1. Copy the **webhook URL** from the Webhook section below.
-2. In incident.io go to **Settings → Webhooks**, create a new endpoint, and paste that URL. Subscribe to **Public incident created (v2)** and **Public incident updated (v2)**.
-3. Copy the **Signing secret** from the endpoint and paste it in **Webhook signing secret** in the Configuration section above, then save.
+1. Add the **On Incident** trigger to a workflow and save the canvas to generate the webhook URL.
+2. Copy the webhook URL from the trigger setup panel.
+3. In incident.io go to **Settings → Webhooks**, create a new endpoint, and paste that URL. Subscribe to **Public incident created (v2)** and **Public incident updated (v2)**.
+4. Copy the **Signing secret** from the endpoint and paste it in **Webhook signing secret** in the Configuration section above, then save.
 
 The On Incident trigger becomes operational once the URL is registered in incident.io and the signing secret is saved here.
 
