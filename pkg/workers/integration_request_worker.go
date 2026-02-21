@@ -116,7 +116,6 @@ func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.
 		OrganizationID:  instance.OrganizationID.String(),
 		OIDC:            w.oidcProvider,
 		Encryptor:       w.encryptor,
-		Tx:              tx,
 	})
 
 	if syncErr != nil {
