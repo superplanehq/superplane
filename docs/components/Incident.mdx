@@ -36,9 +36,9 @@ Required for the **On Incident** trigger. Until this is done, the trigger will n
 1. Add the **On Incident** trigger to a workflow and save the canvas to generate the webhook URL.
 2. Copy the webhook URL from the trigger setup panel.
 3. In incident.io go to **Settings → Webhooks**, create a new endpoint, and paste that URL. Subscribe to **Public incident created (v2)** and **Public incident updated (v2)**.
-4. Copy the **Signing secret** from the endpoint and paste it in **Webhook signing secret** in the Configuration section above, then save.
+4. Copy the **Signing secret** from the endpoint and paste it in the **Webhook signing secret** field in this trigger's configuration (in the On Incident trigger panel), then save the canvas.
 
-The On Incident trigger becomes operational once the URL is registered in incident.io and the signing secret is saved here.
+The On Incident trigger becomes operational once the URL is registered in incident.io and the signing secret is saved in this trigger's configuration.
 
 <a id="on-incident"></a>
 
@@ -55,7 +55,7 @@ The On Incident trigger starts a workflow execution when incident.io sends webho
 ### Configuration
 
 - **Events**: Select which events to listen for (Incident created, Incident updated)
-- **Signing secret**: Configure the webhook signing secret in the incident.io integration (Settings → Integrations). Paste the signing secret from your incident.io webhook endpoint (Settings > Webhooks). Required to verify webhook authenticity.
+- **Signing secret**: Configure the webhook signing secret in **this trigger's configuration**: use the **Webhook signing secret** field in the On Incident trigger panel. Paste the signing secret from your incident.io webhook endpoint (Settings → Webhooks). Required to verify webhook authenticity.
 
 ### Webhook Setup
 
@@ -64,7 +64,7 @@ incident.io does not provide an API to register webhook endpoints. After adding 
 1. Copy the webhook URL shown for this trigger (after saving the canvas).
 2. In incident.io go to **Settings > Webhooks** and create a new endpoint with that URL.
 3. Subscribe to exactly these events: **Public incident created (v2)** and **Public incident updated (v2)**.
-4. Copy the **Signing secret** from the endpoint and add it to the incident.io integration (Settings → Integrations).
+4. Copy the **Signing secret** from the endpoint and paste it in this trigger's **Webhook signing secret** field (in the trigger configuration), then save the canvas.
 
 ### Example Data
 
