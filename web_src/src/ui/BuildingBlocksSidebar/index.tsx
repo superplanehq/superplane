@@ -27,6 +27,7 @@ import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
+import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
@@ -38,6 +39,7 @@ import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
+import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.svg";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
@@ -450,6 +452,7 @@ function CategorySection({
       ecs: awsEcsIcon,
       sns: awsSnsIcon,
     },
+    gcp: gcpIcon,
   };
 
   // Get integration name from first block if available, or match category name
@@ -531,6 +534,7 @@ function CategorySection({
             statuspage: statuspageIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
+              codepipeline: awsCodePipelineIcon,
               cloudwatch: awsCloudwatchIcon,
               ecr: awsEcrIcon,
               ec2: awsEc2Icon,
@@ -540,6 +544,7 @@ function CategorySection({
               ecs: awsEcsIcon,
               sns: awsSnsIcon,
             },
+            gcp: gcpIcon,
           };
           const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;
           const appIconSrc = typeof appLogo === "string" ? appLogo : nameParts[1] ? appLogo?.[nameParts[1]] : undefined;

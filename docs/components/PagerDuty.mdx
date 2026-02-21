@@ -17,11 +17,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Acknowledge Incident" href="#acknowledge-incident" description="Acknowledge an incident in PagerDuty" />
   <LinkCard title="Annotate Incident" href="#annotate-incident" description="Add a note to an existing incident in PagerDuty" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in PagerDuty" />
+  <LinkCard title="Escalate Incident" href="#escalate-incident" description="Escalate an incident to a specific level (high-urgency only)" />
   <LinkCard title="List Incidents" href="#list-incidents" description="Query PagerDuty to get a list of all open incidents (triggered and acknowledged)" />
   <LinkCard title="List Log Entries" href="#list-log-entries" description="List all log entries (audit trail) for a PagerDuty incident" />
   <LinkCard title="List Notes" href="#list-notes" description="List all notes (timeline entries) for a PagerDuty incident" />
+  <LinkCard title="Resolve Incident" href="#resolve-incident" description="Resolve an incident in PagerDuty" />
   <LinkCard title="Snooze Incident" href="#snooze-incident" description="Snooze an acknowledged incident in PagerDuty" />
   <LinkCard title="Update Incident" href="#update-incident" description="Update an existing incident in PagerDuty" />
 </CardGrid>
@@ -291,6 +294,114 @@ This trigger automatically sets up a PagerDuty webhook subscription when configu
 }
 ```
 
+<a id="acknowledge-incident"></a>
+
+## Acknowledge Incident
+
+The Acknowledge Incident component acknowledges an existing PagerDuty incident.
+
+### Use Cases
+
+- **Incident response**: Acknowledge an incident to stop escalations and indicate someone is working on it
+- **Automated acknowledgement**: Automatically acknowledge incidents based on workflow conditions
+- **Integration workflows**: Acknowledge incidents when related events occur in other systems
+
+### Configuration
+
+- **Incident ID**: The ID of the incident to acknowledge (e.g., A12BC34567...)
+- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+
+### Behavior
+
+When an incident is acknowledged, escalations are paused and the incident status changes to "acknowledged". The incident will remain acknowledged until it is resolved or re-triggered.
+
+### Output
+
+Returns the acknowledged incident object with all current information.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "incident": {
+      "assigned_via": "escalation_policy",
+      "assignments": [
+        {
+          "assignee": {
+            "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
+            "id": "PXPGF42",
+            "self": "https://api.pagerduty.com/users/PXPGF42",
+            "summary": "Earline Greenholt",
+            "type": "user_reference"
+          },
+          "at": "2015-11-10T00:31:52Z"
+        }
+      ],
+      "created_at": "2015-10-06T21:30:42Z",
+      "escalation_policy": {
+        "html_url": "https://subdomain.pagerduty.com/escalation_policies/PT20YPA",
+        "id": "PT20YPA",
+        "self": "https://api.pagerduty.com/escalation_policies/PT20YPA",
+        "summary": "Another Escalation Policy",
+        "type": "escalation_policy_reference"
+      },
+      "first_trigger_log_entry": {
+        "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK/log_entries/Q02JTSNZWHSEKV",
+        "id": "Q02JTSNZWHSEKV",
+        "self": "https://api.pagerduty.com/log_entries/Q02JTSNZWHSEKV?incident_id=PT4KHLK",
+        "summary": "Triggered through the API",
+        "type": "trigger_log_entry_reference"
+      },
+      "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK",
+      "id": "PT4KHLK",
+      "incident_key": "baf7cf21b1da41b4b0221008339ff357",
+      "incident_number": 1234,
+      "last_status_change_at": "2015-10-06T21:38:23Z",
+      "last_status_change_by": {
+        "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
+        "id": "PXPGF42",
+        "self": "https://api.pagerduty.com/users/PXPGF42",
+        "summary": "Earline Greenholt",
+        "type": "user_reference"
+      },
+      "priority": {
+        "id": "P53ZZH5",
+        "self": "https://api.pagerduty.com/priorities/P53ZZH5",
+        "summary": "P2",
+        "type": "priority_reference"
+      },
+      "resolved_at": null,
+      "self": "https://api.pagerduty.com/incidents/PT4KHLK",
+      "service": {
+        "html_url": "https://subdomain.pagerduty.com/service-directory/PWIXJZS",
+        "id": "PWIXJZS",
+        "self": "https://api.pagerduty.com/services/PWIXJZS",
+        "summary": "My Mail Service",
+        "type": "service_reference"
+      },
+      "status": "acknowledged",
+      "summary": "[#1234] The server is on fire.",
+      "teams": [
+        {
+          "html_url": "https://subdomain.pagerduty.com/teams/PQ9K7I8",
+          "id": "PQ9K7I8",
+          "self": "https://api.pagerduty.com/teams/PQ9K7I8",
+          "summary": "Engineering",
+          "type": "team_reference"
+        }
+      ],
+      "title": "The server is on fire.",
+      "type": "incident",
+      "updated_at": "2015-10-06T21:40:23Z",
+      "urgency": "high"
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "pagerduty.incident"
+}
+```
+
 <a id="annotate-incident"></a>
 
 ## Annotate Incident
@@ -509,6 +620,125 @@ Returns the created incident object including:
       "title": "The server is on fire.",
       "type": "incident",
       "updated_at": "2015-10-06T21:40:23Z",
+      "urgency": "high"
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "pagerduty.incident"
+}
+```
+
+<a id="escalate-incident"></a>
+
+## Escalate Incident
+
+The Escalate Incident component escalates an existing PagerDuty incident to a specific escalation level within its current escalation policy.
+
+### Important: High-Urgency Incidents Only
+
+**This action only works on high-urgency incidents.** Low-urgency incidents cannot be escalated in PagerDuty. If you need to reassign a low-urgency incident, use the "Reassign Escalation Policy" action instead.
+
+### What is Escalation?
+
+In PagerDuty, an escalation policy defines a chain of responders:
+- **Level 1**: Primary on-call (e.g., the assigned engineer)
+- **Level 2**: Secondary responder (e.g., team lead)
+- **Level 3**: Tertiary responder (e.g., manager)
+- And so on...
+
+Escalating an incident moves it to a higher level, notifying the responders at that level immediately instead of waiting for the automatic escalation timeout.
+
+### Use Cases
+
+- **Manual escalation**: Escalate when the current responder cannot resolve the issue
+- **Automated escalation**: Automatically escalate based on workflow conditions (e.g., incident age)
+- **Skip levels**: Jump directly to a higher level for critical situations
+
+### Configuration
+
+- **Incident ID**: The ID of the incident to escalate (e.g., A12BC34567...)
+- **Escalation Level**: The level to escalate to (1-10). This is the level number within the incident's current escalation policy.
+- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+
+### Output
+
+Returns the escalated incident object with all current information.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "incident": {
+      "assigned_via": "escalation_policy",
+      "assignments": [
+        {
+          "assignee": {
+            "html_url": "https://subdomain.pagerduty.com/users/PUSER02",
+            "id": "PUSER02",
+            "self": "https://api.pagerduty.com/users/PUSER02",
+            "summary": "Manager Smith",
+            "type": "user_reference"
+          },
+          "at": "2015-10-06T21:42:00Z"
+        }
+      ],
+      "created_at": "2015-10-06T21:30:42Z",
+      "escalation_policy": {
+        "html_url": "https://subdomain.pagerduty.com/escalation_policies/PT20YPA",
+        "id": "PT20YPA",
+        "self": "https://api.pagerduty.com/escalation_policies/PT20YPA",
+        "summary": "Another Escalation Policy",
+        "type": "escalation_policy_reference"
+      },
+      "first_trigger_log_entry": {
+        "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK/log_entries/Q02JTSNZWHSEKV",
+        "id": "Q02JTSNZWHSEKV",
+        "self": "https://api.pagerduty.com/log_entries/Q02JTSNZWHSEKV?incident_id=PT4KHLK",
+        "summary": "Triggered through the API",
+        "type": "trigger_log_entry_reference"
+      },
+      "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK",
+      "id": "PT4KHLK",
+      "incident_key": "baf7cf21b1da41b4b0221008339ff357",
+      "incident_number": 1234,
+      "last_status_change_at": "2015-10-06T21:42:00Z",
+      "last_status_change_by": {
+        "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
+        "id": "PXPGF42",
+        "self": "https://api.pagerduty.com/users/PXPGF42",
+        "summary": "Earline Greenholt",
+        "type": "user_reference"
+      },
+      "priority": {
+        "id": "P53ZZH5",
+        "self": "https://api.pagerduty.com/priorities/P53ZZH5",
+        "summary": "P2",
+        "type": "priority_reference"
+      },
+      "resolved_at": null,
+      "self": "https://api.pagerduty.com/incidents/PT4KHLK",
+      "service": {
+        "html_url": "https://subdomain.pagerduty.com/service-directory/PWIXJZS",
+        "id": "PWIXJZS",
+        "self": "https://api.pagerduty.com/services/PWIXJZS",
+        "summary": "My Mail Service",
+        "type": "service_reference"
+      },
+      "status": "triggered",
+      "summary": "[#1234] The server is on fire.",
+      "teams": [
+        {
+          "html_url": "https://subdomain.pagerduty.com/teams/PQ9K7I8",
+          "id": "PQ9K7I8",
+          "self": "https://api.pagerduty.com/teams/PQ9K7I8",
+          "summary": "Engineering",
+          "type": "team_reference"
+        }
+      ],
+      "title": "The server is on fire.",
+      "type": "incident",
+      "updated_at": "2015-10-06T21:42:00Z",
       "urgency": "high"
     }
   },
@@ -821,6 +1051,104 @@ Returns a list of notes with:
   },
   "timestamp": "2024-01-15T11:05:00Z",
   "type": "pagerduty.notes.list"
+}
+```
+
+<a id="resolve-incident"></a>
+
+## Resolve Incident
+
+The Resolve Incident component resolves an existing PagerDuty incident.
+
+### Use Cases
+
+- **Incident closure**: Resolve an incident when the issue has been fixed
+- **Automated resolution**: Automatically resolve incidents based on recovery signals
+- **Integration workflows**: Resolve incidents when related events occur in other systems
+
+### Configuration
+
+- **Incident ID**: The ID of the incident to resolve (e.g., A12BC34567...)
+- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+- **Resolution Notes**: Optional notes about the resolution (saved to incident description)
+
+### Behavior
+
+When an incident is resolved, the incident status changes to "resolved" and all escalations stop. If resolution notes are provided, they will be saved to the incident description.
+
+### Output
+
+Returns the resolved incident object with all current information.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "incident": {
+      "assigned_via": "escalation_policy",
+      "assignments": [],
+      "created_at": "2015-10-06T21:30:42Z",
+      "escalation_policy": {
+        "html_url": "https://subdomain.pagerduty.com/escalation_policies/PT20YPA",
+        "id": "PT20YPA",
+        "self": "https://api.pagerduty.com/escalation_policies/PT20YPA",
+        "summary": "Another Escalation Policy",
+        "type": "escalation_policy_reference"
+      },
+      "first_trigger_log_entry": {
+        "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK/log_entries/Q02JTSNZWHSEKV",
+        "id": "Q02JTSNZWHSEKV",
+        "self": "https://api.pagerduty.com/log_entries/Q02JTSNZWHSEKV?incident_id=PT4KHLK",
+        "summary": "Triggered through the API",
+        "type": "trigger_log_entry_reference"
+      },
+      "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK",
+      "id": "PT4KHLK",
+      "incident_key": "baf7cf21b1da41b4b0221008339ff357",
+      "incident_number": 1234,
+      "last_status_change_at": "2015-10-06T21:45:00Z",
+      "last_status_change_by": {
+        "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
+        "id": "PXPGF42",
+        "self": "https://api.pagerduty.com/users/PXPGF42",
+        "summary": "Earline Greenholt",
+        "type": "user_reference"
+      },
+      "priority": {
+        "id": "P53ZZH5",
+        "self": "https://api.pagerduty.com/priorities/P53ZZH5",
+        "summary": "P2",
+        "type": "priority_reference"
+      },
+      "resolved_at": "2015-10-06T21:45:00Z",
+      "self": "https://api.pagerduty.com/incidents/PT4KHLK",
+      "service": {
+        "html_url": "https://subdomain.pagerduty.com/service-directory/PWIXJZS",
+        "id": "PWIXJZS",
+        "self": "https://api.pagerduty.com/services/PWIXJZS",
+        "summary": "My Mail Service",
+        "type": "service_reference"
+      },
+      "status": "resolved",
+      "summary": "[#1234] The server is on fire.",
+      "teams": [
+        {
+          "html_url": "https://subdomain.pagerduty.com/teams/PQ9K7I8",
+          "id": "PQ9K7I8",
+          "self": "https://api.pagerduty.com/teams/PQ9K7I8",
+          "summary": "Engineering",
+          "type": "team_reference"
+        }
+      ],
+      "title": "The server is on fire.",
+      "type": "incident",
+      "updated_at": "2015-10-06T21:45:00Z",
+      "urgency": "high"
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "pagerduty.incident"
 }
 ```
 
