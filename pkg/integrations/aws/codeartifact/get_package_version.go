@@ -64,19 +64,38 @@ func (c *GetPackageVersion) Configuration() []configuration.Field {
 		{
 			Name:     "region",
 			Label:    "Region",
-			Type:     configuration.FieldTypeString,
+			Type:     configuration.FieldTypeSelect,
 			Required: true,
 			Default:  "us-east-1",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: RegionsForCodeArtifact,
+				},
+			},
 		},
 		{
 			Name:     "domain",
 			Label:    "Domain",
 			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "region",
+					Values: []string{"*"},
+				},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:           "codeartifact.domain",
 					UseNameAsValue: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+					},
 				},
 			},
 		},
@@ -85,36 +104,80 @@ func (c *GetPackageVersion) Configuration() []configuration.Field {
 			Label:    "Repository",
 			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "region",
+					Values: []string{"*"},
+				},
+				{
+					Field:  "domain",
+					Values: []string{"*"},
+				},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:           "codeartifact.repository",
 					UseNameAsValue: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+						{
+							Name: "domain",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "domain",
+							},
+						},
+					},
 				},
 			},
 		},
 		{
-			Name:     "package",
-			Label:    "Package",
-			Type:     configuration.FieldTypeString,
-			Required: true,
+			Name:        "package",
+			Label:       "Package name",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Placeholder: "e.g. lodash, @my-scope/package (npm), my-python-package (pypi)",
+			Description: "Name of the package in the repository (format-specific, e.g. npm scope/name)",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "repository", Values: []string{"*"}},
+			},
 		},
 		{
 			Name:     "version",
 			Label:    "Version",
 			Type:     configuration.FieldTypeString,
 			Required: true,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "repository", Values: []string{"*"}},
+			},
 		},
 		{
 			Name:     "format",
-			Label:    "Format",
-			Type:     configuration.FieldTypeString,
+			Label:    "Package format",
+			Type:     configuration.FieldTypeSelect,
 			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{Options: PackageFormatOptions},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "repository", Values: []string{"*"}},
+			},
 		},
 		{
 			Name:     "namespace",
 			Label:    "Namespace",
 			Type:     configuration.FieldTypeString,
 			Required: false,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "repository",
+					Values: []string{"*"},
+				},
+			},
 		},
 	}
 }

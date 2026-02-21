@@ -13,6 +13,7 @@ interface IntegrationResourceFieldRendererProps {
   field: ConfigurationField;
   value: string | string[] | undefined;
   onChange: (value: string | string[] | undefined) => void;
+  allValues?: Record<string, unknown>;
   organizationId?: string;
   integrationId?: string;
   allowExpressions?: boolean;
@@ -45,6 +46,7 @@ export const IntegrationResourceFieldRenderer = ({
   field,
   value,
   onChange,
+  allValues,
   organizationId,
   integrationId,
   allowExpressions = false,
@@ -56,16 +58,57 @@ export const IntegrationResourceFieldRenderer = ({
   const useNameAsValue = field.typeOptions?.resource?.useNameAsValue ?? false;
   // Check for multi - be explicit about truthiness since it's a boolean field
   const isMulti = Boolean(field.typeOptions?.resource?.multi);
+  const resourceParameters = field.typeOptions?.resource?.parameters ?? [];
 
   // Fixed vs Expression mode for single-select when expressions are allowed
   const initialIsExpression = allowExpressions && !isMulti && isExpressionValue(value);
   const [useExpressionMode, setUseExpressionMode] = useState(initialIsExpression);
 
+  const additionalQueryParameters = useMemo(() => {
+    if (!resourceParameters.length) return undefined;
+    const parameters: Record<string, string> = {};
+
+    for (const parameter of resourceParameters) {
+      const name = parameter.name?.trim();
+      if (!name) continue;
+
+      let rawValue: unknown;
+      if (parameter.value !== undefined && parameter.value !== "") {
+        rawValue = parameter.value;
+      } else if (parameter.valueFrom?.field) {
+        rawValue = allValues?.[parameter.valueFrom.field];
+      } else {
+        continue;
+      }
+
+      if (rawValue === undefined || rawValue === null) continue;
+
+      if (Array.isArray(rawValue)) {
+        const normalized = rawValue.map((entry) => String(entry)).filter((entry) => entry.length > 0);
+        if (normalized.length === 0) continue;
+        parameters[name] = normalized.join(",");
+        continue;
+      }
+
+      if (typeof rawValue === "string") {
+        if (!rawValue.length) continue;
+        parameters[name] = rawValue;
+        continue;
+      }
+
+      if (typeof rawValue === "number" || typeof rawValue === "boolean") {
+        parameters[name] = String(rawValue);
+      }
+    }
+
+    return parameters;
+  }, [resourceParameters, allValues]);
+
   const {
     data: resources,
     isLoading: isLoadingResources,
     error: resourcesError,
-  } = useIntegrationResources(organizationId ?? "", integrationId ?? "", resourceType ?? "");
+  } = useIntegrationResources(organizationId ?? "", integrationId ?? "", resourceType ?? "", additionalQueryParameters);
 
   // All hooks must be called before any early returns
   // Multi-select options (always compute, even if not used)
@@ -132,20 +175,11 @@ export const IntegrationResourceFieldRenderer = ({
   if (resourcesError) {
     return <div className="text-sm text-red-500 dark:text-red-400">Failed to load resources</div>;
   }
-
-  if (!resources || resources.length === 0) {
-    return (
-      <Select disabled>
-        <SelectTrigger className="w-full">
-          <SelectValue placeholder="No resources available" />
-        </SelectTrigger>
-      </Select>
-    );
-  }
+  const hasResources = Boolean(resources && resources.length > 0);
 
   // Single select mode
   if (!isMulti) {
-    const options: AutoCompleteOption[] = resources
+    const options: AutoCompleteOption[] = (resources ?? [])
       .map((resource) => {
         const optionValue = useNameAsValue
           ? (resource.name ?? resource.id ?? "")
@@ -158,20 +192,26 @@ export const IntegrationResourceFieldRenderer = ({
 
     const selectedValue =
       useNameAsValue && typeof value === "string" && value
-        ? (resources.find((r) => r.id === value)?.name ?? value)
+        ? ((resources ?? []).find((r) => r.id === value)?.name ?? value)
         : typeof value === "string"
           ? value
           : "";
 
     const expressionValue = typeof value === "string" ? value : "";
 
-    const picker = (
+    const picker = hasResources ? (
       <AutoCompleteSelect
         options={options}
         value={selectedValue}
         onChange={(val) => onChange(val || undefined)}
         placeholder={field.placeholder ?? `Select ${resourceType}`}
       />
+    ) : (
+      <Select disabled>
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="No resources available" />
+        </SelectTrigger>
+      </Select>
     );
 
     const expressionInput = (
@@ -227,6 +267,16 @@ export const IntegrationResourceFieldRenderer = ({
   }
 
   // Multi-select mode
+  if (!hasResources) {
+    return (
+      <Select disabled>
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="No resources available" />
+        </SelectTrigger>
+      </Select>
+    );
+  }
+
   // Convert selected values to SelectOption objects
   const selectedOptions: SelectOption[] = currentValue
     .map((val: string) => {

@@ -2,7 +2,6 @@ package lambda
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
@@ -14,8 +13,8 @@ func ListFunctions(ctx core.ListResourcesContext, resourceType string) ([]core.I
 		return nil, err
 	}
 
-	region := common.RegionFromInstallation(ctx.Integration)
-	if strings.TrimSpace(region) == "" {
+	region := ctx.Parameters["region"]
+	if region == "" {
 		return nil, fmt.Errorf("region is required")
 	}
 

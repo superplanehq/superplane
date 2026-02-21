@@ -1000,11 +1000,11 @@ type ApiOrganizationsListIntegrationResourcesRequest struct {
 	ApiService    *OrganizationAPIService
 	id            string
 	integrationId string
-	type_         *string
+	parameters    *string
 }
 
-func (r ApiOrganizationsListIntegrationResourcesRequest) Type_(type_ string) ApiOrganizationsListIntegrationResourcesRequest {
-	r.type_ = &type_
+func (r ApiOrganizationsListIntegrationResourcesRequest) Parameters(parameters string) ApiOrganizationsListIntegrationResourcesRequest {
+	r.parameters = &parameters
 	return r
 }
 
@@ -1055,8 +1055,8 @@ func (a *OrganizationAPIService) OrganizationsListIntegrationResourcesExecute(r 
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
-	if r.type_ != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "type", r.type_, "", "")
+	if r.parameters != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "parameters", r.parameters, "", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}

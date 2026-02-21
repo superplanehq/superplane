@@ -20,10 +20,10 @@ var _ MappedNullable = &IntegrationNodeRef{}
 
 // IntegrationNodeRef struct for IntegrationNodeRef
 type IntegrationNodeRef struct {
-	WorkflowId   *string `json:"workflowId,omitempty"`
-	WorkflowName *string `json:"workflowName,omitempty"`
-	NodeId       *string `json:"nodeId,omitempty"`
-	NodeName     *string `json:"nodeName,omitempty"`
+	CanvasId   *string `json:"canvasId,omitempty"`
+	CanvasName *string `json:"canvasName,omitempty"`
+	NodeId     *string `json:"nodeId,omitempty"`
+	NodeName   *string `json:"nodeName,omitempty"`
 }
 
 // NewIntegrationNodeRef instantiates a new IntegrationNodeRef object
@@ -43,68 +43,68 @@ func NewIntegrationNodeRefWithDefaults() *IntegrationNodeRef {
 	return &this
 }
 
-// GetWorkflowId returns the WorkflowId field value if set, zero value otherwise.
-func (o *IntegrationNodeRef) GetWorkflowId() string {
-	if o == nil || IsNil(o.WorkflowId) {
+// GetCanvasId returns the CanvasId field value if set, zero value otherwise.
+func (o *IntegrationNodeRef) GetCanvasId() string {
+	if o == nil || IsNil(o.CanvasId) {
 		var ret string
 		return ret
 	}
-	return *o.WorkflowId
+	return *o.CanvasId
 }
 
-// GetWorkflowIdOk returns a tuple with the WorkflowId field value if set, nil otherwise
+// GetCanvasIdOk returns a tuple with the CanvasId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *IntegrationNodeRef) GetWorkflowIdOk() (*string, bool) {
-	if o == nil || IsNil(o.WorkflowId) {
+func (o *IntegrationNodeRef) GetCanvasIdOk() (*string, bool) {
+	if o == nil || IsNil(o.CanvasId) {
 		return nil, false
 	}
-	return o.WorkflowId, true
+	return o.CanvasId, true
 }
 
-// HasWorkflowId returns a boolean if a field has been set.
-func (o *IntegrationNodeRef) HasWorkflowId() bool {
-	if o != nil && !IsNil(o.WorkflowId) {
+// HasCanvasId returns a boolean if a field has been set.
+func (o *IntegrationNodeRef) HasCanvasId() bool {
+	if o != nil && !IsNil(o.CanvasId) {
 		return true
 	}
 
 	return false
 }
 
-// SetWorkflowId gets a reference to the given string and assigns it to the WorkflowId field.
-func (o *IntegrationNodeRef) SetWorkflowId(v string) {
-	o.WorkflowId = &v
+// SetCanvasId gets a reference to the given string and assigns it to the CanvasId field.
+func (o *IntegrationNodeRef) SetCanvasId(v string) {
+	o.CanvasId = &v
 }
 
-// GetWorkflowName returns the WorkflowName field value if set, zero value otherwise.
-func (o *IntegrationNodeRef) GetWorkflowName() string {
-	if o == nil || IsNil(o.WorkflowName) {
+// GetCanvasName returns the CanvasName field value if set, zero value otherwise.
+func (o *IntegrationNodeRef) GetCanvasName() string {
+	if o == nil || IsNil(o.CanvasName) {
 		var ret string
 		return ret
 	}
-	return *o.WorkflowName
+	return *o.CanvasName
 }
 
-// GetWorkflowNameOk returns a tuple with the WorkflowName field value if set, nil otherwise
+// GetCanvasNameOk returns a tuple with the CanvasName field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *IntegrationNodeRef) GetWorkflowNameOk() (*string, bool) {
-	if o == nil || IsNil(o.WorkflowName) {
+func (o *IntegrationNodeRef) GetCanvasNameOk() (*string, bool) {
+	if o == nil || IsNil(o.CanvasName) {
 		return nil, false
 	}
-	return o.WorkflowName, true
+	return o.CanvasName, true
 }
 
-// HasWorkflowName returns a boolean if a field has been set.
-func (o *IntegrationNodeRef) HasWorkflowName() bool {
-	if o != nil && !IsNil(o.WorkflowName) {
+// HasCanvasName returns a boolean if a field has been set.
+func (o *IntegrationNodeRef) HasCanvasName() bool {
+	if o != nil && !IsNil(o.CanvasName) {
 		return true
 	}
 
 	return false
 }
 
-// SetWorkflowName gets a reference to the given string and assigns it to the WorkflowName field.
-func (o *IntegrationNodeRef) SetWorkflowName(v string) {
-	o.WorkflowName = &v
+// SetCanvasName gets a reference to the given string and assigns it to the CanvasName field.
+func (o *IntegrationNodeRef) SetCanvasName(v string) {
+	o.CanvasName = &v
 }
 
 // GetNodeId returns the NodeId field value if set, zero value otherwise.
@@ -181,11 +181,11 @@ func (o IntegrationNodeRef) MarshalJSON() ([]byte, error) {
 
 func (o IntegrationNodeRef) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.WorkflowId) {
-		toSerialize["workflowId"] = o.WorkflowId
+	if !IsNil(o.CanvasId) {
+		toSerialize["canvasId"] = o.CanvasId
 	}
-	if !IsNil(o.WorkflowName) {
-		toSerialize["workflowName"] = o.WorkflowName
+	if !IsNil(o.CanvasName) {
+		toSerialize["canvasName"] = o.CanvasName
 	}
 	if !IsNil(o.NodeId) {
 		toSerialize["nodeId"] = o.NodeId

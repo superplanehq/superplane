@@ -176,6 +176,14 @@ func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters an
 }
 
 func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
+	subscriptions := make([]core.IntegrationSubscriptionContext, 0, len(c.Subscriptions))
+	for _, subscription := range c.Subscriptions {
+		subscriptions = append(subscriptions, &SubscriptionContext{config: subscription.Configuration})
+	}
+	return subscriptions, nil
+}
+
+func (c *IntegrationContext) FindSubscription(predicate func(core.IntegrationSubscriptionContext) bool) (core.IntegrationSubscriptionContext, error) {
 	return nil, nil
 }
 
@@ -183,6 +191,20 @@ func (c *IntegrationContext) Subscribe(subscription any) (*uuid.UUID, error) {
 	s := Subscription{ID: uuid.New(), Configuration: subscription}
 	c.Subscriptions = append(c.Subscriptions, s)
 	return &s.ID, nil
+}
+
+type SubscriptionContext struct {
+	config   any
+	messages []any
+}
+
+func (s *SubscriptionContext) Configuration() any {
+	return s.config
+}
+
+func (s *SubscriptionContext) SendMessage(message any) error {
+	s.messages = append(s.messages, message)
+	return nil
 }
 
 type ExecutionStateContext struct {

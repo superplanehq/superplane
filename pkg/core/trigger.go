@@ -115,14 +115,21 @@ type WebhookRequestContext struct {
 	WorkflowID    string
 	NodeID        string
 	Configuration any
+	Metadata      MetadataContext
+	Logger        *log.Entry
 	Webhook       NodeWebhookContext
 	Events        EventContext
+	Integration   IntegrationContext
 
 	//
 	// Return an execution context for a given execution,
 	// through a referencing key-value pair.
 	//
 	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
+
+	// Do not make HTTP calls as part of handling the webhook. This is useful for
+	// retrieving more data that is not part of the webhook payload.
+	HTTP HTTPContext
 }
 
 type NodeWebhookContext interface {

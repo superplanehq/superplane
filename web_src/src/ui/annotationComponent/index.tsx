@@ -362,7 +362,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                         <pre className="bg-black/10 p-2 rounded text-xs overflow-auto mb-2">{children}</pre>
                       ),
                       a: ({ children, href }) => (
-                        <a href={href} className="underline text-blue-600">
+                        <a target="_blank" rel="noopener noreferrer" href={href} className="underline text-blue-600">
                           {children}
                         </a>
                       ),

@@ -14,6 +14,7 @@ export interface SwitchStage {
 
 export interface SwitchComponentProps extends ComponentActionsProps {
   title?: string;
+  showHeader?: boolean;
   stages: SwitchStage[];
   collapsed?: boolean;
   selected?: boolean;
@@ -31,6 +32,7 @@ const HANDLE_STYLE = {
 
 export const SwitchComponent: React.FC<SwitchComponentProps> = ({
   title = "Branch processed events",
+  showHeader,
   stages,
   collapsed = false,
   selected = false,
@@ -91,6 +93,7 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
     <ComponentBase
       title={title}
       iconSlug="git-branch"
+      showHeader={showHeader}
       specs={specs}
       eventSections={eventSections}
       collapsed={collapsed}

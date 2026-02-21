@@ -85,7 +85,7 @@ func InvokeNodeExecutionAction(
 		Name:           actionName,
 		Parameters:     parameters,
 		Configuration:  node.Configuration.Data(),
-		HTTP:           contexts.NewHTTPContext(registry.GetHTTPClient()),
+		HTTP:           registry.HTTPContext(),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
 		Auth:           contexts.NewAuthContext(tx, orgID, authService, user),

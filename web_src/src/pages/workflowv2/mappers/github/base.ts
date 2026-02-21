@@ -1,34 +1,32 @@
-import {
-  ComponentsNode,
-  ComponentsComponent,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { MetadataItem } from "@/ui/metadataList";
-import { OutputPayload, ComponentBaseMapper } from "../types";
+import {
+  OutputPayload,
+  ComponentBaseMapper,
+  ComponentBaseContext,
+  SubtitleContext,
+  ExecutionDetailsContext,
+  NodeInfo,
+  ComponentDefinition,
+  ExecutionInfo,
+} from "../types";
 import { Issue } from "./types";
 import { buildGithubExecutionSubtitle } from "./utils";
 
 export const baseIssueMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    queueItems: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    return baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
-  },
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    return buildGithubExecutionSubtitle(execution);
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  subtitle(context: SubtitleContext): string {
+    return buildGithubExecutionSubtitle(context.execution);
+  },
+
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const details: Record<string, string> = {};
 
     if (!outputs || !outputs.default || outputs.default.length === 0) {
@@ -41,14 +39,13 @@ export const baseIssueMapper: ComponentBaseMapper = {
 };
 
 export function baseProps(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  componentDefinition: ComponentsComponent,
-  lastExecutions: CanvasesCanvasNodeExecution[],
-  _?: CanvasesCanvasNodeQueueItem[],
+  nodes: NodeInfo[],
+  node: NodeInfo,
+  componentDefinition: ComponentDefinition,
+  lastExecutions: ExecutionInfo[],
 ): ComponentBaseProps {
   const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-  const componentName = componentDefinition.name || node.component?.name || "unknown";
+  const componentName = componentDefinition.name || node.componentName || "unknown";
 
   return {
     iconSrc: githubIcon,
@@ -93,7 +90,7 @@ export function getDetailsForIssue(issue: Issue): Record<string, string> {
   return details;
 }
 
-function metadataList(node: ComponentsNode): MetadataItem[] {
+function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as any;
 
@@ -104,14 +101,10 @@ function metadataList(node: ComponentsNode): MetadataItem[] {
   return metadata;
 }
 
-function baseEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
-  componentName: string,
-): EventSection[] {
+function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   return [
     {

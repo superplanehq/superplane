@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -91,15 +92,16 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, webhoo
 		return err
 	}
 
-	integration, err := w.registry.GetIntegration(instance.AppName)
+	handler, err := w.registry.GetWebhookHandler(instance.AppName)
 	if err != nil {
 		return err
 	}
 
-	err = integration.CleanupWebhook(core.CleanupWebhookContext{
-		HTTP:        contexts.NewHTTPContext(w.registry.GetHTTPClient()),
-		Webhook:     contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
+	err = handler.Cleanup(core.WebhookHandlerContext{
+		HTTP:        w.registry.HTTPContext(),
 		Integration: contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry),
+		Webhook:     contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
+		Logger:      logging.ForIntegration(*instance),
 	})
 
 	if err != nil {

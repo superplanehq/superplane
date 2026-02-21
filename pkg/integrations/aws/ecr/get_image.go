@@ -69,9 +69,14 @@ func (c *GetImage) Configuration() []configuration.Field {
 		{
 			Name:     "region",
 			Label:    "Region",
-			Type:     configuration.FieldTypeString,
+			Type:     configuration.FieldTypeSelect,
 			Required: true,
 			Default:  "us-east-1",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: common.AllRegions,
+				},
+			},
 		},
 		{
 			Name:        "repository",
@@ -79,10 +84,24 @@ func (c *GetImage) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "ECR repository name or ARN",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "region",
+					Values: []string{"*"},
+				},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:           "ecr.repository",
 					UseNameAsValue: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+					},
 				},
 			},
 		},
@@ -92,6 +111,16 @@ func (c *GetImage) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Placeholder: "sha256:...",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "region",
+					Values: []string{"*"},
+				},
+				{
+					Field:  "repository",
+					Values: []string{"*"},
+				},
+			},
 		},
 		{
 			Name:        "imageTag",
@@ -99,6 +128,16 @@ func (c *GetImage) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Placeholder: "latest",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "region",
+					Values: []string{"*"},
+				},
+				{
+					Field:  "repository",
+					Values: []string{"*"},
+				},
+			},
 		},
 	}
 }

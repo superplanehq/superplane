@@ -11,6 +11,7 @@ import (
 	pbOrganization "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecrets "github.com/superplanehq/superplane/pkg/protos/secrets"
+	pbServiceAccounts "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -38,11 +39,14 @@ type AuthorizationInterceptor struct {
 func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterceptor {
 	rules := map[string]AuthorizationRule{
 		// Secrets rules
-		pbSecrets.Secrets_CreateSecret_FullMethodName:   {Resource: "secrets", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbSecrets.Secrets_UpdateSecret_FullMethodName:   {Resource: "secrets", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbSecrets.Secrets_DescribeSecret_FullMethodName: {Resource: "secrets", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbSecrets.Secrets_ListSecrets_FullMethodName:    {Resource: "secrets", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbSecrets.Secrets_DeleteSecret_FullMethodName:   {Resource: "secrets", Action: "delete", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_CreateSecret_FullMethodName:     {Resource: "secrets", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_UpdateSecret_FullMethodName:     {Resource: "secrets", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_DescribeSecret_FullMethodName:   {Resource: "secrets", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_ListSecrets_FullMethodName:      {Resource: "secrets", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_DeleteSecret_FullMethodName:     {Resource: "secrets", Action: "delete", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_SetSecretKey_FullMethodName:     {Resource: "secrets", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_DeleteSecretKey_FullMethodName:  {Resource: "secrets", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_UpdateSecretName_FullMethodName: {Resource: "secrets", Action: "update", DomainType: models.DomainTypeOrganization},
 
 		// Groups rules
 		pbGroups.Groups_CreateGroup_FullMethodName:         {Resource: "groups", Action: "create", DomainType: models.DomainTypeOrganization},
@@ -111,6 +115,14 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbCanvases.Canvases_InvokeNodeTriggerAction_FullMethodName:   {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbCanvases.Canvases_ListNodeEvents_FullMethodName:            {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbCanvases.Canvases_EmitNodeEvent_FullMethodName:             {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
+
+		// Service Accounts rules
+		pbServiceAccounts.ServiceAccounts_CreateServiceAccount_FullMethodName:          {Resource: "service_accounts", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbServiceAccounts.ServiceAccounts_ListServiceAccounts_FullMethodName:           {Resource: "service_accounts", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbServiceAccounts.ServiceAccounts_DescribeServiceAccount_FullMethodName:        {Resource: "service_accounts", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbServiceAccounts.ServiceAccounts_UpdateServiceAccount_FullMethodName:          {Resource: "service_accounts", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbServiceAccounts.ServiceAccounts_DeleteServiceAccount_FullMethodName:          {Resource: "service_accounts", Action: "delete", DomainType: models.DomainTypeOrganization},
+		pbServiceAccounts.ServiceAccounts_RegenerateServiceAccountToken_FullMethodName: {Resource: "service_accounts", Action: "update", DomainType: models.DomainTypeOrganization},
 	}
 
 	return &AuthorizationInterceptor{

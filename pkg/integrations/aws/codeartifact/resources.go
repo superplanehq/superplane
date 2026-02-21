@@ -2,7 +2,6 @@ package codeartifact
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
@@ -14,13 +13,18 @@ func ListRepositories(ctx core.ListResourcesContext, resourceType string) ([]cor
 		return nil, err
 	}
 
-	region := common.RegionFromInstallation(ctx.Integration)
-	if strings.TrimSpace(region) == "" {
+	region := ctx.Parameters["region"]
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	domain := ctx.Parameters["domain"]
+	if region == "" {
 		return nil, fmt.Errorf("region is required")
 	}
 
 	client := NewClient(ctx.HTTP, creds, region)
-	repositories, err := client.ListRepositories()
+	repositories, err := client.ListRepositories(domain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list codeartifact repositories: %w", err)
 	}
@@ -43,8 +47,8 @@ func ListDomains(ctx core.ListResourcesContext, resourceType string) ([]core.Int
 		return nil, err
 	}
 
-	region := common.RegionFromInstallation(ctx.Integration)
-	if strings.TrimSpace(region) == "" {
+	region := ctx.Parameters["region"]
+	if region == "" {
 		return nil, fmt.Errorf("region is required")
 	}
 

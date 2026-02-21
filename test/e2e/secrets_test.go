@@ -1,0 +1,350 @@
+package e2e
+
+import (
+	"context"
+	"encoding/json"
+	"os"
+	"testing"
+
+	pw "github.com/playwright-community/playwright-go"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/secrets"
+	q "github.com/superplanehq/superplane/test/e2e/queries"
+	"github.com/superplanehq/superplane/test/e2e/session"
+)
+
+func TestSecrets(t *testing.T) {
+	steps := &SecretsSteps{t: t}
+
+	t.Run("creating a new secret", func(t *testing.T) {
+		steps.start()
+		steps.visitSecretsPage()
+		steps.clickCreateSecret()
+		steps.fillSecretName("E2E Test Secret")
+		steps.fillKeyValuePair(0, "API_KEY", "test-api-key-value")
+		steps.submitCreateSecret()
+		steps.assertSecretSavedInDB("E2E Test Secret", map[string]string{"API_KEY": "test-api-key-value"})
+		steps.assertSecretVisibleInList("E2E Test Secret")
+	})
+
+	t.Run("adding a key/value pair to a secret", func(t *testing.T) {
+		steps.start()
+		steps.visitSecretsPage()
+		steps.givenASecretExists("E2E Test Secret 2", map[string]string{"KEY1": "value1"})
+		steps.clickAddKey()
+		steps.fillAddKeyForm("KEY2", "value2")
+		steps.submitAddKey()
+		steps.assertSecretSavedInDB("E2E Test Secret 2", map[string]string{"KEY1": "value1", "KEY2": "value2"})
+	})
+
+	t.Run("removing a key/value pair from a secret", func(t *testing.T) {
+		steps.start()
+		steps.visitSecretsPage()
+		steps.givenASecretExists("E2E Test Secret 3", map[string]string{"KEY1": "value1", "KEY2": "value2"})
+		steps.clickRemoveKeyOnDetail(0)
+		steps.assertSecretSavedInDB("E2E Test Secret 3", map[string]string{"KEY2": "value2"})
+	})
+
+	t.Run("edit a key/value pair from a secret", func(t *testing.T) {
+		steps.start()
+		steps.visitSecretsPage()
+		steps.givenASecretExists("E2E Test Secret 4", map[string]string{"KEY1": "old-value"})
+		steps.clickEditKeyOnDetail(0)
+		steps.fillEditingValue("new-value")
+		steps.submitEditKey()
+		steps.assertSecretSavedInDB("E2E Test Secret 4", map[string]string{"KEY1": "new-value"})
+	})
+
+	t.Run("updating the secret name", func(t *testing.T) {
+		steps.start()
+		steps.visitSecretsPage()
+		steps.givenASecretExists("E2E Test Secret 5", map[string]string{"KEY1": "value1"})
+		steps.clickEditSecretName()
+		steps.fillSecretNameInput("E2E Test Secret 5 Renamed")
+		steps.submitEditSecretName()
+		steps.assertSecretSavedInDB("E2E Test Secret 5 Renamed", map[string]string{"KEY1": "value1"})
+		steps.assertSecretVisibleInList("E2E Test Secret 5 Renamed")
+		steps.assertSecretNotVisibleInList("E2E Test Secret 5")
+	})
+
+	t.Run("deleting a secret", func(t *testing.T) {
+		steps.start()
+		steps.visitSecretsPage()
+		steps.givenASecretExists("E2E Test Secret 6", map[string]string{"KEY1": "value1"})
+		steps.assertSecretVisibleInList("E2E Test Secret 6")
+		steps.clickDeleteSecret("E2E Test Secret 6")
+		steps.assertSecretDeletedFromDB("E2E Test Secret 6")
+		steps.assertSecretNotVisibleInList("E2E Test Secret 6")
+	})
+}
+
+type SecretsSteps struct {
+	t       *testing.T
+	session *session.TestSession
+}
+
+func (s *SecretsSteps) start() {
+	s.session = ctx.NewSession(s.t)
+	s.session.Start()
+	s.session.Login()
+}
+
+func (s *SecretsSteps) visitSecretsPage() {
+	s.session.Visit("/" + s.session.OrgID.String() + "/settings/secrets")
+	s.session.Sleep(500)
+}
+
+func (s *SecretsSteps) clickCreateSecret() {
+	page := s.session.Page()
+	createBtn := page.GetByTestId("secrets-create-btn")
+	err := createBtn.First().Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(500)
+}
+
+func (s *SecretsSteps) fillSecretName(name string) {
+	page := s.session.Page()
+	err := page.GetByTestId("secrets-create-name").Fill(name)
+	require.NoError(s.t, err)
+	s.session.Sleep(300)
+}
+
+func (s *SecretsSteps) fillKeyValuePair(index int, key, value string) {
+	page := s.session.Page()
+	keyInput := page.GetByTestId("secrets-create-key").Nth(index)
+	err := keyInput.Fill(key)
+	require.NoError(s.t, err)
+	s.session.Sleep(200)
+	valueTextarea := page.GetByTestId("secrets-create-value").Nth(index)
+	err = valueTextarea.Fill(value)
+	require.NoError(s.t, err)
+	s.session.Sleep(200)
+}
+
+func (s *SecretsSteps) clickAddPair() {
+	page := s.session.Page()
+	err := page.GetByTestId("secrets-create-add-pair").Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(300)
+}
+
+// clickAddKey clicks "Add key" on the secret detail page to show the add-key form.
+func (s *SecretsSteps) clickAddKey() {
+	page := s.session.Page()
+	addKeyBtn := page.GetByTestId("secret-detail-add-key")
+	err := addKeyBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
+	require.NoError(s.t, err)
+	err = addKeyBtn.Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(300)
+}
+
+// fillAddKeyForm fills the key name and value in the add-key form on the secret detail page.
+func (s *SecretsSteps) fillAddKeyForm(key, value string) {
+	page := s.session.Page()
+	err := page.GetByTestId("secret-detail-add-key-name").Fill(key)
+	require.NoError(s.t, err)
+	s.session.Sleep(200)
+	err = page.GetByTestId("secret-detail-add-value").Fill(value)
+	require.NoError(s.t, err)
+	s.session.Sleep(200)
+}
+
+// submitAddKey clicks Save in the add-key form on the secret detail page.
+func (s *SecretsSteps) submitAddKey() {
+	page := s.session.Page()
+	err := page.GetByTestId("secret-detail-add-save").Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(500)
+}
+
+// clickRemoveKeyOnDetail clicks the Nth "Remove key" button on the secret detail page (removes that key immediately).
+func (s *SecretsSteps) clickRemoveKeyOnDetail(index int) {
+	page := s.session.Page()
+	removeBtn := page.GetByTestId("secret-detail-remove-key").Nth(index)
+	err := removeBtn.Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(500)
+}
+
+// clickEditKeyOnDetail clicks the Nth "Edit value" button on the secret detail page to expand the edit form.
+func (s *SecretsSteps) clickEditKeyOnDetail(index int) {
+	page := s.session.Page()
+	editBtn := page.GetByTestId("secret-detail-edit-key").Nth(index)
+	err := editBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
+	require.NoError(s.t, err)
+	err = editBtn.Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(300)
+}
+
+// fillEditingValue fills the value textarea in the edit form on the secret detail page.
+func (s *SecretsSteps) fillEditingValue(value string) {
+	page := s.session.Page()
+	err := page.GetByTestId("secret-detail-edit-value").Fill(value)
+	require.NoError(s.t, err)
+	s.session.Sleep(200)
+}
+
+// submitEditKey clicks Save in the edit form on the secret detail page.
+func (s *SecretsSteps) submitEditKey() {
+	page := s.session.Page()
+	err := page.GetByTestId("secret-detail-edit-save").Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(500)
+}
+
+// clickEditSecretName clicks the edit-name (pencil) button on the secret detail page to show the name input.
+func (s *SecretsSteps) clickEditSecretName() {
+	page := s.session.Page()
+	editNameBtn := page.GetByTestId("secret-detail-edit-name")
+	err := editNameBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
+	require.NoError(s.t, err)
+	err = editNameBtn.Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(300)
+}
+
+// fillSecretNameInput fills the secret name input in the inline edit form on the secret detail page.
+func (s *SecretsSteps) fillSecretNameInput(name string) {
+	page := s.session.Page()
+	err := page.GetByTestId("secret-detail-edit-name-input").Fill(name)
+	require.NoError(s.t, err)
+	s.session.Sleep(200)
+}
+
+// submitEditSecretName clicks Save in the secret name edit form on the secret detail page.
+func (s *SecretsSteps) submitEditSecretName() {
+	page := s.session.Page()
+	err := page.GetByTestId("secret-detail-edit-name-save").Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(500)
+}
+
+func (s *SecretsSteps) removeKeyValuePair(index int) {
+	page := s.session.Page()
+	err := page.GetByTestId("secrets-create-remove-pair").Nth(index).Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(300)
+}
+
+func (s *SecretsSteps) submitCreateSecret() {
+	page := s.session.Page()
+	createBtn := page.GetByTestId("secrets-create-submit")
+	err := createBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
+	require.NoError(s.t, err)
+	s.session.Sleep(300)
+	err = createBtn.Click()
+	require.NoError(s.t, err)
+
+	// Wait for the modal to close (indicating success) or for an error message
+	// The modal has class "fixed inset-0", so we wait for it to disappear
+	modal := page.Locator(".fixed.inset-0")
+	if err := modal.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateHidden, Timeout: pw.Float(5000)}); err != nil {
+		// Modal didn't close - check for error message
+		errorMsg := page.Locator("text=/Failed to create secret/")
+		if count, _ := errorMsg.Count(); count > 0 {
+			s.t.Fatalf("secret creation failed with error message")
+		}
+		s.t.Fatalf("modal did not close after submitting: %v", err)
+	}
+
+	s.session.Sleep(500)
+}
+
+func (s *SecretsSteps) submitUpdateSecret() {
+	page := s.session.Page()
+	s.session.Click(q.Text("Update Secret"))
+	modal := page.Locator(".fixed.inset-0")
+	if err := modal.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateHidden, Timeout: pw.Float(5000)}); err != nil {
+		errorMsg := page.Locator("text=/Failed to update secret/")
+		if count, _ := errorMsg.Count(); count > 0 {
+			s.t.Fatalf("secret update failed with error message")
+		}
+		s.t.Fatalf("modal did not close after update: %v", err)
+	}
+	s.session.Sleep(500)
+}
+
+func (s *SecretsSteps) clickEditSecret(secretName string) {
+	s.visitSecretsPage()
+	page := s.session.Page()
+	link := page.GetByTestId("secrets-secret-link").GetByText(secretName, pw.LocatorGetByTextOptions{Exact: pw.Bool(true)})
+	err := link.Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(500)
+}
+
+func (s *SecretsSteps) clickDeleteSecret(secretName string) {
+	s.clickEditSecret(secretName)
+	page := s.session.Page()
+	err := page.GetByTestId("secret-detail-delete").Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(500)
+}
+
+func (s *SecretsSteps) assertSecretSavedInDB(name string, expectedData map[string]string) {
+	secret, err := models.FindSecretByName(models.DomainTypeOrganization, s.session.OrgID, name)
+	require.NoError(s.t, err)
+	require.Equal(s.t, name, secret.Name)
+	require.Equal(s.t, models.DomainTypeOrganization, secret.DomainType)
+	require.Equal(s.t, s.session.OrgID.String(), secret.DomainID.String())
+
+	// Secrets created via UI are encrypted; decrypt before comparing
+	encryptor := encryptorFromEnv()
+	decrypted, err := encryptor.Decrypt(context.Background(), secret.Data, []byte(secret.Name))
+	require.NoError(s.t, err)
+	var secretData map[string]string
+	err = json.Unmarshal(decrypted, &secretData)
+	require.NoError(s.t, err)
+	require.Equal(s.t, expectedData, secretData)
+}
+
+func (s *SecretsSteps) assertSecretDeletedFromDB(name string) {
+	_, err := models.FindSecretByName(models.DomainTypeOrganization, s.session.OrgID, name)
+	require.Error(s.t, err)
+	require.Contains(s.t, err.Error(), "record not found")
+}
+
+func (s *SecretsSteps) assertSecretVisibleInList(name string) {
+	s.visitSecretsPage()
+	s.session.AssertText(name)
+}
+
+func (s *SecretsSteps) assertSecretNotVisibleInList(name string) {
+	s.visitSecretsPage()
+	s.session.Sleep(500)
+	// Use exact match so "E2E Test Secret 5" does not match "E2E Test Secret 5 Renamed"
+	locator := s.session.Page().GetByText(name, pw.PageGetByTextOptions{Exact: pw.Bool(true)})
+	count, err := locator.Count()
+	require.NoError(s.t, err)
+	require.Equal(s.t, 0, count, "secret %q should not be visible in the list", name)
+}
+
+// encryptorFromEnv returns the same encryptor the app uses (from NO_ENCRYPTION / ENCRYPTION_KEY),
+// used to decrypt secret data when asserting DB state after UI-created secrets.
+func encryptorFromEnv() crypto.Encryptor {
+	if os.Getenv("NO_ENCRYPTION") == "yes" {
+		return crypto.NewNoOpEncryptor()
+	}
+	key := os.Getenv("ENCRYPTION_KEY")
+	if key == "" {
+		panic("ENCRYPTION_KEY must be set when NO_ENCRYPTION is not yes")
+	}
+	return crypto.NewAESGCMEncryptor([]byte(key))
+}
+
+// givenASecretExists creates a secret directly in the DB (same format as app), then opens the secret detail page.
+// Call after visitSecretsPage(); leaves the user on the secret detail page.
+func (s *SecretsSteps) givenASecretExists(name string, data map[string]string) {
+	encryptor := encryptorFromEnv()
+	raw, err := json.Marshal(data)
+	require.NoError(s.t, err)
+	encrypted, err := encryptor.Encrypt(context.Background(), raw, []byte(name))
+	require.NoError(s.t, err)
+	_, err = models.CreateSecret(name, secrets.ProviderLocal, s.session.Account.ID.String(), models.DomainTypeOrganization, s.session.OrgID, encrypted)
+	require.NoError(s.t, err)
+	s.clickEditSecret(name)
+}

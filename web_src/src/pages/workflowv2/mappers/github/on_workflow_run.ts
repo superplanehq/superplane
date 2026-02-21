@@ -1,6 +1,5 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer } from "../types";
+import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata } from "./types";
@@ -53,8 +52,8 @@ interface OnWorkflowRunEventData {
  * Renderer for the "github.onWorkflowRun" trigger
  */
 export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as OnWorkflowRunEventData;
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventData = context.event?.data as OnWorkflowRunEventData;
     const workflowName =
       eventData?.workflow_run?.display_title ||
       eventData?.workflow_run?.name ||
@@ -64,13 +63,13 @@ export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
 
     return {
       title: workflowName,
-      subtitle: buildGithubSubtitle(conclusion, event.createdAt),
+      subtitle: buildGithubSubtitle(conclusion, context.event?.createdAt),
     };
   },
 
-  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as OnWorkflowRunEventData;
-    const receivedAt = lastEvent.createdAt ? new Date(lastEvent.createdAt).toLocaleString() : "";
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const eventData = context.event?.data as OnWorkflowRunEventData;
+    const receivedAt = context.event?.createdAt ? new Date(context.event?.createdAt || "").toLocaleString() : "";
 
     return {
       "Received at": receivedAt,
@@ -80,7 +79,8 @@ export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as OnWorkflowRunConfiguration;
     const metadataItems = [];
@@ -115,16 +115,16 @@ export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
         : undefined;
 
     const props: TriggerProps = {
-      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
+      title: node.name || definition.label || "Unnamed trigger",
       iconSrc: githubIcon,
-      iconColor: getColorClass(trigger.color),
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      iconColor: getColorClass(definition.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
       specs,
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnWorkflowRunEventData;
+      const eventData = lastEvent.data as OnWorkflowRunEventData;
       const workflowName =
         eventData?.workflow_run?.display_title ||
         eventData?.workflow_run?.name ||
@@ -135,9 +135,9 @@ export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
       props.lastEventData = {
         title: workflowName,
         subtitle: buildGithubSubtitle(conclusion, lastEvent.createdAt),
-        receivedAt: new Date(lastEvent.createdAt!),
+        receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 

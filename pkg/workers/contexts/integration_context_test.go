@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"slices"
 	"testing"
@@ -80,8 +81,9 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 	r := support.Setup(t)
 	defer r.Close()
 
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
-		OnCompareWebhookConfig: func(a, b any) (bool, error) {
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = support.NewDummyWebhookHandler(support.DummyWebhookHandlerOptions{
+		CompareConfigFunc: func(a, b any) (bool, error) {
 			return reflect.DeepEqual(a, b), nil
 		},
 	})
@@ -147,4 +149,107 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 	require.NoError(t, err)
 	require.False(t, newWebhook.DeletedAt.Valid)
 	assert.Equal(t, newConfig, newWebhook.Configuration.Data())
+}
+
+func Test__IntegrationContext_RequestWebhook_MergesExistingWebhookConfig(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = support.NewDummyWebhookHandler(support.DummyWebhookHandlerOptions{
+		CompareConfigFunc: func(a, b any) (bool, error) {
+			return true, nil
+		},
+		MergeFunc: func(current, requested any) (any, bool, error) {
+			currentMap := current.(map[string]any)
+			requestedMap := requested.(map[string]any)
+
+			currentEvents := []string{}
+			switch values := currentMap["eventTypes"].(type) {
+			case []string:
+				currentEvents = append(currentEvents, values...)
+			case []any:
+				for _, item := range values {
+					if eventType, ok := item.(string); ok {
+						currentEvents = append(currentEvents, eventType)
+					}
+				}
+			}
+
+			requestedEvents := []string{}
+			switch values := requestedMap["eventTypes"].(type) {
+			case []string:
+				requestedEvents = append(requestedEvents, values...)
+			case []any:
+				for _, item := range values {
+					if eventType, ok := item.(string); ok {
+						requestedEvents = append(requestedEvents, eventType)
+					}
+				}
+			}
+
+			events := append(currentEvents, requestedEvents...)
+			slices.Sort(events)
+			events = slices.Compact(events)
+
+			return map[string]any{"eventTypes": events}, len(events) != len(currentEvents), nil
+		},
+	})
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	webhookID := uuid.New()
+	_, encryptedKey, err := crypto.NewRandomKey(context.Background(), r.Encryptor, webhookID.String())
+	require.NoError(t, err)
+
+	now := time.Now()
+	webhook := models.Webhook{
+		ID:                webhookID,
+		State:             models.WebhookStateReady,
+		Secret:            encryptedKey,
+		Configuration:     datatypes.NewJSONType[any](map[string]any{"eventTypes": []string{"deploy_ended"}}),
+		Metadata:          datatypes.NewJSONType[any](map[string]any{}),
+		AppInstallationID: &integration.ID,
+		CreatedAt:         &now,
+	}
+	require.NoError(t, database.Conn().Create(&webhook).Error)
+
+	inputNode := models.CanvasNode{
+		NodeID:        "node-1",
+		Name:          "Node 1",
+		Type:          models.NodeTypeTrigger,
+		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{}),
+		Metadata:      datatypes.NewJSONType(map[string]any{}),
+		Position:      datatypes.NewJSONType(models.Position{}),
+	}
+
+	canvas, nodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{inputNode}, nil)
+	require.NotNil(t, canvas)
+	require.Len(t, nodes, 1)
+
+	node := nodes[0]
+	node.AppInstallationID = &integration.ID
+	require.NoError(t, database.Conn().Save(&node).Error)
+
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry)
+	require.NoError(t, ctx.RequestWebhook(map[string]any{"eventTypes": []string{"build_ended"}}))
+
+	require.NotNil(t, node.WebhookID)
+	require.Equal(t, webhookID, *node.WebhookID)
+
+	updatedWebhook, err := models.FindWebhookInTransaction(database.Conn(), webhookID)
+	require.NoError(t, err)
+	assert.Equal(t, models.WebhookStatePending, updatedWebhook.State)
+
+	configurationJSON, marshalErr := json.Marshal(updatedWebhook.Configuration.Data())
+	require.NoError(t, marshalErr)
+	assert.JSONEq(t, `{"eventTypes":["build_ended","deploy_ended"]}`, string(configurationJSON))
 }

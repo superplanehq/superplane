@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent, canvasesInvokeNodeTriggerAction } from "@/api-client";
+import { canvasesInvokeNodeTriggerAction } from "@/api-client";
 import { getColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
-import { TriggerRenderer, CustomFieldRenderer } from "./types";
+import { TriggerRenderer, CustomFieldRenderer, NodeInfo, TriggerRendererContext, TriggerEventContext } from "./types";
 import { TriggerProps } from "@/ui/trigger";
 import { Icon } from "@/components/Icon";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,8 +11,11 @@ import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { showErrorToast } from "@/utils/toast";
 
+const DEFAULT_HEADER_TOKEN_NAME = "X-Webhook-Token";
+
 interface WebhookConfiguration {
   authentication?: string;
+  headerName?: string;
 }
 
 interface WebhookMetadata {
@@ -20,7 +23,7 @@ interface WebhookMetadata {
   authentication?: string;
 }
 
-function formatAuthenticationMethod(auth: string): string {
+function formatAuthenticationMethod(auth: string, headerName?: string): string {
   switch (auth) {
     case "none":
       return "No authentication";
@@ -28,6 +31,8 @@ function formatAuthenticationMethod(auth: string): string {
       return "HMAC signature";
     case "bearer":
       return "Bearer token";
+    case "header_token":
+      return `Header token (${headerName || DEFAULT_HEADER_TOKEN_NAME})`;
     default:
       return "Unknown authentication";
   }
@@ -55,33 +60,31 @@ interface WebhookEventData {
   headers?: Record<string, string>;
 }
 
-function getWebhookEventTitle(event: CanvasesCanvasEvent): string {
+function getWebhookEventTitle(context: TriggerEventContext): string {
   // Check for run_name in the webhook request body
-  const runName = (event.data?.data as { body?: { run_name?: string } })?.body?.run_name;
+  const runName = (context.event?.data?.data as { body?: { run_name?: string } })?.body?.run_name;
   if (runName) {
     return `${runName}`;
   }
 
   // Fallback to method and date
-  return `Webhook from ${event.nodeId}`;
+  return `Webhook ${context.event?.id} at ${new Date(context.event?.createdAt || "").toLocaleString()}`;
 }
 
 /**
  * Renderer for the "webhook" trigger type
  */
 export const webhookTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventDate = new Date(event.createdAt!);
-
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     return {
-      title: getWebhookEventTitle(event),
-      subtitle: formatTimeAgo(eventDate),
+      title: getWebhookEventTitle(context),
+      subtitle: formatTimeAgo(new Date(context.event?.createdAt || "")),
     };
   },
 
-  getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
-    const webhookData = event.data?._webhook as WebhookEventData | undefined;
-    const receivedOn = (event.data?.["timestamp"] as string) || event.createdAt;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const webhookData = context.event?.data?._webhook as WebhookEventData | undefined;
+    const receivedOn = (context.event?.data?.["timestamp"] as string) || context.event?.createdAt;
     const values: Record<string, string> = {
       "Received on": receivedOn ? new Date(receivedOn).toLocaleString() : "n/a",
       Response: "200",
@@ -110,13 +113,14 @@ export const webhookTriggerRenderer: TriggerRenderer = {
     return values;
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent?: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const metadata = node.metadata as WebhookMetadata | undefined;
     const configuration = node.configuration as WebhookConfiguration | undefined;
 
     const props: TriggerProps = {
-      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
-      iconSlug: trigger.icon || "webhook",
+      title: node.name || definition.label || "Unnamed trigger",
+      iconSlug: definition.icon || "webhook",
       iconColor: getColorClass("black"),
       collapsedBackground: "bg-white",
       metadata: [
@@ -126,20 +130,23 @@ export const webhookTriggerRenderer: TriggerRenderer = {
         },
         {
           icon: "shield-check",
-          label: formatAuthenticationMethod(metadata?.authentication || configuration?.authentication || "none"),
+          label: formatAuthenticationMethod(
+            metadata?.authentication || configuration?.authentication || "none",
+            configuration?.headerName,
+          ),
         },
       ],
     };
 
     if (lastEvent) {
-      const eventDate = new Date(lastEvent.createdAt!);
+      const eventDate = new Date(lastEvent.createdAt);
 
       props.lastEventData = {
-        title: getWebhookEventTitle(lastEvent),
+        title: getWebhookEventTitle({ event: lastEvent }),
         subtitle: formatTimeAgo(eventDate),
         receivedAt: eventDate,
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 
@@ -204,6 +211,14 @@ const ResetAuthButton: React.FC<{
           successTitle: "New bearer token generated",
           successDescription:
             "Please update your webhook client with the new bearer token. This will only be shown once.",
+        };
+      case "header_token":
+        return {
+          buttonText: "Reset Header Token",
+          resettingText: "Resetting Header Token...",
+          successTitle: "New header token generated",
+          successDescription:
+            "Please update your webhook client with the new header token. This will only be shown once.",
         };
       default:
         return {
@@ -294,10 +309,11 @@ const ResetAuthButton: React.FC<{
  * Custom field renderer for webhook component configuration
  */
 export const webhookCustomFieldRenderer: CustomFieldRenderer = {
-  render: (node: ComponentsNode, configuration: Record<string, unknown>) => {
+  render: (node: NodeInfo) => {
     const metadata = node.metadata as WebhookMetadata | undefined;
-    const config = configuration as WebhookConfiguration | undefined;
+    const config = node.configuration as WebhookConfiguration | undefined;
     const authMethod = config?.authentication || "none";
+    const headerName = config?.headerName || DEFAULT_HEADER_TOKEN_NAME;
     const webhookUrl = metadata?.url || "[URL GENERATED ONCE THE CANVAS IS SAVED]";
 
     // State to track the currently displayed secret
@@ -338,6 +354,20 @@ export PAYLOAD='{"hello":"world"}'
 
 curl -X POST \\
   -H "Authorization: Bearer $BEARER_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  --data "$PAYLOAD" \\
+  ${webhookUrl}`;
+          break;
+
+        case "header_token":
+          title = "Header Token Authentication";
+          description = `Use a raw token in the ${headerName} header to authenticate webhook requests.`;
+          signatureKey = secret || "<your-header-token>";
+          code = `export HEADER_TOKEN="${signatureKey}"
+export PAYLOAD='{"hello":"world"}'
+
+curl -X POST \\
+  -H "${headerName}: $HEADER_TOKEN" \\
   -H "Content-Type: application/json" \\
   --data "$PAYLOAD" \\
   ${webhookUrl}`;

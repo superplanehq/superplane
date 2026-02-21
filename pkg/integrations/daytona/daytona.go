@@ -109,10 +109,6 @@ func (d *Daytona) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op - Daytona does not emit external events
 }
 
-func (d *Daytona) CompareWebhookConfig(a, b any) (bool, error) {
-	return true, nil
-}
-
 func (d *Daytona) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "snapshot" {
 		return []core.IntegrationResource{}, nil
@@ -138,14 +134,6 @@ func (d *Daytona) ListResources(resourceType string, ctx core.ListResourcesConte
 	}
 
 	return resources, nil
-}
-
-func (d *Daytona) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
-}
-
-func (d *Daytona) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	return nil
 }
 
 func (d *Daytona) Actions() []core.Action {

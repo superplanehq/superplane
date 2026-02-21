@@ -1,6 +1,5 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer } from "../types";
+import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata, Push } from "./types";
@@ -15,18 +14,18 @@ interface GithubConfiguration {
  * Renderer for the "github.onPush" trigger
  */
 export const onPushTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as Push;
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventData = context.event?.data as Push;
     const shortSha = eventData?.head_commit?.id?.slice(0, 7) || "";
 
     return {
       title: eventData?.head_commit?.message || "",
-      subtitle: buildGithubSubtitle(shortSha, event.createdAt),
+      subtitle: buildGithubSubtitle(shortSha, context.event?.createdAt),
     };
   },
 
-  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as Push;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const eventData = context.event?.data as Push;
 
     return {
       Commit: eventData?.head_commit?.message || "",
@@ -35,20 +34,21 @@ export const onPushTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as GithubConfiguration;
 
     const props: TriggerProps = {
-      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
+      title: node.name || definition.label || "Unnamed trigger",
       iconSrc: githubIcon,
-      iconColor: getColorClass(trigger.color),
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      iconColor: getColorClass(definition.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: createGithubMetadataItems(metadata?.repository?.name, configuration?.refs),
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as Push;
+      const eventData = lastEvent.data as Push;
       const shortSha = eventData?.head_commit?.id?.slice(0, 7) || "";
       props.lastEventData = {
         title: eventData?.head_commit?.message || "",

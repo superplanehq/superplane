@@ -1,0 +1,9 @@
+{
+    "type": "jira.issue",
+    "data": {
+        "id": "10001",
+        "key": "PROJ-123",
+        "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

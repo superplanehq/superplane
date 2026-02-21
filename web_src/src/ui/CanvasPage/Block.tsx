@@ -55,6 +55,7 @@ interface BlockProps extends ComponentActionsProps {
   data: BlockData;
   nodeId?: string;
   selected?: boolean;
+  showHeader?: boolean;
   onAnnotationUpdate?: (
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
@@ -385,6 +386,7 @@ function BlockContent({
   onToggleCollapse,
   onToggleView,
   onDelete,
+  showHeader,
   isCompactView,
 }: BlockProps) {
   const compactView =
@@ -428,13 +430,16 @@ function BlockContent({
 
   switch (data.type) {
     case "trigger":
-      return <Trigger {...(data.trigger as TriggerProps)} selected={selected} {...actionProps} />;
+      return (
+        <Trigger {...(data.trigger as TriggerProps)} selected={selected} showHeader={showHeader} {...actionProps} />
+      );
     case "component":
       return (
         <ComponentBase
           {...(data.component as ComponentBaseProps)}
           paused={(data.component as ComponentBaseProps)?.paused}
           selected={selected}
+          showHeader={showHeader}
           {...actionProps}
         />
       );
@@ -444,13 +449,28 @@ function BlockContent({
           {...(data.composite as CompositeProps)}
           onExpandChildEvents={handleExpand}
           selected={selected}
+          showHeader={showHeader}
           {...actionProps}
         />
       );
     case "switch":
-      return <SwitchComponent {...(data.switch as SwitchComponentProps)} selected={selected} {...actionProps} />;
+      return (
+        <SwitchComponent
+          {...(data.switch as SwitchComponentProps)}
+          selected={selected}
+          showHeader={showHeader}
+          {...actionProps}
+        />
+      );
     case "merge":
-      return <MergeComponent {...(data.merge as MergeComponentProps)} selected={selected} {...actionProps} />;
+      return (
+        <MergeComponent
+          {...(data.merge as MergeComponentProps)}
+          selected={selected}
+          showHeader={showHeader}
+          {...actionProps}
+        />
+      );
     case "annotation": {
       const handleAnnotationUpdate = (updates: {
         text?: string;

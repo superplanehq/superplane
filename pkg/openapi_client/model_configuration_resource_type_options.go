@@ -20,9 +20,10 @@ var _ MappedNullable = &ConfigurationResourceTypeOptions{}
 
 // ConfigurationResourceTypeOptions struct for ConfigurationResourceTypeOptions
 type ConfigurationResourceTypeOptions struct {
-	Type           *string `json:"type,omitempty"`
-	UseNameAsValue *bool   `json:"useNameAsValue,omitempty"`
-	Multi          *bool   `json:"multi,omitempty"`
+	Type           *string                     `json:"type,omitempty"`
+	UseNameAsValue *bool                       `json:"useNameAsValue,omitempty"`
+	Multi          *bool                       `json:"multi,omitempty"`
+	Parameters     []ConfigurationParameterRef `json:"parameters,omitempty"`
 }
 
 // NewConfigurationResourceTypeOptions instantiates a new ConfigurationResourceTypeOptions object
@@ -138,6 +139,38 @@ func (o *ConfigurationResourceTypeOptions) SetMulti(v bool) {
 	o.Multi = &v
 }
 
+// GetParameters returns the Parameters field value if set, zero value otherwise.
+func (o *ConfigurationResourceTypeOptions) GetParameters() []ConfigurationParameterRef {
+	if o == nil || IsNil(o.Parameters) {
+		var ret []ConfigurationParameterRef
+		return ret
+	}
+	return o.Parameters
+}
+
+// GetParametersOk returns a tuple with the Parameters field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationResourceTypeOptions) GetParametersOk() ([]ConfigurationParameterRef, bool) {
+	if o == nil || IsNil(o.Parameters) {
+		return nil, false
+	}
+	return o.Parameters, true
+}
+
+// HasParameters returns a boolean if a field has been set.
+func (o *ConfigurationResourceTypeOptions) HasParameters() bool {
+	if o != nil && !IsNil(o.Parameters) {
+		return true
+	}
+
+	return false
+}
+
+// SetParameters gets a reference to the given []ConfigurationParameterRef and assigns it to the Parameters field.
+func (o *ConfigurationResourceTypeOptions) SetParameters(v []ConfigurationParameterRef) {
+	o.Parameters = v
+}
+
 func (o ConfigurationResourceTypeOptions) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -156,6 +189,9 @@ func (o ConfigurationResourceTypeOptions) ToMap() (map[string]interface{}, error
 	}
 	if !IsNil(o.Multi) {
 		toSerialize["multi"] = o.Multi
+	}
+	if !IsNil(o.Parameters) {
+		toSerialize["parameters"] = o.Parameters
 	}
 	return toSerialize, nil
 }

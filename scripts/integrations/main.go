@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	reg := registry.NewRegistry(crypto.NewNoOpEncryptor())
+	reg, _ := registry.NewRegistry(crypto.NewNoOpEncryptor(), registry.HTTPOptions{})
 	integrations := reg.ListIntegrations()
 	coreComponents := reg.ListComponents()
 	coreTriggers := reg.ListTriggers()

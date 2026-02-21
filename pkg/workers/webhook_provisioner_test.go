@@ -55,8 +55,9 @@ func Test__WebhookProvisioner_RetryOnError(t *testing.T) {
 
 	provisioner := NewWebhookProvisioner("https://example.com", &BadEncryptor{}, r.Registry)
 
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
-		OnSetupWebhook: func(ctx core.SetupWebhookContext) (any, error) {
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = support.NewDummyWebhookHandler(support.DummyWebhookHandlerOptions{
+		SetupFunc: func(ctx core.WebhookHandlerContext) (any, error) {
 			return nil, errors.New("oops")
 		},
 	})
@@ -97,8 +98,9 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 
 	provisioner := NewWebhookProvisioner("https://example.com", &BadEncryptor{}, r.Registry)
 
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
-		OnSetupWebhook: func(ctx core.SetupWebhookContext) (any, error) {
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = support.NewDummyWebhookHandler(support.DummyWebhookHandlerOptions{
+		SetupFunc: func(ctx core.WebhookHandlerContext) (any, error) {
 			return nil, errors.New("oops")
 		},
 	})

@@ -2,9 +2,13 @@ package common
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -13,6 +17,85 @@ const (
 	secretAccessKeySecret = "secretAccessKey"
 	sessionTokenSecret    = "sessionToken"
 )
+
+var AllRegions = []configuration.FieldOption{
+	{
+		Label: "us-east-1",
+		Value: "us-east-1",
+	},
+	{
+		Label: "us-east-2",
+		Value: "us-east-2",
+	},
+	{
+		Label: "us-west-1",
+		Value: "us-west-1",
+	},
+	{
+		Label: "us-west-2",
+		Value: "us-west-2",
+	},
+	{
+		Label: "eu-west-1",
+		Value: "eu-west-1",
+	},
+	{
+		Label: "eu-central-1",
+		Value: "eu-central-1",
+	},
+	{
+		Label: "ap-northeast-1",
+		Value: "ap-northeast-1",
+	},
+	{
+		Label: "ap-northeast-2",
+		Value: "ap-northeast-2",
+	},
+	{
+		Label: "ap-southeast-1",
+		Value: "ap-southeast-1",
+	},
+	{
+		Label: "ap-southeast-2",
+		Value: "ap-southeast-2",
+	},
+	{
+		Label: "ap-south-1",
+		Value: "ap-south-1",
+	},
+	{
+		Label: "ca-central-1",
+		Value: "ca-central-1",
+	},
+	{
+		Label: "cn-north-1",
+		Value: "cn-north-1",
+	},
+	{
+		Label: "cn-northwest-1",
+		Value: "cn-northwest-1",
+	},
+	{
+		Label: "eu-north-1",
+		Value: "eu-north-1",
+	},
+	{
+		Label: "eu-south-1",
+		Value: "eu-south-1",
+	},
+	{
+		Label: "eu-west-2",
+		Value: "eu-west-2",
+	},
+	{
+		Label: "eu-west-3",
+		Value: "eu-west-3",
+	},
+	{
+		Label: "sa-east-1",
+		Value: "sa-east-1",
+	},
+}
 
 type IntegrationMetadata struct {
 	Session     *SessionMetadata     `json:"session" mapstructure:"session"`
@@ -58,6 +141,8 @@ type EventBridgeMetadata struct {
 	/*
 	 * List of EventBridge rules created by the integration.
 	 * This ensures that we reuse the same rule for the same source, e.g., aws.codeartifact, aws.ecr, etc.
+	 *
+	 * The key here is the source and region, e.g., "aws.ec2:us-east-1".
 	 */
 	Rules map[string]EventBridgeRuleMetadata `json:"rules" mapstructure:"rules"`
 }
@@ -84,10 +169,10 @@ type ProvisionRuleParameters struct {
 }
 
 type EventBridgeEvent struct {
-	Region     string         `json:"region"`
-	DetailType string         `json:"detail-type"`
-	Source     string         `json:"source"`
-	Detail     map[string]any `json:"detail"`
+	Region     string         `json:"region" mapstructure:"region"`
+	DetailType string         `json:"detail-type" mapstructure:"detail-type"`
+	Source     string         `json:"source" mapstructure:"source"`
+	Detail     map[string]any `json:"detail" mapstructure:"detail"`
 }
 
 type Tag struct {
@@ -107,6 +192,9 @@ func TagsForAPI(tags []Tag) []any {
 }
 
 func CredentialsFromInstallation(ctx core.IntegrationContext) (*aws.Credentials, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("AWS integration context is missing")
+	}
 	secrets, err := ctx.GetSecrets()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get AWS session secrets: %w", err)
@@ -197,4 +285,39 @@ func AccountIDFromRoleArn(roleArn string) (string, error) {
 	}
 
 	return strings.TrimSpace(parts[4]), nil
+}
+
+/*
+ * This is the key used to store the rule in the metadata.
+ * The key here is the source and region, e.g., "aws.ec2:us-east-1".
+ * This ensures that we have a rule per {source, region} combination.
+ */
+func EventBridgeRuleKey(source string, region string) string {
+	return fmt.Sprintf("%s:%s", source, region)
+}
+
+func HasEventBridgeRule(logger *logrus.Entry, integration core.IntegrationContext, source, region, detailType string) (bool, error) {
+	integrationMetadata := IntegrationMetadata{}
+	if err := mapstructure.Decode(integration.GetMetadata(), &integrationMetadata); err != nil {
+		return false, fmt.Errorf("failed to decode integration metadata: %w", err)
+	}
+
+	if integrationMetadata.EventBridge == nil {
+		logger.Infof("EventBridge metadata not found")
+		return false, nil
+	}
+
+	ruleKey := EventBridgeRuleKey(source, region)
+	rule, ok := integrationMetadata.EventBridge.Rules[ruleKey]
+	if !ok {
+		logger.Infof("Rule not found for %s", ruleKey)
+		return false, nil
+	}
+
+	if !slices.Contains(rule.DetailTypes, detailType) {
+		logger.Infof("Rule %s does not have detail type '%s'", ruleKey, detailType)
+		return false, nil
+	}
+
+	return true, nil
 }

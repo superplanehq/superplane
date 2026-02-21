@@ -21,6 +21,7 @@ var _ MappedNullable = &OrganizationsUpdateIntegrationBody{}
 // OrganizationsUpdateIntegrationBody struct for OrganizationsUpdateIntegrationBody
 type OrganizationsUpdateIntegrationBody struct {
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
+	Name          *string                `json:"name,omitempty"`
 }
 
 // NewOrganizationsUpdateIntegrationBody instantiates a new OrganizationsUpdateIntegrationBody object
@@ -72,6 +73,38 @@ func (o *OrganizationsUpdateIntegrationBody) SetConfiguration(v map[string]inter
 	o.Configuration = v
 }
 
+// GetName returns the Name field value if set, zero value otherwise.
+func (o *OrganizationsUpdateIntegrationBody) GetName() string {
+	if o == nil || IsNil(o.Name) {
+		var ret string
+		return ret
+	}
+	return *o.Name
+}
+
+// GetNameOk returns a tuple with the Name field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *OrganizationsUpdateIntegrationBody) GetNameOk() (*string, bool) {
+	if o == nil || IsNil(o.Name) {
+		return nil, false
+	}
+	return o.Name, true
+}
+
+// HasName returns a boolean if a field has been set.
+func (o *OrganizationsUpdateIntegrationBody) HasName() bool {
+	if o != nil && !IsNil(o.Name) {
+		return true
+	}
+
+	return false
+}
+
+// SetName gets a reference to the given string and assigns it to the Name field.
+func (o *OrganizationsUpdateIntegrationBody) SetName(v string) {
+	o.Name = &v
+}
+
 func (o OrganizationsUpdateIntegrationBody) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -84,6 +117,9 @@ func (o OrganizationsUpdateIntegrationBody) ToMap() (map[string]interface{}, err
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration
+	}
+	if !IsNil(o.Name) {
+		toSerialize["name"] = o.Name
 	}
 	return toSerialize, nil
 }
