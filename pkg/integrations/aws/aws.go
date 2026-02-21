@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/cloudwatch"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/codepipeline"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ec2"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
@@ -143,6 +144,7 @@ func (a *AWS) Components() []core.Component {
 		&codeartifact.DisposePackageVersions{},
 		&codeartifact.GetPackageVersion{},
 		&codeartifact.UpdatePackageVersionsStatus{},
+		&codepipeline.RunPipeline{},
 		&ecs.CreateService{},
 		&ecs.DescribeService{},
 		&ecs.ExecuteCommand{},
