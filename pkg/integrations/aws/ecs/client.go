@@ -132,9 +132,78 @@ type RunTaskInput struct {
 	Overrides            RunTaskOverrides
 }
 
+type ServiceMutationInput struct {
+	Cluster                           string
+	TaskDefinition                    string
+	DesiredCount                      *int
+	LaunchType                        string
+	CapacityProviderStrategy          []RunTaskCapacityProviderStrategyItem
+	PlatformVersion                   string
+	EnableExecuteCommand              *bool
+	NetworkConfiguration              RunTaskNetworkConfiguration
+	DeploymentConfiguration           map[string]any
+	ServiceRegistries                 []map[string]any
+	LoadBalancers                     []map[string]any
+	PlacementConstraints              []map[string]any
+	PlacementStrategy                 []map[string]any
+	ServiceConnectConfiguration       map[string]any
+	VolumeConfigurations              []map[string]any
+	VpcLatticeConfigurations          []map[string]any
+	AvailabilityZoneRebalancing       string
+	HealthCheckGracePeriodSeconds     *int
+	EnableECSManagedTags              *bool
+	PropagateTags                     string
+	Tags                              []common.Tag
+	ForceNewDeployment                *bool
+	AdditionalCreateOrUpdateArguments map[string]any
+}
+
+type CreateServiceInput struct {
+	ServiceName        string
+	SchedulingStrategy string
+	ClientToken        string
+	ServiceMutation    ServiceMutationInput
+}
+
+type UpdateServiceInput struct {
+	Service         string
+	ServiceMutation ServiceMutationInput
+}
+
 type RunTaskResponse struct {
 	Tasks    []Task    `json:"tasks"`
 	Failures []Failure `json:"failures"`
+}
+
+type CreateServiceResponse struct {
+	Service Service `json:"service"`
+}
+
+type UpdateServiceResponse struct {
+	Service Service `json:"service"`
+}
+
+type ExecuteCommandInput struct {
+	Cluster     string
+	Task        string
+	Container   string
+	Command     string
+	Interactive bool
+}
+
+type ExecuteCommandSession struct {
+	SessionID  string `json:"sessionId"`
+	StreamURL  string `json:"streamUrl"`
+	TokenValue string `json:"tokenValue"`
+}
+
+type ExecuteCommandResponse struct {
+	ClusterArn    string                `json:"clusterArn"`
+	ContainerArn  string                `json:"containerArn"`
+	ContainerName string                `json:"containerName"`
+	Interactive   bool                  `json:"interactive"`
+	Session       ExecuteCommandSession `json:"session"`
+	TaskArn       string                `json:"taskArn"`
 }
 
 type StopTaskResponse struct {
@@ -290,6 +359,143 @@ func (c *Client) StopTask(cluster string, task string, reason string) (*StopTask
 	}
 
 	return &response, nil
+}
+
+func (c *Client) CreateService(input CreateServiceInput) (*CreateServiceResponse, error) {
+	payload := clonePayload(input.ServiceMutation.AdditionalCreateOrUpdateArguments)
+	payload["cluster"] = input.ServiceMutation.Cluster
+	payload["serviceName"] = input.ServiceName
+	payload["schedulingStrategy"] = input.SchedulingStrategy
+	if input.ClientToken != "" {
+		payload["clientToken"] = input.ClientToken
+	}
+
+	appendServiceMutationPayload(payload, input.ServiceMutation)
+
+	response := CreateServiceResponse{}
+	if err := c.postJSON("CreateService", payload, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+func (c *Client) UpdateService(input UpdateServiceInput) (*UpdateServiceResponse, error) {
+	payload := clonePayload(input.ServiceMutation.AdditionalCreateOrUpdateArguments)
+	payload["cluster"] = input.ServiceMutation.Cluster
+	payload["service"] = input.Service
+
+	appendServiceMutationPayload(payload, input.ServiceMutation)
+
+	response := UpdateServiceResponse{}
+	if err := c.postJSON("UpdateService", payload, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+func (c *Client) ExecuteCommand(input ExecuteCommandInput) (*ExecuteCommandResponse, error) {
+	payload := map[string]any{
+		"cluster":     input.Cluster,
+		"task":        input.Task,
+		"command":     input.Command,
+		"interactive": input.Interactive,
+	}
+	if input.Container != "" {
+		payload["container"] = input.Container
+	}
+
+	response := ExecuteCommandResponse{}
+	if err := c.postJSON("ExecuteCommand", payload, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+func appendServiceMutationPayload(payload map[string]any, input ServiceMutationInput) {
+	if input.TaskDefinition != "" {
+		payload["taskDefinition"] = input.TaskDefinition
+	}
+	if input.DesiredCount != nil {
+		payload["desiredCount"] = *input.DesiredCount
+	}
+	if input.LaunchType != "" {
+		payload["launchType"] = input.LaunchType
+	}
+	if len(input.CapacityProviderStrategy) > 0 {
+		payload["capacityProviderStrategy"] = input.CapacityProviderStrategy
+	}
+	if input.PlatformVersion != "" {
+		payload["platformVersion"] = input.PlatformVersion
+	}
+	if input.EnableExecuteCommand != nil {
+		payload["enableExecuteCommand"] = *input.EnableExecuteCommand
+	}
+	networkConfiguration := input.NetworkConfiguration.ToMap()
+	if !isEmptyObject(networkConfiguration) && !isNetworkConfigurationTemplate(networkConfiguration) {
+		payload["networkConfiguration"] = networkConfiguration
+	}
+	if len(input.DeploymentConfiguration) > 0 {
+		payload["deploymentConfiguration"] = input.DeploymentConfiguration
+	}
+	if len(input.ServiceRegistries) > 0 {
+		payload["serviceRegistries"] = input.ServiceRegistries
+	}
+	if len(input.LoadBalancers) > 0 {
+		payload["loadBalancers"] = input.LoadBalancers
+	}
+	if len(input.PlacementConstraints) > 0 {
+		payload["placementConstraints"] = input.PlacementConstraints
+	}
+	if len(input.PlacementStrategy) > 0 {
+		payload["placementStrategy"] = input.PlacementStrategy
+	}
+	if len(input.ServiceConnectConfiguration) > 0 {
+		payload["serviceConnectConfiguration"] = input.ServiceConnectConfiguration
+	}
+	if len(input.VolumeConfigurations) > 0 {
+		payload["volumeConfigurations"] = input.VolumeConfigurations
+	}
+	if len(input.VpcLatticeConfigurations) > 0 {
+		payload["vpcLatticeConfigurations"] = input.VpcLatticeConfigurations
+	}
+	if input.AvailabilityZoneRebalancing != "" {
+		payload["availabilityZoneRebalancing"] = input.AvailabilityZoneRebalancing
+	}
+	if input.HealthCheckGracePeriodSeconds != nil {
+		payload["healthCheckGracePeriodSeconds"] = *input.HealthCheckGracePeriodSeconds
+	}
+	if input.EnableECSManagedTags != nil {
+		payload["enableECSManagedTags"] = *input.EnableECSManagedTags
+	}
+	if input.PropagateTags != "" {
+		payload["propagateTags"] = input.PropagateTags
+	}
+	if len(input.Tags) > 0 {
+		payload["tags"] = ecsTagsForAPI(input.Tags)
+	}
+	if input.ForceNewDeployment != nil {
+		payload["forceNewDeployment"] = *input.ForceNewDeployment
+	}
+}
+
+func ecsTagsForAPI(tags []common.Tag) []map[string]string {
+	apiTags := make([]map[string]string, 0, len(tags))
+	for _, tag := range tags {
+		key := strings.TrimSpace(tag.Key)
+		if key == "" {
+			continue
+		}
+
+		apiTags = append(apiTags, map[string]string{
+			"key":   key,
+			"value": strings.TrimSpace(tag.Value),
+		})
+	}
+
+	return apiTags
 }
 
 func (c *Client) postJSON(action string, payload any, out any) error {
