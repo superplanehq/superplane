@@ -65,6 +65,7 @@ func Test__Dash0__Sync(t *testing.T) {
 		}
 
 		integrationCtx := &contexts.IntegrationContext{
+			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
@@ -72,13 +73,17 @@ func Test__Dash0__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration: integrationCtx.Configuration,
-			HTTP:          httpContext,
-			Integration:   integrationCtx,
+			Configuration:   integrationCtx.Configuration,
+			HTTP:            httpContext,
+			Integration:     integrationCtx,
+			WebhooksBaseURL: "https://hooks.example.com",
 		})
 
 		require.NoError(t, err)
 		assert.Equal(t, "ready", integrationCtx.State)
+		metadata, ok := integrationCtx.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.Equal(t, "https://hooks.example.com/api/v1/integrations/8f5fbc57-2738-409a-a6f8-af65c2de733c/webhook", metadata.WebhookURL)
 		require.Len(t, httpContext.Requests, 1)
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "/api/prometheus/api/v1/query")
 		assert.Equal(t, "Bearer token123", httpContext.Requests[0].Header.Get("Authorization"))
