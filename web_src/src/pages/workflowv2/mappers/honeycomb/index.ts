@@ -5,13 +5,13 @@ import { createEventMapper } from "./create_event";
 import { onAlertFiredTriggerRenderer } from "./on_alert_fired";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
-  "createEvent": createEventMapper,
+  createEvent: createEventMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
-  "onAlertFired": onAlertFiredTriggerRenderer,
+  onAlertFired: onAlertFiredTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
-  "createEvent": buildActionStateRegistry("Sent"),
+  createEvent: buildActionStateRegistry("Sent"),
 };
