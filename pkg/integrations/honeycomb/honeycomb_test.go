@@ -198,6 +198,10 @@ func Test__Honeycomb__Sync(t *testing.T) {
 					StatusCode: http.StatusCreated,
 					Body:       io.NopCloser(strings.NewReader(ingestKeyBody)),
 				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{}`)), // <-- NEW ping response
+				},
 			},
 		}
 
@@ -209,7 +213,9 @@ func Test__Honeycomb__Sync(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "ready", integrationCtx.State)
-		assert.Len(t, httpCtx.Requests, 6)
+
+		// sada je 7 requestova jer postoji dodatni ping
+		assert.Len(t, httpCtx.Requests, 7)
 
 		cfgSecret, ok := integrationCtx.Secrets[secretNameConfigurationKey]
 		require.True(t, ok)

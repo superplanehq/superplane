@@ -446,6 +446,14 @@ func (c *Client) EnsureIngestKey(teamSlug string) error {
 		return fmt.Errorf("failed to store ingest key secret: %w", err)
 	}
 
+	code2, body2, err2 := c.pingV1WithIngestKey()
+	if err2 != nil {
+		return fmt.Errorf("v1 ping failed after creating ingest key: %w", err2)
+	}
+	if code2 < 200 || code2 >= 300 {
+		return fmt.Errorf("created ingest key but v1 ping failed (http %d): %s", code2, string(body2))
+	}
+
 	return nil
 }
 
