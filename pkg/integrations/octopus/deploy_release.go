@@ -337,7 +337,8 @@ func (c *DeployRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 		return okResponse()
 	}
 
-	// Try to find the deployment ID from the event payload
+	// Try to find a matching execution from all deployment IDs in the event payload.
+	// Octopus may include multiple deployment IDs (e.g. multi-tenant, chained deployments).
 	relatedDocs := readRelatedDocumentIDs(event)
 	deploymentIDs := relatedDocs["Deployments"]
 
@@ -345,10 +346,19 @@ func (c *DeployRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 		return okResponse()
 	}
 
-	deploymentID := deploymentIDs[0]
+	var executionCtx *core.ExecutionContext
+	for _, id := range deploymentIDs {
+		found, err := findExecutionByDeploymentID(ctx, id)
+		if err != nil {
+			return okResponse()
+		}
+		if found != nil {
+			executionCtx = found
+			break
+		}
+	}
 
-	executionCtx, err := findExecutionByDeploymentID(ctx, deploymentID)
-	if err != nil || executionCtx == nil {
+	if executionCtx == nil {
 		return okResponse()
 	}
 
