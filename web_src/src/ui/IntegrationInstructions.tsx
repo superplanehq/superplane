@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
-import { ExternalLink } from "lucide-react";
+import { Check, Copy, ExternalLink } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 const INSTRUCTIONS_CLASSES =
@@ -48,7 +49,7 @@ export function IntegrationInstructions({ description, onContinue, className = "
                   {children}
                 </a>
               ),
-              code: ({ children }) => <code className="rounded bg-black/10 px-1 text-xs">{children}</code>,
+              code: ({ children }) => <CopyableCode>{children}</CopyableCode>,
               strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
               em: ({ children }) => <em className="italic">{children}</em>,
             }}
@@ -64,5 +65,28 @@ export function IntegrationInstructions({ description, onContinue, className = "
         )}
       </div>
     </div>
+  );
+}
+
+function CopyableCode({ children }: { children: React.ReactNode }) {
+  const [copied, setCopied] = useState(false);
+  const text = String(children);
+
+  return (
+    <code
+      className="inline-flex items-center gap-1 rounded bg-black/10 px-1 text-xs cursor-pointer hover:bg-black/15"
+      onClick={() => {
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+    >
+      {children}
+      {copied ? (
+        <Check className="w-3 h-3 text-green-600 shrink-0" />
+      ) : (
+        <Copy className="w-3 h-3 opacity-50 hover:opacity-100 shrink-0" />
+      )}
+    </code>
   );
 }
