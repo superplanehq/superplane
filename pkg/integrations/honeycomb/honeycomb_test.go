@@ -214,7 +214,6 @@ func Test__Honeycomb__Sync(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "ready", integrationCtx.State)
 
-		// sada je 7 requestova jer postoji dodatni ping
 		assert.Len(t, httpCtx.Requests, 7)
 
 		cfgSecret, ok := integrationCtx.Secrets[secretNameConfigurationKey]
