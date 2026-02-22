@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -40,6 +41,13 @@ func (a *PluginComponentAdapter) Label() string       { return a.contribution.La
 func (a *PluginComponentAdapter) Description() string { return a.contribution.Description }
 func (a *PluginComponentAdapter) Icon() string        { return a.contribution.Icon }
 func (a *PluginComponentAdapter) Color() string       { return a.contribution.Color }
+
+func (a *PluginComponentAdapter) Source() string {
+	if strings.HasPrefix(a.pluginName, "script.") {
+		return "script"
+	}
+	return "plugin"
+}
 
 func (a *PluginComponentAdapter) Documentation() string {
 	return a.contribution.Documentation
@@ -158,7 +166,7 @@ func (a *PluginComponentAdapter) Cleanup(ctx core.SetupContext) error {
 
 func applyComponentResult(result *RPCResult, ctx core.ExecutionContext) error {
 	if result == nil {
-		return nil
+		return ctx.ExecutionState.Pass()
 	}
 
 	switch result.Action {
@@ -171,9 +179,9 @@ func applyComponentResult(result *RPCResult, ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail(result.Reason, result.Message)
 	case "setKV":
 		return ctx.ExecutionState.SetKV(result.Key, result.Value)
+	default:
+		return ctx.ExecutionState.Pass()
 	}
-
-	return nil
 }
 
 // PluginIntegrationAdapter implements core.Integration, delegating lifecycle
@@ -424,6 +432,13 @@ func (a *PluginTriggerAdapter) Label() string       { return a.contribution.Labe
 func (a *PluginTriggerAdapter) Description() string { return a.contribution.Description }
 func (a *PluginTriggerAdapter) Icon() string        { return a.contribution.Icon }
 func (a *PluginTriggerAdapter) Color() string       { return a.contribution.Color }
+
+func (a *PluginTriggerAdapter) Source() string {
+	if strings.HasPrefix(a.pluginName, "script.") {
+		return "script"
+	}
+	return "plugin"
+}
 
 func (a *PluginTriggerAdapter) Documentation() string {
 	return a.contribution.Documentation

@@ -194,32 +194,32 @@ func copyDir(src, dst string) error {
 func signalServer(cmd *cobra.Command) {
 	pidFile := os.Getenv("SUPERPLANE_PID_FILE")
 	if pidFile == "" {
-		fmt.Fprintln(cmd.OutOrStdout(), "Server signaled to reload plugins (SIGHUP)")
+		fmt.Fprintln(cmd.OutOrStdout(), "Restart the server to load the plugin.")
 		return
 	}
 
 	data, err := os.ReadFile(pidFile)
 	if err != nil {
-		fmt.Fprintf(cmd.OutOrStdout(), "Could not read PID file, restart the server to load plugins\n")
+		fmt.Fprintf(cmd.OutOrStdout(), "Restart the server to load the plugin.\n")
 		return
 	}
 
 	var pid int
 	if _, err := fmt.Sscanf(strings.TrimSpace(string(data)), "%d", &pid); err != nil {
-		fmt.Fprintf(cmd.OutOrStdout(), "Invalid PID file, restart the server to load plugins\n")
+		fmt.Fprintf(cmd.OutOrStdout(), "Restart the server to load the plugin.\n")
 		return
 	}
 
 	proc, err := os.FindProcess(pid)
 	if err != nil {
-		fmt.Fprintf(cmd.OutOrStdout(), "Could not find server process, restart the server to load plugins\n")
+		fmt.Fprintf(cmd.OutOrStdout(), "Restart the server to load the plugin.\n")
 		return
 	}
 
 	if err := proc.Signal(syscall.SIGHUP); err != nil {
-		fmt.Fprintf(cmd.OutOrStdout(), "Could not signal server, restart the server to load plugins\n")
+		fmt.Fprintf(cmd.OutOrStdout(), "Restart the server to load the plugin.\n")
 		return
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), "Server signaled to reload plugins")
+	fmt.Fprintln(cmd.OutOrStdout(), "Server reloaded.")
 }

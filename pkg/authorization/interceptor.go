@@ -10,6 +10,7 @@ import (
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbOrganization "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
+	pbScripts "github.com/superplanehq/superplane/pkg/protos/scripts"
 	pbSecrets "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbServiceAccounts "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
@@ -123,6 +124,14 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbServiceAccounts.ServiceAccounts_UpdateServiceAccount_FullMethodName:          {Resource: "service_accounts", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbServiceAccounts.ServiceAccounts_DeleteServiceAccount_FullMethodName:          {Resource: "service_accounts", Action: "delete", DomainType: models.DomainTypeOrganization},
 		pbServiceAccounts.ServiceAccounts_RegenerateServiceAccountToken_FullMethodName: {Resource: "service_accounts", Action: "update", DomainType: models.DomainTypeOrganization},
+
+		// Scripts rules
+		pbScripts.Scripts_ListScripts_FullMethodName:    {Resource: "scripts", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbScripts.Scripts_DescribeScript_FullMethodName: {Resource: "scripts", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbScripts.Scripts_CreateScript_FullMethodName:   {Resource: "scripts", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbScripts.Scripts_UpdateScript_FullMethodName:   {Resource: "scripts", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbScripts.Scripts_DeleteScript_FullMethodName:   {Resource: "scripts", Action: "delete", DomainType: models.DomainTypeOrganization},
+		pbScripts.Scripts_GenerateScript_FullMethodName: {Resource: "scripts", Action: "update", DomainType: models.DomainTypeOrganization},
 	}
 
 	return &AuthorizationInterceptor{

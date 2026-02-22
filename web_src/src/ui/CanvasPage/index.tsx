@@ -35,6 +35,7 @@ import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../
 import { ComponentSidebar } from "../componentSidebar";
 import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
+import { ScriptBuilderModal } from "../ScriptBuilderModal";
 import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
 import "./canvas-reset.css";
@@ -326,6 +327,7 @@ function CanvasPage(props: CanvasPageProps) {
   const readOnly = props.readOnly ?? false;
   const [currentTab, setCurrentTab] = useState<"latest" | "settings">("latest");
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
+  const [isScriptBuilderOpen, setIsScriptBuilderOpen] = useState(false);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
 
@@ -821,6 +823,7 @@ function CanvasPage(props: CanvasPageProps) {
           disabledMessage="You don't have permission to edit this canvas."
           onBlockClick={handleBuildingBlockClick}
           onAddNote={handleAddNote}
+          onOpenScripts={() => setIsScriptBuilderOpen(true)}
         />
 
         <div className="flex-1 relative">
@@ -953,6 +956,13 @@ function CanvasPage(props: CanvasPageProps) {
           initialData={emitModalData.initialData}
         />
       )}
+
+      {/* Script Builder Modal */}
+      <ScriptBuilderModal
+        isOpen={isScriptBuilderOpen}
+        onClose={() => setIsScriptBuilderOpen(false)}
+        organizationId={props.organizationId || ""}
+      />
     </div>
   );
 }

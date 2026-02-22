@@ -255,9 +255,9 @@ export class PluginContextImpl implements PluginContext {
 }
 
 export class ComponentRegistryImpl implements ComponentRegistry {
-  private handlers = new Map<string, ComponentHandler>();
+  private handlers = new Map<string, ComponentHandler & Record<string, any>>();
 
-  register(name: string, handler: ComponentHandler): Disposable {
+  register(name: string, handler: ComponentHandler & Record<string, any>): Disposable {
     this.handlers.set(name, handler);
     return {
       dispose: () => this.handlers.delete(name),
@@ -267,12 +267,28 @@ export class ComponentRegistryImpl implements ComponentRegistry {
   getHandler(name: string): ComponentHandler | undefined {
     return this.handlers.get(name);
   }
+
+  getRegisteredMetadata(): Array<Record<string, any>> {
+    const result: Array<Record<string, any>> = [];
+    for (const [name, handler] of this.handlers) {
+      result.push({
+        name,
+        label: handler.label || name,
+        description: handler.description || "",
+        icon: handler.icon || "",
+        color: handler.color || "",
+        configuration: handler.configuration || [],
+        outputChannels: handler.outputChannels || [{ name: "default", label: "Default" }],
+      });
+    }
+    return result;
+  }
 }
 
 export class TriggerRegistryImpl implements TriggerRegistry {
-  private handlers = new Map<string, TriggerHandler>();
+  private handlers = new Map<string, TriggerHandler & Record<string, any>>();
 
-  register(name: string, handler: TriggerHandler): Disposable {
+  register(name: string, handler: TriggerHandler & Record<string, any>): Disposable {
     this.handlers.set(name, handler);
     return {
       dispose: () => this.handlers.delete(name),
@@ -281,6 +297,21 @@ export class TriggerRegistryImpl implements TriggerRegistry {
 
   getHandler(name: string): TriggerHandler | undefined {
     return this.handlers.get(name);
+  }
+
+  getRegisteredMetadata(): Array<Record<string, any>> {
+    const result: Array<Record<string, any>> = [];
+    for (const [name, handler] of this.handlers) {
+      result.push({
+        name,
+        label: handler.label || name,
+        description: handler.description || "",
+        icon: handler.icon || "",
+        color: handler.color || "",
+        configuration: handler.configuration || [],
+      });
+    }
+    return result;
   }
 }
 
@@ -337,8 +368,12 @@ export function buildExecutionContext(
     input: params.input,
     configuration: params.configuration || {},
 
-    emit(channel: string, payloadType: string, data: any) {
-      result = { action: "emit", channel, payloadType, data };
+    emit(channel: string, payloadTypeOrData: any, data?: any) {
+      if (data === undefined && typeof payloadTypeOrData !== "string") {
+        result = { action: "emit", channel, payloadType: "json", data: payloadTypeOrData };
+      } else {
+        result = { action: "emit", channel, payloadType: payloadTypeOrData, data };
+      }
     },
 
     pass() {

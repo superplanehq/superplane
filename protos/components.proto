@@ -84,6 +84,7 @@ message Component {
   string icon = 6;
   string color = 7;
   google.protobuf.Struct example_output = 8;
+  string source = 9;
 }
 
 message OutputChannel {

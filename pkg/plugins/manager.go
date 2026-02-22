@@ -11,7 +11,9 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -63,11 +65,6 @@ type RPCResult struct {
 }
 
 func NewManager(pluginsDir string, reg *registry.Registry) (*Manager, error) {
-	if _, err := os.Stat(pluginsDir); os.IsNotExist(err) {
-		log.Infof("Plugin directory %s does not exist, plugin system disabled", pluginsDir)
-		return nil, fmt.Errorf("plugins directory does not exist: %s", pluginsDir)
-	}
-
 	hostPath := resolvePluginHostPath()
 
 	m := &Manager{
@@ -77,13 +74,17 @@ func NewManager(pluginsDir string, reg *registry.Registry) (*Manager, error) {
 		pluginHostPath: hostPath,
 	}
 
-	if err := m.loadPlugins(); err != nil {
-		return nil, fmt.Errorf("loading plugins: %w", err)
-	}
+	if _, err := os.Stat(pluginsDir); os.IsNotExist(err) {
+		log.Infof("Plugin directory %s does not exist, skipping .spx plugin loading", pluginsDir)
+	} else {
+		if err := m.loadPlugins(); err != nil {
+			return nil, fmt.Errorf("loading plugins: %w", err)
+		}
 
-	if len(m.plugins) > 0 {
-		if err := m.startHost(); err != nil {
-			log.WithError(err).Error("Failed to start Plugin Host, plugin execution will be unavailable")
+		if len(m.plugins) > 0 {
+			if err := m.startHost(); err != nil {
+				log.WithError(err).Error("Failed to start Plugin Host, plugin execution will be unavailable")
+			}
 		}
 	}
 
@@ -761,4 +762,308 @@ func (m *Manager) Shutdown() {
 		m.host.Kill()
 		m.host = nil
 	}
+}
+
+// LoadScriptsFromDB loads all active scripts from the database and registers
+// their contributions. Call this after NewManager during server startup.
+func (m *Manager) LoadScriptsFromDB() error {
+	scripts, err := models.FindActiveScripts()
+	if err != nil {
+		return fmt.Errorf("querying active scripts: %w", err)
+	}
+
+	if len(scripts) == 0 {
+		return nil
+	}
+
+	for _, script := range scripts {
+		scriptID := "script." + script.Name
+		manifest, err := parseScriptManifest(script.Manifest)
+		if err != nil {
+			log.WithError(err).Errorf("Failed to parse manifest for script %s", script.Name)
+			continue
+		}
+
+		m.registerScriptContributions(scriptID, manifest)
+
+		m.mu.Lock()
+		m.plugins[scriptID] = &LoadedPlugin{
+			Manifest:  manifest,
+			Dir:       "",
+			Activated: false,
+		}
+		m.mu.Unlock()
+
+		log.Infof("Script loaded from DB: %s", scriptID)
+	}
+
+	if m.host == nil && len(m.plugins) > 0 {
+		if err := m.startHost(); err != nil {
+			return fmt.Errorf("starting plugin host for scripts: %w", err)
+		}
+	}
+
+	for _, script := range scripts {
+		scriptID := "script." + script.Name
+		if err := m.activateScriptInline(scriptID, script.Source); err != nil {
+			log.WithError(err).Errorf("Failed to activate script %s", scriptID)
+		}
+	}
+
+	return nil
+}
+
+// ActivateScript registers and activates an in-app script.
+func (m *Manager) ActivateScript(name string, source string, manifestJSON []byte) error {
+	scriptID := "script." + name
+	log.Infof("ActivateScript called: scriptID=%s, sourceLen=%d", scriptID, len(source))
+
+	// Unregister any previous contributions for this script
+	m.mu.RLock()
+	existingPlugin, exists := m.plugins[scriptID]
+	m.mu.RUnlock()
+	if exists && existingPlugin.Manifest != nil {
+		m.unregisterScriptContributions(scriptID, existingPlugin.Manifest)
+	}
+
+	m.mu.Lock()
+	m.plugins[scriptID] = &LoadedPlugin{
+		Manifest:  &PluginManifest{},
+		Dir:       "",
+		Activated: false,
+	}
+	m.mu.Unlock()
+
+	if m.host == nil {
+		log.Infof("Plugin host not running, starting it now (hostPath=%s)", m.pluginHostPath)
+		if err := m.startHost(); err != nil {
+			return fmt.Errorf("starting plugin host: %w", err)
+		}
+		log.Info("Plugin host started successfully")
+	}
+
+	return m.activateScriptInline(scriptID, source)
+}
+
+// DeactivateScript deactivates and unregisters an in-app script.
+func (m *Manager) DeactivateScript(name string) error {
+	scriptID := "script." + name
+
+	m.mu.RLock()
+	plugin, ok := m.plugins[scriptID]
+	m.mu.RUnlock()
+
+	if !ok {
+		return nil
+	}
+
+	if m.host != nil && plugin.Activated {
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultActivationTimeout)
+		defer cancel()
+		_, _ = m.host.Call(ctx, "plugin/deactivate", map[string]any{
+			"pluginId": scriptID,
+		})
+	}
+
+	if plugin.Manifest != nil {
+		m.unregisterScriptContributions(scriptID, plugin.Manifest)
+	}
+
+	m.mu.Lock()
+	delete(m.plugins, scriptID)
+	m.mu.Unlock()
+
+	return nil
+}
+
+// UpdateScript deactivates the old script and activates the new one.
+func (m *Manager) UpdateScript(name string, source string, manifestJSON []byte) error {
+	if err := m.DeactivateScript(name); err != nil {
+		return err
+	}
+	return m.ActivateScript(name, source, manifestJSON)
+}
+
+func (m *Manager) activateScriptInline(scriptID, source string) error {
+	log.Infof("activateScriptInline called: scriptID=%s", scriptID)
+
+	if m.host == nil {
+		if err := m.startHost(); err != nil {
+			return fmt.Errorf("starting plugin host for script activation: %w", err)
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultActivationTimeout)
+	defer cancel()
+
+	result, err := m.host.Call(ctx, "plugin/activateInline", map[string]any{
+		"pluginId": scriptID,
+		"source":   source,
+		"manifest": map[string]any{},
+	})
+	if err != nil {
+		return fmt.Errorf("activating script %s: %w", scriptID, err)
+	}
+
+	var parsedResult map[string]any
+	if err := json.Unmarshal(result, &parsedResult); err != nil {
+		log.WithError(err).Warnf("Failed to parse activation result for %s", scriptID)
+		parsedResult = nil
+	}
+	log.Infof("Plugin host returned result for %s: %v", scriptID, parsedResult)
+
+	manifest := m.buildManifestFromActivationResult(parsedResult)
+	log.Infof("Built manifest for %s: components=%d, triggers=%d",
+		scriptID,
+		len(manifest.SuperPlane.Contributes.Components),
+		len(manifest.SuperPlane.Contributes.Triggers))
+
+	m.registerScriptContributions(scriptID, manifest)
+
+	m.mu.Lock()
+	if p, ok := m.plugins[scriptID]; ok {
+		p.Activated = true
+		p.Manifest = manifest
+	}
+	m.mu.Unlock()
+
+	log.Infof("Script activated: %s", scriptID)
+	return nil
+}
+
+func (m *Manager) buildManifestFromActivationResult(result any) *PluginManifest {
+	manifest := &PluginManifest{}
+
+	resultMap, ok := result.(map[string]any)
+	if !ok {
+		return manifest
+	}
+
+	if comps, ok := resultMap["components"].([]any); ok {
+		for _, c := range comps {
+			comp, ok := c.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			contribution := ComponentContribution{
+				Name:        stringFromMap(comp, "name"),
+				Label:       stringFromMap(comp, "label"),
+				Description: stringFromMap(comp, "description"),
+				Icon:        stringFromMap(comp, "icon"),
+				Color:       stringFromMap(comp, "color"),
+			}
+
+			if channels, ok := comp["outputChannels"].([]any); ok {
+				for _, ch := range channels {
+					if chMap, ok := ch.(map[string]any); ok {
+						contribution.OutputChannels = append(contribution.OutputChannels, OutputChannelManifest{
+							Name:  stringFromMap(chMap, "name"),
+							Label: stringFromMap(chMap, "label"),
+						})
+					}
+				}
+			}
+
+			if configs, ok := comp["configuration"].([]any); ok {
+				for _, cfg := range configs {
+					if cfgMap, ok := cfg.(map[string]any); ok {
+						field := configuration.Field{
+							Name:  stringFromMap(cfgMap, "name"),
+							Label: stringFromMap(cfgMap, "label"),
+							Type:  stringFromMap(cfgMap, "type"),
+						}
+						if req, ok := cfgMap["required"].(bool); ok {
+							field.Required = req
+						}
+						contribution.Configuration = append(contribution.Configuration, field)
+					}
+				}
+			}
+
+			manifest.SuperPlane.Contributes.Components = append(manifest.SuperPlane.Contributes.Components, contribution)
+		}
+	}
+
+	if trigs, ok := resultMap["triggers"].([]any); ok {
+		for _, t := range trigs {
+			trig, ok := t.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			contribution := TriggerContribution{
+				Name:        stringFromMap(trig, "name"),
+				Label:       stringFromMap(trig, "label"),
+				Description: stringFromMap(trig, "description"),
+				Icon:        stringFromMap(trig, "icon"),
+				Color:       stringFromMap(trig, "color"),
+			}
+
+			if configs, ok := trig["configuration"].([]any); ok {
+				for _, cfg := range configs {
+					if cfgMap, ok := cfg.(map[string]any); ok {
+						field := configuration.Field{
+							Name:  stringFromMap(cfgMap, "name"),
+							Label: stringFromMap(cfgMap, "label"),
+							Type:  stringFromMap(cfgMap, "type"),
+						}
+						if req, ok := cfgMap["required"].(bool); ok {
+							field.Required = req
+						}
+						contribution.Configuration = append(contribution.Configuration, field)
+					}
+				}
+			}
+
+			manifest.SuperPlane.Contributes.Triggers = append(manifest.SuperPlane.Contributes.Triggers, contribution)
+		}
+	}
+
+	return manifest
+}
+
+func stringFromMap(m map[string]any, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+func (m *Manager) registerScriptContributions(scriptID string, manifest *PluginManifest) {
+	for _, comp := range manifest.SuperPlane.Contributes.Components {
+		adapter := NewPluginComponentAdapter(comp, scriptID, m)
+		m.registry.Components[comp.Name] = adapter
+		log.Infof("  Registered script component: %s", comp.Name)
+	}
+
+	for _, trig := range manifest.SuperPlane.Contributes.Triggers {
+		adapter := NewPluginTriggerAdapter(trig, scriptID, m)
+		m.registry.Triggers[trig.Name] = adapter
+		log.Infof("  Registered script trigger: %s", trig.Name)
+	}
+}
+
+func (m *Manager) unregisterScriptContributions(scriptID string, manifest *PluginManifest) {
+	for _, comp := range manifest.SuperPlane.Contributes.Components {
+		delete(m.registry.Components, comp.Name)
+	}
+	for _, trig := range manifest.SuperPlane.Contributes.Triggers {
+		delete(m.registry.Triggers, trig.Name)
+	}
+}
+
+func parseScriptManifest(manifestJSON []byte) (*PluginManifest, error) {
+	if len(manifestJSON) == 0 || string(manifestJSON) == "{}" {
+		return &PluginManifest{}, nil
+	}
+
+	var superplaneSection SuperPlaneManifest
+	if err := json.Unmarshal(manifestJSON, &superplaneSection); err != nil {
+		return nil, fmt.Errorf("parsing manifest JSON: %w", err)
+	}
+
+	return &PluginManifest{
+		SuperPlane: superplaneSection,
+	}, nil
 }

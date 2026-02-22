@@ -183,6 +183,24 @@ import type {
   RolesUpdateRoleData,
   RolesUpdateRoleErrors,
   RolesUpdateRoleResponses,
+  ScriptsCreateScriptData,
+  ScriptsCreateScriptErrors,
+  ScriptsCreateScriptResponses,
+  ScriptsDeleteScriptData,
+  ScriptsDeleteScriptErrors,
+  ScriptsDeleteScriptResponses,
+  ScriptsDescribeScriptData,
+  ScriptsDescribeScriptErrors,
+  ScriptsDescribeScriptResponses,
+  ScriptsGenerateScriptData,
+  ScriptsGenerateScriptErrors,
+  ScriptsGenerateScriptResponses,
+  ScriptsListScriptsData,
+  ScriptsListScriptsErrors,
+  ScriptsListScriptsResponses,
+  ScriptsUpdateScriptData,
+  ScriptsUpdateScriptErrors,
+  ScriptsUpdateScriptResponses,
   SecretsCreateSecretData,
   SecretsCreateSecretErrors,
   SecretsCreateSecretResponses,
@@ -1171,6 +1189,96 @@ export const rolesAssignRole = <ThrowOnError extends boolean = true>(
 ) =>
   (options.client ?? client).post<RolesAssignRoleResponses, RolesAssignRoleErrors, ThrowOnError>({
     url: "/api/v1/roles/{roleName}/users",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List scripts
+ *
+ * Returns a list of all scripts in the organization
+ */
+export const scriptsListScripts = <ThrowOnError extends boolean = true>(
+  options?: Options<ScriptsListScriptsData, ThrowOnError>,
+) =>
+  (options?.client ?? client).get<ScriptsListScriptsResponses, ScriptsListScriptsErrors, ThrowOnError>({
+    url: "/api/v1/scripts",
+    ...options,
+  });
+
+/**
+ * Create script
+ *
+ * Creates a new in-app script
+ */
+export const scriptsCreateScript = <ThrowOnError extends boolean = true>(
+  options: Options<ScriptsCreateScriptData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<ScriptsCreateScriptResponses, ScriptsCreateScriptErrors, ThrowOnError>({
+    url: "/api/v1/scripts",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete script
+ *
+ * Deletes an existing script
+ */
+export const scriptsDeleteScript = <ThrowOnError extends boolean = true>(
+  options: Options<ScriptsDeleteScriptData, ThrowOnError>,
+) =>
+  (options.client ?? client).delete<ScriptsDeleteScriptResponses, ScriptsDeleteScriptErrors, ThrowOnError>({
+    url: "/api/v1/scripts/{id}",
+    ...options,
+  });
+
+/**
+ * Describe script
+ *
+ * Returns a script
+ */
+export const scriptsDescribeScript = <ThrowOnError extends boolean = true>(
+  options: Options<ScriptsDescribeScriptData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<ScriptsDescribeScriptResponses, ScriptsDescribeScriptErrors, ThrowOnError>({
+    url: "/api/v1/scripts/{id}",
+    ...options,
+  });
+
+/**
+ * Update script
+ *
+ * Updates an existing script
+ */
+export const scriptsUpdateScript = <ThrowOnError extends boolean = true>(
+  options: Options<ScriptsUpdateScriptData, ThrowOnError>,
+) =>
+  (options.client ?? client).patch<ScriptsUpdateScriptResponses, ScriptsUpdateScriptErrors, ThrowOnError>({
+    url: "/api/v1/scripts/{id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Generate script
+ *
+ * Uses AI to generate or update script code based on a user prompt
+ */
+export const scriptsGenerateScript = <ThrowOnError extends boolean = true>(
+  options: Options<ScriptsGenerateScriptData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<ScriptsGenerateScriptResponses, ScriptsGenerateScriptErrors, ThrowOnError>({
+    url: "/api/v1/scripts/{scriptId}/generate",
     ...options,
     headers: {
       "Content-Type": "application/json",

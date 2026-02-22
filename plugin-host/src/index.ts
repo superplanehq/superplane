@@ -1,4 +1,5 @@
 import * as path from "path";
+import * as vm from "vm";
 import { RpcTransport } from "./rpc";
 import * as sdk from "./sdk";
 import {
@@ -13,6 +14,48 @@ import {
   buildWebhookHandlerSetupContext,
   buildWebhookHandlerCleanupContext,
 } from "./sdk";
+
+/**
+ * Converts ES module syntax to CommonJS so scripts can run inside vm.compileFunction.
+ * Handles: import, export function, export async function, export const/let/var, export default.
+ */
+function esmToCjs(source: string): string {
+  const exportedNames: string[] = [];
+
+  let result = source
+    // import { a, b } from "mod"  →  const { a, b } = require("mod")
+    .replace(/\bimport\s+\{([^}]+)\}\s+from\s+["']([^"']+)["']\s*;?/g,
+      (_match, names, mod) => `const {${names}} = require("${mod}");`)
+    // import X from "mod"  →  const X = require("mod")
+    .replace(/\bimport\s+(\w+)\s+from\s+["']([^"']+)["']\s*;?/g,
+      (_match, name, mod) => `const ${name} = require("${mod}");`)
+    // import * as X from "mod"  →  const X = require("mod")
+    .replace(/\bimport\s+\*\s+as\s+(\w+)\s+from\s+["']([^"']+)["']\s*;?/g,
+      (_match, name, mod) => `const ${name} = require("${mod}");`)
+    // export async function name(...)
+    .replace(/\bexport\s+async\s+function\s+(\w+)/g, (_match, name) => {
+      exportedNames.push(name);
+      return `async function ${name}`;
+    })
+    // export function name(...)
+    .replace(/\bexport\s+function\s+(\w+)/g, (_match, name) => {
+      exportedNames.push(name);
+      return `function ${name}`;
+    })
+    // export const/let/var name
+    .replace(/\bexport\s+(const|let|var)\s+(\w+)/g, (_match, kind, name) => {
+      exportedNames.push(name);
+      return `${kind} ${name}`;
+    })
+    // export default (treat as module.exports directly)
+    .replace(/\bexport\s+default\s+/g, "module.exports = ");
+
+  if (exportedNames.length > 0) {
+    result += "\n" + exportedNames.map((n) => `module.exports.${n} = ${n};`).join("\n") + "\n";
+  }
+
+  return result;
+}
 
 interface LoadedPlugin {
   id: string;
@@ -37,6 +80,9 @@ const rpc = new RpcTransport(async (method: string, params: any) => {
 
     case "plugin/deactivate":
       return handleDeactivate(params);
+
+    case "plugin/activateInline":
+      return handleActivateInline(params);
 
     default: {
       if (method.startsWith("component/")) {
@@ -98,6 +144,59 @@ async function handleActivate(params: {
   };
 
   plugins.set(pluginId, plugin);
+}
+
+async function handleActivateInline(params: {
+  pluginId: string;
+  source: string;
+  manifest: any;
+}): Promise<{ components: any[]; triggers: any[] }> {
+  const { pluginId, source } = params;
+
+  if (plugins.has(pluginId)) {
+    await handleDeactivate({ pluginId });
+  }
+
+  const context = new PluginContextImpl(pluginId, rpc);
+
+  let pluginModule: any;
+  try {
+    const cjsSource = esmToCjs(source);
+    const moduleExports: any = {};
+    const moduleObj = { exports: moduleExports };
+
+    const scriptRequire = (id: string) => {
+      if (id === "@superplane/sdk") return sdk;
+      return require(id);
+    };
+
+    const wrappedFn = vm.compileFunction(cjsSource, ["require", "module", "exports"], {
+      filename: `${pluginId}.js`,
+    });
+    wrappedFn(scriptRequire, moduleObj, moduleExports);
+    pluginModule = moduleObj.exports;
+  } catch (err: any) {
+    throw new Error(`Failed to evaluate script ${pluginId}: ${err.message}`);
+  }
+
+  if (typeof pluginModule.activate !== "function") {
+    throw new Error(`Script ${pluginId} does not export an activate() function`);
+  }
+
+  await pluginModule.activate(context);
+
+  plugins.set(pluginId, {
+    id: pluginId,
+    path: "",
+    context,
+    deactivate:
+      typeof pluginModule.deactivate === "function" ? pluginModule.deactivate : undefined,
+  });
+
+  return {
+    components: context.components.getRegisteredMetadata(),
+    triggers: context.triggers.getRegisteredMetadata(),
+  };
 }
 
 async function handleDeactivate(params: {

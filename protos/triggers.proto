@@ -71,4 +71,5 @@ message Trigger {
   string color = 5;
   repeated Configuration.Field configuration = 6;
   google.protobuf.Struct example_data = 7;
+  string source = 8;
 }
