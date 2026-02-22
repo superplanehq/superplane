@@ -104,7 +104,9 @@ func (t *OnAlertFired) Setup(ctx core.TriggerContext) error {
 
 	teamAny, err := ctx.Integration.GetConfig("teamSlug")
 	if err == nil && strings.TrimSpace(string(teamAny)) != "" {
-		_ = client.EnsureConfigurationKey(strings.TrimSpace(string(teamAny)))
+		if err := client.EnsureConfigurationKey(strings.TrimSpace(string(teamAny))); err != nil {
+			return fmt.Errorf("failed to ensure configuration key: %w", err)
+		}
 	}
 
 	triggers, err := client.ListTriggers(cfg.DatasetSlug)
