@@ -1,0 +1,46 @@
+{
+  "data": {
+    "pipeline": {
+      "name": "my-deploy-pipeline",
+      "roleArn": "arn:aws:iam::123456789012:role/pipeline-role",
+      "version": 3,
+      "stages": [
+        {
+          "name": "Source",
+          "actions": [
+            {
+              "name": "SourceAction",
+              "actionTypeId": {
+                "category": "Source",
+                "owner": "AWS",
+                "provider": "CodeStarSourceConnection",
+                "version": "1"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deploy",
+          "actions": [
+            {
+              "name": "DeployAction",
+              "actionTypeId": {
+                "category": "Deploy",
+                "owner": "AWS",
+                "provider": "CodeDeploy",
+                "version": "1"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "metadata": {
+      "pipelineArn": "arn:aws:codepipeline:us-east-1:123456789012:my-deploy-pipeline",
+      "created": "2025-01-15T10:30:00Z",
+      "updated": "2026-02-20T14:00:00Z"
+    }
+  },
+  "timestamp": "2026-02-22T10:00:00.000000000Z",
+  "type": "aws.codepipeline.pipeline"
+}

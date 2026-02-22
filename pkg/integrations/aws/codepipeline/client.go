@@ -35,6 +35,31 @@ func NewClient(httpCtx core.HTTPContext, credentials *aws.Credentials, region st
 	}
 }
 
+type GetPipelineResponseBody struct {
+	Pipeline map[string]any             `json:"pipeline"`
+	Metadata PipelineDefinitionMetadata `json:"metadata"`
+}
+
+type PipelineDefinitionMetadata struct {
+	PipelineARN       string           `json:"pipelineArn"`
+	Created           common.FloatTime `json:"created"`
+	Updated           common.FloatTime `json:"updated"`
+	PollingDisabledAt common.FloatTime `json:"pollingDisabledAt,omitempty"`
+}
+
+func (c *Client) GetPipeline(name string) (*GetPipelineResponseBody, error) {
+	payload := map[string]any{
+		"name": name,
+	}
+
+	var response GetPipelineResponseBody
+	if err := c.postJSON("GetPipeline", payload, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
 type StartPipelineExecutionResponse struct {
 	PipelineExecutionID string `json:"pipelineExecutionId"`
 }
