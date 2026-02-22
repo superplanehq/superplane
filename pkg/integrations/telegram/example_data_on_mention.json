@@ -1,0 +1,26 @@
+{
+  "type": "telegram.message.mention",
+  "data": {
+    "message_id": 1234,
+    "from": {
+      "id": 111222333,
+      "is_bot": false,
+      "first_name": "John",
+      "username": "johndoe"
+    },
+    "chat": {
+      "id": -9876543210,
+      "type": "group",
+      "title": "My Group"
+    },
+    "text": "@mybot hello!",
+    "entities": [
+      {
+        "type": "mention",
+        "offset": 0,
+        "length": 6
+      }
+    ],
+    "date": 1737028800
+  }
+}

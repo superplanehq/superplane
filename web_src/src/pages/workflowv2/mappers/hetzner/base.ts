@@ -7,8 +7,15 @@ function getExecutionDetails(context: ExecutionDetailsContext): Record<string, s
   const metadata = context.execution.metadata as Record<string, unknown> | undefined;
 
   const serverId = metadata?.serverId ?? (metadata?.server as Record<string, unknown> | undefined)?.id;
+  const loadBalancerId =
+    metadata?.loadBalancerId ?? (metadata?.loadBalancer as Record<string, unknown> | undefined)?.id;
+
   if (serverId !== undefined) {
     details["Server ID"] = String(serverId);
+  }
+
+  if (loadBalancerId !== undefined) {
+    details["Load Balancer ID"] = String(loadBalancerId);
   }
 
   if (context.execution.createdAt) {
