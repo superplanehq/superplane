@@ -1,0 +1,57 @@
+{
+  "data": {
+    "action": "create",
+    "actor": {
+      "email": "590b5685-0c0d-476f-b33b-2afdc1273716@oauthapp.linear.app",
+      "id": "bd35d567-0f57-46fa-85e1-9b1e53529393",
+      "name": "superplane",
+      "type": "user",
+      "url": "https://linear.app/brainstormmingdev/profiles/superplane1"
+    },
+    "createdAt": "2026-02-16T21:35:23.762Z",
+    "data": {
+      "addedToTeamAt": "2026-02-16T21:35:23.788Z",
+      "botActor": null,
+      "createdAt": "2026-02-16T21:35:23.762Z",
+      "creatorId": "bd35d567-0f57-46fa-85e1-9b1e53529393",
+      "description": "test test",
+      "descriptionData": "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"test test\"}]}]}",
+      "id": "4aae5d23-07a5-4e68-912e-098dbf5a5b4e",
+      "identifier": "BRA-45",
+      "labelIds": [],
+      "labels": [],
+      "number": 45,
+      "previousIdentifiers": [],
+      "priority": 0,
+      "priorityLabel": "No priority",
+      "prioritySortOrder": -4135,
+      "reactionData": [],
+      "slaType": "all",
+      "sortOrder": -4029,
+      "state": {
+        "color": "#bec2c8",
+        "id": "af874731-64fd-4b3e-b871-b762922637b6",
+        "name": "Backlog",
+        "type": "backlog"
+      },
+      "stateId": "af874731-64fd-4b3e-b871-b762922637b6",
+      "subscriberIds": [
+        "bd35d567-0f57-46fa-85e1-9b1e53529393"
+      ],
+      "team": {
+        "id": "01d0cb17-f38a-4fea-9e5c-717dbb27766f",
+        "key": "BRA",
+        "name": "BrainStormmingDev"
+      },
+      "teamId": "01d0cb17-f38a-4fea-9e5c-717dbb27766f",
+      "title": "Test superplane",
+      "updatedAt": "2026-02-16T21:35:23.762Z",
+      "url": "https://linear.app/brainstormmingdev/issue/BRA-45/test-superplane"
+    },
+    "type": "Issue",
+    "url": "https://linear.app/brainstormmingdev/issue/BRA-45/test-superplane",
+    "webhookTimestamp": 1771277724034
+  },
+  "timestamp": "2026-02-16T21:35:22.388339184Z",
+  "type": "linear.issue"
+}
