@@ -368,24 +368,25 @@ func (c *DeployRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 	}
 
 	resolvedTask := Task{
-		State:         TaskStateFailed,
 		CompletedTime: readString(payload["Timestamp"]),
+	}
+
+	// Default state from event type; only used when GetTask fails.
+	if eventType == EventCategoryDeploymentSucceeded {
+		resolvedTask.State = TaskStateSuccess
+	} else {
+		resolvedTask.State = TaskStateFailed
 	}
 
 	if metadata.Deployment != nil && metadata.Deployment.TaskID != "" {
 		task, taskErr := client.GetTask(metadata.Deployment.TaskID)
 		if taskErr == nil {
+			// Prefer the real task state (may be Canceled, TimedOut, etc.)
 			resolvedTask = task
 			if resolvedTask.CompletedTime == "" {
 				resolvedTask.CompletedTime = readString(payload["Timestamp"])
 			}
 		}
-	}
-
-	if eventType == EventCategoryDeploymentSucceeded {
-		resolvedTask.State = TaskStateSuccess
-	} else if eventType == EventCategoryDeploymentFailed {
-		resolvedTask.State = TaskStateFailed
 	}
 
 	if metadata.Deployment == nil {
