@@ -57,16 +57,24 @@ export function buildRepositoryMetadataItems(
   metadata?: EcrRepositoryMetadata,
   configuration?: EcrRepositoryConfiguration,
 ): MetadataItem[] {
-  const repositoryLabel = getRepositoryLabel(metadata, configuration);
+  const items: MetadataItem[] = [];
 
-  if (!repositoryLabel) {
-    return [];
+  if (metadata?.region) {
+    items.push({
+      icon: "globe",
+      label: metadata.region,
+    });
   }
 
-  return [
-    {
-      icon: "package",
-      label: repositoryLabel,
-    },
-  ];
+  const repositoryLabel = getRepositoryLabel(metadata, configuration);
+  if (!repositoryLabel) {
+    return items;
+  }
+
+  items.push({
+    icon: "package",
+    label: repositoryLabel,
+  });
+
+  return items;
 }

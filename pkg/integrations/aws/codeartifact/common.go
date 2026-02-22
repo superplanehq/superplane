@@ -94,14 +94,14 @@ var RegionsForCodeArtifact = []configuration.FieldOption{
 	},
 }
 
-func validateRepository(ctx core.IntegrationContext, http core.HTTPContext, region string, repository string) (*Repository, error) {
+func validateRepository(ctx core.IntegrationContext, http core.HTTPContext, region string, domain string, repository string) (*Repository, error) {
 	credentials, err := common.CredentialsFromInstallation(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	client := NewClient(http, credentials, region)
-	repositories, err := client.ListRepositories("")
+	repositories, err := client.ListRepositories(domain)
 	if err != nil {
 		return nil, err
 	}

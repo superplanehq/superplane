@@ -453,7 +453,7 @@ type jwksResponse struct {
 }
 
 func (s *Server) handleOIDCConfiguration(w http.ResponseWriter, _ *http.Request) {
-	baseURL := strings.TrimRight(s.BaseURL, "/")
+	baseURL := strings.TrimRight(s.WebhooksBaseURL, "/")
 	response := oidcDiscoveryResponse{
 		Issuer:                           baseURL,
 		JWKSURI:                          baseURL + "/.well-known/jwks.json",

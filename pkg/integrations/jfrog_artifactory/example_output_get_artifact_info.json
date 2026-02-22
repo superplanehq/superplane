@@ -1,0 +1,21 @@
+{
+  "type": "jfrogArtifactory.artifact.info",
+  "data": {
+    "repo": "libs-release-local",
+    "path": "/com/example/artifact/1.0/artifact-1.0.jar",
+    "created": "2026-01-15T10:30:00.000Z",
+    "createdBy": "admin",
+    "lastModified": "2026-01-15T10:30:00.000Z",
+    "modifiedBy": "admin",
+    "downloadUri": "https://mycompany.jfrog.io/artifactory/libs-release-local/com/example/artifact/1.0/artifact-1.0.jar",
+    "mimeType": "application/java-archive",
+    "size": "12345",
+    "checksums": {
+      "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+      "md5": "d41d8cd98f00b204e9800998ecf8427e",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "uri": "https://mycompany.jfrog.io/artifactory/api/storage/libs-release-local/com/example/artifact/1.0/artifact-1.0.jar"
+  },
+  "timestamp": "2026-01-23T12:00:00Z"
+}

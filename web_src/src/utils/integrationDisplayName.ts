@@ -10,17 +10,21 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   cursor: "Cursor",
   pagerduty: "PagerDuty",
   slack: "Slack",
+  digitalocean: "DigitalOcean",
   discord: "Discord",
   datadog: "DataDog",
   cloudflare: "Cloudflare",
   semaphore: "Semaphore",
   rootly: "Rootly",
+  statuspage: "Statuspage",
   daytona: "Daytona",
   dash0: "Dash0",
   aws: "AWS",
+  gcp: "GCP",
   smtp: "SMTP",
   sendgrid: "SendGrid",
   dockerhub: "DockerHub",
+  harness: "Harness",
 };
 
 /**

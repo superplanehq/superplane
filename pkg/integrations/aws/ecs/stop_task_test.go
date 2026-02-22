@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -67,6 +68,7 @@ func Test__StopTask__Setup(t *testing.T) {
 		})
 
 		err := component.Setup(core.SetupContext{
+			Logger: log.NewEntry(log.New()),
 			Configuration: map[string]any{
 				"region":  "us-east-1",
 				"cluster": "demo",
@@ -93,7 +95,7 @@ func Test__StopTask__Setup(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		integration := setupStopTaskIntegrationContext(&common.EventBridgeMetadata{
 			Rules: map[string]common.EventBridgeRuleMetadata{
-				ecsEventBridgeSource: {
+				"aws.ecs:us-east-1": {
 					Source:      ecsEventBridgeSource,
 					Region:      "us-east-1",
 					Name:        "ecs-task-events",
