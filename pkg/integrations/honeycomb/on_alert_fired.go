@@ -126,6 +126,10 @@ func (t *OnAlertFired) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("trigger with name %q not found in dataset %q", cfg.AlertName, cfg.DatasetSlug)
 	}
 
+	if err := ctx.Metadata.Set(OnAlertFiredNodeMetadata{TriggerID: triggerID}); err != nil {
+		return fmt.Errorf("failed to set metadata: %w", err)
+	}
+
 	if err := ctx.Integration.RequestWebhook(map[string]any{
 		"datasetSlug": cfg.DatasetSlug,
 		"triggerIds":  []string{triggerID},
@@ -133,7 +137,6 @@ func (t *OnAlertFired) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to request webhook: %w", err)
 	}
 
-	_ = ctx.Metadata.Set(OnAlertFiredNodeMetadata{TriggerID: triggerID})
 	return nil
 }
 
