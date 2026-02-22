@@ -2,12 +2,12 @@
 title: "Honeycomb"
 ---
 
-Triggers and actions for Honeycomb
+Monitor observability alerts and send events to Honeycomb datasets
 
 ## Triggers
 
 <CardGrid>
-  <LinkCard title="On Alert Fired" href="#on-alert-fired" description="Triggers when Honeycomb sends an alert webhook" />
+  <LinkCard title="On Alert Fired" href="#on-alert-fired" description="Triggers when a Honeycomb Trigger fires" />
 </CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
@@ -15,33 +15,35 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Create Event" href="#create-event" description="Send an event to Honeycomb" />
+  <LinkCard title="Create Event" href="#create-event" description="Send an event to Honeycomb dataset" />
 </CardGrid>
 
 ## Instructions
 
-Connect Honeycomb to Superplane using a Honeycomb API key.
+Connect Honeycomb to SuperPlane using a Management Key.
 
-**Get your API key**:
-Honeycomb → Account → Team Settings → API Keys → copy key → paste here.
+**Required configuration:**
+- **Site**: US (api.honeycomb.io) or EU (api.eu1.honeycomb.io) based on your account region.
+- **Management Key**: Found in Honeycomb under Team Settings > API Keys. Must be in format <keyID>:<secret>.
+- **Team Slug**: Your team identifier, visible in the Honeycomb URL: honeycomb.io/<team-slug>.
+- **Environment Slug**: The environment containing your datasets (e.g. "production"). Found under Team Settings > Environments.
 
-**Trigger setup**:
-After saving a Honeycomb trigger node, Superplane generates a Webhook URL and Shared Secret.
-Add them in Honeycomb → Team Settings → Integrations → Webhooks.
-
-Once configured, Honeycomb events will trigger your workflow automatically.
+SuperPlane will automatically validate your credentials and manage all necessary Honeycomb resources — webhook recipients for triggers and ingest keys for actions — so no manual setup is required.
 
 <a id="on-alert-fired"></a>
 
 ## On Alert Fired
 
-The On Alert Fired trigger starts a workflow execution when Honeycomb sends an alert webhook.
+Starts a workflow execution when a Honeycomb Trigger fires.
 
-Setup:
-1) Add this trigger to a workflow
-2) Optionally set Alert Name (used to filter which node fires)
-3) SAVE the node
-4) Copy Webhook URL and Shared Secret into Honeycomb webhook integration
+**Configuration:**
+- **Dataset Slug**: The slug of the dataset that contains your Honeycomb trigger. Found in the dataset URL: honeycomb.io/<team>/datasets/<dataset-slug>.
+- **Alert Name**: The exact name of the Honeycomb trigger to listen to (case-insensitive). Found in your dataset under Triggers.
+
+**How it works:**
+SuperPlane automatically creates a webhook recipient in Honeycomb and attaches it to the selected trigger. No manual webhook setup is required.
+
+When the trigger fires, SuperPlane receives the webhook and starts a workflow execution with the full alert payload.
 
 ### Example Data
 
@@ -90,13 +92,14 @@ Setup:
 
 ## Create Event
 
-Sends a custom event to Honeycomb using the Events API.
+Sends a JSON event to a Honeycomb dataset.
 
-The component sends a single event as a JSON object where each key becomes a Honeycomb field.
+Each key in the JSON object becomes a Honeycomb field.
 
 Notes:
-- The request body is the JSON object you provide in "Fields".
-- If you do not include a "time" field, the current time is automatically set via request header.
+• Dataset must exist
+• Fields must be valid JSON object
+• Timestamp is auto-added if missing
 
 ### Example Output
 

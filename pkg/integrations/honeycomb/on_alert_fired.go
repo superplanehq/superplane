@@ -15,12 +15,12 @@ import (
 type OnAlertFired struct{}
 
 type OnAlertFiredConfiguration struct {
-	AlertName string `json:"alertName" mapstructure:"alertName"`
+	DatasetSlug string `json:"datasetSlug" mapstructure:"datasetSlug"`
+	AlertName   string `json:"alertName" mapstructure:"alertName"`
 }
 
-type OnAlertFiredMetadata struct {
-	WebhookURL   string `json:"webhookUrl" mapstructure:"webhookUrl"`
-	SharedSecret string `json:"sharedSecret" mapstructure:"sharedSecret"`
+type OnAlertFiredNodeMetadata struct {
+	TriggerID string `json:"triggerId"`
 }
 
 func (t *OnAlertFired) Name() string {
@@ -32,7 +32,7 @@ func (t *OnAlertFired) Label() string {
 }
 
 func (t *OnAlertFired) Description() string {
-	return "Triggers when Honeycomb sends an alert webhook"
+	return "Triggers when a Honeycomb Trigger fires"
 }
 
 func (t *OnAlertFired) Icon() string {
@@ -45,71 +45,93 @@ func (t *OnAlertFired) Color() string {
 
 func (t *OnAlertFired) Documentation() string {
 	return `
-The On Alert Fired trigger starts a workflow execution when Honeycomb sends an alert webhook.
+Starts a workflow execution when a Honeycomb Trigger fires.
 
-Setup:
-1) Add this trigger to a workflow
-2) Optionally set Alert Name (used to filter which node fires)
-3) SAVE the node
-4) Copy Webhook URL and Shared Secret into Honeycomb webhook integration
+**Configuration:**
+- **Dataset Slug**: The slug of the dataset that contains your Honeycomb trigger. Found in the dataset URL: honeycomb.io/<team>/datasets/<dataset-slug>.
+- **Alert Name**: The exact name of the Honeycomb trigger to listen to (case-insensitive). Found in your dataset under Triggers.
+
+**How it works:**
+SuperPlane automatically creates a webhook recipient in Honeycomb and attaches it to the selected trigger. No manual webhook setup is required.
+
+When the trigger fires, SuperPlane receives the webhook and starts a workflow execution with the full alert payload.
 `
 }
 
 func (t *OnAlertFired) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "alertName",
-			Label:       "Alert Name (optional)",
+			Name:        "datasetSlug",
+			Label:       "Dataset Slug",
 			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "If set, only webhooks whose payload name matches will trigger this node.",
+			Required:    true,
+			Description: "The dataset slug containing your Honeycomb trigger.",
+		},
+		{
+			Name:        "alertName",
+			Label:       "Alert Name",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Description: "The name of the Honeycomb trigger to listen to (case-insensitive).",
 		},
 	}
 }
 
 func (t *OnAlertFired) Setup(ctx core.TriggerContext) error {
+	cfg := OnAlertFiredConfiguration{}
+	if err := mapstructure.Decode(ctx.Configuration, &cfg); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
 
-	if ctx.Webhook == nil {
-		if ctx.Integration == nil {
-			return nil
-		}
-		if err := ctx.Integration.RequestWebhook(map[string]any{}); err != nil {
-			return fmt.Errorf("failed to request webhook: %w", err)
-		}
-		return nil
+	cfg.DatasetSlug = strings.TrimSpace(cfg.DatasetSlug)
+	cfg.AlertName = strings.TrimSpace(cfg.AlertName)
+
+	if cfg.DatasetSlug == "" {
+		return fmt.Errorf("datasetSlug is required")
+	}
+	if cfg.AlertName == "" {
+		return fmt.Errorf("alertName is required")
 	}
 
 	if ctx.Integration == nil {
 		return nil
 	}
 
-	secret, err := ctx.Webhook.GetSecret()
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-
-		if err := ctx.Integration.RequestWebhook(map[string]any{}); err != nil {
-			return fmt.Errorf("failed to request webhook: %w", err)
-		}
-
-		secret, err = ctx.Webhook.GetSecret()
-		if err != nil {
-			return fmt.Errorf("failed to get webhook secret after request: %w", err)
-		}
+		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	url, err := ctx.Webhook.Setup()
+	teamAny, err := ctx.Integration.GetConfig("teamSlug")
+	if err == nil && strings.TrimSpace(string(teamAny)) != "" {
+		_ = client.EnsureConfigurationKey(strings.TrimSpace(string(teamAny)))
+	}
+
+	triggers, err := client.ListTriggers(cfg.DatasetSlug)
 	if err != nil {
-		return fmt.Errorf("failed to setup webhook url: %w", err)
+		return fmt.Errorf("failed to list triggers: %w", err)
 	}
 
-	md := OnAlertFiredMetadata{
-		WebhookURL:   strings.TrimSpace(url),
-		SharedSecret: strings.TrimSpace(string(secret)),
+	var triggerID string
+	for _, tr := range triggers {
+		if strings.EqualFold(strings.TrimSpace(tr.Name), cfg.AlertName) {
+			triggerID = tr.ID
+			break
+		}
 	}
 
-	if err := ctx.Metadata.Set(md); err != nil {
-		return fmt.Errorf("failed to set node metadata: %w", err)
+	if triggerID == "" {
+		return fmt.Errorf("trigger with name %q not found in dataset %q", cfg.AlertName, cfg.DatasetSlug)
 	}
 
+	if err := ctx.Integration.RequestWebhook(map[string]any{
+		"datasetSlug": cfg.DatasetSlug,
+		"triggerIds":  []string{triggerID},
+	}); err != nil {
+		return fmt.Errorf("failed to request webhook: %w", err)
+	}
+
+	_ = ctx.Metadata.Set(OnAlertFiredNodeMetadata{TriggerID: triggerID})
 	return nil
 }
 
@@ -126,50 +148,30 @@ func (t *OnAlertFired) Cleanup(ctx core.TriggerContext) error {
 }
 
 func (t *OnAlertFired) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-
 	cfg := OnAlertFiredConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &cfg); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, err
 	}
 
 	secretBytes, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to get webhook secret: %w", err)
+		return http.StatusInternalServerError, err
 	}
 	secret := strings.TrimSpace(string(secretBytes))
-	if secret == "" {
-		return http.StatusInternalServerError, fmt.Errorf("webhook secret is empty")
-	}
 
 	provided := strings.TrimSpace(ctx.Headers.Get("X-Honeycomb-Webhook-Token"))
-	fromAuthorizationHeader := false
-
-	// Fallbacks
 	if provided == "" {
-		provided = strings.TrimSpace(ctx.Headers.Get("Authorization"))
-		fromAuthorizationHeader = provided != ""
-	}
-
-	if provided == "" {
-		provided = strings.TrimSpace(ctx.Headers.Get("X-Shared-Secret"))
+		auth := strings.TrimSpace(ctx.Headers.Get("Authorization"))
+		if strings.HasPrefix(strings.ToLower(auth), "bearer ") {
+			provided = strings.TrimSpace(auth[len("bearer "):])
+		}
 	}
 
 	if provided == "" {
 		return http.StatusUnauthorized, fmt.Errorf("missing webhook token")
 	}
 
-	if fromAuthorizationHeader && strings.HasPrefix(strings.ToLower(provided), "bearer ") {
-		provided = strings.TrimSpace(provided[len("bearer "):])
-	}
-
-	providedBytes := []byte(provided)
-	secretTokenBytes := []byte(secret)
-
-	if len(providedBytes) != len(secretTokenBytes) {
-		subtle.ConstantTimeCompare(secretTokenBytes, secretTokenBytes) // dummy work
-		return http.StatusForbidden, fmt.Errorf("invalid webhook token")
-	}
-	if subtle.ConstantTimeCompare(providedBytes, secretTokenBytes) != 1 {
+	if subtle.ConstantTimeCompare([]byte(provided), []byte(secret)) != 1 {
 		return http.StatusForbidden, fmt.Errorf("invalid webhook token")
 	}
 
@@ -178,28 +180,38 @@ func (t *OnAlertFired) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 		payload = map[string]any{"raw": string(ctx.Body)}
 	}
 
-	want := strings.TrimSpace(cfg.AlertName)
-	if want != "" && !payloadHasAlertName(payload, want) {
-		return http.StatusOK, nil
+	meta := OnAlertFiredNodeMetadata{}
+	raw := ctx.Metadata.Get()
+	if err := mapstructure.Decode(raw, &meta); err == nil && meta.TriggerID != "" {
+		if !payloadHasTriggerID(payload, meta.TriggerID) {
+			return http.StatusOK, nil
+		}
 	}
 
 	if err := ctx.Events.Emit("honeycomb.alert.fired", payload); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("emit failed: %w", err)
+		return http.StatusInternalServerError, err
 	}
 
 	return http.StatusOK, nil
 }
 
-func payloadHasAlertName(payload map[string]any, want string) bool {
+func payloadHasTriggerID(payload map[string]any, want string) bool {
 	want = strings.TrimSpace(want)
-
-	if name, ok := payload["name"].(string); ok {
-		return strings.EqualFold(strings.TrimSpace(name), want)
+	if want == "" {
+		return true
 	}
 
-	if alert, ok := payload["alert"].(map[string]any); ok {
-		if name, ok := alert["name"].(string); ok {
-			return strings.EqualFold(strings.TrimSpace(name), want)
+	if id, ok := payload["id"].(string); ok {
+		return strings.EqualFold(strings.TrimSpace(id), want)
+	}
+
+	if id, ok := payload["trigger_id"].(string); ok {
+		return strings.EqualFold(strings.TrimSpace(id), want)
+	}
+
+	if tr, ok := payload["trigger"].(map[string]any); ok {
+		if id, ok := tr["id"].(string); ok {
+			return strings.EqualFold(strings.TrimSpace(id), want)
 		}
 	}
 

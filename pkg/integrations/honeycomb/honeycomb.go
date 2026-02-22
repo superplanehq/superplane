@@ -1,6 +1,10 @@
 package honeycomb
 
 import (
+	"fmt"
+	"strings"
+
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -11,6 +15,13 @@ func init() {
 }
 
 type Honeycomb struct{}
+
+type Configuration struct {
+	Site            string `json:"site" mapstructure:"site"`
+	ManagementKey   string `json:"managementKey" mapstructure:"managementKey"`
+	TeamSlug        string `json:"teamSlug" mapstructure:"teamSlug"`
+	EnvironmentSlug string `json:"environmentSlug" mapstructure:"environmentSlug"`
+}
 
 func (h *Honeycomb) Name() string {
 	return "honeycomb"
@@ -25,21 +36,20 @@ func (h *Honeycomb) Icon() string {
 }
 
 func (h *Honeycomb) Description() string {
-	return "Triggers and actions for Honeycomb"
+	return "Monitor observability alerts and send events to Honeycomb datasets"
 }
 
 func (h *Honeycomb) Instructions() string {
 	return `
-Connect Honeycomb to Superplane using a Honeycomb API key.
+Connect Honeycomb to SuperPlane using a Management Key.
 
-**Get your API key**:
-Honeycomb → Account → Team Settings → API Keys → copy key → paste here.
+**Required configuration:**
+- **Site**: US (api.honeycomb.io) or EU (api.eu1.honeycomb.io) based on your account region.
+- **Management Key**: Found in Honeycomb under Team Settings > API Keys. Must be in format <keyID>:<secret>.
+- **Team Slug**: Your team identifier, visible in the Honeycomb URL: honeycomb.io/<team-slug>.
+- **Environment Slug**: The environment containing your datasets (e.g. "production"). Found under Team Settings > Environments.
 
-**Trigger setup**:
-After saving a Honeycomb trigger node, Superplane generates a Webhook URL and Shared Secret.
-Add them in Honeycomb → Team Settings → Integrations → Webhooks.
-
-Once configured, Honeycomb events will trigger your workflow automatically.
+SuperPlane will automatically validate your credentials and manage all necessary Honeycomb resources — webhook recipients for triggers and ingest keys for actions — so no manual setup is required.
 `
 }
 
@@ -62,11 +72,25 @@ func (h *Honeycomb) Configuration() []configuration.Field {
 			Description: "Select the Honeycomb API host for your account region.",
 		},
 		{
-			Name:        "apiKey",
-			Label:       "API Key",
+			Name:        "managementKey",
+			Label:       "Management Key",
 			Type:        configuration.FieldTypeString,
-			Description: "Honeycomb API key used for actions (e.g. Create Event).",
+			Description: "Honeycomb Management key in format <keyID>:<secret>.",
 			Sensitive:   true,
+			Required:    true,
+		},
+		{
+			Name:        "teamSlug",
+			Label:       "Team Slug",
+			Type:        configuration.FieldTypeString,
+			Description: "Your team identifier, visible in the Honeycomb URL: honeycomb.io/<team-slug>.",
+			Required:    true,
+		},
+		{
+			Name:        "environmentSlug",
+			Label:       "Environment Slug",
+			Type:        configuration.FieldTypeString,
+			Description: "The environment containing your datasets (e.g. \"production\"). Found under Team Settings > Environments.",
 			Required:    true,
 		},
 	}
@@ -84,15 +108,11 @@ func (h *Honeycomb) Triggers() []core.Trigger {
 	}
 }
 
-func (h *Honeycomb) Sync(ctx core.SyncContext) error {
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return err
-	}
-	if err := client.Validate(); err != nil {
-		return err
-	}
-	ctx.Integration.Ready()
+func (h *Honeycomb) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (h *Honeycomb) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }
 
@@ -100,11 +120,46 @@ func (h *Honeycomb) Cleanup(ctx core.IntegrationCleanupContext) error {
 	return nil
 }
 
-func (h *Honeycomb) Actions() []core.Action {
-	return []core.Action{}
-}
+func (h *Honeycomb) Sync(ctx core.SyncContext) error {
+	cfg := Configuration{}
+	if err := mapstructure.Decode(ctx.Configuration, &cfg); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
 
-func (h *Honeycomb) HandleAction(ctx core.IntegrationActionContext) error {
+	if strings.TrimSpace(cfg.Site) == "" {
+		return fmt.Errorf("site is required")
+	}
+
+	if strings.TrimSpace(cfg.ManagementKey) == "" {
+		return fmt.Errorf("managementKey is required")
+	}
+
+	if strings.TrimSpace(cfg.TeamSlug) == "" {
+		return fmt.Errorf("teamSlug is required")
+	}
+
+	if strings.TrimSpace(cfg.EnvironmentSlug) == "" {
+		return fmt.Errorf("environmentSlug is required")
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	if err := client.ValidateManagementKey(cfg.TeamSlug); err != nil {
+		return err
+	}
+
+	if err := client.EnsureConfigurationKey(cfg.TeamSlug); err != nil {
+		return err
+	}
+
+	if err := client.EnsureIngestKey(cfg.TeamSlug); err != nil {
+		return err
+	}
+
+	ctx.Integration.Ready()
 	return nil
 }
 

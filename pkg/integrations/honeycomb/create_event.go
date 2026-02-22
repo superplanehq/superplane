@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -15,8 +16,8 @@ import (
 type CreateEvent struct{}
 
 type CreateEventConfiguration struct {
-	Dataset    string `json:"dataset" mapstructure:"dataset"`
-	FieldsJSON string `json:"fields" mapstructure:"fields"`
+	Dataset string `json:"dataset" mapstructure:"dataset"`
+	Fields  string `json:"fields" mapstructure:"fields"`
 }
 
 func (c *CreateEvent) Name() string {
@@ -28,17 +29,7 @@ func (c *CreateEvent) Label() string {
 }
 
 func (c *CreateEvent) Description() string {
-	return "Send an event to Honeycomb"
-}
-
-func (c *CreateEvent) Documentation() string {
-	return `Sends a custom event to Honeycomb using the Events API.
-
-The component sends a single event as a JSON object where each key becomes a Honeycomb field.
-
-Notes:
-- The request body is the JSON object you provide in "Fields".
-- If you do not include a "time" field, the current time is automatically set via request header.`
+	return "Send an event to Honeycomb dataset"
 }
 
 func (c *CreateEvent) Icon() string {
@@ -47,6 +38,19 @@ func (c *CreateEvent) Icon() string {
 
 func (c *CreateEvent) Color() string {
 	return "gray"
+}
+
+func (c *CreateEvent) Documentation() string {
+	return `
+Sends a JSON event to a Honeycomb dataset.
+
+Each key in the JSON object becomes a Honeycomb field.
+
+Notes:
+• Dataset must exist
+• Fields must be valid JSON object
+• Timestamp is auto-added if missing
+`
 }
 
 func (c *CreateEvent) OutputChannels(configuration any) []core.OutputChannel {
@@ -60,33 +64,38 @@ func (c *CreateEvent) Configuration() []configuration.Field {
 			Label:       "Dataset",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Honeycomb dataset slug.",
+			Description: "Dataset slug",
 		},
 		{
-			Name:        "fields",
-			Label:       "Fields (JSON)",
-			Type:        configuration.FieldTypeText,
-			Required:    true,
-			Description: `JSON object of fields to send, e.g. {"message":"hello","severity":"info"}`,
+			Name:     "fields",
+			Label:    "Fields JSON",
+			Type:     configuration.FieldTypeText,
+			Required: true,
+			Description: `JSON object to send as event.
+							Example:
+							{"message":"deploy","status":"ok"}`,
 		},
 	}
 }
 
 func (c *CreateEvent) Setup(ctx core.SetupContext) error {
+
 	var cfg CreateEventConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &cfg); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
+		return fmt.Errorf("invalid configuration: %w", err)
 	}
 
+	cfg.Dataset = strings.TrimSpace(cfg.Dataset)
 	if cfg.Dataset == "" {
 		return errors.New("dataset is required")
 	}
-	if cfg.FieldsJSON == "" {
-		return errors.New("fields is required")
+
+	if strings.TrimSpace(cfg.Fields) == "" {
+		return errors.New("fields json is required")
 	}
 
 	var tmp map[string]any
-	if err := json.Unmarshal([]byte(cfg.FieldsJSON), &tmp); err != nil {
+	if err := json.Unmarshal([]byte(cfg.Fields), &tmp); err != nil {
 		return fmt.Errorf("invalid fields json: %w", err)
 	}
 
@@ -98,33 +107,27 @@ func (c *CreateEvent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 }
 
 func (c *CreateEvent) Execute(ctx core.ExecutionContext) error {
+
 	var cfg CreateEventConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &cfg); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-	if cfg.Dataset == "" {
-		return errors.New("dataset is required")
-	}
-	if cfg.FieldsJSON == "" {
-		return errors.New("fields is required")
+		return err
 	}
 
 	var fields map[string]any
-	if err := json.Unmarshal([]byte(cfg.FieldsJSON), &fields); err != nil {
+	if err := json.Unmarshal([]byte(cfg.Fields), &fields); err != nil {
 		return fmt.Errorf("invalid fields json: %w", err)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("failed to create honeycomb client: %w", err)
+		return err
 	}
 
 	if err := client.CreateEvent(cfg.Dataset, fields); err != nil {
 		return err
 	}
 
-	// Emit payload aligned with UI expectations + examples.
-	payload := map[string]any{
+	output := map[string]any{
 		"status":  "sent",
 		"dataset": cfg.Dataset,
 		"fields":  fields,
@@ -133,13 +136,14 @@ func (c *CreateEvent) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"honeycomb.event.created",
-		[]any{payload},
+		[]any{output},
 	)
 }
 
 func (c *CreateEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
+
 func (c *CreateEvent) Actions() []core.Action {
 	return []core.Action{}
 }

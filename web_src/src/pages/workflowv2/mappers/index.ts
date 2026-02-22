@@ -130,7 +130,6 @@ import {
   componentMappers as honeycombComponentMappers,
   triggerRenderers as honeycombTriggerRenderers,
   eventStateRegistry as honeycombEventStateRegistry,
-  customFieldRenderers as honeycombCustomFieldRenderers,
 } from "./honeycomb/index";
 
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
@@ -266,7 +265,6 @@ const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer
   github: githubCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
-  honeycomb: honeycombCustomFieldRenderers,
 };
 
 /**

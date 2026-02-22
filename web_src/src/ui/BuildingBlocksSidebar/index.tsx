@@ -43,6 +43,7 @@ import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
+import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -434,6 +435,7 @@ function CategorySection({
       ecs: awsEcsIcon,
       sns: awsSnsIcon,
     },
+    honeycomb: honeycombIcon,
   };
 
   // Get integration name from first block if available, or match category name
@@ -516,6 +518,7 @@ function CategorySection({
               ecs: awsEcsIcon,
               sns: awsSnsIcon,
             },
+            honeycomb: honeycombIcon,
           };
           const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;
           const appIconSrc = typeof appLogo === "string" ? appLogo : nameParts[1] ? appLogo?.[nameParts[1]] : undefined;

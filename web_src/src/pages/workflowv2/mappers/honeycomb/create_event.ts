@@ -16,7 +16,7 @@ import { formatTimeAgo } from "@/utils/date";
 
 interface CreateEventConfiguration {
   dataset?: string;
-  fields?: string; // JSON string
+  fields?: Record<string, unknown>;
 }
 
 type HoneycombCreateEventPayload = {
@@ -74,6 +74,8 @@ function createEventMetadataList(node: NodeInfo): MetadataItem[] {
 
   if (configuration?.dataset) {
     metadata.push({ icon: "database", label: configuration.dataset });
+  } else {
+    metadata.push({ icon: "database", label: "Uses integration dataset" });
   }
 
   return metadata;
@@ -88,7 +90,7 @@ function createEventSpecs(node: NodeInfo): ComponentBaseSpec[] {
       title: "fields",
       tooltipTitle: "fields",
       iconSlug: "braces",
-      value: configuration.fields,
+      value: safeJSONStringify(configuration.fields),
       contentType: "json",
     });
   }
