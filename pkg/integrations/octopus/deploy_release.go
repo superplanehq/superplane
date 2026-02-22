@@ -228,6 +228,10 @@ func (c *DeployRelease) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("deployment response missing ID")
 	}
 
+	if deployment.TaskID == "" {
+		return fmt.Errorf("deployment response missing task ID")
+	}
+
 	err = ctx.Metadata.Set(DeployReleaseExecutionMetadata{
 		Deployment: &DeploymentMetadata{
 			ID:            deployment.ID,
@@ -380,6 +384,8 @@ func (c *DeployRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 
 	if eventType == EventCategoryDeploymentSucceeded {
 		resolvedTask.State = TaskStateSuccess
+	} else if eventType == EventCategoryDeploymentFailed {
+		resolvedTask.State = TaskStateFailed
 	}
 
 	if metadata.Deployment == nil {

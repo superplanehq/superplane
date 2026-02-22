@@ -58,36 +58,36 @@ type Release struct {
 }
 
 type Deployment struct {
-	ID               string `json:"Id"`
-	Name             string `json:"Name"`
-	ProjectID        string `json:"ProjectId"`
-	ReleaseID        string `json:"ReleaseId"`
-	EnvironmentID    string `json:"EnvironmentId"`
-	TaskID           string `json:"TaskId"`
-	Created          string `json:"Created"`
-	DeployedBy       string `json:"DeployedBy"`
-	FailureEncountered bool `json:"FailureEncountered"`
+	ID                 string `json:"Id"`
+	Name               string `json:"Name"`
+	ProjectID          string `json:"ProjectId"`
+	ReleaseID          string `json:"ReleaseId"`
+	EnvironmentID      string `json:"EnvironmentId"`
+	TaskID             string `json:"TaskId"`
+	Created            string `json:"Created"`
+	DeployedBy         string `json:"DeployedBy"`
+	FailureEncountered bool   `json:"FailureEncountered"`
 }
 
 type Task struct {
-	ID               string `json:"Id"`
-	Name             string `json:"Name"`
-	State            string `json:"State"`
-	IsCompleted      bool   `json:"IsCompleted"`
-	FinishedSuccessfully bool `json:"FinishedSuccessfully"`
-	StartTime        string `json:"StartTime"`
-	CompletedTime    string `json:"CompletedTime"`
-	ErrorMessage     string `json:"ErrorMessage"`
-	Description      string `json:"Description"`
-	Duration         string `json:"Duration"`
+	ID                   string `json:"Id"`
+	Name                 string `json:"Name"`
+	State                string `json:"State"`
+	IsCompleted          bool   `json:"IsCompleted"`
+	FinishedSuccessfully bool   `json:"FinishedSuccessfully"`
+	StartTime            string `json:"StartTime"`
+	CompletedTime        string `json:"CompletedTime"`
+	ErrorMessage         string `json:"ErrorMessage"`
+	Description          string `json:"Description"`
+	Duration             string `json:"Duration"`
 }
 
 type Subscription struct {
-	ID       string `json:"Id"`
-	Name     string `json:"Name"`
-	SpaceID  string `json:"SpaceId"`
-	Type     string `json:"Type"`
-	IsDisabled bool `json:"IsDisabled"`
+	ID                            string                         `json:"Id"`
+	Name                          string                         `json:"Name"`
+	SpaceID                       string                         `json:"SpaceId"`
+	Type                          string                         `json:"Type"`
+	IsDisabled                    bool                           `json:"IsDisabled"`
 	EventNotificationSubscription *EventNotificationSubscription `json:"EventNotificationSubscription"`
 }
 
