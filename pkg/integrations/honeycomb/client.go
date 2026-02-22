@@ -249,6 +249,9 @@ func (c *Client) EnsureConfigurationKey(teamSlug string) error {
 			return nil
 		}
 
+		if err != nil {
+			return fmt.Errorf("configuration key v1 ping failed: %w", err)
+		}
 		if code == http.StatusUnauthorized || code == http.StatusForbidden {
 			_ = c.integrationCtx.SetSecret(secretNameConfigurationKey, []byte{})
 		} else {
