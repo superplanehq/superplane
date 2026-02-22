@@ -515,6 +515,7 @@ function CategorySection({
             digitalocean: digitaloceanIcon,
             discord: discordIcon,
             github: githubIcon,
+            jira: jiraIcon,
             gitlab: gitlabIcon,
             hetzner: hetznerIcon,
             jfrogArtifactory: jfrogArtifactoryIcon,

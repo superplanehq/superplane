@@ -114,6 +114,10 @@ import {
   eventStateRegistry as openaiEventStateRegistry,
 } from "./openai/index";
 import {
+  componentMappers as jiraComponentMappers,
+  triggerRenderers as jiraTriggerRenderers,
+  eventStateRegistry as jiraEventStateRegistry,
+} from "./jira/index";
   componentMappers as grafanaComponentMappers,
   customFieldRenderers as grafanaCustomFieldRenderers,
   triggerRenderers as grafanaTriggerRenderers,
@@ -220,6 +224,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   discord: discordComponentMappers,
   telegram: telegramComponentMappers,
   openai: openaiComponentMappers,
+  jira: jiraComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
   gcp: gcpComponentMappers,
@@ -252,6 +257,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   discord: discordTriggerRenderers,
   telegram: telegramTriggerRenderers,
   openai: openaiTriggerRenderers,
+  jira: jiraTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
   gcp: gcpTriggerRenderers,
@@ -288,6 +294,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   gcp: gcpEventStateRegistry,
   statuspage: statuspageEventStateRegistry,
   aws: awsEventStateRegistry,
+  jira: jiraEventStateRegistry,
   grafana: grafanaEventStateRegistry,
   prometheus: prometheusEventStateRegistry,
   cursor: cursorEventStateRegistry,
