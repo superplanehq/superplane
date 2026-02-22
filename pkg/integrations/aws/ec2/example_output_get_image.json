@@ -1,0 +1,21 @@
+{
+  "data": {
+    "image": {
+      "imageId": "ami-1234567890abcdef0",
+      "name": "my-app-2026-02-18",
+      "description": "Golden image for production",
+      "state": "available",
+      "creationDate": "2026-02-18T12:00:00.000Z",
+      "ownerId": "123456789012",
+      "architecture": "x86_64",
+      "imageType": "machine",
+      "rootDeviceType": "ebs",
+      "rootDeviceName": "/dev/xvda",
+      "virtualizationType": "hvm",
+      "hypervisor": "xen",
+      "region": "us-east-1"
+    }
+  },
+  "timestamp": "2026-02-18T12:00:00Z",
+  "type": "aws.ec2.image"
+}
