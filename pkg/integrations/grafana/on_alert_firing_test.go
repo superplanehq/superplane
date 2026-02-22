@@ -20,6 +20,11 @@ func (w *webhookSecretContext) Setup() (string, error) {
 	return "", nil
 }
 
+func (w *webhookSecretContext) SetSecret(secret []byte) error {
+	w.secret = secret
+	return nil
+}
+
 func (w *webhookSecretContext) GetSecret() ([]byte, error) {
 	if w.err != nil {
 		return nil, w.err
