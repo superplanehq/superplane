@@ -46,7 +46,7 @@ func (h *OctopusWebhookHandler) Merge(current, requested any) (any, bool, error)
 		EventCategories: normalizeEventCategories(
 			append(currentConfig.EventCategories, requestedConfig.EventCategories...),
 		),
-		Projects: mergeStringSlices(currentConfig.Projects, requestedConfig.Projects),
+		Projects:     mergeStringSlices(currentConfig.Projects, requestedConfig.Projects),
 		Environments: mergeStringSlices(currentConfig.Environments, requestedConfig.Environments),
 	}
 
@@ -198,7 +198,14 @@ func cleanupStaleSubscription(client *Client, spaceID, name string) {
 	}
 }
 
+// mergeStringSlices merges two string slices with deduplication.
+// An empty/nil slice means "all" (no filtering), so if either input
+// is empty, the result is empty to preserve that "match all" semantics.
 func mergeStringSlices(a, b []string) []string {
+	if len(a) == 0 || len(b) == 0 {
+		return nil
+	}
+
 	seen := make(map[string]bool, len(a)+len(b))
 	merged := make([]string, 0, len(a)+len(b))
 

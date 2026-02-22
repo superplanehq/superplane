@@ -363,39 +363,38 @@ func (c *DeployRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 		return okResponse()
 	}
 
-	taskState := TaskStateFailed
-	completedTime := readString(payload["Timestamp"])
+	resolvedTask := Task{
+		State:         TaskStateFailed,
+		CompletedTime: readString(payload["Timestamp"]),
+	}
 
 	if metadata.Deployment != nil && metadata.Deployment.TaskID != "" {
 		task, taskErr := client.GetTask(metadata.Deployment.TaskID)
 		if taskErr == nil {
-			taskState = task.State
-			if task.CompletedTime != "" {
-				completedTime = task.CompletedTime
+			resolvedTask = task
+			if resolvedTask.CompletedTime == "" {
+				resolvedTask.CompletedTime = readString(payload["Timestamp"])
 			}
 		}
 	}
 
 	if eventType == EventCategoryDeploymentSucceeded {
-		taskState = TaskStateSuccess
+		resolvedTask.State = TaskStateSuccess
 	}
 
 	if metadata.Deployment == nil {
 		metadata.Deployment = &DeploymentMetadata{}
 	}
 
-	metadata.Deployment.TaskState = taskState
-	metadata.Deployment.CompletedTime = completedTime
+	metadata.Deployment.TaskState = resolvedTask.State
+	metadata.Deployment.CompletedTime = resolvedTask.CompletedTime
 	if err := executionCtx.Metadata.Set(metadata); err != nil {
 		return errorResponse(http.StatusInternalServerError, "error updating metadata: %w", err)
 	}
 
-	deployPayload := buildDeployReleasePayload(metadata.Deployment, Task{
-		State:         taskState,
-		CompletedTime: completedTime,
-	})
+	deployPayload := buildDeployReleasePayload(metadata.Deployment, resolvedTask)
 
-	if err := emitDeployResult(executionCtx.ExecutionState, taskState, deployPayload); err != nil {
+	if err := emitDeployResult(executionCtx.ExecutionState, resolvedTask.State, deployPayload); err != nil {
 		return errorResponse(http.StatusInternalServerError, "error emitting result: %w", err)
 	}
 
