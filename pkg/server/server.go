@@ -52,6 +52,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/hetzner"
 	_ "github.com/superplanehq/superplane/pkg/integrations/jfrog_artifactory"
 	_ "github.com/superplanehq/superplane/pkg/integrations/jira"
+	_ "github.com/superplanehq/superplane/pkg/integrations/octopus"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
 	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
 	_ "github.com/superplanehq/superplane/pkg/integrations/prometheus"
