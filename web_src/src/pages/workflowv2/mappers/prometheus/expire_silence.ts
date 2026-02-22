@@ -17,12 +17,7 @@ import { ExpireSilenceConfiguration, ExpireSilenceNodeMetadata, PrometheusSilenc
 
 export const expireSilenceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return buildExpireSilenceProps(
-      context.nodes,
-      context.node,
-      context.componentDefinition,
-      context.lastExecutions,
-    );
+    return buildExpireSilenceProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
 
   subtitle(context: SubtitleContext): string {
@@ -46,7 +41,7 @@ export const expireSilenceMapper: ComponentBaseMapper = {
     }
 
     const silence = outputs.default[0].data as PrometheusSilencePayload;
-    
+
     if (silence?.silenceID) {
       details["Silence ID"] = silence.silenceID;
     }

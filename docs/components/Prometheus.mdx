@@ -26,7 +26,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 Configure this integration with:
 - **Prometheus Base URL**: URL of your Prometheus server (e.g., `https://prometheus.example.com`)
-- **API Auth**: `none`, `basic`, or `bearer` for Prometheus API requests
+- **Alertmanager Base URL** (optional): URL of your Alertmanager instance (e.g., `https://alertmanager.example.com`). Required for Silence components. If omitted, the Prometheus Base URL is used.
+- **API Auth**: `none`, `basic`, or `bearer` for API requests
 - **Webhook Secret** (recommended): If set, Alertmanager must send `Authorization: Bearer <token>` on webhook requests
 
 ### Alertmanager Setup (manual)

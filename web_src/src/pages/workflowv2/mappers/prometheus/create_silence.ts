@@ -17,12 +17,7 @@ import { CreateSilenceConfiguration, CreateSilenceNodeMetadata, PrometheusSilenc
 
 export const createSilenceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return buildCreateSilenceProps(
-      context.nodes,
-      context.node,
-      context.componentDefinition,
-      context.lastExecutions,
-    );
+    return buildCreateSilenceProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
 
   subtitle(context: SubtitleContext): string {
