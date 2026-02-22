@@ -1,0 +1,10 @@
+{
+  "found": true,
+  "message": "Successfully retrieved feature flag \"my-flag\".",
+  "flag": {
+    "key": "my-flag",
+    "name": "My Flag",
+    "kind": "boolean",
+    "archived": false
+  }
+}
