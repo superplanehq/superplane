@@ -16,7 +16,8 @@ import { formatTimeAgo } from "@/utils/date";
 
 interface CreateEventConfiguration {
   dataset?: string;
-  fields?: Record<string, unknown>;
+  /** Stored as raw JSON string from backend; may be object when from execution output */
+  fields?: string | Record<string, unknown>;
 }
 
 type HoneycombCreateEventPayload = {
@@ -58,7 +59,7 @@ export const createEventMapper: ComponentBaseMapper = {
       "Created At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
       Status: data?.status ?? "-",
       Dataset: data?.dataset ?? "-",
-      "Sent Fields": data?.fields ? safeJSONStringify(data.fields) : "-",
+      "Sent Fields": formatFieldsForDisplay(data?.fields as string | Record<string, unknown> | undefined),
     };
   },
 
@@ -90,7 +91,7 @@ function createEventSpecs(node: NodeInfo): ComponentBaseSpec[] {
       title: "fields",
       tooltipTitle: "fields",
       iconSlug: "braces",
-      value: safeJSONStringify(configuration.fields),
+      value: formatFieldsForDisplay(configuration.fields),
       contentType: "json",
     });
   }
@@ -120,4 +121,18 @@ function safeJSONStringify(value: unknown): string {
   } catch {
     return String(value ?? "");
   }
+}
+
+/** Formats fields for display. Backend stores config.fields as raw JSON string, so we parse first to avoid double-encoding. */
+function formatFieldsForDisplay(fields: string | Record<string, unknown> | undefined): string {
+  if (fields == null) return "-";
+  if (typeof fields === "string") {
+    try {
+      const parsed = JSON.parse(fields) as unknown;
+      return safeJSONStringify(parsed);
+    } catch {
+      return fields;
+    }
+  }
+  return safeJSONStringify(fields);
 }
