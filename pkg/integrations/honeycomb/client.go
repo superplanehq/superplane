@@ -684,7 +684,7 @@ func (c *Client) CreateEvent(datasetSlug string, fields map[string]any) error {
 		return fmt.Errorf("dataset is required")
 	}
 
-	ingestHeader, err := c.getIngestHeaderValue()
+	ingestHeader, err := c.getSecretValue(secretNameIngestKey)
 	if err != nil {
 		return err
 	}
@@ -723,22 +723,6 @@ func (c *Client) CreateEvent(datasetSlug string, fields map[string]any) error {
 
 	b, _ := io.ReadAll(resp.Body)
 	return fmt.Errorf("honeycomb create event failed (status %d): %s", resp.StatusCode, string(b))
-}
-
-func (c *Client) getIngestHeaderValue() (string, error) {
-	secrets, err := c.integrationCtx.GetSecrets()
-	if err != nil {
-		return "", err
-	}
-	for _, s := range secrets {
-		if s.Name == secretNameIngestKey {
-			v := strings.TrimSpace(string(s.Value))
-			if v != "" {
-				return v, nil
-			}
-		}
-	}
-	return "", fmt.Errorf("ingest key not found (expected secret %q)", secretNameIngestKey)
 }
 
 func (c *Client) getSecretValue(name string) (string, error) {
