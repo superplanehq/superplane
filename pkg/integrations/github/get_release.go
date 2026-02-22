@@ -203,14 +203,13 @@ func (c *GetRelease) Execute(ctx core.ExecutionContext) error {
 	//
 	var release any
 
-	if config.ReleaseStrategy == "byId" {
-		// Parse release ID from string to int64
+	switch config.ReleaseStrategy {
+	case "byId":
 		releaseID, err := strconv.ParseInt(*config.ReleaseID, 10, 64)
 		if err != nil {
 			return fmt.Errorf("invalid release ID '%s': must be a valid number", *config.ReleaseID)
 		}
 
-		// Fetch by release ID
 		r, _, err := client.Repositories.GetRelease(
 			context.Background(),
 			appMetadata.Owner,
@@ -221,15 +220,13 @@ func (c *GetRelease) Execute(ctx core.ExecutionContext) error {
 			return fmt.Errorf("failed to get release with ID %d: %w", releaseID, err)
 		}
 		release = r
-	} else if config.ReleaseStrategy == "specific" {
-		// Fetch by tag (validation done above)
+	case "specific":
 		r, err := fetchReleaseByStrategy(client, appMetadata.Owner, config.Repository, config.ReleaseStrategy, *config.TagName)
 		if err != nil {
 			return err
 		}
 		release = r
-	} else {
-		// Use the common helper for other strategies (latest, latestDraft, latestPrerelease)
+	default:
 		r, err := fetchReleaseByStrategy(client, appMetadata.Owner, config.Repository, config.ReleaseStrategy, "")
 		if err != nil {
 			return err

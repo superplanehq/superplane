@@ -192,15 +192,12 @@ func (c *StopTask) Setup(ctx core.SetupContext) error {
 		return nil
 	}
 
-	integrationMetadata := common.IntegrationMetadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-	if integrationMetadata.EventBridge == nil {
-		return fmt.Errorf("event bridge metadata is not configured")
+	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, ecsEventBridgeSource, config.Region, ecsTaskStateChangeEventDetailType)
+	if err != nil {
+		return fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
-	if !hasTaskStateChangeRule(integrationMetadata) {
+	if !hasRule {
 		if err := ctx.Metadata.Set(StopTaskNodeMetadata{Region: config.Region}); err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}

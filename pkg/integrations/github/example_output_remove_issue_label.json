@@ -1,0 +1,13 @@
+{
+  "data": [
+    {
+      "id": 208045947,
+      "name": "enhancement",
+      "color": "a2eeef",
+      "description": "New feature or request",
+      "default": true
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.labels"
+}

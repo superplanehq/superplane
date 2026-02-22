@@ -1,0 +1,123 @@
+---
+title: "Harness"
+---
+
+Run and monitor Harness pipelines from SuperPlane workflows
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Pipeline Completed" href="#on-pipeline-completed" description="Listen to Harness pipeline completion events" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Run Pipeline" href="#run-pipeline" description="Run a Harness pipeline and wait for completion" />
+</CardGrid>
+
+## Instructions
+
+1. **Create API key:** In Harness, create a service-account API key with permission to run and read pipeline executions.
+2. **Connect once, then configure nodes:** Scope fields (**Org**, **Project**, **Pipeline**) are selected in each Harness node.
+3. **Account ID is automatic:** SuperPlane resolves account scope from your API key.
+4. **Trigger notifications are automatic:** For **On Pipeline Completed** with a selected **Pipeline**, SuperPlane provisions a pipeline notification rule for you.
+5. **Auth method:** SuperPlane calls Harness APIs with `x-api-key: <token>` against `https://app.harness.io/gateway` unless overridden by Base URL.
+
+<a id="on-pipeline-completed"></a>
+
+## On Pipeline Completed
+
+The On Pipeline Completed trigger starts a workflow when a Harness pipeline execution finishes.
+
+### Use Cases
+
+- **Failure notifications**: Send Slack alerts when critical pipelines fail
+- **Release automation**: Trigger post-deploy checks when a deployment pipeline succeeds
+- **Incident workflows**: Create tickets for aborted/expired pipeline runs
+
+### Configuration
+
+- **Org**: Harness organization identifier
+- **Project**: Harness project identifier
+- **Pipeline Identifier**: Optional pipeline identifier filter. Leave empty to accept all pipeline completions.
+- **Statuses**: Completion statuses that should trigger the workflow.
+
+### Webhook Setup
+
+SuperPlane automatically provisions Harness pipeline `notificationRules` when **Pipeline** is selected.
+
+If no pipeline is selected, or webhook delivery is unavailable in your Harness account, SuperPlane falls back to polling recent executions.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "eventType": "PIPELINE_END",
+    "executionId": "3y9YlBC9SrOn6W7bPT5nCw",
+    "pipelineIdentifier": "deploy_prod",
+    "raw": {
+      "data": {
+        "pipelineIdentifier": "deploy_prod",
+        "planExecutionId": "3y9YlBC9SrOn6W7bPT5nCw",
+        "status": "FAILED"
+      },
+      "eventType": "PIPELINE_END"
+    },
+    "status": "failed"
+  },
+  "timestamp": "2026-02-12T18:45:55Z",
+  "type": "harness.pipeline.completed"
+}
+```
+
+<a id="run-pipeline"></a>
+
+## Run Pipeline
+
+The Run Pipeline component starts a Harness pipeline execution and waits for it to finish.
+
+### Use Cases
+
+- **CI/CD orchestration**: Trigger deploy pipelines from workflow events
+- **Approval-based releases**: Run release pipelines after manual approvals
+- **Scheduled automation**: Kick off recurring maintenance or validation pipelines
+
+### How It Works
+
+1. Starts a Harness pipeline execution
+2. Stores the execution ID in node execution state
+3. Watches execution completion via webhook (with polling fallback)
+4. Routes output to:
+   - **Success** when execution succeeds
+   - **Failed** when execution fails, aborts, or expires
+
+### Configuration
+
+- **Org**: Harness organization identifier
+- **Project**: Harness project identifier
+- **Pipeline**: Harness pipeline identifier
+- **Ref**: Optional git ref (`refs/heads/main` or `refs/tags/v1.2.3`)
+- **Input Set References**: Optional input set identifiers
+- **Runtime Input YAML**: Optional YAML override for runtime inputs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "endedAt": "2026-02-12T18:45:55Z",
+    "executionId": "3y9YlBC9SrOn6W7bPT5nCw",
+    "pipelineIdentifier": "deploy_prod",
+    "planExecutionUrl": "https://app.harness.io/ng/account/acc123/module/cd/orgs/default/projects/platform/pipelines/deploy_prod/executions/3y9YlBC9SrOn6W7bPT5nCw/pipeline",
+    "startedAt": "2026-02-12T18:42:10Z",
+    "status": "succeeded"
+  },
+  "timestamp": "2026-02-12T18:45:55Z",
+  "type": "harness.pipeline.finished"
+}
+```
+
