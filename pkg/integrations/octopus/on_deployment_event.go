@@ -238,20 +238,14 @@ func (t *OnDeploymentEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, 
 		return okResponse()
 	}
 
-	// Filter by project if configured
-	if config.Project != "" {
-		relatedDocIDs := readRelatedDocumentIDs(event)
-		if !containsRelatedDocument(relatedDocIDs, "Projects", config.Project) {
-			return okResponse()
-		}
+	// Filter by project and/or environment if configured
+	relatedDocIDs := readRelatedDocumentIDs(event)
+	if config.Project != "" && !containsRelatedDocument(relatedDocIDs, "Projects", config.Project) {
+		return okResponse()
 	}
 
-	// Filter by environment if configured
-	if config.Environment != "" {
-		relatedDocIDs := readRelatedDocumentIDs(event)
-		if !containsRelatedDocument(relatedDocIDs, "Environments", config.Environment) {
-			return okResponse()
-		}
+	if config.Environment != "" && !containsRelatedDocument(relatedDocIDs, "Environments", config.Environment) {
+		return okResponse()
 	}
 
 	// Build the emitted data

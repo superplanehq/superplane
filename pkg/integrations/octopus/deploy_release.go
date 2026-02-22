@@ -352,6 +352,10 @@ func (c *DeployRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 		return okResponse()
 	}
 
+	if executionCtx.ExecutionState.IsFinished() {
+		return okResponse()
+	}
+
 	metadata := DeployReleaseExecutionMetadata{}
 	if err := mapstructure.Decode(executionCtx.Metadata.Get(), &metadata); err != nil {
 		return errorResponse(http.StatusInternalServerError, "error decoding metadata: %w", err)
