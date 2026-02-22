@@ -502,6 +502,19 @@ func (c *Client) GetTrigger(datasetSlug, triggerID string) (map[string]any, erro
 	return obj, nil
 }
 
+// stripTriggerForUpdate removes read-only and conflicting fields from a trigger
+// payload so it can be sent to the Honeycomb update API.
+func stripTriggerForUpdate(trigger map[string]any) {
+	if _, hasQueryID := trigger["query_id"]; hasQueryID {
+		delete(trigger, "query")
+	}
+	delete(trigger, "id")
+	delete(trigger, "dataset_slug")
+	delete(trigger, "created_at")
+	delete(trigger, "updated_at")
+	delete(trigger, "triggered")
+}
+
 func (c *Client) UpdateTrigger(datasetSlug, triggerID string, trigger map[string]any) error {
 	body, _ := json.Marshal(trigger)
 	req, err := c.newReqV1(http.MethodPut, fmt.Sprintf("/1/triggers/%s/%s", url.PathEscape(datasetSlug), url.PathEscape(triggerID)), bytes.NewReader(body))
@@ -545,19 +558,7 @@ func (c *Client) EnsureRecipientOnTrigger(datasetSlug, triggerID, recipientID st
 		"target": "SuperPlane",
 	})
 	trigger["recipients"] = recipientsSlice
-
-	// Honeycomb rejects requests with both query and query_id
-	if _, hasQueryID := trigger["query_id"]; hasQueryID {
-		delete(trigger, "query")
-	}
-
-	// Remove read-only fields rejected by Honeycomb
-	delete(trigger, "id")
-	delete(trigger, "dataset_slug")
-	delete(trigger, "created_at")
-	delete(trigger, "updated_at")
-	delete(trigger, "triggered")
-
+	stripTriggerForUpdate(trigger)
 	return c.UpdateTrigger(datasetSlug, triggerID, trigger)
 }
 
@@ -665,16 +666,7 @@ func (c *Client) RemoveRecipientFromTrigger(datasetSlug, triggerID, recipientID 
 		}
 	}
 	trigger["recipients"] = filtered
-
-	if _, hasQueryID := trigger["query_id"]; hasQueryID {
-		delete(trigger, "query")
-	}
-	delete(trigger, "id")
-	delete(trigger, "dataset_slug")
-	delete(trigger, "created_at")
-	delete(trigger, "updated_at")
-	delete(trigger, "triggered")
-
+	stripTriggerForUpdate(trigger)
 	return c.UpdateTrigger(datasetSlug, triggerID, trigger)
 }
 
@@ -685,8 +677,8 @@ func (c *Client) CreateEvent(datasetSlug string, fields map[string]any) error {
 	}
 
 	ingestHeader, err := c.getSecretValue(secretNameIngestKey)
-	if err != nil {
-		return err
+	if err != nil || strings.TrimSpace(ingestHeader) == "" {
+		return fmt.Errorf("ingest key not found (expected secret %q)", secretNameIngestKey)
 	}
 
 	u, _ := url.Parse(c.BaseURL)
