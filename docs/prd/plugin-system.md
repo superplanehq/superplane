@@ -2,17 +2,24 @@
 
 ## Overview
 
-SuperPlane plugins are self-contained, packaged extensions that add custom components, triggers,
-and integrations to the platform. Plugins are developed as TypeScript projects, packaged into
-distributable archive files (`.spx`), and installed via a CLI command. Once installed, each
-plugin declares what it contributes through a manifest, runs in an isolated host process, and
-interacts with SuperPlane through a versioned API module.
+SuperPlane plugins are extensions that add custom components, triggers, and integrations to the
+platform. There are two ways to create plugins:
+
+- **Installed plugins** — developed as TypeScript projects, packaged into distributable archive
+  files (`.spx`), and installed via a CLI command. These are global to the SuperPlane instance
+  and suited for complex, production-grade integrations.
+- **In-app scripts** — created directly in the SuperPlane UI through an AI-assisted builder.
+  These are scoped to a single organization, stored in the database, and suited for quick
+  custom components without any external tooling.
+
+Both paths use the same `@superplane/sdk` API and run in the same isolated Plugin Host process.
 
 Today, extending SuperPlane requires writing Go code in the main repository and redeploying the
 entire application. This limits contributions to developers who know Go and have access to the
-codebase. The plugin system removes that barrier entirely.
+codebase. The plugin system removes that barrier entirely — for developers with the CLI
+workflow, and for non-developers with the in-app builder.
 
-The plugin lifecycle has four stages:
+**Installed plugin lifecycle:**
 
 1. **Develop** — write TypeScript against the `@superplane/sdk` API.
 2. **Package** — run `npx @superplane/cli plugin pack` to produce a `.spx` archive.
@@ -20,8 +27,15 @@ The plugin lifecycle has four stages:
 4. **Run** — the server discovers installed plugins on startup, reads their manifests, and
    activates them lazily.
 
-Plugins run in a separate Node.js process — the Plugin Host — which communicates with the Go
-backend over a local JSON-RPC channel. This process-level isolation means a crashing plugin
+**In-app script lifecycle:**
+
+1. **Create** — open the Script Builder in the SuperPlane UI.
+2. **Describe** — tell the AI assistant what the component should do.
+3. **Refine** — review the generated code, iterate with the AI, edit manually if needed.
+4. **Save** — the server validates the code, registers contributions, and activates it.
+
+All plugins run in a separate Node.js process — the Plugin Host — which communicates with the
+Go backend over a local JSON-RPC channel. This process-level isolation means a crashing plugin
 cannot bring down the server, and the Node.js runtime gives plugin authors access to the full
 npm ecosystem.
 
@@ -37,6 +51,8 @@ npm ecosystem.
    without executing any of its code.
 6. Register plugin-provided components, triggers, and integrations in the existing registry so
    they are indistinguishable from built-in ones in the canvas and API.
+7. Allow users to create simple plugins directly in the UI without setting up a development
+   environment, using an AI-assisted builder.
 
 ## Non-Goals
 
@@ -46,11 +62,15 @@ npm ecosystem.
   activation, but in-flight executions complete on the old code. There is no mid-execution
   code swap.
 - **Browser-side plugin code**: Plugins contribute backend logic only. Frontend rendering uses
-  the same generic mappers that built-in components use.
+  the same generic mappers that built-in components use. The in-app builder generates server-
+  side TypeScript, not browser-side code.
 - **Multi-language plugins**: The Plugin Host runs Node.js. Go, Python, or other runtimes are
   not supported as plugin languages.
 - **Sandboxed network access**: Plugins can make arbitrary HTTP calls from Node.js. Network
   policy enforcement (allowlists, egress controls) is deferred to a later phase.
+- **Full IDE experience**: The in-app builder is for quick prototyping of simple components.
+  Complex plugins with multi-file projects, integration lifecycle handlers, or advanced GitHub
+  App flows should use the `.spx` packaging workflow.
 
 ## Architecture
 
@@ -83,7 +103,12 @@ The plugin system is built on five core principles:
 ### Process Architecture
 
 ```
-┌─────────────────────────────────────────┐
+                  ┌───────────────┐
+                  │  plugins.json │  (installed .spx plugins)
+                  │  + manifests  │
+                  └───────┬───────┘
+                          │
+┌─────────────────────────▼───────────────┐
 │             Go Server (main)            │
 │                                         │
 │  ┌──────────┐  ┌──────────────────────┐ │
@@ -91,30 +116,34 @@ The plugin system is built on five core principles:
 │  │          │◄─┤                      │ │
 │  │Components│  │  - Reads installed    │ │    JSON-RPC over stdio
 │  │Triggers  │  │    plugin manifests  │─┼──────────────────────────┐
-│  │Integr.   │  │  - Manages lifecycle │ │                          │
-│  └──────────┘  └──────────────────────┘ │                          │
-│                                         │                          │
-└─────────────────────────────────────────┘                          │
-                                                                     │
-                                                    ┌────────────────▼──────────────────┐
-                                                    │         Plugin Host (Node.js)      │
-                                                    │                                    │
-                                                    │  ┌──────────────────────────────┐  │
-                                                    │  │       Plugin Loader          │  │
-                                                    │  │  - Requires each plugin      │  │
+│  │Integr.   │  │  - Reads scripts DB  │ │                          │
+│  └──────────┘  │  - Manages lifecycle │ │                          │
+│                └──────────────────────┘ │                          │
+│                          ▲              │                          │
+└──────────────────────────┼──────────────┘                          │
+                           │                                         │
+                  ┌────────┴────────┐               ┌────────────────▼──────────────────┐
+                  │   Scripts DB    │               │         Plugin Host (Node.js)      │
+                  │  (org-scoped    │               │                                    │
+                  │   in-app        │               │  ┌──────────────────────────────┐  │
+                  │   plugins)      │               │  │       Plugin Loader          │  │
+                  └─────────────────┘               │  │  - Requires each plugin      │  │
+                                                    │  │  - Evaluates inline scripts  │  │
                                                     │  │  - Calls activate()          │  │
                                                     │  │  - Routes RPC to handlers    │  │
                                                     │  └──────────────────────────────┘  │
                                                     │                                    │
                                                     │  ┌────────┐ ┌────────┐ ┌────────┐ │
-                                                    │  │Plugin A│ │Plugin B│ │Plugin C│ │
+                                                    │  │Plugin A│ │Plugin B│ │Script X│ │
                                                     │  └────────┘ └────────┘ └────────┘ │
                                                     │                                    │
                                                     └────────────────────────────────────┘
 ```
 
 The Go server spawns one Plugin Host process. The Plugin Host loads all activated plugins in the
-same Node.js runtime. If a plugin throws an unhandled exception, the Plugin Host catches it and
+same Node.js runtime — both installed `.spx` plugins (loaded via `require()`) and in-app
+scripts (loaded via inline activation). If a plugin throws an unhandled exception, the Plugin
+Host catches it and
 reports a failure for that execution — it does not crash the process. If the Plugin Host process
 dies unexpectedly, the Plugin Manager on the Go side detects the broken pipe, restarts the
 process, and re-activates all plugins.
@@ -853,11 +882,16 @@ Plugin-contributed names use dot-separated prefixes derived from the plugin name
 - Plugin `superplane-plugin-transform` contributes `transform.filter`, `transform.reshape`.
 - Plugin `superplane-plugin-slack-utils` contributes `slack-utils.format-message`.
 
+In-app scripts use a `script.` prefix to separate them from installed plugins:
+
+- Script "My Filter" contributes `script.my-filter`.
+- Script "Slack Notify" contributes `script.slack-notify`.
+
 This follows the existing convention where integration components use the integration name as a
 prefix (e.g., `github.create-issue`, `slack.send-message`).
 
-The Plugin Manager validates at startup that no contributed name collides with a built-in name
-or a name from another plugin.
+The Plugin Manager validates at startup that no contributed name collides with a built-in name,
+a name from another plugin, or a name from another script.
 
 ## Resource Limits
 
@@ -918,9 +952,11 @@ If the Plugin Host process exits unexpectedly:
 | `SUPERPLANE_PLUGIN_HTTP_TIMEOUT`         | `10s`         | Timeout for individual HTTP requests.               |
 | `SUPERPLANE_PLUGIN_MAX_COUNT`            | `50`          | Max number of plugins that can be installed.        |
 | `SUPERPLANE_PLUGIN_NODE_PATH`            | (auto-detect) | Path to the Node.js binary.                         |
+| `OPENAI_API_KEY`                         | (none)        | API key for AI-assisted script generation. If unset, the AI chat feature in the Script Builder is disabled. |
 
-If `SUPERPLANE_PLUGINS_DIR` does not exist or contains no `plugins.json`, the plugin system is
-disabled — no Plugin Host is spawned, and the server operates exactly as it does today.
+If `SUPERPLANE_PLUGINS_DIR` does not exist or contains no `plugins.json`, the installed plugin
+system is disabled — no Plugin Host is spawned for installed plugins. However, the server still
+loads in-app scripts from the database and starts the Plugin Host if any active scripts exist.
 
 ## Canvas Integration
 
@@ -1198,6 +1234,181 @@ plugins/superplane-plugin-github-issues/
 No `node_modules/`, no `src/`, no `tsconfig.json`, no build artifacts beyond the single
 `extension.js` bundle.
 
+## In-App Plugin Builder
+
+### Overview
+
+The Script Builder lets users create plugins directly in the SuperPlane UI without installing
+any tooling, writing a `package.json`, or running CLI commands. Users describe what they need in
+a chat interface, and an AI assistant generates TypeScript code against the `@superplane/sdk`
+API. The generated code can be reviewed, edited, and saved — at which point it becomes a live
+component or trigger available in the canvas.
+
+In-app scripts are organization-scoped. They appear in the component/trigger picker only for the
+organization that created them, unlike installed `.spx` plugins which are available globally.
+
+### UI Layout
+
+The Script Builder page is accessible from the main navigation under "Scripts." The layout has
+three panels:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  Scripts                                                                │
+├─────────────┬──────────────────────────────┬─────────────────────────────┤
+│             │                              │  Script Name: [ My Filter ] │
+│  Script 1   │   AI Chat                   │                             │
+│  Script 2 ● │                              │  ┌─────────────────────────┐│
+│  Script 3   │   User: I need a component  │  │ import * as sp from     ││
+│             │   that filters events by     │  │   "@superplane/sdk";    ││
+│  [+ New]    │   severity...                │  │                         ││
+│             │                              │  │ export function         ││
+│             │   AI: Here's a component     │  │   activate(ctx) {       ││
+│             │   that filters...            │  │   ctx.components        ││
+│             │                              │  │     .register(...)      ││
+│             │                              │  │ }                       ││
+│             │   [Send message...]          │  │                         ││
+│             │                              │  └─────────────────────────┘│
+│             │                              │                             │
+│             │                              │  Status: Active ●          │
+│             │                              │  [Save]  [Delete]          │
+├─────────────┴──────────────────────────────┴─────────────────────────────┤
+```
+
+- **Left sidebar**: Lists all scripts in the current organization. Shows status indicator
+  (draft, active, error). "New" button creates a blank script.
+- **Center panel**: AI chat assistant. Users describe what they want in natural language. The
+  assistant generates code and explains it. Each script has its own chat history.
+- **Right panel**: Code editor with the script source. Includes the script name, a syntax-
+  highlighted editor with the TypeScript/JavaScript source code, status indicator, and
+  save/delete actions.
+
+### Database Model
+
+In-app scripts are stored in a `scripts` table:
+
+```sql
+CREATE TABLE scripts (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
+    name            TEXT NOT NULL,
+    label           TEXT NOT NULL,
+    description     TEXT NOT NULL DEFAULT '',
+    source          TEXT NOT NULL DEFAULT '',
+    manifest        JSONB NOT NULL DEFAULT '{}',
+    status          TEXT NOT NULL DEFAULT 'draft',
+    created_by      UUID REFERENCES users(id),
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    UNIQUE (organization_id, name)
+);
+```
+
+- `source`: The TypeScript/JavaScript source code — a single-file plugin.
+- `manifest`: The `superplane` manifest section extracted from the code on save. Contains
+  `contributes` (components, triggers) and `activationEvents`. This is auto-generated by
+  parsing the code's `activate()` function for registration calls, or declared explicitly in a
+  comment block.
+- `status`: One of `draft` (not yet activated), `active` (running in Plugin Host), or `error`
+  (activation failed).
+
+### API
+
+A new gRPC service `Scripts` handles CRUD and AI generation:
+
+```protobuf
+service Scripts {
+  rpc ListScripts(ListScriptsRequest) returns (ListScriptsResponse);
+  rpc DescribeScript(DescribeScriptRequest) returns (DescribeScriptResponse);
+  rpc CreateScript(CreateScriptRequest) returns (CreateScriptResponse);
+  rpc UpdateScript(UpdateScriptRequest) returns (UpdateScriptResponse);
+  rpc DeleteScript(DeleteScriptRequest) returns (DeleteScriptResponse);
+  rpc GenerateScript(GenerateScriptRequest) returns (GenerateScriptResponse);
+}
+```
+
+- **ListScripts**: Returns all scripts for the current organization.
+- **DescribeScript**: Returns a single script with full source and manifest.
+- **CreateScript**: Creates a new script in `draft` status.
+- **UpdateScript**: Updates source, name, or description. If the script is `active`, the
+  server re-validates, re-registers contributions, and re-activates in the Plugin Host.
+- **DeleteScript**: Deactivates the script in the Plugin Host, unregisters contributions,
+  and deletes the database row.
+- **GenerateScript**: Sends a user message to the AI backend and returns the assistant's
+  response (which includes generated code). Maintains chat history per script.
+
+The proto file follows the pattern of existing services like `blueprints.proto`.
+
+### Plugin Host Integration
+
+Installed plugins activate via `require(filePath)`. In-app scripts need a different mechanism
+since their code lives in the database, not on the filesystem.
+
+A new RPC method `plugin/activateInline` is added to the Plugin Host:
+
+```json
+{
+  "method": "plugin/activateInline",
+  "params": {
+    "pluginId": "script.my-filter",
+    "source": "const sp = require('@superplane/sdk');\nexport function activate(ctx) { ... }",
+    "manifest": { "contributes": { "components": [...] } }
+  }
+}
+```
+
+The Plugin Host evaluates the source code using Node.js `vm` module, then calls `activate()`
+the same way it does for file-based plugins. From this point forward, the script's handlers
+are routed identically to installed plugin handlers.
+
+When a script is updated (source changes), the server sends `plugin/deactivate` followed by
+`plugin/activateInline` with the new source.
+
+### Registration Flow
+
+When a script is saved with source code:
+
+1. The server parses the source to extract the manifest (contributed components, triggers).
+2. The manifest is stored in the `scripts.manifest` JSONB column.
+3. Contributions are registered in the registry with the `script.` prefix.
+4. The Plugin Host receives `plugin/activateInline` with the source.
+5. The script status is set to `active`.
+
+If step 4 fails (e.g., syntax error, `activate()` throws), the status is set to `error` with
+the error message, and contributions are unregistered.
+
+### AI-Assisted Code Generation
+
+The AI chat backend proxies messages to a configurable LLM provider (OpenAI by default). The
+system prompt includes:
+
+- The `@superplane/sdk` API reference (component registration, trigger registration, context
+  interfaces, available methods).
+- Examples of well-structured plugins.
+- Constraints (single-file plugin, must export `activate()`, must use `@superplane/sdk`).
+
+The AI generates complete, runnable plugin code. Users can iterate by describing changes in
+natural language. The chat history is maintained per script so the AI has context for follow-up
+requests.
+
+### Coexistence with Installed Plugins
+
+In-app scripts and installed `.spx` plugins coexist in the same Plugin Host and registry:
+
+| Aspect              | Installed Plugins (.spx)            | In-App Scripts                         |
+|---------------------|-------------------------------------|----------------------------------------|
+| Storage             | Filesystem (`plugins/` directory)   | Database (`scripts` table)             |
+| Scope               | Global (all organizations)          | Organization-scoped                    |
+| Naming prefix       | Plugin name (e.g., `github-issues`) | `script.` (e.g., `script.my-filter`)  |
+| Authoring           | External IDE + CLI                  | In-app UI + AI assistant               |
+| Activation          | `require()` file path               | `plugin/activateInline` with source    |
+| Lifecycle           | CLI install/uninstall + SIGHUP      | API create/update/delete               |
+| Manifest source     | `package.json` file                 | Extracted from code, stored in DB      |
+
+Name collisions between the two namespaces are not possible because of the `script.` prefix.
+Within the script namespace, names are unique per organization.
+
 ## Implementation Plan
 
 ### Phase 1: Packaging CLI and Archive Format
@@ -1251,6 +1462,28 @@ At the end of Phase 3, plugins can be packaged, installed, and executed end-to-e
 4. Document plugin authoring guide, SDK reference, and deployment instructions.
 5. Publish `@superplane/sdk` type definitions as an npm package for plugin development.
 
+### Phase 5: In-App Plugin Builder
+
+1. Create `scripts` database table and migration.
+2. Define `protos/scripts.proto` with CRUD + Generate RPCs. Regenerate protobuf, OpenAPI spec,
+   and SDKs.
+3. Implement gRPC actions for the `Scripts` service in `pkg/grpc/actions/scripts/`.
+4. Implement `pkg/models/script.go` — database model with CRUD operations.
+5. Add `plugin/activateInline` RPC method to the Plugin Host for evaluating source code strings
+   (using Node.js `vm` module) instead of `require()`.
+6. Extend the Plugin Manager to load scripts from the database at startup, register their
+   contributions, and activate them via `plugin/activateInline`.
+7. Implement AI generation backend — proxy chat messages to OpenAI, maintain per-script chat
+   history, include `@superplane/sdk` reference in the system prompt.
+8. Build the Script Builder UI page in `web_src/` — three-panel layout with script list, AI
+   chat, and code editor.
+9. Add authorization rules for the new `Scripts` endpoints in
+   `pkg/authorization/interceptor.go`.
+10. Add E2E tests for creating, editing, and executing an in-app script.
+
+At the end of Phase 5, users can create simple components and triggers from the UI without any
+external tooling.
+
 ## Security Considerations
 
 - **Process isolation.** Plugins run in a separate Node.js process. A crashing or misbehaving
@@ -1267,9 +1500,17 @@ At the end of Phase 3, plugins can be packaged, installed, and executed end-to-e
   a future consideration.
 - **Resource limits.** Execution timeouts, memory limits, and request caps prevent a single
   plugin from consuming unbounded resources.
-- **Trust model.** Plugins are `.spx` archives explicitly installed by the operator via the CLI.
-  There is no user-facing upload mechanism or auto-install. The operator controls which `.spx`
-  files are installed — the same trust model as built-in Go components.
+- **Trust model.** Installed plugins are `.spx` archives explicitly installed by the operator
+  via the CLI. The operator controls which `.spx` files are installed — the same trust model as
+  built-in Go components. In-app scripts are created by authenticated users within their
+  organization. They run through the same Plugin Host with the same context isolation, but
+  authorization for creating/editing scripts is governed by the organization's role-based access
+  control.
+- **In-app script isolation.** Scripts created in the UI run in the same Plugin Host process as
+  installed plugins. They cannot access other organizations' data because the context callbacks
+  (`ctx/secrets.*`, `ctx/metadata.*`, etc.) are scoped to the calling organization. Scripts
+  cannot import arbitrary npm packages — only `@superplane/sdk` is available as a built-in
+  module.
 
 ## Decisions
 
@@ -1298,8 +1539,17 @@ At the end of Phase 3, plugins can be packaged, installed, and executed end-to-e
   written in JavaScript, but the primary authoring experience targets TypeScript.
 - **Naming**: Plugin contributions use dot-separated names. No special prefix like `js.` — the
   name reflects the plugin's domain, not its implementation language.
-- **Global scope**: Like built-in components, plugin contributions are available to all
-  organizations on the instance. Per-organization plugin scoping is out of scope.
+- **Installed plugin scope**: Like built-in components, installed plugin contributions are
+  available to all organizations on the instance.
+- **In-app script scope**: In-app scripts are organization-scoped. They are visible and usable
+  only within the organization that created them. This allows different organizations on the
+  same instance to have independent custom components without interfering with each other.
 - **No file watching**: There is no file watcher polling for changes. Plugins are installed and
   uninstalled explicitly via the CLI, which signals the server to reload. This is simpler and
   more predictable than watching directories for changes.
+- **Inline activation**: In-app scripts use `plugin/activateInline` instead of `require()`.
+  The Plugin Host evaluates the source code string using Node.js `vm` module, keeping the same
+  activation lifecycle as file-based plugins but without needing the code on the filesystem.
+- **AI generation**: The in-app builder uses server-side LLM proxying rather than client-side
+  API calls. This keeps the API key server-side, allows rate limiting, and enables the server
+  to inject an up-to-date system prompt with the SDK reference.
