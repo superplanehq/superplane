@@ -94,9 +94,6 @@ func (g *GitLab) Description() string {
 
 func (g *GitLab) Instructions() string {
 	return fmt.Sprintf(`
-When connecting using App OAuth:
-- Leave **Client ID** and **Secret** empty to start the setup wizard.
-
 When connecting using Personal Access Token:
 - Go to Preferences → Personal Access Token → Add New token
 - Use **Scopes**: %s

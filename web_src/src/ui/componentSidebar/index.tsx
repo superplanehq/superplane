@@ -339,16 +339,16 @@ export const ComponentSidebar = ({
         configuration: createIntegrationConfig,
       });
       const integration = result.data?.integration;
+      if (!integration) return;
 
-      const hasMetadataContent =
-        integration && selectedIntegrationForDialog
-          ? renderIntegrationMetadata(selectedIntegrationForDialog.name, integration) !== null
-          : false;
+      const hasMetadataContent = selectedIntegrationForDialog
+        ? renderIntegrationMetadata(selectedIntegrationForDialog.name, integration) !== null
+        : false;
 
-      if (integration?.status?.state === "pending" || hasMetadataContent) {
-        setCreatedWizardIntegration(integration!);
-        setCreateIntegrationConfig(integration?.spec?.configuration ?? {});
-        if (integration?.status?.browserAction) {
+      if (integration.status?.state === "pending" || hasMetadataContent) {
+        setCreatedWizardIntegration(integration);
+        setCreateIntegrationConfig(integration.spec?.configuration ?? {});
+        if (integration.status?.browserAction) {
           setCreateIntegrationBrowserAction(integration.status.browserAction);
         }
         return;
@@ -1004,9 +1004,10 @@ export const ComponentSidebar = ({
               const allFields = selectedIntegrationForDialog.configuration ?? [];
               const fieldsToShow = isSetupPhase ? allFields : creationFields;
               const isBusy = createIntegrationMutation.isPending || wizardUpdateMutation.isPending;
-              const metadataContent = isSetupPhase
-                ? renderIntegrationMetadata(selectedIntegrationForDialog.name, createdWizardIntegration!)
-                : null;
+              const metadataContent =
+                isSetupPhase && createdWizardIntegration
+                  ? renderIntegrationMetadata(selectedIntegrationForDialog.name, createdWizardIntegration)
+                  : null;
 
               return (
                 <>

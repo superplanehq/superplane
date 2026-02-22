@@ -178,16 +178,16 @@ export function Integrations({ organizationId }: IntegrationsProps) {
         configuration,
       });
       const integration = result.data?.integration;
+      if (!integration) return;
 
-      const hasMetadataContent =
-        integration && selectedIntegration
-          ? renderIntegrationMetadata(selectedIntegration.name, integration) !== null
-          : false;
+      const hasMetadataContent = selectedIntegration
+        ? renderIntegrationMetadata(selectedIntegration.name, integration) !== null
+        : false;
 
-      if (integration?.status?.state === "pending" || hasMetadataContent) {
-        setCreatedIntegration(integration!);
-        setConfiguration(integration?.spec?.configuration ?? {});
-        if (integration?.status?.browserAction) {
+      if (integration.status?.state === "pending" || hasMetadataContent) {
+        setCreatedIntegration(integration);
+        setConfiguration(integration.spec?.configuration ?? {});
+        if (integration.status?.browserAction) {
           setWizardBrowserAction(integration.status.browserAction);
         }
         return;
@@ -197,7 +197,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       setSelectedIntegration(null);
       setIntegrationName("");
       setConfiguration({});
-      if (integration?.metadata?.id) {
+      if (integration.metadata?.id) {
         navigate(`/${organizationId}/settings/integrations/${integration.metadata.id}`);
       }
     } catch (_error) {
@@ -222,9 +222,6 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       }
 
       handleCloseModal();
-      if (integration?.metadata?.id) {
-        navigate(`/${organizationId}/settings/integrations/${integration.metadata.id}`);
-      }
     } catch (_error) {
       showErrorToast("Failed to update integration");
     }
@@ -444,12 +441,14 @@ export function Integrations({ organizationId }: IntegrationsProps) {
           const allFields = selectedIntegration.configuration ?? [];
           const fieldsToShow = isSetupPhase ? allFields : creationFields;
           const isBusy = createIntegrationMutation.isPending || updateIntegrationMutation.isPending;
-          const metadataContent = isSetupPhase
-            ? renderIntegrationMetadata(selectedIntegration.name, createdIntegration!)
-            : null;
-          const activeBrowserAction = isSetupPhase
-            ? (wizardBrowserAction ?? createdIntegration!.status?.browserAction)
-            : undefined;
+          const metadataContent =
+            isSetupPhase && createdIntegration
+              ? renderIntegrationMetadata(selectedIntegration.name, createdIntegration)
+              : null;
+          const activeBrowserAction =
+            isSetupPhase && createdIntegration
+              ? (wizardBrowserAction ?? createdIntegration.status?.browserAction)
+              : undefined;
 
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
