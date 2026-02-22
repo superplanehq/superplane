@@ -19,6 +19,7 @@ import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import digitaloceanIcon from "@/assets/icons/integrations/digitalocean.svg";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
+import telegramIcon from "@/assets/icons/integrations/telegram.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
@@ -38,6 +39,7 @@ import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
+import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
@@ -53,9 +55,11 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   daytona: daytonaIcon,
   digitalocean: digitaloceanIcon,
   discord: discordIcon,
+  telegram: telegramIcon,
   github: githubIcon,
   gitlab: gitlabIcon,
   hetzner: hetznerIcon,
+  jfrogArtifactory: jfrogArtifactoryIcon,
   grafana: grafanaIcon,
   jira: jiraIcon,
   openai: openAiIcon,
@@ -88,9 +92,11 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   daytona: daytonaIcon,
   digitalocean: digitaloceanIcon,
   discord: discordIcon,
+  telegram: telegramIcon,
   github: githubIcon,
   gitlab: gitlabIcon,
   hetzner: hetznerIcon,
+  jfrogArtifactory: jfrogArtifactoryIcon,
   grafana: grafanaIcon,
   jira: jiraIcon,
   openai: openAiIcon,

@@ -67,6 +67,18 @@ var exampleDataOnBranchCreatedBytes []byte
 //go:embed example_data_on_workflow_run.json
 var exampleDataOnWorkflowRunBytes []byte
 
+//go:embed example_output_add_issue_label.json
+var exampleOutputAddIssueLabelBytes []byte
+
+//go:embed example_output_remove_issue_label.json
+var exampleOutputRemoveIssueLabelBytes []byte
+
+//go:embed example_output_add_issue_assignee.json
+var exampleOutputAddIssueAssigneeBytes []byte
+
+//go:embed example_output_remove_issue_assignee.json
+var exampleOutputRemoveIssueAssigneeBytes []byte
+
 //go:embed example_output_get_workflow_usage.json
 var exampleOutputGetWorkflowUsageBytes []byte
 
@@ -129,6 +141,18 @@ var exampleDataOnBranchCreated map[string]any
 
 var exampleDataOnWorkflowRunOnce sync.Once
 var exampleDataOnWorkflowRun map[string]any
+
+var exampleOutputAddIssueLabelOnce sync.Once
+var exampleOutputAddIssueLabel map[string]any
+
+var exampleOutputRemoveIssueLabelOnce sync.Once
+var exampleOutputRemoveIssueLabel map[string]any
+
+var exampleOutputAddIssueAssigneeOnce sync.Once
+var exampleOutputAddIssueAssignee map[string]any
+
+var exampleOutputRemoveIssueAssigneeOnce sync.Once
+var exampleOutputRemoveIssueAssignee map[string]any
 
 var exampleOutputGetWorkflowUsageOnce sync.Once
 var exampleOutputGetWorkflowUsage map[string]any
@@ -223,6 +247,22 @@ func (t *OnBranchCreated) ExampleData() map[string]any {
 
 func (t *OnWorkflowRun) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnWorkflowRunOnce, exampleDataOnWorkflowRunBytes, &exampleDataOnWorkflowRun)
+}
+
+func (c *AddIssueLabel) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddIssueLabelOnce, exampleOutputAddIssueLabelBytes, &exampleOutputAddIssueLabel)
+}
+
+func (c *RemoveIssueLabel) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputRemoveIssueLabelOnce, exampleOutputRemoveIssueLabelBytes, &exampleOutputRemoveIssueLabel)
+}
+
+func (c *AddIssueAssignee) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddIssueAssigneeOnce, exampleOutputAddIssueAssigneeBytes, &exampleOutputAddIssueAssignee)
+}
+
+func (c *RemoveIssueAssignee) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputRemoveIssueAssigneeOnce, exampleOutputRemoveIssueAssigneeBytes, &exampleOutputRemoveIssueAssignee)
 }
 
 func (g *GetWorkflowUsage) ExampleOutput() map[string]any {

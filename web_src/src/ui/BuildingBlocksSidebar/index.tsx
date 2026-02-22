@@ -21,6 +21,7 @@ import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import digitaloceanIcon from "@/assets/icons/integrations/digitalocean.svg";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
+import telegramIcon from "@/assets/icons/integrations/telegram.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
@@ -50,6 +51,7 @@ import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
+import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
@@ -423,6 +425,7 @@ function CategorySection({
     github: githubIcon,
     gitlab: gitlabIcon,
     hetzner: hetznerIcon,
+    jfrogArtifactory: jfrogArtifactoryIcon,
     grafana: grafanaIcon,
     jira: jiraIcon,
     openai: openAiIcon,
@@ -434,6 +437,7 @@ function CategorySection({
     incident: incidentIcon,
     semaphore: SemaphoreLogo,
     slack: slackIcon,
+    telegram: telegramIcon,
     sendgrid: sendgridIcon,
     prometheus: prometheusIcon,
     render: renderIcon,
@@ -515,6 +519,7 @@ function CategorySection({
             github: githubIcon,
             gitlab: gitlabIcon,
             hetzner: hetznerIcon,
+            jfrogArtifactory: jfrogArtifactoryIcon,
             grafana: grafanaIcon,
             openai: openAiIcon,
             "open-ai": openAiIcon,
@@ -525,6 +530,7 @@ function CategorySection({
             incident: incidentIcon,
             semaphore: SemaphoreLogo,
             slack: slackIcon,
+            telegram: telegramIcon,
             sendgrid: sendgridIcon,
             prometheus: prometheusIcon,
             render: renderIcon,

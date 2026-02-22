@@ -18,6 +18,7 @@ import { deleteReleaseMapper } from "./delete_release";
 import { getReleaseMapper } from "./get_release";
 import { createReviewMapper } from "./create_review";
 import { getWorkflowUsageMapper } from "./get_workflow_usage";
+import { labelsMapper } from "./labels";
 import { buildActionStateRegistry } from "../utils";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
@@ -33,6 +34,10 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   deleteRelease: buildActionStateRegistry("deleted"),
   getRelease: buildActionStateRegistry("retrieved"),
   getWorkflowUsage: buildActionStateRegistry("retrieved"),
+  addIssueLabel: buildActionStateRegistry("added"),
+  removeIssueLabel: buildActionStateRegistry("removed"),
+  addIssueAssignee: buildActionStateRegistry("added"),
+  removeIssueAssignee: buildActionStateRegistry("removed"),
 };
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -48,6 +53,10 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   deleteRelease: deleteReleaseMapper,
   getRelease: getReleaseMapper,
   getWorkflowUsage: getWorkflowUsageMapper,
+  addIssueLabel: labelsMapper,
+  removeIssueLabel: labelsMapper,
+  addIssueAssignee: baseIssueMapper,
+  removeIssueAssignee: baseIssueMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
