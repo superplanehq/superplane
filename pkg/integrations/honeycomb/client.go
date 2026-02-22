@@ -185,6 +185,34 @@ func (c *Client) pingV1WithConfigKey() (int, []byte, error) {
 	return code, b, err
 }
 
+// pingV1WithKey pings /1/auth with the given API key to validate it works.
+// Honeycomb accepts both configuration and ingest keys for this endpoint.
+func (c *Client) pingV1WithKey(key string) (int, []byte, error) {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return 0, nil, fmt.Errorf("key is empty")
+	}
+	u, _ := url.Parse(c.BaseURL)
+	u.Path = "/1/auth"
+	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	if err != nil {
+		return 0, nil, err
+	}
+	req.Header.Set("X-Honeycomb-Team", key)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	b, code, err := c.do(req)
+	return code, b, err
+}
+
+func (c *Client) pingV1WithIngestKey() (int, []byte, error) {
+	ingestKey, err := c.getSecretValue(secretNameIngestKey)
+	if err != nil {
+		return 0, nil, err
+	}
+	return c.pingV1WithKey(ingestKey)
+}
+
 type listEnvironmentsResponse struct {
 	Data []struct {
 		ID         string `json:"id"`
@@ -337,7 +365,19 @@ func (c *Client) EnsureConfigurationKey(teamSlug string) error {
 // when sending events. If a valid key already exists, it is reused.
 func (c *Client) EnsureIngestKey(teamSlug string) error {
 	if c.hasSecret(secretNameIngestKey) {
-		return nil
+		code, body, err := c.pingV1WithIngestKey()
+		if err == nil && code >= 200 && code < 300 {
+			return nil
+		}
+
+		if err != nil {
+			return fmt.Errorf("ingest key v1 ping failed: %w", err)
+		}
+		if code == http.StatusUnauthorized || code == http.StatusForbidden {
+			_ = c.integrationCtx.SetSecret(secretNameIngestKey, []byte{})
+		} else {
+			return fmt.Errorf("existing ingest key failed v1 ping (http %d): %s", code, string(body))
+		}
 	}
 
 	teamSlug = strings.TrimSpace(teamSlug)
