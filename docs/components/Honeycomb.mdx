@@ -1,0 +1,120 @@
+---
+title: "Honeycomb"
+---
+
+Monitor observability alerts and send events to Honeycomb datasets
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Alert Fired" href="#on-alert-fired" description="Triggers when a Honeycomb Trigger fires" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Event" href="#create-event" description="Send an event to Honeycomb dataset" />
+</CardGrid>
+
+## Instructions
+
+Connect Honeycomb to SuperPlane using a Management Key.
+
+**Required configuration:**
+- **Site**: US (api.honeycomb.io) or EU (api.eu1.honeycomb.io) based on your account region.
+- **Management Key**: Found in Honeycomb under Team Settings > API Keys. Must be in format &lt;keyID&gt;:&lt;secret&gt;.
+- **Team Slug**: Your team identifier, visible in the Honeycomb URL: honeycomb.io/&lt;team-slug&gt;.
+- **Environment Slug**: The environment containing your datasets (e.g. "production"). Found under Team Settings > Environments.
+
+SuperPlane will automatically validate your credentials and manage all necessary Honeycomb resources — webhook recipients for triggers and ingest keys for actions — so no manual setup is required.
+
+<a id="on-alert-fired"></a>
+
+## On Alert Fired
+
+Starts a workflow execution when a Honeycomb Trigger fires.
+
+**Configuration:**
+- **Dataset Slug**: The slug of the dataset that contains your Honeycomb trigger. Found in the dataset URL: honeycomb.io/&lt;team&gt;/datasets/&lt;dataset-slug&gt;.
+- **Alert Name**: The exact name of the Honeycomb trigger to listen to (case-insensitive). Found in your dataset under Triggers.
+
+**How it works:**
+SuperPlane automatically creates a webhook recipient in Honeycomb and attaches it to the selected trigger. No manual webhook setup is required.
+
+When the trigger fires, SuperPlane receives the webhook and starts a workflow execution with the full alert payload.
+
+### Example Data
+
+```json
+{
+  "dataset": {
+    "name": "Production API",
+    "slug": "api-production"
+  },
+  "description": "API error rate has exceeded the acceptable threshold",
+  "id": "01HQXYZ123ABC",
+  "name": "High Error Rate - Production API",
+  "query": {
+    "query_url": "https://ui.honeycomb.io/myteam/datasets/api-production/query/xyz789",
+    "time_range": 900
+  },
+  "result_groups": [
+    {
+      "group": {
+        "endpoint": "/api/users"
+      },
+      "result_value": 12.3
+    },
+    {
+      "group": {
+        "endpoint": "/api/orders"
+      },
+      "result_value": 6.8
+    }
+  ],
+  "result_value": 8.5,
+  "severity": "critical",
+  "status": "firing",
+  "summary": "Error rate is 8.5% (threshold: 5%)",
+  "threshold": {
+    "op": "above",
+    "value": 5
+  },
+  "trigger_url": "https://ui.honeycomb.io/myteam/triggers/abc123",
+  "triggered_at": "2026-02-15T10:30:00Z",
+  "version": "v1"
+}
+```
+
+<a id="create-event"></a>
+
+## Create Event
+
+Sends a JSON event to a Honeycomb dataset.
+
+Each key in the JSON object becomes a Honeycomb field.
+
+Notes:
+• Dataset must exist
+• Fields must be valid JSON object
+• Timestamp is auto-added if missing
+
+### Example Output
+
+```json
+{
+  "dataset": "deployments",
+  "fields": {
+    "deployed_by": "github-actions",
+    "duration_seconds": 42,
+    "environment": "production",
+    "event_type": "deployment",
+    "service": "billing-api",
+    "success": true,
+    "version": "2.4.1"
+  },
+  "status": "sent"
+}
+```
