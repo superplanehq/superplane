@@ -28,8 +28,8 @@ const (
 - Click the **Continue** button to go to the Linear API settings page
 - Click **Create new** under OAuth2 Applications:
   - **Application name**: SuperPlane
-  - **Redirect callback URLs**: ` + "`%s`" + `
-  - Enable **Webhooks** and set the webhook URL to: ` + "`%s`" + `
+  - **Redirect callback URLs**: Use the Callback URL shown above
+  - Enable **Webhooks** and set the webhook URL to the Webhook URL shown above
   - Under webhook events, check **Issues**
 - Copy the **Client ID**, **Client Secret**, and **Webhook signing secret** and paste them in the fields below.
 - Click **Save** to complete the setup.
@@ -45,9 +45,11 @@ func init() {
 type Linear struct{}
 
 type Metadata struct {
-	State  *string `json:"state,omitempty" mapstructure:"state,omitempty"`
-	Teams  []Team  `json:"teams" mapstructure:"teams"`
-	Labels []Label `json:"labels" mapstructure:"labels"`
+	State       *string `json:"state,omitempty" mapstructure:"state,omitempty"`
+	Teams       []Team  `json:"teams" mapstructure:"teams"`
+	Labels      []Label `json:"labels" mapstructure:"labels"`
+	WebhookURL  string  `json:"webhookUrl,omitempty" mapstructure:"webhookUrl,omitempty"`
+	CallbackURL string  `json:"callbackUrl,omitempty" mapstructure:"callbackUrl,omitempty"`
 }
 
 func (l *Linear) Name() string {
@@ -67,7 +69,7 @@ func (l *Linear) Description() string {
 }
 
 func (l *Linear) Instructions() string {
-	return `Leave **Client ID** and **Client Secret** empty to start the setup wizard.`
+	return ""
 }
 
 func (l *Linear) Configuration() []configuration.Field {
@@ -122,10 +124,14 @@ func (l *Linear) Sync(ctx core.SyncContext) error {
 	clientID, _ := ctx.Integration.GetConfig("clientId")
 	clientSecret, _ := ctx.Integration.GetConfig("clientSecret")
 
-	// No credentials yet — show setup instructions.
+	// No credentials yet — show setup instructions with URLs in metadata.
 	if string(clientID) == "" || string(clientSecret) == "" {
+		ctx.Integration.SetMetadata(Metadata{
+			WebhookURL:  webhookURL,
+			CallbackURL: callbackURL,
+		})
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: fmt.Sprintf(appSetupDescription, callbackURL, webhookURL),
+			Description: appSetupDescription,
 			URL:         "https://linear.app/settings/api/applications/new",
 			Method:      "GET",
 		})
@@ -254,6 +260,8 @@ func (l *Linear) updateMetadata(ctx core.SyncContext) error {
 	metadata.Teams = teams
 	metadata.Labels = labels
 	metadata.State = nil
+	metadata.WebhookURL = ""
+	metadata.CallbackURL = ""
 	ctx.Integration.SetMetadata(metadata)
 	return nil
 }

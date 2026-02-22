@@ -106,6 +106,9 @@ func (p *Prometheus) Configuration() []configuration.Field {
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "authType", Values: []string{AuthTypeBasic}},
 			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "authType", Values: []string{AuthTypeBasic}},
+			},
 		},
 		{
 			Name:      "password",
@@ -116,6 +119,9 @@ func (p *Prometheus) Configuration() []configuration.Field {
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "authType", Values: []string{AuthTypeBasic}},
 			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "authType", Values: []string{AuthTypeBasic}},
+			},
 		},
 		{
 			Name:      "bearerToken",
@@ -124,6 +130,9 @@ func (p *Prometheus) Configuration() []configuration.Field {
 			Required:  false,
 			Sensitive: true,
 			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "authType", Values: []string{AuthTypeBearer}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "authType", Values: []string{AuthTypeBearer}},
 			},
 		},

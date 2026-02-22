@@ -65,7 +65,7 @@ func (g *Grafana) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Description: "Grafana API key or service account token",
 			Sensitive:   true,
-			Required:    false,
+			Required:    true,
 		},
 	}
 }

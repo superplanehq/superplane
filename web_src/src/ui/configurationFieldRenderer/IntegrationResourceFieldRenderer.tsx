@@ -246,8 +246,9 @@ export const IntegrationResourceFieldRenderer = ({
       .filter((option): option is AutoCompleteOption => option !== null);
 
     // Optional single-select: allow clearing selection via empty option (driven by field.required)
-    const options: AutoCompleteOption[] =
-      !field.required ? [{ value: "", label: "None" }, ...resourceOptions] : resourceOptions;
+    const options: AutoCompleteOption[] = !field.required
+      ? [{ value: "", label: "None" }, ...resourceOptions]
+      : resourceOptions;
 
     const selectedValue =
       useNameAsValue && typeof value === "string" && value

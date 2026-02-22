@@ -19,6 +19,7 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast } from "@/utils/toast";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
+import { renderIntegrationMetadata } from "@/pages/organization/settings/integrationMetadataRenderers";
 import { ChildEventsState } from "../composite";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
@@ -257,6 +258,7 @@ export const ComponentSidebar = ({
   const [createIntegrationBrowserAction, setCreateIntegrationBrowserAction] = useState<
     OrganizationsBrowserAction | undefined
   >(undefined);
+  const [createdWizardIntegration, setCreatedWizardIntegration] = useState<OrganizationsIntegration | null>(null);
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
   const [configureIntegrationName, setConfigureIntegrationName] = useState("");
   // Use autocompleteExampleObj directly - current node is already filtered out upstream
@@ -264,6 +266,8 @@ export const ComponentSidebar = ({
 
   const { data: availableIntegrationDefinitions = [] } = useAvailableIntegrations();
   const createIntegrationMutation = useCreateIntegration(domainId ?? "");
+  const createdWizardIntegrationId = createdWizardIntegration?.metadata?.id ?? "";
+  const wizardUpdateMutation = useUpdateIntegration(domainId ?? "", createdWizardIntegrationId);
   const { data: configureIntegration, isLoading: configureIntegrationLoading } = useIntegration(
     domainId ?? "",
     configureIntegrationId ?? "",
@@ -315,8 +319,10 @@ export const ComponentSidebar = ({
     setCreateIntegrationName("");
     setCreateIntegrationConfig({});
     setCreateIntegrationBrowserAction(undefined);
+    setCreatedWizardIntegration(null);
     createIntegrationMutation.reset();
-  }, [createIntegrationMutation]);
+    wizardUpdateMutation.reset();
+  }, [createIntegrationMutation, wizardUpdateMutation]);
 
   const handleCreateIntegrationSubmit = useCallback(async () => {
     if (!selectedIntegrationForDialog?.name || !domainId) return;
@@ -332,21 +338,61 @@ export const ComponentSidebar = ({
         name: nextName,
         configuration: createIntegrationConfig,
       });
-      const browserAction = result.data?.integration?.status?.browserAction;
-      if (browserAction) {
-        setCreateIntegrationBrowserAction(browserAction);
+      const integration = result.data?.integration;
+
+      const hasMetadataContent =
+        integration && selectedIntegrationForDialog
+          ? renderIntegrationMetadata(selectedIntegrationForDialog.name, integration) !== null
+          : false;
+
+      if (integration?.status?.state === "pending" || hasMetadataContent) {
+        setCreatedWizardIntegration(integration!);
+        setCreateIntegrationConfig(integration?.spec?.configuration ?? {});
+        if (integration?.status?.browserAction) {
+          setCreateIntegrationBrowserAction(integration.status.browserAction);
+        }
         return;
       }
+
       handleCloseCreateIntegrationDialog();
     } catch (error) {
       showErrorToast(`Failed to create integration: ${getApiErrorMessage(error)}`);
     }
   }, [
-    selectedIntegrationForDialog?.name,
+    selectedIntegrationForDialog,
     domainId,
     createIntegrationName,
     createIntegrationConfig,
     createIntegrationMutation,
+    handleCloseCreateIntegrationDialog,
+  ]);
+
+  const handleWizardSaveSubmit = useCallback(async () => {
+    if (!createdWizardIntegration?.metadata?.id || !domainId) return;
+
+    try {
+      const result = await wizardUpdateMutation.mutateAsync({
+        name: createIntegrationName,
+        configuration: createIntegrationConfig,
+      });
+      const integration = result.data?.integration;
+
+      if (integration?.status?.browserAction) {
+        setCreatedWizardIntegration(integration);
+        setCreateIntegrationBrowserAction(integration.status.browserAction);
+        return;
+      }
+
+      handleCloseCreateIntegrationDialog();
+    } catch (error) {
+      showErrorToast(`Failed to update integration: ${getApiErrorMessage(error)}`);
+    }
+  }, [
+    createdWizardIntegration?.metadata?.id,
+    domainId,
+    createIntegrationName,
+    createIntegrationConfig,
+    wizardUpdateMutation,
     handleCloseCreateIntegrationDialog,
   ]);
 
@@ -945,123 +991,167 @@ export const ComponentSidebar = ({
       >
         <DialogContent
           className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
-          showCloseButton={!createIntegrationMutation.isPending}
+          showCloseButton={!createIntegrationMutation.isPending && !wizardUpdateMutation.isPending}
         >
-          {selectedIntegrationForDialog && (
-            <>
-              <DialogHeader>
-                <div className="flex items-center gap-3">
-                  <IntegrationIcon
-                    integrationName={selectedIntegrationForDialog.name}
-                    iconSlug={selectedIntegrationForDialog.icon}
-                    className="h-6 w-6 text-gray-500 dark:text-gray-400"
-                  />
-                  <div className="flex items-center gap-2">
-                    <DialogTitle>
-                      Configure{" "}
-                      {getIntegrationTypeDisplayName(undefined, selectedIntegrationForDialog.name) ||
-                        selectedIntegrationForDialog.name}
-                    </DialogTitle>
-                    <a
-                      href={integrationHomeHref}
-                      className="inline-flex h-4 w-4 items-center justify-center text-gray-500 hover:text-gray-800 transition-colors"
-                      aria-label="Open integration settings"
-                    >
-                      <Settings className="h-4 w-4" />
-                    </a>
+          {selectedIntegrationForDialog &&
+            (() => {
+              const isSetupPhase = createdWizardIntegration != null;
+              const isReadyWithMetadata = isSetupPhase && createdWizardIntegration?.status?.state !== "pending";
+              const creationFields =
+                selectedIntegrationForDialog.configuration?.filter(
+                  (f: ConfigurationField) => f.required || (f.requiredConditions && f.requiredConditions.length > 0),
+                ) ?? [];
+              const allFields = selectedIntegrationForDialog.configuration ?? [];
+              const fieldsToShow = isSetupPhase ? allFields : creationFields;
+              const isBusy = createIntegrationMutation.isPending || wizardUpdateMutation.isPending;
+              const metadataContent = isSetupPhase
+                ? renderIntegrationMetadata(selectedIntegrationForDialog.name, createdWizardIntegration!)
+                : null;
+
+              return (
+                <>
+                  <DialogHeader>
+                    <div className="flex items-center gap-3">
+                      <IntegrationIcon
+                        integrationName={selectedIntegrationForDialog.name}
+                        iconSlug={selectedIntegrationForDialog.icon}
+                        className="h-6 w-6 text-gray-500 dark:text-gray-400"
+                      />
+                      <div className="flex items-center gap-2">
+                        <DialogTitle>
+                          {isSetupPhase ? "Set up" : "Configure"}{" "}
+                          {getIntegrationTypeDisplayName(undefined, selectedIntegrationForDialog.name) ||
+                            selectedIntegrationForDialog.name}
+                        </DialogTitle>
+                        <a
+                          href={integrationHomeHref}
+                          className="inline-flex h-4 w-4 items-center justify-center text-gray-500 hover:text-gray-800 transition-colors"
+                          aria-label="Open integration settings"
+                        >
+                          <Settings className="h-4 w-4" />
+                        </a>
+                      </div>
+                    </div>
+                    {!isSetupPhase && selectedInstructions && (
+                      <IntegrationInstructions description={selectedInstructions} className="mt-2" />
+                    )}
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    {metadataContent}
+
+                    {isSetupPhase && createIntegrationBrowserAction && (
+                      <IntegrationInstructions
+                        description={createIntegrationBrowserAction.description}
+                        onContinue={createIntegrationBrowserAction.url ? handleCreateBrowserAction : undefined}
+                      />
+                    )}
+
+                    {!isSetupPhase && (
+                      <div>
+                        <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                          Integration Name
+                          <span className="text-gray-800 ml-1">*</span>
+                        </Label>
+                        <Input
+                          type="text"
+                          value={createIntegrationName}
+                          onChange={(e) => setCreateIntegrationName(e.target.value)}
+                          placeholder="e.g., my-app-integration"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                          A unique name for this integration
+                        </p>
+                      </div>
+                    )}
+
+                    {fieldsToShow.length > 0 && (
+                      <div className="space-y-4">
+                        {fieldsToShow.map((field: ConfigurationField) => {
+                          if (!field.name) return null;
+                          return (
+                            <ConfigurationFieldRenderer
+                              key={field.name}
+                              field={field}
+                              value={createIntegrationConfig[field.name]}
+                              onChange={(value) =>
+                                setCreateIntegrationConfig((prev) => ({ ...prev, [field.name || ""]: value }))
+                              }
+                              allValues={createIntegrationConfig}
+                              domainId={domainId ?? ""}
+                              domainType="DOMAIN_TYPE_ORGANIZATION"
+                              organizationId={domainId ?? ""}
+                              appInstallationId={createdWizardIntegration?.metadata?.id}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                </div>
-                {(createIntegrationBrowserAction?.description || selectedInstructions) && (
-                  <IntegrationInstructions
-                    description={createIntegrationBrowserAction?.description || selectedInstructions}
-                    onContinue={createIntegrationBrowserAction?.url ? handleCreateBrowserAction : undefined}
-                    className="mt-2"
-                  />
-                )}
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
-                    Integration Name
-                    <span className="text-gray-800 ml-1">*</span>
-                  </Label>
-                  <Input
-                    type="text"
-                    value={createIntegrationName}
-                    onChange={(e) => setCreateIntegrationName(e.target.value)}
-                    placeholder="e.g., my-app-integration"
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
-                </div>
-                {selectedIntegrationForDialog.configuration &&
-                  selectedIntegrationForDialog.configuration.length > 0 && (
-                    <div className="space-y-4">
-                      {selectedIntegrationForDialog.configuration.map((field: ConfigurationField) => {
-                        if (!field.name) return null;
-                        return (
-                          <ConfigurationFieldRenderer
-                            key={field.name}
-                            field={field}
-                            value={createIntegrationConfig[field.name]}
-                            onChange={(value) =>
-                              setCreateIntegrationConfig((prev) => ({ ...prev, [field.name || ""]: value }))
-                            }
-                            allValues={createIntegrationConfig}
-                            domainId={domainId ?? ""}
-                            domainType="DOMAIN_TYPE_ORGANIZATION"
-                            organizationId={domainId ?? ""}
-                          />
-                        );
-                      })}
+                  <DialogFooter className="gap-2 sm:justify-start mt-6">
+                    {isSetupPhase ? (
+                      <>
+                        {isReadyWithMetadata ? (
+                          <Button color="blue" onClick={handleCloseCreateIntegrationDialog}>
+                            Done
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              color="blue"
+                              onClick={() => void handleWizardSaveSubmit()}
+                              disabled={isBusy}
+                              className="flex items-center gap-2"
+                            >
+                              {wizardUpdateMutation.isPending ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Saving...
+                                </>
+                              ) : (
+                                "Save"
+                              )}
+                            </Button>
+                            <Button variant="outline" onClick={handleCloseCreateIntegrationDialog} disabled={isBusy}>
+                              Close
+                            </Button>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          color="blue"
+                          onClick={() => void handleCreateIntegrationSubmit()}
+                          disabled={isBusy || !createIntegrationName?.trim()}
+                          className="flex items-center gap-2"
+                        >
+                          {createIntegrationMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Connecting...
+                            </>
+                          ) : (
+                            "Connect"
+                          )}
+                        </Button>
+                        <Button variant="outline" onClick={handleCloseCreateIntegrationDialog} disabled={isBusy}>
+                          Cancel
+                        </Button>
+                      </>
+                    )}
+                  </DialogFooter>
+                  {(createIntegrationMutation.isError || wizardUpdateMutation.isError) && (
+                    <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                      <p className="text-sm text-red-800 dark:text-red-200">
+                        {createIntegrationMutation.isError
+                          ? `Failed to create integration: ${getApiErrorMessage(createIntegrationMutation.error)}`
+                          : `Failed to update integration: ${getApiErrorMessage(wizardUpdateMutation.error)}`}
+                      </p>
                     </div>
                   )}
-              </div>
-              <DialogFooter className="gap-2 sm:justify-start mt-6">
-                {createIntegrationBrowserAction ? (
-                  <>
-                    <Button color="blue" onClick={handleCloseCreateIntegrationDialog}>
-                      Save
-                    </Button>
-                    <Button variant="outline" onClick={handleCloseCreateIntegrationDialog}>
-                      Cancel
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      color="blue"
-                      onClick={() => void handleCreateIntegrationSubmit()}
-                      disabled={createIntegrationMutation.isPending || !createIntegrationName?.trim()}
-                      className="flex items-center gap-2"
-                    >
-                      {createIntegrationMutation.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Connecting...
-                        </>
-                      ) : (
-                        "Connect"
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={handleCloseCreateIntegrationDialog}
-                      disabled={createIntegrationMutation.isPending}
-                    >
-                      Cancel
-                    </Button>
-                  </>
-                )}
-              </DialogFooter>
-              {createIntegrationMutation.isError && (
-                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                  <p className="text-sm text-red-800 dark:text-red-200">
-                    Failed to create integration: {getApiErrorMessage(createIntegrationMutation.error)}
-                  </p>
-                </div>
-              )}
-            </>
-          )}
+                </>
+              );
+            })()}
         </DialogContent>
       </Dialog>
 

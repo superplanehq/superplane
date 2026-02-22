@@ -162,6 +162,9 @@ func (g *GitLab) Configuration() []configuration.Field {
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "authType", Values: []string{AuthTypePersonalAccessToken}},
 			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "authType", Values: []string{AuthTypePersonalAccessToken}},
+			},
 		},
 	}
 }
