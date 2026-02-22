@@ -1,0 +1,12 @@
+{
+  "data": {
+    "id": 101,
+    "number": 42,
+    "title": "Fix flaky build",
+    "state": "open",
+    "assignees": [],
+    "html_url": "https://github.com/acme/widgets/issues/42"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issue"
+}
