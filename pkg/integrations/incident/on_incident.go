@@ -139,9 +139,17 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 	}
 
 	// Persist the signing secret in the encrypted webhook.Secret field (same as Grafana, PagerDuty, etc.).
-	if ctx.Webhook != nil && signingSecret != "" {
-		if err := ctx.Webhook.SetSecret([]byte(signingSecret)); err != nil {
-			return fmt.Errorf("failed to persist webhook signing secret: %w", err)
+	// When signingSecret is empty, clear any random secret from webhook creation so resolveSigningSecret
+	// returns "" and HandleWebhook returns "signing secret is required" instead of "invalid signature".
+	if ctx.Webhook != nil {
+		if signingSecret != "" {
+			if err := ctx.Webhook.SetSecret([]byte(signingSecret)); err != nil {
+				return fmt.Errorf("failed to persist webhook signing secret: %w", err)
+			}
+		} else {
+			if err := ctx.Webhook.SetSecret([]byte{}); err != nil {
+				return fmt.Errorf("failed to clear webhook secret: %w", err)
+			}
 		}
 	}
 
