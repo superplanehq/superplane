@@ -1,0 +1,24 @@
+{
+  "data": {
+    "aggregate": "namespace",
+    "cpuCost": 45.23,
+    "cpuEfficiency": 0.42,
+    "end": "2026-02-22T00:00:00Z",
+    "gpuCost": 0,
+    "name": "production",
+    "networkCost": 12.5,
+    "properties": {
+      "namespace": "production"
+    },
+    "pvCost": 8.75,
+    "ramCost": 38.92,
+    "ramEfficiency": 0.61,
+    "start": "2026-02-21T00:00:00Z",
+    "threshold": 100,
+    "totalCost": 105.4,
+    "totalEfficiency": 0.51,
+    "window": "1d"
+  },
+  "timestamp": "2026-02-22T12:00:00.000000000Z",
+  "type": "opencost.costThreshold"
+}

@@ -41,6 +41,7 @@ import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
+import opencostIcon from "@/assets/icons/integrations/opencost.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 
 /** Integration type name (e.g. "github") → logo src. Used for Settings tab and header. */
@@ -63,6 +64,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   jira: jiraIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
+  opencost: opencostIcon,
   claude: claudeIcon,
   cursor: cursorIcon,
   pagerduty: pagerDutyIcon,
@@ -99,6 +101,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   jira: jiraIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
+  opencost: opencostIcon,
   claude: claudeIcon,
   cursor: cursorIcon,
   pagerduty: pagerDutyIcon,
