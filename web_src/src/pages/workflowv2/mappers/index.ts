@@ -156,6 +156,12 @@ import {
   triggerRenderers as dockerhubTriggerRenderers,
   eventStateRegistry as dockerhubEventStateRegistry,
 } from "./dockerhub";
+
+import {
+  componentMappers as honeycombComponentMappers,
+  triggerRenderers as honeycombTriggerRenderers,
+  eventStateRegistry as honeycombEventStateRegistry,
+} from "./honeycomb/index";
 import {
   componentMappers as gcpComponentMappers,
   customFieldRenderers as gcpCustomFieldRenderers,
@@ -229,6 +235,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   jfrogArtifactory: jfrogArtifactoryComponentMappers,
   statuspage: statuspageComponentMappers,
   dockerhub: dockerhubComponentMappers,
+  honeycomb: honeycombComponentMappers,
   harness: harnessComponentMappers,
   servicenow: servicenowComponentMappers,
 };
@@ -262,6 +269,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   jfrogArtifactory: jfrogArtifactoryTriggerRenderers,
   statuspage: statuspageTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
+  honeycomb: honeycombTriggerRenderers,
   harness: harnessTriggerRenderers,
   servicenow: servicenowTriggerRenderers,
 };
@@ -294,6 +302,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   gitlab: gitlabEventStateRegistry,
   jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
+  honeycomb: honeycombEventStateRegistry,
   harness: harnessEventStateRegistry,
   servicenow: servicenowEventStateRegistry,
 };
