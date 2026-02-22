@@ -4,13 +4,13 @@ title: "Honeycomb"
 
 Monitor observability alerts and send events to Honeycomb datasets
 
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
 ## Triggers
 
 <CardGrid>
   <LinkCard title="On Alert Fired" href="#on-alert-fired" description="Triggers when a Honeycomb Trigger fires" />
 </CardGrid>
-
-import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
 
@@ -24,8 +24,8 @@ Connect Honeycomb to SuperPlane using a Management Key.
 
 **Required configuration:**
 - **Site**: US (api.honeycomb.io) or EU (api.eu1.honeycomb.io) based on your account region.
-- **Management Key**: Found in Honeycomb under Team Settings > API Keys. Must be in format <keyID>:<secret>.
-- **Team Slug**: Your team identifier, visible in the Honeycomb URL: honeycomb.io/<team-slug>.
+- **Management Key**: Found in Honeycomb under Team Settings > API Keys. Must be in format &lt;keyID&gt;:&lt;secret&gt;.
+- **Team Slug**: Your team identifier, visible in the Honeycomb URL: honeycomb.io/&lt;team-slug&gt;.
 - **Environment Slug**: The environment containing your datasets (e.g. "production"). Found under Team Settings > Environments.
 
 SuperPlane will automatically validate your credentials and manage all necessary Honeycomb resources — webhook recipients for triggers and ingest keys for actions — so no manual setup is required.
@@ -37,7 +37,7 @@ SuperPlane will automatically validate your credentials and manage all necessary
 Starts a workflow execution when a Honeycomb Trigger fires.
 
 **Configuration:**
-- **Dataset Slug**: The slug of the dataset that contains your Honeycomb trigger. Found in the dataset URL: honeycomb.io/<team>/datasets/<dataset-slug>.
+- **Dataset Slug**: The slug of the dataset that contains your Honeycomb trigger. Found in the dataset URL: honeycomb.io/&lt;team&gt;/datasets/&lt;dataset-slug&gt;.
 - **Alert Name**: The exact name of the Honeycomb trigger to listen to (case-insensitive). Found in your dataset under Triggers.
 
 **How it works:**
