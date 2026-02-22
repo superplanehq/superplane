@@ -15,9 +15,10 @@ import (
 type RemoveIssueLabel struct{}
 
 type RemoveIssueLabelConfiguration struct {
-	Repository  string   `json:"repository" mapstructure:"repository"`
-	IssueNumber string   `json:"issueNumber" mapstructure:"issueNumber"`
-	Labels      []string `json:"labels" mapstructure:"labels"`
+	Repository     string   `json:"repository" mapstructure:"repository"`
+	IssueNumber    string   `json:"issueNumber" mapstructure:"issueNumber"`
+	Labels         []string `json:"labels" mapstructure:"labels"`
+	FailIfNotFound bool     `json:"failIfNotFound" mapstructure:"failIfNotFound"`
 }
 
 func (c *RemoveIssueLabel) Name() string {
@@ -99,6 +100,13 @@ func (c *RemoveIssueLabel) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "failIfNotFound",
+			Label:       "Fail if not found",
+			Type:        configuration.FieldTypeBool,
+			Description: "Fail the execution if a label is not present on the issue",
+			Default:     false,
+		},
 	}
 }
 
@@ -157,6 +165,10 @@ func (c *RemoveIssueLabel) Execute(ctx core.ExecutionContext) error {
 			label,
 		)
 		if err != nil {
+			if !config.FailIfNotFound {
+				continue
+			}
+
 			return fmt.Errorf("failed to remove label %s from issue: %w", label, err)
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -15,9 +16,10 @@ import (
 type RemoveIssueAssignee struct{}
 
 type RemoveIssueAssigneeConfiguration struct {
-	Repository  string   `json:"repository" mapstructure:"repository"`
-	IssueNumber string   `json:"issueNumber" mapstructure:"issueNumber"`
-	Assignees   []string `json:"assignees" mapstructure:"assignees"`
+	Repository     string   `json:"repository" mapstructure:"repository"`
+	IssueNumber    string   `json:"issueNumber" mapstructure:"issueNumber"`
+	Assignees      []string `json:"assignees" mapstructure:"assignees"`
+	FailIfNotFound bool     `json:"failIfNotFound" mapstructure:"failIfNotFound"`
 }
 
 func (c *RemoveIssueAssignee) Name() string {
@@ -100,6 +102,13 @@ func (c *RemoveIssueAssignee) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "failIfNotFound",
+			Label:       "Fail if not found",
+			Type:        configuration.FieldTypeBool,
+			Description: "Fail the execution if an assignee is not present on the issue",
+			Default:     false,
+		},
 	}
 }
 
@@ -149,15 +158,27 @@ func (c *RemoveIssueAssignee) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
+	assignees := sanitizeAssignees(config.Assignees)
+
 	issue, _, err := client.Issues.RemoveAssignees(
 		context.Background(),
 		appMetadata.Owner,
 		config.Repository,
 		issueNumber,
-		sanitizeAssignees(config.Assignees),
+		assignees,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to remove assignees from issue: %w", err)
+	}
+
+	if config.FailIfNotFound {
+		for _, requested := range assignees {
+			for _, a := range issue.Assignees {
+				if strings.EqualFold(a.GetLogin(), requested) {
+					return fmt.Errorf("failed to remove assignee %s: user not found on issue", requested)
+				}
+			}
+		}
 	}
 
 	return ctx.ExecutionState.Emit(

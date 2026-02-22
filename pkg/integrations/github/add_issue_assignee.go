@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -150,31 +149,15 @@ func (c *AddIssueAssignee) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
-	assignees := sanitizeAssignees(config.Assignees)
-
 	issue, _, err := client.Issues.AddAssignees(
 		context.Background(),
 		appMetadata.Owner,
 		config.Repository,
 		issueNumber,
-		assignees,
+		sanitizeAssignees(config.Assignees),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to add assignees to issue: %w", err)
-	}
-
-	for _, requested := range assignees {
-		found := false
-		for _, a := range issue.Assignees {
-			if strings.EqualFold(a.GetLogin(), requested) {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return fmt.Errorf("failed to add assignee %s: user not found or cannot be assigned", requested)
-		}
 	}
 
 	return ctx.ExecutionState.Emit(
