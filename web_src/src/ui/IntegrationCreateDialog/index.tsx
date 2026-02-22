@@ -11,6 +11,7 @@ import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { useUpdateIntegration } from "@/hooks/useIntegrations";
 import type {
   ConfigurationField,
   IntegrationsIntegrationDefinition,
@@ -31,8 +32,6 @@ export interface IntegrationCreateDialogProps {
   organizationId: string;
   /** Called to create the integration. Returns the API response (integration id, browser action, webhook url, etc.). */
   onCreateIntegration: (payload: IntegrationCreatePayload) => Promise<OrganizationsCreateIntegrationResponse>;
-  /** Called to update the integration (e.g. complete webhook setup). */
-  onUpdateIntegration: (integrationId: string, payload: { configuration: Record<string, unknown> }) => Promise<void>;
   /** Optional: called when dialog closes so parent can reset mutation state. */
   onReset?: () => void;
   defaultName?: string;
@@ -52,7 +51,6 @@ export function IntegrationCreateDialog({
   integrationDefinition,
   organizationId,
   onCreateIntegration,
-  onUpdateIntegration,
   onReset,
   defaultName = "",
   integrationHomeHref,
@@ -72,8 +70,9 @@ export function IntegrationCreateDialog({
     config: Record<string, unknown>;
   } | null>(null);
   const [isCreatePending, setIsCreatePending] = useState(false);
-  const [isUpdatePending, setIsUpdatePending] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  const updateIntegrationMutation = useUpdateIntegration(organizationId, pendingWebhookSetup?.id ?? "");
 
   const selectedInstructions = useMemo(() => {
     const raw = integrationDefinition?.instructions?.trim();
@@ -178,19 +177,16 @@ export function IntegrationCreateDialog({
   const handleCompleteWebhookSetup = useCallback(async () => {
     if (!pendingWebhookSetup) return;
 
-    setIsUpdatePending(true);
     try {
-      await onUpdateIntegration(pendingWebhookSetup.id, {
+      await updateIntegrationMutation.mutateAsync({
         configuration: { ...pendingWebhookSetup.config, ...configuration },
       });
       handleClose();
       onCreated?.(pendingWebhookSetup.id);
     } catch {
       showErrorToast("Failed to complete setup");
-    } finally {
-      setIsUpdatePending(false);
     }
-  }, [pendingWebhookSetup, configuration, onUpdateIntegration, handleClose, onCreated]);
+  }, [pendingWebhookSetup, configuration, updateIntegrationMutation, handleClose, onCreated]);
 
   const handleBrowserActionContinue = useCallback(() => {
     if (!createIntegrationBrowserAction) return;
@@ -225,7 +221,7 @@ export function IntegrationCreateDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
-        showCloseButton={!isCreatePending && !isUpdatePending}
+        showCloseButton={!isCreatePending && !updateIntegrationMutation.isPending}
       >
         <DialogHeader>
           <div className="flex items-center gap-3">
@@ -359,10 +355,10 @@ export function IntegrationCreateDialog({
               <Button
                 color="blue"
                 onClick={() => void handleCompleteWebhookSetup()}
-                disabled={isUpdatePending}
+                disabled={updateIntegrationMutation.isPending}
                 className="flex items-center gap-2"
               >
-                {isUpdatePending ? (
+                {updateIntegrationMutation.isPending ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Completing...
@@ -371,7 +367,7 @@ export function IntegrationCreateDialog({
                   "Complete setup"
                 )}
               </Button>
-              <Button variant="outline" onClick={handleClose} disabled={isUpdatePending}>
+              <Button variant="outline" onClick={handleClose} disabled={updateIntegrationMutation.isPending}>
                 Done
               </Button>
             </>

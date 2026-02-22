@@ -8,12 +8,8 @@ import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { resolveIcon } from "@/lib/utils";
 import { Check, Copy, Loader2, Settings, TriangleAlert, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { organizationsUpdateIntegration } from "@/api-client";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getHeaderIconSrc, IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import {
-  integrationKeys,
   useAvailableIntegrations,
   useCreateIntegration,
   useIntegration,
@@ -272,35 +268,12 @@ export const ComponentSidebar = ({
   const resolvedAutocompleteExampleObj = autocompleteExampleObj ?? null;
 
   const { data: availableIntegrationDefinitions = [] } = useAvailableIntegrations();
-  const queryClient = useQueryClient();
   const { data: configureIntegration, isLoading: configureIntegrationLoading } = useIntegration(
     domainId ?? "",
     configureIntegrationId ?? "",
   );
   const updateIntegrationMutation = useUpdateIntegration(domainId ?? "", configureIntegrationId ?? "");
   const createIntegrationMutation = useCreateIntegration(domainId ?? "");
-  const completeWebhookUpdateMutation = useMutation({
-    mutationFn: async ({
-      integrationId,
-      configuration,
-    }: {
-      integrationId: string;
-      configuration: Record<string, unknown>;
-    }) => {
-      const orgId = domainId ?? "";
-      return organizationsUpdateIntegration(
-        withOrganizationHeader({
-          path: { id: orgId, integrationId },
-          body: { configuration },
-        }),
-      );
-    },
-    onSuccess: (_, variables) => {
-      const orgId = domainId ?? "";
-      queryClient.invalidateQueries({ queryKey: integrationKeys.connected(orgId) });
-      queryClient.invalidateQueries({ queryKey: integrationKeys.integration(orgId, variables.integrationId) });
-    },
-  });
   const configureIntegrationDefinition = useMemo(
     () =>
       configureIntegration?.spec?.integrationName
@@ -916,13 +889,7 @@ export const ComponentSidebar = ({
           const res = await createIntegrationMutation.mutateAsync(payload);
           return res.data;
         }}
-        onUpdateIntegration={async (integrationId, payload) => {
-          await completeWebhookUpdateMutation.mutateAsync({ integrationId, ...payload });
-        }}
-        onReset={() => {
-          createIntegrationMutation.reset();
-          completeWebhookUpdateMutation.reset();
-        }}
+        onReset={() => createIntegrationMutation.reset()}
         defaultName={createIntegrationDefinition?.name ?? ""}
         integrationHomeHref={integrationHomeHref}
         onCreated={() => handleCloseCreateIntegrationDialog()}
