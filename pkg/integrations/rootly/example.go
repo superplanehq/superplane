@@ -31,6 +31,12 @@ var exampleDataOnIncidentBytes []byte
 var exampleDataOnIncidentOnce sync.Once
 var exampleDataOnIncident map[string]any
 
+//go:embed example_data_on_event.json
+var exampleDataOnEventBytes []byte
+
+var exampleDataOnEventOnce sync.Once
+var exampleDataOnEvent map[string]any
+
 func (c *CreateIncident) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIncidentOnce, exampleOutputCreateIncidentBytes, &exampleOutputCreateIncident)
 }
@@ -55,4 +61,8 @@ var exampleOutputGetIncident map[string]any
 
 func (c *GetIncident) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetIncidentOnce, exampleOutputGetIncidentBytes, &exampleOutputGetIncident)
+}
+
+func (t *OnEvent) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnEventOnce, exampleDataOnEventBytes, &exampleDataOnEvent)
 }
