@@ -424,7 +424,10 @@ func (c *Client) GetWorkflowJobs(workflowID string) ([]JobResponse, error) {
 	return allItems, nil
 }
 
-func (c *Client) ListProjectPipelines(projectSlug string, branch string) ([]PipelineResponse, error) {
+// ListProjectPipelines fetches pipelines for a project, optionally filtered by branch.
+// maxPages controls how many pages of results to fetch. If maxPages <= 0, all pages are fetched.
+// For callers that only need the most recent pipelines, pass maxPages=1 to avoid unnecessary requests.
+func (c *Client) ListProjectPipelines(projectSlug string, branch string, maxPages int) ([]PipelineResponse, error) {
 	baseReqURL := fmt.Sprintf("%s/project/%s/pipeline", baseURL, projectSlug)
 	if branch != "" {
 		baseReqURL += "?branch=" + neturl.QueryEscape(branch)
@@ -432,6 +435,7 @@ func (c *Client) ListProjectPipelines(projectSlug string, branch string) ([]Pipe
 
 	var allItems []PipelineResponse
 	pageToken := ""
+	pagesFetched := 0
 
 	for {
 		reqURL := baseReqURL
@@ -454,7 +458,12 @@ func (c *Client) ListProjectPipelines(projectSlug string, branch string) ([]Pipe
 		}
 
 		allItems = append(allItems, response.Items...)
+		pagesFetched++
+
 		if response.NextPageToken == "" {
+			break
+		}
+		if maxPages > 0 && pagesFetched >= maxPages {
 			break
 		}
 		pageToken = response.NextPageToken
