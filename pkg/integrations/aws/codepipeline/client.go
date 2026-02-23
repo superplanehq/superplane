@@ -101,6 +101,24 @@ func (c *Client) GetPipelineExecution(pipelineName, executionID string) (*Pipeli
 	return &response.PipelineExecution, nil
 }
 
+type GetPipelineExecutionDetailsResponse struct {
+	PipelineExecution map[string]any `json:"pipelineExecution"`
+}
+
+func (c *Client) GetPipelineExecutionDetails(pipelineName, executionID string) (*GetPipelineExecutionDetailsResponse, error) {
+	payload := map[string]any{
+		"pipelineName":        pipelineName,
+		"pipelineExecutionId": executionID,
+	}
+
+	var response GetPipelineExecutionDetailsResponse
+	if err := c.postJSON("GetPipelineExecution", payload, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
 func (c *Client) StopPipelineExecution(pipelineName, executionID, reason string, abandon bool) error {
 	payload := map[string]any{
 		"pipelineName":        pipelineName,
