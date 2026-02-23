@@ -273,7 +273,7 @@ export function BuildingBlocksSidebar({
         <div className="flex flex-col items-start gap-3 w-full">
           <div className="flex justify-between gap-3 w-full">
             <div className="flex flex-col gap-0.5">
-              <h2 className="text-base font-medium">New Component</h2>
+              <h2 className="text-base font-medium">Add Component</h2>
             </div>
           </div>
           <div
@@ -411,6 +411,25 @@ function CategorySection({
     return null;
   }
 
+  const subtypeOrder: Record<"trigger" | "action" | "flow", number> = {
+    trigger: 0,
+    action: 1,
+    flow: 2,
+  };
+
+  const sortedBlocks = [...allBlocks].sort((a, b) => {
+    const aSubtype = a.componentSubtype || getComponentSubtype(a);
+    const bSubtype = b.componentSubtype || getComponentSubtype(b);
+    const subtypeComparison = subtypeOrder[aSubtype] - subtypeOrder[bSubtype];
+    if (subtypeComparison !== 0) {
+      return subtypeComparison;
+    }
+
+    const aName = (a.label || a.name || "").toLowerCase();
+    const bName = (b.label || b.name || "").toLowerCase();
+    return aName.localeCompare(bName);
+  });
+
   // Determine category icon
   const appLogoMap: Record<string, string | Record<string, string>> = {
     bitbucket: bitbucketIcon,
@@ -485,21 +504,20 @@ function CategorySection({
   return (
     <details className="flex-1 px-5 mb-5 group" open={shouldBeOpen}>
       <summary className="relative cursor-pointer hover:text-gray-500 dark:hover:text-gray-300 mb-3 flex items-center gap-1 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-border/60" />
         <span className="relative z-10 flex items-center gap-1 bg-white dark:bg-gray-900 pr-3">
           <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
           {categoryIconSrc ? (
-            <img src={categoryIconSrc} alt={category.name} className="size-3.5" />
+            <img src={categoryIconSrc} alt={category.name} className="size-4" />
           ) : CategoryIcon ? (
             <CategoryIcon size={14} className="text-gray-500" />
           ) : null}
-          <span className="text-[13px] text-gray-500 font-medium pl-1">
-            {category.name} ({allBlocks.length})
-          </span>
+          <span className="text-[13px] text-gray-800 font-medium pl-1">{category.name}</span>
         </span>
       </summary>
 
       <ItemGroup>
-        {allBlocks.map((block) => {
+        {sortedBlocks.map((block) => {
           const nameParts = block.name?.split(".") ?? [];
           const iconSlug =
             block.type === "blueprint" ? "component" : nameParts[0] === "smtp" ? "mail" : block.icon || "zap";
@@ -636,7 +654,7 @@ function CategorySection({
             >
               <ItemMedia>
                 {appIconSrc ? (
-                  <img src={appIconSrc} alt={block.label || block.name} className="size-3.5" />
+                  <img src={appIconSrc} alt={block.label || block.name} className="size-4" />
                 ) : (
                   <IconComponent size={14} className="text-gray-500" />
                 )}
@@ -644,8 +662,8 @@ function CategorySection({
 
               <ItemContent>
                 <div className="flex items-center gap-2 w-full min-w-0">
-                  <ItemTitle className="text-sm font-normal min-w-0 flex-1 truncate">
-                    {block.label || block.name}
+                  <ItemTitle className="text-sm font-normal min-w-0 flex-1 w-0 overflow-hidden">
+                    <span className="block min-w-0 truncate">{block.label || block.name}</span>
                   </ItemTitle>
                   {(() => {
                     const subtype = block.componentSubtype || getComponentSubtype(block);
