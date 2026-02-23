@@ -46,7 +46,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnIncidentEventData;
-    return getDetailsForIncident(eventData?.incident!);
+    return getDetailsForIncident(eventData?.incident);
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {

@@ -48,7 +48,7 @@ export function getIncidentFromExecution(execution: ExecutionInfo): Incident | n
   return outputs.default[0].data as Incident;
 }
 
-export function getDetailsForIncident(incident: Incident): Record<string, string> {
+export function getDetailsForIncident(incident: Incident | undefined): Record<string, string> {
   const details: Record<string, string> = {};
 
   details.ID = incident?.id || "-";
