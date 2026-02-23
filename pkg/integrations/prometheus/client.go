@@ -43,10 +43,10 @@ type PrometheusAlert struct {
 }
 
 type Matcher struct {
-	Name    string `json:"name"`
-	Value   string `json:"value"`
-	IsRegex bool   `json:"isRegex"`
-	IsEqual bool   `json:"isEqual"`
+	Name    string `json:"name"    mapstructure:"name"`
+	Value   string `json:"value"   mapstructure:"value"`
+	IsRegex bool   `json:"isRegex" mapstructure:"isRegex"`
+	IsEqual bool   `json:"isEqual" mapstructure:"isEqual"`
 }
 
 type SilencePayload struct {

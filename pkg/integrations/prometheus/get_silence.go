@@ -20,6 +20,16 @@ type GetSilenceNodeMetadata struct {
 	SilenceID string `json:"silenceID"`
 }
 
+type getSilencePayload struct {
+	SilenceID string    `mapstructure:"silenceID"`
+	Status    string    `mapstructure:"status"`
+	Matchers  []Matcher `mapstructure:"matchers"`
+	StartsAt  string    `mapstructure:"startsAt"`
+	EndsAt    string    `mapstructure:"endsAt"`
+	CreatedBy string    `mapstructure:"createdBy"`
+	Comment   string    `mapstructure:"comment"`
+}
+
 func (c *GetSilence) Name() string {
 	return "prometheus.getSilence"
 }
@@ -102,24 +112,19 @@ func (c *GetSilence) Execute(ctx core.ExecutionContext) error {
 
 	ctx.Metadata.Set(GetSilenceNodeMetadata{SilenceID: silence.ID})
 
-	matchersData := make([]map[string]any, len(silence.Matchers))
-	for i, m := range silence.Matchers {
-		matchersData[i] = map[string]any{
-			"name":    m.Name,
-			"value":   m.Value,
-			"isRegex": m.IsRegex,
-			"isEqual": m.IsEqual,
-		}
+	p := getSilencePayload{
+		SilenceID: silence.ID,
+		Status:    silence.Status.State,
+		Matchers:  silence.Matchers,
+		StartsAt:  silence.StartsAt,
+		EndsAt:    silence.EndsAt,
+		CreatedBy: silence.CreatedBy,
+		Comment:   silence.Comment,
 	}
 
-	payload := map[string]any{
-		"silenceID": silence.ID,
-		"status":    silence.Status.State,
-		"matchers":  matchersData,
-		"startsAt":  silence.StartsAt,
-		"endsAt":    silence.EndsAt,
-		"createdBy": silence.CreatedBy,
-		"comment":   silence.Comment,
+	var payload map[string]any
+	if err := mapstructure.Decode(p, &payload); err != nil {
+		return fmt.Errorf("failed to decode silence payload: %w", err)
 	}
 
 	return ctx.ExecutionState.Emit(
