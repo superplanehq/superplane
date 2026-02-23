@@ -413,19 +413,19 @@ var DefaultMaxHTTPResponseBytes int64 = 8 * 1024 * 1024
  * - Localhost variations
  */
 var defaultBlockedHTTPHosts = []string{
-	"metadata.google.internal",
-	"metadata.goog",
-	"metadata.azure.com",
-	"169.254.169.254",
-	"fd00:ec2::254",
-	"kubernetes.default",
-	"kubernetes.default.svc",
-	"kubernetes.default.svc.cluster.local",
-	"localhost",
-	"127.0.0.1",
-	"::1",
-	"0.0.0.0",
-	"::",
+	// "metadata.google.internal",
+	// "metadata.goog",
+	// "metadata.azure.com",
+	// "169.254.169.254",
+	// "fd00:ec2::254",
+	// "kubernetes.default",
+	// "kubernetes.default.svc",
+	// "kubernetes.default.svc.cluster.local",
+	// "localhost",
+	// "127.0.0.1",
+	// "::1",
+	// "0.0.0.0",
+	// "::",
 }
 
 func getBlockedHTTPHosts() []string {
@@ -438,15 +438,15 @@ func getBlockedHTTPHosts() []string {
 }
 
 var defaultBlockedPrivateIPRanges = []string{
-	"0.0.0.0/8",
-	"10.0.0.0/8",
-	"172.16.0.0/12",
-	"192.168.0.0/16",
-	"127.0.0.0/8",
-	"169.254.0.0/16",
-	"::1/128",
-	"fc00::/7",
-	"fe80::/10",
+	// "0.0.0.0/8",
+	// "10.0.0.0/8",
+	// "172.16.0.0/12",
+	// "192.168.0.0/16",
+	// "127.0.0.0/8",
+	// "169.254.0.0/16",
+	// "::1/128",
+	// "fc00::/7",
+	// "fe80::/10",
 }
 
 func getPrivateIPRanges() []string {
