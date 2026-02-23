@@ -191,6 +191,27 @@ func TestImageReferenceConstants(t *testing.T) {
 	assert.Equal(t, "0001-com-ubuntu-server-focal", ImageUbuntu2004LTS.Offer)
 	assert.Equal(t, "20_04-lts-gen2", ImageUbuntu2004LTS.SKU)
 	assert.Equal(t, "latest", ImageUbuntu2004LTS.Version)
+
+	assert.Equal(t, "Canonical", ImageUbuntu2204LTS.Publisher)
+	assert.Equal(t, "Canonical", ImageUbuntu2404LTS.Publisher)
+	assert.Equal(t, "Debian", ImageDebian12.Publisher)
+	assert.Equal(t, "MicrosoftWindowsServer", ImageWindowsServer2022.Publisher)
+}
+
+func TestResolveImagePreset(t *testing.T) {
+	img := ResolveImagePreset("ubuntu-22.04")
+	assert.Equal(t, ImageUbuntu2204LTS, img)
+
+	img = ResolveImagePreset("windows-2022")
+	assert.Equal(t, ImageWindowsServer2022, img)
+
+	// Unknown preset falls back to Ubuntu 24.04
+	img = ResolveImagePreset("unknown")
+	assert.Equal(t, ImageUbuntu2404LTS, img)
+
+	// Empty preset falls back to Ubuntu 24.04
+	img = ResolveImagePreset("")
+	assert.Equal(t, ImageUbuntu2404LTS, img)
 }
 
 func TestImageReference_StructFields(t *testing.T) {

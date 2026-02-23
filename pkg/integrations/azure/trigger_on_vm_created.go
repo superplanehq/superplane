@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -16,6 +17,7 @@ type OnVMCreatedTrigger struct{}
 
 type OnVMCreatedConfiguration struct {
 	ResourceGroup string `json:"resourceGroup" mapstructure:"resourceGroup"`
+	NameFilter    string `json:"nameFilter" mapstructure:"nameFilter"`
 }
 
 func (t *OnVMCreatedTrigger) Name() string {
@@ -52,6 +54,8 @@ provides detailed information about the new VM.
 
 - **Resource Group** (optional): Filter events to only trigger for VMs created in a specific
   resource group. Leave empty to trigger for all resource groups in the subscription.
+- **VM Name Filter** (optional): A regex pattern to filter VMs by name. Only VMs whose name
+  matches the pattern will trigger the workflow. Leave empty to trigger for all VM names.
 
 ## Event Data
 
@@ -62,7 +66,7 @@ Each VM creation event includes:
 - **resourceGroup**: The resource group containing the VM
 - **subscriptionId**: The Azure subscription ID
 - **location**: The Azure region where the VM was created
-- **provisioningState**: The provisioning state (typically "Succeeded")
+- **status**: The status of the operation (typically "Succeeded")
 - **timestamp**: The timestamp when the event occurred
 
 ## Azure Event Grid Setup
@@ -95,14 +99,14 @@ func (t *OnVMCreatedTrigger) Color() string {
 
 func (t *OnVMCreatedTrigger) ExampleData() map[string]any {
 	return map[string]any{
-		"vmName":            "my-vm-01",
-		"vmId":              "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-		"resourceGroup":     "my-rg",
-		"subscriptionId":    "12345678-1234-1234-1234-123456789abc",
-		"location":          "eastus",
-		"provisioningState": "Succeeded",
-		"timestamp":         "2026-02-11T10:30:00Z",
-		"operationName":     "Microsoft.Compute/virtualMachines/write",
+		"vmName":         "my-vm-01",
+		"vmId":           "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+		"resourceGroup":  "my-rg",
+		"subscriptionId": "12345678-1234-1234-1234-123456789abc",
+		"location":       "eastus",
+		"timestamp":      "2026-02-11T10:30:00Z",
+		"operationName":  "Microsoft.Compute/virtualMachines/write",
+		"status":         "Succeeded",
 	}
 }
 
@@ -111,10 +115,23 @@ func (t *OnVMCreatedTrigger) Configuration() []configuration.Field {
 		{
 			Name:        "resourceGroup",
 			Label:       "Resource Group",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Description: "Filter events to a specific resource group (optional - leave empty for all resource groups)",
-			Placeholder: "my-resource-group",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           ResourceTypeResourceGroupDropdown,
+					UseNameAsValue: true,
+				},
+			},
+		},
+		{
+			Name:        "nameFilter",
+			Label:       "VM Name Filter",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Placeholder: "e.g., prod-.*",
+			Description: "Optional regex pattern to filter VMs by name",
 		},
 	}
 }
@@ -237,8 +254,10 @@ func (t *OnVMCreatedTrigger) handleVMCreationEvent(
 		return fmt.Errorf("failed to parse event data: %w", err)
 	}
 
-	if !isSuccessfulProvisioning(eventData.ProvisioningState) {
-		ctx.Logger.Infof("Skipping VM event with provisioning state: %s", eventData.ProvisioningState)
+	// Azure Event Grid ResourceWriteSuccess events use the "status" field
+	// (not "provisioningState") to indicate the outcome of the operation.
+	if !isSuccessfulStatus(eventData.Status) {
+		ctx.Logger.Infof("Skipping VM event with status: %s", eventData.Status)
 		return nil
 	}
 
@@ -254,16 +273,28 @@ func (t *OnVMCreatedTrigger) handleVMCreationEvent(
 
 	vmName := extractVMName(event.Subject)
 
+	// Apply name filter if configured
+	if config.NameFilter != "" {
+		matched, err := regexp.MatchString(config.NameFilter, vmName)
+		if err != nil {
+			return fmt.Errorf("invalid regex pattern: %w", err)
+		}
+
+		if !matched {
+			ctx.Logger.Debugf("Skipping VM %s (name filter: %s)", vmName, config.NameFilter)
+			return nil
+		}
+	}
+
 	payload := map[string]any{
-		"vmName":            vmName,
-		"vmId":              event.Subject,
-		"resourceGroup":     resourceGroup,
-		"subscriptionId":    extractSubscriptionID(event.Subject),
-		"location":          "",
-		"provisioningState": eventData.ProvisioningState,
-		"timestamp":         event.EventTime,
-		"operationName":     eventData.OperationName,
-		"status":            eventData.Status,
+		"vmName":        vmName,
+		"vmId":          event.Subject,
+		"resourceGroup": resourceGroup,
+		"subscriptionId": extractSubscriptionID(event.Subject),
+		"location":       "",
+		"timestamp":      event.EventTime,
+		"operationName":  eventData.OperationName,
+		"status":         eventData.Status,
 	}
 
 	ctx.Logger.Infof("VM created: %s in resource group %s", vmName, resourceGroup)
@@ -363,7 +394,7 @@ func isVirtualMachineEvent(subject string) bool {
 	return strings.Contains(subject, ResourceTypeVirtualMachine)
 }
 
-// isSuccessfulProvisioning reports whether provisioning succeeded.
-func isSuccessfulProvisioning(provisioningState string) bool {
-	return provisioningState == ProvisioningStateSucceeded
+// isSuccessfulStatus reports whether the event status indicates success.
+func isSuccessfulStatus(status string) bool {
+	return status == ProvisioningStateSucceeded
 }

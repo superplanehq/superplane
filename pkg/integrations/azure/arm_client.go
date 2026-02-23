@@ -14,11 +14,12 @@ import (
 )
 
 const (
-	armBaseURL                 = "https://management.azure.com"
-	armAPIVersionCompute       = "2024-03-01"
-	armAPIVersionNetwork       = "2023-11-01"
-	armAPIVersionResources     = "2024-03-01"
-	armAPIVersionEventGrid     = "2024-06-01-preview"
+	armBaseURL                    = "https://management.azure.com"
+	armAPIVersionCompute          = "2024-03-01"
+	armAPIVersionNetwork          = "2023-11-01"
+	armAPIVersionResources        = "2024-03-01"
+	armAPIVersionEventGrid        = "2024-06-01-preview"
+	armAPIVersionResourceProvider = "2021-04-01"
 
 	lroDefaultPollInterval = 5 * time.Second
 	lroMaxPollDuration     = 30 * time.Minute
@@ -81,6 +82,81 @@ func (c *armClient) get(ctx context.Context, url string, dest any) error {
 	}
 
 	return json.NewDecoder(resp.Body).Decode(dest)
+}
+
+// post performs a POST request and returns the raw response.
+func (c *armClient) post(ctx context.Context, url string, body io.Reader) (*http.Response, error) {
+	resp, err := c.doRequest(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode >= 400 {
+		defer resp.Body.Close()
+		return nil, readARMError(resp)
+	}
+
+	return resp, nil
+}
+
+// ensureResourceProviderRegistered checks whether an Azure resource provider
+// (e.g. "Microsoft.EventGrid") is registered, and if not, attempts to register
+// it. The method fails fast if the caller lacks permissions or if registration
+// does not complete within a short window.
+func (c *armClient) ensureResourceProviderRegistered(ctx context.Context, providerNamespace string) error {
+	checkURL := fmt.Sprintf("%s/subscriptions/%s/providers/%s?api-version=%s",
+		armBaseURL, c.subscriptionID, providerNamespace, armAPIVersionResourceProvider)
+
+	var provider struct {
+		RegistrationState string `json:"registrationState"`
+	}
+	if err := c.get(ctx, checkURL, &provider); err != nil {
+		return fmt.Errorf("failed to check %s registration state: %w", providerNamespace, err)
+	}
+
+	if provider.RegistrationState == "Registered" {
+		return nil
+	}
+
+	// Attempt to register the provider.
+	registerURL := fmt.Sprintf("%s/subscriptions/%s/providers/%s/register?api-version=%s",
+		armBaseURL, c.subscriptionID, providerNamespace, armAPIVersionResourceProvider)
+
+	resp, err := c.post(ctx, registerURL, nil)
+	if err != nil {
+		return fmt.Errorf(
+			"%s resource provider is not registered and auto-registration failed: %w. "+
+				"Please register it manually: az provider register --namespace %s",
+			providerNamespace, err, providerNamespace,
+		)
+	}
+	resp.Body.Close()
+
+	// Poll with a short timeout — registration typically takes 10-30s.
+	deadline := time.Now().Add(2 * time.Minute)
+	for {
+		if time.Now().After(deadline) {
+			return fmt.Errorf(
+				"timed out waiting for %s to register. "+
+					"Please register it manually and retry: az provider register --namespace %s",
+				providerNamespace, providerNamespace,
+			)
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Second):
+		}
+
+		if err := c.get(ctx, checkURL, &provider); err != nil {
+			return fmt.Errorf("failed to check registration state: %w", err)
+		}
+
+		if provider.RegistrationState == "Registered" {
+			return nil
+		}
+	}
 }
 
 // put performs a PUT request with a JSON body and returns the raw response.

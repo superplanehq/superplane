@@ -1,16 +1,65 @@
 package azure
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/oidc"
 )
+
+// mockOIDCProvider implements oidc.Provider for testing.
+type mockOIDCProvider struct{}
+
+func (m *mockOIDCProvider) Sign(subject string, duration time.Duration, audience string, additionalClaims map[string]any) (string, error) {
+	return "mock-jwt-token", nil
+}
+
+func (m *mockOIDCProvider) PublicJWKs() []oidc.PublicJWK {
+	return nil
+}
+
+// mockIntegrationContext implements core.IntegrationContext for testing.
+type mockIntegrationContext struct {
+	id     string
+	config map[string]string
+}
+
+func (m *mockIntegrationContext) ID() uuid.UUID {
+	id, _ := uuid.Parse(m.id)
+	return id
+}
+
+func (m *mockIntegrationContext) GetConfig(name string) ([]byte, error) {
+	if v, ok := m.config[name]; ok {
+		return []byte(v), nil
+	}
+	return nil, fmt.Errorf("config %s not found", name)
+}
+
+func (m *mockIntegrationContext) GetMetadata() any                                 { return nil }
+func (m *mockIntegrationContext) SetMetadata(any)                                  {}
+func (m *mockIntegrationContext) Ready()                                           {}
+func (m *mockIntegrationContext) Error(string)                                     {}
+func (m *mockIntegrationContext) NewBrowserAction(core.BrowserAction)              {}
+func (m *mockIntegrationContext) RemoveBrowserAction()                             {}
+func (m *mockIntegrationContext) SetSecret(string, []byte) error                   { return nil }
+func (m *mockIntegrationContext) GetSecrets() ([]core.IntegrationSecret, error)    { return nil, nil }
+func (m *mockIntegrationContext) RequestWebhook(any) error                         { return nil }
+func (m *mockIntegrationContext) Subscribe(any) (*uuid.UUID, error)                { return nil, nil }
+func (m *mockIntegrationContext) ScheduleResync(time.Duration) error               { return nil }
+func (m *mockIntegrationContext) ScheduleActionCall(string, any, time.Duration) error { return nil }
+func (m *mockIntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
+	return nil, nil
+}
 
 func TestAzureIntegration_Name(t *testing.T) {
 	integration := &AzureIntegration{}
@@ -189,18 +238,39 @@ func TestAzureIntegration_HandleRequest_Unknown(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
-func TestAzureIntegration_GetProvider(t *testing.T) {
+func TestAzureIntegration_SetOIDCProvider(t *testing.T) {
 	integration := &AzureIntegration{}
 
-	// Initially nil
-	assert.Nil(t, integration.GetProvider())
+	assert.Nil(t, integration.oidcProvider)
 
-	// Set a mock provider
+	mockOIDC := &mockOIDCProvider{}
+	integration.SetOIDCProvider(mockOIDC)
+
+	assert.NotNil(t, integration.oidcProvider)
+	assert.Equal(t, mockOIDC, integration.oidcProvider)
+}
+
+func TestAzureIntegration_EnsureProvider_ReturnsCachedProvider(t *testing.T) {
 	provider := &AzureProvider{}
-	integration.provider = provider
+	integration := &AzureIntegration{
+		provider:      provider,
+		integrationID: "test-id",
+	}
 
-	assert.NotNil(t, integration.GetProvider())
-	assert.Equal(t, provider, integration.GetProvider())
+	ctx := &mockIntegrationContext{id: "test-id"}
+	result, err := integration.ensureProvider(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, provider, result)
+}
+
+func TestAzureIntegration_EnsureProvider_FailsWithoutOIDC(t *testing.T) {
+	integration := &AzureIntegration{}
+
+	ctx := &mockIntegrationContext{id: "test-id"}
+	result, err := integration.ensureProvider(ctx)
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "OIDC provider not available")
 }
 
 func TestConfiguration_Struct(t *testing.T) {

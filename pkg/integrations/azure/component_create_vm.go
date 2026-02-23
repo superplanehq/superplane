@@ -28,10 +28,7 @@ type CreateVMConfiguration struct {
 	NetworkInterfaceID string `json:"networkInterfaceId" mapstructure:"networkInterfaceId"`
 	OSDiskType         string `json:"osDiskType" mapstructure:"osDiskType"`
 	CustomData         string `json:"customData" mapstructure:"customData"`
-	ImagePublisher     string `json:"imagePublisher" mapstructure:"imagePublisher"`
-	ImageOffer         string `json:"imageOffer" mapstructure:"imageOffer"`
-	ImageSku           string `json:"imageSku" mapstructure:"imageSku"`
-	ImageVersion       string `json:"imageVersion" mapstructure:"imageVersion"`
+	Image              string `json:"image" mapstructure:"image"`
 }
 
 func (c *CreateVMComponent) Name() string {
@@ -72,8 +69,9 @@ The Create Virtual Machine component creates a new Azure VM with full configurat
 - **Size**: The VM size (e.g., "Standard_B1s", "Standard_D2s_v3")
 - **Admin Username**: Administrator username for the VM
 - **Admin Password**: Administrator password for the VM (must meet Azure complexity requirements)
-- **Network Interface ID**: Optional existing NIC. Leave empty to create NIC from selected VNet/Subnet.
-- **Image**: The OS image to use (publisher, offer, SKU, version)
+- **Virtual Network / Subnet**: The network for the VM
+- **Network Interface ID**: Optional existing NIC (overrides VNet/Subnet)
+- **OS Image**: Select from common presets (Ubuntu, Debian, Windows Server)
 
 ## Output
 
@@ -207,7 +205,7 @@ func (c *CreateVMComponent) Configuration() []configuration.Field {
 			Name:        "virtualNetworkName",
 			Label:       "Virtual Network",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
+			Required:    true,
 			Description: "Select an existing virtual network in the selected resource group",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -226,7 +224,7 @@ func (c *CreateVMComponent) Configuration() []configuration.Field {
 			Name:        "subnetName",
 			Label:       "Subnet",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
+			Required:    true,
 			Description: "Select an existing subnet in the selected virtual network",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -275,7 +273,7 @@ func (c *CreateVMComponent) Configuration() []configuration.Field {
 			Label:       "Network Interface ID",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Optional: existing network interface ID (leave empty to create NIC from selected VNet/Subnet)",
+			Description: "Optional: use an existing network interface instead of creating one from VNet/Subnet",
 			Placeholder: "/subscriptions/.../resourceGroups/.../providers/Microsoft.Network/networkInterfaces/my-nic",
 		},
 		{
@@ -304,40 +302,23 @@ func (c *CreateVMComponent) Configuration() []configuration.Field {
 			Placeholder: "#cloud-config\npackages:\n  - nginx",
 		},
 		{
-			Name:        "imagePublisher",
-			Label:       "Image Publisher",
-			Type:        configuration.FieldTypeString,
+			Name:        "image",
+			Label:       "OS Image",
+			Type:        configuration.FieldTypeSelect,
 			Required:    false,
-			Description: "The publisher of the VM image",
-			Default:     ImageUbuntu2004LTS.Publisher,
-			Placeholder: "Canonical",
-		},
-		{
-			Name:        "imageOffer",
-			Label:       "Image Offer",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "The offer of the VM image",
-			Default:     ImageUbuntu2004LTS.Offer,
-			Placeholder: "UbuntuServer",
-		},
-		{
-			Name:        "imageSku",
-			Label:       "Image SKU",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "The SKU of the VM image",
-			Default:     ImageUbuntu2004LTS.SKU,
-			Placeholder: "20.04-LTS",
-		},
-		{
-			Name:        "imageVersion",
-			Label:       "Image Version",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "The version of the VM image",
-			Default:     ImageUbuntu2004LTS.Version,
-			Placeholder: "latest",
+			Description: "The operating system image for the VM",
+			Default:     "ubuntu-24.04",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Ubuntu 24.04 LTS", Value: "ubuntu-24.04"},
+						{Label: "Ubuntu 22.04 LTS", Value: "ubuntu-22.04"},
+						{Label: "Ubuntu 20.04 LTS", Value: "ubuntu-20.04"},
+						{Label: "Debian 12", Value: "debian-12"},
+						{Label: "Windows Server 2022", Value: "windows-2022"},
+					},
+				},
+			},
 		},
 	}
 }
@@ -366,24 +347,11 @@ func (c *CreateVMComponent) Setup(ctx core.SetupContext) error {
 	if config.AdminPassword == "" {
 		return fmt.Errorf("admin password is required")
 	}
-	if config.NetworkInterfaceID == "" && (config.VirtualNetworkName == "" || config.SubnetName == "") {
-		return fmt.Errorf("either network interface ID or both virtual network and subnet are required")
+	if config.VirtualNetworkName == "" {
+		return fmt.Errorf("virtual network is required")
 	}
-	if config.OSDiskType == "" {
-		config.OSDiskType = "StandardSSD_LRS"
-	}
-
-	if config.ImagePublisher == "" {
-		config.ImagePublisher = ImageUbuntu2004LTS.Publisher
-	}
-	if config.ImageOffer == "" {
-		config.ImageOffer = ImageUbuntu2004LTS.Offer
-	}
-	if config.ImageSku == "" {
-		config.ImageSku = ImageUbuntu2004LTS.SKU
-	}
-	if config.ImageVersion == "" {
-		config.ImageVersion = ImageUbuntu2004LTS.Version
+	if config.SubnetName == "" {
+		return fmt.Errorf("subnet is required")
 	}
 
 	return nil
@@ -399,23 +367,12 @@ func (c *CreateVMComponent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	provider := c.integration.GetProvider()
-	if provider == nil {
-		return fmt.Errorf("Azure provider not initialized; Sync must run before executing actions")
+	provider, err := c.integration.ensureProvider(ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("Azure provider not available: %w", err)
 	}
 
-	if config.ImagePublisher == "" {
-		config.ImagePublisher = ImageUbuntu2004LTS.Publisher
-	}
-	if config.ImageOffer == "" {
-		config.ImageOffer = ImageUbuntu2004LTS.Offer
-	}
-	if config.ImageSku == "" {
-		config.ImageSku = ImageUbuntu2004LTS.SKU
-	}
-	if config.ImageVersion == "" {
-		config.ImageVersion = ImageUbuntu2004LTS.Version
-	}
+	image := ResolveImagePreset(config.Image)
 
 	req := CreateVMRequest{
 		ResourceGroup:      config.ResourceGroup,
@@ -430,10 +387,10 @@ func (c *CreateVMComponent) Execute(ctx core.ExecutionContext) error {
 		SubnetName:         config.SubnetName,
 		OSDiskType:         config.OSDiskType,
 		CustomData:         config.CustomData,
-		ImagePublisher:     config.ImagePublisher,
-		ImageOffer:         config.ImageOffer,
-		ImageSku:           config.ImageSku,
-		ImageVersion:       config.ImageVersion,
+		ImagePublisher:     image.Publisher,
+		ImageOffer:         image.Offer,
+		ImageSku:           image.SKU,
+		ImageVersion:       image.Version,
 	}
 
 	ctx.Logger.Infof("Creating Azure VM: %s in resource group %s", config.Name, config.ResourceGroup)

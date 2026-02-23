@@ -495,3 +495,49 @@ var ImageUbuntu2004LTS = ImageReference{
 	SKU:       "20_04-lts-gen2",
 	Version:   "latest",
 }
+
+var ImageUbuntu2204LTS = ImageReference{
+	Publisher: "Canonical",
+	Offer:     "0001-com-ubuntu-server-jammy",
+	SKU:       "22_04-lts-gen2",
+	Version:   "latest",
+}
+
+var ImageUbuntu2404LTS = ImageReference{
+	Publisher: "Canonical",
+	Offer:     "ubuntu-24_04-lts",
+	SKU:       "server",
+	Version:   "latest",
+}
+
+var ImageDebian12 = ImageReference{
+	Publisher: "Debian",
+	Offer:     "debian-12",
+	SKU:       "12-gen2",
+	Version:   "latest",
+}
+
+var ImageWindowsServer2022 = ImageReference{
+	Publisher: "MicrosoftWindowsServer",
+	Offer:     "WindowsServer",
+	SKU:       "2022-datacenter-g2",
+	Version:   "latest",
+}
+
+// ImagePresets maps preset keys to their image references.
+var ImagePresets = map[string]ImageReference{
+	"ubuntu-24.04": ImageUbuntu2404LTS,
+	"ubuntu-22.04": ImageUbuntu2204LTS,
+	"ubuntu-20.04": ImageUbuntu2004LTS,
+	"debian-12":    ImageDebian12,
+	"windows-2022": ImageWindowsServer2022,
+}
+
+// ResolveImagePreset returns the ImageReference for a preset key,
+// or the Ubuntu 24.04 default if the key is empty or unknown.
+func ResolveImagePreset(preset string) ImageReference {
+	if img, ok := ImagePresets[preset]; ok {
+		return img
+	}
+	return ImageUbuntu2404LTS
+}

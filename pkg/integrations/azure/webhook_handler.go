@@ -26,9 +26,16 @@ func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error)
 	webhookURL := ctx.Webhook.GetURL()
 	ctx.Logger.Infof("Setting up Azure Event Grid subscription for webhook: %s", webhookURL)
 
-	provider := h.integration.GetProvider()
-	if provider == nil {
-		return nil, fmt.Errorf("Azure provider not initialized; Sync must run before webhook setup")
+	provider, err := h.integration.ensureProvider(ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("Azure provider not available: %w", err)
+	}
+
+	// Ensure Microsoft.EventGrid resource provider is registered before
+	// creating the subscription, otherwise the LRO will fail.
+	ctx.Logger.Info("Ensuring Microsoft.EventGrid resource provider is registered")
+	if err := provider.GetClient().ensureResourceProviderRegistered(context.Background(), "Microsoft.EventGrid"); err != nil {
+		return nil, fmt.Errorf("failed to register Microsoft.EventGrid resource provider: %w", err)
 	}
 
 	config, err := decodeAzureWebhookConfiguration(ctx.Webhook.GetConfiguration())
@@ -39,16 +46,18 @@ func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error)
 	subName := fmt.Sprintf("superplane-%s", ctx.Webhook.GetID())
 	scope := fmt.Sprintf("/subscriptions/%s", provider.GetSubscriptionID())
 
-	// Build subject filter if resource type is specified
-	var subjectBeginsWith, subjectEndsWith string
-	if config.ResourceType != "" {
-		subjectEndsWith = "/providers/" + config.ResourceType
-		if config.ResourceGroup != "" {
-			subjectBeginsWith = fmt.Sprintf(
-				"/subscriptions/%s/resourceGroups/%s",
-				provider.GetSubscriptionID(), config.ResourceGroup,
-			)
-		}
+	// Build subject filter.
+	// Note: Event Grid subjects for resource events look like:
+	//   /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Compute/virtualMachines/{name}
+	// The subject ends with the resource name, so we cannot use subjectEndsWith
+	// to filter by resource type. Instead, we use subjectBeginsWith when a resource
+	// group is specified and rely on handler-side filtering for the resource type.
+	var subjectBeginsWith string
+	if config.ResourceGroup != "" {
+		subjectBeginsWith = fmt.Sprintf(
+			"/subscriptions/%s/resourceGroups/%s",
+			provider.GetSubscriptionID(), config.ResourceGroup,
+		)
 	}
 
 	// Get webhook secret for delivery authentication
@@ -79,7 +88,6 @@ func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error)
 			"filter": map[string]any{
 				"includedEventTypes": config.EventTypes,
 				"subjectBeginsWith":  subjectBeginsWith,
-				"subjectEndsWith":    subjectEndsWith,
 			},
 		},
 	}
@@ -105,9 +113,9 @@ func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error)
 func (h *AzureWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	ctx.Logger.Info("Cleaning up Azure Event Grid subscription")
 
-	provider := h.integration.GetProvider()
-	if provider == nil {
-		ctx.Logger.Warn("Azure provider not initialized; skipping Event Grid cleanup")
+	provider, err := h.integration.ensureProvider(ctx.Integration)
+	if err != nil {
+		ctx.Logger.Warnf("Azure provider not available; skipping Event Grid cleanup: %v", err)
 		return nil
 	}
 
