@@ -31,7 +31,14 @@ export interface Incident {
 export interface IncidentEvent {
   id?: string;
   event?: string;
+  event_raw?: string;
+  kind?: string;
+  source?: string;
   visibility?: string;
   occurred_at?: string;
   created_at?: string;
+  updated_at?: string;
+  incident_id?: string;
+  event_id?: string;
+  issued_at?: string;
 }
