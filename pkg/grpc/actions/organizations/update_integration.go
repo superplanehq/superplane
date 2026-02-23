@@ -97,7 +97,6 @@ func UpdateIntegration(
 		OrganizationID:  orgID,
 		Integration:     integrationCtx,
 		OIDC:            oidcProvider,
-		Encryptor:       registry.Encryptor,
 	})
 
 	if syncErr != nil {
