@@ -1,0 +1,109 @@
+{
+  "name": "superplane-plugin-github-issues",
+  "version": "1.0.0",
+  "description": "Create and listen for GitHub issues using GitHub App authentication",
+  "main": "dist/index.js",
+  "engines": {
+    "superplane": "^1.0.0"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "superplane": {
+    "integration": {
+      "name": "github-issues",
+      "label": "GitHub Issues",
+      "icon": "github",
+      "description": "Create and listen for GitHub issues",
+      "hasWebhookHandler": true,
+      "configuration": [
+        {
+          "name": "organization",
+          "label": "Organization",
+          "type": "string",
+          "description": "Organization to install the app into. If not specified, the app will be installed into the user's account."
+        }
+      ]
+    },
+    "activationEvents": [
+      "onComponent:github-issues.create-issue",
+      "onTrigger:github-issues.on-issue-created"
+    ],
+    "contributes": {
+      "components": [
+        {
+          "name": "github-issues.create-issue",
+          "label": "Create Issue",
+          "description": "Create a new issue in a GitHub repository",
+          "icon": "github",
+          "color": "gray",
+          "configuration": [
+            {
+              "name": "repository",
+              "label": "Repository",
+              "type": "integration-resource",
+              "required": true,
+              "typeOptions": {
+                "resource": {
+                  "type": "repository",
+                  "useNameAsValue": true
+                }
+              }
+            },
+            { "name": "title", "label": "Title", "type": "string", "required": true },
+            { "name": "body", "label": "Body", "type": "text" },
+            { "name": "assignees", "label": "Assignees", "type": "list", "typeOptions": { "list": { "itemLabel": "Assignee", "itemDefinition": { "type": "string" } } } },
+            { "name": "labels", "label": "Labels", "type": "list", "typeOptions": { "list": { "itemLabel": "Label", "itemDefinition": { "type": "string" } } } }
+          ],
+          "outputChannels": [
+            { "name": "default", "label": "Default" }
+          ]
+        }
+      ],
+      "triggers": [
+        {
+          "name": "github-issues.on-issue-created",
+          "label": "On Issue Created",
+          "description": "Fires when a new issue is opened in a GitHub repository",
+          "icon": "github",
+          "color": "gray",
+          "configuration": [
+            {
+              "name": "repository",
+              "label": "Repository",
+              "type": "integration-resource",
+              "required": true,
+              "typeOptions": {
+                "resource": {
+                  "type": "repository",
+                  "useNameAsValue": true
+                }
+              }
+            }
+          ],
+          "exampleData": {
+            "action": "opened",
+            "issue": {
+              "number": 42,
+              "title": "Bug: login page returns 500",
+              "body": "Steps to reproduce...",
+              "state": "open",
+              "html_url": "https://github.com/acme/app/issues/42",
+              "user": { "login": "octocat" },
+              "labels": [{ "name": "bug" }],
+              "created_at": "2026-02-20T10:30:00Z"
+            },
+            "repository": {
+              "full_name": "acme/app"
+            }
+          }
+        }
+      ],
+      "integrations": []
+    }
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/node": "^22.0.0"
+  }
+}

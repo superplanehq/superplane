@@ -20,14 +20,15 @@ var _ MappedNullable = &ComponentsComponent{}
 
 // ComponentsComponent struct for ComponentsComponent
 type ComponentsComponent struct {
-	Name           *string                             `json:"name,omitempty"`
-	Label          *string                             `json:"label,omitempty"`
-	Description    *string                             `json:"description,omitempty"`
-	Configuration  []ConfigurationField                `json:"configuration,omitempty"`
+	Name *string `json:"name,omitempty"`
+	Label *string `json:"label,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Configuration []ConfigurationField `json:"configuration,omitempty"`
 	OutputChannels []SuperplaneComponentsOutputChannel `json:"outputChannels,omitempty"`
-	Icon           *string                             `json:"icon,omitempty"`
-	Color          *string                             `json:"color,omitempty"`
-	ExampleOutput  map[string]interface{}              `json:"exampleOutput,omitempty"`
+	Icon *string `json:"icon,omitempty"`
+	Color *string `json:"color,omitempty"`
+	ExampleOutput map[string]interface{} `json:"exampleOutput,omitempty"`
+	Source *string `json:"source,omitempty"`
 }
 
 // NewComponentsComponent instantiates a new ComponentsComponent object
@@ -303,8 +304,40 @@ func (o *ComponentsComponent) SetExampleOutput(v map[string]interface{}) {
 	o.ExampleOutput = v
 }
 
+// GetSource returns the Source field value if set, zero value otherwise.
+func (o *ComponentsComponent) GetSource() string {
+	if o == nil || IsNil(o.Source) {
+		var ret string
+		return ret
+	}
+	return *o.Source
+}
+
+// GetSourceOk returns a tuple with the Source field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsComponent) GetSourceOk() (*string, bool) {
+	if o == nil || IsNil(o.Source) {
+		return nil, false
+	}
+	return o.Source, true
+}
+
+// HasSource returns a boolean if a field has been set.
+func (o *ComponentsComponent) HasSource() bool {
+	if o != nil && !IsNil(o.Source) {
+		return true
+	}
+
+	return false
+}
+
+// SetSource gets a reference to the given string and assigns it to the Source field.
+func (o *ComponentsComponent) SetSource(v string) {
+	o.Source = &v
+}
+
 func (o ComponentsComponent) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -336,6 +369,9 @@ func (o ComponentsComponent) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.ExampleOutput) {
 		toSerialize["exampleOutput"] = o.ExampleOutput
+	}
+	if !IsNil(o.Source) {
+		toSerialize["source"] = o.Source
 	}
 	return toSerialize, nil
 }
@@ -375,3 +411,5 @@ func (v *NullableComponentsComponent) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

@@ -337,6 +337,25 @@ CREATE TABLE public.schema_migrations (
 
 
 --
+-- Name: scripts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.scripts (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    name character varying(128) NOT NULL,
+    label character varying(256) DEFAULT ''::character varying NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    source text DEFAULT ''::text NOT NULL,
+    manifest jsonb DEFAULT '{}'::jsonb NOT NULL,
+    status character varying(32) DEFAULT 'draft'::character varying NOT NULL,
+    created_by uuid,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: secrets; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -756,6 +775,22 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
+-- Name: scripts scripts_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scripts
+    ADD CONSTRAINT scripts_organization_id_name_key UNIQUE (organization_id, name);
+
+
+--
+-- Name: scripts scripts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scripts
+    ADD CONSTRAINT scripts_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: secrets secrets_domain_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1019,6 +1054,13 @@ CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (d
 --
 
 CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_scripts_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_scripts_organization_id ON public.scripts USING btree (organization_id);
 
 
 --
@@ -1341,6 +1383,14 @@ ALTER TABLE ONLY public.organization_invite_links
 
 
 --
+-- Name: scripts scripts_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scripts
+    ADD CONSTRAINT scripts_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+
+
+--
 -- Name: users users_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1532,7 +1582,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260216151135	f
+20260222183740	f
 \.
 
 

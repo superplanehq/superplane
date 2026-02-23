@@ -4,17 +4,21 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/ai"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
+	"github.com/superplanehq/superplane/pkg/plugins"
 	"github.com/superplanehq/superplane/pkg/public"
 	registry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/services"
@@ -189,9 +193,9 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	go notificationEmailConsumer.Start()
 }
 
-func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcProvider oidc.Provider) {
+func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcProvider oidc.Provider, aiClient *ai.Client, pluginManager grpc.PluginActivator) {
 	log.Println("Starting Internal API")
-	grpc.RunServer(baseURL, webhooksBaseURL, basePath, encryptor, authService, registry, oidcProvider, lookupInternalAPIPort())
+	grpc.RunServer(baseURL, webhooksBaseURL, basePath, encryptor, authService, registry, oidcProvider, aiClient, pluginManager, lookupInternalAPIPort())
 }
 
 func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcProvider oidc.Provider, authService authorization.Authorization) {
@@ -372,12 +376,47 @@ func Start() {
 
 	templates.Setup(registry)
 
+	pluginsDir := os.Getenv("SUPERPLANE_PLUGINS_DIR")
+	if pluginsDir == "" {
+		pluginsDir = "plugins"
+	}
+
+	pluginManager, err := plugins.NewManager(pluginsDir, registry)
+	if err != nil {
+		log.Infof("Plugin system (.spx): %v", err)
+	} else {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGHUP)
+		go func() {
+			for range sigCh {
+				log.Info("Received SIGHUP, reloading plugins")
+				pluginManager.Reload()
+			}
+		}()
+	}
+
+	if pluginManager != nil {
+		if err := pluginManager.LoadScriptsFromDB(); err != nil {
+			log.Warnf("Failed to load scripts from DB: %v", err)
+		}
+	}
+
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcProvider, authService)
 	}
 
+	var aiClient *ai.Client
+	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
+		aiClient = ai.NewClient(key)
+		log.Info("AI script generation enabled")
+	}
+
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, authService, registry, oidcProvider)
+		var activator grpc.PluginActivator
+		if pluginManager != nil {
+			activator = pluginManager
+		}
+		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, authService, registry, oidcProvider, aiClient, activator)
 	}
 
 	startWorkers(encryptorInstance, registry, oidcProvider, baseURL, authService)

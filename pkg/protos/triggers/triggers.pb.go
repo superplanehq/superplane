@@ -202,6 +202,7 @@ type Trigger struct {
 	Color         string                 `protobuf:"bytes,5,opt,name=color,proto3" json:"color,omitempty"`
 	Configuration []*configuration.Field `protobuf:"bytes,6,rep,name=configuration,proto3" json:"configuration,omitempty"`
 	ExampleData   *_struct.Struct        `protobuf:"bytes,7,opt,name=example_data,json=exampleData,proto3" json:"example_data,omitempty"`
+	Source        string                 `protobuf:"bytes,8,opt,name=source,proto3" json:"source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -285,6 +286,13 @@ func (x *Trigger) GetExampleData() *_struct.Struct {
 	return nil
 }
 
+func (x *Trigger) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
 var File_triggers_proto protoreflect.FileDescriptor
 
 const file_triggers_proto_rawDesc = "" +
@@ -296,7 +304,7 @@ const file_triggers_proto_rawDesc = "" +
 	"\x16DescribeTriggerRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"Q\n" +
 	"\x17DescribeTriggerResponse\x126\n" +
-	"\atrigger\x18\x01 \x01(\v2\x1c.Superplane.Triggers.TriggerR\atrigger\"\x82\x02\n" +
+	"\atrigger\x18\x01 \x01(\v2\x1c.Superplane.Triggers.TriggerR\atrigger\"\x9a\x02\n" +
 	"\aTrigger\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
@@ -304,7 +312,8 @@ const file_triggers_proto_rawDesc = "" +
 	"\x04icon\x18\x04 \x01(\tR\x04icon\x12\x14\n" +
 	"\x05color\x18\x05 \x01(\tR\x05color\x12E\n" +
 	"\rconfiguration\x18\x06 \x03(\v2\x1f.Superplane.Configuration.FieldR\rconfiguration\x12:\n" +
-	"\fexample_data\x18\a \x01(\v2\x17.google.protobuf.StructR\vexampleData2\x9c\x03\n" +
+	"\fexample_data\x18\a \x01(\v2\x17.google.protobuf.StructR\vexampleData\x12\x16\n" +
+	"\x06source\x18\b \x01(\tR\x06source2\x9c\x03\n" +
 	"\bTriggers\x12\xc2\x01\n" +
 	"\fListTriggers\x12(.Superplane.Triggers.ListTriggersRequest\x1a).Superplane.Triggers.ListTriggersResponse\"]\x92AB\n" +
 	"\aTrigger\x12\rList triggers\x1a(Returns a list of all available triggers\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/triggers\x12\xca\x01\n" +

@@ -180,6 +180,7 @@ type SetupContext struct {
 	Auth          AuthContext
 	Integration   IntegrationContext
 	Webhook       NodeWebhookContext
+	Secrets       SecretsContext
 }
 
 /*

@@ -33,6 +33,10 @@ p,/roles/org_admin,/org/*,blueprints,delete
 p,/roles/org_admin,/org/*,service_accounts,create
 p,/roles/org_admin,/org/*,service_accounts,update
 p,/roles/org_admin,/org/*,service_accounts,delete
+p,/roles/org_admin,/org/*,scripts,create
+p,/roles/org_admin,/org/*,scripts,read
+p,/roles/org_admin,/org/*,scripts,update
+p,/roles/org_admin,/org/*,scripts,delete
 p,/roles/org_owner,/org/*,integrations,delete
 p,/roles/org_owner,/org/*,org,update
 p,/roles/org_owner,/org/*,org,delete

@@ -20,13 +20,14 @@ import (
 	"strings"
 )
 
+
 // ServiceAccountsAPIService ServiceAccountsAPI service
 type ServiceAccountsAPIService service
 
 type ApiServiceAccountsCreateServiceAccountRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *ServiceAccountsAPIService
-	body       *ServiceAccountsCreateServiceAccountRequest
+	body *ServiceAccountsCreateServiceAccountRequest
 }
 
 func (r ApiServiceAccountsCreateServiceAccountRequest) Body(body ServiceAccountsCreateServiceAccountRequest) ApiServiceAccountsCreateServiceAccountRequest {
@@ -43,25 +44,24 @@ ServiceAccountsCreateServiceAccount Create a service account
 
 Creates a new service account in the organization
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiServiceAccountsCreateServiceAccountRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiServiceAccountsCreateServiceAccountRequest
 */
 func (a *ServiceAccountsAPIService) ServiceAccountsCreateServiceAccount(ctx context.Context) ApiServiceAccountsCreateServiceAccountRequest {
 	return ApiServiceAccountsCreateServiceAccountRequest{
 		ApiService: a,
-		ctx:        ctx,
+		ctx: ctx,
 	}
 }
 
 // Execute executes the request
-//
-//	@return ServiceAccountsCreateServiceAccountResponse
+//  @return ServiceAccountsCreateServiceAccountResponse
 func (a *ServiceAccountsAPIService) ServiceAccountsCreateServiceAccountExecute(r ApiServiceAccountsCreateServiceAccountRequest) (*ServiceAccountsCreateServiceAccountResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPost
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *ServiceAccountsCreateServiceAccountResponse
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *ServiceAccountsCreateServiceAccountResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ServiceAccountsAPIService.ServiceAccountsCreateServiceAccount")
@@ -119,14 +119,14 @@ func (a *ServiceAccountsAPIService) ServiceAccountsCreateServiceAccountExecute(r
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -143,9 +143,9 @@ func (a *ServiceAccountsAPIService) ServiceAccountsCreateServiceAccountExecute(r
 }
 
 type ApiServiceAccountsDeleteServiceAccountRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *ServiceAccountsAPIService
-	id         string
+	id string
 }
 
 func (r ApiServiceAccountsDeleteServiceAccountRequest) Execute() (map[string]interface{}, *http.Response, error) {
@@ -157,27 +157,26 @@ ServiceAccountsDeleteServiceAccount Delete a service account
 
 Deletes a service account and removes its RBAC policies
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id
-	@return ApiServiceAccountsDeleteServiceAccountRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param id
+ @return ApiServiceAccountsDeleteServiceAccountRequest
 */
 func (a *ServiceAccountsAPIService) ServiceAccountsDeleteServiceAccount(ctx context.Context, id string) ApiServiceAccountsDeleteServiceAccountRequest {
 	return ApiServiceAccountsDeleteServiceAccountRequest{
 		ApiService: a,
-		ctx:        ctx,
-		id:         id,
+		ctx: ctx,
+		id: id,
 	}
 }
 
 // Execute executes the request
-//
-//	@return map[string]interface{}
+//  @return map[string]interface{}
 func (a *ServiceAccountsAPIService) ServiceAccountsDeleteServiceAccountExecute(r ApiServiceAccountsDeleteServiceAccountRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodDelete
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue map[string]interface{}
+		localVarHTTPMethod   = http.MethodDelete
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ServiceAccountsAPIService.ServiceAccountsDeleteServiceAccount")
@@ -231,14 +230,14 @@ func (a *ServiceAccountsAPIService) ServiceAccountsDeleteServiceAccountExecute(r
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -255,9 +254,9 @@ func (a *ServiceAccountsAPIService) ServiceAccountsDeleteServiceAccountExecute(r
 }
 
 type ApiServiceAccountsDescribeServiceAccountRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *ServiceAccountsAPIService
-	id         string
+	id string
 }
 
 func (r ApiServiceAccountsDescribeServiceAccountRequest) Execute() (*ServiceAccountsDescribeServiceAccountResponse, *http.Response, error) {
@@ -269,27 +268,26 @@ ServiceAccountsDescribeServiceAccount Describe a service account
 
 Returns details of a specific service account
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id
-	@return ApiServiceAccountsDescribeServiceAccountRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param id
+ @return ApiServiceAccountsDescribeServiceAccountRequest
 */
 func (a *ServiceAccountsAPIService) ServiceAccountsDescribeServiceAccount(ctx context.Context, id string) ApiServiceAccountsDescribeServiceAccountRequest {
 	return ApiServiceAccountsDescribeServiceAccountRequest{
 		ApiService: a,
-		ctx:        ctx,
-		id:         id,
+		ctx: ctx,
+		id: id,
 	}
 }
 
 // Execute executes the request
-//
-//	@return ServiceAccountsDescribeServiceAccountResponse
+//  @return ServiceAccountsDescribeServiceAccountResponse
 func (a *ServiceAccountsAPIService) ServiceAccountsDescribeServiceAccountExecute(r ApiServiceAccountsDescribeServiceAccountRequest) (*ServiceAccountsDescribeServiceAccountResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *ServiceAccountsDescribeServiceAccountResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *ServiceAccountsDescribeServiceAccountResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ServiceAccountsAPIService.ServiceAccountsDescribeServiceAccount")
@@ -343,14 +341,14 @@ func (a *ServiceAccountsAPIService) ServiceAccountsDescribeServiceAccountExecute
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -367,7 +365,7 @@ func (a *ServiceAccountsAPIService) ServiceAccountsDescribeServiceAccountExecute
 }
 
 type ApiServiceAccountsListServiceAccountsRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *ServiceAccountsAPIService
 }
 
@@ -380,25 +378,24 @@ ServiceAccountsListServiceAccounts List service accounts
 
 Returns all service accounts in the organization
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiServiceAccountsListServiceAccountsRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiServiceAccountsListServiceAccountsRequest
 */
 func (a *ServiceAccountsAPIService) ServiceAccountsListServiceAccounts(ctx context.Context) ApiServiceAccountsListServiceAccountsRequest {
 	return ApiServiceAccountsListServiceAccountsRequest{
 		ApiService: a,
-		ctx:        ctx,
+		ctx: ctx,
 	}
 }
 
 // Execute executes the request
-//
-//	@return ServiceAccountsListServiceAccountsResponse
+//  @return ServiceAccountsListServiceAccountsResponse
 func (a *ServiceAccountsAPIService) ServiceAccountsListServiceAccountsExecute(r ApiServiceAccountsListServiceAccountsRequest) (*ServiceAccountsListServiceAccountsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *ServiceAccountsListServiceAccountsResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *ServiceAccountsListServiceAccountsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ServiceAccountsAPIService.ServiceAccountsListServiceAccounts")
@@ -451,14 +448,14 @@ func (a *ServiceAccountsAPIService) ServiceAccountsListServiceAccountsExecute(r 
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -475,10 +472,10 @@ func (a *ServiceAccountsAPIService) ServiceAccountsListServiceAccountsExecute(r 
 }
 
 type ApiServiceAccountsRegenerateServiceAccountTokenRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *ServiceAccountsAPIService
-	id         string
-	body       *map[string]interface{}
+	id string
+	body *map[string]interface{}
 }
 
 func (r ApiServiceAccountsRegenerateServiceAccountTokenRequest) Body(body map[string]interface{}) ApiServiceAccountsRegenerateServiceAccountTokenRequest {
@@ -495,27 +492,26 @@ ServiceAccountsRegenerateServiceAccountToken Regenerate service account token
 
 Regenerates the API token for a service account
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id
-	@return ApiServiceAccountsRegenerateServiceAccountTokenRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param id
+ @return ApiServiceAccountsRegenerateServiceAccountTokenRequest
 */
 func (a *ServiceAccountsAPIService) ServiceAccountsRegenerateServiceAccountToken(ctx context.Context, id string) ApiServiceAccountsRegenerateServiceAccountTokenRequest {
 	return ApiServiceAccountsRegenerateServiceAccountTokenRequest{
 		ApiService: a,
-		ctx:        ctx,
-		id:         id,
+		ctx: ctx,
+		id: id,
 	}
 }
 
 // Execute executes the request
-//
-//	@return ServiceAccountsRegenerateServiceAccountTokenResponse
+//  @return ServiceAccountsRegenerateServiceAccountTokenResponse
 func (a *ServiceAccountsAPIService) ServiceAccountsRegenerateServiceAccountTokenExecute(r ApiServiceAccountsRegenerateServiceAccountTokenRequest) (*ServiceAccountsRegenerateServiceAccountTokenResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPost
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *ServiceAccountsRegenerateServiceAccountTokenResponse
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *ServiceAccountsRegenerateServiceAccountTokenResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ServiceAccountsAPIService.ServiceAccountsRegenerateServiceAccountToken")
@@ -574,14 +570,14 @@ func (a *ServiceAccountsAPIService) ServiceAccountsRegenerateServiceAccountToken
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -598,10 +594,10 @@ func (a *ServiceAccountsAPIService) ServiceAccountsRegenerateServiceAccountToken
 }
 
 type ApiServiceAccountsUpdateServiceAccountRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *ServiceAccountsAPIService
-	id         string
-	body       *ServiceAccountsUpdateServiceAccountBody
+	id string
+	body *ServiceAccountsUpdateServiceAccountBody
 }
 
 func (r ApiServiceAccountsUpdateServiceAccountRequest) Body(body ServiceAccountsUpdateServiceAccountBody) ApiServiceAccountsUpdateServiceAccountRequest {
@@ -618,27 +614,26 @@ ServiceAccountsUpdateServiceAccount Update a service account
 
 Updates the name or description of a service account
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id
-	@return ApiServiceAccountsUpdateServiceAccountRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param id
+ @return ApiServiceAccountsUpdateServiceAccountRequest
 */
 func (a *ServiceAccountsAPIService) ServiceAccountsUpdateServiceAccount(ctx context.Context, id string) ApiServiceAccountsUpdateServiceAccountRequest {
 	return ApiServiceAccountsUpdateServiceAccountRequest{
 		ApiService: a,
-		ctx:        ctx,
-		id:         id,
+		ctx: ctx,
+		id: id,
 	}
 }
 
 // Execute executes the request
-//
-//	@return ServiceAccountsUpdateServiceAccountResponse
+//  @return ServiceAccountsUpdateServiceAccountResponse
 func (a *ServiceAccountsAPIService) ServiceAccountsUpdateServiceAccountExecute(r ApiServiceAccountsUpdateServiceAccountRequest) (*ServiceAccountsUpdateServiceAccountResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPatch
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *ServiceAccountsUpdateServiceAccountResponse
+		localVarHTTPMethod   = http.MethodPatch
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *ServiceAccountsUpdateServiceAccountResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ServiceAccountsAPIService.ServiceAccountsUpdateServiceAccount")
@@ -697,14 +692,14 @@ func (a *ServiceAccountsAPIService) ServiceAccountsUpdateServiceAccountExecute(r
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

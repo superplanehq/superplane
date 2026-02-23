@@ -21,7 +21,8 @@ var _ MappedNullable = &ConfigurationListTypeOptions{}
 // ConfigurationListTypeOptions struct for ConfigurationListTypeOptions
 type ConfigurationListTypeOptions struct {
 	ItemDefinition *ConfigurationListItemDefinition `json:"itemDefinition,omitempty"`
-	ItemLabel      *string                          `json:"itemLabel,omitempty"`
+	ItemLabel *string `json:"itemLabel,omitempty"`
+	MaxItems *int32 `json:"maxItems,omitempty"`
 }
 
 // NewConfigurationListTypeOptions instantiates a new ConfigurationListTypeOptions object
@@ -105,8 +106,40 @@ func (o *ConfigurationListTypeOptions) SetItemLabel(v string) {
 	o.ItemLabel = &v
 }
 
+// GetMaxItems returns the MaxItems field value if set, zero value otherwise.
+func (o *ConfigurationListTypeOptions) GetMaxItems() int32 {
+	if o == nil || IsNil(o.MaxItems) {
+		var ret int32
+		return ret
+	}
+	return *o.MaxItems
+}
+
+// GetMaxItemsOk returns a tuple with the MaxItems field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationListTypeOptions) GetMaxItemsOk() (*int32, bool) {
+	if o == nil || IsNil(o.MaxItems) {
+		return nil, false
+	}
+	return o.MaxItems, true
+}
+
+// HasMaxItems returns a boolean if a field has been set.
+func (o *ConfigurationListTypeOptions) HasMaxItems() bool {
+	if o != nil && !IsNil(o.MaxItems) {
+		return true
+	}
+
+	return false
+}
+
+// SetMaxItems gets a reference to the given int32 and assigns it to the MaxItems field.
+func (o *ConfigurationListTypeOptions) SetMaxItems(v int32) {
+	o.MaxItems = &v
+}
+
 func (o ConfigurationListTypeOptions) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -120,6 +153,9 @@ func (o ConfigurationListTypeOptions) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.ItemLabel) {
 		toSerialize["itemLabel"] = o.ItemLabel
+	}
+	if !IsNil(o.MaxItems) {
+		toSerialize["maxItems"] = o.MaxItems
 	}
 	return toSerialize, nil
 }
@@ -159,3 +195,5 @@ func (v *NullableConfigurationListTypeOptions) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

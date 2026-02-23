@@ -42,38 +42,49 @@ export function buildBuildingBlockCategories(
   const filteredTriggers = triggers.filter((trigger) => !deprecatedTriggerNames.has(trigger.name ?? ""));
   const filteredComponents = components.filter((component) => !deprecatedComponentNames.has(component.name ?? ""));
 
-  // Combine triggers and components into a single "Core" category
-  const coreBlocks: BuildingBlock[] = [
-    ...filteredTriggers.map((t): BuildingBlock => {
-      const block: BuildingBlock = {
-        name: t.name!,
-        label: t.label,
-        description: t.description,
-        type: "trigger",
-        configuration: t.configuration,
-        icon: t.icon,
-        color: t.color,
-        isLive: true,
-      };
-      block.componentSubtype = getComponentSubtype(block);
-      return block;
-    }),
-    ...filteredComponents.map((c): BuildingBlock => {
-      const block: BuildingBlock = {
-        name: c.name!,
-        label: c.label,
-        description: c.description,
-        type: "component",
-        outputChannels: c.outputChannels,
-        configuration: c.configuration,
-        icon: c.icon,
-        color: c.color,
-        isLive: true,
-      };
-      block.componentSubtype = getComponentSubtype(block);
-      return block;
-    }),
-  ];
+  const coreBlocks: BuildingBlock[] = [];
+  const customBlocks: BuildingBlock[] = [];
+
+  filteredTriggers.forEach((t) => {
+    const block: BuildingBlock = {
+      name: t.name!,
+      label: t.label,
+      description: t.description,
+      type: "trigger",
+      configuration: t.configuration,
+      icon: t.icon,
+      color: t.color,
+      isLive: true,
+      source: t.source,
+    };
+    block.componentSubtype = getComponentSubtype(block);
+    if (t.source === "script") {
+      customBlocks.push(block);
+    } else {
+      coreBlocks.push(block);
+    }
+  });
+
+  filteredComponents.forEach((c) => {
+    const block: BuildingBlock = {
+      name: c.name!,
+      label: c.label,
+      description: c.description,
+      type: "component",
+      outputChannels: c.outputChannels,
+      configuration: c.configuration,
+      icon: c.icon,
+      color: c.color,
+      isLive: true,
+      source: c.source,
+    };
+    block.componentSubtype = getComponentSubtype(block);
+    if (c.source === "script") {
+      customBlocks.push(block);
+    } else {
+      coreBlocks.push(block);
+    }
+  });
 
   const liveCategories: BuildingBlockCategory[] = [
     {
@@ -99,6 +110,11 @@ export function buildBuildingBlockCategories(
       }),
     },
   ];
+
+  liveCategories.push({
+    name: "Custom Components",
+    blocks: customBlocks,
+  });
 
   // Add a category for each available application with its components and triggers
   availableIntegrations.forEach((integration) => {

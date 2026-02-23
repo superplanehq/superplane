@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
+	"github.com/superplanehq/superplane/pkg/ai"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -21,6 +22,7 @@ import (
 	mepb "github.com/superplanehq/superplane/pkg/protos/me"
 	organizationPb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
+	pbScripts "github.com/superplanehq/superplane/pkg/protos/scripts"
 	secretPb "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbServiceAccounts "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 	triggerPb "github.com/superplanehq/superplane/pkg/protos/triggers"
@@ -54,7 +56,7 @@ func sentryRecoveryHandler(p any) error {
 	return status.Errorf(codes.Internal, "internal server error")
 }
 
-func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcProvider oidc.Provider, port int) {
+func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcProvider oidc.Provider, aiClient *ai.Client, pluginManager PluginActivator, port int) {
 	endpoint := fmt.Sprintf("0.0.0.0:%d", port)
 	lis, err := net.Listen("tcp", endpoint)
 
@@ -127,6 +129,9 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 
 	serviceAccountsService := NewServiceAccountsService(authService)
 	pbServiceAccounts.RegisterServiceAccountsServer(grpcServer, serviceAccountsService)
+
+	scriptsService := NewScriptsService(aiClient, pluginManager)
+	pbScripts.RegisterScriptsServer(grpcServer, scriptsService)
 
 	reflection.Register(grpcServer)
 

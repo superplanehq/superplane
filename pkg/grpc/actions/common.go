@@ -1128,6 +1128,11 @@ func SerializeComponents(in []core.Component) []*componentpb.Component {
 		}
 		exampleOutput, _ := structpb.NewStruct(component.ExampleOutput())
 
+		source := ""
+		if sp, ok := component.(interface{ Source() string }); ok {
+			source = sp.Source()
+		}
+
 		out[i] = &componentpb.Component{
 			Name:           component.Name(),
 			Label:          component.Label(),
@@ -1137,6 +1142,7 @@ func SerializeComponents(in []core.Component) []*componentpb.Component {
 			OutputChannels: channels,
 			Configuration:  configuration,
 			ExampleOutput:  exampleOutput,
+			Source:         source,
 		}
 	}
 
@@ -1154,6 +1160,11 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 		}
 		exampleData, _ := structpb.NewStruct(trigger.ExampleData())
 
+		source := ""
+		if sp, ok := trigger.(interface{ Source() string }); ok {
+			source = sp.Source()
+		}
+
 		out[i] = &triggerpb.Trigger{
 			Name:          trigger.Name(),
 			Label:         trigger.Label(),
@@ -1162,6 +1173,7 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 			Color:         trigger.Color(),
 			Configuration: configuration,
 			ExampleData:   exampleData,
+			Source:        source,
 		}
 	}
 	return out

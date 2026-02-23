@@ -256,6 +256,7 @@ type Component struct {
 	Icon           string                 `protobuf:"bytes,6,opt,name=icon,proto3" json:"icon,omitempty"`
 	Color          string                 `protobuf:"bytes,7,opt,name=color,proto3" json:"color,omitempty"`
 	ExampleOutput  *_struct.Struct        `protobuf:"bytes,8,opt,name=example_output,json=exampleOutput,proto3" json:"example_output,omitempty"`
+	Source         string                 `protobuf:"bytes,9,opt,name=source,proto3" json:"source,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -344,6 +345,13 @@ func (x *Component) GetExampleOutput() *_struct.Struct {
 		return x.ExampleOutput
 	}
 	return nil
+}
+
+func (x *Component) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
 }
 
 type OutputChannel struct {
@@ -1172,7 +1180,7 @@ const file_components_proto_rawDesc = "" +
 	"\x18DescribeComponentRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"[\n" +
 	"\x19DescribeComponentResponse\x12>\n" +
-	"\tcomponent\x18\x01 \x01(\v2 .Superplane.Components.ComponentR\tcomponent\"\xd7\x02\n" +
+	"\tcomponent\x18\x01 \x01(\v2 .Superplane.Components.ComponentR\tcomponent\"\xef\x02\n" +
 	"\tComponent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
@@ -1181,7 +1189,8 @@ const file_components_proto_rawDesc = "" +
 	"\x0foutput_channels\x18\x05 \x03(\v2$.Superplane.Components.OutputChannelR\x0eoutputChannels\x12\x12\n" +
 	"\x04icon\x18\x06 \x01(\tR\x04icon\x12\x14\n" +
 	"\x05color\x18\a \x01(\tR\x05color\x12>\n" +
-	"\x0eexample_output\x18\b \x01(\v2\x17.google.protobuf.StructR\rexampleOutput\"[\n" +
+	"\x0eexample_output\x18\b \x01(\v2\x17.google.protobuf.StructR\rexampleOutput\x12\x16\n" +
+	"\x06source\x18\t \x01(\tR\x06source\"[\n" +
 	"\rOutputChannel\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +

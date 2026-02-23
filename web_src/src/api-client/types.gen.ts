@@ -304,6 +304,7 @@ export type ComponentsComponent = {
   exampleOutput?: {
     [key: string]: unknown;
   };
+  source?: string;
 };
 
 export type ComponentsComponentAction = {
@@ -839,6 +840,57 @@ export type RolesUpdateRoleResponse = {
   role?: RolesRole;
 };
 
+export type ScriptsCreateScriptRequest = {
+  script?: ScriptsScript;
+};
+
+export type ScriptsCreateScriptResponse = {
+  script?: ScriptsScript;
+};
+
+export type ScriptsDeleteScriptResponse = {
+  [key: string]: unknown;
+};
+
+export type ScriptsDescribeScriptResponse = {
+  script?: ScriptsScript;
+};
+
+export type ScriptsGenerateScriptBody = {
+  message?: string;
+};
+
+export type ScriptsGenerateScriptResponse = {
+  response?: string;
+  source?: string;
+};
+
+export type ScriptsListScriptsResponse = {
+  scripts?: Array<ScriptsScript>;
+};
+
+export type ScriptsScript = {
+  id?: string;
+  organizationId?: string;
+  name?: string;
+  label?: string;
+  description?: string;
+  source?: string;
+  manifestJson?: string;
+  status?: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ScriptsUpdateScriptBody = {
+  script?: ScriptsScript;
+};
+
+export type ScriptsUpdateScriptResponse = {
+  script?: ScriptsScript;
+};
+
 /**
  * Local secrets are stored and managed by SuperPlane itself.
  */
@@ -1037,6 +1089,7 @@ export type TriggersTrigger = {
   exampleData?: {
     [key: string]: unknown;
   };
+  source?: string;
 };
 
 export type UsersAccountProvider = {
@@ -2852,6 +2905,164 @@ export type RolesAssignRoleResponses = {
 };
 
 export type RolesAssignRoleResponse2 = RolesAssignRoleResponses[keyof RolesAssignRoleResponses];
+
+export type ScriptsListScriptsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/v1/scripts";
+};
+
+export type ScriptsListScriptsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ScriptsListScriptsError = ScriptsListScriptsErrors[keyof ScriptsListScriptsErrors];
+
+export type ScriptsListScriptsResponses = {
+  /**
+   * A successful response.
+   */
+  200: ScriptsListScriptsResponse;
+};
+
+export type ScriptsListScriptsResponse2 = ScriptsListScriptsResponses[keyof ScriptsListScriptsResponses];
+
+export type ScriptsCreateScriptData = {
+  body: ScriptsCreateScriptRequest;
+  path?: never;
+  query?: never;
+  url: "/api/v1/scripts";
+};
+
+export type ScriptsCreateScriptErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ScriptsCreateScriptError = ScriptsCreateScriptErrors[keyof ScriptsCreateScriptErrors];
+
+export type ScriptsCreateScriptResponses = {
+  /**
+   * A successful response.
+   */
+  200: ScriptsCreateScriptResponse;
+};
+
+export type ScriptsCreateScriptResponse2 = ScriptsCreateScriptResponses[keyof ScriptsCreateScriptResponses];
+
+export type ScriptsDeleteScriptData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/scripts/{id}";
+};
+
+export type ScriptsDeleteScriptErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ScriptsDeleteScriptError = ScriptsDeleteScriptErrors[keyof ScriptsDeleteScriptErrors];
+
+export type ScriptsDeleteScriptResponses = {
+  /**
+   * A successful response.
+   */
+  200: ScriptsDeleteScriptResponse;
+};
+
+export type ScriptsDeleteScriptResponse2 = ScriptsDeleteScriptResponses[keyof ScriptsDeleteScriptResponses];
+
+export type ScriptsDescribeScriptData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/scripts/{id}";
+};
+
+export type ScriptsDescribeScriptErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ScriptsDescribeScriptError = ScriptsDescribeScriptErrors[keyof ScriptsDescribeScriptErrors];
+
+export type ScriptsDescribeScriptResponses = {
+  /**
+   * A successful response.
+   */
+  200: ScriptsDescribeScriptResponse;
+};
+
+export type ScriptsDescribeScriptResponse2 = ScriptsDescribeScriptResponses[keyof ScriptsDescribeScriptResponses];
+
+export type ScriptsUpdateScriptData = {
+  body: ScriptsUpdateScriptBody;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/scripts/{id}";
+};
+
+export type ScriptsUpdateScriptErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ScriptsUpdateScriptError = ScriptsUpdateScriptErrors[keyof ScriptsUpdateScriptErrors];
+
+export type ScriptsUpdateScriptResponses = {
+  /**
+   * A successful response.
+   */
+  200: ScriptsUpdateScriptResponse;
+};
+
+export type ScriptsUpdateScriptResponse2 = ScriptsUpdateScriptResponses[keyof ScriptsUpdateScriptResponses];
+
+export type ScriptsGenerateScriptData = {
+  body: ScriptsGenerateScriptBody;
+  path: {
+    scriptId: string;
+  };
+  query?: never;
+  url: "/api/v1/scripts/{scriptId}/generate";
+};
+
+export type ScriptsGenerateScriptErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ScriptsGenerateScriptError = ScriptsGenerateScriptErrors[keyof ScriptsGenerateScriptErrors];
+
+export type ScriptsGenerateScriptResponses = {
+  /**
+   * A successful response.
+   */
+  200: ScriptsGenerateScriptResponse;
+};
+
+export type ScriptsGenerateScriptResponse2 = ScriptsGenerateScriptResponses[keyof ScriptsGenerateScriptResponses];
 
 export type SecretsListSecretsData = {
   body?: never;

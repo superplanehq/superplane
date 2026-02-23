@@ -48,6 +48,9 @@
     },
     {
       "name": "ServiceAccounts"
+    },
+    {
+      "name": "Scripts"
     }
   ],
   "schemes": [
@@ -2412,6 +2415,202 @@
         ]
       }
     },
+    "/api/v1/scripts": {
+      "get": {
+        "summary": "List scripts",
+        "description": "Returns a list of all scripts in the organization",
+        "operationId": "Scripts_ListScripts",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ScriptsListScriptsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Script"
+        ]
+      },
+      "post": {
+        "summary": "Create script",
+        "description": "Creates a new in-app script",
+        "operationId": "Scripts_CreateScript",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ScriptsCreateScriptResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ScriptsCreateScriptRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Script"
+        ]
+      }
+    },
+    "/api/v1/scripts/{id}": {
+      "get": {
+        "summary": "Describe script",
+        "description": "Returns a script",
+        "operationId": "Scripts_DescribeScript",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ScriptsDescribeScriptResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Script"
+        ]
+      },
+      "delete": {
+        "summary": "Delete script",
+        "description": "Deletes an existing script",
+        "operationId": "Scripts_DeleteScript",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ScriptsDeleteScriptResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Script"
+        ]
+      },
+      "patch": {
+        "summary": "Update script",
+        "description": "Updates an existing script",
+        "operationId": "Scripts_UpdateScript",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ScriptsUpdateScriptResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ScriptsUpdateScriptBody"
+            }
+          }
+        ],
+        "tags": [
+          "Script"
+        ]
+      }
+    },
+    "/api/v1/scripts/{scriptId}/generate": {
+      "post": {
+        "summary": "Generate script",
+        "description": "Uses AI to generate or update script code based on a user prompt",
+        "operationId": "Scripts_GenerateScript",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ScriptsGenerateScriptResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "scriptId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ScriptsGenerateScriptBody"
+            }
+          }
+        ],
+        "tags": [
+          "Script"
+        ]
+      }
+    },
     "/api/v1/secrets": {
       "get": {
         "summary": "List secrets",
@@ -3920,6 +4119,9 @@
         },
         "exampleOutput": {
           "type": "object"
+        },
+        "source": {
+          "type": "string"
         }
       }
     },
@@ -5179,6 +5381,120 @@
         }
       }
     },
+    "ScriptsCreateScriptRequest": {
+      "type": "object",
+      "properties": {
+        "script": {
+          "$ref": "#/definitions/ScriptsScript"
+        }
+      }
+    },
+    "ScriptsCreateScriptResponse": {
+      "type": "object",
+      "properties": {
+        "script": {
+          "$ref": "#/definitions/ScriptsScript"
+        }
+      }
+    },
+    "ScriptsDeleteScriptResponse": {
+      "type": "object"
+    },
+    "ScriptsDescribeScriptResponse": {
+      "type": "object",
+      "properties": {
+        "script": {
+          "$ref": "#/definitions/ScriptsScript"
+        }
+      }
+    },
+    "ScriptsGenerateScriptBody": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "ScriptsGenerateScriptResponse": {
+      "type": "object",
+      "properties": {
+        "response": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      }
+    },
+    "ScriptsListScriptsResponse": {
+      "type": "object",
+      "properties": {
+        "scripts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ScriptsScript"
+          }
+        }
+      }
+    },
+    "ScriptsScript": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "manifestJson": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "createdBy": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "ScriptsUpdateScriptBody": {
+      "type": "object",
+      "properties": {
+        "script": {
+          "$ref": "#/definitions/ScriptsScript"
+        }
+      }
+    },
+    "ScriptsUpdateScriptResponse": {
+      "type": "object",
+      "properties": {
+        "script": {
+          "$ref": "#/definitions/ScriptsScript"
+        }
+      }
+    },
     "SecretLocal": {
       "type": "object",
       "properties": {
@@ -5626,6 +5942,9 @@
         },
         "exampleData": {
           "type": "object"
+        },
+        "source": {
+          "type": "string"
         }
       }
     },

@@ -16,3 +16,9 @@ vendor/bundle
 CLAUDE.local.md
 .env
 .idea/
+plugin-host/dist/
+plugin-host/node_modules/
+/plugins/
+*.spx
+examples/plugins/superplane-plugin-github-issues/node_modules/
+examples/plugins/superplane-plugin-github-issues/dist/

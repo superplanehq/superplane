@@ -1,0 +1,157 @@
+syntax = "proto3";
+
+package Superplane.Scripts;
+
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/scripts";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Scripts API";
+    version: "1.0";
+    description: "API for Superplane in-app scripts";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Scripts {
+  rpc ListScripts(ListScriptsRequest) returns (ListScriptsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/scripts"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List scripts";
+      description: "Returns a list of all scripts in the organization";
+      tags: "Script";
+    };
+  }
+
+  rpc DescribeScript(DescribeScriptRequest) returns (DescribeScriptResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/scripts/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe script";
+      description: "Returns a script";
+      tags: "Script";
+    };
+  }
+
+  rpc CreateScript(CreateScriptRequest) returns (CreateScriptResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/scripts"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create script";
+      description: "Creates a new in-app script";
+      tags: "Script";
+    };
+  }
+
+  rpc UpdateScript(UpdateScriptRequest) returns (UpdateScriptResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/scripts/{id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update script";
+      description: "Updates an existing script";
+      tags: "Script";
+    };
+  }
+
+  rpc DeleteScript(DeleteScriptRequest) returns (DeleteScriptResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/scripts/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete script";
+      description: "Deletes an existing script";
+      tags: "Script";
+    };
+  }
+
+  rpc GenerateScript(GenerateScriptRequest) returns (GenerateScriptResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/scripts/{script_id}/generate"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Generate script";
+      description: "Uses AI to generate or update script code based on a user prompt";
+      tags: "Script";
+    };
+  }
+}
+
+message ListScriptsRequest {}
+
+message ListScriptsResponse {
+  repeated Script scripts = 1;
+}
+
+message DescribeScriptRequest {
+  string id = 1;
+}
+
+message DescribeScriptResponse {
+  Script script = 1;
+}
+
+message CreateScriptRequest {
+  Script script = 1;
+}
+
+message CreateScriptResponse {
+  Script script = 1;
+}
+
+message UpdateScriptRequest {
+  string id = 1;
+  Script script = 2;
+}
+
+message UpdateScriptResponse {
+  Script script = 1;
+}
+
+message DeleteScriptRequest {
+  string id = 1;
+}
+
+message DeleteScriptResponse {}
+
+message GenerateScriptRequest {
+  string script_id = 1;
+  string message = 2;
+}
+
+message GenerateScriptResponse {
+  string response = 1;
+  string source = 2;
+}
+
+message Script {
+  string id = 1;
+  string organization_id = 2;
+  string name = 3;
+  string label = 4;
+  string description = 5;
+  string source = 6;
+  string manifest_json = 7;
+  string status = 8;
+  string created_by = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}

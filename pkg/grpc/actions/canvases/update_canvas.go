@@ -94,7 +94,7 @@ func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *reg
 			}
 
 			if workflowNode.State == models.CanvasNodeStateReady {
-				err = setupNode(ctx, tx, encryptor, registry, workflowNode, webhookBaseURL)
+				err = setupNode(ctx, tx, encryptor, registry, workflowNode, webhookBaseURL, existingCanvas.OrganizationID)
 				if err != nil {
 					workflowNode.State = models.CanvasNodeStateError
 					errorMsg := err.Error()
@@ -307,12 +307,12 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 	return &canvasNode, nil
 }
 
-func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string) error {
+func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string, organizationID uuid.UUID) error {
 	switch node.Type {
 	case models.NodeTypeTrigger:
-		return setupTrigger(ctx, tx, encryptor, registry, node, webhookBaseURL)
+		return setupTrigger(ctx, tx, encryptor, registry, node, webhookBaseURL, organizationID)
 	case models.NodeTypeComponent:
-		return setupComponent(ctx, tx, encryptor, registry, node, webhookBaseURL)
+		return setupComponent(ctx, tx, encryptor, registry, node, webhookBaseURL, organizationID)
 	case models.NodeTypeWidget:
 		// Widgets are not persisted and don't have any logic to execute and to setup.
 		return nil
@@ -321,7 +321,7 @@ func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, reg
 	return nil
 }
 
-func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string) error {
+func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string, organizationID uuid.UUID) error {
 	ref := node.Ref.Data()
 	trigger, err := registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
@@ -336,6 +336,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		Requests:      contexts.NewNodeRequestContext(tx, node),
 		Events:        contexts.NewEventContext(tx, node),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
+		Secrets:       contexts.NewSecretsContext(tx, organizationID, encryptor),
 	}
 
 	if node.AppInstallationID != nil {
@@ -363,7 +364,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 	return tx.Save(node).Error
 }
 
-func setupComponent(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string) error {
+func setupComponent(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string, organizationID uuid.UUID) error {
 	ref := node.Ref.Data()
 	component, err := registry.GetComponent(ref.Component.Name)
 	if err != nil {
@@ -377,6 +378,7 @@ func setupComponent(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
+		Secrets:       contexts.NewSecretsContext(tx, organizationID, encryptor),
 	}
 
 	if node.AppInstallationID != nil {

@@ -8,7 +8,7 @@ import { resolveIcon } from "@/lib/utils";
 import { isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getComponentSubtype } from "../buildingBlocks";
-import { ChevronRight, GripVerticalIcon, Plus, Search, StickyNote, X } from "lucide-react";
+import { ChevronRight, FileCode2, GripVerticalIcon, Plus, Search, StickyNote, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
@@ -69,6 +69,7 @@ export interface BuildingBlock {
   isLive?: boolean; // marks items that actually work now
   integrationName?: string; // for components/triggers from integrations
   deprecated?: boolean; // marks items that are deprecated
+  source?: string; // "script" for custom components, "plugin" for plugin components
 }
 
 export type BuildingBlockCategory = {
@@ -85,6 +86,7 @@ export interface BuildingBlocksSidebarProps {
   disabledMessage?: string;
   onBlockClick?: (block: BuildingBlock) => void;
   onAddNote?: () => void;
+  onOpenScripts?: () => void;
 }
 
 export function BuildingBlocksSidebar({
@@ -96,6 +98,7 @@ export function BuildingBlocksSidebar({
   disabledMessage,
   onBlockClick,
   onAddNote,
+  onOpenScripts,
 }: BuildingBlocksSidebarProps) {
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
 
@@ -225,6 +228,7 @@ export function BuildingBlocksSidebar({
 
   const categoryOrder: Record<string, number> = {
     Core: 0,
+    "Custom Components": 1,
     Bundles: 2,
   };
 
@@ -310,6 +314,19 @@ export function BuildingBlocksSidebar({
           </SelectContent>
         </Select>
       </div>
+
+      {onOpenScripts && (
+        <div className="px-5 pt-4">
+          <button
+            onClick={onOpenScripts}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <FileCode2 className="h-4 w-4 text-gray-500" />
+            <span>Custom Components</span>
+            <ChevronRight className="h-3.5 w-3.5 ml-auto text-gray-400" />
+          </button>
+        </div>
+      )}
 
       <div className="gap-2 py-6">
         {sortedCategories.map((category) => (
@@ -407,7 +424,7 @@ function CategorySection({
     });
   }
 
-  if (allBlocks.length === 0) {
+  if (allBlocks.length === 0 && category.name !== "Custom Components") {
     return null;
   }
 
@@ -467,6 +484,8 @@ function CategorySection({
   let CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null = null;
   if (category.name === "Core") {
     CategoryIcon = resolveIcon("zap");
+  } else if (category.name === "Custom Components") {
+    CategoryIcon = resolveIcon("file-code-2");
   } else if (category.name === "Bundles") {
     CategoryIcon = resolveIcon("package");
   } else if (integrationName === "smtp") {
@@ -478,9 +497,9 @@ function CategorySection({
   }
 
   const isCoreCategory = category.name === "Core";
+  const isCustomCategory = category.name === "Custom Components";
   const hasSearchTerm = query.length > 0;
-  // Expand if it's Core category (default) or if there's a search term (show results)
-  const shouldBeOpen = isCoreCategory || hasSearchTerm;
+  const shouldBeOpen = isCoreCategory || isCustomCategory || hasSearchTerm;
 
   return (
     <details className="flex-1 px-5 mb-5 group" open={shouldBeOpen}>
@@ -499,6 +518,11 @@ function CategorySection({
       </summary>
 
       <ItemGroup>
+        {allBlocks.length === 0 && isCustomCategory && (
+          <p className="ml-3 px-2 py-2 text-sm text-gray-400">
+            No custom components yet. Use the builder to create one.
+          </p>
+        )}
         {allBlocks.map((block) => {
           const nameParts = block.name?.split(".") ?? [];
           const iconSlug =
