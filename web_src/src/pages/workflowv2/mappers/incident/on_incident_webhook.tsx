@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { canvasesInvokeNodeTriggerAction, canvasesUpdateCanvas } from "@/api-client";
+import {
+  canvasesDescribeCanvas,
+  canvasesInvokeNodeTriggerAction,
+  canvasesUpdateCanvas,
+} from "@/api-client";
 import type { CanvasesCanvas } from "@/api-client";
 import { CustomFieldRenderer, NodeInfo } from "../types";
 import { Icon } from "@/components/Icon";
@@ -47,20 +51,16 @@ const CopyWebhookUrlButton: React.FC<{ webhookUrl: string }> = ({ webhookUrl }) 
   );
 };
 
-function updateCanvasCacheWithConfigured(
-  queryClient: ReturnType<typeof useQueryClient>,
-  organizationId: string,
-  canvasId: string,
+/** Applies signingSecretConfigured to the given node on a canvas copy. Does not mutate. */
+function applySigningSecretConfigured(
+  canvas: CanvasesCanvas,
   nodeId: string,
 ): CanvasesCanvas | null {
-  const canvas = queryClient.getQueryData(canvasKeys.detail(organizationId, canvasId)) as CanvasesCanvas | undefined;
   if (!canvas?.spec?.nodes) return null;
   const updatedNodes = canvas.spec.nodes.map((n) =>
     n.id === nodeId ? { ...n, configuration: { ...n.configuration, signingSecretConfigured: true } } : n,
   );
-  const updated = { ...canvas, spec: { ...canvas.spec, nodes: updatedNodes } };
-  queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updated);
-  return updated;
+  return { ...canvas, spec: { ...canvas.spec, nodes: updatedNodes } };
 }
 
 const SetSigningSecretSection: React.FC<{ nodeId: string }> = ({ nodeId }) => {
@@ -81,9 +81,25 @@ const SetSigningSecretSection: React.FC<{ nodeId: string }> = ({ nodeId }) => {
           body: { parameters: { webhookSigningSecret: secret } },
         }),
       );
-      const updatedCanvas = updateCanvasCacheWithConfigured(queryClient, organizationId, canvasId, nodeId);
-      setSuccess(true);
-      setSecret("");
+
+      // Refetch the canvas from the server so we save from the latest state instead of
+      // the query cache, avoiding overwriting concurrent edits from other tabs or users.
+      const freshCanvas = await queryClient.fetchQuery({
+        queryKey: canvasKeys.detail(organizationId, canvasId),
+        queryFn: async () => {
+          const response = await canvasesDescribeCanvas(
+            withOrganizationHeader({ path: { id: canvasId } }),
+          );
+          return response.data?.canvas;
+        },
+      });
+
+      if (!freshCanvas) {
+        showErrorToast("Could not load canvas to save");
+        return;
+      }
+
+      const updatedCanvas = applySigningSecretConfigured(freshCanvas, nodeId);
       if (updatedCanvas) {
         await canvasesUpdateCanvas(
           withOrganizationHeader({
@@ -96,7 +112,12 @@ const SetSigningSecretSection: React.FC<{ nodeId: string }> = ({ nodeId }) => {
             },
           }),
         );
-        queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+        queryClient.setQueryData(
+          canvasKeys.detail(organizationId, canvasId),
+          updatedCanvas,
+        );
+        setSuccess(true);
+        setSecret("");
         showSuccessToast("Signing secret set and canvas saved");
       }
     } catch (_err) {
