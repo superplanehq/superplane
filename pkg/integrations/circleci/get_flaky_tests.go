@@ -134,14 +134,14 @@ func (c *GetFlakyTests) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	flakyTests, err := client.GetInsightsFlakyTests(spec.ProjectSlug)
+	flakyTests, totalCount, err := client.GetInsightsFlakyTests(spec.ProjectSlug)
 	if err != nil {
 		return fmt.Errorf("failed to get flaky tests: %w", err)
 	}
 
 	output := map[string]any{
 		"flaky_tests": flakyTests,
-		"total_count": len(flakyTests),
+		"total_count": totalCount,
 	}
 
 	return ctx.ExecutionState.Emit(
