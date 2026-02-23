@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -400,7 +401,7 @@ func (c *Client) GetWorkflowJobs(workflowID string) ([]JobResponse, error) {
 func (c *Client) ListProjectPipelines(projectSlug string, branch string) ([]PipelineResponse, error) {
 	url := fmt.Sprintf("%s/project/%s/pipeline", baseURL, projectSlug)
 	if branch != "" {
-		url += "?branch=" + branch
+		url += "?branch=" + neturl.QueryEscape(branch)
 	}
 
 	responseBody, err := c.execRequest("GET", url, nil)
@@ -459,7 +460,7 @@ type TestMetricsResponse struct {
 }
 
 func (c *Client) GetInsightsTestMetrics(projectSlug, workflowName string) (*TestMetricsResponse, error) {
-	url := fmt.Sprintf("%s/insights/%s/workflows/%s/test-metrics", baseURL, projectSlug, workflowName)
+	url := fmt.Sprintf("%s/insights/%s/workflows/%s/test-metrics", baseURL, projectSlug, neturl.PathEscape(workflowName))
 	responseBody, err := c.execRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -486,11 +487,11 @@ type FlakyTestResponse struct {
 	File           string  `json:"file"`
 }
 
-func (c *Client) GetInsightsFlakyTests(projectSlug string) ([]FlakyTestResponse, error) {
+func (c *Client) GetInsightsFlakyTests(projectSlug string) ([]FlakyTestResponse, int, error) {
 	url := fmt.Sprintf("%s/insights/%s/flaky-tests", baseURL, projectSlug)
 	responseBody, err := c.execRequest("GET", url, nil)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var response struct {
@@ -499,10 +500,10 @@ func (c *Client) GetInsightsFlakyTests(projectSlug string) ([]FlakyTestResponse,
 	}
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		return nil, 0, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
-	return response.FlakyTests, nil
+	return response.FlakyTests, response.TotalCount, nil
 }
 
 type PipelineDefinitionResponse struct {
