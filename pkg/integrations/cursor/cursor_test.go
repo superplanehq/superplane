@@ -103,7 +103,7 @@ func Test__Cursor__Sync(t *testing.T) {
 		require.Len(t, httpContext.Requests, 2)
 	})
 
-	t.Run("no keys provided -> error", func(t *testing.T) {
+	t.Run("no keys provided -> stays pending", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{}
 
 		integrationCtx := &contexts.IntegrationContext{
@@ -116,8 +116,8 @@ func Test__Cursor__Sync(t *testing.T) {
 			Integration:   integrationCtx,
 		})
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "one of the keys is required")
+		require.NoError(t, err)
+		assert.Empty(t, integrationCtx.State)
 	})
 
 	t.Run("invalid cloud agent key -> error", func(t *testing.T) {

@@ -1,0 +1,151 @@
+---
+title: "Linear"
+---
+
+Manage and react to issues in Linear
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Issue" href="#on-issue" description="Start a workflow when an issue is created, updated, or removed in Linear" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Linear" />
+</CardGrid>
+
+<a id="on-issue"></a>
+
+## On Issue
+
+The On Issue trigger starts a workflow when an issue is created, updated, or removed in Linear.
+
+### Use Cases
+
+- **Issue automation**: Run workflows when issues change
+- **Notification workflows**: Notify channels or create tasks elsewhere
+- **Filter by team/label**: Optionally restrict to a team and/or labels
+
+### Configuration
+
+- **Team**: Optional. Select a team to listen to, or leave empty to listen to all public teams.
+- **Labels**: Optional. Only trigger when the issue has at least one of these labels.
+
+### Event Data
+
+The payload includes Linear webhook fields: action, type, data (issue), actor, url, createdAt, webhookTimestamp.
+The action field indicates the event type: "create", "update", or "remove".
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "create",
+    "actor": {
+      "email": "590b5685-0c0d-476f-b33b-2afdc1273716@oauthapp.linear.app",
+      "id": "bd35d567-0f57-46fa-85e1-9b1e53529393",
+      "name": "superplane",
+      "type": "user",
+      "url": "https://linear.app/brainstormmingdev/profiles/superplane1"
+    },
+    "createdAt": "2026-02-16T21:35:23.762Z",
+    "data": {
+      "addedToTeamAt": "2026-02-16T21:35:23.788Z",
+      "botActor": null,
+      "createdAt": "2026-02-16T21:35:23.762Z",
+      "creatorId": "bd35d567-0f57-46fa-85e1-9b1e53529393",
+      "description": "test test",
+      "descriptionData": "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"test test\"}]}]}",
+      "id": "4aae5d23-07a5-4e68-912e-098dbf5a5b4e",
+      "identifier": "BRA-45",
+      "labelIds": [],
+      "labels": [],
+      "number": 45,
+      "previousIdentifiers": [],
+      "priority": 0,
+      "priorityLabel": "No priority",
+      "prioritySortOrder": -4135,
+      "reactionData": [],
+      "slaType": "all",
+      "sortOrder": -4029,
+      "state": {
+        "color": "#bec2c8",
+        "id": "af874731-64fd-4b3e-b871-b762922637b6",
+        "name": "Backlog",
+        "type": "backlog"
+      },
+      "stateId": "af874731-64fd-4b3e-b871-b762922637b6",
+      "subscriberIds": [
+        "bd35d567-0f57-46fa-85e1-9b1e53529393"
+      ],
+      "team": {
+        "id": "01d0cb17-f38a-4fea-9e5c-717dbb27766f",
+        "key": "BRA",
+        "name": "BrainStormmingDev"
+      },
+      "teamId": "01d0cb17-f38a-4fea-9e5c-717dbb27766f",
+      "title": "Test superplane",
+      "updatedAt": "2026-02-16T21:35:23.762Z",
+      "url": "https://linear.app/brainstormmingdev/issue/BRA-45/test-superplane"
+    },
+    "type": "Issue",
+    "url": "https://linear.app/brainstormmingdev/issue/BRA-45/test-superplane",
+    "webhookTimestamp": 1771277724034
+  },
+  "timestamp": "2026-02-16T21:35:22.388339184Z",
+  "type": "linear.issue"
+}
+```
+
+<a id="create-issue"></a>
+
+## Create Issue
+
+The Create Issue component creates a new issue in Linear.
+
+### Use Cases
+
+- **Task creation**: Automatically create issues from workflow events
+- **Bug tracking**: Create issues from alerts or external systems
+- **Feature requests**: Generate issues from forms or other triggers
+
+### Configuration
+
+- **Team**: The Linear team to create the issue in
+- **Title**: Issue title (required)
+- **Description**: Optional description
+- **Assignee**, **Labels**, **Priority**, **Status**: Optional
+
+### Output
+
+Returns the created issue: id, identifier, title, description, priority, url, createdAt.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2026-02-16T21:35:23.762Z",
+    "description": "test test",
+    "id": "4aae5d23-07a5-4e68-912e-098dbf5a5b4e",
+    "identifier": "BRA-45",
+    "priority": 0,
+    "state": {
+      "id": "af874731-64fd-4b3e-b871-b762922637b6"
+    },
+    "team": {
+      "id": "01d0cb17-f38a-4fea-9e5c-717dbb27766f"
+    },
+    "title": "Test superplane",
+    "url": "https://linear.app/brainstormmingdev/issue/BRA-45/test-superplane"
+  },
+  "timestamp": "2026-02-16T21:35:22.010159122Z",
+  "type": "linear.issue"
+}
+```
+

@@ -1,7 +1,5 @@
-import { Icon } from "@/components/Icon";
-import { showErrorToast } from "@/utils/toast";
-import { useState } from "react";
 import { IntegrationMetadataRenderer } from "./types";
+import { CopyButton } from "./components";
 
 export const dash0MetadataRenderer: IntegrationMetadataRenderer = ({ integration }) => {
   const metadata = integration.status?.metadata as Record<string, unknown> | undefined;
@@ -11,31 +9,6 @@ export const dash0MetadataRenderer: IntegrationMetadataRenderer = ({ integration
   }
 
   const normalizedWebhookURL = webhookUrl.trim();
-
-  const CopyButton = () => {
-    const [copied, setCopied] = useState(false);
-
-    const handleCopy = async () => {
-      try {
-        await navigator.clipboard.writeText(normalizedWebhookURL);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      } catch (_error) {
-        showErrorToast("Failed to copy webhook URL");
-      }
-    };
-
-    return (
-      <button
-        type="button"
-        onClick={() => void handleCopy()}
-        className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-blue-900 border border-blue-300 rounded bg-white hover:bg-blue-50"
-        title={copied ? "Copied" : "Copy webhook URL"}
-      >
-        <Icon name={copied ? "check" : "copy"} size="sm" />
-      </button>
-    );
-  };
 
   return (
     <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
@@ -67,7 +40,7 @@ export const dash0MetadataRenderer: IntegrationMetadataRenderer = ({ integration
             {normalizedWebhookURL}
           </code>
         </div>
-        <CopyButton />
+        <CopyButton text={normalizedWebhookURL} label="Webhook URL" />
       </div>
     </div>
   );

@@ -157,6 +157,11 @@ import {
   eventStateRegistry as dockerhubEventStateRegistry,
 } from "./dockerhub";
 import {
+  componentMappers as linearComponentMappers,
+  triggerRenderers as linearTriggerRenderers,
+  eventStateRegistry as linearEventStateRegistry,
+} from "./linear/index";
+import {
   componentMappers as gcpComponentMappers,
   customFieldRenderers as gcpCustomFieldRenderers,
   triggerRenderers as gcpTriggerRenderers,
@@ -168,7 +173,6 @@ import {
   triggerRenderers as servicenowTriggerRenderers,
   eventStateRegistry as servicenowEventStateRegistry,
 } from "./servicenow/index";
-
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
@@ -229,6 +233,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   jfrogArtifactory: jfrogArtifactoryComponentMappers,
   statuspage: statuspageComponentMappers,
   dockerhub: dockerhubComponentMappers,
+  linear: linearComponentMappers,
   harness: harnessComponentMappers,
   servicenow: servicenowComponentMappers,
 };
@@ -262,6 +267,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   jfrogArtifactory: jfrogArtifactoryTriggerRenderers,
   statuspage: statuspageTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
+  linear: linearTriggerRenderers,
   harness: harnessTriggerRenderers,
   servicenow: servicenowTriggerRenderers,
 };
@@ -294,6 +300,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   gitlab: gitlabEventStateRegistry,
   jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
+  linear: linearEventStateRegistry,
   harness: harnessEventStateRegistry,
   servicenow: servicenowEventStateRegistry,
 };
