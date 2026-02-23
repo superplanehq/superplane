@@ -166,14 +166,20 @@ func (c *Client) GetPipeline(id string) (*Pipeline, error) {
 	return pipelineResponse.Pipeline, nil
 }
 
-func (c *Client) ListPipelines(projectID string) ([]any, error) {
+type PipelineSummary struct {
+	PipelineName string `json:"name"`
+	PipelineID   string `json:"ppl_id"`
+	State        string `json:"state"`
+}
+
+func (c *Client) ListPipelines(projectID string) ([]PipelineSummary, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/pipelines?project_id=%s", c.OrgURL, projectID)
 	response, err := c.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var pipelines []any
+	var pipelines []PipelineSummary
 	err = json.Unmarshal(response, &pipelines)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)

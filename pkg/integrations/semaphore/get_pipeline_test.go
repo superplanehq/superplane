@@ -8,12 +8,24 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func Test__GetPipeline__Setup(t *testing.T) {
 	component := &GetPipeline{}
+
+	t.Run("configuration uses pipeline resource field", func(t *testing.T) {
+		fields := component.Configuration()
+		require.Len(t, fields, 1)
+		assert.Equal(t, "pipelineId", fields[0].Name)
+		assert.Equal(t, "Pipeline", fields[0].Label)
+		assert.Equal(t, configuration.FieldTypeIntegrationResource, fields[0].Type)
+		require.NotNil(t, fields[0].TypeOptions)
+		require.NotNil(t, fields[0].TypeOptions.Resource)
+		assert.Equal(t, ResourceTypePipeline, fields[0].TypeOptions.Resource.Type)
+	})
 
 	t.Run("invalid configuration -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{

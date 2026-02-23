@@ -38,7 +38,7 @@ func (c *GetPipeline) Documentation() string {
 
 ## Configuration
 
-- **Pipeline ID**: The Semaphore pipeline ID (supports expressions, e.g. ` + "`{{ event.pipeline.id }}`" + `)
+- **Pipeline**: The Semaphore pipeline to fetch (supports expressions, e.g. ` + "`{{ $['Run Workflow'].data.pipeline.id }}`" + `)
 
 ## Output
 
@@ -66,11 +66,15 @@ func (c *GetPipeline) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "pipelineId",
-			Label:       "Pipeline ID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Pipeline",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The Semaphore pipeline ID",
-			Placeholder: "e.g. {{ event.pipeline.id }}",
+			Description: "The Semaphore pipeline to fetch",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypePipeline,
+				},
+			},
 		},
 	}
 }
