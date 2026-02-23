@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/google/go-github/v74/github"
 	"github.com/google/uuid"
@@ -118,6 +119,12 @@ func (c *CreateIssueComment) Setup(ctx core.SetupContext) error {
 
 	if config.Body == "" {
 		return errors.New("body is required")
+	}
+
+	// Repository can be expression-based (resolved at runtime), so skip
+	// setup-time installation validation for templated values.
+	if strings.Contains(config.Repository, "{{") {
+		return nil
 	}
 
 	return ensureRepoInMetadata(
