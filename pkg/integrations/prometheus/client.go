@@ -43,10 +43,10 @@ type PrometheusAlert struct {
 }
 
 type Matcher struct {
-	Name    string `json:"name"`
-	Value   string `json:"value"`
-	IsRegex bool   `json:"isRegex"`
-	IsEqual bool   `json:"isEqual"`
+	Name    string `json:"name"    mapstructure:"name"`
+	Value   string `json:"value"   mapstructure:"value"`
+	IsRegex bool   `json:"isRegex" mapstructure:"isRegex"`
+	IsEqual bool   `json:"isEqual" mapstructure:"isEqual"`
 }
 
 type SilencePayload struct {
@@ -62,9 +62,14 @@ type silenceResponse struct {
 }
 
 type AlertmanagerSilence struct {
-	ID      string                    `json:"id"`
-	Status  AlertmanagerSilenceStatus `json:"status"`
-	Comment string                    `json:"comment"`
+	ID        string                    `json:"id"`
+	Status    AlertmanagerSilenceStatus `json:"status"`
+	Matchers  []Matcher                 `json:"matchers"`
+	StartsAt  string                    `json:"startsAt"`
+	EndsAt    string                    `json:"endsAt"`
+	CreatedBy string                    `json:"createdBy"`
+	Comment   string                    `json:"comment"`
+	UpdatedAt string                    `json:"updatedAt"`
 }
 
 type AlertmanagerSilenceStatus struct {
@@ -191,6 +196,30 @@ func (c *Client) Query(query string) (map[string]any, error) {
 	return response.Data, nil
 }
 
+func (c *Client) QueryRange(query, start, end, step string) (map[string]any, error) {
+	apiPath := fmt.Sprintf("/api/v1/query_range?query=%s&start=%s&end=%s&step=%s",
+		url.QueryEscape(query),
+		url.QueryEscape(start),
+		url.QueryEscape(end),
+		url.QueryEscape(step),
+	)
+	body, err := c.execRequest(http.MethodGet, apiPath)
+	if err != nil {
+		return nil, err
+	}
+
+	response := prometheusResponse[map[string]any]{}
+	if err := decodeResponse(body, &response); err != nil {
+		return nil, err
+	}
+
+	if response.Status != "success" {
+		return nil, formatPrometheusError(response.ErrorType, response.Error)
+	}
+
+	return response.Data, nil
+}
+
 func (c *Client) alertmanagerBaseURL() string {
 	if c.alertmanagerURL != "" {
 		return c.alertmanagerURL
@@ -237,6 +266,21 @@ func (c *Client) ExpireSilence(silenceID string) error {
 	apiURL := fmt.Sprintf("%s/api/v2/silence/%s", c.alertmanagerBaseURL(), silenceID)
 	_, err := c.execRequestWithBodyAndURL(http.MethodDelete, apiURL, nil)
 	return err
+}
+
+func (c *Client) GetSilence(silenceID string) (AlertmanagerSilence, error) {
+	apiURL := fmt.Sprintf("%s/api/v2/silence/%s", c.alertmanagerBaseURL(), silenceID)
+	body, err := c.execRequestWithBodyAndURL(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return AlertmanagerSilence{}, err
+	}
+
+	response := AlertmanagerSilence{}
+	if err := decodeResponse(body, &response); err != nil {
+		return AlertmanagerSilence{}, err
+	}
+
+	return response, nil
 }
 
 func (c *Client) execRequest(method string, path string) ([]byte, error) {
