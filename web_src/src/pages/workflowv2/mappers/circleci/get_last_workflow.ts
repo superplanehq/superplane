@@ -2,17 +2,17 @@ import {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ExecutionInfo,
   NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { ComponentBaseProps } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getStateMap } from "..";
 import { MetadataItem } from "@/ui/metadataList";
 import { formatTimeAgo } from "@/utils/date";
 import CircleCILogo from "@/assets/icons/integrations/circleci.svg";
+import { getEventSections } from "./common";
 
 interface GetLastWorkflowOutput {
   workflow?: {
@@ -94,20 +94,4 @@ function getMetadataList(node: NodeInfo): MetadataItem[] {
   }
 
   return metadata;
-}
-
-function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
-  return [
-    {
-      receivedAt: new Date(execution.createdAt ?? 0),
-      eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt ?? 0)),
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id ?? "",
-    },
-  ];
 }
