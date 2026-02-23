@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -55,6 +57,15 @@ func (c *Client) execRequest(method, requestURL string, body io.Reader) ([]byte,
 	}
 
 	return responseBody, nil
+}
+
+// appendPageToken appends a page-token query parameter to a URL.
+// It handles URLs that already have query parameters.
+func appendPageToken(reqURL, token string) string {
+	if strings.Contains(reqURL, "?") {
+		return reqURL + "&page-token=" + neturl.QueryEscape(token)
+	}
+	return reqURL + "?page-token=" + neturl.QueryEscape(token)
 }
 
 type UserResponse struct {
@@ -360,6 +371,197 @@ func (c *Client) DeleteWebhook(webhookID string) error {
 	}
 
 	return nil
+}
+
+// JobResponse represents a job within a workflow.
+type JobResponse struct {
+	ID            string         `json:"id"`
+	Name          string         `json:"name"`
+	Type          string         `json:"type"`
+	Status        string         `json:"status"`
+	StartedAt     string         `json:"started_at"`
+	StoppedAt     string         `json:"stopped_at"`
+	JobNumber     int            `json:"job_number"`
+	Dependencies  []any          `json:"dependencies"`
+	ProjectSlug   string         `json:"project_slug"`
+	ApprovalURL   string         `json:"approval_request_id,omitempty"`
+	CanceledBy    string         `json:"canceled_by,omitempty"`
+	ApprovedBy    string         `json:"approved_by,omitempty"`
+}
+
+func (c *Client) GetWorkflowJobs(workflowID string) ([]JobResponse, error) {
+	baseReqURL := fmt.Sprintf("%s/workflow/%s/job", baseURL, workflowID)
+	var allItems []JobResponse
+	pageToken := ""
+
+	for {
+		reqURL := baseReqURL
+		if pageToken != "" {
+			reqURL = appendPageToken(reqURL, pageToken)
+		}
+
+		responseBody, err := c.execRequest("GET", reqURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var response struct {
+			Items         []JobResponse `json:"items"`
+			NextPageToken string        `json:"next_page_token"`
+		}
+		err = json.Unmarshal(responseBody, &response)
+		if err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		}
+
+		allItems = append(allItems, response.Items...)
+		if response.NextPageToken == "" {
+			break
+		}
+		pageToken = response.NextPageToken
+	}
+
+	return allItems, nil
+}
+
+func (c *Client) ListProjectPipelines(projectSlug string, branch string) ([]PipelineResponse, error) {
+	baseReqURL := fmt.Sprintf("%s/project/%s/pipeline", baseURL, projectSlug)
+	if branch != "" {
+		baseReqURL += "?branch=" + neturl.QueryEscape(branch)
+	}
+
+	var allItems []PipelineResponse
+	pageToken := ""
+
+	for {
+		reqURL := baseReqURL
+		if pageToken != "" {
+			reqURL = appendPageToken(reqURL, pageToken)
+		}
+
+		responseBody, err := c.execRequest("GET", reqURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var response struct {
+			Items         []PipelineResponse `json:"items"`
+			NextPageToken string             `json:"next_page_token"`
+		}
+		err = json.Unmarshal(responseBody, &response)
+		if err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		}
+
+		allItems = append(allItems, response.Items...)
+		if response.NextPageToken == "" {
+			break
+		}
+		pageToken = response.NextPageToken
+	}
+
+	return allItems, nil
+}
+
+// InsightsWorkflowRun represents aggregated workflow run data from the insights API.
+type InsightsWorkflowRun struct {
+	Name    string                 `json:"name"`
+	Metrics map[string]interface{} `json:"metrics"`
+	WindowStart string             `json:"window_start"`
+	WindowEnd   string             `json:"window_end"`
+}
+
+func (c *Client) GetInsightsWorkflows(projectSlug string) ([]InsightsWorkflowRun, error) {
+	baseReqURL := fmt.Sprintf("%s/insights/%s/workflows", baseURL, projectSlug)
+	var allItems []InsightsWorkflowRun
+	pageToken := ""
+
+	for {
+		reqURL := baseReqURL
+		if pageToken != "" {
+			reqURL = appendPageToken(reqURL, pageToken)
+		}
+
+		responseBody, err := c.execRequest("GET", reqURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var response struct {
+			Items         []InsightsWorkflowRun `json:"items"`
+			NextPageToken string                `json:"next_page_token"`
+		}
+		err = json.Unmarshal(responseBody, &response)
+		if err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		}
+
+		allItems = append(allItems, response.Items...)
+		if response.NextPageToken == "" {
+			break
+		}
+		pageToken = response.NextPageToken
+	}
+
+	return allItems, nil
+}
+
+// TestMetricsResponse represents test metrics data from the insights API.
+type TestMetricsResponse struct {
+	AverageTestCount   int                    `json:"average_test_count"`
+	MostFailedTests    []map[string]any       `json:"most_failed_tests"`
+	MostFailedTestsExtra int                  `json:"most_failed_tests_extra"`
+	SlowestTests       []map[string]any       `json:"slowest_tests"`
+	SlowestTestsExtra  int                    `json:"slowest_tests_extra"`
+	TotalTestRuns      int                    `json:"total_test_runs"`
+	TestRuns           []map[string]any       `json:"test_runs"`
+}
+
+func (c *Client) GetInsightsTestMetrics(projectSlug, workflowName string) (*TestMetricsResponse, error) {
+	url := fmt.Sprintf("%s/insights/%s/workflows/%s/test-metrics", baseURL, projectSlug, neturl.PathEscape(workflowName))
+	responseBody, err := c.execRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response TestMetricsResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &response, nil
+}
+
+// FlakyTestResponse represents a flaky test from the insights API.
+type FlakyTestResponse struct {
+	TestName       string  `json:"test_name"`
+	PipelineName   string  `json:"pipeline_name"`
+	WorkflowName   string  `json:"workflow_name"`
+	JobName        string  `json:"job_name"`
+	TimesFlaked    int     `json:"times_flaked"`
+	ClassName      string  `json:"class_name"`
+	Source         string  `json:"source"`
+	File           string  `json:"file"`
+}
+
+func (c *Client) GetInsightsFlakyTests(projectSlug string) ([]FlakyTestResponse, int, error) {
+	url := fmt.Sprintf("%s/insights/%s/flaky-tests", baseURL, projectSlug)
+	responseBody, err := c.execRequest("GET", url, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var response struct {
+		FlakyTests    []FlakyTestResponse `json:"flaky_tests"`
+		TotalCount    int                 `json:"total_count"`
+	}
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return response.FlakyTests, response.TotalCount, nil
 }
 
 type PipelineDefinitionResponse struct {
