@@ -125,12 +125,11 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		}
 	}
 
-	// Store webhook URL and signing-secret status in metadata. SigningSecretConfigured is set by the setSecret action.
+	// Store webhook URL in metadata; preserve SigningSecretConfigured from existing metadata (set by setSecret action).
 	if ctx.Metadata != nil {
-		metadata := OnIncidentMetadata{
-			WebhookURL:              webhookURL,
-			SigningSecretConfigured: false,
-		}
+		metadata := OnIncidentMetadata{}
+		_ = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
+		metadata.WebhookURL = webhookURL
 		if err := ctx.Metadata.Set(metadata); err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
