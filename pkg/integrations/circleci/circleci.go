@@ -39,10 +39,6 @@ func (c *CircleCI) Description() string {
 	return "Trigger and monitor CircleCI pipelines"
 }
 
-func (c *CircleCI) Instructions() string {
-	return "Create a Personal API Token in CircleCI → User Settings → Personal API Tokens"
-}
-
 func (c *CircleCI) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -62,6 +58,13 @@ func (c *CircleCI) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (c *CircleCI) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: "Create a Personal API Token in CircleCI → User Settings → Personal API Tokens",
+		})
+		return nil
+	}
+
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {

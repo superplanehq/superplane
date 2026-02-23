@@ -9,6 +9,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+const setupInstructions = `
+To generate a DockerHub access token:
+- Go to **DockerHub** → **Account Settings** → **Personal Access Tokens**
+- Generate a new token
+- **Copy the token**, and enter your DockerHub username and the token below
+`
+
 func init() {
 	registry.RegisterIntegration("dockerhub", &DockerHub{})
 }
@@ -34,15 +41,6 @@ func (d *DockerHub) Icon() string {
 
 func (d *DockerHub) Description() string {
 	return "Manage and react to DockerHub repositories and tags"
-}
-
-func (d *DockerHub) Instructions() string {
-	return `
-To generate a DockerHub access token:
-- Go to **DockerHub** → **Account Settings** → **Personal Access Tokens**
-- Generate a new token
-- **Copy the token**, and enter your DockerHub username and the token below
-`
 }
 
 func (d *DockerHub) Configuration() []configuration.Field {
@@ -82,6 +80,13 @@ func (d *DockerHub) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (d *DockerHub) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: setupInstructions,
+		})
+		return nil
+	}
+
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)

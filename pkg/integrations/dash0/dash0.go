@@ -44,10 +44,6 @@ func (d *Dash0) Description() string {
 	return "Connect to Dash0 to query data using Prometheus API"
 }
 
-func (d *Dash0) Instructions() string {
-	return ""
-}
-
 func (d *Dash0) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

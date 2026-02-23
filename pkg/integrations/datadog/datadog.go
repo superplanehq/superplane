@@ -46,10 +46,6 @@ func (d *Datadog) Description() string {
 	return "Create events in Datadog"
 }
 
-func (d *Datadog) Instructions() string {
-	return installationInstructions
-}
-
 func (d *Datadog) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -104,6 +100,13 @@ func (d *Datadog) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (d *Datadog) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: installationInstructions,
+		})
+		return nil
+	}
+
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {

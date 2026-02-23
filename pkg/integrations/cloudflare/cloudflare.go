@@ -9,6 +9,28 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+const (
+	setupInstructions = `
+## Create a Cloudflare API Token
+
+1. Open the [Cloudflare API Tokens page](https://dash.cloudflare.com/profile/api-tokens)
+2. Click **Create Token**
+3. Click **Get started** next to "Create Custom Token"
+4. Configure the token:
+   - **Token name**: SuperPlane Integration
+   - **Permissions** (click "+ Add more" to add each):
+     - Zone / Zone / Read
+     - Zone / DNS / Edit
+     - Zone / Dynamic Redirect / Edit
+     - Zone / DNS / Edit
+   - **Zone Resources**: Include / All zones _(or select specific zones)_
+5. Click **Continue to summary**, then **Create Token**
+6. Copy the token and paste it below
+
+> **Note**: The token is only shown once. Store it securely if needed elsewhere.
+`
+)
+
 func init() {
 	registry.RegisterIntegration("cloudflare", &Cloudflare{})
 }
@@ -39,26 +61,6 @@ func (c *Cloudflare) Description() string {
 	return "Manage Cloudflare zones, rules, and DNS"
 }
 
-func (c *Cloudflare) Instructions() string {
-	return `## Create a Cloudflare API Token
-
-1. Open the [Cloudflare API Tokens page](https://dash.cloudflare.com/profile/api-tokens)
-2. Click **Create Token**
-3. Click **Get started** next to "Create Custom Token"
-4. Configure the token:
-   - **Token name**: SuperPlane Integration
-   - **Permissions** (click "+ Add more" to add each):
-     - Zone / Zone / Read
-     - Zone / DNS / Edit
-     - Zone / Dynamic Redirect / Edit
-     - Zone / DNS / Edit
-   - **Zone Resources**: Include / All zones _(or select specific zones)_
-5. Click **Continue to summary**, then **Create Token**
-6. Copy the token and paste it below
-
-> **Note**: The token is only shown once. Store it securely if needed elsewhere.`
-}
-
 func (c *Cloudflare) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -86,6 +88,13 @@ func (c *Cloudflare) Triggers() []core.Trigger {
 }
 
 func (c *Cloudflare) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: setupInstructions,
+		})
+		return nil
+	}
+
 	configuration := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &configuration)
 	if err != nil {

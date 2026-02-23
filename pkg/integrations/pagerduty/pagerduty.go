@@ -56,10 +56,6 @@ func (p *PagerDuty) Description() string {
 	return "Manage and react to incidents in PagerDuty"
 }
 
-func (p *PagerDuty) Instructions() string {
-	return ""
-}
-
 func (p *PagerDuty) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -160,6 +156,10 @@ func (p *PagerDuty) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (p *PagerDuty) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		return nil
+	}
+
 	configuration := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &configuration)
 	if err != nil {

@@ -11,6 +11,21 @@ import (
 
 const resourceTypeDataSource = "data-source"
 
+const setupInstructions = `
+To connect Grafana:
+1. In Grafana, go to Administration > Users and access > Service accounts.
+2. Create a Service Account and assign a role (Viewer/Editor/Admin as needed).
+3. Open the Service Account and create a token. Copy it immediately.
+4. (Legacy Grafana) If Service Accounts are unavailable, use an API key.
+5. Set the Base URL to your Grafana instance (e.g. https://grafana.example.com).
+6. Paste the token into SuperPlane and save.
+
+For the alert trigger:
+1. SuperPlane will attempt to automatically create/update a Grafana Webhook contact point.
+2. Route your alert rule to the contact point created by SuperPlane.
+3. If auto-provisioning is not available (permissions/API limitations), create a Webhook contact point manually using the webhook URL from SuperPlane.
+`
+
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("grafana", &Grafana{}, &GrafanaWebhookHandler{})
 }
@@ -31,23 +46,6 @@ func (g *Grafana) Icon() string {
 
 func (g *Grafana) Description() string {
 	return "Connect Grafana alerts and data queries to SuperPlane workflows"
-}
-
-func (g *Grafana) Instructions() string {
-	return `
-To connect Grafana:
-1. In Grafana, go to Administration > Users and access > Service accounts.
-2. Create a Service Account and assign a role (Viewer/Editor/Admin as needed).
-3. Open the Service Account and create a token. Copy it immediately.
-4. (Legacy Grafana) If Service Accounts are unavailable, use an API key.
-5. Set the Base URL to your Grafana instance (e.g. https://grafana.example.com).
-6. Paste the token into SuperPlane and save.
-
-For the alert trigger:
-1. SuperPlane will attempt to automatically create/update a Grafana Webhook contact point.
-2. Route your alert rule to the contact point created by SuperPlane.
-3. If auto-provisioning is not available (permissions/API limitations), create a Webhook contact point manually using the webhook URL from SuperPlane.
-`
 }
 
 func (g *Grafana) Configuration() []configuration.Field {
@@ -95,6 +93,13 @@ func (g *Grafana) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (g *Grafana) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: setupInstructions,
+		})
+		return nil
+	}
+
 	if _, err := readBaseURL(ctx.Integration); err != nil {
 		return err
 	}

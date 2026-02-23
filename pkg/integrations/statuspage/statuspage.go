@@ -36,10 +36,6 @@ func (s *Statuspage) Description() string {
 	return "Create and manage incidents on your Atlassian Statuspage"
 }
 
-func (s *Statuspage) Instructions() string {
-	return "To get your API key: Open your Statuspage, click the icon in the top-right corner, select API info, then create an API key."
-}
-
 func (s *Statuspage) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -66,6 +62,13 @@ func (s *Statuspage) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (s *Statuspage) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: "To get your API key: Open your Statuspage, click the icon in the top-right corner, select API info, then create an API key.",
+		})
+		return nil
+	}
+
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {

@@ -13,6 +13,7 @@ import { useParams } from "react-router-dom";
 import { Members } from "./Members";
 import { Integrations } from "./Integrations";
 import { IntegrationDetails } from "./IntegrationDetails";
+import { IntegrationSetup } from "./IntegrationSetup";
 import { Secrets } from "./Secrets";
 import { SecretDetail } from "./SecretDetail";
 import { ServiceAccounts } from "./ServiceAccounts";
@@ -436,6 +437,14 @@ export function OrganizationSettings() {
               element={
                 <RequirePermission resource="integrations" action="read">
                   <IntegrationDetails organizationId={organizationId || ""} />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="integrations/new/:integrationName"
+              element={
+                <RequirePermission resource="integrations" action="create">
+                  <IntegrationSetup organizationId={organizationId || ""} />
                 </RequirePermission>
               }
             />

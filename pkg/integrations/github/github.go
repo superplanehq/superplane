@@ -76,10 +76,6 @@ func (g *GitHub) Description() string {
 	return "Manage and react to changes in your GitHub repositories"
 }
 
-func (g *GitHub) Instructions() string {
-	return ""
-}
-
 func (g *GitHub) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

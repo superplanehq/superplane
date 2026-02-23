@@ -69,10 +69,6 @@ func (b *Bitbucket) Description() string {
 	return "React to events in your Bitbucket repositories"
 }
 
-func (b *Bitbucket) Instructions() string {
-	return installationInstructions
-}
-
 func (b *Bitbucket) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -137,6 +133,13 @@ func (b *Bitbucket) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: installationInstructions,
+		})
+		return nil
 	}
 
 	if config.Workspace == "" {

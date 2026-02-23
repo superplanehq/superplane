@@ -20,6 +20,28 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+const setupInstructions = `
+### Service Account Key
+
+1. Go to [IAM & Admin → Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts) in the Google Cloud Console.
+2. Select a service account → **Keys** → **Add Key** → **JSON**.
+3. Paste the downloaded JSON below.
+
+### Workload Identity Federation (keyless)
+
+1. Create a [Workload Identity Pool](https://cloud.google.com/iam/docs/workload-identity-federation) with an OIDC provider.
+2. Set the **Issuer URL** to this SuperPlane instance's URL.
+3. Set the **Audience** to the pool provider resource name.
+4. Grant the federated identity permission to [impersonate a service account](https://cloud.google.com/iam/docs/workload-identity-federation-with-other-providers#mapping) with the roles your workflows need.
+5. Enter the **pool provider resource name** and **Project ID** below.
+
+## Required IAM roles
+
+- ` + "`roles/logging.configWriter`" + ` — create logging sinks for event triggers
+- ` + "`roles/pubsub.admin`" + ` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
+- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management)
+`
+
 func init() {
 	registry.RegisterIntegration("gcp", &GCP{})
 	compute.SetClientFactory(func(ctx core.ExecutionContext) (compute.Client, error) {
@@ -57,30 +79,6 @@ func (g *GCP) Icon() string {
 
 func (g *GCP) Description() string {
 	return "Manage and use Google Cloud resources in your workflows"
-}
-
-func (g *GCP) Instructions() string {
-	return `## Connection method
-
-### Service Account Key
-
-1. Go to [IAM & Admin → Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts) in the Google Cloud Console.
-2. Select a service account → **Keys** → **Add Key** → **JSON**.
-3. Paste the downloaded JSON below.
-
-### Workload Identity Federation (keyless)
-
-1. Create a [Workload Identity Pool](https://cloud.google.com/iam/docs/workload-identity-federation) with an OIDC provider.
-2. Set the **Issuer URL** to this SuperPlane instance's URL.
-3. Set the **Audience** to the pool provider resource name.
-4. Grant the federated identity permission to [impersonate a service account](https://cloud.google.com/iam/docs/workload-identity-federation-with-other-providers#mapping) with the roles your workflows need.
-5. Enter the **pool provider resource name** and **Project ID** below.
-
-## Required IAM roles
-
-- ` + "`roles/logging.configWriter`" + ` — create logging sinks for event triggers
-- ` + "`roles/pubsub.admin`" + ` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management)`
 }
 
 func (g *GCP) Configuration() []configuration.Field {
@@ -150,6 +148,13 @@ func (g *GCP) Triggers() []core.Trigger {
 }
 
 func (g *GCP) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: setupInstructions,
+		})
+		return nil
+	}
+
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)

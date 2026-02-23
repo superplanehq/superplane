@@ -98,13 +98,6 @@ func writeIntegrationIndex(
 	writeCardGridImport(&buf, triggers, components)
 	writeCardGridTriggers(&buf, triggers)
 	writeCardGridComponents(&buf, components)
-
-	if instructions := strings.TrimSpace(integration.Instructions()); instructions != "" {
-		buf.WriteString("## Instructions\n\n")
-		buf.WriteString(sanitizeHTMLTags(instructions))
-		buf.WriteString("\n\n")
-	}
-
 	writeTriggerSection(&buf, triggers)
 	writeComponentSection(&buf, components)
 

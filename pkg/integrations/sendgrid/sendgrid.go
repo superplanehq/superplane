@@ -43,19 +43,6 @@ func (s *SendGrid) Description() string {
 	return "Send transactional and marketing email with SendGrid"
 }
 
-func (s *SendGrid) Instructions() string {
-	return `### Connection
-
-Configure the SendGrid integration in SuperPlane with:
-- **API Key**: SendGrid API key with Mail Send and Mail Settings Read scopes
-- **Default From Email**: Required sender email address for SendGrid actions
-- **Default From Name**: Optional sender name for SendGrid actions
-
-### Actions and Triggers
-
-The SendGrid base integration establishes API access. Actions and triggers will be documented here once they are available.`
-}
-
 func (s *SendGrid) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -101,6 +88,10 @@ func (s *SendGrid) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (s *SendGrid) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		return nil
+	}
+
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)

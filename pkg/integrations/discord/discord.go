@@ -8,6 +8,21 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+const setupInstructions = `
+To set up Discord integration:
+
+1. Go to the **Discord Developer Portal** (https://discord.com/developers/applications)
+2. Click **New Application** and give it a name
+3. Go to **OAuth2** → **URL Generator**:
+   - Under **Scopes**, select **bot**
+   - Under **Bot Permissions**, select **View Channels** and **Send Messages**
+   - Copy the generated URL and open it in a new tab to invite the bot to your server
+4. Go to the **Bot** section:
+   - Click **Add Bot** (if not already added)
+   - Uncheck the **Public Bot** option
+   - Under **Token**, click **Reset Token** then **Copy** to get your bot token
+5. Paste the **Bot Token** in the **Bot Token** field below`
+
 func init() {
 	registry.RegisterIntegration("discord", &Discord{})
 }
@@ -39,22 +54,6 @@ func (d *Discord) Description() string {
 	return "Send messages to Discord channels"
 }
 
-func (d *Discord) Instructions() string {
-	return `To set up Discord integration:
-
-1. Go to the **Discord Developer Portal** (https://discord.com/developers/applications)
-2. Click **New Application** and give it a name
-3. Go to **OAuth2** → **URL Generator**:
-   - Under **Scopes**, select **bot**
-   - Under **Bot Permissions**, select **View Channels** and **Send Messages**
-   - Copy the generated URL and open it in a new tab to invite the bot to your server
-4. Go to the **Bot** section:
-   - Click **Add Bot** (if not already added)
-   - Uncheck the **Public Bot** option
-   - Under **Token**, click **Reset Token** then **Copy** to get your bot token
-5. Paste the **Bot Token** in the **Bot Token** field below`
-}
-
 func (d *Discord) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -79,6 +78,13 @@ func (d *Discord) Triggers() []core.Trigger {
 }
 
 func (d *Discord) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: setupInstructions,
+		})
+		return nil
+	}
+
 	// Get the decrypted bot token using GetConfig (sensitive fields are encrypted)
 	botTokenBytes, err := ctx.Integration.GetConfig("botToken")
 	if err != nil {

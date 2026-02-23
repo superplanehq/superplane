@@ -13,28 +13,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Incident" href="#get-incident" description="Fetch a single ServiceNow incident by selecting it from the dropdown" />
 </CardGrid>
 
-## Instructions
-
-Requires a ServiceNow instance with OAuth API access.
-
-Before creating OAuth credentials, enable client credentials grant on your instance:
-- Go to **System Properties** (sys_properties_list.do) and search for:
-  - **Name**: glide.oauth.inbound.client.credential.grant_type.enabled
-  - (Important: the property name ends with **enabled**)
-- If it does not exist, create it with:
-  - **Application Scope**: Global
-  - **Type**: true | false
-  - **Value**: true
-
-Then configure OAuth:
-- Go to **System OAuth > Inbound Integrations**
-- Create a new integration with **OAuth - Client Credentials Grant**
-- Copy the generated **Client ID** and **Client Secret**
-- Assign required permissions to the integration account:
-  - **itil** role (required for incident read/write)
-  - Optionally **admin** if broader scoped access is needed
-- Optionally enable **Web Service Access Only** on the integration account to restrict it to API-only use.
-
 <a id="create-incident"></a>
 
 ## Create Incident

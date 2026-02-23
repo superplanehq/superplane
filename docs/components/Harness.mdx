@@ -18,14 +18,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Run Pipeline" href="#run-pipeline" description="Run a Harness pipeline and wait for completion" />
 </CardGrid>
 
-## Instructions
-
-1. **Create API key:** In Harness, create a service-account API key with permission to run and read pipeline executions.
-2. **Connect once, then configure nodes:** Scope fields (**Org**, **Project**, **Pipeline**) are selected in each Harness node.
-3. **Account ID is automatic:** SuperPlane resolves account scope from your API key.
-4. **Trigger notifications are automatic:** For **On Pipeline Completed** with a selected **Pipeline**, SuperPlane provisions a pipeline notification rule for you.
-5. **Auth method:** SuperPlane calls Harness APIs with `x-api-key: <token>` against `https://app.harness.io/gateway` unless overridden by Base URL.
-
 <a id="on-pipeline-completed"></a>
 
 ## On Pipeline Completed

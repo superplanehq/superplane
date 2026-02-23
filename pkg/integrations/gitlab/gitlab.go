@@ -28,6 +28,18 @@ var scopeList = []string{
 	"read_repository",
 }
 
+var setupInstructions = fmt.Sprintf(`
+	When connecting using App OAuth:
+	- Leave **Client ID** and **Secret** empty to start the setup wizard.
+
+	When connecting using Personal Access Token:
+	- Go to Preferences → Personal Access Token → Add New token
+	- Use **Scopes**: %s
+	- Copy the token and paste it into the **Access Token** configuration field, then click **Save**.
+	`,
+	strings.Join(scopeList, ", "),
+)
+
 const (
 	appSetupDescription = `
 - Click the **Continue** button to go to the Applications page in GitLab
@@ -90,18 +102,6 @@ func (g *GitLab) Icon() string {
 
 func (g *GitLab) Description() string {
 	return "Manage and react to changes in your GitLab repositories"
-}
-
-func (g *GitLab) Instructions() string {
-	return fmt.Sprintf(`
-When connecting using App OAuth:
-- Leave **Client ID** and **Secret** empty to start the setup wizard.
-
-When connecting using Personal Access Token:
-- Go to Preferences → Personal Access Token → Add New token
-- Use **Scopes**: %s
-- Copy the token and paste it into the **Access Token** configuration field, then click **Save**.
-`, strings.Join(scopeList, ", "))
 }
 
 func (g *GitLab) Configuration() []configuration.Field {
@@ -189,6 +189,12 @@ func (g *GitLab) Triggers() []core.Trigger {
 }
 
 func (g *GitLab) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: setupInstructions,
+		})
+		return nil
+	}
 
 	configuration := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &configuration)

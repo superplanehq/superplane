@@ -9,6 +9,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+const setupInstructions = `
+1. **Create API key:** In Harness, create a service-account API key with permission to run and read pipeline executions.
+2. **Connect once, then configure nodes:** Scope fields (**Org**, **Project**, **Pipeline**) are selected in each Harness node.
+3. **Account ID is automatic:** SuperPlane resolves account scope from your API key.
+4. **Trigger notifications are automatic:** For **On Pipeline Completed** with a selected **Pipeline**, SuperPlane provisions a pipeline notification rule for you.
+5. **Auth method:** SuperPlane calls Harness APIs with ` + "`x-api-key: <token>`" + ` against ` + "`https://app.harness.io/gateway`" + ` unless overridden by Base URL.
+`
+
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("harness", &Harness{}, &HarnessWebhookHandler{})
 }
@@ -29,14 +37,6 @@ func (h *Harness) Icon() string {
 
 func (h *Harness) Description() string {
 	return "Run and monitor Harness pipelines from SuperPlane workflows"
-}
-
-func (h *Harness) Instructions() string {
-	return `1. **Create API key:** In Harness, create a service-account API key with permission to run and read pipeline executions.
-2. **Connect once, then configure nodes:** Scope fields (**Org**, **Project**, **Pipeline**) are selected in each Harness node.
-3. **Account ID is automatic:** SuperPlane resolves account scope from your API key.
-4. **Trigger notifications are automatic:** For **On Pipeline Completed** with a selected **Pipeline**, SuperPlane provisions a pipeline notification rule for you.
-5. **Auth method:** SuperPlane calls Harness APIs with ` + "`x-api-key: <token>`" + ` against ` + "`https://app.harness.io/gateway`" + ` unless overridden by Base URL.`
 }
 
 func (h *Harness) Configuration() []configuration.Field {
@@ -79,6 +79,13 @@ func (h *Harness) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (h *Harness) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: setupInstructions,
+		})
+		return nil
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err

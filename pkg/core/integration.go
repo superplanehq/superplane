@@ -32,11 +32,6 @@ type Integration interface {
 	Description() string
 
 	/*
-	 * Markdown-formatted instructions shown in the connection modal.
-	 */
-	Instructions() string
-
-	/*
 	 * The configuration fields of the integration.
 	 */
 	Configuration() []configuration.Field
@@ -176,6 +171,7 @@ type SyncContext struct {
 	BaseURL         string
 	WebhooksBaseURL string
 	OrganizationID  string
+	FirstSetup      bool
 	HTTP            HTTPContext
 	Integration     IntegrationContext
 	OIDC            oidc.Provider

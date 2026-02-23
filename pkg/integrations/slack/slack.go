@@ -67,13 +67,6 @@ func (s *Slack) Description() string {
 	return "Send and react to Slack messages and interactions"
 }
 
-func (s *Slack) Instructions() string {
-	return `
-You can install the Slack app without the **Bot Token** and **Signing Secret**.
-After installation, follow the setup prompt to create the Slack app and add those values.
-`
-}
-
 func (s *Slack) Configuration() []configuration.Field {
 	//
 	// Both fields are not required, because they will only be filled in after the app is created.

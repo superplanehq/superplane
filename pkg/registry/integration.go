@@ -40,10 +40,6 @@ func (s *PanicableIntegration) Description() string {
 	return s.underlying.Description()
 }
 
-func (s *PanicableIntegration) Instructions() string {
-	return s.underlying.Instructions()
-}
-
 func (s *PanicableIntegration) Configuration() []configuration.Field {
 	return s.underlying.Configuration()
 }

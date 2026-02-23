@@ -19,7 +19,6 @@ func (p *panickingIntegration) Name() string                         { return "p
 func (p *panickingIntegration) Label() string                        { return "Panicking Integration" }
 func (p *panickingIntegration) Icon() string                         { return "icon" }
 func (p *panickingIntegration) Description() string                  { return "description" }
-func (p *panickingIntegration) Instructions() string                 { return "instructions" }
 func (p *panickingIntegration) Configuration() []configuration.Field { return nil }
 func (p *panickingIntegration) Components() []core.Component         { return nil }
 func (p *panickingIntegration) Triggers() []core.Trigger             { return nil }

@@ -36,10 +36,6 @@ func (i *Cursor) Description() string {
 	return "Build workflows with Cursor AI Agents and track usage"
 }
 
-func (i *Cursor) Instructions() string {
-	return "To get your API keys, visit the [Cursor Dashboard](https://cursor.com/dashboard). You may need separate keys for Agents and Admin features."
-}
-
 func (i *Cursor) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -62,6 +58,13 @@ func (i *Cursor) Configuration() []configuration.Field {
 }
 
 func (i *Cursor) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: "To get your API keys, visit the [Cursor Dashboard](https://cursor.com/dashboard). You may need separate keys for Agents and Admin features.",
+		})
+		return nil
+	}
+
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)

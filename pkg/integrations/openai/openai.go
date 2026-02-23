@@ -67,15 +67,15 @@ func (o *OpenAI) Triggers() []core.Trigger {
 	return []core.Trigger{}
 }
 
-func (o *OpenAI) Instructions() string {
-	return ""
-}
-
 func (o *OpenAI) Cleanup(ctx core.IntegrationCleanupContext) error {
 	return nil
 }
 
 func (o *OpenAI) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		return nil
+	}
+
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)

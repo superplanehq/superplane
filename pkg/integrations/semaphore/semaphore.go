@@ -40,10 +40,6 @@ func (s *Semaphore) Description() string {
 	return "Run and react to your Semaphore workflows"
 }
 
-func (s *Semaphore) Instructions() string {
-	return ""
-}
-
 func (s *Semaphore) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -70,6 +66,10 @@ func (s *Semaphore) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (s *Semaphore) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		return nil
+	}
+
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
@@ -80,6 +80,14 @@ func (s *Semaphore) Sync(ctx core.SyncContext) error {
 	err = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	if err != nil {
 		return fmt.Errorf("Failed to decode metadata: %v", err)
+	}
+
+	if config.OrganizationURL == "" && config.APIToken == "" {
+		if ctx.FirstSetup {
+			return nil
+		}
+
+		return fmt.Errorf("organization URL and API token are required")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -97,6 +105,7 @@ func (s *Semaphore) Sync(ctx core.SyncContext) error {
 	}
 
 	ctx.Integration.Ready()
+	ctx.Integration.RemoveBrowserAction()
 	return nil
 }
 

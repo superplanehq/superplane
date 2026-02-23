@@ -76,6 +76,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 		WebhooksBaseURL: webhooksBaseURL,
 		OrganizationID:  orgID,
 		OIDC:            oidcProvider,
+		FirstSetup:      true,
 	})
 
 	err = database.Conn().Save(newIntegration).Error

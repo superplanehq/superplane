@@ -32,7 +32,6 @@ func serializeIntegrations(in []core.Integration) []*pb.IntegrationDefinition {
 			Label:         integration.Label(),
 			Icon:          integration.Icon(),
 			Description:   integration.Description(),
-			Instructions:  integration.Instructions(),
 			Configuration: configuration,
 			Components:    actions.SerializeComponents(integration.Components()),
 			Triggers:      actions.SerializeTriggers(integration.Triggers()),

@@ -10,6 +10,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+const setupInstructions = `
+**API Token:** Create a token in [Hetzner Cloud Console](https://console.hetzner.cloud/) → Project → Security → API Tokens. Use **Read & Write** scope.
+`
+
 func init() {
 	registry.RegisterIntegration("hetzner", &Hetzner{})
 }
@@ -34,12 +38,6 @@ func (h *Hetzner) Icon() string {
 
 func (h *Hetzner) Description() string {
 	return "Create and delete Hetzner Cloud servers and load balancers"
-}
-
-func (h *Hetzner) Instructions() string {
-	return `
-**API Token:** Create a token in [Hetzner Cloud Console](https://console.hetzner.cloud/) → Project → Security → API Tokens. Use **Read & Write** scope.
-`
 }
 
 func (h *Hetzner) Configuration() []configuration.Field {
@@ -73,6 +71,13 @@ func (h *Hetzner) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (h *Hetzner) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: setupInstructions,
+		})
+		return nil
+	}
+
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)

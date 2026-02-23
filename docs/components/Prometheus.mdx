@@ -20,23 +20,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Alert" href="#get-alert" description="Get a Prometheus alert by name" />
 </CardGrid>
 
-## Instructions
-
-### Connection
-
-Configure this integration with:
-- **Prometheus Base URL**: URL of your Prometheus server (e.g., `https://prometheus.example.com`)
-- **Alertmanager Base URL** (optional): URL of your Alertmanager instance (e.g., `https://alertmanager.example.com`). Required for Silence components. If omitted, the Prometheus Base URL is used.
-- **API Auth**: `none`, `basic`, or `bearer` for API requests
-- **Webhook Secret** (recommended): If set, Alertmanager must send `Authorization: Bearer <token>` on webhook requests
-
-### Alertmanager Setup (manual)
-
-The trigger setup panel in SuperPlane shows the generated webhook URL.
-Use the On Alert trigger setup instructions in the workflow sidebar for the exact `alertmanager.yml` snippet.
-
-After editing config, reload Alertmanager (for example `POST /-/reload` when lifecycle reload is enabled).
-
 <a id="on-alert"></a>
 
 ## On Alert

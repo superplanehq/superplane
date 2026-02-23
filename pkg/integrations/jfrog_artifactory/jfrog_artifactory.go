@@ -8,6 +8,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+const setupInstructions = `
+To set up the JFrog Artifactory integration:
+
+1. Log in to your JFrog Platform
+2. Go to **User Menu** (top right) -> **Edit Profile** -> **Authentication Settings**
+3. Click **Generate an Identity Token**
+4. Copy the token and paste it in the **Access Token** field below
+5. Enter your JFrog Platform URL without the /artifactory suffix (e.g. https://mycompany.jfrog.io)
+`
+
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("jfrogArtifactory", &JFrogArtifactory{}, &JFrogWebhookHandler{})
 }
@@ -28,16 +38,6 @@ func (j *JFrogArtifactory) Icon() string {
 
 func (j *JFrogArtifactory) Description() string {
 	return "Manage artifacts in JFrog Artifactory repositories"
-}
-
-func (j *JFrogArtifactory) Instructions() string {
-	return `To set up the JFrog Artifactory integration:
-
-1. Log in to your JFrog Platform
-2. Go to **User Menu** (top right) -> **Edit Profile** -> **Authentication Settings**
-3. Click **Generate an Identity Token**
-4. Copy the token and paste it in the **Access Token** field below
-5. Enter your JFrog Platform URL without the /artifactory suffix (e.g. https://mycompany.jfrog.io)`
 }
 
 func (j *JFrogArtifactory) Configuration() []configuration.Field {
@@ -73,6 +73,13 @@ func (j *JFrogArtifactory) Triggers() []core.Trigger {
 }
 
 func (j *JFrogArtifactory) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: setupInstructions,
+		})
+		return nil
+	}
+
 	rawURL, err := ctx.Integration.GetConfig("url")
 	if err != nil {
 		return fmt.Errorf("url is required")

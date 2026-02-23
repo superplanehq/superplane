@@ -58,15 +58,18 @@ func (i *Claude) Triggers() []core.Trigger {
 	return []core.Trigger{}
 }
 
-func (i *Claude) Instructions() string {
-	return "To get new Claude API key, go to [platform.claude.com](https://platform.claude.com)."
-}
-
 func (i *Claude) Cleanup(ctx core.IntegrationCleanupContext) error {
 	return nil
 }
 
 func (i *Claude) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: "To get new Claude API key, go to [platform.claude.com](https://platform.claude.com).",
+		})
+		return nil
+	}
+
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)

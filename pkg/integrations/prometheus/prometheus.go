@@ -23,6 +23,22 @@ const (
 	PrometheusAlertPayloadType = "prometheus.alert"
 )
 
+const setupInstructions = `### Connection
+
+Configure this integration with:
+- **Prometheus Base URL**: URL of your Prometheus server (e.g., ` + "`https://prometheus.example.com`" + `)
+- **Alertmanager Base URL** (optional): URL of your Alertmanager instance (e.g., ` + "`https://alertmanager.example.com`" + `). Required for Silence components. If omitted, the Prometheus Base URL is used.
+- **API Auth**: ` + "`none`" + `, ` + "`basic`" + `, or ` + "`bearer`" + ` for API requests
+- **Webhook Secret** (recommended): If set, Alertmanager must send ` + "`Authorization: Bearer <token>`" + ` on webhook requests
+
+### Alertmanager Setup (manual)
+
+The trigger setup panel in SuperPlane shows the generated webhook URL.
+Use the On Alert trigger setup instructions in the workflow sidebar for the exact ` + "`alertmanager.yml`" + ` snippet.
+
+After editing config, reload Alertmanager (for example ` + "`POST /-/reload`" + ` when lifecycle reload is enabled).
+`
+
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("prometheus", &Prometheus{}, &PrometheusWebhookHandler{})
 }
@@ -55,23 +71,6 @@ func (p *Prometheus) Icon() string {
 
 func (p *Prometheus) Description() string {
 	return "Monitor alerts from Prometheus and Alertmanager"
-}
-
-func (p *Prometheus) Instructions() string {
-	return `### Connection
-
-Configure this integration with:
-- **Prometheus Base URL**: URL of your Prometheus server (e.g., ` + "`https://prometheus.example.com`" + `)
-- **Alertmanager Base URL** (optional): URL of your Alertmanager instance (e.g., ` + "`https://alertmanager.example.com`" + `). Required for Silence components. If omitted, the Prometheus Base URL is used.
-- **API Auth**: ` + "`none`" + `, ` + "`basic`" + `, or ` + "`bearer`" + ` for API requests
-- **Webhook Secret** (recommended): If set, Alertmanager must send ` + "`Authorization: Bearer <token>`" + ` on webhook requests
-
-### Alertmanager Setup (manual)
-
-The trigger setup panel in SuperPlane shows the generated webhook URL.
-Use the On Alert trigger setup instructions in the workflow sidebar for the exact ` + "`alertmanager.yml`" + ` snippet.
-
-After editing config, reload Alertmanager (for example ` + "`POST /-/reload`" + ` when lifecycle reload is enabled).`
 }
 
 func (p *Prometheus) Configuration() []configuration.Field {
@@ -163,6 +162,13 @@ func (p *Prometheus) Triggers() []core.Trigger {
 }
 
 func (p *Prometheus) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: setupInstructions,
+		})
+		return nil
+	}
+
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)

@@ -11,6 +11,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+const setupInstructions = `
+1. **API Key:** Create it in [Render Account Settings -> API Keys](https://dashboard.render.com/u/settings#api-keys).
+2. **Workspace (optional):** Use your Render workspace ID (` + "`usr-...`" + ` or ` + "`tea-...`" + `) or workspace name. Leave empty to use the first workspace available to the API key.
+3. **Workspace Plan:** Select **Professional** or **Organization / Enterprise** (used to choose webhook strategy).
+4. **Auth:** SuperPlane sends requests to [Render API v1](https://api.render.com/v1/) using ` + "`Authorization: Bearer <API_KEY>`" + `.
+5. **Webhooks:** SuperPlane configures Render webhooks automatically via the [Render Webhooks API](https://render.com/docs/webhooks). No manual setup is required.
+6. **Troubleshooting:** Check [Render Dashboard -> Integrations -> Webhooks](https://dashboard.render.com/) and the [Render webhook docs](https://render.com/docs/webhooks).
+
+Note: **Plan requirement:** Render webhooks require a Professional plan or higher.`
+
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("render", &Render{}, &RenderWebhookHandler{})
 }
@@ -46,18 +56,6 @@ func (r *Render) Icon() string {
 
 func (r *Render) Description() string {
 	return "Deploy and manage Render services, and react to Render deploy/build events"
-}
-
-func (r *Render) Instructions() string {
-	return `
-1. **API Key:** Create it in [Render Account Settings -> API Keys](https://dashboard.render.com/u/settings#api-keys).
-2. **Workspace (optional):** Use your Render workspace ID (` + "`usr-...`" + ` or ` + "`tea-...`" + `) or workspace name. Leave empty to use the first workspace available to the API key.
-3. **Workspace Plan:** Select **Professional** or **Organization / Enterprise** (used to choose webhook strategy).
-4. **Auth:** SuperPlane sends requests to [Render API v1](https://api.render.com/v1/) using ` + "`Authorization: Bearer <API_KEY>`" + `.
-5. **Webhooks:** SuperPlane configures Render webhooks automatically via the [Render Webhooks API](https://render.com/docs/webhooks). No manual setup is required.
-6. **Troubleshooting:** Check [Render Dashboard -> Integrations -> Webhooks](https://dashboard.render.com/) and the [Render webhook docs](https://render.com/docs/webhooks).
-
-Note: **Plan requirement:** Render webhooks require a Professional plan or higher.`
 }
 
 func (r *Render) Configuration() []configuration.Field {
@@ -121,6 +119,13 @@ func (r *Render) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (r *Render) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: setupInstructions,
+		})
+		return nil
+	}
+
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)

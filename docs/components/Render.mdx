@@ -25,17 +25,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Update Env Var" href="#update-env-var" description="Update or generate a value for a Render service environment variable" />
 </CardGrid>
 
-## Instructions
-
-1. **API Key:** Create it in [Render Account Settings -> API Keys](https://dashboard.render.com/u/settings#api-keys).
-2. **Workspace (optional):** Use your Render workspace ID (`usr-...` or `tea-...`) or workspace name. Leave empty to use the first workspace available to the API key.
-3. **Workspace Plan:** Select **Professional** or **Organization / Enterprise** (used to choose webhook strategy).
-4. **Auth:** SuperPlane sends requests to [Render API v1](https://api.render.com/v1/) using `Authorization: Bearer <API_KEY>`.
-5. **Webhooks:** SuperPlane configures Render webhooks automatically via the [Render Webhooks API](https://render.com/docs/webhooks). No manual setup is required.
-6. **Troubleshooting:** Check [Render Dashboard -> Integrations -> Webhooks](https://dashboard.render.com/) and the [Render webhook docs](https://render.com/docs/webhooks).
-
-Note: **Plan requirement:** Render webhooks require a Professional plan or higher.
-
 <a id="on-build"></a>
 
 ## On Build

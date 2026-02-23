@@ -41,10 +41,6 @@ func (j *Jira) Description() string {
 	return "Manage and react to issues in Jira"
 }
 
-func (j *Jira) Instructions() string {
-	return ""
-}
-
 func (j *Jira) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -87,6 +83,10 @@ func (j *Jira) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (j *Jira) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		return nil
+	}
+
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {

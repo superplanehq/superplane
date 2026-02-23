@@ -42,10 +42,6 @@ func (r *Rootly) Description() string {
 	return "Manage and react to incidents in Rootly"
 }
 
-func (r *Rootly) Instructions() string {
-	return ""
-}
-
 func (r *Rootly) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -79,6 +75,10 @@ func (r *Rootly) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (r *Rootly) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		return nil
+	}
+
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {

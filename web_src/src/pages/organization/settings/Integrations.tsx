@@ -1,24 +1,14 @@
-import { Loader2, Plug, Search, X } from "lucide-react";
+import { Plug, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  useAvailableIntegrations,
-  useConnectedIntegrations,
-  useCreateIntegration,
-} from "../../../hooks/useIntegrations";
+import { useAvailableIntegrations, useConnectedIntegrations } from "../../../hooks/useIntegrations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { IntegrationsIntegrationDefinition } from "../../../api-client/types.gen";
-import { getApiErrorMessage } from "@/utils/errors";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
-import { Icon } from "@/components/Icon";
-import { showErrorToast } from "@/utils/toast";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 
 interface IntegrationsProps {
   organizationId: string;
@@ -27,24 +17,14 @@ interface IntegrationsProps {
 export function Integrations({ organizationId }: IntegrationsProps) {
   const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationDefinition | null>(null);
-  const [integrationName, setIntegrationName] = useState("");
-  const [configuration, setConfiguration] = useState<Record<string, unknown>>({});
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterQuery, setFilterQuery] = useState("");
   const canCreateIntegrations = canAct("integrations", "create");
   const canUpdateIntegrations = canAct("integrations", "update");
 
   const { data: availableIntegrations = [], isLoading: loadingAvailable } = useAvailableIntegrations();
   const { data: organizationIntegrations = [], isLoading: loadingInstalled } = useConnectedIntegrations(organizationId);
-  const createIntegrationMutation = useCreateIntegration(organizationId);
 
   const isLoading = loadingAvailable || loadingInstalled;
-  const integrationNames = useMemo(() => {
-    return new Set(
-      organizationIntegrations.map((integration) => integration.metadata?.name?.trim()).filter(Boolean) as string[],
-    );
-  }, [organizationIntegrations]);
   const connectedInstancesByProvider = useMemo(() => {
     const groups = new Map<string, typeof organizationIntegrations>();
 
@@ -58,6 +38,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
 
     return groups;
   }, [organizationIntegrations]);
+
   const integrationCatalog = useMemo(() => {
     const catalogByProvider = new Map<
       string,
@@ -107,7 +88,8 @@ export function Integrations({ organizationId }: IntegrationsProps) {
     });
 
     return [...catalogByProvider.values()].sort((a, b) => a.providerLabel.localeCompare(b.providerLabel));
-  }, [availableIntegrations, connectedInstancesByProvider]);
+  }, [availableIntegrations, connectedInstancesByProvider, organizationIntegrations]);
+
   const filteredIntegrationCatalog = useMemo(() => {
     const normalizedQuery = filterQuery.trim().toLowerCase();
     if (!normalizedQuery) {
@@ -129,65 +111,6 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       );
     });
   }, [filterQuery, integrationCatalog]);
-
-  const selectedInstructions = useMemo(() => {
-    return selectedIntegration?.instructions?.trim();
-  }, [selectedIntegration?.instructions]);
-
-  const getNextIntegrationName = (baseName?: string) => {
-    const normalizedBaseName = baseName?.trim() || "integration";
-    if (!integrationNames.has(normalizedBaseName)) {
-      return normalizedBaseName;
-    }
-
-    let suffix = 2;
-    let candidate = `${normalizedBaseName}-${suffix}`;
-    while (integrationNames.has(candidate)) {
-      suffix += 1;
-      candidate = `${normalizedBaseName}-${suffix}`;
-    }
-
-    return candidate;
-  };
-
-  const handleConnectClick = (integration: IntegrationsIntegrationDefinition) => {
-    if (!canCreateIntegrations) return;
-    setSelectedIntegration(integration);
-    setIntegrationName(getNextIntegrationName(integration.name));
-    setConfiguration({});
-    setIsModalOpen(true);
-  };
-  const handleConnect = async () => {
-    if (!canCreateIntegrations) return;
-    if (!selectedIntegration?.name) return;
-
-    try {
-      const result = await createIntegrationMutation.mutateAsync({
-        integrationName: selectedIntegration.name,
-        name: integrationName,
-        configuration,
-      });
-      setIsModalOpen(false);
-      setSelectedIntegration(null);
-      setIntegrationName("");
-      setConfiguration({});
-
-      // Redirect to the integration details page
-      if (result.data?.integration?.metadata?.id) {
-        navigate(`/${organizationId}/settings/integrations/${result.data.integration.metadata.id}`);
-      }
-    } catch (_error) {
-      showErrorToast("Failed to create integration");
-    }
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedIntegration(null);
-    setIntegrationName("");
-    setConfiguration({});
-    createIntegrationMutation.reset();
-  };
 
   if (isLoading) {
     return (
@@ -265,8 +188,8 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       variant="default"
                       size="sm"
                       onClick={() => {
-                        if (!item.integrationDef) return;
-                        handleConnectClick(item.integrationDef);
+                        if (!item.integrationDef?.name) return;
+                        navigate(`/${organizationId}/settings/integrations/new/${item.integrationDef.name}`);
                       }}
                       className="self-start"
                       disabled={!item.integrationDef || !canCreateIntegrations}
@@ -347,114 +270,6 @@ export function Integrations({ organizationId }: IntegrationsProps) {
           })}
         </div>
       )}
-
-      {/* Connect Modal */}
-      {isModalOpen &&
-        selectedIntegration &&
-        (() => {
-          const integrationTypeName = selectedIntegration.name;
-          return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      <IntegrationIcon
-                        integrationName={integrationTypeName}
-                        iconSlug={selectedIntegration.icon}
-                        className="w-6 h-6 text-gray-500 dark:text-gray-400"
-                      />
-                      <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
-                        Connect {selectedIntegration.label || selectedIntegration.name}
-                      </h3>
-                    </div>
-                    <button
-                      onClick={handleCloseModal}
-                      className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-                      disabled={createIntegrationMutation.isPending}
-                    >
-                      <Icon name="x" size="sm" />
-                    </button>
-                  </div>
-
-                  <div className="space-y-4">
-                    {selectedInstructions && <IntegrationInstructions description={selectedInstructions} />}
-                    {/* Integration Name Field */}
-                    <div>
-                      <Label className="text-gray-800 dark:text-gray-100 mb-2">
-                        Integration Name
-                        <span className="text-gray-800 ml-1">*</span>
-                      </Label>
-                      <Input
-                        type="text"
-                        value={integrationName}
-                        onChange={(e) => setIntegrationName(e.target.value)}
-                        placeholder="e.g., my-app-integration"
-                        required
-                        disabled={!canCreateIntegrations}
-                      />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                        A unique name for this integration
-                      </p>
-                    </div>
-
-                    {/* Configuration Fields */}
-                    {selectedIntegration.configuration && selectedIntegration.configuration.length > 0 && (
-                      <div className="space-y-4">
-                        {selectedIntegration.configuration.map((field) => {
-                          if (!field.name) return null;
-                          return (
-                            <ConfigurationFieldRenderer
-                              key={field.name}
-                              field={field}
-                              value={configuration[field.name]}
-                              onChange={(value) => setConfiguration({ ...configuration, [field.name || ""]: value })}
-                              allValues={configuration}
-                              domainId={organizationId}
-                              domainType="DOMAIN_TYPE_ORGANIZATION"
-                              organizationId={organizationId}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex justify-start gap-3 mt-6">
-                    <Button
-                      color="blue"
-                      onClick={handleConnect}
-                      disabled={
-                        createIntegrationMutation.isPending || !integrationName?.trim() || !canCreateIntegrations
-                      }
-                      className="flex items-center gap-2"
-                    >
-                      {createIntegrationMutation.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Connecting...
-                        </>
-                      ) : (
-                        "Connect"
-                      )}
-                    </Button>
-                    <Button variant="outline" onClick={handleCloseModal} disabled={createIntegrationMutation.isPending}>
-                      Cancel
-                    </Button>
-                  </div>
-
-                  {createIntegrationMutation.isError && (
-                    <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                      <p className="text-sm text-red-800 dark:text-red-200">
-                        Failed to create integration: {getApiErrorMessage(createIntegrationMutation.error)}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })()}
     </div>
   );
 }

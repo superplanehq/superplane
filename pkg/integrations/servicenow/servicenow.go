@@ -15,6 +15,27 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+const setupInstructions = `
+Requires a ServiceNow instance with OAuth API access.
+
+Before creating OAuth credentials, enable client credentials grant on your instance:
+- Go to **System Properties** (sys_properties_list.do) and search for:
+  - **Name**: glide.oauth.inbound.client.credential.grant_type.enabled
+  - (Important: the property name ends with **enabled**)
+- If it does not exist, create it with:
+  - **Application Scope**: Global
+  - **Type**: true | false
+  - **Value**: true
+
+Then configure OAuth:
+- Go to **System OAuth > Inbound Integrations**
+- Create a new integration with **OAuth - Client Credentials Grant**
+- Copy the generated **Client ID** and **Client Secret**
+- Assign required permissions to the integration account:
+  - **itil** role (required for incident read/write)
+  - Optionally **admin** if broader scoped access is needed
+- Optionally enable **Web Service Access Only** on the integration account to restrict it to API-only use.`
+
 func init() {
 	registry.RegisterIntegration("servicenow", &ServiceNow{})
 }
@@ -45,28 +66,6 @@ func (s *ServiceNow) Icon() string {
 
 func (s *ServiceNow) Description() string {
 	return "Manage and react to incidents in ServiceNow"
-}
-
-func (s *ServiceNow) Instructions() string {
-	return `Requires a ServiceNow instance with OAuth API access.
-
-Before creating OAuth credentials, enable client credentials grant on your instance:
-- Go to **System Properties** (sys_properties_list.do) and search for:
-  - **Name**: glide.oauth.inbound.client.credential.grant_type.enabled
-  - (Important: the property name ends with **enabled**)
-- If it does not exist, create it with:
-  - **Application Scope**: Global
-  - **Type**: true | false
-  - **Value**: true
-
-Then configure OAuth:
-- Go to **System OAuth > Inbound Integrations**
-- Create a new integration with **OAuth - Client Credentials Grant**
-- Copy the generated **Client ID** and **Client Secret**
-- Assign required permissions to the integration account:
-  - **itil** role (required for incident read/write)
-  - Optionally **admin** if broader scoped access is needed
-- Optionally enable **Web Service Access Only** on the integration account to restrict it to API-only use.`
 }
 
 func (s *ServiceNow) Configuration() []configuration.Field {
@@ -113,6 +112,13 @@ func (s *ServiceNow) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (s *ServiceNow) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: setupInstructions,
+		})
+		return nil
+	}
+
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {

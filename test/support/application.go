@@ -44,10 +44,6 @@ func (t *DummyIntegration) Icon() string {
 	return "test"
 }
 
-func (t *DummyIntegration) Instructions() string {
-	return "Just a dummy application used in unit tests"
-}
-
 func (t *DummyIntegration) Description() string {
 	return "Just a dummy application used in unit tests"
 }
