@@ -16,7 +16,8 @@ func init() {
 type OpenAI struct{}
 
 type Configuration struct {
-	APIKey string `json:"apiKey"`
+	APIKey  string `json:"apiKey"`
+	BaseURL string `json:"baseURL"`
 }
 
 func (o *OpenAI) Name() string {
@@ -44,6 +45,14 @@ func (o *OpenAI) Configuration() []configuration.Field {
 			Required:    true,
 			Sensitive:   true,
 			Description: "OpenAI API key",
+		},
+		{
+			Name:        "baseURL",
+			Label:       "Base URL",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Custom API base URL for OpenAI-compatible providers (e.g. Azure OpenAI, Ollama, vLLM)",
+			Placeholder: "https://api.openai.com/v1",
 		},
 	}
 }

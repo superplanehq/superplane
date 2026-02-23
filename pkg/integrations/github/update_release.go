@@ -281,7 +281,7 @@ func (c *UpdateRelease) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *UpdateRelease) generateReleaseNotes(ctx core.ExecutionContext, client *github.Client, owner, repo, tagName string) (string, error) {
+func (c *UpdateRelease) generateReleaseNotes(_ core.ExecutionContext, client *github.Client, owner, repo, tagName string) (string, error) {
 	opts := &github.GenerateNotesOptions{
 		TagName: tagName,
 	}

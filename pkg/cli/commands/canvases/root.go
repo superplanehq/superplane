@@ -26,6 +26,14 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	}
 	core.Bind(getCmd, &getCommand{}, options)
 
+	activeCmd := &cobra.Command{
+		Use:   "active [canvas-id]",
+		Short: "Set the active canvas",
+		Long:  "Without arguments, prompts for a canvas selection. With a canvas ID, sets it directly.",
+		Args:  cobra.MaximumNArgs(1),
+	}
+	core.Bind(activeCmd, &ActiveCommand{}, options)
+
 	var createFile string
 	createCmd := &cobra.Command{
 		Use:   "create [canvas-name]",
@@ -47,6 +55,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 
 	root.AddCommand(listCmd)
 	root.AddCommand(getCmd)
+	root.AddCommand(activeCmd)
 	root.AddCommand(createCmd)
 	root.AddCommand(updateCmd)
 

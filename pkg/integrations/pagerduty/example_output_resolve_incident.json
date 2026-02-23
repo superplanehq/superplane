@@ -1,0 +1,67 @@
+{
+    "type": "pagerduty.incident",
+    "data": {
+        "incident": {
+            "id": "PT4KHLK",
+            "type": "incident",
+            "title": "The server is on fire.",
+            "summary": "[#1234] The server is on fire.",
+            "self": "https://api.pagerduty.com/incidents/PT4KHLK",
+            "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK",
+            "incident_number": 1234,
+            "created_at": "2015-10-06T21:30:42Z",
+            "updated_at": "2015-10-06T21:45:00Z",
+            "status": "resolved",
+            "incident_key": "baf7cf21b1da41b4b0221008339ff357",
+            "service": {
+                "id": "PWIXJZS",
+                "type": "service_reference",
+                "summary": "My Mail Service",
+                "self": "https://api.pagerduty.com/services/PWIXJZS",
+                "html_url": "https://subdomain.pagerduty.com/service-directory/PWIXJZS"
+            },
+            "priority": {
+                "id": "P53ZZH5",
+                "type": "priority_reference",
+                "summary": "P2",
+                "self": "https://api.pagerduty.com/priorities/P53ZZH5"
+            },
+            "assigned_via": "escalation_policy",
+            "assignments": [],
+            "resolved_at": "2015-10-06T21:45:00Z",
+            "last_status_change_at": "2015-10-06T21:45:00Z",
+            "last_status_change_by": {
+                "id": "PXPGF42",
+                "type": "user_reference",
+                "summary": "Earline Greenholt",
+                "self": "https://api.pagerduty.com/users/PXPGF42",
+                "html_url": "https://subdomain.pagerduty.com/users/PXPGF42"
+            },
+            "first_trigger_log_entry": {
+                "id": "Q02JTSNZWHSEKV",
+                "type": "trigger_log_entry_reference",
+                "summary": "Triggered through the API",
+                "self": "https://api.pagerduty.com/log_entries/Q02JTSNZWHSEKV?incident_id=PT4KHLK",
+                "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK/log_entries/Q02JTSNZWHSEKV"
+            },
+            "escalation_policy": {
+                "id": "PT20YPA",
+                "type": "escalation_policy_reference",
+                "summary": "Another Escalation Policy",
+                "self": "https://api.pagerduty.com/escalation_policies/PT20YPA",
+                "html_url": "https://subdomain.pagerduty.com/escalation_policies/PT20YPA"
+            },
+            "teams": [
+                {
+                    "id": "PQ9K7I8",
+                    "type": "team_reference",
+                    "summary": "Engineering",
+                    "self": "https://api.pagerduty.com/teams/PQ9K7I8",
+                    "html_url": "https://subdomain.pagerduty.com/teams/PQ9K7I8"
+                }
+            ],
+            "urgency": "high"
+        }
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

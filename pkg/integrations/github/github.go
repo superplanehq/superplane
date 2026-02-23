@@ -97,6 +97,10 @@ func (g *GitHub) Components() []core.Component {
 		&CreateIssue{},
 		&CreateIssueComment{},
 		&UpdateIssue{},
+		&AddIssueLabel{},
+		&RemoveIssueLabel{},
+		&AddIssueAssignee{},
+		&RemoveIssueAssignee{},
 		&CreateReview{},
 		&RunWorkflow{},
 		&PublishCommitStatus{},
@@ -104,6 +108,7 @@ func (g *GitHub) Components() []core.Component {
 		&GetRelease{},
 		&UpdateRelease{},
 		&DeleteRelease{},
+		&GetWorkflowUsage{},
 	}
 }
 
@@ -486,12 +491,13 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 		"public": false,
 		"url":    "https://superplane.com",
 		"default_permissions": map[string]string{
-			"issues":           "write",
-			"actions":          "write",
-			"contents":         "write",
-			"pull_requests":    "write",
-			"repository_hooks": "write",
-			"statuses":         "write",
+			"issues":                      "write",
+			"actions":                     "write",
+			"contents":                    "write",
+			"pull_requests":               "write",
+			"repository_hooks":            "write",
+			"statuses":                    "write",
+			"organization_administration": "read",
 		},
 		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.Integration.ID().String()),
 		"redirect_url": fmt.Sprintf(`%s/api/v1/integrations/%s/redirect`, ctx.BaseURL, ctx.Integration.ID().String()),
