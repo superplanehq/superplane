@@ -13,8 +13,8 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__OnEvent__HandleWebhook(t *testing.T) {
-	trigger := &OnEvent{}
+func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
+	trigger := &OnIncidentTimelineEvent{}
 
 	signatureFor := func(secret string, timestamp string, body []byte) string {
 		payload := append([]byte(timestamp), body...)
@@ -80,7 +80,7 @@ func Test__OnEvent__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("incident_event.updated emits when metadata empty", func(t *testing.T) {
-		body := []byte(`{"event":{"type":"incident_event.updated","id":"evt-123","issued_at":"2026-02-10T15:34:36Z"},"data":{"id":"ev-1","event":"Initial note","kind":"note","visibility":"internal","occurred_at":"2026-02-10T15:00:00Z","created_at":"2026-02-10T15:00:01Z","incident_id":"inc-123"}}`)
+		body := []byte(`{"event":{"type":"incident_event.updated","id":"evt-123","issued_at":"2026-02-10T15:34:36Z"},"data":{"id":"ev-1","event":"Initial note","kind":"event","visibility":"internal","occurred_at":"2026-02-10T15:00:00Z","created_at":"2026-02-10T15:00:01Z","incident_id":"inc-123"}}`)
 		secret := "test-secret"
 		timestamp := "1234567890"
 
@@ -104,14 +104,14 @@ func Test__OnEvent__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("incident_event.updated dedupes unchanged event", func(t *testing.T) {
-		body := []byte(`{"event":{"type":"incident_event.updated","id":"evt-124","issued_at":"2026-02-10T15:40:00Z"},"data":{"id":"ev-1","event":"Initial note","kind":"note","visibility":"internal","occurred_at":"2026-02-10T15:00:00Z","created_at":"2026-02-10T15:00:01Z","updated_at":"2026-02-10T15:00:02Z","incident_id":"inc-123"}}`)
+		body := []byte(`{"event":{"type":"incident_event.updated","id":"evt-124","issued_at":"2026-02-10T15:40:00Z"},"data":{"id":"ev-1","event":"Initial note","kind":"event","visibility":"internal","occurred_at":"2026-02-10T15:00:00Z","created_at":"2026-02-10T15:00:01Z","updated_at":"2026-02-10T15:00:02Z","incident_id":"inc-123"}}`)
 		secret := "test-secret"
 		timestamp := "1234567890"
 
 		headers := http.Header{}
 		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
 
-		metadata := &contexts.MetadataContext{Metadata: OnEventMetadata{EventStates: map[string]string{"ev-1": "2026-02-10T15:00:02Z"}}}
+		metadata := &contexts.MetadataContext{Metadata: OnIncidentTimelineEventMetadata{EventStates: map[string]string{"ev-1": "2026-02-10T15:00:02Z"}}}
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
@@ -128,14 +128,14 @@ func Test__OnEvent__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("visibility filter -> skips non-matching events", func(t *testing.T) {
-		body := []byte(`{"event":{"type":"incident_event.updated","id":"evt-125","issued_at":"2026-02-10T15:40:00Z"},"data":{"id":"ev-2","event":"External update","kind":"status","visibility":"external","occurred_at":"2026-02-10T15:10:00Z","created_at":"2026-02-10T15:10:01Z","incident_id":"inc-123"}}`)
+		body := []byte(`{"event":{"type":"incident_event.updated","id":"evt-125","issued_at":"2026-02-10T15:40:00Z"},"data":{"id":"ev-2","event":"External update","kind":"event","visibility":"external","occurred_at":"2026-02-10T15:10:00Z","created_at":"2026-02-10T15:10:01Z","incident_id":"inc-123"}}`)
 		secret := "test-secret"
 		timestamp := "1234567890"
 
 		headers := http.Header{}
 		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
 
-		metadata := &contexts.MetadataContext{Metadata: OnEventMetadata{EventStates: map[string]string{"ev-2": "2026-02-10T15:10:01Z"}}}
+		metadata := &contexts.MetadataContext{Metadata: OnIncidentTimelineEventMetadata{EventStates: map[string]string{"ev-2": "2026-02-10T15:10:01Z"}}}
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
@@ -152,7 +152,7 @@ func Test__OnEvent__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("incident_event.created -> emits even without baseline", func(t *testing.T) {
-		body := []byte(`{"event":{"type":"incident_event.created","id":"evt-200","issued_at":"2026-02-10T16:00:00Z"},"data":{"id":"ev-200","event":"Failover initiated","kind":"note","visibility":"internal","occurred_at":"2026-02-10T16:00:00Z","created_at":"2026-02-10T16:00:01Z","incident_id":"inc-200"}}`)
+		body := []byte(`{"event":{"type":"incident_event.created","id":"evt-200","issued_at":"2026-02-10T16:00:00Z"},"data":{"id":"ev-200","event":"Failover initiated","kind":"event","visibility":"internal","occurred_at":"2026-02-10T16:00:00Z","created_at":"2026-02-10T16:00:01Z","incident_id":"inc-200"}}`)
 		secret := "test-secret"
 		timestamp := "1234567890"
 
@@ -209,9 +209,32 @@ func Test__OnEvent__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "5dcbfe70-0416-469a-8629-be5353f4fd60", incident["id"])
 	})
 
+	t.Run("non-event kind -> no emit", func(t *testing.T) {
+		body := []byte(`{"event":{"type":"incident_event.updated","id":"evt-300","issued_at":"2026-02-10T16:10:00Z"},"data":{"id":"ev-300","event":"Note update","kind":"trail","visibility":"internal","occurred_at":"2026-02-10T16:10:00Z","created_at":"2026-02-10T16:10:01Z","incident_id":"inc-300"}}`)
+		secret := "test-secret"
+		timestamp := "1234567890"
+
+		headers := http.Header{}
+		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Configuration: baseConfig,
+			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Events:        eventContext,
+			Metadata:      &contexts.MetadataContext{},
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 0, eventContext.Count())
+	})
+
 	t.Run("incident filters -> fetches incident and emits", func(t *testing.T) {
 		now := time.Now().UTC().Format(time.RFC3339)
-		body := []byte(`{"event":{"type":"incident_event.updated","id":"evt-200","issued_at":"` + now + `"},"data":{"id":"ev-200","event":"Status update","kind":"trail","source":"web","visibility":"internal","occurred_at":"` + now + `","created_at":"` + now + `","incident_id":"inc-200"}}`)
+		body := []byte(`{"event":{"type":"incident_event.updated","id":"evt-200","issued_at":"` + now + `"},"data":{"id":"ev-200","event":"Status update","kind":"event","source":"web","visibility":"internal","occurred_at":"` + now + `","created_at":"` + now + `","incident_id":"inc-200"}}`)
 		secret := "test-secret"
 		timestamp := "1234567890"
 
@@ -274,8 +297,8 @@ func Test__OnEvent__HandleWebhook(t *testing.T) {
 	})
 }
 
-func Test__OnEvent__Setup(t *testing.T) {
-	trigger := &OnEvent{}
+func Test__OnIncidentTimelineEvent__Setup(t *testing.T) {
+	trigger := &OnIncidentTimelineEvent{}
 
 	integrationCtx := &contexts.IntegrationContext{}
 	err := trigger.Setup(core.TriggerContext{

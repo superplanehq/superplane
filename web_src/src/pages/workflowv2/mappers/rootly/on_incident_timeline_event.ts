@@ -20,7 +20,7 @@ interface OnEventEventData extends IncidentEvent {
 }
 
 /**
- * Renderer for the "rootly.onEvent" trigger type
+ * Renderer for the "rootly.onIncidentTimelineEvent" trigger type
  */
 export const onEventTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {

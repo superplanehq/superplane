@@ -12,16 +12,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const rootlyIncidentEventPayloadType = "rootly.onEvent"
+const rootlyIncidentTimelineEventPayloadType = "rootly.onIncidentTimelineEvent"
 
-var rootlyIncidentEventWebhookTypes = []string{
+var rootlyIncidentTimelineEventWebhookTypes = []string{
 	"incident_event.created",
 	"incident_event.updated",
 }
 
-type OnEvent struct{}
+type OnIncidentTimelineEvent struct{}
 
-type OnEventConfiguration struct {
+type OnIncidentTimelineEventConfiguration struct {
 	IncidentStatus []string `json:"incidentStatus" mapstructure:"incidentStatus"`
 	Severity       []string `json:"severity" mapstructure:"severity"`
 	Service        []string `json:"service" mapstructure:"service"`
@@ -30,24 +30,25 @@ type OnEventConfiguration struct {
 	Visibility     string   `json:"visibility" mapstructure:"visibility"`
 }
 
-type OnEventMetadata struct {
+type OnIncidentTimelineEventMetadata struct {
 	EventStates map[string]string `json:"eventStates"`
 }
 
-func (t *OnEvent) Name() string {
-	return "rootly.onEvent"
+func (t *OnIncidentTimelineEvent) Name() string {
+	return "rootly.onIncidentTimelineEvent"
 }
 
-func (t *OnEvent) Label() string {
-	return "On Event"
+func (t *OnIncidentTimelineEvent) Label() string {
+	return "On Incident Timeline Event"
 }
 
-func (t *OnEvent) Description() string {
+func (t *OnIncidentTimelineEvent) Description() string {
 	return "Listen to incident timeline events"
 }
 
-func (t *OnEvent) Documentation() string {
-	return `The On Event trigger starts a workflow execution when Rootly incident timeline events are created or updated.
+func (t *OnIncidentTimelineEvent) Documentation() string {
+	return `The On Incident Timeline Event trigger starts a workflow execution when Rootly incident timeline events are created or updated.
+Only events with kind "event" are emitted.
 
 ## Use Cases
 
@@ -88,15 +89,15 @@ Each incident event includes:
 This trigger automatically sets up a Rootly webhook endpoint when configured. The endpoint is managed by SuperPlane and will be cleaned up when the trigger is removed.`
 }
 
-func (t *OnEvent) Icon() string {
+func (t *OnIncidentTimelineEvent) Icon() string {
 	return "message-square"
 }
 
-func (t *OnEvent) Color() string {
+func (t *OnIncidentTimelineEvent) Color() string {
 	return "gray"
 }
 
-func (t *OnEvent) Configuration() []configuration.Field {
+func (t *OnIncidentTimelineEvent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "incidentStatus",
@@ -204,22 +205,22 @@ func (t *OnEvent) Configuration() []configuration.Field {
 	}
 }
 
-func (t *OnEvent) Setup(ctx core.TriggerContext) error {
+func (t *OnIncidentTimelineEvent) Setup(ctx core.TriggerContext) error {
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		Events: rootlyIncidentEventWebhookTypes,
+		Events: rootlyIncidentTimelineEventWebhookTypes,
 	})
 }
 
-func (t *OnEvent) Actions() []core.Action {
+func (t *OnIncidentTimelineEvent) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (t *OnEvent) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnIncidentTimelineEvent) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
 	return nil, nil
 }
 
-func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	config := OnEventConfiguration{}
+func (t *OnIncidentTimelineEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	config := OnIncidentTimelineEventConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -239,7 +240,7 @@ func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	if !slices.Contains(rootlyIncidentEventWebhookTypes, webhook.Event.Type) {
+	if !slices.Contains(rootlyIncidentTimelineEventWebhookTypes, webhook.Event.Type) {
 		return http.StatusOK, nil
 	}
 
@@ -263,6 +264,12 @@ func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	}
 
 	incidentID := extractString(incidentEvent, "incident_id", "incidentId")
+
+	// Only process events with kind "event" to avoid emitting for non-timeline events like "trail/start/close".
+	if !strings.EqualFold(extractString(incidentEvent, "kind"), "event") {
+		return http.StatusOK, nil
+	}
+
 	incidentFiltersEnabled := len(config.IncidentStatus) > 0 || len(config.Severity) > 0 || len(config.Service) > 0 || len(config.Team) > 0
 	var incidentDetails map[string]any
 	if incidentID != "" && ctx.HTTP != nil && ctx.Integration != nil {
@@ -293,7 +300,7 @@ func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		}
 	}
 
-	metadata := loadOnEventMetadata(ctx.Metadata)
+	metadata := loadOnIncidentTimelineEventMetadata(ctx.Metadata)
 	updatedStates := map[string]string{}
 	for key, value := range metadata.EventStates {
 		updatedStates[key] = value
@@ -313,14 +320,14 @@ func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		}
 	}
 
-	payload := buildIncidentEventPayload(incidentDetails, incidentEvent, webhook.Event)
-	if err := ctx.Events.Emit(rootlyIncidentEventPayloadType, payload); err != nil {
+	payload := buildIncidentTimelineEventPayload(incidentDetails, incidentEvent, webhook.Event)
+	if err := ctx.Events.Emit(rootlyIncidentTimelineEventPayloadType, payload); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}
 	emitted++
 
 	if ctx.Metadata != nil {
-		if err := ctx.Metadata.Set(OnEventMetadata{EventStates: updatedStates}); err != nil {
+		if err := ctx.Metadata.Set(OnIncidentTimelineEventMetadata{EventStates: updatedStates}); err != nil {
 			return http.StatusInternalServerError, fmt.Errorf("error updating metadata: %v", err)
 		}
 	}
@@ -332,19 +339,19 @@ func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
 
-func (t *OnEvent) Cleanup(ctx core.TriggerContext) error {
+func (t *OnIncidentTimelineEvent) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
 
-// loadOnEventMetadata pulls persisted state for deduping repeated webhook deliveries.
-func loadOnEventMetadata(ctx core.MetadataContext) OnEventMetadata {
+// loadOnIncidentTimelineEventMetadata pulls persisted state for deduping repeated webhook deliveries.
+func loadOnIncidentTimelineEventMetadata(ctx core.MetadataContext) OnIncidentTimelineEventMetadata {
 	if ctx == nil {
-		return OnEventMetadata{EventStates: map[string]string{}}
+		return OnIncidentTimelineEventMetadata{EventStates: map[string]string{}}
 	}
 
-	metadata := OnEventMetadata{}
+	metadata := OnIncidentTimelineEventMetadata{}
 	if err := mapstructure.Decode(ctx.Get(), &metadata); err != nil || metadata.EventStates == nil {
-		return OnEventMetadata{EventStates: map[string]string{}}
+		return OnIncidentTimelineEventMetadata{EventStates: map[string]string{}}
 	}
 
 	return metadata
@@ -365,8 +372,8 @@ func extractEventFromData(data map[string]any) map[string]any {
 	return nil
 }
 
-// buildIncidentEventPayload keeps the Rootly event shape and augments with incident context.
-func buildIncidentEventPayload(incident map[string]any, incidentEvent map[string]any, webhookEvent WebhookEvent) map[string]any {
+// buildIncidentTimelineEventPayload keeps the Rootly event shape and augments with incident context.
+func buildIncidentTimelineEventPayload(incident map[string]any, incidentEvent map[string]any, webhookEvent WebhookEvent) map[string]any {
 	incidentPayload := buildIncidentSummaryPayload(incident, incidentEvent)
 	payload := map[string]any{
 		"id":          extractString(incidentEvent, "id"),
@@ -495,7 +502,7 @@ func isIncidentEventPayload(data map[string]any) bool {
 }
 
 // matchesIncidentFilters applies incident-level filters from fetched incident details.
-func matchesIncidentFilters(incident map[string]any, config OnEventConfiguration) bool {
+func matchesIncidentFilters(incident map[string]any, config OnIncidentTimelineEventConfiguration) bool {
 	if len(config.IncidentStatus) > 0 {
 		status := extractString(incident, "status", "state")
 		if !matchesEventFilter(config.IncidentStatus, status) {
