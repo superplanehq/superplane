@@ -3,6 +3,7 @@ package daytona
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -10,7 +11,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const ExecuteCodePayloadType = "daytona.execute.response"
+const (
+	ExecuteCodePayloadType  = "daytona.execute.response"
+	ExecuteCodePollInterval = 5 * time.Second
+)
 
 type ExecuteCode struct{}
 
@@ -19,6 +23,14 @@ type ExecuteCodeSpec struct {
 	Code      string `json:"code"`
 	Language  string `json:"language"`
 	Timeout   int    `json:"timeout,omitempty"`
+}
+
+type ExecuteCodeMetadata struct {
+	SandboxID string `json:"sandboxId" mapstructure:"sandboxId"`
+	SessionID string `json:"sessionId" mapstructure:"sessionId"`
+	CmdID     string `json:"cmdId" mapstructure:"cmdId"`
+	StartedAt int64  `json:"startedAt" mapstructure:"startedAt"`
+	Timeout   int    `json:"timeout" mapstructure:"timeout"`
 }
 
 func (e *ExecuteCode) Name() string {
@@ -162,22 +174,46 @@ func (e *ExecuteCode) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %v", err)
 	}
 
-	req := &ExecuteCodeRequest{
-		Code:     spec.Code,
-		Language: spec.Language,
-		Timeout:  spec.Timeout,
+	var command string
+	switch spec.Language {
+	case "python":
+		command = fmt.Sprintf("python3 -c %q", spec.Code)
+	case "javascript":
+		command = fmt.Sprintf("node -e %q", spec.Code)
+	case "typescript":
+		command = fmt.Sprintf("npx ts-node -e %q", spec.Code)
+	default:
+		command = fmt.Sprintf("python3 -c %q", spec.Code)
 	}
 
-	response, err := client.ExecuteCode(spec.SandboxID, req)
+	sessionID := uuid.New().String()
+	if err := client.CreateSession(spec.SandboxID, sessionID); err != nil {
+		return fmt.Errorf("failed to create session: %v", err)
+	}
+
+	response, err := client.ExecuteSessionCommand(spec.SandboxID, sessionID, command)
 	if err != nil {
 		return fmt.Errorf("failed to execute code: %v", err)
 	}
 
-	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
-		ExecuteCodePayloadType,
-		[]any{response},
-	)
+	timeout := spec.Timeout
+	if timeout == 0 {
+		timeout = 30
+	}
+
+	metadata := ExecuteCodeMetadata{
+		SandboxID: spec.SandboxID,
+		SessionID: sessionID,
+		CmdID:     response.CmdID,
+		StartedAt: time.Now().Unix(),
+		Timeout:   timeout,
+	}
+
+	if err := ctx.Metadata.Set(metadata); err != nil {
+		return err
+	}
+
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, ExecuteCodePollInterval)
 }
 
 func (e *ExecuteCode) Cancel(ctx core.ExecutionContext) error {
@@ -189,11 +225,62 @@ func (e *ExecuteCode) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 }
 
 func (e *ExecuteCode) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{Name: "poll", UserAccessible: false},
+	}
 }
 
 func (e *ExecuteCode) HandleAction(ctx core.ActionContext) error {
-	return nil
+	if ctx.Name == "poll" {
+		return e.poll(ctx)
+	}
+	return fmt.Errorf("unknown action: %s", ctx.Name)
+}
+
+func (e *ExecuteCode) poll(ctx core.ActionContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	var metadata ExecuteCodeMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %v", err)
+	}
+
+	if time.Now().Unix()-metadata.StartedAt > int64(metadata.Timeout) {
+		return fmt.Errorf("code execution timed out after %d seconds", metadata.Timeout)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	session, err := client.GetSession(metadata.SandboxID, metadata.SessionID)
+	if err != nil {
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, ExecuteCodePollInterval)
+	}
+
+	cmd := session.FindCommand(metadata.CmdID)
+	if cmd == nil || cmd.ExitCode == nil {
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, ExecuteCodePollInterval)
+	}
+
+	logs, err := client.GetSessionCommandLogs(metadata.SandboxID, metadata.SessionID, metadata.CmdID)
+	if err != nil {
+		logs = ""
+	}
+
+	result := &ExecuteCodeResponse{
+		ExitCode: *cmd.ExitCode,
+		Result:   logs,
+	}
+
+	return ctx.ExecutionState.Emit(
+		core.DefaultOutputChannel.Name,
+		ExecuteCodePayloadType,
+		[]any{result},
+	)
 }
 
 func (e *ExecuteCode) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

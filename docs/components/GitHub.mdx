@@ -4,6 +4,8 @@ title: "GitHub"
 
 Manage and react to changes in your GitHub repositories
 
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
 ## Triggers
 
 <CardGrid>
@@ -18,11 +20,11 @@ Manage and react to changes in your GitHub repositories
   <LinkCard title="On Workflow Run" href="#on-workflow-run" description="Listen to workflow run events" />
 </CardGrid>
 
-import { CardGrid, LinkCard } from "@astrojs/starlight/components";
-
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Add Issue Assignee" href="#add-issue-assignee" description="Add assignees to a GitHub issue" />
+  <LinkCard title="Add Issue Label" href="#add-issue-label" description="Add labels to a GitHub issue" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitHub repository" />
   <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a GitHub issue or pull request" />
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
@@ -30,7 +32,10 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
+  <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Retrieve billable GitHub Actions usage (minutes) for the organization" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
+  <LinkCard title="Remove Issue Assignee" href="#remove-issue-assignee" description="Remove assignees from a GitHub issue" />
+  <LinkCard title="Remove Issue Label" href="#remove-issue-label" description="Remove labels from a GitHub issue" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
   <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitHub repository" />
@@ -936,6 +941,97 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 }
 ```
 
+<a id="add-issue-assignee"></a>
+
+## Add Issue Assignee
+
+The Add Issue Assignee component adds one or more assignees to an existing GitHub issue without affecting existing assignees.
+
+### Use Cases
+
+- **Auto-assignment**: Automatically assign issues to team members based on workflow triggers
+- **Escalation**: Add additional assignees when issues require attention from specific people
+- **On-call routing**: Assign issues to the current on-call engineer
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the issue
+- **Issue Number**: The issue number to add assignees to (supports expressions)
+- **Assignees**: List of GitHub usernames to assign to the issue
+
+### Output
+
+Returns the updated issue object with all current information.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "id": 1,
+        "login": "octocat"
+      }
+    ],
+    "html_url": "https://github.com/acme/widgets/issues/42",
+    "id": 101,
+    "number": 42,
+    "state": "open",
+    "title": "Fix flaky build"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issue"
+}
+```
+
+<a id="add-issue-label"></a>
+
+## Add Issue Label
+
+The Add Issue Label component adds one or more labels to an existing GitHub issue without affecting existing labels.
+
+### Use Cases
+
+- **Triage automation**: Automatically label issues based on content or source
+- **Status tracking**: Add status labels as issues move through workflows
+- **Priority tagging**: Apply priority labels based on external signals
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the issue
+- **Issue Number**: The issue number to add labels to (supports expressions)
+- **Labels**: List of label names to add to the issue
+
+### Output
+
+Returns the full list of labels currently on the issue after the addition.
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "color": "d73a4a",
+      "default": true,
+      "description": "Something isn't working",
+      "id": 208045946,
+      "name": "bug"
+    },
+    {
+      "color": "a2eeef",
+      "default": true,
+      "description": "New feature or request",
+      "id": 208045947,
+      "name": "enhancement"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.labels"
+}
+```
+
 <a id="create-issue"></a>
 
 ## Create Issue
@@ -1281,6 +1377,88 @@ Returns release information including:
 }
 ```
 
+<a id="get-workflow-usage"></a>
+
+## Get Workflow Usage
+
+The Get Workflow Usage component retrieves billable GitHub Actions usage (minutes) for the installation's organization.
+
+### Prerequisites
+
+This action calls GitHub's **billing usage** API, which requires the GitHub App to have **Organization permission: Organization administration (read)**. 
+
+**Important**: Existing installations will need to approve the new permission when prompted by GitHub. Until the permission is granted, this action will return a 403 error.
+
+**Note**: This component uses GitHub's enhanced billing usage report API, which provides detailed usage information.
+
+### Behavior
+
+- Returns billing data for the **current billing cycle** 
+- Only private repositories on GitHub-hosted runners accrue billable minutes
+- Public repositories and self-hosted runners show zero billable usage
+- Can filter by specific repositories when selected
+- Uses enhanced billing platform API for accurate reporting
+
+### Configuration
+
+- **Repositories** (optional, multiselect): Select one or more specific repositories to track. These will be included in the output for reference (max 5) and stored in node metadata with full repository details (ID, name, URL). When repositories are selected, only usage for those repositories is included in the totals.
+
+### Output
+
+Returns usage data with:
+- `minutes_used`: Total billable minutes used in the current billing cycle
+- `minutes_used_breakdown`: Map of minutes by runner SKU (e.g., "Actions Linux": 120, "Actions Windows": 60, "Actions macOS": 30)
+- `included_minutes`: Always 0 (not provided by enhanced billing API)
+- `total_paid_minutes_used`: Estimated paid minutes based on cost data
+- `repositories`: List of selected repositories for tracking (max 5)
+
+**Note**: Breakdown is by runner SKU (OS and type), not by individual workflow.
+
+### Node Metadata
+
+The component stores repository information in node metadata:
+- Repository ID, name, and URL for each selected repository (max 5)
+- This metadata is displayed in the workflow canvas for easy reference
+
+### Use Cases
+
+- **Billing Monitoring**: Track GitHub Actions usage for billing purposes
+- **Quota Management**: Monitor usage to avoid exceeding billing quotas
+- **Cost Control**: Alert when usage approaches limits or budget thresholds
+- **Usage Reporting**: Generate monthly or periodic usage reports for compliance
+- **Resource Planning**: Analyze runner usage patterns by OS type
+
+### References
+
+- [GitHub Billing Usage API](https://docs.github.com/rest/billing/usage)
+- [GitHub Enhanced Billing Platform](https://docs.github.com/billing/using-the-new-billing-platform)
+- [Permissions required for GitHub Apps - Organization Administration](https://docs.github.com/en/rest/overview/permissions-required-for-github-apps#organization-permissions-for-administration)
+- [Viewing your usage of metered products](https://docs.github.com/en/billing/managing-billing-for-github-actions/viewing-your-github-actions-usage)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "included_minutes": 0,
+    "minutes_used": 1840.5,
+    "minutes_used_breakdown": {
+      "Actions Linux": 1200,
+      "Actions Windows": 400.5,
+      "Actions macOS": 240
+    },
+    "repositories": [
+      "repo1",
+      "repo2",
+      "repo3"
+    ],
+    "total_paid_minutes_used": 150
+  },
+  "timestamp": "2026-02-17T20:00:00Z",
+  "type": "github.workflowUsage"
+}
+```
+
 <a id="publish-commit-status"></a>
 
 ## Publish Commit Status
@@ -1321,6 +1499,85 @@ Returns the created status object with all status information.
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.commitStatus"
+}
+```
+
+<a id="remove-issue-assignee"></a>
+
+## Remove Issue Assignee
+
+The Remove Issue Assignee component removes one or more assignees from an existing GitHub issue without affecting other assignees.
+
+### Use Cases
+
+- **De-escalation**: Remove assignees when issues are resolved or transferred
+- **Rotation**: Remove previous on-call assignees when rotating responsibilities
+- **Cleanup**: Remove assignees who are no longer involved with an issue
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the issue
+- **Issue Number**: The issue number to remove assignees from (supports expressions)
+- **Assignees**: List of GitHub usernames to remove from the issue
+
+### Output
+
+Returns the updated issue object with all current information.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [],
+    "html_url": "https://github.com/acme/widgets/issues/42",
+    "id": 101,
+    "number": 42,
+    "state": "open",
+    "title": "Fix flaky build"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issue"
+}
+```
+
+<a id="remove-issue-label"></a>
+
+## Remove Issue Label
+
+The Remove Issue Label component removes one or more labels from an existing GitHub issue without affecting other labels.
+
+### Use Cases
+
+- **Triage cleanup**: Remove temporary triage labels after processing
+- **Status transitions**: Remove old status labels when issues move forward
+- **Automated cleanup**: Strip labels that no longer apply based on workflow events
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the issue
+- **Issue Number**: The issue number to remove labels from (supports expressions)
+- **Labels**: List of label names to remove from the issue
+
+### Output
+
+Returns the remaining list of labels on the issue after the removal.
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "color": "a2eeef",
+      "default": true,
+      "description": "New feature or request",
+      "id": 208045947,
+      "name": "enhancement"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.labels"
 }
 ```
 

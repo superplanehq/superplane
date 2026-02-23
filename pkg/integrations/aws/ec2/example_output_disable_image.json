@@ -1,0 +1,10 @@
+{
+  "data": {
+    "requestId": "req-disable",
+    "imageId": "ami-07f0e4f3e9c123abc",
+    "region": "us-east-1",
+    "disabled": true
+  },
+  "timestamp": "2026-02-19T09:30:00Z",
+  "type": "aws.ec2.image.disabled"
+}
