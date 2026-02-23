@@ -24,16 +24,18 @@ import (
 )
 
 type NodeRequestWorker struct {
-	semaphore *semaphore.Weighted
-	registry  *registry.Registry
-	encryptor crypto.Encryptor
+	semaphore      *semaphore.Weighted
+	registry       *registry.Registry
+	encryptor      crypto.Encryptor
+	webhookBaseURL string
 }
 
-func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry) *NodeRequestWorker {
+func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, webhookBaseURL string) *NodeRequestWorker {
 	return &NodeRequestWorker{
-		encryptor: encryptor,
-		registry:  registry,
-		semaphore: semaphore.NewWeighted(25),
+		encryptor:      encryptor,
+		registry:       registry,
+		webhookBaseURL: webhookBaseURL,
+		semaphore:      semaphore.NewWeighted(25),
 	}
 }
 
@@ -156,6 +158,10 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Events:        contexts.NewEventContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
+	}
+
+	if node.WebhookID != nil {
+		actionCtx.Webhook = contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL)
 	}
 
 	if node.AppInstallationID != nil {
