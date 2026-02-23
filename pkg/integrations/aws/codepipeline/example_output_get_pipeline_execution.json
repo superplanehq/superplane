@@ -1,0 +1,26 @@
+{
+  "data": {
+    "pipelineExecutionId": "a1b2c3d4-5678-90ab-cdef-111122223333",
+    "pipelineName": "my-deploy-pipeline",
+    "pipelineVersion": 3,
+    "status": "Succeeded",
+    "statusSummary": "Pipeline completed successfully",
+    "artifactRevisions": [
+      {
+        "name": "SourceArtifact",
+        "revisionId": "abc123def456789",
+        "revisionChangeIdentifier": "abc123def456789",
+        "revisionSummary": "Merge pull request #42 from feature/add-auth",
+        "revisionUrl": "https://github.com/example/repo/commit/abc123def456789"
+      }
+    ],
+    "trigger": {
+      "triggerType": "StartPipelineExecution",
+      "triggerDetail": "arn:aws:iam::123456789012:user/developer"
+    },
+    "executionMode": "SUPERSEDED",
+    "executionType": "STANDARD"
+  },
+  "timestamp": "2026-02-23T10:00:00.000000000Z",
+  "type": "aws.codepipeline.pipeline.execution"
+}

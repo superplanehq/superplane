@@ -27,6 +27,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CodeArtifact • Dispose Package Versions" href="#code-artifact-•-dispose-package-versions" description="Delete assets and set package version status to Disposed (record remains)" />
   <LinkCard title="CodeArtifact • Get Package Version" href="#code-artifact-•-get-package-version" description="Describe an AWS CodeArtifact package version" />
   <LinkCard title="CodeArtifact • Update Package Versions Status" href="#code-artifact-•-update-package-versions-status" description="Update the status of one or more package versions (Archived, Published, Unlisted)" />
+  <LinkCard title="CodePipeline • Get Pipeline" href="#code-pipeline-•-get-pipeline" description="Retrieve the definition of an AWS CodePipeline pipeline" />
+  <LinkCard title="CodePipeline • Get Pipeline Execution" href="#code-pipeline-•-get-pipeline-execution" description="Retrieve the status and details of an AWS CodePipeline execution" />
   <LinkCard title="CodePipeline • Run Pipeline" href="#code-pipeline-•-run-pipeline" description="Start an AWS CodePipeline execution and wait for it to complete" />
   <LinkCard title="EC2 • Copy Image" href="#ec2-•-copy-image" description="Copy an EC2 AMI image to another region" />
   <LinkCard title="EC2 • Create Image" href="#ec2-•-create-image" description="Create a new AMI image from an EC2 instance" />
@@ -611,6 +613,140 @@ The Update Package Versions Status component sets the status of package versions
       "status": "Archived"
     }
   }
+}
+```
+
+<a id="code-pipeline-•-get-pipeline"></a>
+
+## CodePipeline • Get Pipeline
+
+The Get Pipeline component retrieves the full definition of an AWS CodePipeline pipeline.
+
+### Use Cases
+
+- **Pipeline inspection**: Fetch pipeline stages, actions, and configuration
+- **Workflow branching**: Route workflow based on pipeline structure or version
+- **Audit and compliance**: Retrieve pipeline definitions for auditing purposes
+
+### Configuration
+
+- **Region**: AWS region where the pipeline exists
+- **Pipeline**: Pipeline name to retrieve
+
+### Output
+
+Emits the full pipeline definition including:
+- Pipeline name, version, and role ARN
+- All stages and their actions
+- Pipeline metadata (ARN, creation date, last updated date)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "metadata": {
+      "created": "2025-01-15T10:30:00Z",
+      "pipelineArn": "arn:aws:codepipeline:us-east-1:123456789012:my-deploy-pipeline",
+      "updated": "2026-02-20T14:00:00Z"
+    },
+    "pipeline": {
+      "name": "my-deploy-pipeline",
+      "roleArn": "arn:aws:iam::123456789012:role/pipeline-role",
+      "stages": [
+        {
+          "actions": [
+            {
+              "actionTypeId": {
+                "category": "Source",
+                "owner": "AWS",
+                "provider": "CodeStarSourceConnection",
+                "version": "1"
+              },
+              "name": "SourceAction"
+            }
+          ],
+          "name": "Source"
+        },
+        {
+          "actions": [
+            {
+              "actionTypeId": {
+                "category": "Deploy",
+                "owner": "AWS",
+                "provider": "CodeDeploy",
+                "version": "1"
+              },
+              "name": "DeployAction"
+            }
+          ],
+          "name": "Deploy"
+        }
+      ],
+      "version": 3
+    }
+  },
+  "timestamp": "2026-02-22T10:00:00.000000000Z",
+  "type": "aws.codepipeline.pipeline"
+}
+```
+
+<a id="code-pipeline-•-get-pipeline-execution"></a>
+
+## CodePipeline • Get Pipeline Execution
+
+The Get Pipeline Execution component retrieves the details of a specific AWS CodePipeline execution.
+
+### Use Cases
+
+- **Execution inspection**: Fetch the status, trigger, and artifact revisions of a pipeline run
+- **Post-deploy checks**: After a RunPipeline component, fetch details of that execution for logging
+- **Workflow branching**: Route workflow based on execution status or trigger type
+- **Audit and compliance**: Retrieve execution details for auditing purposes
+
+### Configuration
+
+- **Region**: AWS region where the pipeline exists
+- **Pipeline**: Pipeline name
+- **Execution ID**: The ID of the specific execution to retrieve
+
+### Output
+
+Emits the full pipeline execution details including:
+- Execution ID, status, and status summary
+- Pipeline name and version
+- Trigger type and detail
+- Artifact revisions (source code revisions involved)
+- Execution mode and type
+
+### Example Output
+
+```json
+{
+  "data": {
+    "artifactRevisions": [
+      {
+        "name": "SourceArtifact",
+        "revisionChangeIdentifier": "abc123def456789",
+        "revisionId": "abc123def456789",
+        "revisionSummary": "Merge pull request #42 from feature/add-auth",
+        "revisionUrl": "https://github.com/example/repo/commit/abc123def456789"
+      }
+    ],
+    "executionMode": "SUPERSEDED",
+    "executionType": "STANDARD",
+    "pipelineExecutionId": "a1b2c3d4-5678-90ab-cdef-111122223333",
+    "pipelineName": "my-deploy-pipeline",
+    "pipelineVersion": 3,
+    "status": "Succeeded",
+    "statusSummary": "Pipeline completed successfully",
+    "trigger": {
+      "triggerDetail": "arn:aws:iam::123456789012:user/developer",
+      "triggerType": "StartPipelineExecution"
+    }
+  },
+  "timestamp": "2026-02-23T10:00:00.000000000Z",
+  "type": "aws.codepipeline.pipeline.execution"
 }
 ```
 
