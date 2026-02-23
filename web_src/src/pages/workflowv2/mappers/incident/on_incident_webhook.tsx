@@ -1,11 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  canvasesDescribeCanvas,
-  canvasesInvokeNodeTriggerAction,
-  canvasesUpdateCanvas,
-} from "@/api-client";
+import { canvasesDescribeCanvas, canvasesInvokeNodeTriggerAction, canvasesUpdateCanvas } from "@/api-client";
 import type { CanvasesCanvas } from "@/api-client";
 import { CustomFieldRenderer, NodeInfo } from "../types";
 import { Icon } from "@/components/Icon";
@@ -55,10 +51,11 @@ const CopyWebhookUrlButton: React.FC<{ webhookUrl: string }> = ({ webhookUrl }) 
 function applySigningSecretConfigured(
   canvas: CanvasesCanvas,
   nodeId: string,
+  configured: boolean,
 ): CanvasesCanvas | null {
   if (!canvas?.spec?.nodes) return null;
   const updatedNodes = canvas.spec.nodes.map((n) =>
-    n.id === nodeId ? { ...n, configuration: { ...n.configuration, signingSecretConfigured: true } } : n,
+    n.id === nodeId ? { ...n, configuration: { ...n.configuration, signingSecretConfigured: configured } } : n,
   );
   return { ...canvas, spec: { ...canvas.spec, nodes: updatedNodes } };
 }
@@ -71,25 +68,24 @@ const SetSigningSecretSection: React.FC<{ nodeId: string }> = ({ nodeId }) => {
   const { organizationId, canvasId } = useParams<{ organizationId: string; canvasId: string }>();
 
   const handleSetSecretAndSave = async () => {
-    if (!canvasId || !organizationId || !secret.trim()) return;
+    if (!canvasId || !organizationId) return;
     setIsSubmitting(true);
     setSuccess(false);
     try {
-      await canvasesInvokeNodeTriggerAction(
+      const invokeResponse = await canvasesInvokeNodeTriggerAction(
         withOrganizationHeader({
           path: { canvasId, nodeId, actionName: "setSecret" },
           body: { parameters: { webhookSigningSecret: secret } },
         }),
       );
+      const configured = (invokeResponse.data?.result?.signingSecretConfigured as boolean) ?? false;
 
       // Refetch the canvas from the server so we save from the latest state instead of
       // the query cache, avoiding overwriting concurrent edits from other tabs or users.
       const freshCanvas = await queryClient.fetchQuery({
         queryKey: canvasKeys.detail(organizationId, canvasId),
         queryFn: async () => {
-          const response = await canvasesDescribeCanvas(
-            withOrganizationHeader({ path: { id: canvasId } }),
-          );
+          const response = await canvasesDescribeCanvas(withOrganizationHeader({ path: { id: canvasId } }));
           return response.data?.canvas;
         },
       });
@@ -99,7 +95,7 @@ const SetSigningSecretSection: React.FC<{ nodeId: string }> = ({ nodeId }) => {
         return;
       }
 
-      const updatedCanvas = applySigningSecretConfigured(freshCanvas, nodeId);
+      const updatedCanvas = applySigningSecretConfigured(freshCanvas, nodeId, configured);
       if (updatedCanvas) {
         await canvasesUpdateCanvas(
           withOrganizationHeader({
@@ -112,13 +108,12 @@ const SetSigningSecretSection: React.FC<{ nodeId: string }> = ({ nodeId }) => {
             },
           }),
         );
-        queryClient.setQueryData(
-          canvasKeys.detail(organizationId, canvasId),
-          updatedCanvas,
-        );
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedCanvas);
         setSuccess(true);
         setSecret("");
-        showSuccessToast("Signing secret set and canvas saved");
+        showSuccessToast(
+          configured ? "Signing secret set and canvas saved" : "Signing secret cleared and canvas saved",
+        );
       }
     } catch (_err) {
       showErrorToast("Failed to set signing secret or save canvas");
@@ -146,7 +141,7 @@ const SetSigningSecretSection: React.FC<{ nodeId: string }> = ({ nodeId }) => {
           type="button"
           size="default"
           onClick={handleSetSecretAndSave}
-          disabled={isSubmitting || !secret.trim()}
+          disabled={isSubmitting}
           className="shrink-0 inline-flex items-center gap-2"
         >
           {isSubmitting ? (
@@ -154,8 +149,10 @@ const SetSigningSecretSection: React.FC<{ nodeId: string }> = ({ nodeId }) => {
               <Icon name="loader" size="sm" className="animate-spin" />
               Saving...
             </>
-          ) : (
+          ) : secret.trim() ? (
             "Set signing secret"
+          ) : (
+            "Clear signing secret"
           )}
         </Button>
       </div>
