@@ -21,8 +21,8 @@ const (
 type OnIncident struct{}
 
 type OnIncidentConfiguration struct {
-	Events                   []string `json:"events" mapstructure:"events"`
-	SigningSecretConfigured  bool     `json:"signingSecretConfigured" mapstructure:"signingSecretConfigured"` // Set by UI after setSecret; not used for verification
+	Events                  []string `json:"events" mapstructure:"events"`
+	SigningSecretConfigured bool     `json:"signingSecretConfigured" mapstructure:"signingSecretConfigured"` // Set by UI after setSecret; not used for verification
 }
 
 // OnIncidentMetadata is stored after Setup and includes the webhook URL and signing-secret status for the UI.
@@ -128,7 +128,7 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 	// Store webhook URL and signing-secret status in metadata. SigningSecretConfigured is set by the setSecret action.
 	if ctx.Metadata != nil {
 		metadata := OnIncidentMetadata{
-			WebhookURL:             webhookURL,
+			WebhookURL:              webhookURL,
 			SigningSecretConfigured: false,
 		}
 		if err := ctx.Metadata.Set(metadata); err != nil {
@@ -147,13 +147,13 @@ func (t *OnIncident) Actions() []core.Action {
 			UserAccessible: true,
 			Parameters: []configuration.Field{
 				{
-					Name:         "webhookSigningSecret",
-					Label:        "Webhook signing secret",
-					Type:         configuration.FieldTypeString,
-					Required:     false,
-					Sensitive:    true,
-					Description:  "Paste the signing secret from your incident.io webhook endpoint (Settings → Webhooks). Leave empty to clear.",
-					Placeholder:  "whsec_...",
+					Name:        "webhookSigningSecret",
+					Label:       "Webhook signing secret",
+					Type:        configuration.FieldTypeString,
+					Required:    false,
+					Sensitive:   true,
+					Description: "Paste the signing secret from your incident.io webhook endpoint (Settings → Webhooks). Leave empty to clear.",
+					Placeholder: "whsec_...",
 				},
 			},
 		},
@@ -205,7 +205,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 
 	signingSecret := resolveSigningSecret(ctx)
 	if signingSecret == "" {
-	return http.StatusForbidden, fmt.Errorf("signing secret is required for webhook verification; use the Set signing secret action for this trigger")
+		return http.StatusForbidden, fmt.Errorf("signing secret is required for webhook verification; use the Set signing secret action for this trigger")
 	}
 
 	webhookID := ctx.Headers.Get("webhook-id")

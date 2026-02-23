@@ -56,9 +56,7 @@ function updateCanvasCacheWithConfigured(
   const canvas = queryClient.getQueryData(canvasKeys.detail(organizationId, canvasId)) as CanvasesCanvas | undefined;
   if (!canvas?.spec?.nodes) return null;
   const updatedNodes = canvas.spec.nodes.map((n) =>
-    n.id === nodeId
-      ? { ...n, configuration: { ...n.configuration, signingSecretConfigured: true } }
-      : n,
+    n.id === nodeId ? { ...n, configuration: { ...n.configuration, signingSecretConfigured: true } } : n,
   );
   const updated = { ...canvas, spec: { ...canvas.spec, nodes: updatedNodes } };
   queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updated);
@@ -184,11 +182,10 @@ export const onIncidentCustomFieldRenderer: CustomFieldRenderer = {
               {webhookUrl}
             </pre>
             <p className="text-gray-600 dark:text-gray-400">
-              In incident.io go to <strong>Settings → Webhooks</strong>, create an endpoint with this URL, and
-              subscribe to <strong>Public incident created (v2)</strong> and{" "}
-              <strong>Public incident updated (v2)</strong>. Then use <strong>Set signing secret</strong> below to
-              store the signing secret from your incident.io webhook endpoint (it will not be stored in the workflow
-              configuration).
+              In incident.io go to <strong>Settings → Webhooks</strong>, create an endpoint with this URL, and subscribe
+              to <strong>Public incident created (v2)</strong> and <strong>Public incident updated (v2)</strong>. Then
+              use <strong>Set signing secret</strong> below to store the signing secret from your incident.io webhook
+              endpoint (it will not be stored in the workflow configuration).
             </p>
           </div>
           <SetSigningSecretSection nodeId={node.id} />
@@ -197,8 +194,9 @@ export const onIncidentCustomFieldRenderer: CustomFieldRenderer = {
               This trigger is not operational until the webhook is set up.
             </p>
             <p className="text-xs text-amber-700 dark:text-amber-300">
-              Save the canvas to generate the webhook URL, add it in incident.io, then use <strong>Set signing
-              secret</strong> above with the signing secret from the endpoint. Until then, no events will be received.
+              Save the canvas to generate the webhook URL, add it in incident.io, then use{" "}
+              <strong>Set signing secret</strong> above with the signing secret from the endpoint. Until then, no events
+              will be received.
             </p>
           </div>
         </div>
