@@ -123,7 +123,7 @@ const SetSigningSecretSection: React.FC<{ nodeId: string }> = ({ nodeId }) => {
         />
         <Button
           type="button"
-          size="sm"
+          size="default"
           onClick={handleSetSecretAndSave}
           disabled={isSubmitting || !secret.trim()}
           className="shrink-0 inline-flex items-center gap-2"
