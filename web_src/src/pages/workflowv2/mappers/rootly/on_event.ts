@@ -3,11 +3,19 @@ import { formatTimeAgo } from "@/utils/date";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
-import { Incident, IncidentEvent } from "./types";
-import { getDetailsForIncident } from "./base";
+import { IncidentEvent } from "./types";
+
+interface IncidentSummary {
+  id?: string;
+  title?: string;
+  status?: string;
+  severity?: string;
+  services?: string[];
+  teams?: string[];
+}
 
 interface OnEventEventData extends IncidentEvent {
-  incident?: Incident;
+  incident?: IncidentSummary;
   event_type?: string;
 }
 
@@ -41,7 +49,6 @@ export const onEventTriggerRenderer: TriggerRenderer = {
       service?: string[];
       team?: string[];
       eventSource?: string[];
-      eventKind?: string[];
       visibility?: string;
     };
     const metadataItems = [];
@@ -81,13 +88,6 @@ export const onEventTriggerRenderer: TriggerRenderer = {
       });
     }
 
-    if (configuration?.eventKind?.length) {
-      metadataItems.push({
-        icon: "tag",
-        label: `Kind: ${configuration.eventKind.join(", ")}`,
-      });
-    }
-
     if (configuration?.visibility) {
       metadataItems.push({
         icon: "eye",
@@ -106,9 +106,7 @@ export const onEventTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnEventEventData;
       const incident = eventData?.incident;
       const title = eventData?.event || incident?.title || "Incident event";
-      const contentParts = [eventData?.kind, incident?.title, incident?.severity, incident?.status]
-        .filter(Boolean)
-        .join(" · ");
+      const contentParts = [eventData?.kind, incident?.severity, incident?.status].filter(Boolean).join(" · ");
       const subtitle = buildSubtitle(contentParts, lastEvent.createdAt);
 
       props.lastEventData = {
@@ -173,7 +171,35 @@ function getDetailsForIncidentEventPayload(eventData?: OnEventEventData): Record
   }
 
   if (eventData.incident) {
-    Object.assign(details, getDetailsForIncident(eventData.incident));
+    Object.assign(details, getDetailsForIncidentSummary(eventData.incident));
+  }
+
+  return details;
+}
+
+function getDetailsForIncidentSummary(incident: IncidentSummary): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  details.ID = incident.id || "-";
+
+  if (incident.title) {
+    details.Title = incident.title;
+  }
+
+  if (incident.status) {
+    details.Status = incident.status;
+  }
+
+  if (incident.severity) {
+    details.Severity = incident.severity;
+  }
+
+  if (incident.services?.length) {
+    details.Services = incident.services.join(", ");
+  }
+
+  if (incident.teams?.length) {
+    details.Teams = incident.teams.join(", ");
   }
 
   return details;

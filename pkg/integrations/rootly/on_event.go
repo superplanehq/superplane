@@ -27,7 +27,6 @@ type OnEventConfiguration struct {
 	Service        []string `json:"service" mapstructure:"service"`
 	Team           []string `json:"team" mapstructure:"team"`
 	EventSource    []string `json:"eventSource" mapstructure:"eventSource"`
-	EventKind      []string `json:"eventKind" mapstructure:"eventKind"`
 	Visibility     string   `json:"visibility" mapstructure:"visibility"`
 }
 
@@ -64,7 +63,6 @@ func (t *OnEvent) Documentation() string {
 - **Service**: Optional filter by service name
 - **Team**: Optional filter by team name
 - **Event Source**: Optional filter by event source (web, api, system)
-- **Event Kind**: Optional filter by event kind (note, annotation, event, trail)
 - **Visibility**: Optional filter by event visibility (internal or external)
 
 ## Event Data
@@ -72,11 +70,17 @@ func (t *OnEvent) Documentation() string {
 Each incident event includes:
 - **id**: Event ID
 - **event**: Event content
+- **event_raw**: Raw event content
+- **event_id**: Webhook event ID
 - **event_type**: Event type (incident_event.created or incident_event.updated)
 - **kind**: Event kind
 - **source**: Event source
+- **visibility**: Event visibility
 - **occurred_at**: When the event occurred
 - **created_at**: When the event was created
+- **updated_at**: When the event was last updated
+- **issued_at**: When the webhook was issued
+- **incident_id**: Incident ID
 - **incident**: Incident information
 
 ## Webhook Setup
@@ -99,6 +103,7 @@ func (t *OnEvent) Configuration() []configuration.Field {
 			Label:       "Incident Status",
 			Type:        configuration.FieldTypeMultiSelect,
 			Required:    false,
+			Togglable:   true,
 			Description: "Only emit events for incidents with this status",
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
@@ -120,6 +125,7 @@ func (t *OnEvent) Configuration() []configuration.Field {
 			Label:       "Severity",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
+			Togglable:   true,
 			Description: "Only emit events for incidents with this severity",
 			Placeholder: "Select a severity",
 			TypeOptions: &configuration.TypeOptions{
@@ -135,6 +141,7 @@ func (t *OnEvent) Configuration() []configuration.Field {
 			Label:       "Service",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
+			Togglable:   true,
 			Description: "Only emit events for incidents impacting this service",
 			Placeholder: "Select a service",
 			TypeOptions: &configuration.TypeOptions{
@@ -150,6 +157,7 @@ func (t *OnEvent) Configuration() []configuration.Field {
 			Label:       "Team",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
+			Togglable:   true,
 			Description: "Only emit events for incidents owned by this team",
 			Placeholder: "Select a team",
 			TypeOptions: &configuration.TypeOptions{
@@ -165,6 +173,7 @@ func (t *OnEvent) Configuration() []configuration.Field {
 			Label:       "Event Source",
 			Type:        configuration.FieldTypeMultiSelect,
 			Required:    false,
+			Togglable:   true,
 			Description: "Only emit events from these sources",
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
@@ -177,27 +186,11 @@ func (t *OnEvent) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "eventKind",
-			Label:       "Event Kind",
-			Type:        configuration.FieldTypeMultiSelect,
-			Required:    false,
-			Description: "Only emit events with these kinds",
-			TypeOptions: &configuration.TypeOptions{
-				MultiSelect: &configuration.MultiSelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Note", Value: "note"},
-						{Label: "Annotation", Value: "annotation"},
-						{Label: "Event", Value: "event"},
-						{Label: "Trail", Value: "trail"},
-					},
-				},
-			},
-		},
-		{
-			Name:     "visibility",
-			Label:    "Visibility",
-			Type:     configuration.FieldTypeSelect,
-			Required: false,
+			Name:      "visibility",
+			Label:     "Visibility",
+			Type:      configuration.FieldTypeSelect,
+			Required:  false,
+			Togglable: true,
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -265,24 +258,16 @@ func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusOK, nil
 	}
 
-	if !matchesEventFilter(config.EventKind, extractString(incidentEvent, "kind")) {
-		return http.StatusOK, nil
-	}
-
 	if config.Visibility != "" && !strings.EqualFold(config.Visibility, extractString(incidentEvent, "visibility")) {
 		return http.StatusOK, nil
 	}
 
-	// Incident filters require an API lookup since the webhook payload only includes incident_id.
+	incidentID := extractString(incidentEvent, "incident_id", "incidentId")
 	incidentFiltersEnabled := len(config.IncidentStatus) > 0 || len(config.Severity) > 0 || len(config.Service) > 0 || len(config.Team) > 0
 	var incidentDetails map[string]any
-	if incidentFiltersEnabled {
-		incidentID := extractString(incidentEvent, "incident_id", "incidentId")
-		if incidentID == "" {
-			return http.StatusOK, nil
-		}
-
-		// Fetch incident details to apply status/severity/service/team filters.
+	if incidentID != "" && ctx.HTTP != nil && ctx.Integration != nil {
+		// Fetch incident details to apply status/severity/service/team filters
+		// and enrich the emitted payload with incident context.
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err != nil {
 			return http.StatusInternalServerError, fmt.Errorf("error creating client: %v", err)
@@ -291,6 +276,16 @@ func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		incidentDetails, err = client.GetIncidentDetailed(incidentID)
 		if err != nil {
 			return http.StatusInternalServerError, fmt.Errorf("error fetching incident: %v", err)
+		}
+	}
+
+	if incidentFiltersEnabled {
+		if incidentID == "" {
+			return http.StatusOK, nil
+		}
+
+		if incidentDetails == nil {
+			return http.StatusInternalServerError, fmt.Errorf("incident details unavailable for filtering")
 		}
 
 		if !matchesIncidentFilters(incidentDetails, config) {
@@ -318,7 +313,7 @@ func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		}
 	}
 
-	payload := buildIncidentEventPayload(incidentEvent, webhook.Event.Type)
+	payload := buildIncidentEventPayload(incidentDetails, incidentEvent, webhook.Event)
 	if err := ctx.Events.Emit(rootlyIncidentEventPayloadType, payload); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}
@@ -341,6 +336,7 @@ func (t *OnEvent) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
 
+// loadOnEventMetadata pulls persisted state for deduping repeated webhook deliveries.
 func loadOnEventMetadata(ctx core.MetadataContext) OnEventMetadata {
 	if ctx == nil {
 		return OnEventMetadata{EventStates: map[string]string{}}
@@ -354,6 +350,7 @@ func loadOnEventMetadata(ctx core.MetadataContext) OnEventMetadata {
 	return metadata
 }
 
+// extractEventFromData normalizes either top-level or nested incident_event payloads.
 func extractEventFromData(data map[string]any) map[string]any {
 	if event, ok := data["incident_event"].(map[string]any); ok {
 		if isIncidentEventPayload(event) {
@@ -368,24 +365,65 @@ func extractEventFromData(data map[string]any) map[string]any {
 	return nil
 }
 
-// func buildIncidentEventPayload(incident map[string]any, incidentEvent map[string]any, eventType string) map[string]any {
-func buildIncidentEventPayload(incidentEvent map[string]any, eventType string) map[string]any {
-	// if incident == nil {
-	// 	if incidentID := extractString(incidentEvent, "incident_id", "incidentId"); incidentID != "" {
-	// 		incident = map[string]any{"id": incidentID}
-	// 	}
-	// }
-
+// buildIncidentEventPayload keeps the Rootly event shape and augments with incident context.
+func buildIncidentEventPayload(incident map[string]any, incidentEvent map[string]any, webhookEvent WebhookEvent) map[string]any {
+	incidentPayload := buildIncidentSummaryPayload(incident, incidentEvent)
 	payload := map[string]any{
 		"id":          extractString(incidentEvent, "id"),
 		"event":       extractString(incidentEvent, "event"),
-		"event_type":  eventType,
+		"event_raw":   extractString(incidentEvent, "event_raw"),
 		"kind":        extractString(incidentEvent, "kind"),
 		"source":      extractString(incidentEvent, "source"),
+		"visibility":  extractString(incidentEvent, "visibility"),
 		"occurred_at": extractString(incidentEvent, "occurred_at"),
 		"created_at":  extractString(incidentEvent, "created_at"),
-		"visibility":  extractString(incidentEvent, "visibility"),
-		// "incident":    incident,
+		"updated_at":  extractString(incidentEvent, "updated_at"),
+		"incident_id": extractString(incidentEvent, "incident_id", "incidentId"),
+		"event_id":    webhookEvent.ID,
+		"event_type":  webhookEvent.Type,
+		"issued_at":   webhookEvent.IssuedAt,
+		"incident":    incidentPayload,
+	}
+
+	return payload
+}
+
+// buildIncidentSummaryPayload emits a compact incident stub for filtering context.
+func buildIncidentSummaryPayload(incident map[string]any, incidentEvent map[string]any) map[string]any {
+	incidentID := ""
+	if incident != nil {
+		incidentID = extractString(incident, "id")
+	}
+	if incidentID == "" {
+		incidentID = extractString(incidentEvent, "incident_id", "incidentId")
+	}
+
+	if incidentID == "" && incident == nil {
+		return nil
+	}
+
+	payload := map[string]any{
+		"id": incidentID,
+	}
+
+	if incident == nil {
+		return payload
+	}
+
+	if title := extractString(incident, "title"); title != "" {
+		payload["title"] = title
+	}
+	if status := extractString(incident, "status", "state"); status != "" {
+		payload["status"] = status
+	}
+	if severity := severityString(incident["severity"]); severity != "" {
+		payload["severity"] = severity
+	}
+	if services := extractResourceNames(incident, "services"); len(services) > 0 {
+		payload["services"] = services
+	}
+	if teams := extractResourceNames(incident, "groups"); len(teams) > 0 {
+		payload["teams"] = teams
 	}
 
 	return payload
@@ -417,6 +455,7 @@ func matchesEventFilter(filters []string, value string) bool {
 	})
 }
 
+// eventFingerprint helps avoid double-processing when Rootly retries a webhook.
 func eventFingerprint(event map[string]any) string {
 	if value := extractString(event, "updated_at"); value != "" {
 		return value
@@ -438,6 +477,7 @@ func eventFingerprint(event map[string]any) string {
 	return string(raw)
 }
 
+// isIncidentEventPayload checks for expected incident event fields.
 func isIncidentEventPayload(data map[string]any) bool {
 	if data == nil {
 		return false
@@ -454,6 +494,7 @@ func isIncidentEventPayload(data map[string]any) bool {
 	return false
 }
 
+// matchesIncidentFilters applies incident-level filters from fetched incident details.
 func matchesIncidentFilters(incident map[string]any, config OnEventConfiguration) bool {
 	if len(config.IncidentStatus) > 0 {
 		status := extractString(incident, "status", "state")
@@ -489,6 +530,7 @@ func matchesIncidentFilters(incident map[string]any, config OnEventConfiguration
 	return true
 }
 
+// extractResourceNames pulls service/team names from varied response shapes.
 func extractResourceNames(incident map[string]any, key string) []string {
 	raw, ok := incident[key]
 	if !ok || raw == nil {

@@ -199,7 +199,12 @@ func Test__OnEvent__HandleWebhook(t *testing.T) {
 
 		payload := eventContext.Payloads[0].Data.(map[string]any)
 		assert.Equal(t, "another try", payload["event"])
+		assert.Equal(t, "another try", payload["event_raw"])
+		assert.Equal(t, "d390b7e6-2f80-4d71-92e3-5d19dc7f9c68", payload["event_id"])
 		assert.Equal(t, "incident_event.created", payload["event_type"])
+		assert.Equal(t, "2026-02-17T05:54:29.581-08:00", payload["issued_at"])
+		assert.Equal(t, "5dcbfe70-0416-469a-8629-be5353f4fd60", payload["incident_id"])
+		assert.Equal(t, "2026-02-17T05:54:29.522-08:00", payload["updated_at"])
 		incident := payload["incident"].(map[string]any)
 		assert.Equal(t, "5dcbfe70-0416-469a-8629-be5353f4fd60", incident["id"])
 	})
@@ -258,6 +263,14 @@ func Test__OnEvent__HandleWebhook(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, eventContext.Count())
 		require.Len(t, httpCtx.Requests, 1)
+
+		payload := eventContext.Payloads[0].Data.(map[string]any)
+		incident := payload["incident"].(map[string]any)
+		assert.Equal(t, "inc-200", incident["id"])
+		assert.Equal(t, "resolved", incident["status"])
+		assert.Equal(t, "sev2", incident["severity"])
+		assert.Equal(t, []string{"API"}, incident["services"])
+		assert.Equal(t, []string{"Platform"}, incident["teams"])
 	})
 }
 
