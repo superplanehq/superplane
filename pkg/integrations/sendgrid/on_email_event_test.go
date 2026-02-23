@@ -175,6 +175,11 @@ func (t *testNodeWebhookContext) GetSecret() ([]byte, error) {
 	return t.secret, nil
 }
 
+func (t *testNodeWebhookContext) SetSecret(secret []byte) error {
+	t.secret = secret
+	return nil
+}
+
 func (t *testNodeWebhookContext) ResetSecret() ([]byte, []byte, error) {
 	return nil, nil, nil
 }
