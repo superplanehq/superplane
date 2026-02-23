@@ -201,6 +201,82 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 	})
 }
 
+func Test__OnIncident__HandleAction__SetSecret(t *testing.T) {
+	trigger := &OnIncident{}
+
+	t.Run("setSecret stores secret and updates metadata", func(t *testing.T) {
+		webhookCtx := &setupFirstWebhookContext{}
+		webhookCtx.setupCalled = true
+		metadataCtx := &contexts.MetadataContext{}
+		metadataCtx.Metadata = OnIncidentMetadata{WebhookURL: "https://example.com/webhook"}
+
+		result, err := trigger.HandleAction(core.TriggerActionContext{
+			Name:       "setSecret",
+			Parameters: map[string]any{"webhookSigningSecret": "whsec_abc123"},
+			Webhook:    webhookCtx,
+			Metadata:   metadataCtx,
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, true, result["ok"])
+		assert.Equal(t, true, result["signingSecretConfigured"])
+		assert.Equal(t, "whsec_abc123", string(webhookCtx.secret))
+
+		metadata, ok := metadataCtx.Metadata.(OnIncidentMetadata)
+		require.True(t, ok)
+		assert.True(t, metadata.SigningSecretConfigured)
+		assert.Equal(t, "https://example.com/webhook", metadata.WebhookURL)
+	})
+
+	t.Run("setSecret with empty string clears secret", func(t *testing.T) {
+		webhookCtx := &setupFirstWebhookContext{}
+		webhookCtx.setupCalled = true
+		webhookCtx.secret = []byte("existing")
+		metadataCtx := &contexts.MetadataContext{}
+		metadataCtx.Metadata = OnIncidentMetadata{WebhookURL: "https://example.com/webhook", SigningSecretConfigured: true}
+
+		result, err := trigger.HandleAction(core.TriggerActionContext{
+			Name:       "setSecret",
+			Parameters: map[string]any{"webhookSigningSecret": ""},
+			Webhook:    webhookCtx,
+			Metadata:   metadataCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, true, result["ok"])
+		assert.Equal(t, false, result["signingSecretConfigured"])
+		assert.Equal(t, []byte{}, webhookCtx.secret)
+
+		metadata, ok := metadataCtx.Metadata.(OnIncidentMetadata)
+		require.True(t, ok)
+		assert.False(t, metadata.SigningSecretConfigured)
+	})
+
+	t.Run("setSecret without webhook returns error", func(t *testing.T) {
+		result, err := trigger.HandleAction(core.TriggerActionContext{
+			Name:       "setSecret",
+			Parameters: map[string]any{"webhookSigningSecret": "whsec_xyz"},
+			Webhook:    nil,
+		})
+
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		assert.ErrorContains(t, err, "webhook is not available")
+	})
+
+	t.Run("unsupported action returns error", func(t *testing.T) {
+		result, err := trigger.HandleAction(core.TriggerActionContext{
+			Name:    "unknownAction",
+			Webhook: &setupFirstWebhookContext{setupCalled: true},
+		})
+
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		assert.ErrorContains(t, err, "not supported")
+	})
+}
+
 func Test__OnIncident__Setup(t *testing.T) {
 	trigger := &OnIncident{}
 
@@ -228,7 +304,7 @@ func Test__OnIncident__Setup(t *testing.T) {
 		assert.Equal(t, []string{EventIncidentCreatedV2}, req.Events)
 	})
 
-	t.Run("setup webhook and set secret from trigger config", func(t *testing.T) {
+	t.Run("setup webhook URL and metadata without secret", func(t *testing.T) {
 		webhookCtx := &setupFirstWebhookContext{}
 		metadataCtx := &contexts.MetadataContext{}
 		integrationCtx := &contexts.IntegrationContext{}
@@ -237,17 +313,17 @@ func Test__OnIncident__Setup(t *testing.T) {
 			Integration:   integrationCtx,
 			Webhook:       webhookCtx,
 			Metadata:      metadataCtx,
-			Configuration: OnIncidentConfiguration{Events: []string{EventIncidentCreatedV2}, WebhookSigningSecret: "whsec_test_secret"},
+			Configuration: OnIncidentConfiguration{Events: []string{EventIncidentCreatedV2}},
 		})
 
 		require.NoError(t, err)
 		assert.True(t, webhookCtx.setupCalled)
-		assert.Equal(t, "whsec_test_secret", string(webhookCtx.secret))
-		require.Len(t, integrationCtx.WebhookRequests, 1)
+		// Secret is set only via setSecret action, not in Setup
+		assert.Nil(t, webhookCtx.secret)
 
 		metadata, ok := metadataCtx.Metadata.(OnIncidentMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "https://example.com/api/v1/webhooks/webhook-123", metadata.WebhookURL)
-		assert.True(t, metadata.SigningSecretConfigured)
+		assert.False(t, metadata.SigningSecretConfigured)
 	})
 }

@@ -21,8 +21,8 @@ const (
 type OnIncident struct{}
 
 type OnIncidentConfiguration struct {
-	Events               []string `json:"events" mapstructure:"events"`
-	WebhookSigningSecret string   `json:"webhookSigningSecret" mapstructure:"webhookSigningSecret"`
+	Events                   []string `json:"events" mapstructure:"events"`
+	SigningSecretConfigured  bool     `json:"signingSecretConfigured" mapstructure:"signingSecretConfigured"` // Set by UI after setSecret; not used for verification
 }
 
 // OnIncidentMetadata is stored after Setup and includes the webhook URL and signing-secret status for the UI.
@@ -55,7 +55,7 @@ func (t *OnIncident) Documentation() string {
 ## Configuration
 
 - **Events**: Select which events to listen for (Incident created, Incident updated)
-- **Webhook signing secret**: Paste the signing secret from your incident.io webhook endpoint (Settings → Webhooks). Required to verify webhook authenticity. Configure it in this trigger's configuration below.
+- **Webhook signing secret**: Use the **Set signing secret** action below (after creating the webhook in incident.io) to store the signing secret. It is stored securely and never in the workflow configuration.
 
 ## Webhook Setup
 
@@ -64,7 +64,7 @@ incident.io does not provide an API to register webhook endpoints. After adding 
 1. Save the canvas to generate the webhook URL, then copy it from this panel.
 2. In incident.io go to **Settings > Webhooks** and create a new endpoint with that URL.
 3. Subscribe to **Public incident created (v2)** and **Public incident updated (v2)**.
-4. Copy the **Signing secret** from the endpoint and paste it in **Webhook signing secret** in this trigger's configuration.`
+4. Copy the **Signing secret** from the endpoint, then use **Set signing secret** below to store it securely.`
 }
 
 func (t *OnIncident) Icon() string {
@@ -92,15 +92,6 @@ func (t *OnIncident) Configuration() []configuration.Field {
 				},
 			},
 		},
-		{
-			Name:        "webhookSigningSecret",
-			Label:       "Webhook signing secret",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Sensitive:   true,
-			Description: "From your incident.io webhook endpoint (Settings → Webhooks). Paste the signing secret here so this trigger can verify requests.",
-			Placeholder: "whsec_...",
-		},
 	}
 }
 
@@ -119,12 +110,8 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("integration is required to set up the incident.io webhook trigger")
 	}
 
-	signingSecret := strings.TrimSpace(config.WebhookSigningSecret)
-
-	// Pass only events and hash so the secret is never stored in plaintext in the webhook Configuration column.
 	if err := ctx.Integration.RequestWebhook(WebhookConfiguration{
-		Events:            config.Events,
-		SigningSecretHash: SigningSecretHash(signingSecret),
+		Events: config.Events,
 	}); err != nil {
 		return err
 	}
@@ -138,26 +125,11 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		}
 	}
 
-	// Persist the signing secret in the encrypted webhook.Secret field (same as Grafana, PagerDuty, etc.).
-	// When signingSecret is empty, clear any random secret from webhook creation so resolveSigningSecret
-	// returns "" and HandleWebhook returns "signing secret is required" instead of "invalid signature".
-	if ctx.Webhook != nil {
-		if signingSecret != "" {
-			if err := ctx.Webhook.SetSecret([]byte(signingSecret)); err != nil {
-				return fmt.Errorf("failed to persist webhook signing secret: %w", err)
-			}
-		} else {
-			if err := ctx.Webhook.SetSecret([]byte{}); err != nil {
-				return fmt.Errorf("failed to clear webhook secret: %w", err)
-			}
-		}
-	}
-
-	// Store webhook URL and signing-secret status in metadata for the UI.
+	// Store webhook URL and signing-secret status in metadata. SigningSecretConfigured is set by the setSecret action.
 	if ctx.Metadata != nil {
 		metadata := OnIncidentMetadata{
-			WebhookURL:              webhookURL,
-			SigningSecretConfigured: signingSecret != "",
+			WebhookURL:             webhookURL,
+			SigningSecretConfigured: false,
 		}
 		if err := ctx.Metadata.Set(metadata); err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
@@ -168,11 +140,56 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 }
 
 func (t *OnIncident) Actions() []core.Action {
-	return nil
+	return []core.Action{
+		{
+			Name:           "setSecret",
+			Description:    "Set or clear the webhook signing secret from your incident.io endpoint",
+			UserAccessible: true,
+			Parameters: []configuration.Field{
+				{
+					Name:         "webhookSigningSecret",
+					Label:        "Webhook signing secret",
+					Type:         configuration.FieldTypeString,
+					Required:     false,
+					Sensitive:    true,
+					Description:  "Paste the signing secret from your incident.io webhook endpoint (Settings → Webhooks). Leave empty to clear.",
+					Placeholder:  "whsec_...",
+				},
+			},
+		},
+	}
 }
 
 func (t *OnIncident) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	return nil, nil
+	if ctx.Name != "setSecret" {
+		return nil, fmt.Errorf("action %s not supported", ctx.Name)
+	}
+	return t.setSecret(ctx)
+}
+
+func (t *OnIncident) setSecret(ctx core.TriggerActionContext) (map[string]any, error) {
+	if ctx.Webhook == nil {
+		return nil, fmt.Errorf("webhook is not available")
+	}
+	var secret string
+	if v, ok := ctx.Parameters["webhookSigningSecret"]; ok && v != nil {
+		if s, ok := v.(string); ok {
+			secret = strings.TrimSpace(s)
+		}
+	}
+	if err := ctx.Webhook.SetSecret([]byte(secret)); err != nil {
+		return nil, fmt.Errorf("failed to set webhook signing secret: %w", err)
+	}
+	configured := secret != ""
+	if ctx.Metadata != nil {
+		metadata := OnIncidentMetadata{}
+		_ = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
+		metadata.SigningSecretConfigured = configured
+		if err := ctx.Metadata.Set(metadata); err != nil {
+			return nil, fmt.Errorf("failed to update metadata: %w", err)
+		}
+	}
+	return map[string]any{"ok": true, "signingSecretConfigured": configured}, nil
 }
 
 func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
@@ -188,7 +205,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 
 	signingSecret := resolveSigningSecret(ctx)
 	if signingSecret == "" {
-		return http.StatusForbidden, fmt.Errorf("signing secret is required for webhook verification; add it in this trigger's configuration (Webhook signing secret)")
+	return http.StatusForbidden, fmt.Errorf("signing secret is required for webhook verification; use the Set signing secret action for this trigger")
 	}
 
 	webhookID := ctx.Headers.Get("webhook-id")
@@ -275,23 +292,17 @@ func (t *OnIncident) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
 
-// resolveSigningSecret returns the webhook signing secret for verification.
-// It prefers the secret stored in the webhook (set during trigger Setup); if missing, falls back to the trigger's configuration (same pattern as Grafana's resolveWebhookSharedSecret).
+// resolveSigningSecret returns the webhook signing secret for verification (stored via setSecret action).
 func resolveSigningSecret(ctx core.WebhookRequestContext) string {
-	if ctx.Webhook != nil {
-		if b, err := ctx.Webhook.GetSecret(); err == nil && len(b) > 0 {
-			s := strings.TrimSpace(string(b))
-			if s != "" {
-				return s
-			}
-		}
-	}
-	config := OnIncidentConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+	if ctx.Webhook == nil {
 		return ""
 	}
-	s := strings.TrimSpace(config.WebhookSigningSecret)
-	if s == "" || s == "<redacted>" {
+	b, err := ctx.Webhook.GetSecret()
+	if err != nil || len(b) == 0 {
+		return ""
+	}
+	s := strings.TrimSpace(string(b))
+	if s == "" {
 		return ""
 	}
 	return s
