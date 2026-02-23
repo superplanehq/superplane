@@ -1,0 +1,42 @@
+{
+  "data": {
+    "window": "1d",
+    "aggregate": "namespace",
+    "items": [
+      {
+        "name": "kube-system",
+        "cpuCost": 1.25,
+        "gpuCost": 0,
+        "ramCost": 0.75,
+        "pvCost": 0.1,
+        "networkCost": 0.05,
+        "sharedCost": 0,
+        "externalCost": 0,
+        "totalCost": 2.15,
+        "totalEfficiency": 0.45,
+        "cpuEfficiency": 0.5,
+        "ramEfficiency": 0.4,
+        "start": "2026-02-22T00:00:00Z",
+        "end": "2026-02-23T00:00:00Z"
+      },
+      {
+        "name": "default",
+        "cpuCost": 3.5,
+        "gpuCost": 0,
+        "ramCost": 2.1,
+        "pvCost": 0.5,
+        "networkCost": 0.15,
+        "sharedCost": 0,
+        "externalCost": 0,
+        "totalCost": 6.25,
+        "totalEfficiency": 0.62,
+        "cpuEfficiency": 0.7,
+        "ramEfficiency": 0.55,
+        "start": "2026-02-22T00:00:00Z",
+        "end": "2026-02-23T00:00:00Z"
+      }
+    ]
+  },
+  "timestamp": "2026-02-23T10:00:00Z",
+  "type": "opencost.costAllocation"
+}

@@ -1,0 +1,131 @@
+---
+title: "OpenCost"
+---
+
+Monitor and query Kubernetes cost allocation data from OpenCost
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="Cost Exceeds Threshold" href="#cost-exceeds-threshold" description="Trigger when OpenCost allocation cost exceeds a configured threshold" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Get Cost Allocation" href="#get-cost-allocation" description="Fetch cost allocation data from OpenCost" />
+</CardGrid>
+
+## Instructions
+
+1. **Deploy OpenCost:** Ensure OpenCost is running in your Kubernetes cluster and its API is accessible.
+2. **API URL:** Provide the base URL where the OpenCost API is reachable (e.g. `http://opencost.opencost.svc:9003`).
+3. **No authentication required:** OpenCost does not require authentication by default. If you have placed it behind an authenticating proxy, provide the API token.
+
+<a id="cost-exceeds-threshold"></a>
+
+## Cost Exceeds Threshold
+
+The Cost Exceeds Threshold trigger fires when any allocation item from OpenCost exceeds the configured cost threshold. SuperPlane polls the OpenCost allocation API every 5 minutes.
+
+### Use Cases
+
+- **Budget alerts**: Send a Slack notification when a namespace exceeds its cost budget
+- **Incident creation**: Automatically create a ticket when cluster spend spikes
+- **Cost governance**: Trigger approval workflows when spend crosses a limit
+
+### Configuration
+
+- **Window**: Time window to query (e.g. `1d`, `7d`, `today`, `lastweek`)
+- **Aggregate**: Dimension to group costs by (e.g. `namespace`, `cluster`, `pod`)
+- **Threshold (USD)**: Cost threshold. The trigger fires when any allocation item's total cost exceeds this value.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "name": "default",
+    "totalCost": 150.75,
+    "threshold": 100,
+    "window": "1d",
+    "aggregate": "namespace",
+    "cpuCost": 85.5,
+    "gpuCost": 0,
+    "ramCost": 45.25,
+    "pvCost": 12.5,
+    "networkCost": 7.5,
+    "start": "2026-02-22T00:00:00Z",
+    "end": "2026-02-23T00:00:00Z"
+  },
+  "timestamp": "2026-02-23T10:00:00Z",
+  "type": "opencost.costExceedsThreshold"
+}
+```
+
+<a id="get-cost-allocation"></a>
+
+## Get Cost Allocation
+
+The Get Cost Allocation component fetches Kubernetes cost allocation data from OpenCost.
+
+### Use Cases
+
+- **Cost reporting**: Post a cost allocation breakdown to Slack on a schedule
+- **Workflow enrichment**: Use cost data in downstream workflow steps for decision-making
+- **Audit trails**: Collect and store cost snapshots for historical tracking
+
+### Configuration
+
+- **Window**: Time window to query (e.g. `1d`, `7d`, `today`, `lastweek`)
+- **Aggregate**: Dimension to group costs by (e.g. `namespace`, `cluster`, `pod`)
+- **Step**: Optional step duration for splitting the window into intervals (e.g. `1d`, `1h`)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "window": "1d",
+    "aggregate": "namespace",
+    "items": [
+      {
+        "name": "kube-system",
+        "cpuCost": 1.25,
+        "gpuCost": 0,
+        "ramCost": 0.75,
+        "pvCost": 0.1,
+        "networkCost": 0.05,
+        "sharedCost": 0,
+        "externalCost": 0,
+        "totalCost": 2.15,
+        "totalEfficiency": 0.45,
+        "cpuEfficiency": 0.5,
+        "ramEfficiency": 0.4,
+        "start": "2026-02-22T00:00:00Z",
+        "end": "2026-02-23T00:00:00Z"
+      },
+      {
+        "name": "default",
+        "cpuCost": 3.5,
+        "gpuCost": 0,
+        "ramCost": 2.1,
+        "pvCost": 0.5,
+        "networkCost": 0.15,
+        "sharedCost": 0,
+        "externalCost": 0,
+        "totalCost": 6.25,
+        "totalEfficiency": 0.62,
+        "cpuEfficiency": 0.7,
+        "ramEfficiency": 0.55,
+        "start": "2026-02-22T00:00:00Z",
+        "end": "2026-02-23T00:00:00Z"
+      }
+    ]
+  },
+  "timestamp": "2026-02-23T10:00:00Z",
+  "type": "opencost.costAllocation"
+}
+```

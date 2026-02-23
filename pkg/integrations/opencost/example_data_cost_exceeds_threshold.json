@@ -1,0 +1,18 @@
+{
+  "data": {
+    "name": "default",
+    "totalCost": 150.75,
+    "threshold": 100,
+    "window": "1d",
+    "aggregate": "namespace",
+    "cpuCost": 85.5,
+    "gpuCost": 0,
+    "ramCost": 45.25,
+    "pvCost": 12.5,
+    "networkCost": 7.5,
+    "start": "2026-02-22T00:00:00Z",
+    "end": "2026-02-23T00:00:00Z"
+  },
+  "timestamp": "2026-02-23T10:00:00Z",
+  "type": "opencost.costExceedsThreshold"
+}
