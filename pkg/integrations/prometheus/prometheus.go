@@ -153,6 +153,9 @@ func (p *Prometheus) Components() []core.Component {
 		&GetAlert{},
 		&CreateSilence{},
 		&ExpireSilence{},
+		&GetSilence{},
+		&Query{},
+		&QueryRange{},
 	}
 }
 

@@ -1,0 +1,13 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "4400:9090"
+    volumes:
+      - ./prometheus-test/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus-test/alert_rules.yml:/etc/prometheus/alert_rules.yml
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    ports:
+      - "9093:9093"

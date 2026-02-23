@@ -1,0 +1,11 @@
+groups:
+  - name: test
+    rules:
+      - alert: SuperplaneTestAlert
+        expr: up == 1
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SuperPlane test alert is firing"
+          description: "Demo alert from local Prometheus setup"
