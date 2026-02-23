@@ -25,6 +25,7 @@ import telegramIcon from "@/assets/icons/integrations/telegram.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import linearIcon from "@/assets/icons/integrations/linear.svg";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
@@ -427,6 +428,7 @@ function CategorySection({
     jfrogArtifactory: jfrogArtifactoryIcon,
     grafana: grafanaIcon,
     jira: jiraIcon,
+    linear: linearIcon,
     openai: openAiIcon,
     "open-ai": openAiIcon,
     claude: claudeIcon,
@@ -517,6 +519,7 @@ function CategorySection({
             github: githubIcon,
             gitlab: gitlabIcon,
             hetzner: hetznerIcon,
+            linear: linearIcon,
             jfrogArtifactory: jfrogArtifactoryIcon,
             grafana: grafanaIcon,
             openai: openAiIcon,

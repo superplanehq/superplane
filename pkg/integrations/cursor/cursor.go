@@ -68,7 +68,7 @@ func (i *Cursor) Sync(ctx core.SyncContext) error {
 	}
 
 	if config.LaunchAgentKey == "" && config.AdminKey == "" {
-		return fmt.Errorf("one of the keys is required")
+		return nil
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
