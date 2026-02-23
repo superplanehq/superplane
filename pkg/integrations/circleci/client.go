@@ -375,18 +375,18 @@ func (c *Client) DeleteWebhook(webhookID string) error {
 
 // JobResponse represents a job within a workflow.
 type JobResponse struct {
-	ID            string         `json:"id"`
-	Name          string         `json:"name"`
-	Type          string         `json:"type"`
-	Status        string         `json:"status"`
-	StartedAt     string         `json:"started_at"`
-	StoppedAt     string         `json:"stopped_at"`
-	JobNumber     int            `json:"job_number"`
-	Dependencies  []any          `json:"dependencies"`
-	ProjectSlug   string         `json:"project_slug"`
-	ApprovalURL   string         `json:"approval_request_id,omitempty"`
-	CanceledBy    string         `json:"canceled_by,omitempty"`
-	ApprovedBy    string         `json:"approved_by,omitempty"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Type         string `json:"type"`
+	Status       string `json:"status"`
+	StartedAt    string `json:"started_at"`
+	StoppedAt    string `json:"stopped_at"`
+	JobNumber    int    `json:"job_number"`
+	Dependencies []any  `json:"dependencies"`
+	ProjectSlug  string `json:"project_slug"`
+	ApprovalURL  string `json:"approval_request_id,omitempty"`
+	CanceledBy   string `json:"canceled_by,omitempty"`
+	ApprovedBy   string `json:"approved_by,omitempty"`
 }
 
 func (c *Client) GetWorkflowJobs(workflowID string) ([]JobResponse, error) {
@@ -465,10 +465,10 @@ func (c *Client) ListProjectPipelines(projectSlug string, branch string) ([]Pipe
 
 // InsightsWorkflowRun represents aggregated workflow run data from the insights API.
 type InsightsWorkflowRun struct {
-	Name    string                 `json:"name"`
-	Metrics map[string]interface{} `json:"metrics"`
-	WindowStart string             `json:"window_start"`
-	WindowEnd   string             `json:"window_end"`
+	Name        string                 `json:"name"`
+	Metrics     map[string]interface{} `json:"metrics"`
+	WindowStart string                 `json:"window_start"`
+	WindowEnd   string                 `json:"window_end"`
 }
 
 func (c *Client) GetInsightsWorkflows(projectSlug string) ([]InsightsWorkflowRun, error) {
@@ -508,13 +508,13 @@ func (c *Client) GetInsightsWorkflows(projectSlug string) ([]InsightsWorkflowRun
 
 // TestMetricsResponse represents test metrics data from the insights API.
 type TestMetricsResponse struct {
-	AverageTestCount   int                    `json:"average_test_count"`
-	MostFailedTests    []map[string]any       `json:"most_failed_tests"`
-	MostFailedTestsExtra int                  `json:"most_failed_tests_extra"`
-	SlowestTests       []map[string]any       `json:"slowest_tests"`
-	SlowestTestsExtra  int                    `json:"slowest_tests_extra"`
-	TotalTestRuns      int                    `json:"total_test_runs"`
-	TestRuns           []map[string]any       `json:"test_runs"`
+	AverageTestCount     int              `json:"average_test_count"`
+	MostFailedTests      []map[string]any `json:"most_failed_tests"`
+	MostFailedTestsExtra int              `json:"most_failed_tests_extra"`
+	SlowestTests         []map[string]any `json:"slowest_tests"`
+	SlowestTestsExtra    int              `json:"slowest_tests_extra"`
+	TotalTestRuns        int              `json:"total_test_runs"`
+	TestRuns             []map[string]any `json:"test_runs"`
 }
 
 func (c *Client) GetInsightsTestMetrics(projectSlug, workflowName string) (*TestMetricsResponse, error) {
@@ -535,14 +535,14 @@ func (c *Client) GetInsightsTestMetrics(projectSlug, workflowName string) (*Test
 
 // FlakyTestResponse represents a flaky test from the insights API.
 type FlakyTestResponse struct {
-	TestName       string  `json:"test_name"`
-	PipelineName   string  `json:"pipeline_name"`
-	WorkflowName   string  `json:"workflow_name"`
-	JobName        string  `json:"job_name"`
-	TimesFlaked    int     `json:"times_flaked"`
-	ClassName      string  `json:"class_name"`
-	Source         string  `json:"source"`
-	File           string  `json:"file"`
+	TestName     string `json:"test_name"`
+	PipelineName string `json:"pipeline_name"`
+	WorkflowName string `json:"workflow_name"`
+	JobName      string `json:"job_name"`
+	TimesFlaked  int    `json:"times_flaked"`
+	ClassName    string `json:"class_name"`
+	Source       string `json:"source"`
+	File         string `json:"file"`
 }
 
 func (c *Client) GetInsightsFlakyTests(projectSlug string) ([]FlakyTestResponse, int, error) {
@@ -553,8 +553,8 @@ func (c *Client) GetInsightsFlakyTests(projectSlug string) ([]FlakyTestResponse,
 	}
 
 	var response struct {
-		FlakyTests    []FlakyTestResponse `json:"flaky_tests"`
-		TotalCount    int                 `json:"total_count"`
+		FlakyTests []FlakyTestResponse `json:"flaky_tests"`
+		TotalCount int                 `json:"total_count"`
 	}
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {

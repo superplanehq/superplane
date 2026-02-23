@@ -66,7 +66,7 @@ func Test__GetFlakyTests__Execute(t *testing.T) {
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
-					Body: io.NopCloser(strings.NewReader(`{"flaky_tests":[{"test_name":"TestFlaky","times_flaked":5,"workflow_name":"build","job_name":"test"}],"total_count":1}`)),
+					Body:       io.NopCloser(strings.NewReader(`{"flaky_tests":[{"test_name":"TestFlaky","times_flaked":5,"workflow_name":"build","job_name":"test"}],"total_count":1}`)),
 				},
 			},
 		}
