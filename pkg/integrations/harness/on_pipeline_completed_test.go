@@ -32,6 +32,14 @@ func (c *failingNodeWebhookContext) GetSecret() ([]byte, error) {
 	return []byte(c.secret), nil
 }
 
+func (c *failingNodeWebhookContext) SetSecret(secret []byte) error {
+	if c.err != nil {
+		return c.err
+	}
+	c.secret = string(secret)
+	return nil
+}
+
 func (c *failingNodeWebhookContext) ResetSecret() ([]byte, []byte, error) {
 	return []byte(c.secret), []byte(c.secret), nil
 }
