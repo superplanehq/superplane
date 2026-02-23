@@ -384,7 +384,7 @@ type JobResponse struct {
 	JobNumber    int    `json:"job_number"`
 	Dependencies []any  `json:"dependencies"`
 	ProjectSlug  string `json:"project_slug"`
-	ApprovalURL  string `json:"approval_request_id,omitempty"`
+	ApprovalRequestID string `json:"approval_request_id,omitempty"`
 	CanceledBy   string `json:"canceled_by,omitempty"`
 	ApprovedBy   string `json:"approved_by,omitempty"`
 }

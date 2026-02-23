@@ -56,9 +56,12 @@ export const getFlakyTestsMapper: ComponentBaseMapper = {
     if (result?.flaky_tests && result.flaky_tests.length > 0) {
       const topFlaky = result.flaky_tests
         .slice(0, 3)
+        .filter((t) => t.test_name != null && t.times_flaked != null)
         .map((t) => `${t.test_name} (${t.times_flaked}x)`)
         .join(", ");
-      details["Top Flaky"] = topFlaky;
+      if (topFlaky) {
+        details["Top Flaky"] = topFlaky;
+      }
     }
 
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
