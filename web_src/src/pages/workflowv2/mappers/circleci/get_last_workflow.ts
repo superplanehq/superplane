@@ -61,7 +61,7 @@ export const getLastWorkflowMapper: ComponentBaseMapper = {
     }
 
     if (result?.pipeline) {
-      if (result.pipeline.number) details["Pipeline Number"] = String(result.pipeline.number);
+      if (result.pipeline.number != null) details["Pipeline Number"] = String(result.pipeline.number);
       if (result.pipeline.state) details["Pipeline State"] = result.pipeline.state;
     }
 
