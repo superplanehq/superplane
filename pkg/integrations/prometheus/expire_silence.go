@@ -14,7 +14,7 @@ import (
 type ExpireSilence struct{}
 
 type ExpireSilenceConfiguration struct {
-	SilenceID string `json:"silenceID" mapstructure:"silenceID"`
+	Silence string `json:"silence" mapstructure:"silence"`
 }
 
 type ExpireSilenceNodeMetadata struct {
@@ -38,7 +38,7 @@ func (c *ExpireSilence) Documentation() string {
 
 ## Configuration
 
-- **Silence ID**: Required silence ID to expire. Supports expressions so users can reference ` + "`$['Create Silence'].silenceID`" + `.
+- **Silence**: Required silence to expire. Supports expressions so users can reference ` + "`$['Create Silence'].silenceID`" + `.
 
 ## Output
 
@@ -60,11 +60,16 @@ func (c *ExpireSilence) OutputChannels(configuration any) []core.OutputChannel {
 func (c *ExpireSilence) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "silenceID",
-			Label:       "Silence ID",
-			Type:        configuration.FieldTypeString,
+			Name:        "silence",
+			Label:       "Silence",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Silence ID to expire",
+			Description: "Silence to expire",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeSilence,
+				},
+			},
 		},
 	}
 }
@@ -76,8 +81,8 @@ func (c *ExpireSilence) Setup(ctx core.SetupContext) error {
 	}
 	config = sanitizeExpireSilenceConfiguration(config)
 
-	if config.SilenceID == "" {
-		return fmt.Errorf("silenceID is required")
+	if config.Silence == "" {
+		return fmt.Errorf("silence is required")
 	}
 
 	return nil
@@ -95,14 +100,14 @@ func (c *ExpireSilence) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create Prometheus client: %w", err)
 	}
 
-	if err := client.ExpireSilence(config.SilenceID); err != nil {
+	if err := client.ExpireSilence(config.Silence); err != nil {
 		return fmt.Errorf("failed to expire silence: %w", err)
 	}
 
-	ctx.Metadata.Set(ExpireSilenceNodeMetadata{SilenceID: config.SilenceID})
+	ctx.Metadata.Set(ExpireSilenceNodeMetadata{SilenceID: config.Silence})
 
 	payload := map[string]any{
-		"silenceID": config.SilenceID,
+		"silenceID": config.Silence,
 		"status":    "expired",
 	}
 
@@ -138,6 +143,6 @@ func (c *ExpireSilence) Cleanup(ctx core.SetupContext) error {
 }
 
 func sanitizeExpireSilenceConfiguration(config ExpireSilenceConfiguration) ExpireSilenceConfiguration {
-	config.SilenceID = strings.TrimSpace(config.SilenceID)
+	config.Silence = strings.TrimSpace(config.Silence)
 	return config
 }

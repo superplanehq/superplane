@@ -81,6 +81,7 @@ func (c *CreateSilence) Configuration() []configuration.Field {
 			Label:       "Matchers",
 			Type:        configuration.FieldTypeList,
 			Required:    true,
+			Default:     `[{"name":"alertname","value":"Watchdog","isRegex":false,"isEqual":true}]`,
 			Description: "List of label matchers to select alerts",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{

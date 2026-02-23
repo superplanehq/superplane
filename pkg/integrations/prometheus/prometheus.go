@@ -222,10 +222,6 @@ func (p *Prometheus) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (p *Prometheus) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	return []core.IntegrationResource{}, nil
-}
-
 func (p *Prometheus) Actions() []core.Action {
 	return []core.Action{}
 }

@@ -61,6 +61,16 @@ type silenceResponse struct {
 	SilenceID string `json:"silenceID"`
 }
 
+type AlertmanagerSilence struct {
+	ID      string                    `json:"id"`
+	Status  AlertmanagerSilenceStatus `json:"status"`
+	Comment string                    `json:"comment"`
+}
+
+type AlertmanagerSilenceStatus struct {
+	State string `json:"state"`
+}
+
 func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext) (*Client, error) {
 	baseURL, err := requiredConfig(integration, "baseURL")
 	if err != nil {
@@ -206,6 +216,21 @@ func (c *Client) CreateSilence(silence SilencePayload) (string, error) {
 	}
 
 	return response.SilenceID, nil
+}
+
+func (c *Client) ListSilences() ([]AlertmanagerSilence, error) {
+	apiURL := c.alertmanagerBaseURL() + "/api/v2/silences"
+	body, err := c.execRequestWithBodyAndURL(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := []AlertmanagerSilence{}
+	if err := decodeResponse(body, &response); err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
 
 func (c *Client) ExpireSilence(silenceID string) error {

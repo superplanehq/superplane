@@ -81,9 +81,13 @@ function getMetadata(node: NodeInfo): MetadataItem[] {
   const nodeMetadata = node.metadata as ExpireSilenceNodeMetadata | undefined;
   const configuration = node.configuration as ExpireSilenceConfiguration | undefined;
 
-  const silenceID = nodeMetadata?.silenceID || configuration?.silenceID;
-  if (silenceID) {
-    metadata.push({ icon: "bell", label: silenceID });
+  const selectedSilence = configuration?.silence || configuration?.silenceID;
+  if (selectedSilence) {
+    metadata.push({ icon: "bell-off", label: selectedSilence });
+  }
+
+  if (nodeMetadata?.silenceID && nodeMetadata.silenceID !== selectedSilence) {
+    metadata.push({ icon: "bell-off", label: nodeMetadata.silenceID });
   }
 
   return metadata.slice(0, 3);

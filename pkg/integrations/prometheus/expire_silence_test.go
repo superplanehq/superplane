@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -15,16 +16,27 @@ import (
 func Test__ExpireSilence__Setup(t *testing.T) {
 	component := &ExpireSilence{}
 
-	t.Run("silenceID is required", func(t *testing.T) {
+	t.Run("configuration uses silence resource field", func(t *testing.T) {
+		fields := component.Configuration()
+		require.Len(t, fields, 1)
+		assert.Equal(t, "silence", fields[0].Name)
+		assert.Equal(t, "Silence", fields[0].Label)
+		assert.Equal(t, configuration.FieldTypeIntegrationResource, fields[0].Type)
+		require.NotNil(t, fields[0].TypeOptions)
+		require.NotNil(t, fields[0].TypeOptions.Resource)
+		assert.Equal(t, ResourceTypeSilence, fields[0].TypeOptions.Resource.Type)
+	})
+
+	t.Run("silence is required", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{"silenceID": ""},
+			Configuration: map[string]any{"silence": ""},
 		})
-		require.ErrorContains(t, err, "silenceID is required")
+		require.ErrorContains(t, err, "silence is required")
 	})
 
 	t.Run("valid setup", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{"silenceID": "abc123"},
+			Configuration: map[string]any{"silence": "abc123"},
 		})
 		require.NoError(t, err)
 	})
@@ -46,7 +58,7 @@ func Test__ExpireSilence__Execute(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
 		executionCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{"silenceID": "abc123"},
+			Configuration: map[string]any{"silence": "abc123"},
 			HTTP:          httpCtx,
 			Integration: &contexts.IntegrationContext{Configuration: map[string]any{
 				"baseURL":  "https://prometheus.example.com",
@@ -81,7 +93,7 @@ func Test__ExpireSilence__Execute(t *testing.T) {
 		}
 
 		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{"silenceID": "nonexistent"},
+			Configuration: map[string]any{"silence": "nonexistent"},
 			HTTP:          httpCtx,
 			Integration: &contexts.IntegrationContext{Configuration: map[string]any{
 				"baseURL":  "https://prometheus.example.com",
@@ -94,7 +106,7 @@ func Test__ExpireSilence__Execute(t *testing.T) {
 		require.ErrorContains(t, err, "failed to expire silence")
 	})
 
-	t.Run("execute sanitizes silenceID", func(t *testing.T) {
+	t.Run("execute sanitizes silence", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -106,7 +118,7 @@ func Test__ExpireSilence__Execute(t *testing.T) {
 
 		executionCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{"silenceID": "  abc123  "},
+			Configuration: map[string]any{"silence": "  abc123  "},
 			HTTP:          httpCtx,
 			Integration: &contexts.IntegrationContext{Configuration: map[string]any{
 				"baseURL":  "https://prometheus.example.com",
