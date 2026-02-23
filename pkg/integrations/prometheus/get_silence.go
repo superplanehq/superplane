@@ -13,7 +13,8 @@ import (
 type GetSilence struct{}
 
 type GetSilenceConfiguration struct {
-	SilenceID string `json:"silenceID" mapstructure:"silenceID"`
+	Silence         string `json:"silence" mapstructure:"silence"`
+	LegacySilenceID string `json:"silenceID,omitempty" mapstructure:"silenceID"`
 }
 
 type GetSilenceNodeMetadata struct {
@@ -47,7 +48,7 @@ func (c *GetSilence) Documentation() string {
 
 ## Configuration
 
-- **Silence ID**: Required ID of the silence to retrieve (supports expressions, e.g. ` + "`{{ $['Create Silence'].silenceID }}`" + `)
+- **Silence**: Required silence to retrieve (supports expressions, e.g. ` + "`{{ $['Create Silence'].silenceID }}`" + `)
 
 ## Output
 
@@ -69,12 +70,16 @@ func (c *GetSilence) OutputChannels(configuration any) []core.OutputChannel {
 func (c *GetSilence) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "silenceID",
-			Label:       "Silence ID",
-			Type:        configuration.FieldTypeString,
+			Name:        "silence",
+			Label:       "Silence",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Placeholder: "{{ $['Create Silence'].silenceID }}",
-			Description: "ID of the silence to retrieve",
+			Description: "Silence to retrieve",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeSilence,
+				},
+			},
 		},
 	}
 }
@@ -86,8 +91,8 @@ func (c *GetSilence) Setup(ctx core.SetupContext) error {
 	}
 	config = sanitizeGetSilenceConfiguration(config)
 
-	if config.SilenceID == "" {
-		return fmt.Errorf("silenceID is required")
+	if config.Silence == "" {
+		return fmt.Errorf("silence is required")
 	}
 
 	return nil
@@ -105,7 +110,7 @@ func (c *GetSilence) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create Prometheus client: %w", err)
 	}
 
-	silence, err := client.GetSilence(config.SilenceID)
+	silence, err := client.GetSilence(config.Silence)
 	if err != nil {
 		return fmt.Errorf("failed to get silence: %w", err)
 	}
@@ -159,6 +164,10 @@ func (c *GetSilence) Cleanup(ctx core.SetupContext) error {
 }
 
 func sanitizeGetSilenceConfiguration(config GetSilenceConfiguration) GetSilenceConfiguration {
-	config.SilenceID = strings.TrimSpace(config.SilenceID)
+	config.Silence = strings.TrimSpace(config.Silence)
+	config.LegacySilenceID = strings.TrimSpace(config.LegacySilenceID)
+	if config.Silence == "" {
+		config.Silence = config.LegacySilenceID
+	}
 	return config
 }

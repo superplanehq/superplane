@@ -15,16 +15,25 @@ import (
 func Test__GetSilence__Setup(t *testing.T) {
 	component := &GetSilence{}
 
-	t.Run("silenceID is required", func(t *testing.T) {
+	t.Run("silence is required", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"silenceID": "",
+				"silence": "",
 			},
 		})
-		require.ErrorContains(t, err, "silenceID is required")
+		require.ErrorContains(t, err, "silence is required")
 	})
 
 	t.Run("valid setup", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"silence": "abc123",
+			},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("legacy silenceID setup still works", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"silenceID": "abc123",
@@ -62,7 +71,7 @@ func Test__GetSilence__Execute(t *testing.T) {
 		executionCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"silenceID": "abc123",
+				"silence": "abc123",
 			},
 			HTTP: httpCtx,
 			Integration: &contexts.IntegrationContext{Configuration: map[string]any{
@@ -104,7 +113,7 @@ func Test__GetSilence__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"silenceID": "notexist",
+				"silence": "notexist",
 			},
 			HTTP: httpCtx,
 			Integration: &contexts.IntegrationContext{Configuration: map[string]any{

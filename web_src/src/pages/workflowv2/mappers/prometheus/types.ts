@@ -68,6 +68,7 @@ export interface ExpireSilenceNodeMetadata {
 }
 
 export interface GetSilenceConfiguration {
+  silence?: string;
   silenceID?: string;
 }
 

@@ -78,6 +78,7 @@ func (c *QueryRange) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Placeholder: "2026-01-01T00:00:00Z",
+			Default:     "2026-01-01T00:00:00Z",
 			Description: "Start timestamp (RFC3339 or Unix)",
 		},
 		{
@@ -86,6 +87,7 @@ func (c *QueryRange) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Placeholder: "2026-01-02T00:00:00Z",
+			Default:     "2026-01-02T00:00:00Z",
 			Description: "End timestamp (RFC3339 or Unix)",
 		},
 		{
@@ -94,6 +96,7 @@ func (c *QueryRange) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Placeholder: "15s",
+			Default:     "15s",
 			Description: "Query resolution step (e.g. 15s, 1m)",
 		},
 	}

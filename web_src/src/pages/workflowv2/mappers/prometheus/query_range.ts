@@ -103,6 +103,14 @@ function getMetadata(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "search", label: query });
   }
 
+  if (configuration?.start) {
+    metadata.push({ icon: "clock", label: `Start: ${configuration.start}` });
+  }
+
+  if (configuration?.end) {
+    metadata.push({ icon: "clock", label: `End: ${configuration.end}` });
+  }
+
   return metadata.slice(0, 3);
 }
 

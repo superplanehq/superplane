@@ -107,7 +107,7 @@ function getMetadata(node: NodeInfo): MetadataItem[] {
   const nodeMetadata = node.metadata as GetSilenceNodeMetadata | undefined;
   const configuration = node.configuration as GetSilenceConfiguration | undefined;
 
-  const silenceID = nodeMetadata?.silenceID || configuration?.silenceID;
+  const silenceID = nodeMetadata?.silenceID || configuration?.silence || configuration?.silenceID;
   if (silenceID) {
     metadata.push({ icon: "bell-off", label: silenceID });
   }
