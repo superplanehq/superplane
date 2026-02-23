@@ -3,6 +3,7 @@ package circleci
 import (
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -163,12 +164,22 @@ func (c *GetLastWorkflow) Execute(ctx core.ExecutionContext) error {
 		)
 	}
 
-	// Get workflows from the most recent pipeline
+	// Sort pipelines by created_at descending to find the most recent one,
+	// rather than assuming the API returns them in order.
+	sort.Slice(pipelines, func(i, j int) bool {
+		return pipelines[i].CreatedAt > pipelines[j].CreatedAt
+	})
+
 	latestPipeline := pipelines[0]
 	workflows, err := client.GetPipelineWorkflows(latestPipeline.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get pipeline workflows: %w", err)
 	}
+
+	// Sort workflows by created_at descending to find the most recent one.
+	sort.Slice(workflows, func(i, j int) bool {
+		return workflows[i].CreatedAt > workflows[j].CreatedAt
+	})
 
 	var latestWorkflow *WorkflowResponse
 	if len(workflows) > 0 {

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	neturl "net/url"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -56,6 +57,15 @@ func (c *Client) execRequest(method, requestURL string, body io.Reader) ([]byte,
 	}
 
 	return responseBody, nil
+}
+
+// appendPageToken appends a page-token query parameter to a URL.
+// It handles URLs that already have query parameters.
+func appendPageToken(reqURL, token string) string {
+	if strings.Contains(reqURL, "?") {
+		return reqURL + "&page-token=" + neturl.QueryEscape(token)
+	}
+	return reqURL + "?page-token=" + neturl.QueryEscape(token)
 }
 
 type UserResponse struct {
@@ -380,45 +390,77 @@ type JobResponse struct {
 }
 
 func (c *Client) GetWorkflowJobs(workflowID string) ([]JobResponse, error) {
-	url := fmt.Sprintf("%s/workflow/%s/job", baseURL, workflowID)
-	responseBody, err := c.execRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
+	baseReqURL := fmt.Sprintf("%s/workflow/%s/job", baseURL, workflowID)
+	var allItems []JobResponse
+	pageToken := ""
+
+	for {
+		reqURL := baseReqURL
+		if pageToken != "" {
+			reqURL = appendPageToken(reqURL, pageToken)
+		}
+
+		responseBody, err := c.execRequest("GET", reqURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var response struct {
+			Items         []JobResponse `json:"items"`
+			NextPageToken string        `json:"next_page_token"`
+		}
+		err = json.Unmarshal(responseBody, &response)
+		if err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		}
+
+		allItems = append(allItems, response.Items...)
+		if response.NextPageToken == "" {
+			break
+		}
+		pageToken = response.NextPageToken
 	}
 
-	var response struct {
-		Items    []JobResponse `json:"items"`
-		NextPageToken string   `json:"next_page_token"`
-	}
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
-	}
-
-	return response.Items, nil
+	return allItems, nil
 }
 
 func (c *Client) ListProjectPipelines(projectSlug string, branch string) ([]PipelineResponse, error) {
-	url := fmt.Sprintf("%s/project/%s/pipeline", baseURL, projectSlug)
+	baseReqURL := fmt.Sprintf("%s/project/%s/pipeline", baseURL, projectSlug)
 	if branch != "" {
-		url += "?branch=" + neturl.QueryEscape(branch)
+		baseReqURL += "?branch=" + neturl.QueryEscape(branch)
 	}
 
-	responseBody, err := c.execRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
+	var allItems []PipelineResponse
+	pageToken := ""
+
+	for {
+		reqURL := baseReqURL
+		if pageToken != "" {
+			reqURL = appendPageToken(reqURL, pageToken)
+		}
+
+		responseBody, err := c.execRequest("GET", reqURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var response struct {
+			Items         []PipelineResponse `json:"items"`
+			NextPageToken string             `json:"next_page_token"`
+		}
+		err = json.Unmarshal(responseBody, &response)
+		if err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		}
+
+		allItems = append(allItems, response.Items...)
+		if response.NextPageToken == "" {
+			break
+		}
+		pageToken = response.NextPageToken
 	}
 
-	var response struct {
-		Items         []PipelineResponse `json:"items"`
-		NextPageToken string             `json:"next_page_token"`
-	}
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
-	}
-
-	return response.Items, nil
+	return allItems, nil
 }
 
 // InsightsWorkflowRun represents aggregated workflow run data from the insights API.
@@ -430,22 +472,38 @@ type InsightsWorkflowRun struct {
 }
 
 func (c *Client) GetInsightsWorkflows(projectSlug string) ([]InsightsWorkflowRun, error) {
-	url := fmt.Sprintf("%s/insights/%s/workflows", baseURL, projectSlug)
-	responseBody, err := c.execRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
+	baseReqURL := fmt.Sprintf("%s/insights/%s/workflows", baseURL, projectSlug)
+	var allItems []InsightsWorkflowRun
+	pageToken := ""
+
+	for {
+		reqURL := baseReqURL
+		if pageToken != "" {
+			reqURL = appendPageToken(reqURL, pageToken)
+		}
+
+		responseBody, err := c.execRequest("GET", reqURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var response struct {
+			Items         []InsightsWorkflowRun `json:"items"`
+			NextPageToken string                `json:"next_page_token"`
+		}
+		err = json.Unmarshal(responseBody, &response)
+		if err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		}
+
+		allItems = append(allItems, response.Items...)
+		if response.NextPageToken == "" {
+			break
+		}
+		pageToken = response.NextPageToken
 	}
 
-	var response struct {
-		Items         []InsightsWorkflowRun `json:"items"`
-		NextPageToken string                `json:"next_page_token"`
-	}
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
-	}
-
-	return response.Items, nil
+	return allItems, nil
 }
 
 // TestMetricsResponse represents test metrics data from the insights API.
