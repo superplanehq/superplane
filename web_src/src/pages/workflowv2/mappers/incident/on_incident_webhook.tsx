@@ -114,6 +114,8 @@ const SetSigningSecretSection: React.FC<{ nodeId: string }> = ({ nodeId }) => {
         showSuccessToast(
           configured ? "Signing secret set and canvas saved" : "Signing secret cleared and canvas saved",
         );
+      } else {
+        showErrorToast("Could not update canvas (invalid canvas structure). Try saving the canvas and try again.");
       }
     } catch (_err) {
       showErrorToast("Failed to set signing secret or save canvas");
