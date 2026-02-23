@@ -1,0 +1,24 @@
+{
+    "type": "rootly.onEvent",
+    "data": {
+        "event": "incident_event.created",
+        "event_id": "evt-abc123",
+        "issued_at": "2026-01-19T12:30:00Z",
+        "id": "ie-def456",
+        "event_content": "Investigation started — confirmed elevated error rates on the payments service",
+        "kind": "note",
+        "visibility": "internal",
+        "occurred_at": "2026-01-19T12:28:00Z",
+        "created_at": "2026-01-19T12:30:00Z",
+        "user_display_name": "Jane Smith",
+        "incident": {
+            "id": "inc-ghi789",
+            "title": "Payment processing errors",
+            "status": "started",
+            "severity": "sev1",
+            "started_at": "2026-01-19T12:00:00Z",
+            "url": "https://app.rootly.com/incidents/inc-ghi789"
+        }
+    },
+    "timestamp": "2026-01-19T12:30:00Z"
+}
