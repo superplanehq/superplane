@@ -148,7 +148,8 @@ func (c *GetLastWorkflow) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	pipelines, err := client.ListProjectPipelines(spec.ProjectSlug, strings.TrimSpace(spec.Branch))
+	// Only fetch the first page of pipelines since we only need the most recent one.
+	pipelines, err := client.ListProjectPipelines(spec.ProjectSlug, strings.TrimSpace(spec.Branch), 1)
 	if err != nil {
 		return fmt.Errorf("failed to list project pipelines: %w", err)
 	}
