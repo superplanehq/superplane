@@ -66,3 +66,35 @@ export interface ExpireSilenceConfiguration {
 export interface ExpireSilenceNodeMetadata {
   silenceID?: string;
 }
+
+export interface GetSilenceConfiguration {
+  silenceID?: string;
+}
+
+export interface GetSilenceNodeMetadata {
+  silenceID?: string;
+}
+
+export interface QueryConfiguration {
+  query?: string;
+}
+
+export interface QueryNodeMetadata {
+  query?: string;
+}
+
+export interface QueryRangeConfiguration {
+  query?: string;
+  start?: string;
+  end?: string;
+  step?: string;
+}
+
+export interface QueryRangeNodeMetadata {
+  query?: string;
+}
+
+export interface PrometheusQueryPayload {
+  resultType?: string;
+  result?: any[];
+}

@@ -18,6 +18,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Silence" href="#create-silence" description="Create a silence in Alertmanager to suppress alerts" />
   <LinkCard title="Expire Silence" href="#expire-silence" description="Expire an active silence in Alertmanager" />
   <LinkCard title="Get Alert" href="#get-alert" description="Get a Prometheus alert by name" />
+  <LinkCard title="Get Silence" href="#get-silence" description="Get a silence from Alertmanager by ID" />
+  <LinkCard title="Query" href="#query" description="Execute a PromQL instant query" />
+  <LinkCard title="Query Range" href="#query-range" description="Execute a PromQL range query" />
 </CardGrid>
 
 ## Instructions
@@ -214,6 +217,136 @@ Emits one `prometheus.alert` payload with labels, annotations, state, and timing
   },
   "timestamp": "2026-02-12T16:18:05.943610583Z",
   "type": "prometheus.alert"
+}
+```
+
+<a id="get-silence"></a>
+
+## Get Silence
+
+The Get Silence component retrieves a silence from Alertmanager (`GET /api/v2/silence/{silenceID}`) by its ID.
+
+### Configuration
+
+- **Silence ID**: Required ID of the silence to retrieve (supports expressions, e.g. `{{ $['Create Silence'].silenceID }}`)
+
+### Output
+
+Emits one `prometheus.silence` payload with silence ID, status, matchers, timing, and creator info.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "comment": "Scheduled maintenance window",
+    "createdBy": "SuperPlane",
+    "endsAt": "2026-02-12T17:30:00Z",
+    "matchers": [
+      {
+        "isEqual": true,
+        "isRegex": false,
+        "name": "alertname",
+        "value": "HighLatency"
+      }
+    ],
+    "silenceID": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+    "startsAt": "2026-02-12T16:30:00Z",
+    "status": "active"
+  },
+  "timestamp": "2026-02-12T16:30:05.123456789Z",
+  "type": "prometheus.silence"
+}
+```
+
+<a id="query"></a>
+
+## Query
+
+The Query component executes an instant PromQL query against Prometheus (`GET /api/v1/query`).
+
+### Configuration
+
+- **Query**: Required PromQL expression to evaluate (supports expressions). Example: `up`
+
+### Output
+
+Emits one `prometheus.query` payload with the result type and results.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "result": [
+      {
+        "metric": {
+          "__name__": "up",
+          "instance": "localhost:9090",
+          "job": "prometheus"
+        },
+        "value": [
+          1708000000,
+          "1"
+        ]
+      }
+    ],
+    "resultType": "vector"
+  },
+  "timestamp": "2026-02-12T16:30:05.123456789Z",
+  "type": "prometheus.query"
+}
+```
+
+<a id="query-range"></a>
+
+## Query Range
+
+The Query Range component executes a range PromQL query against Prometheus (`GET /api/v1/query_range`).
+
+### Configuration
+
+- **Query**: Required PromQL expression to evaluate (supports expressions). Example: `up`
+- **Start**: Required start timestamp in RFC3339 or Unix format (supports expressions). Example: `2026-01-01T00:00:00Z`
+- **End**: Required end timestamp in RFC3339 or Unix format (supports expressions). Example: `2026-01-02T00:00:00Z`
+- **Step**: Required query resolution step (e.g. `15s`, `1m`)
+
+### Output
+
+Emits one `prometheus.queryRange` payload with the result type and results.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "result": [
+      {
+        "metric": {
+          "__name__": "up",
+          "instance": "localhost:9090",
+          "job": "prometheus"
+        },
+        "values": [
+          [
+            1708000000,
+            "1"
+          ],
+          [
+            1708000015,
+            "1"
+          ],
+          [
+            1708000030,
+            "1"
+          ]
+        ]
+      }
+    ],
+    "resultType": "matrix"
+  },
+  "timestamp": "2026-02-12T16:30:05.123456789Z",
+  "type": "prometheus.queryRange"
 }
 ```
 
