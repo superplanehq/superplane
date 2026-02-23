@@ -209,6 +209,10 @@ func (s *setupWebhookContext) GetSecret() ([]byte, error) {
 	return nil, nil
 }
 
+func (s *setupWebhookContext) SetSecret([]byte) error {
+	return nil
+}
+
 func (s *setupWebhookContext) ResetSecret() ([]byte, []byte, error) {
 	return nil, nil, nil
 }
