@@ -41,7 +41,7 @@ type armSubnet struct {
 }
 
 func (a *AzureIntegration) ListResourceGroups(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	provider, err := a.providerFromListResourcesContext(ctx)
+	provider, err := a.ensureProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (a *AzureIntegration) ListVMSizes(ctx core.ListResourcesContext, location s
 		return []core.IntegrationResource{}, nil
 	}
 
-	provider, err := a.providerFromListResourcesContext(ctx)
+	provider, err := a.ensureProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func (a *AzureIntegration) ListVirtualNetworks(ctx core.ListResourcesContext, re
 	}
 	resourceGroup = azureResourceName(resourceGroup)
 
-	provider, err := a.providerFromListResourcesContext(ctx)
+	provider, err := a.ensureProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func (a *AzureIntegration) ListSubnets(ctx core.ListResourcesContext, resourceGr
 	resourceGroup = azureResourceName(resourceGroup)
 	vnetName = azureResourceName(vnetName)
 
-	provider, err := a.providerFromListResourcesContext(ctx)
+	provider, err := a.ensureProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -226,14 +226,6 @@ func (a *AzureIntegration) ListSubnets(ctx core.ListResourcesContext, resourceGr
 	})
 
 	return resources, nil
-}
-
-func (a *AzureIntegration) providerFromListResourcesContext(_ core.ListResourcesContext) (*AzureProvider, error) {
-	if a.provider == nil {
-		return nil, fmt.Errorf("Azure provider not initialized; Sync must run before listing resources")
-	}
-
-	return a.provider, nil
 }
 
 func isVirtualMachineSKU(sku armSKU) bool {

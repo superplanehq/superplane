@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -18,7 +21,18 @@ func init() {
 }
 
 type AzureIntegration struct {
+	mu       sync.Mutex
 	provider *AzureProvider
+
+	// oidcProvider is injected at startup via SetOIDCProvider (called by
+	// the registry). It is used to lazily initialize the Azure provider
+	// on the first request, without requiring a manual Sync.
+	oidcProvider oidc.Provider
+
+	// Cached from the last ensureProvider / Sync call so the provider
+	// can be reused across requests without re-reading the DB.
+	integrationID string
+	config        *Configuration
 }
 
 type Configuration struct {
@@ -134,26 +148,26 @@ func (a *AzureIntegration) Sync(ctx core.SyncContext) error {
 		config.TenantID, config.SubscriptionID)
 
 	integrationID := ctx.Integration.ID().String()
-	oidcProvider := ctx.OIDC
 
-	getAssertion := func(_ context.Context) (string, error) {
-		subject := fmt.Sprintf("app-installation:%s", integrationID)
-		return oidcProvider.Sign(subject, 5*time.Minute, integrationID, nil)
+	// Prefer the OIDC provider from the SyncContext (always fresh),
+	// but fall back to the one injected at startup via SetOIDCProvider.
+	oidcProv := ctx.OIDC
+	if oidcProv == nil {
+		oidcProv = a.oidcProvider
 	}
 
-	provider, err := NewAzureProvider(
-		context.Background(),
-		config.TenantID,
-		config.ClientID,
-		config.SubscriptionID,
-		getAssertion,
-		ctx.Logger,
-	)
+	a.mu.Lock()
+	a.oidcProvider = oidcProv
+	a.integrationID = integrationID
+	a.config = &config
+
+	provider, err := a.initProviderLocked()
 	if err != nil {
+		a.mu.Unlock()
 		return fmt.Errorf("failed to initialize Azure provider: %w", err)
 	}
-
 	a.provider = provider
+	a.mu.Unlock()
 
 	// Verify credentials by listing resource groups.
 	// This proves that the federated identity credential is configured correctly.
@@ -262,7 +276,98 @@ func (a *AzureIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Response.Write([]byte("not found"))
 }
 
-// GetProvider returns the initialized provider.
-func (a *AzureIntegration) GetProvider() *AzureProvider {
-	return a.provider
+// SetOIDCProvider implements core.OIDCAwareIntegration. The registry calls
+// this once during startup so that the integration can lazily create
+// authenticated Azure clients without waiting for a manual Sync.
+func (a *AzureIntegration) SetOIDCProvider(p oidc.Provider) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.oidcProvider = p
+}
+
+// ensureProvider returns the cached Azure provider, or lazily creates one
+// by reading the integration configuration from the database and using the
+// OIDC provider that was injected at startup. This is the single entry
+// point for all code paths that need an authenticated Azure client
+// (ListResources, Execute, WebhookHandler).
+func (a *AzureIntegration) ensureProvider(integrationCtx core.IntegrationContext) (*AzureProvider, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	integrationID := integrationCtx.ID().String()
+
+	// Return the cached provider when it matches the current integration.
+	if a.provider != nil && a.integrationID == integrationID {
+		return a.provider, nil
+	}
+
+	if a.oidcProvider == nil {
+		return nil, fmt.Errorf("Azure OIDC provider not available; server may not have finished starting")
+	}
+
+	config, err := loadConfig(integrationCtx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load Azure configuration: %w", err)
+	}
+
+	a.integrationID = integrationID
+	a.config = config
+
+	provider, err := a.initProviderLocked()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize Azure provider: %w", err)
+	}
+
+	a.provider = provider
+	return a.provider, nil
+}
+
+// loadConfig reads the Azure integration configuration from the database
+// through the IntegrationContext.
+func loadConfig(ctx core.IntegrationContext) (*Configuration, error) {
+	tenantID, err := ctx.GetConfig("tenantId")
+	if err != nil {
+		return nil, fmt.Errorf("tenantId: %w", err)
+	}
+
+	clientID, err := ctx.GetConfig("clientId")
+	if err != nil {
+		return nil, fmt.Errorf("clientId: %w", err)
+	}
+
+	subscriptionID, err := ctx.GetConfig("subscriptionId")
+	if err != nil {
+		return nil, fmt.Errorf("subscriptionId: %w", err)
+	}
+
+	return &Configuration{
+		TenantID:       string(tenantID),
+		ClientID:       string(clientID),
+		SubscriptionID: string(subscriptionID),
+	}, nil
+}
+
+// initProviderLocked creates a new AzureProvider using the stored OIDC credentials.
+// Caller must hold a.mu.
+func (a *AzureIntegration) initProviderLocked() (*AzureProvider, error) {
+	if a.oidcProvider == nil || a.config == nil {
+		return nil, fmt.Errorf("OIDC provider or config not available")
+	}
+
+	oidcProv := a.oidcProvider
+	integrationID := a.integrationID
+
+	getAssertion := func(_ context.Context) (string, error) {
+		subject := fmt.Sprintf("app-installation:%s", integrationID)
+		return oidcProv.Sign(subject, 5*time.Minute, integrationID, nil)
+	}
+
+	return NewAzureProvider(
+		context.Background(),
+		a.config.TenantID,
+		a.config.ClientID,
+		a.config.SubscriptionID,
+		getAssertion,
+		logrus.NewEntry(logrus.StandardLogger()),
+	)
 }
