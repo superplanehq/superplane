@@ -2716,8 +2716,13 @@ export function WorkflowPageV2() {
       if (!renderer) return null;
 
       // Return a function that takes the current configuration
-      return () => {
-        return renderer.render(buildNodeInfo(node), onRun ? { onRun } : undefined);
+      return (configuration?: Record<string, unknown>) => {
+        const nodeWithConfiguration = {
+          ...node,
+          configuration: configuration ?? node.configuration,
+        };
+
+        return renderer.render(buildNodeInfo(nodeWithConfiguration), onRun ? { onRun } : undefined);
       };
     },
     [canvas],
