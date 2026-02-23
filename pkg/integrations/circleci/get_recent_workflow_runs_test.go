@@ -66,7 +66,7 @@ func Test__GetRecentWorkflowRuns__Execute(t *testing.T) {
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
-					Body: io.NopCloser(strings.NewReader(`{"items":[{"name":"build","metrics":{"success_rate":0.95},"window_start":"2024-01-01T00:00:00Z","window_end":"2024-02-01T00:00:00Z"}]}`)),
+					Body:       io.NopCloser(strings.NewReader(`{"items":[{"name":"build","metrics":{"success_rate":0.95},"window_start":"2024-01-01T00:00:00Z","window_end":"2024-02-01T00:00:00Z"}]}`)),
 				},
 			},
 		}

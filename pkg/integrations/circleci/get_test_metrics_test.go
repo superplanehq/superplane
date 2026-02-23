@@ -81,7 +81,7 @@ func Test__GetTestMetrics__Execute(t *testing.T) {
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
-					Body: io.NopCloser(strings.NewReader(`{"average_test_count":150,"most_failed_tests":[],"most_failed_tests_extra":0,"slowest_tests":[],"slowest_tests_extra":0,"total_test_runs":200,"test_runs":[]}`)),
+					Body:       io.NopCloser(strings.NewReader(`{"average_test_count":150,"most_failed_tests":[],"most_failed_tests_extra":0,"slowest_tests":[],"slowest_tests_extra":0,"total_test_runs":200,"test_runs":[]}`)),
 				},
 			},
 		}
