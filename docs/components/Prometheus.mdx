@@ -15,6 +15,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Silence" href="#create-silence" description="Create a silence in Alertmanager to suppress alerts" />
+  <LinkCard title="Expire Silence" href="#expire-silence" description="Expire an active silence in Alertmanager" />
   <LinkCard title="Get Alert" href="#get-alert" description="Get a Prometheus alert by name" />
 </CardGrid>
 
@@ -24,7 +26,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 Configure this integration with:
 - **Prometheus Base URL**: URL of your Prometheus server (e.g., `https://prometheus.example.com`)
-- **API Auth**: `none`, `basic`, or `bearer` for Prometheus API requests
+- **Alertmanager Base URL** (optional): URL of your Alertmanager instance (e.g., `https://alertmanager.example.com`). Required for Silence components. If omitted, the Prometheus Base URL is used.
+- **API Auth**: `none`, `basic`, or `bearer` for API requests
 - **Webhook Secret** (recommended): If set, Alertmanager must send `Authorization: Bearer <token>` on webhook requests
 
 ### Alertmanager Setup (manual)
@@ -95,6 +98,85 @@ After updating Alertmanager config, reload it (for example `POST /-/reload` when
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "prometheus.alert"
+}
+```
+
+<a id="create-silence"></a>
+
+## Create Silence
+
+The Create Silence component creates a silence in Alertmanager (`POST /api/v2/silences`) to suppress matching alerts.
+
+### Configuration
+
+- **Matchers**: Required list of matchers. Each matcher has:
+  - **Name**: Label name to match
+  - **Value**: Label value to match
+  - **Is Regex**: Whether value is a regex pattern (default: false)
+  - **Is Equal**: Whether to match equality (true) or inequality (false) (default: true)
+- **Duration**: Required duration string (e.g. `1h`, `30m`, `2h30m`)
+- **Created By**: Required name of who is creating the silence
+- **Comment**: Required reason for the silence
+
+### Output
+
+Emits one `prometheus.silence` payload with silence ID, status, matchers, timing, and creator info.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "comment": "Scheduled maintenance window for database migration",
+    "createdBy": "SuperPlane",
+    "endsAt": "2026-02-12T17:30:00Z",
+    "matchers": [
+      {
+        "isEqual": true,
+        "isRegex": false,
+        "name": "alertname",
+        "value": "HighLatency"
+      },
+      {
+        "isEqual": true,
+        "isRegex": false,
+        "name": "severity",
+        "value": "critical"
+      }
+    ],
+    "silenceID": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+    "startsAt": "2026-02-12T16:30:00Z",
+    "status": "active"
+  },
+  "timestamp": "2026-02-12T16:30:05.123456789Z",
+  "type": "prometheus.silence"
+}
+```
+
+<a id="expire-silence"></a>
+
+## Expire Silence
+
+The Expire Silence component expires an active silence in Alertmanager (`DELETE /api/v2/silence/{silenceID}`).
+
+### Configuration
+
+- **Silence**: Required silence to expire. Supports expressions so users can reference `$['Create Silence'].silenceID`.
+
+### Output
+
+Emits one `prometheus.silence.expired` payload with silence ID and status.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "silenceID": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+    "status": "expired"
+  },
+  "timestamp": "2026-02-12T17:45:10.987654321Z",
+  "type": "prometheus.silence.expired"
 }
 ```
 

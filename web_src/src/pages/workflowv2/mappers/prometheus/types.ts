@@ -15,6 +15,23 @@ export interface PrometheusAlertPayload {
   externalURL?: string;
 }
 
+export interface PrometheusSilencePayload {
+  silenceID?: string;
+  status?: string;
+  matchers?: PrometheusMatcher[];
+  startsAt?: string;
+  endsAt?: string;
+  createdBy?: string;
+  comment?: string;
+}
+
+export interface PrometheusMatcher {
+  name?: string;
+  value?: string;
+  isRegex?: boolean;
+  isEqual?: boolean;
+}
+
 export interface OnAlertConfiguration {
   statuses?: string[];
   alertNames?: string[];
@@ -28,4 +45,24 @@ export interface OnAlertMetadata {
 export interface GetAlertConfiguration {
   alertName?: string;
   state?: string;
+}
+
+export interface CreateSilenceConfiguration {
+  matchers?: PrometheusMatcher[];
+  duration?: string;
+  createdBy?: string;
+  comment?: string;
+}
+
+export interface CreateSilenceNodeMetadata {
+  silenceID?: string;
+}
+
+export interface ExpireSilenceConfiguration {
+  silence?: string;
+  silenceID?: string;
+}
+
+export interface ExpireSilenceNodeMetadata {
+  silenceID?: string;
 }

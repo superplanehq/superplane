@@ -144,6 +144,8 @@ func (a *AWS) Components() []core.Component {
 		&codeartifact.DisposePackageVersions{},
 		&codeartifact.GetPackageVersion{},
 		&codeartifact.UpdatePackageVersionsStatus{},
+		&codepipeline.GetPipeline{},
+		&codepipeline.GetPipelineExecution{},
 		&codepipeline.RunPipeline{},
 		&ecs.CreateService{},
 		&ecs.DescribeService{},

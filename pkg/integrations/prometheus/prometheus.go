@@ -31,6 +31,7 @@ type Prometheus struct{}
 
 type Configuration struct {
 	BaseURL            string `json:"baseURL" mapstructure:"baseURL"`
+	AlertmanagerURL    string `json:"alertmanagerURL,omitempty" mapstructure:"alertmanagerURL"`
 	AuthType           string `json:"authType" mapstructure:"authType"`
 	Username           string `json:"username,omitempty" mapstructure:"username"`
 	Password           string `json:"password,omitempty" mapstructure:"password"`
@@ -61,7 +62,8 @@ func (p *Prometheus) Instructions() string {
 
 Configure this integration with:
 - **Prometheus Base URL**: URL of your Prometheus server (e.g., ` + "`https://prometheus.example.com`" + `)
-- **API Auth**: ` + "`none`" + `, ` + "`basic`" + `, or ` + "`bearer`" + ` for Prometheus API requests
+- **Alertmanager Base URL** (optional): URL of your Alertmanager instance (e.g., ` + "`https://alertmanager.example.com`" + `). Required for Silence components. If omitted, the Prometheus Base URL is used.
+- **API Auth**: ` + "`none`" + `, ` + "`basic`" + `, or ` + "`bearer`" + ` for API requests
 - **Webhook Secret** (recommended): If set, Alertmanager must send ` + "`Authorization: Bearer <token>`" + ` on webhook requests
 
 ### Alertmanager Setup (manual)
@@ -81,6 +83,14 @@ func (p *Prometheus) Configuration() []configuration.Field {
 			Required:    true,
 			Placeholder: "https://prometheus.example.com",
 			Description: "Base URL for Prometheus HTTP API",
+		},
+		{
+			Name:        "alertmanagerURL",
+			Label:       "Alertmanager Base URL",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Placeholder: "https://alertmanager.example.com",
+			Description: "Base URL for Alertmanager API (used by Silence components). Falls back to Prometheus Base URL if not set.",
 		},
 		{
 			Name:     "authType",
@@ -141,6 +151,8 @@ func (p *Prometheus) Configuration() []configuration.Field {
 func (p *Prometheus) Components() []core.Component {
 	return []core.Component{
 		&GetAlert{},
+		&CreateSilence{},
+		&ExpireSilence{},
 	}
 }
 
@@ -208,10 +220,6 @@ func (p *Prometheus) Cleanup(ctx core.IntegrationCleanupContext) error {
 
 func (p *Prometheus) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
-}
-
-func (p *Prometheus) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	return []core.IntegrationResource{}, nil
 }
 
 func (p *Prometheus) Actions() []core.Action {
