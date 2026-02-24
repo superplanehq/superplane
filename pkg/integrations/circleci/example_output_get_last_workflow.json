@@ -1,0 +1,32 @@
+{
+  "type": "circleci.lastWorkflow",
+  "timestamp": "2026-02-24T16:06:00Z",
+  "data": {
+    "project_slug": "gh/username/repo",
+    "pipeline": {
+      "id": "1285fe1d-d3a6-44fc-8886-8979558254c4",
+      "number": 130,
+      "state": "created",
+      "created_at": "2026-02-24T16:00:00Z",
+      "updated_at": "2026-02-24T16:01:30Z",
+      "vcs": {
+        "branch": "main",
+        "revision": "d34db33f"
+      },
+      "trigger": {
+        "type": "api"
+      }
+    },
+    "workflow": {
+      "id": "fda08377-fe7e-46b1-8992-3a7aaecac9c3",
+      "name": "build-test-deploy",
+      "status": "success",
+      "created_at": "2026-02-24T16:00:00Z",
+      "stopped_at": "2026-02-24T16:01:30Z",
+      "pipeline_id": "1285fe1d-d3a6-44fc-8886-8979558254c4",
+      "pipeline_number": 130,
+      "project_slug": "gh/username/repo",
+      "started_by": "dev101labs"
+    }
+  }
+}

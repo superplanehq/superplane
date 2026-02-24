@@ -1,0 +1,34 @@
+{
+  "type": "circleci.testMetrics",
+  "timestamp": "2026-02-24T16:08:00Z",
+  "data": {
+    "project_slug": "gh/username/repo",
+    "workflow_name": "build-test-deploy",
+    "branch": "main",
+    "reporting_window": "last-30-days",
+    "metrics": {
+      "items": [
+        {
+          "name": "build-test-deploy",
+          "total_runs": 120,
+          "total_failing": 9,
+          "total_successful": 111,
+          "tests": {
+            "slowest": [
+              {
+                "name": "TestIntegrationSuite",
+                "avg_duration": 32.4
+              }
+            ],
+            "most_failed": [
+              {
+                "name": "TestRetries",
+                "failed_runs": 4
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

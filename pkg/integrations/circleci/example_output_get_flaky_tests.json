@@ -1,0 +1,29 @@
+{
+  "type": "circleci.flakyTests",
+  "timestamp": "2026-02-24T16:09:00Z",
+  "data": {
+    "project_slug": "gh/username/repo",
+    "branch": "main",
+    "reporting_window": "last-90-days",
+    "flaky_tests": {
+      "items": [
+        {
+          "name": "TestPipelineRetry",
+          "classname": "pipeline_test",
+          "file": "internal/pipeline/retry_test.go",
+          "flaky_rate": 0.14,
+          "total_runs": 56,
+          "failed_runs": 8
+        },
+        {
+          "name": "TestWorkflowSummary",
+          "classname": "workflow_test",
+          "file": "internal/workflow/summary_test.go",
+          "flaky_rate": 0.08,
+          "total_runs": 50,
+          "failed_runs": 4
+        }
+      ]
+    }
+  }
+}

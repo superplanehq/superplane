@@ -1,0 +1,26 @@
+{
+  "type": "circleci.recentWorkflowRuns",
+  "timestamp": "2026-02-24T16:07:00Z",
+  "data": {
+    "project_slug": "gh/username/repo",
+    "branch": "main",
+    "reporting_window": "last-90-days",
+    "insights": {
+      "items": [
+        {
+          "name": "build-test-deploy",
+          "metrics": {
+            "success_rate": 0.97,
+            "throughput": 45.2,
+            "duration_metrics": {
+              "min": 70,
+              "median": 85,
+              "p95": 140
+            }
+          }
+        }
+      ],
+      "next_page_token": ""
+    }
+  }
+}
