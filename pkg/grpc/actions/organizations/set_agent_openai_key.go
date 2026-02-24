@@ -41,6 +41,20 @@ func SetAgentOpenAIKey(
 		return nil, err
 	}
 
+	validationStatus := models.OrganizationAgentOpenAIKeyStatusUnchecked
+	var validationError *string
+	var validatedAt *time.Time
+	if validate {
+		validationStatus, validationError, validatedAt = validateOpenAIKeyLive(ctx, apiKey)
+	}
+	if validationStatus == models.OrganizationAgentOpenAIKeyStatusInvalid {
+		msg := "OpenAI rejected the provided API key"
+		if validationError != nil && *validationError != "" {
+			msg = *validationError
+		}
+		return nil, status.Error(codes.InvalidArgument, msg)
+	}
+
 	ciphertext, err := encryptor.Encrypt(ctx, []byte(apiKey), []byte(agentOpenAIKeyCredentialName))
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to encrypt OpenAI API key")
@@ -59,13 +73,6 @@ func SetAgentOpenAIKey(
 		UpdatedBy:        updatedBy,
 		CreatedAt:        now,
 		UpdatedAt:        now,
-	}
-
-	validationStatus := models.OrganizationAgentOpenAIKeyStatusUnchecked
-	var validationError *string
-	var validatedAt *time.Time
-	if validate {
-		validationStatus, validationError, validatedAt = validateOpenAIKeyLive(ctx, apiKey)
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -103,10 +110,7 @@ func SetAgentOpenAIKey(
 }
 
 func isOpenAIKeyFormatValid(apiKey string) bool {
-	if len(apiKey) < 20 {
-		return false
-	}
-	return strings.HasPrefix(apiKey, "sk-")
+	return strings.TrimSpace(apiKey) != ""
 }
 
 func validateOpenAIKeyLive(

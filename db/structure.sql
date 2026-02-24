@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -266,6 +266,44 @@ CREATE TABLE public.installation_metadata (
 
 
 --
+-- Name: organization_agent_credentials; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_agent_credentials (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    provider character varying(64) NOT NULL,
+    api_key_ciphertext bytea NOT NULL,
+    encryption_key_id character varying(255) NOT NULL,
+    key_last4 character varying(8) NOT NULL,
+    created_by uuid,
+    updated_by uuid,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT organization_agent_credentials_provider_check CHECK (((provider)::text = 'openai'::text))
+);
+
+
+--
+-- Name: organization_agent_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_agent_settings (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    agent_mode_enabled boolean DEFAULT false NOT NULL,
+    openai_key_last4 character varying(8),
+    openai_key_status character varying(32) DEFAULT 'not_configured'::character varying NOT NULL,
+    openai_key_validated_at timestamp without time zone,
+    openai_key_validation_error text,
+    updated_by uuid,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT organization_agent_settings_openai_key_status_check CHECK (((openai_key_status)::text = ANY ((ARRAY['not_configured'::character varying, 'valid'::character varying, 'invalid'::character varying, 'unchecked'::character varying])::text[])))
+);
+
+
+--
 -- Name: organization_invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -333,6 +371,25 @@ CREATE TABLE public.role_metadata (
 CREATE TABLE public.schema_migrations (
     version bigint NOT NULL,
     dirty boolean NOT NULL
+);
+
+
+--
+-- Name: scripts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.scripts (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    name character varying(128) NOT NULL,
+    label character varying(256) DEFAULT ''::character varying NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    source text DEFAULT ''::text NOT NULL,
+    manifest jsonb DEFAULT '{}'::jsonb NOT NULL,
+    status character varying(32) DEFAULT 'draft'::character varying NOT NULL,
+    created_by uuid,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
 );
 
 
@@ -692,6 +749,38 @@ ALTER TABLE ONLY public.installation_metadata
 
 
 --
+-- Name: organization_agent_credentials organization_agent_credentials_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_agent_credentials
+    ADD CONSTRAINT organization_agent_credentials_organization_id_key UNIQUE (organization_id);
+
+
+--
+-- Name: organization_agent_credentials organization_agent_credentials_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_agent_credentials
+    ADD CONSTRAINT organization_agent_credentials_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_agent_settings organization_agent_settings_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_agent_settings
+    ADD CONSTRAINT organization_agent_settings_organization_id_key UNIQUE (organization_id);
+
+
+--
+-- Name: organization_agent_settings organization_agent_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_agent_settings
+    ADD CONSTRAINT organization_agent_settings_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organization_invitations organization_invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -753,6 +842,22 @@ ALTER TABLE ONLY public.role_metadata
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: scripts scripts_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scripts
+    ADD CONSTRAINT scripts_organization_id_name_key UNIQUE (organization_id, name);
+
+
+--
+-- Name: scripts scripts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scripts
+    ADD CONSTRAINT scripts_pkey PRIMARY KEY (id);
 
 
 --
@@ -1008,6 +1113,20 @@ CREATE INDEX idx_node_requests_state_run_at ON public.workflow_node_requests USI
 
 
 --
+-- Name: idx_organization_agent_credentials_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_agent_credentials_organization_id ON public.organization_agent_credentials USING btree (organization_id);
+
+
+--
+-- Name: idx_organization_agent_settings_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_agent_settings_organization_id ON public.organization_agent_settings USING btree (organization_id);
+
+
+--
 -- Name: idx_organizations_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1019,6 +1138,13 @@ CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (d
 --
 
 CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_scripts_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_scripts_organization_id ON public.scripts USING btree (organization_id);
 
 
 --
@@ -1325,6 +1451,46 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
+-- Name: organization_agent_credentials organization_agent_credentials_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_agent_credentials
+    ADD CONSTRAINT organization_agent_credentials_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: organization_agent_credentials organization_agent_credentials_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_agent_credentials
+    ADD CONSTRAINT organization_agent_credentials_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_agent_credentials organization_agent_credentials_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_agent_credentials
+    ADD CONSTRAINT organization_agent_credentials_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: organization_agent_settings organization_agent_settings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_agent_settings
+    ADD CONSTRAINT organization_agent_settings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_agent_settings organization_agent_settings_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_agent_settings
+    ADD CONSTRAINT organization_agent_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
 -- Name: organization_invitations organization_invitations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1338,6 +1504,14 @@ ALTER TABLE ONLY public.organization_invitations
 
 ALTER TABLE ONLY public.organization_invite_links
     ADD CONSTRAINT organization_invite_links_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: scripts scripts_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scripts
+    ADD CONSTRAINT scripts_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
 
 
 --
@@ -1513,7 +1687,7 @@ ALTER TABLE ONLY public.workflow_nodes
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1532,7 +1706,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260216151135	f
+20260224131131	f
 \.
 
 
@@ -1549,7 +1723,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;

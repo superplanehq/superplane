@@ -20,10 +20,10 @@ type OrganizationAgentSettings struct {
 	ID                       uuid.UUID  `gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
 	OrganizationID           uuid.UUID  `gorm:"type:uuid;uniqueIndex"`
 	AgentModeEnabled         bool
-	OpenAIKeyLast4           *string
-	OpenAIKeyStatus          string
-	OpenAIKeyValidatedAt     *time.Time
-	OpenAIKeyValidationError *string
+	OpenAIKeyLast4           *string    `gorm:"column:openai_key_last4"`
+	OpenAIKeyStatus          string     `gorm:"column:openai_key_status"`
+	OpenAIKeyValidatedAt     *time.Time `gorm:"column:openai_key_validated_at"`
+	OpenAIKeyValidationError *string    `gorm:"column:openai_key_validation_error"`
 	UpdatedBy                *uuid.UUID `gorm:"type:uuid"`
 	CreatedAt                time.Time
 	UpdatedAt                time.Time

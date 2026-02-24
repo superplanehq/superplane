@@ -14,9 +14,10 @@ import {
   useDeleteOrganizationAgentOpenAIKey,
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { Switch } from "@/ui/switch";
+import { getApiErrorMessage } from "@/utils/errors";
 
 interface GeneralProps {
   organization: OrganizationsOrganization;
@@ -31,8 +32,9 @@ export function General({ organization }: GeneralProps) {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showDeleteForm, setShowDeleteForm] = useState(false);
   const [agentApiKey, setAgentApiKey] = useState("");
-  const [agentMessage, setAgentMessage] = useState<string | null>(null);
+  const [agentApiKeyError, setAgentApiKeyError] = useState<string | null>(null);
   const [agentError, setAgentError] = useState<string | null>(null);
+  const [showAgentConfigureModal, setShowAgentConfigureModal] = useState(false);
 
   // Use React Query mutation hook
   const updateOrganizationMutation = useUpdateOrganization(organizationId || "");
@@ -46,8 +48,8 @@ export function General({ organization }: GeneralProps) {
 
   const agentModeEnabled = agentSettings?.agentModeEnabled ?? false;
   const openAIKey = agentSettings?.openaiKey;
-  const openAIKeyStatus = openAIKey?.status || "not_configured";
   const openAIKeyConfigured = !!openAIKey?.configured;
+  const isAgentModeZeroState = !openAIKeyConfigured && !agentModeEnabled;
   const agentSettingsBusy =
     loadingAgentSettings ||
     updateAgentSettingsMutation.isPending ||
@@ -96,69 +98,66 @@ export function General({ organization }: GeneralProps) {
     }
   };
 
-  const handleAgentModeToggle = async (enabled: boolean) => {
-    if (!canUpdateOrg || !organizationId) return;
-
-    try {
-      setAgentError(null);
-      setAgentMessage(null);
-      await updateAgentSettingsMutation.mutateAsync(enabled);
-      setAgentMessage(enabled ? "Agent Mode enabled" : "Agent Mode disabled");
-      setTimeout(() => setAgentMessage(null), 3000);
-    } catch (_err) {
-      setAgentError("Failed to update Agent Mode setting");
-      setTimeout(() => setAgentError(null), 3000);
-    }
-  };
-
   const handleSaveAgentOpenAIKey = async () => {
     if (!canUpdateOrg || !organizationId) return;
     if (!agentApiKey.trim()) {
-      setAgentError("OpenAI API key is required");
+      setAgentApiKeyError("OpenAI API key is required");
       return;
     }
 
     try {
+      setAgentApiKeyError(null);
       setAgentError(null);
-      setAgentMessage(null);
-      await setAgentOpenAIKeyMutation.mutateAsync({
+      const saveResult = await setAgentOpenAIKeyMutation.mutateAsync({
         apiKey: agentApiKey.trim(),
         validate: true,
       });
+      const savedKeyStatus = saveResult?.agentSettings?.openaiKey?.status;
+      const savedKeyLast4 = saveResult?.agentSettings?.openaiKey?.last4 || "";
+      const savedKeyValidationError = saveResult?.agentSettings?.openaiKey?.validationError;
+
+      if (savedKeyStatus === "invalid") {
+        setAgentApiKeyError("Invalid OpenAI API key.");
+        return;
+      }
+
+      if (isAgentModeZeroState) {
+        await updateAgentSettingsMutation.mutateAsync(true);
+      }
       setAgentApiKey("");
-      setAgentMessage("OpenAI key saved");
-      setTimeout(() => setAgentMessage(null), 3000);
+      setShowAgentConfigureModal(false);
     } catch (_err) {
-      setAgentError("Failed to save OpenAI key");
-      setTimeout(() => setAgentError(null), 3000);
+      const apiError = getApiErrorMessage(_err);
+      setAgentApiKeyError(apiError);
     }
   };
 
-  const handleDeleteAgentOpenAIKey = async () => {
+  const handleConfigureAgentMode = () => {
+    if (!canUpdateOrg) return;
+    setAgentError(null);
+    setShowAgentConfigureModal(true);
+  };
+
+  const handleCancelConfigureAgentMode = () => {
+    setAgentApiKey("");
+    setAgentApiKeyError(null);
+    setAgentError(null);
+    setShowAgentConfigureModal(false);
+  };
+
+  const handleDisableAgentMode = async () => {
     if (!canUpdateOrg || !organizationId) return;
 
     try {
       setAgentError(null);
-      setAgentMessage(null);
       await deleteAgentOpenAIKeyMutation.mutateAsync();
-      setAgentMessage("OpenAI key removed");
-      setTimeout(() => setAgentMessage(null), 3000);
+      await updateAgentSettingsMutation.mutateAsync(false);
+      setAgentApiKey("");
+      setAgentApiKeyError(null);
+      setShowAgentConfigureModal(false);
     } catch (_err) {
-      setAgentError("Failed to remove OpenAI key");
+      setAgentError(`Failed to disable Agent Mode: ${getApiErrorMessage(_err)}`);
       setTimeout(() => setAgentError(null), 3000);
-    }
-  };
-
-  const openAIKeyStatusDescription = () => {
-    switch (openAIKeyStatus) {
-      case "valid":
-        return "Configured and validated.";
-      case "invalid":
-        return openAIKey?.validationError || "Configured, but key validation failed.";
-      case "unchecked":
-        return openAIKey?.validationError || "Configured, but validation is pending.";
-      default:
-        return "Not configured.";
     }
   };
 
@@ -202,20 +201,54 @@ export function General({ organization }: GeneralProps) {
         message="You don't have permission to update this organization."
         className="w-full"
       >
-        <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+        <Fieldset
+          className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6"
+          data-testid="agent-mode-settings-card"
+        >
           <div className="flex items-start justify-between gap-6">
             <div>
-              <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Enable Agent Mode</Label>
+              <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Mode</Label>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Turn on Agent Mode for this organization. Add an OpenAI key to make Agent Mode effective.
+                {openAIKeyConfigured || agentModeEnabled
+                  ? "Agent Mode is enabled."
+                  : "Set up Agent Mode for this organization."}
               </p>
             </div>
-            <Switch
-              checked={agentModeEnabled}
-              onCheckedChange={handleAgentModeToggle}
-              disabled={agentSettingsBusy || !canUpdateOrg}
-              aria-label="Enable Agent Mode"
-            />
+            <div className="flex items-center gap-2">
+              {isAgentModeZeroState && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleConfigureAgentMode}
+                  disabled={agentSettingsBusy || !canUpdateOrg}
+                  data-testid="agent-mode-setup-button"
+                >
+                  Setup
+                </Button>
+              )}
+              {!isAgentModeZeroState && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleConfigureAgentMode}
+                  disabled={agentSettingsBusy || !canUpdateOrg}
+                  data-testid="agent-mode-update-key-button"
+                >
+                  Update key
+                </Button>
+              )}
+              {!isAgentModeZeroState && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDisableAgentMode}
+                  disabled={!canUpdateOrg || agentSettingsBusy || !openAIKeyConfigured}
+                  data-testid="agent-mode-disable-button"
+                >
+                  Disable
+                </Button>
+              )}
+            </div>
           </div>
 
           {agentError && (
@@ -224,56 +257,54 @@ export function General({ organization }: GeneralProps) {
             </div>
           )}
 
-          {agentMessage && (
-            <div className="bg-white border border-green-300 text-green-600 px-4 py-2 rounded mt-4">
-              <p className="text-sm">{agentMessage}</p>
-            </div>
-          )}
-
-          {agentModeEnabled && (
-            <div className="mt-4 space-y-4">
-              <div>
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                  OpenAI key status:{" "}
-                  <span className="font-medium text-gray-900 dark:text-gray-100">{openAIKeyStatus}</span>
-                  {openAIKeyConfigured && openAIKey?.last4 ? (
-                    <span className="text-gray-500 dark:text-gray-400"> (••••{openAIKey.last4})</span>
-                  ) : null}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{openAIKeyStatusDescription()}</p>
-              </div>
-
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="flex-1 min-w-[320px]">
-                  <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    OpenAI API key
-                  </Label>
+          <Dialog open={showAgentConfigureModal} onOpenChange={setShowAgentConfigureModal}>
+            <DialogContent showCloseButton={!agentSettingsBusy}>
+              <DialogHeader>
+                <DialogTitle>{isAgentModeZeroState ? "Set up Agent Mode" : "Configure Agent Mode"}</DialogTitle>
+                <DialogDescription>
+                  {isAgentModeZeroState ? "Add an OpenAI API key to set up Agent Mode." : "Update the OpenAI API key."}
+                </DialogDescription>
+              </DialogHeader>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSaveAgentOpenAIKey();
+                }}
+              >
+                <div className="space-y-2">
+                  <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300">OpenAI API key</Label>
                   <Input
                     type="password"
                     value={agentApiKey}
-                    onChange={(e) => setAgentApiKey(e.target.value)}
+                    onChange={(e) => {
+                      setAgentApiKey(e.target.value);
+                      if (agentApiKeyError) {
+                        setAgentApiKeyError(null);
+                      }
+                    }}
                     placeholder="sk-..."
                     disabled={!canUpdateOrg || agentSettingsBusy}
+                    data-testid="agent-openai-key-input"
+                    className={agentApiKeyError ? "border-red-300 focus-visible:ring-red-200" : undefined}
+                    aria-invalid={agentApiKeyError ? "true" : "false"}
                   />
+                  {agentApiKeyError && <p className="text-sm text-red-600 mt-1 whitespace-pre-line">{agentApiKeyError}</p>}
                 </div>
-                <Button
-                  type="button"
-                  onClick={handleSaveAgentOpenAIKey}
-                  disabled={!canUpdateOrg || agentSettingsBusy || !agentApiKey.trim()}
-                >
-                  {setAgentOpenAIKeyMutation.isPending ? "Saving..." : "Save key"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleDeleteAgentOpenAIKey}
-                  disabled={!canUpdateOrg || agentSettingsBusy || !openAIKeyConfigured}
-                >
-                  {deleteAgentOpenAIKeyMutation.isPending ? "Removing..." : "Remove key"}
-                </Button>
-              </div>
-            </div>
-          )}
+                <DialogFooter className="mt-4">
+                  <Button type="button" variant="outline" onClick={handleCancelConfigureAgentMode} disabled={agentSettingsBusy}>
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={!canUpdateOrg || agentSettingsBusy || !agentApiKey.trim()}
+                    data-testid="agent-openai-key-save"
+                  >
+                    {setAgentOpenAIKeyMutation.isPending ? "Saving..." : "Save"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </Fieldset>
       </PermissionTooltip>
 
