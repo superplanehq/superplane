@@ -816,6 +816,7 @@ function CanvasPage(props: CanvasPageProps) {
           isOpen={isBuildingBlocksSidebarOpen}
           onToggle={handleSidebarToggle}
           blocks={props.buildingBlocks || []}
+          integrations={props.integrations}
           canvasZoom={canvasZoom}
           disabled={readOnly}
           disabledMessage="You don't have permission to edit this canvas."

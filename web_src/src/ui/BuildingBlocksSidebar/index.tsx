@@ -1,14 +1,20 @@
-import type { SuperplaneBlueprintsOutputChannel, SuperplaneComponentsOutputChannel } from "@/api-client";
+import type { OrganizationsIntegration, SuperplaneBlueprintsOutputChannel, SuperplaneComponentsOutputChannel } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/ui/dropdownMenu";
 import { resolveIcon } from "@/lib/utils";
 import { isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getComponentSubtype } from "../buildingBlocks";
-import { ChevronRight, GripVerticalIcon, Plus, Search, StickyNote, X } from "lucide-react";
+import { ChevronRight, GripVerticalIcon, Plug, Plus, Search, Settings2, StickyNote, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
@@ -80,6 +86,7 @@ export interface BuildingBlocksSidebarProps {
   isOpen: boolean;
   onToggle: (open: boolean) => void;
   blocks: BuildingBlockCategory[];
+  integrations?: OrganizationsIntegration[];
   canvasZoom?: number;
   disabled?: boolean;
   disabledMessage?: string;
@@ -91,6 +98,7 @@ export function BuildingBlocksSidebar({
   isOpen,
   onToggle,
   blocks,
+  integrations = [],
   canvasZoom = 1,
   disabled = false,
   disabledMessage,
@@ -169,6 +177,10 @@ export function BuildingBlocksSidebar({
   const [isResizing, setIsResizing] = useState(false);
   const [hoveredBlock, setHoveredBlock] = useState<BuildingBlock | null>(null);
   const dragPreviewRef = useRef<HTMLDivElement>(null);
+  const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(true);
+  const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(false);
+
+  const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
   // Save sidebar width to localStorage whenever it changes
   useEffect(() => {
@@ -243,6 +255,29 @@ export function BuildingBlocksSidebar({
       return aOrder - bOrder;
     }
 
+    if (showConnectedIntegrationsOnTop && aOrder === Infinity && bOrder === Infinity) {
+      const aIntegrationName = a.blocks.find((block) => block.integrationName)?.integrationName;
+      const bIntegrationName = b.blocks.find((block) => block.integrationName)?.integrationName;
+
+      const aHasConnectedIntegration = aIntegrationName
+        ? integrations.some(
+            (integration) =>
+              normalizeIntegrationName(integration.spec?.integrationName) === normalizeIntegrationName(aIntegrationName),
+          )
+        : false;
+
+      const bHasConnectedIntegration = bIntegrationName
+        ? integrations.some(
+            (integration) =>
+              normalizeIntegrationName(integration.spec?.integrationName) === normalizeIntegrationName(bIntegrationName),
+          )
+        : false;
+
+      if (aHasConnectedIntegration !== bHasConnectedIntegration) {
+        return aHasConnectedIntegration ? -1 : 1;
+      }
+    }
+
     return a.name.localeCompare(b.name);
   });
 
@@ -309,6 +344,27 @@ export function BuildingBlocksSidebar({
             <SelectItem value="flow">Flow</SelectItem>
           </SelectContent>
         </Select>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon-sm" className="h-8 w-8" aria-label="Sidebar settings">
+              <Settings2 className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuCheckboxItem
+              checked={showIntegrationSetupStatus}
+              onCheckedChange={(checked) => setShowIntegrationSetupStatus(Boolean(checked))}
+            >
+              Show integration setup status
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={showConnectedIntegrationsOnTop}
+              onCheckedChange={(checked) => setShowConnectedIntegrationsOnTop(Boolean(checked))}
+            >
+              Connected integrations on top
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="gap-2 py-6">
@@ -316,6 +372,8 @@ export function BuildingBlocksSidebar({
           <CategorySection
             key={category.name}
             category={category}
+            integrations={integrations}
+            showIntegrationSetupStatus={showIntegrationSetupStatus}
             canvasZoom={canvasZoom}
             searchTerm={searchTerm}
             typeFilter={typeFilter}
@@ -366,6 +424,8 @@ export function BuildingBlocksSidebar({
 
 interface CategorySectionProps {
   category: BuildingBlockCategory;
+  integrations: OrganizationsIntegration[];
+  showIntegrationSetupStatus: boolean;
   canvasZoom: number;
   searchTerm?: string;
   typeFilter?: "all" | "trigger" | "action" | "flow";
@@ -377,6 +437,8 @@ interface CategorySectionProps {
 
 function CategorySection({
   category,
+  integrations,
+  showIntegrationSetupStatus,
   canvasZoom,
   searchTerm = "",
   typeFilter = "all",
@@ -385,6 +447,8 @@ function CategorySection({
   dragPreviewRef,
   onBlockClick,
 }: CategorySectionProps) {
+  const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
   const query = searchTerm.trim().toLowerCase();
   const categoryMatches = query ? (category.name || "").toLowerCase().includes(query) : true;
 
@@ -482,6 +546,34 @@ function CategorySection({
   const appLogo = appLogoMap[integrationName];
   const categoryIconSrc = typeof appLogo === "string" ? appLogo : integrationName === "aws" ? awsIcon : undefined;
 
+  // Mirror org/integrations colors: ready=green, pending=amber, error=red, default=gray.
+  const normalizedIntegrationName = normalizeIntegrationName(firstBlock?.integrationName);
+  const matchingIntegrationStates = normalizedIntegrationName
+    ? integrations
+        .filter((integration) => normalizeIntegrationName(integration.spec?.integrationName) === normalizedIntegrationName)
+        .map((integration) => integration.status?.state)
+    : [];
+
+  const integrationState =
+    category.name === "Core"
+      ? "ready"
+      : matchingIntegrationStates.includes("ready")
+      ? "ready"
+      : matchingIntegrationStates.includes("error")
+        ? "error"
+        : matchingIntegrationStates.includes("pending")
+          ? "pending"
+          : undefined;
+
+  const integrationStatusColorClass =
+    integrationState === "ready"
+      ? "text-green-500"
+      : integrationState === "error"
+        ? "text-red-500"
+        : integrationState === "pending"
+          ? "text-amber-600"
+          : "text-gray-500";
+
   // Determine icon for special categories (Core, Bundles, SMTP use Lucide SVG; others use img when categoryIconSrc)
   let CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null = null;
   if (category.name === "Core") {
@@ -503,7 +595,7 @@ function CategorySection({
 
   return (
     <details className="flex-1 px-5 mb-5 group" open={shouldBeOpen}>
-      <summary className="relative cursor-pointer hover:text-gray-500 dark:hover:text-gray-300 mb-3 flex items-center gap-1 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
+      <summary className="relative cursor-pointer hover:text-gray-500 dark:hover:text-gray-300 mb-3 flex w-full items-center justify-between gap-2 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
         <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-border/60" />
         <span className="relative z-10 flex items-center gap-1 bg-white dark:bg-gray-900 pr-3">
           <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
@@ -514,6 +606,11 @@ function CategorySection({
           ) : null}
           <span className="text-[13px] text-gray-800 font-medium pl-1">{category.name}</span>
         </span>
+        {showIntegrationSetupStatus && (
+          <span className="relative z-10 shrink-0 bg-white dark:bg-gray-900 pl-3">
+            <Plug size={14} className={integrationStatusColorClass} />
+          </span>
+        )}
       </summary>
 
       <ItemGroup>
