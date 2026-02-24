@@ -20,14 +20,6 @@ type GetObjectAttributesConfiguration struct {
 	Key    string `json:"key" mapstructure:"key"`
 }
 
-var objectAttributeOptions = []configuration.FieldOption{
-	{Label: "ETag", Value: "ETag"},
-	{Label: "Checksum", Value: "Checksum"},
-	{Label: "ObjectParts", Value: "ObjectParts"},
-	{Label: "StorageClass", Value: "StorageClass"},
-	{Label: "ObjectSize", Value: "ObjectSize"},
-}
-
 func (c *GetObjectAttributes) Name() string {
 	return "aws.s3.getObjectAttributes"
 }
