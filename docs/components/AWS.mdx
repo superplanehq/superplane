@@ -11,6 +11,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="CloudWatch • On Alarm" href="#cloud-watch-•-on-alarm" description="Listen to AWS CloudWatch alarm state change events" />
   <LinkCard title="CodeArtifact • On Package Version" href="#code-artifact-•-on-package-version" description="Listen to AWS CodeArtifact package version events" />
+  <LinkCard title="CodePipeline • On Pipeline" href="#code-pipeline-•-on-pipeline" description="Listen to AWS CodePipeline pipeline execution state change events" />
   <LinkCard title="EC2 • On Image" href="#ec2-•-on-image" description="Listen to AWS EC2 AMI state change events" />
   <LinkCard title="ECR • On Image Push" href="#ecr-•-on-image-push" description="Listen to AWS ECR image push events" />
   <LinkCard title="ECR • On Image Scan" href="#ecr-•-on-image-scan" description="Listen to AWS ECR image scan events" />
@@ -178,6 +179,64 @@ The On Package Version trigger starts a workflow execution when a package versio
   },
   "timestamp": "2026-03-10T14:25:30.31254162Z",
   "type": "aws.codeartifact.package.version"
+}
+```
+
+<a id="code-pipeline-•-on-pipeline"></a>
+
+## CodePipeline • On Pipeline
+
+The On Pipeline trigger starts a workflow execution when AWS CodePipeline emits a pipeline execution state change event.
+
+### Use Cases
+
+- **Deployment visibility**: Start workflows whenever pipeline state changes
+- **Incident response**: Notify teams when a pipeline fails or is canceled
+- **Workflow orchestration**: Trigger follow-up automations on specific pipeline states
+
+### Configuration
+
+- **Region**: AWS region where pipeline execution events are observed
+- **Pipelines**: Optional pipeline name filters (supports equals, not-equals, and regex matches)
+- **Pipeline States**: Optional list of states to match (for example STARTED, SUCCEEDED, FAILED)
+
+### Event Data
+
+Each event includes:
+- **detail.pipeline**: CodePipeline pipeline name
+- **detail.execution-id**: Pipeline execution ID
+- **detail.state**: Pipeline execution state
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account": "123456789012",
+    "detail": {
+      "execution-id": "00000000-0000-0000-0000-000000000001",
+      "execution-trigger": {
+        "trigger-detail": "arn:aws:sts::123456789012:assumed-role/superplane-demo-role/SuperPlane-00000000-0000-0000-0000-000000000000",
+        "trigger-type": "StartPipelineExecution"
+      },
+      "pipeline": "demo-pipeline",
+      "pipeline-execution-attempt": 1,
+      "start-time": "2026-02-24T15:21:42.016Z",
+      "state": "STARTED",
+      "version": 1
+    },
+    "detail-type": "CodePipeline Pipeline Execution State Change",
+    "id": "00000000-0000-0000-0000-000000000002",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:codepipeline:us-east-1:123456789012:demo-pipeline"
+    ],
+    "source": "aws.codepipeline",
+    "time": "2026-02-24T15:21:42Z",
+    "version": "0"
+  },
+  "timestamp": "2026-02-24T15:21:52.212Z",
+  "type": "aws.codepipeline.pipeline"
 }
 ```
 

@@ -185,6 +185,7 @@ func (a *AWS) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&cloudwatch.OnAlarm{},
 		&codeartifact.OnPackageVersion{},
+		&codepipeline.OnPipeline{},
 		&ec2.OnImage{},
 		&ecr.OnImageScan{},
 		&ecr.OnImagePush{},
