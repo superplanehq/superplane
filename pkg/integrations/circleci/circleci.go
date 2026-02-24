@@ -159,6 +159,11 @@ func (c *CircleCI) ListResources(resourceType string, ctx core.ListResourcesCont
 func (c *CircleCI) Components() []core.Component {
 	return []core.Component{
 		&RunPipeline{},
+		&GetWorkflow{},
+		&GetLastWorkflow{},
+		&GetRecentWorkflowRuns{},
+		&GetTestMetrics{},
+		&GetFlakyTests{},
 	}
 }
 

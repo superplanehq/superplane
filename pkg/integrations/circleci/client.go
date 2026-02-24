@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -385,4 +386,119 @@ func (c *Client) GetPipelineDefinitions(projectID string) ([]PipelineDefinitionR
 	}
 
 	return response.Items, nil
+}
+
+func buildQueryString(params map[string]string) string {
+	if len(params) == 0 {
+		return ""
+	}
+	values := url.Values{}
+	for key, value := range params {
+		if value == "" {
+			continue
+		}
+		values.Set(key, value)
+	}
+	encoded := values.Encode()
+	if encoded == "" {
+		return ""
+	}
+	return "?" + encoded
+}
+
+func (c *Client) GetWorkflowJobs(workflowID string) (map[string]any, error) {
+	path := fmt.Sprintf("%s/workflow/%s/job", baseURL, workflowID)
+	responseBody, err := c.execRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return response, nil
+}
+
+func (c *Client) GetLastWorkflow(projectSlug string, filters map[string]string) (map[string]any, error) {
+	pipelineURL := fmt.Sprintf("%s/project/%s/pipeline%s", baseURL, projectSlug, buildQueryString(filters))
+	pipelineBody, err := c.execRequest("GET", pipelineURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var pipelineResp map[string]any
+	if err := json.Unmarshal(pipelineBody, &pipelineResp); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	items, ok := pipelineResp["items"].([]any)
+	if !ok || len(items) == 0 {
+		return map[string]any{
+			"pipeline":  pipelineResp,
+			"workflows": []any{},
+		}, nil
+	}
+
+	firstItem, ok := items[0].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected pipeline response shape")
+	}
+
+	pipelineID, _ := firstItem["id"].(string)
+	workflows, err := c.GetPipelineWorkflows(pipelineID)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"pipeline":  firstItem,
+		"workflows": workflows,
+	}, nil
+}
+
+func (c *Client) GetWorkflowInsights(projectSlug string, filters map[string]string) (map[string]any, error) {
+	path := fmt.Sprintf("%s/insights/%s/workflows%s", baseURL, projectSlug, buildQueryString(filters))
+	responseBody, err := c.execRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return response, nil
+}
+
+func (c *Client) GetWorkflowTestMetrics(projectSlug, workflowName string, filters map[string]string) (map[string]any, error) {
+	path := fmt.Sprintf("%s/insights/%s/workflows/%s/test-metrics%s", baseURL, projectSlug, workflowName, buildQueryString(filters))
+	responseBody, err := c.execRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return response, nil
+}
+
+func (c *Client) GetFlakyTests(projectSlug string, filters map[string]string) (map[string]any, error) {
+	path := fmt.Sprintf("%s/insights/%s/flaky-tests%s", baseURL, projectSlug, buildQueryString(filters))
+	responseBody, err := c.execRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return response, nil
 }
