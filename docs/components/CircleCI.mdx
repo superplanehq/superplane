@@ -15,6 +15,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Get Flaky Tests" href="#get-flaky-tests" description="Identify flaky tests in a CircleCI project" />
+  <LinkCard title="Get Last Workflow" href="#get-last-workflow" description="Get the most recent workflow for a CircleCI project" />
+  <LinkCard title="Get Recent Workflow Runs" href="#get-recent-workflow-runs" description="Get recent runs of a CircleCI workflow" />
+  <LinkCard title="Get Test Metrics" href="#get-test-metrics" description="Get test performance data for a CircleCI workflow" />
+  <LinkCard title="Get Workflow" href="#get-workflow" description="Retrieve a CircleCI workflow by ID" />
   <LinkCard title="Run Pipeline" href="#run-pipeline" description="Run a CircleCI pipeline and wait for completion" />
 </CardGrid>
 
@@ -80,6 +85,289 @@ This trigger automatically sets up a CircleCI webhook when configured. The webho
   },
   "timestamp": "2021-09-01T22:49:34.317Z",
   "type": "circleci.workflow.completed"
+}
+```
+
+<a id="get-flaky-tests"></a>
+
+## Get Flaky Tests
+
+The Get Flaky Tests component identifies flaky tests in a CircleCI project using the Insights API.
+
+### Use Cases
+
+- **Test reliability**: Identify tests that pass and fail inconsistently
+- **CI stability**: Find flaky tests that cause unreliable builds
+- **Quality improvement**: Prioritize fixing flaky tests for better developer experience
+
+### Configuration
+
+- **Project Slug**: CircleCI project slug (e.g., gh/username/repo)
+
+### Output
+
+Emits a `circleci.flakyTests` payload with a list of flaky tests and their flakiness data.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "flakyTests": [
+      {
+        "classname": "auth_test.go",
+        "file": "pkg/auth/auth_test.go",
+        "jobName": "test",
+        "pipelineName": "build-pipeline",
+        "source": "go",
+        "testName": "TestUserAuthentication",
+        "timesFlaky": 8,
+        "workflowName": "build-test-deploy"
+      },
+      {
+        "classname": "cache_test.go",
+        "file": "pkg/cache/cache_test.go",
+        "jobName": "test",
+        "pipelineName": "build-pipeline",
+        "source": "go",
+        "testName": "TestCacheInvalidation",
+        "timesFlaky": 3,
+        "workflowName": "build-test-deploy"
+      }
+    ],
+    "totalFlakyTests": 2
+  },
+  "timestamp": "2021-09-01T22:55:34.317Z",
+  "type": "circleci.flakyTests"
+}
+```
+
+<a id="get-last-workflow"></a>
+
+## Get Last Workflow
+
+The Get Last Workflow component retrieves the most recent workflow for a CircleCI project.
+
+### Use Cases
+
+- **Latest status check**: Get the most recent workflow to check project health
+- **Branch monitoring**: Monitor the latest workflow on a specific branch
+- **Status filtering**: Find the last workflow with a specific status (e.g., last successful build)
+
+### How It Works
+
+1. Fetches recent pipelines for the project (optionally filtered by branch)
+2. Iterates through pipelines to find workflows
+3. Returns the first workflow matching the optional status filter
+
+### Configuration
+
+- **Project Slug**: CircleCI project slug (e.g., gh/username/repo)
+- **Branch**: Optional branch filter
+- **Status**: Optional workflow status filter (success, failed, etc.)
+
+### Output
+
+Emits a `circleci.workflow` payload with the most recent matching workflow details.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2021-09-01T22:49:03.544Z",
+    "id": "fda08377-fe7e-46b1-8992-3a7aaecac9c3",
+    "name": "build-test-deploy",
+    "pipelineId": "1285fe1d-d3a6-44fc-8886-8979558254c4",
+    "status": "success",
+    "stoppedAt": "2021-09-01T22:55:34.317Z"
+  },
+  "timestamp": "2021-09-01T22:55:34.317Z",
+  "type": "circleci.workflow"
+}
+```
+
+<a id="get-recent-workflow-runs"></a>
+
+## Get Recent Workflow Runs
+
+The Get Recent Workflow Runs component fetches recent individual runs for a named CircleCI workflow via the Insights API.
+
+### Use Cases
+
+- **Workflow health monitoring**: See recent run statuses and durations at a glance
+- **Performance tracking**: Monitor how long workflow runs take over time
+- **Branch comparison**: Compare recent runs across branches
+
+### How It Works
+
+1. Calls the CircleCI Insights endpoint for the given project and workflow name
+2. Returns a list of individual workflow runs (up to 90 days back)
+3. Each run includes its status, duration, branch, timestamps, and credits used
+
+### Configuration
+
+- **Project Slug**: CircleCI project slug (e.g., gh/username/repo)
+- **Workflow Name**: Name of the workflow to fetch runs for
+- **Branch**: Optional branch filter (defaults to the project's default branch)
+
+### Output
+
+Emits a `circleci.workflowRuns` payload containing an array of recent workflow runs with fields like `id`, `status`, `duration`, `branch`, `createdAt`, `stoppedAt`, and `creditsUsed`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "runs": [
+      {
+        "branch": "main",
+        "createdAt": "2021-09-01T22:49:03.544Z",
+        "creditsUsed": 150,
+        "duration": 384,
+        "id": "fda08377-fe7e-46b1-8992-3a7aaecac9c3",
+        "isApproval": false,
+        "status": "success",
+        "stoppedAt": "2021-09-01T22:55:27.544Z"
+      },
+      {
+        "branch": "main",
+        "createdAt": "2021-08-31T14:22:10.000Z",
+        "creditsUsed": 160,
+        "duration": 412,
+        "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+        "isApproval": false,
+        "status": "failed",
+        "stoppedAt": "2021-08-31T14:29:02.000Z"
+      }
+    ]
+  },
+  "timestamp": "2021-09-01T22:55:34.317Z",
+  "type": "circleci.workflowRuns"
+}
+```
+
+<a id="get-test-metrics"></a>
+
+## Get Test Metrics
+
+The Get Test Metrics component fetches test performance data from the CircleCI Insights API.
+
+### Use Cases
+
+- **Test health monitoring**: Track most failed and slowest tests
+- **CI optimization**: Identify tests that slow down your pipeline
+- **Quality tracking**: Monitor test success rates across runs
+
+### Configuration
+
+- **Project Slug**: CircleCI project slug (e.g., gh/username/repo)
+- **Workflow Name**: Name of the workflow to get test metrics for
+
+### Output
+
+Emits a `circleci.testMetrics` payload with most failed tests, slowest tests, and test run summaries.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "mostFailedTests": [
+      {
+        "classname": "auth_test.go",
+        "failedRuns": 5,
+        "flaky": true,
+        "testName": "TestUserAuthentication",
+        "totalRuns": 42
+      }
+    ],
+    "slowestTests": [
+      {
+        "classname": "migration_test.go",
+        "failedRuns": 1,
+        "flaky": false,
+        "p50DurationSecs": 12.5,
+        "testName": "TestDatabaseMigration",
+        "totalRuns": 42
+      }
+    ],
+    "testRuns": [
+      {
+        "pipelineNumber": 130,
+        "successRate": 0.95,
+        "testCounts": {
+          "error": 0,
+          "failure": 2,
+          "skipped": 1,
+          "success": 38,
+          "total": 41
+        },
+        "workflowId": "fda08377-fe7e-46b1-8992-3a7aaecac9c3"
+      }
+    ],
+    "totalTestRuns": 42
+  },
+  "timestamp": "2021-09-01T22:55:34.317Z",
+  "type": "circleci.testMetrics"
+}
+```
+
+<a id="get-workflow"></a>
+
+## Get Workflow
+
+The Get Workflow component fetches details for a CircleCI workflow.
+
+### Use Cases
+
+- **Workflow inspection**: Fetch current workflow status, jobs, and metadata
+- **Workflow context**: Use workflow fields to drive branching decisions in later steps
+
+### Configuration
+
+- **Workflow ID**: The ID of the CircleCI workflow to retrieve (supports expressions)
+
+### Output
+
+Emits a `circleci.workflow` payload containing workflow fields like `id`, `name`, `status`, `createdAt`, and `stoppedAt`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2021-09-01T22:49:03.544Z",
+    "id": "fda08377-fe7e-46b1-8992-3a7aaecac9c3",
+    "jobs": [
+      {
+        "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "jobNumber": 42,
+        "name": "build",
+        "projectSlug": "gh/acme/my-app",
+        "startedAt": "2021-09-01T22:49:05.000Z",
+        "status": "success",
+        "stoppedAt": "2021-09-01T22:52:10.000Z",
+        "type": "build"
+      },
+      {
+        "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+        "jobNumber": 43,
+        "name": "test",
+        "projectSlug": "gh/acme/my-app",
+        "startedAt": "2021-09-01T22:52:15.000Z",
+        "status": "success",
+        "stoppedAt": "2021-09-01T22:54:30.000Z",
+        "type": "build"
+      }
+    ],
+    "name": "build-test-deploy",
+    "status": "success",
+    "stoppedAt": "2021-09-01T22:55:34.317Z"
+  },
+  "timestamp": "2021-09-01T22:55:34.317Z",
+  "type": "circleci.workflow"
 }
 ```
 
