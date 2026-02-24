@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect } from "react";
-import { Camera, Grid3X3, Maximize, Minus, MousePointer2, Plus } from "lucide-react";
+import { Camera, Grid3X3, Maximize, Minus, MousePointer2, Plus, SquareDot } from "lucide-react";
 import { toPng } from "html-to-image";
 
 import {
@@ -229,12 +229,12 @@ export function ZoomSlider({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant={isSnapToGridEnabled ? "default" : "ghost"}
+                variant="ghost"
                 size="icon-sm"
                 className="h-8 w-8"
                 onClick={onSnapToGridToggle}
               >
-                <Grid3X3 className="h-3 w-3" />
+                {isSnapToGridEnabled ? <SquareDot className="h-3 w-3" /> : <Grid3X3 className="h-3 w-3" />}
               </Button>
             </TooltipTrigger>
             <TooltipContent>{isSnapToGridEnabled ? "Disable snap to grid" : "Enable snap to grid"}</TooltipContent>
