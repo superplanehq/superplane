@@ -34,6 +34,7 @@ import { publishMessageMapper } from "./sns/publish_message";
 import { getPipelineExecutionMapper } from "./codepipeline/get_pipeline_execution";
 import { RUN_PIPELINE_STATE_REGISTRY, runPipelineMapper } from "./codepipeline/run_pipeline";
 import { getPipelineMapper } from "./codepipeline/get_pipeline";
+import { onPipelineTriggerRenderer } from "./codepipeline/on_pipeline";
 import { onImageTriggerRenderer } from "./ec2/on_image";
 import { createImageMapper } from "./ec2/create_image";
 import { getImageMapper as getEc2ImageMapper } from "./ec2/get_image";
@@ -91,6 +92,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   "cloudwatch.onAlarm": onAlarmTriggerRenderer,
   "codeArtifact.onPackageVersion": onPackageVersionTriggerRenderer,
+  "codepipeline.onPipeline": onPipelineTriggerRenderer,
   "ecr.onImagePush": onImagePushTriggerRenderer,
   "ecr.onImageScan": onImageScanTriggerRenderer,
   "sns.onTopicMessage": onTopicMessageTriggerRenderer,
