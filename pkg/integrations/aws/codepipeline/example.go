@@ -7,6 +7,20 @@ import (
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
+//go:embed example_data_on_pipeline.json
+var exampleDataOnPipelineBytes []byte
+
+var exampleDataOnPipelineOnce sync.Once
+var exampleDataOnPipeline map[string]any
+
+func (p *OnPipeline) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleDataOnPipelineOnce,
+		exampleDataOnPipelineBytes,
+		&exampleDataOnPipeline,
+	)
+}
+
 //go:embed example_output_run_pipeline.json
 var exampleOutputRunPipelineBytes []byte
 

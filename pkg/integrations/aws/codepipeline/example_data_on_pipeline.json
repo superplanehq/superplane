@@ -1,0 +1,15 @@
+{
+  "version": "0",
+  "id": "00000000-0000-0000-0000-000000000000",
+  "detail-type": "CodePipeline Pipeline Execution State Change",
+  "source": "aws.codepipeline",
+  "account": "123456789012",
+  "time": "2026-01-01T00:00:00Z",
+  "region": "us-east-1",
+  "resources": [],
+  "detail": {
+    "pipeline": "deploy-api",
+    "execution-id": "exec-123",
+    "state": "SUCCEEDED"
+  }
+}
