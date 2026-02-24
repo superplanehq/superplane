@@ -88,10 +88,10 @@ func Test__DeleteFeatureFlag__Execute(t *testing.T) {
 		execID := uuid.New()
 
 		err := component.Execute(core.ExecutionContext{
-			ID:            execID,
-			Configuration: map[string]any{"projectKey": "default", "flagKey": "old-feature"},
-			HTTP:          httpContext,
-			Integration:   integrationCtx,
+			ID:             execID,
+			Configuration:  map[string]any{"projectKey": "default", "flagKey": "old-feature"},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
 			ExecutionState: execStateCtx,
 		})
 
