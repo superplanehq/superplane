@@ -103,12 +103,33 @@ func (c *Client) GetProject(projectSlug string) (*ProjectResponse, error) {
 }
 
 type PipelineResponse struct {
-	ID        string                 `json:"id"`
-	Number    int                    `json:"number"`
-	State     string                 `json:"state"`
-	CreatedAt string                 `json:"created_at"`
-	UpdatedAt string                 `json:"updated_at"`
-	VCS       map[string]interface{} `json:"vcs"`
+	ID          string                 `json:"id"`
+	Number      int                    `json:"number"`
+	State       string                 `json:"state"`
+	ProjectSlug string                 `json:"project_slug"`
+	CreatedAt   string                 `json:"created_at"`
+	UpdatedAt   string                 `json:"updated_at"`
+	VCS         map[string]interface{} `json:"vcs"`
+}
+
+type AllPipelinesResponse struct {
+	Items         []PipelineResponse `json:"items"`
+	NextPageToken string             `json:"next_page_token"`
+}
+
+func (c *Client) GetAllPipelines() (*AllPipelinesResponse, error) {
+	reqURL := fmt.Sprintf("%s/pipeline", baseURL)
+	responseBody, err := c.execRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response AllPipelinesResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &response, nil
 }
 
 func (c *Client) GetPipeline(pipelineID string) (*PipelineResponse, error) {

@@ -66,18 +66,34 @@ func (c *GetTestMetrics) OutputChannels(configuration any) []core.OutputChannel 
 func (c *GetTestMetrics) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "projectSlug",
-			Label:       "Project slug",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "CircleCI project slug (e.g., gh/username/repo)",
+			Name:     "projectSlug",
+			Label:    "Project",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeProject,
+				},
+			},
 		},
 		{
-			Name:        "workflowName",
-			Label:       "Workflow name",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Name of the workflow to get test metrics for",
+			Name:     "workflowName",
+			Label:    "Workflow",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeWorkflow,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "projectSlug",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "projectSlug",
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }

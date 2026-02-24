@@ -6,6 +6,30 @@ import (
 	"net/url"
 )
 
+type WorkflowSummary struct {
+	Name string `json:"name"`
+}
+
+type WorkflowSummariesResponse struct {
+	Items         []WorkflowSummary `json:"items"`
+	NextPageToken string            `json:"next_page_token"`
+}
+
+func (c *Client) ListWorkflowSummaries(projectSlug string) (*WorkflowSummariesResponse, error) {
+	reqURL := fmt.Sprintf("%s/insights/%s/workflows", baseURL, projectSlug)
+	responseBody, err := c.execRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response WorkflowSummariesResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &response, nil
+}
+
 type WorkflowRunsParams struct {
 	Branch    string
 	StartDate string
