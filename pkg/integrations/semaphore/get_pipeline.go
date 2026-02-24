@@ -67,7 +67,7 @@ func (c *GetPipeline) Configuration() []configuration.Field {
 		{
 			Name:        "pipelineId",
 			Label:       "Pipeline ID",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeExpression,
 			Required:    true,
 			Description: "The Semaphore pipeline ID",
 			Placeholder: "e.g. {{ event.pipeline.id }}",
