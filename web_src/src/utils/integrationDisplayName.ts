@@ -12,6 +12,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   slack: "Slack",
   digitalocean: "DigitalOcean",
   discord: "Discord",
+  firehydrant: "FireHydrant",
   datadog: "DataDog",
   cloudflare: "Cloudflare",
   semaphore: "Semaphore",
