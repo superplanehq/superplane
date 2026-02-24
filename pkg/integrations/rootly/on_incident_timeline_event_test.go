@@ -209,7 +209,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "5dcbfe70-0416-469a-8629-be5353f4fd60", incident["id"])
 	})
 
-	t.Run("non-event kind -> no emit", func(t *testing.T) {
+	t.Run("non-event kind -> no emit (default kind=event filter)", func(t *testing.T) {
 		body := []byte(`{"event":{"type":"incident_event.updated","id":"evt-300","issued_at":"2026-02-10T16:10:00Z"},"data":{"id":"ev-300","event":"Note update","kind":"trail","visibility":"internal","occurred_at":"2026-02-10T16:10:00Z","created_at":"2026-02-10T16:10:01Z","incident_id":"inc-300"}}`)
 		secret := "test-secret"
 		timestamp := "1234567890"
@@ -230,6 +230,78 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 		require.Equal(t, http.StatusOK, code)
 		require.NoError(t, err)
 		require.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("kind filter set to trail -> emits trail events", func(t *testing.T) {
+		body := []byte(`{"event":{"type":"incident_event.updated","id":"evt-400","issued_at":"2026-02-10T16:20:00Z"},"data":{"id":"ev-400","event":"Audit entry","kind":"trail","visibility":"internal","occurred_at":"2026-02-10T16:20:00Z","created_at":"2026-02-10T16:20:01Z","incident_id":"inc-400"}}`)
+		secret := "test-secret"
+		timestamp := "1234567890"
+
+		headers := http.Header{}
+		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Configuration: map[string]any{"kind": "trail"},
+			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Events:        eventContext,
+			Metadata:      &contexts.MetadataContext{},
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventContext.Count())
+	})
+
+	t.Run("kind filter set to trail -> skips event kind", func(t *testing.T) {
+		body := []byte(`{"event":{"type":"incident_event.created","id":"evt-401","issued_at":"2026-02-10T16:21:00Z"},"data":{"id":"ev-401","event":"User note","kind":"event","visibility":"internal","occurred_at":"2026-02-10T16:21:00Z","created_at":"2026-02-10T16:21:01Z","incident_id":"inc-401"}}`)
+		secret := "test-secret"
+		timestamp := "1234567890"
+
+		headers := http.Header{}
+		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Configuration: map[string]any{"kind": "trail"},
+			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Events:        eventContext,
+			Metadata:      &contexts.MetadataContext{},
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("user display name in payload -> extracted from user field", func(t *testing.T) {
+		body := []byte(`{"event":{"id":"evt-500","type":"incident_event.created","issued_at":"2026-02-17T10:00:00Z"},"data":{"id":"ev-500","event":"Investigating now","event_raw":"Investigating now","kind":"event","source":"web","visibility":"internal","occurred_at":"2026-02-17T10:00:00Z","created_at":"2026-02-17T10:00:00Z","incident_id":"inc-500","user":{"id":"user-1","full_name":"Jane Smith"}}}`)
+		secret := "test-secret"
+		timestamp := "1234567890"
+
+		headers := http.Header{}
+		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Configuration: baseConfig,
+			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Events:        eventContext,
+			Metadata:      &contexts.MetadataContext{},
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventContext.Count())
+
+		payload := eventContext.Payloads[0].Data.(map[string]any)
+		assert.Equal(t, "Jane Smith", payload["user_display_name"])
 	})
 
 	t.Run("incident filters -> fetches incident and emits", func(t *testing.T) {

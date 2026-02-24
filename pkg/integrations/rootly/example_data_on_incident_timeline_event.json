@@ -24,6 +24,7 @@
     "occurred_at": "2026-02-22T09:46:23.868-08:00",
     "source": "web",
     "updated_at": "2026-02-22T09:46:23.868-08:00",
+    "user_display_name": "Jane Smith",
     "visibility": "internal"
   },
   "timestamp": "2026-02-22T17:46:40.603539728Z",

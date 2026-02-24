@@ -17,6 +17,7 @@ interface IncidentSummary {
 interface OnEventEventData extends IncidentEvent {
   incident?: IncidentSummary;
   event_type?: string;
+  user_display_name?: string;
 }
 
 /**
@@ -50,6 +51,7 @@ export const onEventTriggerRenderer: TriggerRenderer = {
       team?: string[];
       eventSource?: string[];
       visibility?: string;
+      kind?: string;
     };
     const metadataItems = [];
 
@@ -92,6 +94,13 @@ export const onEventTriggerRenderer: TriggerRenderer = {
       metadataItems.push({
         icon: "eye",
         label: `Visibility: ${configuration.visibility}`,
+      });
+    }
+
+    if (configuration?.kind) {
+      metadataItems.push({
+        icon: "tag",
+        label: `Kind: ${configuration.kind}`,
       });
     }
 
@@ -168,6 +177,10 @@ function getDetailsForIncidentEventPayload(eventData?: OnEventEventData): Record
 
   if (eventData.occurred_at) {
     details["Occurred At"] = new Date(eventData.occurred_at).toLocaleString();
+  }
+
+  if (eventData.user_display_name) {
+    details["User"] = eventData.user_display_name;
   }
 
   if (eventData.incident) {
