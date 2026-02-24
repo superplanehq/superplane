@@ -205,12 +205,7 @@ export function ZoomSlider({
         {onSnapToGridToggle && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="h-8 w-8"
-                onClick={onSnapToGridToggle}
-              >
+              <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={onSnapToGridToggle}>
                 {isSnapToGridEnabled ? <SquareDot className="h-3 w-3" /> : <Grid3X3 className="h-3 w-3" />}
               </Button>
             </TooltipTrigger>

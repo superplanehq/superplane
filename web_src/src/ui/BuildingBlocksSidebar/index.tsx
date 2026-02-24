@@ -1,15 +1,14 @@
-import type { OrganizationsIntegration, SuperplaneBlueprintsOutputChannel, SuperplaneComponentsOutputChannel } from "@/api-client";
+import type {
+  OrganizationsIntegration,
+  SuperplaneBlueprintsOutputChannel,
+  SuperplaneComponentsOutputChannel,
+} from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/ui/dropdownMenu";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { resolveIcon } from "@/lib/utils";
 import { isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
@@ -262,14 +261,16 @@ export function BuildingBlocksSidebar({
       const aHasConnectedIntegration = aIntegrationName
         ? integrations.some(
             (integration) =>
-              normalizeIntegrationName(integration.spec?.integrationName) === normalizeIntegrationName(aIntegrationName),
+              normalizeIntegrationName(integration.spec?.integrationName) ===
+              normalizeIntegrationName(aIntegrationName),
           )
         : false;
 
       const bHasConnectedIntegration = bIntegrationName
         ? integrations.some(
             (integration) =>
-              normalizeIntegrationName(integration.spec?.integrationName) === normalizeIntegrationName(bIntegrationName),
+              normalizeIntegrationName(integration.spec?.integrationName) ===
+              normalizeIntegrationName(bIntegrationName),
           )
         : false;
 
@@ -550,7 +551,9 @@ function CategorySection({
   const normalizedIntegrationName = normalizeIntegrationName(firstBlock?.integrationName);
   const matchingIntegrationStates = normalizedIntegrationName
     ? integrations
-        .filter((integration) => normalizeIntegrationName(integration.spec?.integrationName) === normalizedIntegrationName)
+        .filter(
+          (integration) => normalizeIntegrationName(integration.spec?.integrationName) === normalizedIntegrationName,
+        )
         .map((integration) => integration.status?.state)
     : [];
 
@@ -558,12 +561,12 @@ function CategorySection({
     category.name === "Core"
       ? "ready"
       : matchingIntegrationStates.includes("ready")
-      ? "ready"
-      : matchingIntegrationStates.includes("error")
-        ? "error"
-        : matchingIntegrationStates.includes("pending")
-          ? "pending"
-          : undefined;
+        ? "ready"
+        : matchingIntegrationStates.includes("error")
+          ? "error"
+          : matchingIntegrationStates.includes("pending")
+            ? "pending"
+            : undefined;
 
   const integrationStatusColorClass =
     integrationState === "ready"
