@@ -64,11 +64,15 @@ func (c *GetFlakyTests) OutputChannels(configuration any) []core.OutputChannel {
 func (c *GetFlakyTests) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "projectSlug",
-			Label:       "Project slug",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "CircleCI project slug (e.g., gh/username/repo)",
+			Name:     "projectSlug",
+			Label:    "Project",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeProject,
+				},
+			},
 		},
 	}
 }

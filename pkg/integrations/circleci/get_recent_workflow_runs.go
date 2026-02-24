@@ -74,18 +74,34 @@ func (c *GetRecentWorkflowRuns) OutputChannels(configuration any) []core.OutputC
 func (c *GetRecentWorkflowRuns) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "projectSlug",
-			Label:       "Project slug",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "CircleCI project slug (e.g., gh/username/repo)",
+			Name:     "projectSlug",
+			Label:    "Project",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeProject,
+				},
+			},
 		},
 		{
-			Name:        "workflowName",
-			Label:       "Workflow name",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Name of the workflow to fetch runs for",
+			Name:     "workflowName",
+			Label:    "Workflow",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeWorkflow,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "projectSlug",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "projectSlug",
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "branch",
