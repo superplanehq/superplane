@@ -5,10 +5,18 @@ import type { OrganizationsOrganization } from "../../../api-client/types.gen";
 import { Field, Fieldset, Label } from "../../../components/Fieldset/fieldset";
 import { Heading } from "../../../components/Heading/heading";
 import { Input } from "../../../components/Input/input";
-import { useDeleteOrganization, useUpdateOrganization } from "../../../hooks/useOrganizationData";
+import {
+  useDeleteOrganization,
+  useUpdateOrganization,
+  useOrganizationAgentSettings,
+  useUpdateOrganizationAgentSettings,
+  useSetOrganizationAgentOpenAIKey,
+  useDeleteOrganizationAgentOpenAIKey,
+} from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { Switch } from "@/ui/switch";
 
 interface GeneralProps {
   organization: OrganizationsOrganization;
@@ -22,12 +30,29 @@ export function General({ organization }: GeneralProps) {
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showDeleteForm, setShowDeleteForm] = useState(false);
+  const [agentApiKey, setAgentApiKey] = useState("");
+  const [agentMessage, setAgentMessage] = useState<string | null>(null);
+  const [agentError, setAgentError] = useState<string | null>(null);
 
   // Use React Query mutation hook
   const updateOrganizationMutation = useUpdateOrganization(organizationId || "");
   const deleteOrganizationMutation = useDeleteOrganization(organizationId || "");
+  const { data: agentSettings, isLoading: loadingAgentSettings } = useOrganizationAgentSettings(organizationId || "");
+  const updateAgentSettingsMutation = useUpdateOrganizationAgentSettings(organizationId || "");
+  const setAgentOpenAIKeyMutation = useSetOrganizationAgentOpenAIKey(organizationId || "");
+  const deleteAgentOpenAIKeyMutation = useDeleteOrganizationAgentOpenAIKey(organizationId || "");
   const canUpdateOrg = canAct("org", "update");
   const canDeleteOrg = canAct("org", "delete");
+
+  const agentModeEnabled = agentSettings?.agentModeEnabled ?? false;
+  const openAIKey = agentSettings?.openaiKey;
+  const openAIKeyStatus = openAIKey?.status || "not_configured";
+  const openAIKeyConfigured = !!openAIKey?.configured;
+  const agentSettingsBusy =
+    loadingAgentSettings ||
+    updateAgentSettingsMutation.isPending ||
+    setAgentOpenAIKeyMutation.isPending ||
+    deleteAgentOpenAIKeyMutation.isPending;
 
   const handleSave = async () => {
     if (!canUpdateOrg) return;
@@ -70,6 +95,73 @@ export function General({ organization }: GeneralProps) {
       setDeleteError("Failed to delete organization. Please try again.");
     }
   };
+
+  const handleAgentModeToggle = async (enabled: boolean) => {
+    if (!canUpdateOrg || !organizationId) return;
+
+    try {
+      setAgentError(null);
+      setAgentMessage(null);
+      await updateAgentSettingsMutation.mutateAsync(enabled);
+      setAgentMessage(enabled ? "Agent Mode enabled" : "Agent Mode disabled");
+      setTimeout(() => setAgentMessage(null), 3000);
+    } catch (_err) {
+      setAgentError("Failed to update Agent Mode setting");
+      setTimeout(() => setAgentError(null), 3000);
+    }
+  };
+
+  const handleSaveAgentOpenAIKey = async () => {
+    if (!canUpdateOrg || !organizationId) return;
+    if (!agentApiKey.trim()) {
+      setAgentError("OpenAI API key is required");
+      return;
+    }
+
+    try {
+      setAgentError(null);
+      setAgentMessage(null);
+      await setAgentOpenAIKeyMutation.mutateAsync({
+        apiKey: agentApiKey.trim(),
+        validate: true,
+      });
+      setAgentApiKey("");
+      setAgentMessage("OpenAI key saved");
+      setTimeout(() => setAgentMessage(null), 3000);
+    } catch (_err) {
+      setAgentError("Failed to save OpenAI key");
+      setTimeout(() => setAgentError(null), 3000);
+    }
+  };
+
+  const handleDeleteAgentOpenAIKey = async () => {
+    if (!canUpdateOrg || !organizationId) return;
+
+    try {
+      setAgentError(null);
+      setAgentMessage(null);
+      await deleteAgentOpenAIKeyMutation.mutateAsync();
+      setAgentMessage("OpenAI key removed");
+      setTimeout(() => setAgentMessage(null), 3000);
+    } catch (_err) {
+      setAgentError("Failed to remove OpenAI key");
+      setTimeout(() => setAgentError(null), 3000);
+    }
+  };
+
+  const openAIKeyStatusDescription = () => {
+    switch (openAIKeyStatus) {
+      case "valid":
+        return "Configured and validated.";
+      case "invalid":
+        return openAIKey?.validationError || "Configured, but key validation failed.";
+      case "unchecked":
+        return openAIKey?.validationError || "Configured, but validation is pending.";
+      default:
+        return "Not configured.";
+    }
+  };
+
   return (
     <div className="space-y-6 pt-6 text-left">
       <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
@@ -104,6 +196,86 @@ export function General({ organization }: GeneralProps) {
           </div>
         </Field>
       </Fieldset>
+
+      <PermissionTooltip
+        allowed={canUpdateOrg || permissionsLoading}
+        message="You don't have permission to update this organization."
+        className="w-full"
+      >
+        <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+          <div className="flex items-start justify-between gap-6">
+            <div>
+              <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Enable Agent Mode</Label>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Turn on Agent Mode for this organization. Add an OpenAI key to make Agent Mode effective.
+              </p>
+            </div>
+            <Switch
+              checked={agentModeEnabled}
+              onCheckedChange={handleAgentModeToggle}
+              disabled={agentSettingsBusy || !canUpdateOrg}
+              aria-label="Enable Agent Mode"
+            />
+          </div>
+
+          {agentError && (
+            <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded mt-4">
+              <p className="text-sm">{agentError}</p>
+            </div>
+          )}
+
+          {agentMessage && (
+            <div className="bg-white border border-green-300 text-green-600 px-4 py-2 rounded mt-4">
+              <p className="text-sm">{agentMessage}</p>
+            </div>
+          )}
+
+          {agentModeEnabled && (
+            <div className="mt-4 space-y-4">
+              <div>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  OpenAI key status:{" "}
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{openAIKeyStatus}</span>
+                  {openAIKeyConfigured && openAIKey?.last4 ? (
+                    <span className="text-gray-500 dark:text-gray-400"> (••••{openAIKey.last4})</span>
+                  ) : null}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{openAIKeyStatusDescription()}</p>
+              </div>
+
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="flex-1 min-w-[320px]">
+                  <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    OpenAI API key
+                  </Label>
+                  <Input
+                    type="password"
+                    value={agentApiKey}
+                    onChange={(e) => setAgentApiKey(e.target.value)}
+                    placeholder="sk-..."
+                    disabled={!canUpdateOrg || agentSettingsBusy}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleSaveAgentOpenAIKey}
+                  disabled={!canUpdateOrg || agentSettingsBusy || !agentApiKey.trim()}
+                >
+                  {setAgentOpenAIKeyMutation.isPending ? "Saving..." : "Save key"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDeleteAgentOpenAIKey}
+                  disabled={!canUpdateOrg || agentSettingsBusy || !openAIKeyConfigured}
+                >
+                  {deleteAgentOpenAIKeyMutation.isPending ? "Removing..." : "Remove key"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Fieldset>
+      </PermissionTooltip>
 
       <Fieldset className="bg-white border border-gray-300 rounded-lg p-6 space-y-4">
         {!showDeleteForm ? (

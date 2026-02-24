@@ -20,10 +20,10 @@ var _ MappedNullable = &OrganizationsBrowserAction{}
 
 // OrganizationsBrowserAction struct for OrganizationsBrowserAction
 type OrganizationsBrowserAction struct {
-	Url         *string            `json:"url,omitempty"`
-	Method      *string            `json:"method,omitempty"`
-	FormFields  *map[string]string `json:"formFields,omitempty"`
-	Description *string            `json:"description,omitempty"`
+	Url *string `json:"url,omitempty"`
+	Method *string `json:"method,omitempty"`
+	FormFields *map[string]string `json:"formFields,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
 
 // NewOrganizationsBrowserAction instantiates a new OrganizationsBrowserAction object
@@ -172,7 +172,7 @@ func (o *OrganizationsBrowserAction) SetDescription(v string) {
 }
 
 func (o OrganizationsBrowserAction) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -231,3 +231,5 @@ func (v *NullableOrganizationsBrowserAction) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

@@ -135,6 +135,16 @@ This slows activation, creates confusion in admin setup, and delays Agent Mode a
   - Section uses the same card-style structure as other settings sections on the page.
 - Destructive action (Remove key) should be visually separated and require confirmation.
 
+## Architecture Decision
+
+We intentionally separate Agent Mode settings from credential storage:
+
+- `organization_agent_settings` stores feature state and non-sensitive metadata used by UI and policy checks.
+- `organization_agent_credentials` stores encrypted OpenAI key material with tighter access controls.
+
+This separation keeps sensitive data isolated, supports future key rotation workflows (including versioned
+credentials), and avoids coupling Agent Mode to the existing Secrets feature.
+
 ## Database Structure
 
 ### Table: organization_agent_settings

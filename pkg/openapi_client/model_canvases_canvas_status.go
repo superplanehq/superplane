@@ -22,7 +22,7 @@ var _ MappedNullable = &CanvasesCanvasStatus{}
 type CanvasesCanvasStatus struct {
 	LastExecutions []CanvasesCanvasNodeExecution `json:"lastExecutions,omitempty"`
 	NextQueueItems []CanvasesCanvasNodeQueueItem `json:"nextQueueItems,omitempty"`
-	LastEvents     []CanvasesCanvasEvent         `json:"lastEvents,omitempty"`
+	LastEvents []CanvasesCanvasEvent `json:"lastEvents,omitempty"`
 }
 
 // NewCanvasesCanvasStatus instantiates a new CanvasesCanvasStatus object
@@ -139,7 +139,7 @@ func (o *CanvasesCanvasStatus) SetLastEvents(v []CanvasesCanvasEvent) {
 }
 
 func (o CanvasesCanvasStatus) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,3 +195,5 @@ func (v *NullableCanvasesCanvasStatus) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

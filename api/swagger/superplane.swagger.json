@@ -1683,6 +1683,146 @@
         ]
       }
     },
+    "/api/v1/organizations/{id}/agent-settings": {
+      "get": {
+        "summary": "Get organization Agent Mode settings",
+        "description": "Returns Agent Mode enablement and OpenAI key status for an organization",
+        "operationId": "Organizations_GetAgentSettings",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsGetAgentSettingsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      },
+      "patch": {
+        "summary": "Update organization Agent Mode settings",
+        "description": "Updates Agent Mode enablement for an organization",
+        "operationId": "Organizations_UpdateAgentSettings",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateAgentSettingsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateAgentSettingsBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/api/v1/organizations/{id}/agent-settings/openai-key": {
+      "delete": {
+        "summary": "Delete organization OpenAI key for Agent Mode",
+        "description": "Deletes the OpenAI key used by organization Agent Mode",
+        "operationId": "Organizations_DeleteAgentOpenAIKey",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsDeleteAgentOpenAIKeyResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      },
+      "put": {
+        "summary": "Create or update organization OpenAI key for Agent Mode",
+        "description": "Sets the OpenAI key used by organization Agent Mode",
+        "operationId": "Organizations_SetAgentOpenAIKey",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsSetAgentOpenAIKeyResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsSetAgentOpenAIKeyBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
     "/api/v1/organizations/{id}/integrations": {
       "get": {
         "summary": "List integrations in an organization",
@@ -4703,6 +4843,51 @@
         }
       }
     },
+    "OrganizationsAgentOpenAIKey": {
+      "type": "object",
+      "properties": {
+        "configured": {
+          "type": "boolean"
+        },
+        "last4": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "validationError": {
+          "type": "string"
+        },
+        "validatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedBy": {
+          "type": "string"
+        }
+      }
+    },
+    "OrganizationsAgentSettings": {
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string"
+        },
+        "agentModeEnabled": {
+          "type": "boolean"
+        },
+        "agentModeEffective": {
+          "type": "boolean"
+        },
+        "openaiKey": {
+          "$ref": "#/definitions/OrganizationsAgentOpenAIKey"
+        }
+      }
+    },
     "OrganizationsBrowserAction": {
       "type": "object",
       "properties": {
@@ -4761,6 +4946,14 @@
         }
       }
     },
+    "OrganizationsDeleteAgentOpenAIKeyResponse": {
+      "type": "object",
+      "properties": {
+        "agentSettings": {
+          "$ref": "#/definitions/OrganizationsAgentSettings"
+        }
+      }
+    },
     "OrganizationsDeleteIntegrationResponse": {
       "type": "object"
     },
@@ -4780,6 +4973,14 @@
       "properties": {
         "organization": {
           "$ref": "#/definitions/OrganizationsOrganization"
+        }
+      }
+    },
+    "OrganizationsGetAgentSettingsResponse": {
+      "type": "object",
+      "properties": {
+        "agentSettings": {
+          "$ref": "#/definitions/OrganizationsAgentSettings"
         }
       }
     },
@@ -4984,6 +5185,41 @@
       "properties": {
         "inviteLink": {
           "$ref": "#/definitions/OrganizationsInviteLink"
+        }
+      }
+    },
+    "OrganizationsSetAgentOpenAIKeyBody": {
+      "type": "object",
+      "properties": {
+        "apiKey": {
+          "type": "string"
+        },
+        "validate": {
+          "type": "boolean"
+        }
+      }
+    },
+    "OrganizationsSetAgentOpenAIKeyResponse": {
+      "type": "object",
+      "properties": {
+        "agentSettings": {
+          "$ref": "#/definitions/OrganizationsAgentSettings"
+        }
+      }
+    },
+    "OrganizationsUpdateAgentSettingsBody": {
+      "type": "object",
+      "properties": {
+        "agentModeEnabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "OrganizationsUpdateAgentSettingsResponse": {
+      "type": "object",
+      "properties": {
+        "agentSettings": {
+          "$ref": "#/definitions/OrganizationsAgentSettings"
         }
       }
     },

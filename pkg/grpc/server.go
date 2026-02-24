@@ -89,7 +89,7 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 	//
 	// Initialize services exposed by this server.
 	//
-	organizationService := NewOrganizationService(authService, registry, oidcProvider, baseURL, webhooksBaseURL)
+	organizationService := NewOrganizationService(authService, encryptor, registry, oidcProvider, baseURL, webhooksBaseURL)
 	organizationPb.RegisterOrganizationsServer(grpcServer, organizationService)
 
 	userService := NewUsersService(authService)

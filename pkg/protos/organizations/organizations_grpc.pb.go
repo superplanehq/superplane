@@ -30,6 +30,10 @@ const (
 	Organizations_GetInviteLink_FullMethodName            = "/Superplane.Organizations.Organizations/GetInviteLink"
 	Organizations_UpdateInviteLink_FullMethodName         = "/Superplane.Organizations.Organizations/UpdateInviteLink"
 	Organizations_ResetInviteLink_FullMethodName          = "/Superplane.Organizations.Organizations/ResetInviteLink"
+	Organizations_GetAgentSettings_FullMethodName         = "/Superplane.Organizations.Organizations/GetAgentSettings"
+	Organizations_UpdateAgentSettings_FullMethodName      = "/Superplane.Organizations.Organizations/UpdateAgentSettings"
+	Organizations_SetAgentOpenAIKey_FullMethodName        = "/Superplane.Organizations.Organizations/SetAgentOpenAIKey"
+	Organizations_DeleteAgentOpenAIKey_FullMethodName     = "/Superplane.Organizations.Organizations/DeleteAgentOpenAIKey"
 	Organizations_AcceptInviteLink_FullMethodName         = "/Superplane.Organizations.Organizations/AcceptInviteLink"
 	Organizations_ListIntegrations_FullMethodName         = "/Superplane.Organizations.Organizations/ListIntegrations"
 	Organizations_DescribeIntegration_FullMethodName      = "/Superplane.Organizations.Organizations/DescribeIntegration"
@@ -53,6 +57,10 @@ type OrganizationsClient interface {
 	GetInviteLink(ctx context.Context, in *GetInviteLinkRequest, opts ...grpc.CallOption) (*GetInviteLinkResponse, error)
 	UpdateInviteLink(ctx context.Context, in *UpdateInviteLinkRequest, opts ...grpc.CallOption) (*UpdateInviteLinkResponse, error)
 	ResetInviteLink(ctx context.Context, in *ResetInviteLinkRequest, opts ...grpc.CallOption) (*ResetInviteLinkResponse, error)
+	GetAgentSettings(ctx context.Context, in *GetAgentSettingsRequest, opts ...grpc.CallOption) (*GetAgentSettingsResponse, error)
+	UpdateAgentSettings(ctx context.Context, in *UpdateAgentSettingsRequest, opts ...grpc.CallOption) (*UpdateAgentSettingsResponse, error)
+	SetAgentOpenAIKey(ctx context.Context, in *SetAgentOpenAIKeyRequest, opts ...grpc.CallOption) (*SetAgentOpenAIKeyResponse, error)
+	DeleteAgentOpenAIKey(ctx context.Context, in *DeleteAgentOpenAIKeyRequest, opts ...grpc.CallOption) (*DeleteAgentOpenAIKeyResponse, error)
 	AcceptInviteLink(ctx context.Context, in *InviteLink, opts ...grpc.CallOption) (*_struct.Struct, error)
 	ListIntegrations(ctx context.Context, in *ListIntegrationsRequest, opts ...grpc.CallOption) (*ListIntegrationsResponse, error)
 	DescribeIntegration(ctx context.Context, in *DescribeIntegrationRequest, opts ...grpc.CallOption) (*DescribeIntegrationResponse, error)
@@ -170,6 +178,46 @@ func (c *organizationsClient) ResetInviteLink(ctx context.Context, in *ResetInvi
 	return out, nil
 }
 
+func (c *organizationsClient) GetAgentSettings(ctx context.Context, in *GetAgentSettingsRequest, opts ...grpc.CallOption) (*GetAgentSettingsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAgentSettingsResponse)
+	err := c.cc.Invoke(ctx, Organizations_GetAgentSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) UpdateAgentSettings(ctx context.Context, in *UpdateAgentSettingsRequest, opts ...grpc.CallOption) (*UpdateAgentSettingsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateAgentSettingsResponse)
+	err := c.cc.Invoke(ctx, Organizations_UpdateAgentSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) SetAgentOpenAIKey(ctx context.Context, in *SetAgentOpenAIKeyRequest, opts ...grpc.CallOption) (*SetAgentOpenAIKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetAgentOpenAIKeyResponse)
+	err := c.cc.Invoke(ctx, Organizations_SetAgentOpenAIKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) DeleteAgentOpenAIKey(ctx context.Context, in *DeleteAgentOpenAIKeyRequest, opts ...grpc.CallOption) (*DeleteAgentOpenAIKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteAgentOpenAIKeyResponse)
+	err := c.cc.Invoke(ctx, Organizations_DeleteAgentOpenAIKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *organizationsClient) AcceptInviteLink(ctx context.Context, in *InviteLink, opts ...grpc.CallOption) (*_struct.Struct, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(_struct.Struct)
@@ -254,6 +302,10 @@ type OrganizationsServer interface {
 	GetInviteLink(context.Context, *GetInviteLinkRequest) (*GetInviteLinkResponse, error)
 	UpdateInviteLink(context.Context, *UpdateInviteLinkRequest) (*UpdateInviteLinkResponse, error)
 	ResetInviteLink(context.Context, *ResetInviteLinkRequest) (*ResetInviteLinkResponse, error)
+	GetAgentSettings(context.Context, *GetAgentSettingsRequest) (*GetAgentSettingsResponse, error)
+	UpdateAgentSettings(context.Context, *UpdateAgentSettingsRequest) (*UpdateAgentSettingsResponse, error)
+	SetAgentOpenAIKey(context.Context, *SetAgentOpenAIKeyRequest) (*SetAgentOpenAIKeyResponse, error)
+	DeleteAgentOpenAIKey(context.Context, *DeleteAgentOpenAIKeyRequest) (*DeleteAgentOpenAIKeyResponse, error)
 	AcceptInviteLink(context.Context, *InviteLink) (*_struct.Struct, error)
 	ListIntegrations(context.Context, *ListIntegrationsRequest) (*ListIntegrationsResponse, error)
 	DescribeIntegration(context.Context, *DescribeIntegrationRequest) (*DescribeIntegrationResponse, error)
@@ -299,6 +351,18 @@ func (UnimplementedOrganizationsServer) UpdateInviteLink(context.Context, *Updat
 }
 func (UnimplementedOrganizationsServer) ResetInviteLink(context.Context, *ResetInviteLinkRequest) (*ResetInviteLinkResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResetInviteLink not implemented")
+}
+func (UnimplementedOrganizationsServer) GetAgentSettings(context.Context, *GetAgentSettingsRequest) (*GetAgentSettingsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAgentSettings not implemented")
+}
+func (UnimplementedOrganizationsServer) UpdateAgentSettings(context.Context, *UpdateAgentSettingsRequest) (*UpdateAgentSettingsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateAgentSettings not implemented")
+}
+func (UnimplementedOrganizationsServer) SetAgentOpenAIKey(context.Context, *SetAgentOpenAIKeyRequest) (*SetAgentOpenAIKeyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetAgentOpenAIKey not implemented")
+}
+func (UnimplementedOrganizationsServer) DeleteAgentOpenAIKey(context.Context, *DeleteAgentOpenAIKeyRequest) (*DeleteAgentOpenAIKeyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteAgentOpenAIKey not implemented")
 }
 func (UnimplementedOrganizationsServer) AcceptInviteLink(context.Context, *InviteLink) (*_struct.Struct, error) {
 	return nil, status.Error(codes.Unimplemented, "method AcceptInviteLink not implemented")
@@ -521,6 +585,78 @@ func _Organizations_ResetInviteLink_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Organizations_GetAgentSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAgentSettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).GetAgentSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_GetAgentSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).GetAgentSettings(ctx, req.(*GetAgentSettingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_UpdateAgentSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAgentSettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).UpdateAgentSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_UpdateAgentSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).UpdateAgentSettings(ctx, req.(*UpdateAgentSettingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_SetAgentOpenAIKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetAgentOpenAIKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).SetAgentOpenAIKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_SetAgentOpenAIKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).SetAgentOpenAIKey(ctx, req.(*SetAgentOpenAIKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_DeleteAgentOpenAIKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAgentOpenAIKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).DeleteAgentOpenAIKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_DeleteAgentOpenAIKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).DeleteAgentOpenAIKey(ctx, req.(*DeleteAgentOpenAIKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Organizations_AcceptInviteLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(InviteLink)
 	if err := dec(in); err != nil {
@@ -693,6 +829,22 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResetInviteLink",
 			Handler:    _Organizations_ResetInviteLink_Handler,
+		},
+		{
+			MethodName: "GetAgentSettings",
+			Handler:    _Organizations_GetAgentSettings_Handler,
+		},
+		{
+			MethodName: "UpdateAgentSettings",
+			Handler:    _Organizations_UpdateAgentSettings_Handler,
+		},
+		{
+			MethodName: "SetAgentOpenAIKey",
+			Handler:    _Organizations_SetAgentOpenAIKey_Handler,
+		},
+		{
+			MethodName: "DeleteAgentOpenAIKey",
+			Handler:    _Organizations_DeleteAgentOpenAIKey_Handler,
 		},
 		{
 			MethodName: "AcceptInviteLink",

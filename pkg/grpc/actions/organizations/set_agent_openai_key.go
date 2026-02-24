@@ -1,0 +1,149 @@
+package organizations
+
+import (
+	"context"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
+)
+
+const agentCredentialEncryptionKeyID = "default"
+
+func SetAgentOpenAIKey(
+	ctx context.Context,
+	encryptor crypto.Encryptor,
+	orgID string,
+	requesterUserID string,
+	apiKey string,
+	validate bool,
+) (*pb.SetAgentOpenAIKeyResponse, error) {
+	apiKey = strings.TrimSpace(apiKey)
+	if !isOpenAIKeyFormatValid(apiKey) {
+		return nil, status.Error(codes.InvalidArgument, "invalid OpenAI API key format")
+	}
+
+	organizationUUID, err := uuid.Parse(orgID)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid organization id")
+	}
+
+	updatedBy, err := optionalUUID(requesterUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	ciphertext, err := encryptor.Encrypt(ctx, []byte(apiKey), []byte(agentOpenAIKeyCredentialName))
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to encrypt OpenAI API key")
+	}
+
+	last4 := openAIKeyLast4(apiKey)
+	now := time.Now()
+	var settings *models.OrganizationAgentSettings
+	credential := &models.OrganizationAgentCredential{
+		OrganizationID:   organizationUUID,
+		Provider:         models.OrganizationAgentCredentialProviderOpenAI,
+		APIKeyCiphertext: ciphertext,
+		EncryptionKeyID:  agentCredentialEncryptionKeyID,
+		KeyLast4:         last4,
+		CreatedBy:        updatedBy,
+		UpdatedBy:        updatedBy,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+
+	validationStatus := models.OrganizationAgentOpenAIKeyStatusUnchecked
+	var validationError *string
+	var validatedAt *time.Time
+	if validate {
+		validationStatus, validationError, validatedAt = validateOpenAIKeyLive(ctx, apiKey)
+	}
+
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		var txErr error
+
+		settings, txErr = findOrCreateOrganizationAgentSettingsInTransaction(tx, orgID)
+		if txErr != nil {
+			return txErr
+		}
+
+		if txErr = models.UpsertOrganizationAgentCredentialInTransaction(tx, credential); txErr != nil {
+			return status.Error(codes.Internal, "failed to store OpenAI API key")
+		}
+
+		settings.OpenAIKeyLast4 = &last4
+		settings.OpenAIKeyStatus = validationStatus
+		settings.OpenAIKeyValidatedAt = validatedAt
+		settings.OpenAIKeyValidationError = validationError
+		settings.UpdatedBy = updatedBy
+		settings.UpdatedAt = now
+
+		if txErr = models.UpsertOrganizationAgentSettingsInTransaction(tx, settings); txErr != nil {
+			return status.Error(codes.Internal, "failed to update agent settings")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.SetAgentOpenAIKeyResponse{
+		AgentSettings: serializeAgentSettings(settings, credential),
+	}, nil
+}
+
+func isOpenAIKeyFormatValid(apiKey string) bool {
+	if len(apiKey) < 20 {
+		return false
+	}
+	return strings.HasPrefix(apiKey, "sk-")
+}
+
+func validateOpenAIKeyLive(
+	ctx context.Context,
+	apiKey string,
+) (string, *string, *time.Time) {
+	now := time.Now()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/models", nil)
+	if err != nil {
+		msg := "unable to validate OpenAI key right now"
+		return models.OrganizationAgentOpenAIKeyStatusUnchecked, &msg, &now
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		msg := "unable to validate OpenAI key right now"
+		return models.OrganizationAgentOpenAIKeyStatusUnchecked, &msg, &now
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return models.OrganizationAgentOpenAIKeyStatusValid, nil, &now
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		msg := "OpenAI rejected the provided API key"
+		return models.OrganizationAgentOpenAIKeyStatusInvalid, &msg, &now
+	}
+
+	if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+		msg := "unable to validate OpenAI key right now"
+		return models.OrganizationAgentOpenAIKeyStatusUnchecked, &msg, &now
+	}
+
+	msg := "OpenAI rejected the provided API key"
+	return models.OrganizationAgentOpenAIKeyStatusInvalid, &msg, &now
+}

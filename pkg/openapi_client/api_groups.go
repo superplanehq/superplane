@@ -20,14 +20,15 @@ import (
 	"strings"
 )
 
+
 // GroupsAPIService GroupsAPI service
 type GroupsAPIService service
 
 type ApiGroupsAddUserToGroupRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *GroupsAPIService
-	groupName  string
-	body       *GroupsAddUserToGroupBody
+	groupName string
+	body *GroupsAddUserToGroupBody
 }
 
 func (r ApiGroupsAddUserToGroupRequest) Body(body GroupsAddUserToGroupBody) ApiGroupsAddUserToGroupRequest {
@@ -44,27 +45,26 @@ GroupsAddUserToGroup Add user to group
 
 Adds a user to a group within a domain
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param groupName
-	@return ApiGroupsAddUserToGroupRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param groupName
+ @return ApiGroupsAddUserToGroupRequest
 */
 func (a *GroupsAPIService) GroupsAddUserToGroup(ctx context.Context, groupName string) ApiGroupsAddUserToGroupRequest {
 	return ApiGroupsAddUserToGroupRequest{
 		ApiService: a,
-		ctx:        ctx,
-		groupName:  groupName,
+		ctx: ctx,
+		groupName: groupName,
 	}
 }
 
 // Execute executes the request
-//
-//	@return map[string]interface{}
+//  @return map[string]interface{}
 func (a *GroupsAPIService) GroupsAddUserToGroupExecute(r ApiGroupsAddUserToGroupRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPost
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue map[string]interface{}
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "GroupsAPIService.GroupsAddUserToGroup")
@@ -123,14 +123,14 @@ func (a *GroupsAPIService) GroupsAddUserToGroupExecute(r ApiGroupsAddUserToGroup
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -147,9 +147,9 @@ func (a *GroupsAPIService) GroupsAddUserToGroupExecute(r ApiGroupsAddUserToGroup
 }
 
 type ApiGroupsCreateGroupRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *GroupsAPIService
-	body       *GroupsCreateGroupRequest
+	body *GroupsCreateGroupRequest
 }
 
 func (r ApiGroupsCreateGroupRequest) Body(body GroupsCreateGroupRequest) ApiGroupsCreateGroupRequest {
@@ -166,25 +166,24 @@ GroupsCreateGroup Create group
 
 Creates a new group within a domain with a specific role
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiGroupsCreateGroupRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiGroupsCreateGroupRequest
 */
 func (a *GroupsAPIService) GroupsCreateGroup(ctx context.Context) ApiGroupsCreateGroupRequest {
 	return ApiGroupsCreateGroupRequest{
 		ApiService: a,
-		ctx:        ctx,
+		ctx: ctx,
 	}
 }
 
 // Execute executes the request
-//
-//	@return GroupsCreateGroupResponse
+//  @return GroupsCreateGroupResponse
 func (a *GroupsAPIService) GroupsCreateGroupExecute(r ApiGroupsCreateGroupRequest) (*GroupsCreateGroupResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPost
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *GroupsCreateGroupResponse
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *GroupsCreateGroupResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "GroupsAPIService.GroupsCreateGroup")
@@ -242,14 +241,14 @@ func (a *GroupsAPIService) GroupsCreateGroupExecute(r ApiGroupsCreateGroupReques
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -266,11 +265,11 @@ func (a *GroupsAPIService) GroupsCreateGroupExecute(r ApiGroupsCreateGroupReques
 }
 
 type ApiGroupsDeleteGroupRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *GroupsAPIService
-	groupName  string
+	groupName string
 	domainType *string
-	domainId   *string
+	domainId *string
 }
 
 func (r ApiGroupsDeleteGroupRequest) DomainType(domainType string) ApiGroupsDeleteGroupRequest {
@@ -292,27 +291,26 @@ GroupsDeleteGroup Delete group
 
 Deletes an existing group within a domain
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param groupName
-	@return ApiGroupsDeleteGroupRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param groupName
+ @return ApiGroupsDeleteGroupRequest
 */
 func (a *GroupsAPIService) GroupsDeleteGroup(ctx context.Context, groupName string) ApiGroupsDeleteGroupRequest {
 	return ApiGroupsDeleteGroupRequest{
 		ApiService: a,
-		ctx:        ctx,
-		groupName:  groupName,
+		ctx: ctx,
+		groupName: groupName,
 	}
 }
 
 // Execute executes the request
-//
-//	@return map[string]interface{}
+//  @return map[string]interface{}
 func (a *GroupsAPIService) GroupsDeleteGroupExecute(r ApiGroupsDeleteGroupRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodDelete
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue map[string]interface{}
+		localVarHTTPMethod   = http.MethodDelete
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "GroupsAPIService.GroupsDeleteGroup")
@@ -375,14 +373,14 @@ func (a *GroupsAPIService) GroupsDeleteGroupExecute(r ApiGroupsDeleteGroupReques
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -399,11 +397,11 @@ func (a *GroupsAPIService) GroupsDeleteGroupExecute(r ApiGroupsDeleteGroupReques
 }
 
 type ApiGroupsDescribeGroupRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *GroupsAPIService
-	groupName  string
+	groupName string
 	domainType *string
-	domainId   *string
+	domainId *string
 }
 
 func (r ApiGroupsDescribeGroupRequest) DomainType(domainType string) ApiGroupsDescribeGroupRequest {
@@ -425,27 +423,26 @@ GroupsDescribeGroup Get group
 
 Returns details of a specific group within a domain
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param groupName
-	@return ApiGroupsDescribeGroupRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param groupName
+ @return ApiGroupsDescribeGroupRequest
 */
 func (a *GroupsAPIService) GroupsDescribeGroup(ctx context.Context, groupName string) ApiGroupsDescribeGroupRequest {
 	return ApiGroupsDescribeGroupRequest{
 		ApiService: a,
-		ctx:        ctx,
-		groupName:  groupName,
+		ctx: ctx,
+		groupName: groupName,
 	}
 }
 
 // Execute executes the request
-//
-//	@return GroupsDescribeGroupResponse
+//  @return GroupsDescribeGroupResponse
 func (a *GroupsAPIService) GroupsDescribeGroupExecute(r ApiGroupsDescribeGroupRequest) (*GroupsDescribeGroupResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *GroupsDescribeGroupResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *GroupsDescribeGroupResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "GroupsAPIService.GroupsDescribeGroup")
@@ -508,14 +505,14 @@ func (a *GroupsAPIService) GroupsDescribeGroupExecute(r ApiGroupsDescribeGroupRe
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -532,11 +529,11 @@ func (a *GroupsAPIService) GroupsDescribeGroupExecute(r ApiGroupsDescribeGroupRe
 }
 
 type ApiGroupsListGroupUsersRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *GroupsAPIService
-	groupName  string
+	groupName string
 	domainType *string
-	domainId   *string
+	domainId *string
 }
 
 func (r ApiGroupsListGroupUsersRequest) DomainType(domainType string) ApiGroupsListGroupUsersRequest {
@@ -558,27 +555,26 @@ GroupsListGroupUsers Get group users
 
 Returns users that belong to a specific group within a domain
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param groupName
-	@return ApiGroupsListGroupUsersRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param groupName
+ @return ApiGroupsListGroupUsersRequest
 */
 func (a *GroupsAPIService) GroupsListGroupUsers(ctx context.Context, groupName string) ApiGroupsListGroupUsersRequest {
 	return ApiGroupsListGroupUsersRequest{
 		ApiService: a,
-		ctx:        ctx,
-		groupName:  groupName,
+		ctx: ctx,
+		groupName: groupName,
 	}
 }
 
 // Execute executes the request
-//
-//	@return GroupsListGroupUsersResponse
+//  @return GroupsListGroupUsersResponse
 func (a *GroupsAPIService) GroupsListGroupUsersExecute(r ApiGroupsListGroupUsersRequest) (*GroupsListGroupUsersResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *GroupsListGroupUsersResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *GroupsListGroupUsersResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "GroupsAPIService.GroupsListGroupUsers")
@@ -641,14 +637,14 @@ func (a *GroupsAPIService) GroupsListGroupUsersExecute(r ApiGroupsListGroupUsers
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -665,10 +661,10 @@ func (a *GroupsAPIService) GroupsListGroupUsersExecute(r ApiGroupsListGroupUsers
 }
 
 type ApiGroupsListGroupsRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *GroupsAPIService
 	domainType *string
-	domainId   *string
+	domainId *string
 }
 
 func (r ApiGroupsListGroupsRequest) DomainType(domainType string) ApiGroupsListGroupsRequest {
@@ -690,25 +686,24 @@ GroupsListGroups List groups
 
 Returns a list of groups within a domain
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiGroupsListGroupsRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiGroupsListGroupsRequest
 */
 func (a *GroupsAPIService) GroupsListGroups(ctx context.Context) ApiGroupsListGroupsRequest {
 	return ApiGroupsListGroupsRequest{
 		ApiService: a,
-		ctx:        ctx,
+		ctx: ctx,
 	}
 }
 
 // Execute executes the request
-//
-//	@return GroupsListGroupsResponse
+//  @return GroupsListGroupsResponse
 func (a *GroupsAPIService) GroupsListGroupsExecute(r ApiGroupsListGroupsRequest) (*GroupsListGroupsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *GroupsListGroupsResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *GroupsListGroupsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "GroupsAPIService.GroupsListGroups")
@@ -770,14 +765,14 @@ func (a *GroupsAPIService) GroupsListGroupsExecute(r ApiGroupsListGroupsRequest)
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -794,10 +789,10 @@ func (a *GroupsAPIService) GroupsListGroupsExecute(r ApiGroupsListGroupsRequest)
 }
 
 type ApiGroupsRemoveUserFromGroupRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *GroupsAPIService
-	groupName  string
-	body       *GroupsRemoveUserFromGroupBody
+	groupName string
+	body *GroupsRemoveUserFromGroupBody
 }
 
 func (r ApiGroupsRemoveUserFromGroupRequest) Body(body GroupsRemoveUserFromGroupBody) ApiGroupsRemoveUserFromGroupRequest {
@@ -814,27 +809,26 @@ GroupsRemoveUserFromGroup Remove user from group
 
 Removes a user from a group within a domain
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param groupName
-	@return ApiGroupsRemoveUserFromGroupRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param groupName
+ @return ApiGroupsRemoveUserFromGroupRequest
 */
 func (a *GroupsAPIService) GroupsRemoveUserFromGroup(ctx context.Context, groupName string) ApiGroupsRemoveUserFromGroupRequest {
 	return ApiGroupsRemoveUserFromGroupRequest{
 		ApiService: a,
-		ctx:        ctx,
-		groupName:  groupName,
+		ctx: ctx,
+		groupName: groupName,
 	}
 }
 
 // Execute executes the request
-//
-//	@return map[string]interface{}
+//  @return map[string]interface{}
 func (a *GroupsAPIService) GroupsRemoveUserFromGroupExecute(r ApiGroupsRemoveUserFromGroupRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPatch
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue map[string]interface{}
+		localVarHTTPMethod   = http.MethodPatch
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "GroupsAPIService.GroupsRemoveUserFromGroup")
@@ -893,14 +887,14 @@ func (a *GroupsAPIService) GroupsRemoveUserFromGroupExecute(r ApiGroupsRemoveUse
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -917,10 +911,10 @@ func (a *GroupsAPIService) GroupsRemoveUserFromGroupExecute(r ApiGroupsRemoveUse
 }
 
 type ApiGroupsUpdateGroupRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *GroupsAPIService
-	groupName  string
-	body       *GroupsUpdateGroupBody
+	groupName string
+	body *GroupsUpdateGroupBody
 }
 
 func (r ApiGroupsUpdateGroupRequest) Body(body GroupsUpdateGroupBody) ApiGroupsUpdateGroupRequest {
@@ -937,27 +931,26 @@ GroupsUpdateGroup Update group
 
 Updates an existing group within a domain
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param groupName
-	@return ApiGroupsUpdateGroupRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param groupName
+ @return ApiGroupsUpdateGroupRequest
 */
 func (a *GroupsAPIService) GroupsUpdateGroup(ctx context.Context, groupName string) ApiGroupsUpdateGroupRequest {
 	return ApiGroupsUpdateGroupRequest{
 		ApiService: a,
-		ctx:        ctx,
-		groupName:  groupName,
+		ctx: ctx,
+		groupName: groupName,
 	}
 }
 
 // Execute executes the request
-//
-//	@return GroupsUpdateGroupResponse
+//  @return GroupsUpdateGroupResponse
 func (a *GroupsAPIService) GroupsUpdateGroupExecute(r ApiGroupsUpdateGroupRequest) (*GroupsUpdateGroupResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPut
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *GroupsUpdateGroupResponse
+		localVarHTTPMethod   = http.MethodPut
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *GroupsUpdateGroupResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "GroupsAPIService.GroupsUpdateGroup")
@@ -1016,14 +1009,14 @@ func (a *GroupsAPIService) GroupsUpdateGroupExecute(r ApiGroupsUpdateGroupReques
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
