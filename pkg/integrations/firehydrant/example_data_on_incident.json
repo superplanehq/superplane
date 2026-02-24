@@ -1,0 +1,40 @@
+{
+    "type": "firehydrant.onIncident",
+    "data": {
+        "event": "incident.created",
+        "operation": "CREATED",
+        "resource_type": "incident",
+        "incident": {
+            "id": "04d9fd1a-ba9c-417d-b396-58a6e2c374de",
+            "name": "API latency spike detected",
+            "number": 602,
+            "description": "Multiple endpoints experiencing high latency",
+            "summary": "API response times have increased significantly across all endpoints.",
+            "customer_impact_summary": "Users are experiencing slow page loads and timeouts.",
+            "current_milestone": "started",
+            "created_at": "2026-01-19T12:00:00Z",
+            "updated_at": "2026-01-19T12:00:00Z",
+            "started_at": "2026-01-19T12:00:00Z",
+            "severity": {
+                "slug": "SEV2",
+                "description": "A significant issue affecting a subset of users",
+                "type": "unexpected_downtime"
+            },
+            "priority": {
+                "slug": "P3",
+                "description": ""
+            },
+            "milestones": [
+                {
+                    "type": "started",
+                    "occurred_at": "2026-01-19T12:00:00Z"
+                }
+            ],
+            "impacts": [],
+            "tags": [],
+            "role_assignments": [],
+            "team_assignments": []
+        }
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}
