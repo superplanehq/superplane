@@ -42,9 +42,7 @@ export const deleteObjectMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? deleteObjectEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? deleteObjectEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: deleteObjectMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -86,11 +84,7 @@ function deleteObjectMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function deleteObjectEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function deleteObjectEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });

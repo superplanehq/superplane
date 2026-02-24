@@ -81,7 +81,10 @@ function copyObjectMetadataList(node: NodeInfo): MetadataItem[] {
 
   const srcBucket = configuration?.sourceBucket?.trim();
   if (srcBucket) {
-    metadata.push({ icon: "arrow-right", label: `${srcBucket} → ${configuration?.destinationBucket?.trim() || "..."}` });
+    metadata.push({
+      icon: "arrow-right",
+      label: `${srcBucket} → ${configuration?.destinationBucket?.trim() || "..."}`,
+    });
   }
 
   return metadata;
