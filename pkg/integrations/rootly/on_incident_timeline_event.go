@@ -28,6 +28,7 @@ type OnIncidentTimelineEventConfiguration struct {
 	Team           []string `json:"team" mapstructure:"team"`
 	EventSource    []string `json:"eventSource" mapstructure:"eventSource"`
 	Visibility     string   `json:"visibility" mapstructure:"visibility"`
+	Kind           string   `json:"kind" mapstructure:"kind"`
 }
 
 type OnIncidentTimelineEventMetadata struct {
@@ -48,7 +49,7 @@ func (t *OnIncidentTimelineEvent) Description() string {
 
 func (t *OnIncidentTimelineEvent) Documentation() string {
 	return `The On Incident Timeline Event trigger starts a workflow execution when Rootly incident timeline events are created or updated.
-Only events with kind "event" are emitted.
+By default, only events with kind "event" (user-created notes and annotations) are emitted. Configure the Event Kind filter to receive other kinds such as "trail", "start", or "close".
 
 ## Use Cases
 
@@ -65,6 +66,7 @@ Only events with kind "event" are emitted.
 - **Team**: Optional filter by team name
 - **Event Source**: Optional filter by event source (web, api, system)
 - **Visibility**: Optional filter by event visibility (internal or external)
+- **Event Kind**: Optional filter by event kind (defaults to "event"; set to "trail", "start", or "close" to receive other kinds)
 
 ## Event Data
 
@@ -82,6 +84,7 @@ Each incident event includes:
 - **updated_at**: When the event was last updated
 - **issued_at**: When the webhook was issued
 - **incident_id**: Incident ID
+- **user_display_name**: Display name of the user who created the event
 - **incident**: Incident information
 
 ## Webhook Setup
@@ -202,6 +205,15 @@ func (t *OnIncidentTimelineEvent) Configuration() []configuration.Field {
 			},
 			Description: "Only emit events with this visibility",
 		},
+		{
+			Name:        "kind",
+			Label:       "Event Kind",
+			Type:        configuration.FieldTypeExpression,
+			Required:    false,
+			Togglable:   true,
+			Default:     "event",
+			Description: "Only emit events with this kind (defaults to \"event\"). Set to \"trail\", \"start\", or \"close\" to receive other kinds.",
+		},
 	}
 }
 
@@ -263,12 +275,17 @@ func (t *OnIncidentTimelineEvent) HandleWebhook(ctx core.WebhookRequestContext) 
 		return http.StatusOK, nil
 	}
 
-	incidentID := extractString(incidentEvent, "incident_id", "incidentId")
-
-	// Only process events with kind "event" to avoid emitting for non-timeline events like "trail/start/close".
-	if !strings.EqualFold(extractString(incidentEvent, "kind"), "event") {
+	// Apply kind filter. Defaults to "event" (user-created notes/annotations) when not configured,
+	// preserving backward compatibility. Set config.Kind explicitly to receive other kinds (trail, start, close).
+	kindFilter := config.Kind
+	if kindFilter == "" {
+		kindFilter = "event"
+	}
+	if !strings.EqualFold(kindFilter, extractString(incidentEvent, "kind")) {
 		return http.StatusOK, nil
 	}
+
+	incidentID := extractString(incidentEvent, "incident_id", "incidentId")
 
 	incidentFiltersEnabled := len(config.IncidentStatus) > 0 || len(config.Severity) > 0 || len(config.Service) > 0 || len(config.Team) > 0
 	var incidentDetails map[string]any
@@ -376,23 +393,46 @@ func extractEventFromData(data map[string]any) map[string]any {
 func buildIncidentTimelineEventPayload(incident map[string]any, incidentEvent map[string]any, webhookEvent WebhookEvent) map[string]any {
 	incidentPayload := buildIncidentSummaryPayload(incident, incidentEvent)
 	payload := map[string]any{
-		"id":          extractString(incidentEvent, "id"),
-		"event":       extractString(incidentEvent, "event"),
-		"event_raw":   extractString(incidentEvent, "event_raw"),
-		"kind":        extractString(incidentEvent, "kind"),
-		"source":      extractString(incidentEvent, "source"),
-		"visibility":  extractString(incidentEvent, "visibility"),
-		"occurred_at": extractString(incidentEvent, "occurred_at"),
-		"created_at":  extractString(incidentEvent, "created_at"),
-		"updated_at":  extractString(incidentEvent, "updated_at"),
-		"incident_id": extractString(incidentEvent, "incident_id", "incidentId"),
-		"event_id":    webhookEvent.ID,
-		"event_type":  webhookEvent.Type,
-		"issued_at":   webhookEvent.IssuedAt,
-		"incident":    incidentPayload,
+		"id":                extractString(incidentEvent, "id"),
+		"event":             extractString(incidentEvent, "event"),
+		"event_raw":         extractString(incidentEvent, "event_raw"),
+		"kind":              extractString(incidentEvent, "kind"),
+		"source":            extractString(incidentEvent, "source"),
+		"visibility":        extractString(incidentEvent, "visibility"),
+		"occurred_at":       extractString(incidentEvent, "occurred_at"),
+		"created_at":        extractString(incidentEvent, "created_at"),
+		"updated_at":        extractString(incidentEvent, "updated_at"),
+		"incident_id":       extractString(incidentEvent, "incident_id", "incidentId"),
+		"event_id":          webhookEvent.ID,
+		"event_type":        webhookEvent.Type,
+		"issued_at":         webhookEvent.IssuedAt,
+		"user_display_name": extractUserDisplayName(incidentEvent),
+		"incident":          incidentPayload,
 	}
 
 	return payload
+}
+
+// extractUserDisplayName extracts the display name of the user who created the event.
+// It tries common field paths used by the Rootly API.
+func extractUserDisplayName(data map[string]any) string {
+	if name := extractString(data, "user_display_name"); name != "" {
+		return name
+	}
+
+	if user, ok := data["user"].(map[string]any); ok {
+		if name := extractString(user, "full_name", "name", "display_name"); name != "" {
+			return name
+		}
+	}
+
+	if createdBy, ok := data["created_by"].(map[string]any); ok {
+		if name := extractString(createdBy, "full_name", "name", "display_name"); name != "" {
+			return name
+		}
+	}
+
+	return ""
 }
 
 // buildIncidentSummaryPayload emits a compact incident stub for filtering context.
