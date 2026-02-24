@@ -18,13 +18,13 @@ const KindFlag = "flag"
 
 // LaunchDarkly webhook actions found in the accesses array.
 const (
-	ActionCreateFlag        = "createFlag"
-	ActionUpdateOn          = "updateOn"
+	ActionCreateFlag         = "createFlag"
+	ActionUpdateOn           = "updateOn"
 	ActionUpdateOffVariation = "updateOffVariation"
-	ActionUpdateFallthrough = "updateFallthrough"
-	ActionUpdateRules       = "updateRules"
-	ActionUpdateTargets     = "updateTargets"
-	ActionDeleteFlag        = "deleteFlag"
+	ActionUpdateFallthrough  = "updateFallthrough"
+	ActionUpdateRules        = "updateRules"
+	ActionUpdateTargets      = "updateTargets"
+	ActionDeleteFlag         = "deleteFlag"
 )
 
 type OnFeatureFlagChange struct{}
