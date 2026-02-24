@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -108,6 +109,7 @@ type PipelineResponse struct {
 	CreatedAt string                 `json:"created_at"`
 	UpdatedAt string                 `json:"updated_at"`
 	VCS       map[string]interface{} `json:"vcs"`
+	Trigger   map[string]interface{} `json:"trigger,omitempty"`
 }
 
 func (c *Client) GetPipeline(pipelineID string) (*PipelineResponse, error) {
@@ -163,11 +165,15 @@ func (c *Client) RunPipeline(projectSlug string, params RunPipelineParams) (*Run
 }
 
 type WorkflowResponse struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"created_at"`
-	StoppedAt string `json:"stopped_at"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Status         string `json:"status"`
+	CreatedAt      string `json:"created_at"`
+	StoppedAt      string `json:"stopped_at"`
+	PipelineID     string `json:"pipeline_id"`
+	PipelineNumber int    `json:"pipeline_number"`
+	ProjectSlug    string `json:"project_slug"`
+	StartedBy      string `json:"started_by"`
 }
 
 func (c *Client) GetPipelineWorkflows(pipelineID string) ([]WorkflowResponse, error) {
@@ -202,6 +208,127 @@ func (c *Client) GetWorkflow(workflowID string) (*WorkflowResponse, error) {
 	}
 
 	return &workflow, nil
+}
+
+type WorkflowJobResponse struct {
+	ID        string `json:"id"`
+	JobNumber int    `json:"job_number"`
+	Name      string `json:"name"`
+	Status    string `json:"status"`
+	Type      string `json:"type"`
+	StartedAt string `json:"started_at"`
+	StoppedAt string `json:"stopped_at"`
+	Duration  int    `json:"duration"`
+}
+
+func (c *Client) GetWorkflowJobs(workflowID string) ([]WorkflowJobResponse, error) {
+	requestURL := fmt.Sprintf("%s/workflow/%s/job", baseURL, workflowID)
+	responseBody, err := c.execRequest("GET", requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Items []WorkflowJobResponse `json:"items"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return response.Items, nil
+}
+
+func (c *Client) GetProjectPipelines(projectSlug, branch string) ([]PipelineResponse, error) {
+	requestURL := fmt.Sprintf("%s/project/%s/pipeline", baseURL, projectSlug)
+
+	query := url.Values{}
+	if branch != "" {
+		query.Set("branch", branch)
+	}
+	if len(query) > 0 {
+		requestURL = fmt.Sprintf("%s?%s", requestURL, query.Encode())
+	}
+
+	responseBody, err := c.execRequest("GET", requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Items []PipelineResponse `json:"items"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return response.Items, nil
+}
+
+func (c *Client) GetInsightsWorkflows(projectSlug, branch, reportingWindow string) (map[string]any, error) {
+	requestURL := fmt.Sprintf("%s/insights/%s/workflows", baseURL, projectSlug)
+	requestURL = withInsightsQueryParams(requestURL, branch, reportingWindow)
+
+	responseBody, err := c.execRequest("GET", requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return response, nil
+}
+
+func (c *Client) GetTestMetrics(projectSlug, workflowName, branch, reportingWindow string) (map[string]any, error) {
+	requestURL := fmt.Sprintf("%s/insights/%s/workflows/%s/test-metrics", baseURL, projectSlug, url.PathEscape(workflowName))
+	requestURL = withInsightsQueryParams(requestURL, branch, reportingWindow)
+
+	responseBody, err := c.execRequest("GET", requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return response, nil
+}
+
+func (c *Client) GetFlakyTests(projectSlug, branch, reportingWindow string) (map[string]any, error) {
+	requestURL := fmt.Sprintf("%s/insights/%s/flaky-tests", baseURL, projectSlug)
+	requestURL = withInsightsQueryParams(requestURL, branch, reportingWindow)
+
+	responseBody, err := c.execRequest("GET", requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return response, nil
+}
+
+func withInsightsQueryParams(requestURL, branch, reportingWindow string) string {
+	query := url.Values{}
+
+	if branch != "" {
+		query.Set("branch", branch)
+	}
+	if reportingWindow != "" {
+		query.Set("reporting-window", reportingWindow)
+	}
+	if len(query) == 0 {
+		return requestURL
+	}
+
+	return fmt.Sprintf("%s?%s", requestURL, query.Encode())
 }
 
 type PipelineStatusResult struct {

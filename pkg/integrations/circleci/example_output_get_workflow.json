@@ -1,0 +1,45 @@
+{
+  "type": "circleci.workflow",
+  "timestamp": "2026-02-24T16:05:00Z",
+  "data": {
+    "workflow": {
+      "id": "fda08377-fe7e-46b1-8992-3a7aaecac9c3",
+      "name": "build-test-deploy",
+      "status": "success",
+      "created_at": "2026-02-24T16:00:00Z",
+      "stopped_at": "2026-02-24T16:01:30Z",
+      "pipeline_id": "1285fe1d-d3a6-44fc-8886-8979558254c4",
+      "pipeline_number": 130,
+      "project_slug": "gh/username/repo",
+      "started_by": "dev101labs"
+    },
+    "jobs": [
+      {
+        "id": "job-1",
+        "job_number": 801,
+        "name": "build",
+        "status": "success",
+        "type": "build",
+        "started_at": "2026-02-24T16:00:05Z",
+        "stopped_at": "2026-02-24T16:00:45Z",
+        "duration": 40
+      },
+      {
+        "id": "job-2",
+        "job_number": 802,
+        "name": "test",
+        "status": "success",
+        "type": "build",
+        "started_at": "2026-02-24T16:00:46Z",
+        "stopped_at": "2026-02-24T16:01:29Z",
+        "duration": 43
+      }
+    ],
+    "pipeline": {
+      "id": "1285fe1d-d3a6-44fc-8886-8979558254c4",
+      "number": 130,
+      "project_slug": "gh/username/repo"
+    },
+    "duration_seconds": 90
+  }
+}
