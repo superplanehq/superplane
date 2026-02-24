@@ -8,62 +8,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-type OnIncident struct{}
-
-func (t *OnIncident) Name() string {
-	return "firehydrant.onIncident"
-}
-
-func (t *OnIncident) Label() string {
-	return "On New Incident"
-}
-
-func (t *OnIncident) Description() string {
-	return "Runs when a new incident is created in FireHydrant"
-}
-
-func (t *OnIncident) Documentation() string {
-	return ""
-}
-
-func (t *OnIncident) Icon() string {
-	return "flame"
-}
-
-func (t *OnIncident) Color() string {
-	return "gray"
-}
-
-func (t *OnIncident) Configuration() []configuration.Field {
-	return []configuration.Field{}
-}
-
-func (t *OnIncident) Setup(ctx core.TriggerContext) error {
-	return nil
-}
-
-func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
-}
-
-func (t *OnIncident) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (t *OnIncident) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	return nil, nil
-}
-
-func (t *OnIncident) Cleanup(ctx core.TriggerContext) error {
-	return nil
-}
-
-// Stub for ExampleData - will be implemented with embedded JSON
-func (t *OnIncident) ExampleData() map[string]any {
-	return map[string]any{}
-}
-
-var _ core.Trigger = (*OnIncident)(nil)
 var _ core.Component = (*CreateIncident)(nil)
 
 type CreateIncident struct{}
