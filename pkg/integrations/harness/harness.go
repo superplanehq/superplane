@@ -80,9 +80,10 @@ func (h *Harness) Cleanup(ctx core.IntegrationCleanupContext) error {
 
 func (h *Harness) Sync(ctx core.SyncContext) error {
 	if ctx.FirstSetup {
-		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: setupInstructions,
-		})
+		ctx.Integration.Instructions(
+			setupInstructions,
+			[]core.SetupAction{},
+		)
 		return nil
 	}
 

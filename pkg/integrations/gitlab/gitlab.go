@@ -190,9 +190,10 @@ func (g *GitLab) Triggers() []core.Trigger {
 
 func (g *GitLab) Sync(ctx core.SyncContext) error {
 	if ctx.FirstSetup {
-		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: setupInstructions,
-		})
+		ctx.Integration.Instructions(
+			setupInstructions,
+			[]core.SetupAction{},
+		)
 		return nil
 	}
 
@@ -231,11 +232,18 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 	// If no client ID or secret, show setup instructions
 	//
 	if string(clientID) == "" || string(clientSecret) == "" {
-		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: fmt.Sprintf(appSetupDescription, callbackURL, strings.Join(scopeList, ", ")),
-			URL:         fmt.Sprintf("%s/-/user_settings/applications", baseURL),
-			Method:      "GET",
-		})
+		ctx.Integration.Instructions(
+			fmt.Sprintf(appSetupDescription, callbackURL, strings.Join(scopeList, ", ")),
+			[]core.SetupAction{
+				{
+					Type: "redirect",
+					Redirect: &core.RedirectAction{
+						URL:    fmt.Sprintf("%s/-/user_settings/applications", baseURL),
+						Method: "GET",
+					},
+				},
+			},
+		)
 
 		return nil
 	}
@@ -263,7 +271,7 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 		return nil
 	}
 
-	ctx.Integration.RemoveBrowserAction()
+	ctx.Integration.RemoveInstructions()
 	ctx.Integration.Ready()
 	return nil
 }
@@ -330,11 +338,18 @@ func (g *GitLab) handleOAuthNoAccessToken(ctx core.SyncContext, baseURL string, 
 		url.QueryEscape(*metadata.State),
 	)
 
-	ctx.Integration.NewBrowserAction(core.BrowserAction{
-		Description: appConnectDescription,
-		URL:         authURL,
-		Method:      "GET",
-	})
+	ctx.Integration.Instructions(
+		appConnectDescription,
+		[]core.SetupAction{
+			{
+				Type: "redirect",
+				Redirect: &core.RedirectAction{
+					URL:    authURL,
+					Method: "GET",
+				},
+			},
+		},
+	)
 
 	return nil
 }
@@ -354,7 +369,7 @@ func (g *GitLab) personalAccessTokenSync(ctx core.SyncContext) error {
 		return nil
 	}
 
-	ctx.Integration.RemoveBrowserAction()
+	ctx.Integration.RemoveInstructions()
 	ctx.Integration.Ready()
 	return nil
 }
@@ -479,7 +494,7 @@ func (g *GitLab) handleCallback(ctx core.HTTPRequestContext, config *Configurati
 		return
 	}
 
-	ctx.Integration.RemoveBrowserAction()
+	ctx.Integration.RemoveInstructions()
 	ctx.Integration.Ready()
 
 	http.Redirect(ctx.Response, ctx.Request,

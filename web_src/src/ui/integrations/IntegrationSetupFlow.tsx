@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Loader2 } from "lucide-react";
-import type { ConfigurationField, IntegrationsIntegrationDefinition } from "@/api-client";
+import { Check, Loader2, Settings2 } from "lucide-react";
+import type { ConfigurationField, IntegrationsIntegrationDefinition, OrganizationsSetupAction } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +13,10 @@ import {
   useAvailableIntegrations,
   useCreateIntegration,
   useIntegration,
+  useInvokeIntegrationAction,
   useUpdateIntegration,
 } from "@/hooks/useIntegrations";
+import { executeSetupRedirectAction } from "@/utils/setupInstructions";
 
 interface IntegrationSetupFlowProps {
   organizationId: string;
@@ -36,10 +38,12 @@ export function IntegrationSetupFlow({
   const [installationName, setInstallationName] = useState(integrationName);
   const [createdIntegrationId, setCreatedIntegrationId] = useState<string | null>(null);
   const [configValues, setConfigValues] = useState<Record<string, unknown>>({});
+  const [activeInstructionAction, setActiveInstructionAction] = useState<number | null>(null);
 
   const { data: availableIntegrations = [] } = useAvailableIntegrations();
   const createMutation = useCreateIntegration(organizationId);
   const updateMutation = useUpdateIntegration(organizationId, createdIntegrationId || "");
+  const invokeActionMutation = useInvokeIntegrationAction(organizationId, createdIntegrationId || "");
   const { data: integration, isLoading: isLoadingIntegration } = useIntegration(
     organizationId,
     createdIntegrationId || "",
@@ -57,37 +61,33 @@ export function IntegrationSetupFlow({
     return availableIntegrations.find((item) => item.name === integrationName);
   }, [availableIntegrations, integrationDefinition, integrationName]);
 
-  const handleBrowserAction = useCallback(() => {
-    const browserAction = integration?.status?.browserAction;
-    if (!browserAction) return;
+  const handleInstructionAction = useCallback(
+    async (action: OrganizationsSetupAction, index: number) => {
+      if (action.redirect) {
+        executeSetupRedirectAction(action.redirect);
+        return;
+      }
 
-    const { url, method, formFields } = browserAction;
+      const actionName = action.actionCall?.actionName?.trim();
+      if (!actionName) {
+        showErrorToast("Missing action name in setup instruction");
+        return;
+      }
 
-    if (method?.toUpperCase() === "POST" && formFields) {
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = url || "";
-      form.target = "_blank";
-      form.style.display = "none";
-
-      Object.entries(formFields).forEach(([key, value]) => {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = key;
-        input.value = String(value);
-        form.appendChild(input);
-      });
-
-      document.body.appendChild(form);
-      form.submit();
-      document.body.removeChild(form);
-      return;
-    }
-
-    if (url) {
-      window.open(url, "_blank");
-    }
-  }, [integration?.status?.browserAction]);
+      try {
+        setActiveInstructionAction(index);
+        await invokeActionMutation.mutateAsync({
+          actionName,
+          parameters: action.actionCall?.parameters || {},
+        });
+      } catch (error) {
+        showErrorToast(`Failed to run integration action: ${getApiErrorMessage(error)}`);
+      } finally {
+        setActiveInstructionAction(null);
+      }
+    },
+    [invokeActionMutation],
+  );
 
   const handleCreate = useCallback(async () => {
     const nextName = installationName.trim();
@@ -139,7 +139,7 @@ export function IntegrationSetupFlow({
 
   useEffect(() => {
     const isReady = integration?.status?.state === "ready";
-    const nextIsFinalStep = Boolean(createdIntegrationId && isReady && !integration?.status?.browserAction);
+    const nextIsFinalStep = Boolean(createdIntegrationId && isReady && !integration?.status?.instruction);
     onStateChange?.({
       name: installationName,
       status: integration?.status?.state,
@@ -150,13 +150,16 @@ export function IntegrationSetupFlow({
     onStateChange,
     installationName,
     integration?.status?.state,
-    integration?.status?.browserAction,
+    integration?.status?.instruction,
     createdIntegrationId,
   ]);
 
   const isCreated = Boolean(createdIntegrationId);
   const isReady = integration?.status?.state === "ready";
-  const canFinish = Boolean(createdIntegrationId && isReady && !integration?.status?.browserAction);
+  const hasActionCallSetupAction = Boolean(
+    integration?.status?.instruction?.actions?.some((action) => Boolean(action.actionCall)),
+  );
+  const canFinish = Boolean(createdIntegrationId && isReady && !integration?.status?.instruction);
   const isFinalStep = canFinish;
 
   return (
@@ -173,8 +176,8 @@ export function IntegrationSetupFlow({
             />
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            You can connect the same provider multiple times, but each integration name
-            must be unique in your organization.
+            You can connect the same provider multiple times, but each integration name must be unique in your
+            organization.
           </p>
         </div>
       ) : null}
@@ -190,15 +193,32 @@ export function IntegrationSetupFlow({
         </Alert>
       ) : null}
 
-      {isCreated && integration?.status?.browserAction ? (
-        <IntegrationInstructions
-          description={integration.status.browserAction.description}
-          onContinue={integration.status.browserAction.url ? handleBrowserAction : undefined}
-        />
+      {isCreated && integration?.status?.instruction ? (
+        <div className="rounded-lg border border-orange-950/15 bg-orange-100 dark:border-orange-900/40 dark:bg-orange-950/30">
+          <div className="p-4">
+            <IntegrationInstructions
+              description={integration.status.instruction.text}
+              className="rounded-none border-0 bg-transparent p-0 text-gray-800 dark:text-gray-200"
+              actions={(integration.status.instruction.actions || []).map((action, index) => ({
+                label: action.redirect?.label || action.actionCall?.label || "Continue",
+                onClick: () => {
+                  void handleInstructionAction(action, index);
+                },
+                external: Boolean(action.redirect),
+                disabled: invokeActionMutation.isPending,
+                isPending: invokeActionMutation.isPending && activeInstructionAction === index,
+              }))}
+            />
+          </div>
+        </div>
       ) : null}
 
-      {!isFinalStep && isCreated ? (
+      {!isFinalStep && isCreated && !hasActionCallSetupAction ? (
         <div className="space-y-3">
+          <h2 className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <Settings2 className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+            Configuration
+          </h2>
           <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-4">
             {activeDefinition?.configuration && activeDefinition.configuration.length > 0 ? (
               activeDefinition.configuration.map((field: ConfigurationField) => {

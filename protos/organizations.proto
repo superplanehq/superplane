@@ -217,6 +217,18 @@ service Organizations {
       tags: "Organization";
     };
   }
+
+  rpc InvokeIntegrationAction(InvokeIntegrationActionRequest) returns (InvokeIntegrationActionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/integrations/{integration_id}/actions/{action_name}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Invoke integration action";
+      description: "Invokes a custom action on an organization integration";
+      tags: "Organization";
+    };
+  }
 }
 
 message Organization {
@@ -389,6 +401,15 @@ message DeleteIntegrationRequest {
 
 message DeleteIntegrationResponse {}
 
+message InvokeIntegrationActionRequest {
+  string id = 1;
+  string integration_id = 2;
+  string action_name = 3;
+  google.protobuf.Struct parameters = 4;
+}
+
+message InvokeIntegrationActionResponse {}
+
 message Integration {
   message Metadata {
     string id = 1;
@@ -406,7 +427,7 @@ message Integration {
     string state = 1;
     string state_description = 2;
     google.protobuf.Struct metadata = 3;
-    BrowserAction browser_action = 4;
+    SetupInstruction instruction = 4;
     repeated NodeRef used_in = 5;
   }
 
@@ -422,11 +443,34 @@ message Integration {
   Status status = 3;
 }
 
-message BrowserAction {
-  string url = 1;
-  string method = 2;
-  map<string, string> form_fields = 3;
-  string description = 4;
+message SetupInstruction {
+  string text = 1;
+  repeated SetupAction actions = 2;
+}
+
+message SetupAction {
+  enum Type {
+    TYPE_UNKNOWN = 0;
+    TYPE_REDIRECT = 1;
+    TYPE_ACTION_CALL = 2;
+  }
+
+  message Redirect {
+    string label = 1;
+    string url = 2;
+    string method = 3;
+    map<string, string> form_fields = 4;
+  }
+
+  message ActionCall {
+    string label = 1;
+    string action_name = 2;
+    google.protobuf.Struct parameters = 3;
+  }
+
+  Type type = 1;
+  Redirect redirect = 2;
+  ActionCall action_call = 3;
 }
 
 // Event messages for organization lifecycle events

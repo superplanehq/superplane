@@ -152,6 +152,25 @@ func (s *OrganizationService) DeleteIntegration(ctx context.Context, req *pb.Del
 	return organizations.DeleteIntegration(ctx, orgID, req.IntegrationId)
 }
 
+func (s *OrganizationService) InvokeIntegrationAction(ctx context.Context, req *pb.InvokeIntegrationActionRequest) (*pb.InvokeIntegrationActionResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+
+	parameters := map[string]any{}
+	if req.Parameters != nil {
+		parameters = req.Parameters.AsMap()
+	}
+
+	return organizations.InvokeIntegrationAction(
+		ctx,
+		s.registry,
+		s.webhooksBaseURL,
+		orgID,
+		req.IntegrationId,
+		req.ActionName,
+		parameters,
+	)
+}
+
 func accountIDFromContext(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {

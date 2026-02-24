@@ -1871,6 +1871,58 @@
         ]
       }
     },
+    "/api/v1/organizations/{id}/integrations/{integrationId}/actions/{actionName}": {
+      "post": {
+        "summary": "Invoke integration action",
+        "description": "Invokes a custom action on an organization integration",
+        "operationId": "Organizations_InvokeIntegrationAction",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsInvokeIntegrationActionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "integrationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "actionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsInvokeIntegrationActionBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
     "/api/v1/organizations/{id}/integrations/{integrationId}/resources": {
       "get": {
         "summary": "List integration resources",
@@ -4703,26 +4755,6 @@
         }
       }
     },
-    "OrganizationsBrowserAction": {
-      "type": "object",
-      "properties": {
-        "url": {
-          "type": "string"
-        },
-        "method": {
-          "type": "string"
-        },
-        "formFields": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "description": {
-          "type": "string"
-        }
-      }
-    },
     "OrganizationsCreateIntegrationBody": {
       "type": "object",
       "properties": {
@@ -4861,8 +4893,8 @@
         "metadata": {
           "type": "object"
         },
-        "browserAction": {
-          "$ref": "#/definitions/OrganizationsBrowserAction"
+        "instruction": {
+          "$ref": "#/definitions/OrganizationsSetupInstruction"
         },
         "usedIn": {
           "type": "array",
@@ -4918,6 +4950,17 @@
           "format": "date-time"
         }
       }
+    },
+    "OrganizationsInvokeIntegrationActionBody": {
+      "type": "object",
+      "properties": {
+        "parameters": {
+          "type": "object"
+        }
+      }
+    },
+    "OrganizationsInvokeIntegrationActionResponse": {
+      "type": "object"
     },
     "OrganizationsListIntegrationResourcesResponse": {
       "type": "object",
@@ -4984,6 +5027,44 @@
       "properties": {
         "inviteLink": {
           "$ref": "#/definitions/OrganizationsInviteLink"
+        }
+      }
+    },
+    "OrganizationsSetupAction": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/OrganizationsSetupActionType"
+        },
+        "redirect": {
+          "$ref": "#/definitions/SetupActionRedirect"
+        },
+        "actionCall": {
+          "$ref": "#/definitions/SetupActionActionCall"
+        }
+      }
+    },
+    "OrganizationsSetupActionType": {
+      "type": "string",
+      "enum": [
+        "TYPE_UNKNOWN",
+        "TYPE_REDIRECT",
+        "TYPE_ACTION_CALL"
+      ],
+      "default": "TYPE_UNKNOWN"
+    },
+    "OrganizationsSetupInstruction": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/OrganizationsSetupAction"
+          }
         }
       }
     },
@@ -5467,6 +5548,40 @@
       "properties": {
         "serviceAccount": {
           "$ref": "#/definitions/ServiceAccountsServiceAccount"
+        }
+      }
+    },
+    "SetupActionActionCall": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "actionName": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "object"
+        }
+      }
+    },
+    "SetupActionRedirect": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "formFields": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },

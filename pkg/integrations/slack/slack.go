@@ -157,7 +157,7 @@ func (s *Slack) Sync(ctx core.SyncContext) error {
 			BotID:  result.BotID,
 		})
 
-		ctx.Integration.RemoveBrowserAction()
+		ctx.Integration.RemoveInstructions()
 		ctx.Integration.Ready()
 		return nil
 	}
@@ -174,11 +174,18 @@ func (s *Slack) createAppCreationPrompt(ctx core.SyncContext) error {
 	encodedManifest := url.QueryEscape(string(manifestJSON))
 	manifestURL := fmt.Sprintf("https://api.slack.com/apps?new_app=1&manifest_json=%s", encodedManifest)
 
-	ctx.Integration.NewBrowserAction(core.BrowserAction{
-		Description: appBootstrapDescription,
-		URL:         manifestURL,
-		Method:      "GET",
-	})
+	ctx.Integration.Instructions(
+		appBootstrapDescription,
+		[]core.SetupAction{
+			{
+				Type: "redirect",
+				Redirect: &core.RedirectAction{
+					URL:    manifestURL,
+					Method: "GET",
+				},
+			},
+		},
+	)
 	return nil
 }
 

@@ -226,7 +226,7 @@ func (a *AWS) Sync(ctx core.SyncContext) error {
 
 	ctx.Integration.SetMetadata(metadata)
 	ctx.Integration.Ready()
-	ctx.Integration.RemoveBrowserAction()
+	ctx.Integration.RemoveInstructions()
 
 	return nil
 }
@@ -326,8 +326,7 @@ func (a *AWS) cleanupIAM(ctx core.IntegrationCleanupContext, metadata *common.In
 }
 
 func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
-	ctx.Integration.NewBrowserAction(core.BrowserAction{
-		Description: fmt.Sprintf(`
+	ctx.Integration.Instructions(fmt.Sprintf(`
 **1. Create Identity Provider**
 
 - Go to AWS IAM Console → Identity Providers → Add provider
@@ -342,7 +341,6 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 - Select the identity provider created in step 1
 - Add permissions for the integration to manage EventBridge connections, API destinations, and rules. To get started, you can use the **AmazonEventBridgeFullAccess** managed policy
 - Add permissions for the integration manage IAM roles needed for itself. To get started, you can use the **IAMFullAccess** managed policy
-- Add permissions for the integration to manage SQS. To get started, you can use the **AmazonSQSFullAccess** managed policy
 - Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need.
 - Give it a name and description, and create it
 
@@ -350,8 +348,7 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 
 - Copy the ARN of the IAM role created in step 2
 - Paste it into the "Role ARN" field in the installation configuration
-`, ctx.BaseURL, ctx.Integration.ID().String()),
-	})
+`, ctx.BaseURL, ctx.Integration.ID().String()), []core.SetupAction{})
 
 	return nil
 }

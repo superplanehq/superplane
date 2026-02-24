@@ -67,17 +67,19 @@ func (m *MetadataContext) Set(metadata any) error {
 }
 
 type IntegrationContext struct {
-	IntegrationID    string
-	Configuration    map[string]any
-	Metadata         any
-	State            string
-	StateDescription string
-	BrowserAction    *core.BrowserAction
-	Secrets          map[string]core.IntegrationSecret
-	WebhookRequests  []any
-	ResyncRequests   []time.Duration
-	ActionRequests   []ActionRequest
-	Subscriptions    []Subscription
+	IntegrationID      string
+	Configuration      map[string]any
+	Metadata           any
+	State              string
+	StateDescription   string
+	BrowserAction      *core.BrowserAction
+	Secrets            map[string]core.IntegrationSecret
+	WebhookRequests    []any
+	ResyncRequests     []time.Duration
+	ActionRequests     []ActionRequest
+	Subscriptions      []Subscription
+	InstructionText    string
+	InstructionActions []core.SetupAction
 }
 
 type ActionRequest struct {
@@ -139,12 +141,14 @@ func (c *IntegrationContext) Error(message string) {
 	c.StateDescription = message
 }
 
-func (c *IntegrationContext) NewBrowserAction(action core.BrowserAction) {
-	c.BrowserAction = &action
+func (c *IntegrationContext) Instructions(text string, actions []core.SetupAction) {
+	c.InstructionText = text
+	c.InstructionActions = actions
 }
 
-func (c *IntegrationContext) RemoveBrowserAction() {
-	c.BrowserAction = nil
+func (c *IntegrationContext) RemoveInstructions() {
+	c.InstructionText = ""
+	c.InstructionActions = nil
 }
 
 func (c *IntegrationContext) SetSecret(name string, value []byte) error {

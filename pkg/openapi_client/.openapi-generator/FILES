@@ -124,7 +124,6 @@ docs/NodeComponentRef.md
 docs/NodeTriggerRef.md
 docs/NodeWidgetRef.md
 docs/OrganizationAPI.md
-docs/OrganizationsBrowserAction.md
 docs/OrganizationsCreateIntegrationBody.md
 docs/OrganizationsCreateIntegrationResponse.md
 docs/OrganizationsCreateInvitationBody.md
@@ -139,11 +138,15 @@ docs/OrganizationsIntegrationSpec.md
 docs/OrganizationsIntegrationStatus.md
 docs/OrganizationsInvitation.md
 docs/OrganizationsInviteLink.md
+docs/OrganizationsInvokeIntegrationActionBody.md
 docs/OrganizationsListIntegrationResourcesResponse.md
 docs/OrganizationsListInvitationsResponse.md
 docs/OrganizationsOrganization.md
 docs/OrganizationsOrganizationMetadata.md
 docs/OrganizationsResetInviteLinkResponse.md
+docs/OrganizationsSetupAction.md
+docs/OrganizationsSetupActionType.md
+docs/OrganizationsSetupInstruction.md
 docs/OrganizationsUpdateIntegrationBody.md
 docs/OrganizationsUpdateIntegrationResponse.md
 docs/OrganizationsUpdateInviteLinkBody.md
@@ -189,6 +192,8 @@ docs/ServiceAccountsRegenerateServiceAccountTokenResponse.md
 docs/ServiceAccountsServiceAccount.md
 docs/ServiceAccountsUpdateServiceAccountBody.md
 docs/ServiceAccountsUpdateServiceAccountResponse.md
+docs/SetupActionActionCall.md
+docs/SetupActionRedirect.md
 docs/SuperplaneBlueprintsOutputChannel.md
 docs/SuperplaneBlueprintsUserRef.md
 docs/SuperplaneCanvasesUserRef.md
@@ -308,7 +313,6 @@ model_node_blueprint_ref.go
 model_node_component_ref.go
 model_node_trigger_ref.go
 model_node_widget_ref.go
-model_organizations_browser_action.go
 model_organizations_create_integration_body.go
 model_organizations_create_integration_response.go
 model_organizations_create_invitation_body.go
@@ -323,11 +327,15 @@ model_organizations_integration_spec.go
 model_organizations_integration_status.go
 model_organizations_invitation.go
 model_organizations_invite_link.go
+model_organizations_invoke_integration_action_body.go
 model_organizations_list_integration_resources_response.go
 model_organizations_list_invitations_response.go
 model_organizations_organization.go
 model_organizations_organization_metadata.go
 model_organizations_reset_invite_link_response.go
+model_organizations_setup_action.go
+model_organizations_setup_action_type.go
+model_organizations_setup_instruction.go
 model_organizations_update_integration_body.go
 model_organizations_update_integration_response.go
 model_organizations_update_invite_link_body.go
@@ -370,6 +378,8 @@ model_service_accounts_regenerate_service_account_token_response.go
 model_service_accounts_service_account.go
 model_service_accounts_update_service_account_body.go
 model_service_accounts_update_service_account_response.go
+model_setup_action_action_call.go
+model_setup_action_redirect.go
 model_superplane_blueprints_output_channel.go
 model_superplane_blueprints_user_ref.go
 model_superplane_canvases_user_ref.go

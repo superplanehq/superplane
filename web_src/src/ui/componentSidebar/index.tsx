@@ -9,7 +9,12 @@ import { resolveIcon } from "@/lib/utils";
 import { Check, Copy, Loader2, Settings, TriangleAlert, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getHeaderIconSrc, IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { useAvailableIntegrations, useIntegration, useUpdateIntegration } from "@/hooks/useIntegrations";
+import {
+  useAvailableIntegrations,
+  useIntegration,
+  useInvokeIntegrationAction,
+  useUpdateIntegration,
+} from "@/hooks/useIntegrations";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast } from "@/utils/toast";
@@ -36,6 +41,7 @@ import { EventState, EventStateMap } from "../componentBase";
 import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
+import { executeSetupRedirectAction } from "@/utils/setupInstructions";
 
 interface ComponentSidebarProps {
   isOpen?: boolean;
@@ -249,6 +255,7 @@ export const ComponentSidebar = ({
   const [isCreateIntegrationDialogOpen, setIsCreateIntegrationDialogOpen] = useState(false);
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
   const [configureIntegrationName, setConfigureIntegrationName] = useState("");
+  const [activeConfigureInstructionAction, setActiveConfigureInstructionAction] = useState<number | null>(null);
   // Use autocompleteExampleObj directly - current node is already filtered out upstream
   const resolvedAutocompleteExampleObj = autocompleteExampleObj ?? null;
 
@@ -258,12 +265,16 @@ export const ComponentSidebar = ({
     configureIntegrationId ?? "",
   );
   const updateIntegrationMutation = useUpdateIntegration(domainId ?? "", configureIntegrationId ?? "");
+  const invokeIntegrationActionMutation = useInvokeIntegrationAction(domainId ?? "", configureIntegrationId ?? "");
   const configureIntegrationDefinition = useMemo(
     () =>
       configureIntegration?.spec?.integrationName
         ? availableIntegrationDefinitions.find((d) => d.name === configureIntegration.spec?.integrationName)
         : undefined,
     [availableIntegrationDefinitions, configureIntegration?.spec?.integrationName],
+  );
+  const hasConfigureActionCallSetupAction = Boolean(
+    configureIntegration?.status?.instruction?.actions?.some((action) => Boolean(action.actionCall)),
   );
   const [configureIntegrationConfig, setConfigureIntegrationConfig] = useState<Record<string, unknown>>({});
   const createIntegrationDefinition = useMemo(
@@ -307,8 +318,10 @@ export const ComponentSidebar = ({
     setConfigureIntegrationId(null);
     setConfigureIntegrationName("");
     setConfigureIntegrationConfig({});
+    setActiveConfigureInstructionAction(null);
     updateIntegrationMutation.reset();
-  }, [updateIntegrationMutation]);
+    invokeIntegrationActionMutation.reset();
+  }, [updateIntegrationMutation, invokeIntegrationActionMutation]);
 
   const handleConfigureIntegrationSubmit = useCallback(async () => {
     if (!configureIntegrationId || !domainId) return;
@@ -334,30 +347,36 @@ export const ComponentSidebar = ({
     handleCloseConfigureIntegrationDialog,
   ]);
 
-  const handleConfigureBrowserAction = useCallback(() => {
-    const browserAction = configureIntegration?.status?.browserAction;
-    if (!browserAction) return;
-    const { url, method, formFields } = browserAction;
-    if (method?.toUpperCase() === "POST" && formFields) {
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = url || "";
-      form.target = "_blank";
-      form.style.display = "none";
-      Object.entries(formFields).forEach(([key, value]) => {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = key;
-        input.value = String(value);
-        form.appendChild(input);
-      });
-      document.body.appendChild(form);
-      form.submit();
-      document.body.removeChild(form);
-    } else if (url) {
-      window.open(url, "_blank");
-    }
-  }, [configureIntegration?.status?.browserAction]);
+  const handleConfigureInstructionAction = useCallback(
+    async (index: number) => {
+      const action = configureIntegration?.status?.instruction?.actions?.[index];
+      if (!action) return;
+
+      if (action.redirect) {
+        executeSetupRedirectAction(action.redirect);
+        return;
+      }
+
+      const actionName = action.actionCall?.actionName?.trim();
+      if (!actionName) {
+        showErrorToast("Missing action name in setup instruction");
+        return;
+      }
+
+      try {
+        setActiveConfigureInstructionAction(index);
+        await invokeIntegrationActionMutation.mutateAsync({
+          actionName,
+          parameters: action.actionCall?.parameters || {},
+        });
+      } catch (error) {
+        showErrorToast(`Failed to run integration action: ${getApiErrorMessage(error)}`);
+      } finally {
+        setActiveConfigureInstructionAction(null);
+      }
+    },
+    [configureIntegration?.status?.instruction?.actions, invokeIntegrationActionMutation],
+  );
 
   useEffect(() => {
     if (configureIntegration?.spec?.configuration) {
@@ -950,13 +969,20 @@ export const ComponentSidebar = ({
                   <p>{configureIntegration.status.stateDescription}</p>
                 </div>
               )}
-              {configureIntegration?.status?.browserAction && (
+              {configureIntegration?.status?.instruction ? (
                 <IntegrationInstructions
-                  description={configureIntegration.status.browserAction.description}
-                  onContinue={configureIntegration.status.browserAction.url ? handleConfigureBrowserAction : undefined}
-                  className="mb-6"
+                  description={configureIntegration.status.instruction.text}
+                  actions={(configureIntegration.status.instruction.actions || []).map((action, index) => ({
+                    label: action.redirect?.label || action.actionCall?.label || "Continue",
+                    onClick: () => {
+                      void handleConfigureInstructionAction(index);
+                    },
+                    external: Boolean(action.redirect),
+                    disabled: invokeIntegrationActionMutation.isPending,
+                    isPending: invokeIntegrationActionMutation.isPending && activeConfigureInstructionAction === index,
+                  }))}
                 />
-              )}
+              ) : null}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -978,8 +1004,8 @@ export const ComponentSidebar = ({
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
                 </div>
 
-                {configureIntegrationDefinition?.configuration &&
-                configureIntegrationDefinition.configuration.length > 0 ? (
+                {hasConfigureActionCallSetupAction ? null : configureIntegrationDefinition?.configuration &&
+                  configureIntegrationDefinition.configuration.length > 0 ? (
                   configureIntegrationDefinition.configuration.map((field: ConfigurationField) => {
                     if (!field.name) return null;
                     return (

@@ -25,8 +25,15 @@ type Configuration struct {
 }
 
 type Metadata struct {
-	WebhookURL string `json:"webhookUrl" mapstructure:"webhookUrl"`
+	WebhookURL                 string `json:"webhookUrl" mapstructure:"webhookUrl"`
+	NotificationChannelCreated bool   `json:"notificationChannelCreated" mapstructure:"notificationChannelCreated"`
+	NotificationChannelSkipped bool   `json:"notificationChannelSkipped" mapstructure:"notificationChannelSkipped"`
 }
+
+const (
+	setupNotificationChannelCompleteAction = "setupNotificationChannelComplete"
+	setupNotificationChannelSkippedAction  = "setupNotificationChannelSkipped"
+)
 
 func (d *Dash0) Name() string {
 	return "dash0"
@@ -82,6 +89,11 @@ func (d *Dash0) Triggers() []core.Trigger {
 }
 
 func (d *Dash0) Sync(ctx core.SyncContext) error {
+	if ctx.FirstSetup {
+		ctx.Integration.Instructions(`Configure your Dash0 API token and Prometheus API base URL, then save to continue setup.`, nil)
+		return nil
+	}
+
 	configuration := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &configuration)
 	if err != nil {
@@ -109,14 +121,50 @@ func (d *Dash0) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error validating connection: %v", err)
 	}
 
-	ctx.Integration.SetMetadata(Metadata{
-		WebhookURL: fmt.Sprintf(
-			"%s/api/v1/integrations/%s/webhook",
-			strings.TrimRight(ctx.WebhooksBaseURL, "/"),
-			ctx.Integration.ID().String(),
-		),
-	})
+	metadata := Metadata{}
+	if ctx.Integration.GetMetadata() != nil {
+		err = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+		if err != nil {
+			return fmt.Errorf("failed to decode metadata: %v", err)
+		}
+	}
 
+	metadata.WebhookURL = fmt.Sprintf(
+		"%s/api/v1/integrations/%s/webhook",
+		strings.TrimRight(ctx.WebhooksBaseURL, "/"),
+		ctx.Integration.ID().String(),
+	)
+	ctx.Integration.SetMetadata(metadata)
+
+	if !metadata.NotificationChannelCreated && !metadata.NotificationChannelSkipped {
+		ctx.Integration.Instructions(
+			fmt.Sprintf(
+				"### Dash0 Notification Webhook\n\nCreate a notification channel in Dash0:\n\n1. Go to [Organization Settings > Notification Channels](https://app.dash0.com/settings/notifications).\n2. Add a new notification channel.\n3. Copy the webhook URL below and paste it in the \"Webhook URL\" field.\n\nUse this webhook URL as the destination:\n\n`%s`",
+				metadata.WebhookURL,
+			),
+			[]core.SetupAction{
+				{
+					Type: "action_call",
+					ActionCall: &core.ActionCallAction{
+						Label:      "Done",
+						ActionName: setupNotificationChannelCompleteAction,
+						Parameters: map[string]any{},
+					},
+				},
+				{
+					Type: "action_call",
+					ActionCall: &core.ActionCallAction{
+						Label:      "Skip for now",
+						ActionName: setupNotificationChannelSkippedAction,
+						Parameters: map[string]any{},
+					},
+				},
+			},
+		)
+		return nil
+	}
+
+	ctx.Integration.RemoveInstructions()
 	ctx.Integration.Ready()
 	return nil
 }
@@ -264,9 +312,39 @@ func (d *Dash0) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (d *Dash0) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name:           setupNotificationChannelCompleteAction,
+			UserAccessible: true,
+		},
+		{
+			Name:           setupNotificationChannelSkippedAction,
+			UserAccessible: true,
+		},
+	}
 }
 
 func (d *Dash0) HandleAction(ctx core.IntegrationActionContext) error {
+	metadata := Metadata{}
+	if ctx.Integration.GetMetadata() != nil {
+		err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+		if err != nil {
+			return fmt.Errorf("failed to decode metadata: %v", err)
+		}
+	}
+
+	switch ctx.Name {
+	case setupNotificationChannelCompleteAction:
+		metadata.NotificationChannelCreated = true
+		metadata.NotificationChannelSkipped = false
+	case setupNotificationChannelSkippedAction:
+		metadata.NotificationChannelSkipped = true
+	default:
+		return fmt.Errorf("unsupported action %s", ctx.Name)
+	}
+
+	ctx.Integration.SetMetadata(metadata)
+	ctx.Integration.RemoveInstructions()
+	ctx.Integration.Ready()
 	return nil
 }

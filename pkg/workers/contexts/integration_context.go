@@ -373,19 +373,57 @@ func (c *IntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
 	return secrets, nil
 }
 
-func (c *IntegrationContext) NewBrowserAction(action core.BrowserAction) {
-	d := datatypes.NewJSONType(models.BrowserAction{
-		URL:         action.URL,
-		Method:      action.Method,
-		FormFields:  action.FormFields,
-		Description: action.Description,
-	})
+func (c *IntegrationContext) Instructions(text string, actions []core.SetupAction) {
+	setupInstruction := models.SetupInstruction{
+		Text:    text,
+		Actions: make([]models.SetupAction, 0, len(actions)),
+	}
 
-	c.integration.BrowserAction = &d
+	for i, action := range actions {
+		setupInstruction.Actions = append(setupInstruction.Actions, models.SetupAction{
+			Type: action.Type,
+		})
+		switch action.Type {
+		case "redirect":
+			setupInstruction.Actions[i].Redirect = &models.RedirectAction{
+				Label:      action.Redirect.Label,
+				URL:        action.Redirect.URL,
+				Method:     action.Redirect.Method,
+				FormFields: action.Redirect.FormFields,
+			}
+		case "action_call":
+			setupInstruction.Actions[i].ActionCall = &models.ActionCallAction{
+				Label:      action.ActionCall.Label,
+				ActionName: action.ActionCall.ActionName,
+				Parameters: action.ActionCall.Parameters,
+			}
+		}
+	}
+
+	instruction := datatypes.NewJSONType(setupInstruction)
+	c.integration.SetupInstruction = &instruction
 }
 
-func (c *IntegrationContext) RemoveBrowserAction() {
-	c.integration.BrowserAction = nil
+func (c *IntegrationContext) NewBrowserAction(action core.BrowserAction) {
+	d := datatypes.NewJSONType(models.SetupInstruction{
+		Text: action.Description,
+		Actions: []models.SetupAction{
+			{
+				Type: "redirect",
+				Redirect: &models.RedirectAction{
+					URL:        action.URL,
+					Method:     action.Method,
+					FormFields: action.FormFields,
+				},
+			},
+		},
+	})
+
+	c.integration.SetupInstruction = &d
+}
+
+func (c *IntegrationContext) RemoveInstructions() {
+	c.integration.SetupInstruction = nil
 }
 
 func (c *IntegrationContext) Subscribe(configuration any) (*uuid.UUID, error) {

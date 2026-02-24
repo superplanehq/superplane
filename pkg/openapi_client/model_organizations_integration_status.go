@@ -20,11 +20,11 @@ var _ MappedNullable = &OrganizationsIntegrationStatus{}
 
 // OrganizationsIntegrationStatus struct for OrganizationsIntegrationStatus
 type OrganizationsIntegrationStatus struct {
-	State            *string                     `json:"state,omitempty"`
-	StateDescription *string                     `json:"stateDescription,omitempty"`
-	Metadata         map[string]interface{}      `json:"metadata,omitempty"`
-	BrowserAction    *OrganizationsBrowserAction `json:"browserAction,omitempty"`
-	UsedIn           []IntegrationNodeRef        `json:"usedIn,omitempty"`
+	State            *string                        `json:"state,omitempty"`
+	StateDescription *string                        `json:"stateDescription,omitempty"`
+	Metadata         map[string]interface{}         `json:"metadata,omitempty"`
+	Instruction      *OrganizationsSetupInstruction `json:"instruction,omitempty"`
+	UsedIn           []IntegrationNodeRef           `json:"usedIn,omitempty"`
 }
 
 // NewOrganizationsIntegrationStatus instantiates a new OrganizationsIntegrationStatus object
@@ -140,36 +140,36 @@ func (o *OrganizationsIntegrationStatus) SetMetadata(v map[string]interface{}) {
 	o.Metadata = v
 }
 
-// GetBrowserAction returns the BrowserAction field value if set, zero value otherwise.
-func (o *OrganizationsIntegrationStatus) GetBrowserAction() OrganizationsBrowserAction {
-	if o == nil || IsNil(o.BrowserAction) {
-		var ret OrganizationsBrowserAction
+// GetInstruction returns the Instruction field value if set, zero value otherwise.
+func (o *OrganizationsIntegrationStatus) GetInstruction() OrganizationsSetupInstruction {
+	if o == nil || IsNil(o.Instruction) {
+		var ret OrganizationsSetupInstruction
 		return ret
 	}
-	return *o.BrowserAction
+	return *o.Instruction
 }
 
-// GetBrowserActionOk returns a tuple with the BrowserAction field value if set, nil otherwise
+// GetInstructionOk returns a tuple with the Instruction field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *OrganizationsIntegrationStatus) GetBrowserActionOk() (*OrganizationsBrowserAction, bool) {
-	if o == nil || IsNil(o.BrowserAction) {
+func (o *OrganizationsIntegrationStatus) GetInstructionOk() (*OrganizationsSetupInstruction, bool) {
+	if o == nil || IsNil(o.Instruction) {
 		return nil, false
 	}
-	return o.BrowserAction, true
+	return o.Instruction, true
 }
 
-// HasBrowserAction returns a boolean if a field has been set.
-func (o *OrganizationsIntegrationStatus) HasBrowserAction() bool {
-	if o != nil && !IsNil(o.BrowserAction) {
+// HasInstruction returns a boolean if a field has been set.
+func (o *OrganizationsIntegrationStatus) HasInstruction() bool {
+	if o != nil && !IsNil(o.Instruction) {
 		return true
 	}
 
 	return false
 }
 
-// SetBrowserAction gets a reference to the given OrganizationsBrowserAction and assigns it to the BrowserAction field.
-func (o *OrganizationsIntegrationStatus) SetBrowserAction(v OrganizationsBrowserAction) {
-	o.BrowserAction = &v
+// SetInstruction gets a reference to the given OrganizationsSetupInstruction and assigns it to the Instruction field.
+func (o *OrganizationsIntegrationStatus) SetInstruction(v OrganizationsSetupInstruction) {
+	o.Instruction = &v
 }
 
 // GetUsedIn returns the UsedIn field value if set, zero value otherwise.
@@ -223,8 +223,8 @@ func (o OrganizationsIntegrationStatus) ToMap() (map[string]interface{}, error) 
 	if !IsNil(o.Metadata) {
 		toSerialize["metadata"] = o.Metadata
 	}
-	if !IsNil(o.BrowserAction) {
-		toSerialize["browserAction"] = o.BrowserAction
+	if !IsNil(o.Instruction) {
+		toSerialize["instruction"] = o.Instruction
 	}
 	if !IsNil(o.UsedIn) {
 		toSerialize["usedIn"] = o.UsedIn

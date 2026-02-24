@@ -7,6 +7,7 @@ import {
   organizationsCreateIntegration,
   organizationsUpdateIntegration,
   organizationsDeleteIntegration,
+  organizationsInvokeIntegrationAction,
 } from "@/api-client/sdk.gen";
 import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
@@ -192,6 +193,31 @@ export const useDeleteIntegration = (organizationId: string, integrationId: stri
         queryKey: integrationKeys.connected(organizationId),
       });
       queryClient.removeQueries({
+        queryKey: integrationKeys.integration(organizationId, integrationId),
+      });
+    },
+  });
+};
+
+export const useInvokeIntegrationAction = (organizationId: string, integrationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { actionName: string; parameters?: Record<string, unknown> }) => {
+      return await organizationsInvokeIntegrationAction(
+        withOrganizationHeader({
+          path: { id: organizationId, integrationId, actionName: data.actionName },
+          body: {
+            parameters: data.parameters,
+          },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: integrationKeys.connected(organizationId),
+      });
+      queryClient.invalidateQueries({
         queryKey: integrationKeys.integration(organizationId, integrationId),
       });
     },

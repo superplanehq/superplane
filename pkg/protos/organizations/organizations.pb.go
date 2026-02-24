@@ -25,6 +25,55 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type SetupAction_Type int32
+
+const (
+	SetupAction_TYPE_UNKNOWN     SetupAction_Type = 0
+	SetupAction_TYPE_REDIRECT    SetupAction_Type = 1
+	SetupAction_TYPE_ACTION_CALL SetupAction_Type = 2
+)
+
+// Enum value maps for SetupAction_Type.
+var (
+	SetupAction_Type_name = map[int32]string{
+		0: "TYPE_UNKNOWN",
+		1: "TYPE_REDIRECT",
+		2: "TYPE_ACTION_CALL",
+	}
+	SetupAction_Type_value = map[string]int32{
+		"TYPE_UNKNOWN":     0,
+		"TYPE_REDIRECT":    1,
+		"TYPE_ACTION_CALL": 2,
+	}
+)
+
+func (x SetupAction_Type) Enum() *SetupAction_Type {
+	p := new(SetupAction_Type)
+	*p = x
+	return p
+}
+
+func (x SetupAction_Type) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SetupAction_Type) Descriptor() protoreflect.EnumDescriptor {
+	return file_organizations_proto_enumTypes[0].Descriptor()
+}
+
+func (SetupAction_Type) Type() protoreflect.EnumType {
+	return &file_organizations_proto_enumTypes[0]
+}
+
+func (x SetupAction_Type) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SetupAction_Type.Descriptor instead.
+func (SetupAction_Type) EnumDescriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{40, 0}
+}
+
 type Organization struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Metadata      *Organization_Metadata `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
@@ -1785,6 +1834,110 @@ func (*DeleteIntegrationResponse) Descriptor() ([]byte, []int) {
 	return file_organizations_proto_rawDescGZIP(), []int{35}
 }
 
+type InvokeIntegrationActionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	IntegrationId string                 `protobuf:"bytes,2,opt,name=integration_id,json=integrationId,proto3" json:"integration_id,omitempty"`
+	ActionName    string                 `protobuf:"bytes,3,opt,name=action_name,json=actionName,proto3" json:"action_name,omitempty"`
+	Parameters    *_struct.Struct        `protobuf:"bytes,4,opt,name=parameters,proto3" json:"parameters,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InvokeIntegrationActionRequest) Reset() {
+	*x = InvokeIntegrationActionRequest{}
+	mi := &file_organizations_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvokeIntegrationActionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvokeIntegrationActionRequest) ProtoMessage() {}
+
+func (x *InvokeIntegrationActionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvokeIntegrationActionRequest.ProtoReflect.Descriptor instead.
+func (*InvokeIntegrationActionRequest) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *InvokeIntegrationActionRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *InvokeIntegrationActionRequest) GetIntegrationId() string {
+	if x != nil {
+		return x.IntegrationId
+	}
+	return ""
+}
+
+func (x *InvokeIntegrationActionRequest) GetActionName() string {
+	if x != nil {
+		return x.ActionName
+	}
+	return ""
+}
+
+func (x *InvokeIntegrationActionRequest) GetParameters() *_struct.Struct {
+	if x != nil {
+		return x.Parameters
+	}
+	return nil
+}
+
+type InvokeIntegrationActionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InvokeIntegrationActionResponse) Reset() {
+	*x = InvokeIntegrationActionResponse{}
+	mi := &file_organizations_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvokeIntegrationActionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvokeIntegrationActionResponse) ProtoMessage() {}
+
+func (x *InvokeIntegrationActionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvokeIntegrationActionResponse.ProtoReflect.Descriptor instead.
+func (*InvokeIntegrationActionResponse) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{37}
+}
+
 type Integration struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Metadata      *Integration_Metadata  `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
@@ -1796,7 +1949,7 @@ type Integration struct {
 
 func (x *Integration) Reset() {
 	*x = Integration{}
-	mi := &file_organizations_proto_msgTypes[36]
+	mi := &file_organizations_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1808,7 +1961,7 @@ func (x *Integration) String() string {
 func (*Integration) ProtoMessage() {}
 
 func (x *Integration) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[36]
+	mi := &file_organizations_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1821,7 +1974,7 @@ func (x *Integration) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Integration.ProtoReflect.Descriptor instead.
 func (*Integration) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{36}
+	return file_organizations_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *Integration) GetMetadata() *Integration_Metadata {
@@ -1845,31 +1998,29 @@ func (x *Integration) GetStatus() *Integration_Status {
 	return nil
 }
 
-type BrowserAction struct {
+type SetupInstruction struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
-	Method        string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`
-	FormFields    map[string]string      `protobuf:"bytes,3,rep,name=form_fields,json=formFields,proto3" json:"form_fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	Actions       []*SetupAction         `protobuf:"bytes,2,rep,name=actions,proto3" json:"actions,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *BrowserAction) Reset() {
-	*x = BrowserAction{}
-	mi := &file_organizations_proto_msgTypes[37]
+func (x *SetupInstruction) Reset() {
+	*x = SetupInstruction{}
+	mi := &file_organizations_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BrowserAction) String() string {
+func (x *SetupInstruction) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BrowserAction) ProtoMessage() {}
+func (*SetupInstruction) ProtoMessage() {}
 
-func (x *BrowserAction) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[37]
+func (x *SetupInstruction) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1880,37 +2031,83 @@ func (x *BrowserAction) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BrowserAction.ProtoReflect.Descriptor instead.
-func (*BrowserAction) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{37}
+// Deprecated: Use SetupInstruction.ProtoReflect.Descriptor instead.
+func (*SetupInstruction) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{39}
 }
 
-func (x *BrowserAction) GetUrl() string {
+func (x *SetupInstruction) GetText() string {
 	if x != nil {
-		return x.Url
+		return x.Text
 	}
 	return ""
 }
 
-func (x *BrowserAction) GetMethod() string {
+func (x *SetupInstruction) GetActions() []*SetupAction {
 	if x != nil {
-		return x.Method
-	}
-	return ""
-}
-
-func (x *BrowserAction) GetFormFields() map[string]string {
-	if x != nil {
-		return x.FormFields
+		return x.Actions
 	}
 	return nil
 }
 
-func (x *BrowserAction) GetDescription() string {
+type SetupAction struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Type          SetupAction_Type        `protobuf:"varint,1,opt,name=type,proto3,enum=Superplane.Organizations.SetupAction_Type" json:"type,omitempty"`
+	Redirect      *SetupAction_Redirect   `protobuf:"bytes,2,opt,name=redirect,proto3" json:"redirect,omitempty"`
+	ActionCall    *SetupAction_ActionCall `protobuf:"bytes,3,opt,name=action_call,json=actionCall,proto3" json:"action_call,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetupAction) Reset() {
+	*x = SetupAction{}
+	mi := &file_organizations_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupAction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupAction) ProtoMessage() {}
+
+func (x *SetupAction) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[40]
 	if x != nil {
-		return x.Description
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
 	}
-	return ""
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupAction.ProtoReflect.Descriptor instead.
+func (*SetupAction) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *SetupAction) GetType() SetupAction_Type {
+	if x != nil {
+		return x.Type
+	}
+	return SetupAction_TYPE_UNKNOWN
+}
+
+func (x *SetupAction) GetRedirect() *SetupAction_Redirect {
+	if x != nil {
+		return x.Redirect
+	}
+	return nil
+}
+
+func (x *SetupAction) GetActionCall() *SetupAction_ActionCall {
+	if x != nil {
+		return x.ActionCall
+	}
+	return nil
 }
 
 // Event messages for organization lifecycle events
@@ -1924,7 +2121,7 @@ type OrganizationCreated struct {
 
 func (x *OrganizationCreated) Reset() {
 	*x = OrganizationCreated{}
-	mi := &file_organizations_proto_msgTypes[38]
+	mi := &file_organizations_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1936,7 +2133,7 @@ func (x *OrganizationCreated) String() string {
 func (*OrganizationCreated) ProtoMessage() {}
 
 func (x *OrganizationCreated) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[38]
+	mi := &file_organizations_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1949,7 +2146,7 @@ func (x *OrganizationCreated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OrganizationCreated.ProtoReflect.Descriptor instead.
 func (*OrganizationCreated) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{38}
+	return file_organizations_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *OrganizationCreated) GetOrganizationId() string {
@@ -1976,7 +2173,7 @@ type OrganizationUpdated struct {
 
 func (x *OrganizationUpdated) Reset() {
 	*x = OrganizationUpdated{}
-	mi := &file_organizations_proto_msgTypes[39]
+	mi := &file_organizations_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1988,7 +2185,7 @@ func (x *OrganizationUpdated) String() string {
 func (*OrganizationUpdated) ProtoMessage() {}
 
 func (x *OrganizationUpdated) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[39]
+	mi := &file_organizations_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2001,7 +2198,7 @@ func (x *OrganizationUpdated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OrganizationUpdated.ProtoReflect.Descriptor instead.
 func (*OrganizationUpdated) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{39}
+	return file_organizations_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *OrganizationUpdated) GetOrganizationId() string {
@@ -2028,7 +2225,7 @@ type OrganizationDeleted struct {
 
 func (x *OrganizationDeleted) Reset() {
 	*x = OrganizationDeleted{}
-	mi := &file_organizations_proto_msgTypes[40]
+	mi := &file_organizations_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2040,7 +2237,7 @@ func (x *OrganizationDeleted) String() string {
 func (*OrganizationDeleted) ProtoMessage() {}
 
 func (x *OrganizationDeleted) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[40]
+	mi := &file_organizations_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2053,7 +2250,7 @@ func (x *OrganizationDeleted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OrganizationDeleted.ProtoReflect.Descriptor instead.
 func (*OrganizationDeleted) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{40}
+	return file_organizations_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *OrganizationDeleted) GetOrganizationId() string {
@@ -2080,7 +2277,7 @@ type InvitationCreated struct {
 
 func (x *InvitationCreated) Reset() {
 	*x = InvitationCreated{}
-	mi := &file_organizations_proto_msgTypes[41]
+	mi := &file_organizations_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2092,7 +2289,7 @@ func (x *InvitationCreated) String() string {
 func (*InvitationCreated) ProtoMessage() {}
 
 func (x *InvitationCreated) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[41]
+	mi := &file_organizations_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2105,7 +2302,7 @@ func (x *InvitationCreated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InvitationCreated.ProtoReflect.Descriptor instead.
 func (*InvitationCreated) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{41}
+	return file_organizations_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *InvitationCreated) GetInvitationId() string {
@@ -2135,7 +2332,7 @@ type Organization_Metadata struct {
 
 func (x *Organization_Metadata) Reset() {
 	*x = Organization_Metadata{}
-	mi := &file_organizations_proto_msgTypes[42]
+	mi := &file_organizations_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2147,7 +2344,7 @@ func (x *Organization_Metadata) String() string {
 func (*Organization_Metadata) ProtoMessage() {}
 
 func (x *Organization_Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[42]
+	mi := &file_organizations_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2210,7 +2407,7 @@ type Integration_Metadata struct {
 
 func (x *Integration_Metadata) Reset() {
 	*x = Integration_Metadata{}
-	mi := &file_organizations_proto_msgTypes[44]
+	mi := &file_organizations_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2222,7 +2419,7 @@ func (x *Integration_Metadata) String() string {
 func (*Integration_Metadata) ProtoMessage() {}
 
 func (x *Integration_Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[44]
+	mi := &file_organizations_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2235,7 +2432,7 @@ func (x *Integration_Metadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Integration_Metadata.ProtoReflect.Descriptor instead.
 func (*Integration_Metadata) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{36, 0}
+	return file_organizations_proto_rawDescGZIP(), []int{38, 0}
 }
 
 func (x *Integration_Metadata) GetId() string {
@@ -2276,7 +2473,7 @@ type Integration_Spec struct {
 
 func (x *Integration_Spec) Reset() {
 	*x = Integration_Spec{}
-	mi := &file_organizations_proto_msgTypes[45]
+	mi := &file_organizations_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2288,7 +2485,7 @@ func (x *Integration_Spec) String() string {
 func (*Integration_Spec) ProtoMessage() {}
 
 func (x *Integration_Spec) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[45]
+	mi := &file_organizations_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2301,7 +2498,7 @@ func (x *Integration_Spec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Integration_Spec.ProtoReflect.Descriptor instead.
 func (*Integration_Spec) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{36, 1}
+	return file_organizations_proto_rawDescGZIP(), []int{38, 1}
 }
 
 func (x *Integration_Spec) GetIntegrationName() string {
@@ -2323,7 +2520,7 @@ type Integration_Status struct {
 	State            string                 `protobuf:"bytes,1,opt,name=state,proto3" json:"state,omitempty"`
 	StateDescription string                 `protobuf:"bytes,2,opt,name=state_description,json=stateDescription,proto3" json:"state_description,omitempty"`
 	Metadata         *_struct.Struct        `protobuf:"bytes,3,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	BrowserAction    *BrowserAction         `protobuf:"bytes,4,opt,name=browser_action,json=browserAction,proto3" json:"browser_action,omitempty"`
+	Instruction      *SetupInstruction      `protobuf:"bytes,4,opt,name=instruction,proto3" json:"instruction,omitempty"`
 	UsedIn           []*Integration_NodeRef `protobuf:"bytes,5,rep,name=used_in,json=usedIn,proto3" json:"used_in,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
@@ -2331,7 +2528,7 @@ type Integration_Status struct {
 
 func (x *Integration_Status) Reset() {
 	*x = Integration_Status{}
-	mi := &file_organizations_proto_msgTypes[46]
+	mi := &file_organizations_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2343,7 +2540,7 @@ func (x *Integration_Status) String() string {
 func (*Integration_Status) ProtoMessage() {}
 
 func (x *Integration_Status) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[46]
+	mi := &file_organizations_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2356,7 +2553,7 @@ func (x *Integration_Status) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Integration_Status.ProtoReflect.Descriptor instead.
 func (*Integration_Status) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{36, 2}
+	return file_organizations_proto_rawDescGZIP(), []int{38, 2}
 }
 
 func (x *Integration_Status) GetState() string {
@@ -2380,9 +2577,9 @@ func (x *Integration_Status) GetMetadata() *_struct.Struct {
 	return nil
 }
 
-func (x *Integration_Status) GetBrowserAction() *BrowserAction {
+func (x *Integration_Status) GetInstruction() *SetupInstruction {
 	if x != nil {
-		return x.BrowserAction
+		return x.Instruction
 	}
 	return nil
 }
@@ -2406,7 +2603,7 @@ type Integration_NodeRef struct {
 
 func (x *Integration_NodeRef) Reset() {
 	*x = Integration_NodeRef{}
-	mi := &file_organizations_proto_msgTypes[47]
+	mi := &file_organizations_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2418,7 +2615,7 @@ func (x *Integration_NodeRef) String() string {
 func (*Integration_NodeRef) ProtoMessage() {}
 
 func (x *Integration_NodeRef) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[47]
+	mi := &file_organizations_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2431,7 +2628,7 @@ func (x *Integration_NodeRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Integration_NodeRef.ProtoReflect.Descriptor instead.
 func (*Integration_NodeRef) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{36, 3}
+	return file_organizations_proto_rawDescGZIP(), []int{38, 3}
 }
 
 func (x *Integration_NodeRef) GetCanvasId() string {
@@ -2460,6 +2657,134 @@ func (x *Integration_NodeRef) GetNodeName() string {
 		return x.NodeName
 	}
 	return ""
+}
+
+type SetupAction_Redirect struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Label         string                 `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
+	Url           string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	Method        string                 `protobuf:"bytes,3,opt,name=method,proto3" json:"method,omitempty"`
+	FormFields    map[string]string      `protobuf:"bytes,4,rep,name=form_fields,json=formFields,proto3" json:"form_fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetupAction_Redirect) Reset() {
+	*x = SetupAction_Redirect{}
+	mi := &file_organizations_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupAction_Redirect) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupAction_Redirect) ProtoMessage() {}
+
+func (x *SetupAction_Redirect) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupAction_Redirect.ProtoReflect.Descriptor instead.
+func (*SetupAction_Redirect) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{40, 0}
+}
+
+func (x *SetupAction_Redirect) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *SetupAction_Redirect) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *SetupAction_Redirect) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *SetupAction_Redirect) GetFormFields() map[string]string {
+	if x != nil {
+		return x.FormFields
+	}
+	return nil
+}
+
+type SetupAction_ActionCall struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Label         string                 `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
+	ActionName    string                 `protobuf:"bytes,2,opt,name=action_name,json=actionName,proto3" json:"action_name,omitempty"`
+	Parameters    *_struct.Struct        `protobuf:"bytes,3,opt,name=parameters,proto3" json:"parameters,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetupAction_ActionCall) Reset() {
+	*x = SetupAction_ActionCall{}
+	mi := &file_organizations_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupAction_ActionCall) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupAction_ActionCall) ProtoMessage() {}
+
+func (x *SetupAction_ActionCall) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupAction_ActionCall.ProtoReflect.Descriptor instead.
+func (*SetupAction_ActionCall) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{40, 1}
+}
+
+func (x *SetupAction_ActionCall) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *SetupAction_ActionCall) GetActionName() string {
+	if x != nil {
+		return x.ActionName
+	}
+	return ""
+}
+
+func (x *SetupAction_ActionCall) GetParameters() *_struct.Struct {
+	if x != nil {
+		return x.Parameters
+	}
+	return nil
 }
 
 var File_organizations_proto protoreflect.FileDescriptor
@@ -2583,7 +2908,16 @@ const file_organizations_proto_rawDesc = "" +
 	"\x18DeleteIntegrationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\x0eintegration_id\x18\x02 \x01(\tR\rintegrationId\"\x1b\n" +
-	"\x19DeleteIntegrationResponse\"\x92\a\n" +
+	"\x19DeleteIntegrationResponse\"\xb1\x01\n" +
+	"\x1eInvokeIntegrationActionRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
+	"\x0eintegration_id\x18\x02 \x01(\tR\rintegrationId\x12\x1f\n" +
+	"\vaction_name\x18\x03 \x01(\tR\n" +
+	"actionName\x127\n" +
+	"\n" +
+	"parameters\x18\x04 \x01(\v2\x17.google.protobuf.StructR\n" +
+	"parameters\"!\n" +
+	"\x1fInvokeIntegrationActionResponse\"\x90\a\n" +
 	"\vIntegration\x12J\n" +
 	"\bmetadata\x18\x01 \x01(\v2..Superplane.Organizations.Integration.MetadataR\bmetadata\x12>\n" +
 	"\x04spec\x18\x02 \x01(\v2*.Superplane.Organizations.Integration.SpecR\x04spec\x12D\n" +
@@ -2597,28 +2931,48 @@ const file_organizations_proto_rawDesc = "" +
 	"updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1ap\n" +
 	"\x04Spec\x12)\n" +
 	"\x10integration_name\x18\x01 \x01(\tR\x0fintegrationName\x12=\n" +
-	"\rconfiguration\x18\x02 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x1a\x98\x02\n" +
+	"\rconfiguration\x18\x02 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x1a\x96\x02\n" +
 	"\x06Status\x12\x14\n" +
 	"\x05state\x18\x01 \x01(\tR\x05state\x12+\n" +
 	"\x11state_description\x18\x02 \x01(\tR\x10stateDescription\x123\n" +
-	"\bmetadata\x18\x03 \x01(\v2\x17.google.protobuf.StructR\bmetadata\x12N\n" +
-	"\x0ebrowser_action\x18\x04 \x01(\v2'.Superplane.Organizations.BrowserActionR\rbrowserAction\x12F\n" +
+	"\bmetadata\x18\x03 \x01(\v2\x17.google.protobuf.StructR\bmetadata\x12L\n" +
+	"\vinstruction\x18\x04 \x01(\v2*.Superplane.Organizations.SetupInstructionR\vinstruction\x12F\n" +
 	"\aused_in\x18\x05 \x03(\v2-.Superplane.Organizations.Integration.NodeRefR\x06usedIn\x1a}\n" +
 	"\aNodeRef\x12\x1b\n" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x1f\n" +
 	"\vcanvas_name\x18\x02 \x01(\tR\n" +
 	"canvasName\x12\x17\n" +
 	"\anode_id\x18\x03 \x01(\tR\x06nodeId\x12\x1b\n" +
-	"\tnode_name\x18\x04 \x01(\tR\bnodeName\"\xf4\x01\n" +
-	"\rBrowserAction\x12\x10\n" +
-	"\x03url\x18\x01 \x01(\tR\x03url\x12\x16\n" +
-	"\x06method\x18\x02 \x01(\tR\x06method\x12X\n" +
-	"\vform_fields\x18\x03 \x03(\v27.Superplane.Organizations.BrowserAction.FormFieldsEntryR\n" +
-	"formFields\x12 \n" +
-	"\vdescription\x18\x04 \x01(\tR\vdescription\x1a=\n" +
+	"\tnode_name\x18\x04 \x01(\tR\bnodeName\"g\n" +
+	"\x10SetupInstruction\x12\x12\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\x12?\n" +
+	"\aactions\x18\x02 \x03(\v2%.Superplane.Organizations.SetupActionR\aactions\"\x9a\x05\n" +
+	"\vSetupAction\x12>\n" +
+	"\x04type\x18\x01 \x01(\x0e2*.Superplane.Organizations.SetupAction.TypeR\x04type\x12J\n" +
+	"\bredirect\x18\x02 \x01(\v2..Superplane.Organizations.SetupAction.RedirectR\bredirect\x12Q\n" +
+	"\vaction_call\x18\x03 \x01(\v20.Superplane.Organizations.SetupAction.ActionCallR\n" +
+	"actionCall\x1a\xea\x01\n" +
+	"\bRedirect\x12\x14\n" +
+	"\x05label\x18\x01 \x01(\tR\x05label\x12\x10\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\x12\x16\n" +
+	"\x06method\x18\x03 \x01(\tR\x06method\x12_\n" +
+	"\vform_fields\x18\x04 \x03(\v2>.Superplane.Organizations.SetupAction.Redirect.FormFieldsEntryR\n" +
+	"formFields\x1a=\n" +
 	"\x0fFormFieldsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"x\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a|\n" +
+	"\n" +
+	"ActionCall\x12\x14\n" +
+	"\x05label\x18\x01 \x01(\tR\x05label\x12\x1f\n" +
+	"\vaction_name\x18\x02 \x01(\tR\n" +
+	"actionName\x127\n" +
+	"\n" +
+	"parameters\x18\x03 \x01(\v2\x17.google.protobuf.StructR\n" +
+	"parameters\"A\n" +
+	"\x04Type\x12\x10\n" +
+	"\fTYPE_UNKNOWN\x10\x00\x12\x11\n" +
+	"\rTYPE_REDIRECT\x10\x01\x12\x14\n" +
+	"\x10TYPE_ACTION_CALL\x10\x02\"x\n" +
 	"\x13OrganizationCreated\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x128\n" +
 	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"x\n" +
@@ -2630,7 +2984,7 @@ const file_organizations_proto_rawDesc = "" +
 	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"r\n" +
 	"\x11InvitationCreated\x12#\n" +
 	"\rinvitation_id\x18\x01 \x01(\tR\finvitationId\x128\n" +
-	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xbe%\n" +
+	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\x8f(\n" +
 	"\rOrganizations\x12\xa7\x02\n" +
 	"\x14DescribeOrganization\x125.Superplane.Organizations.DescribeOrganizationRequest\x1a6.Superplane.Organizations.DescribeOrganizationResponse\"\x9f\x01\x92Az\n" +
 	"\fOrganization\x12\x18Get organization details\x1aPReturns the details of a specific organization (can be referenced by ID or name)\x82\xd3\xe4\x93\x02\x1c\x12\x1a/api/v1/organizations/{id}\x12\x96\x02\n" +
@@ -2666,7 +3020,9 @@ const file_organizations_proto_rawDesc = "" +
 	"\x11UpdateIntegration\x122.Superplane.Organizations.UpdateIntegrationRequest\x1a3.Superplane.Organizations.UpdateIntegrationResponse\"\xa3\x01\x92A]\n" +
 	"\fOrganization\x12\x12Update integration\x1a9Updates the configuration for an organization integration\x82\xd3\xe4\x93\x02=:\x01*28/api/v1/organizations/{id}/integrations/{integration_id}\x12\x9e\x02\n" +
 	"\x11DeleteIntegration\x122.Superplane.Organizations.DeleteIntegrationRequest\x1a3.Superplane.Organizations.DeleteIntegrationResponse\"\x9f\x01\x92A\\\n" +
-	"\fOrganization\x12\x1fDelete organization integration\x1a+Deletes an integration from an organization\x82\xd3\xe4\x93\x02:*8/api/v1/organizations/{id}/integrations/{integration_id}B\xf0\x01\x92A\xaf\x01\x12\x84\x01\n" +
+	"\fOrganization\x12\x1fDelete organization integration\x1a+Deletes an integration from an organization\x82\xd3\xe4\x93\x02:*8/api/v1/organizations/{id}/integrations/{integration_id}\x12\xce\x02\n" +
+	"\x17InvokeIntegrationAction\x128.Superplane.Organizations.InvokeIntegrationActionRequest\x1a9.Superplane.Organizations.InvokeIntegrationActionResponse\"\xbd\x01\x92Aa\n" +
+	"\fOrganization\x12\x19Invoke integration action\x1a6Invokes a custom action on an organization integration\x82\xd3\xe4\x93\x02S:\x01*\"N/api/v1/organizations/{id}/integrations/{integration_id}/actions/{action_name}B\xf0\x01\x92A\xaf\x01\x12\x84\x01\n" +
 	"\x1cSuperplane Organizations API\x128API for managing organizations in the Superplane service\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ;github.com/superplanehq/superplane/pkg/protos/organizationsb\x06proto3"
 
@@ -2682,136 +3038,151 @@ func file_organizations_proto_rawDescGZIP() []byte {
 	return file_organizations_proto_rawDescData
 }
 
-var file_organizations_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
+var file_organizations_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_organizations_proto_msgTypes = make([]protoimpl.MessageInfo, 54)
 var file_organizations_proto_goTypes = []any{
-	(*Organization)(nil),                     // 0: Superplane.Organizations.Organization
-	(*DescribeOrganizationRequest)(nil),      // 1: Superplane.Organizations.DescribeOrganizationRequest
-	(*DescribeOrganizationResponse)(nil),     // 2: Superplane.Organizations.DescribeOrganizationResponse
-	(*UpdateOrganizationRequest)(nil),        // 3: Superplane.Organizations.UpdateOrganizationRequest
-	(*UpdateOrganizationResponse)(nil),       // 4: Superplane.Organizations.UpdateOrganizationResponse
-	(*DeleteOrganizationRequest)(nil),        // 5: Superplane.Organizations.DeleteOrganizationRequest
-	(*DeleteOrganizationResponse)(nil),       // 6: Superplane.Organizations.DeleteOrganizationResponse
-	(*Invitation)(nil),                       // 7: Superplane.Organizations.Invitation
-	(*InviteLink)(nil),                       // 8: Superplane.Organizations.InviteLink
-	(*CreateInvitationRequest)(nil),          // 9: Superplane.Organizations.CreateInvitationRequest
-	(*CreateInvitationResponse)(nil),         // 10: Superplane.Organizations.CreateInvitationResponse
-	(*ListInvitationsRequest)(nil),           // 11: Superplane.Organizations.ListInvitationsRequest
-	(*ListInvitationsResponse)(nil),          // 12: Superplane.Organizations.ListInvitationsResponse
-	(*RemoveInvitationRequest)(nil),          // 13: Superplane.Organizations.RemoveInvitationRequest
-	(*RemoveInvitationResponse)(nil),         // 14: Superplane.Organizations.RemoveInvitationResponse
-	(*GetInviteLinkRequest)(nil),             // 15: Superplane.Organizations.GetInviteLinkRequest
-	(*GetInviteLinkResponse)(nil),            // 16: Superplane.Organizations.GetInviteLinkResponse
-	(*UpdateInviteLinkRequest)(nil),          // 17: Superplane.Organizations.UpdateInviteLinkRequest
-	(*UpdateInviteLinkResponse)(nil),         // 18: Superplane.Organizations.UpdateInviteLinkResponse
-	(*ResetInviteLinkRequest)(nil),           // 19: Superplane.Organizations.ResetInviteLinkRequest
-	(*ResetInviteLinkResponse)(nil),          // 20: Superplane.Organizations.ResetInviteLinkResponse
-	(*RemoveUserRequest)(nil),                // 21: Superplane.Organizations.RemoveUserRequest
-	(*RemoveUserResponse)(nil),               // 22: Superplane.Organizations.RemoveUserResponse
-	(*ListIntegrationsRequest)(nil),          // 23: Superplane.Organizations.ListIntegrationsRequest
-	(*ListIntegrationsResponse)(nil),         // 24: Superplane.Organizations.ListIntegrationsResponse
-	(*CreateIntegrationRequest)(nil),         // 25: Superplane.Organizations.CreateIntegrationRequest
-	(*CreateIntegrationResponse)(nil),        // 26: Superplane.Organizations.CreateIntegrationResponse
-	(*DescribeIntegrationRequest)(nil),       // 27: Superplane.Organizations.DescribeIntegrationRequest
-	(*DescribeIntegrationResponse)(nil),      // 28: Superplane.Organizations.DescribeIntegrationResponse
-	(*ListIntegrationResourcesRequest)(nil),  // 29: Superplane.Organizations.ListIntegrationResourcesRequest
-	(*ListIntegrationResourcesResponse)(nil), // 30: Superplane.Organizations.ListIntegrationResourcesResponse
-	(*IntegrationResourceRef)(nil),           // 31: Superplane.Organizations.IntegrationResourceRef
-	(*UpdateIntegrationRequest)(nil),         // 32: Superplane.Organizations.UpdateIntegrationRequest
-	(*UpdateIntegrationResponse)(nil),        // 33: Superplane.Organizations.UpdateIntegrationResponse
-	(*DeleteIntegrationRequest)(nil),         // 34: Superplane.Organizations.DeleteIntegrationRequest
-	(*DeleteIntegrationResponse)(nil),        // 35: Superplane.Organizations.DeleteIntegrationResponse
-	(*Integration)(nil),                      // 36: Superplane.Organizations.Integration
-	(*BrowserAction)(nil),                    // 37: Superplane.Organizations.BrowserAction
-	(*OrganizationCreated)(nil),              // 38: Superplane.Organizations.OrganizationCreated
-	(*OrganizationUpdated)(nil),              // 39: Superplane.Organizations.OrganizationUpdated
-	(*OrganizationDeleted)(nil),              // 40: Superplane.Organizations.OrganizationDeleted
-	(*InvitationCreated)(nil),                // 41: Superplane.Organizations.InvitationCreated
-	(*Organization_Metadata)(nil),            // 42: Superplane.Organizations.Organization.Metadata
-	nil,                                      // 43: Superplane.Organizations.ListIntegrationResourcesRequest.ParametersEntry
-	(*Integration_Metadata)(nil),             // 44: Superplane.Organizations.Integration.Metadata
-	(*Integration_Spec)(nil),                 // 45: Superplane.Organizations.Integration.Spec
-	(*Integration_Status)(nil),               // 46: Superplane.Organizations.Integration.Status
-	(*Integration_NodeRef)(nil),              // 47: Superplane.Organizations.Integration.NodeRef
-	nil,                                      // 48: Superplane.Organizations.BrowserAction.FormFieldsEntry
-	(*timestamp.Timestamp)(nil),              // 49: google.protobuf.Timestamp
-	(*_struct.Struct)(nil),                   // 50: google.protobuf.Struct
+	(SetupAction_Type)(0),                    // 0: Superplane.Organizations.SetupAction.Type
+	(*Organization)(nil),                     // 1: Superplane.Organizations.Organization
+	(*DescribeOrganizationRequest)(nil),      // 2: Superplane.Organizations.DescribeOrganizationRequest
+	(*DescribeOrganizationResponse)(nil),     // 3: Superplane.Organizations.DescribeOrganizationResponse
+	(*UpdateOrganizationRequest)(nil),        // 4: Superplane.Organizations.UpdateOrganizationRequest
+	(*UpdateOrganizationResponse)(nil),       // 5: Superplane.Organizations.UpdateOrganizationResponse
+	(*DeleteOrganizationRequest)(nil),        // 6: Superplane.Organizations.DeleteOrganizationRequest
+	(*DeleteOrganizationResponse)(nil),       // 7: Superplane.Organizations.DeleteOrganizationResponse
+	(*Invitation)(nil),                       // 8: Superplane.Organizations.Invitation
+	(*InviteLink)(nil),                       // 9: Superplane.Organizations.InviteLink
+	(*CreateInvitationRequest)(nil),          // 10: Superplane.Organizations.CreateInvitationRequest
+	(*CreateInvitationResponse)(nil),         // 11: Superplane.Organizations.CreateInvitationResponse
+	(*ListInvitationsRequest)(nil),           // 12: Superplane.Organizations.ListInvitationsRequest
+	(*ListInvitationsResponse)(nil),          // 13: Superplane.Organizations.ListInvitationsResponse
+	(*RemoveInvitationRequest)(nil),          // 14: Superplane.Organizations.RemoveInvitationRequest
+	(*RemoveInvitationResponse)(nil),         // 15: Superplane.Organizations.RemoveInvitationResponse
+	(*GetInviteLinkRequest)(nil),             // 16: Superplane.Organizations.GetInviteLinkRequest
+	(*GetInviteLinkResponse)(nil),            // 17: Superplane.Organizations.GetInviteLinkResponse
+	(*UpdateInviteLinkRequest)(nil),          // 18: Superplane.Organizations.UpdateInviteLinkRequest
+	(*UpdateInviteLinkResponse)(nil),         // 19: Superplane.Organizations.UpdateInviteLinkResponse
+	(*ResetInviteLinkRequest)(nil),           // 20: Superplane.Organizations.ResetInviteLinkRequest
+	(*ResetInviteLinkResponse)(nil),          // 21: Superplane.Organizations.ResetInviteLinkResponse
+	(*RemoveUserRequest)(nil),                // 22: Superplane.Organizations.RemoveUserRequest
+	(*RemoveUserResponse)(nil),               // 23: Superplane.Organizations.RemoveUserResponse
+	(*ListIntegrationsRequest)(nil),          // 24: Superplane.Organizations.ListIntegrationsRequest
+	(*ListIntegrationsResponse)(nil),         // 25: Superplane.Organizations.ListIntegrationsResponse
+	(*CreateIntegrationRequest)(nil),         // 26: Superplane.Organizations.CreateIntegrationRequest
+	(*CreateIntegrationResponse)(nil),        // 27: Superplane.Organizations.CreateIntegrationResponse
+	(*DescribeIntegrationRequest)(nil),       // 28: Superplane.Organizations.DescribeIntegrationRequest
+	(*DescribeIntegrationResponse)(nil),      // 29: Superplane.Organizations.DescribeIntegrationResponse
+	(*ListIntegrationResourcesRequest)(nil),  // 30: Superplane.Organizations.ListIntegrationResourcesRequest
+	(*ListIntegrationResourcesResponse)(nil), // 31: Superplane.Organizations.ListIntegrationResourcesResponse
+	(*IntegrationResourceRef)(nil),           // 32: Superplane.Organizations.IntegrationResourceRef
+	(*UpdateIntegrationRequest)(nil),         // 33: Superplane.Organizations.UpdateIntegrationRequest
+	(*UpdateIntegrationResponse)(nil),        // 34: Superplane.Organizations.UpdateIntegrationResponse
+	(*DeleteIntegrationRequest)(nil),         // 35: Superplane.Organizations.DeleteIntegrationRequest
+	(*DeleteIntegrationResponse)(nil),        // 36: Superplane.Organizations.DeleteIntegrationResponse
+	(*InvokeIntegrationActionRequest)(nil),   // 37: Superplane.Organizations.InvokeIntegrationActionRequest
+	(*InvokeIntegrationActionResponse)(nil),  // 38: Superplane.Organizations.InvokeIntegrationActionResponse
+	(*Integration)(nil),                      // 39: Superplane.Organizations.Integration
+	(*SetupInstruction)(nil),                 // 40: Superplane.Organizations.SetupInstruction
+	(*SetupAction)(nil),                      // 41: Superplane.Organizations.SetupAction
+	(*OrganizationCreated)(nil),              // 42: Superplane.Organizations.OrganizationCreated
+	(*OrganizationUpdated)(nil),              // 43: Superplane.Organizations.OrganizationUpdated
+	(*OrganizationDeleted)(nil),              // 44: Superplane.Organizations.OrganizationDeleted
+	(*InvitationCreated)(nil),                // 45: Superplane.Organizations.InvitationCreated
+	(*Organization_Metadata)(nil),            // 46: Superplane.Organizations.Organization.Metadata
+	nil,                                      // 47: Superplane.Organizations.ListIntegrationResourcesRequest.ParametersEntry
+	(*Integration_Metadata)(nil),             // 48: Superplane.Organizations.Integration.Metadata
+	(*Integration_Spec)(nil),                 // 49: Superplane.Organizations.Integration.Spec
+	(*Integration_Status)(nil),               // 50: Superplane.Organizations.Integration.Status
+	(*Integration_NodeRef)(nil),              // 51: Superplane.Organizations.Integration.NodeRef
+	(*SetupAction_Redirect)(nil),             // 52: Superplane.Organizations.SetupAction.Redirect
+	(*SetupAction_ActionCall)(nil),           // 53: Superplane.Organizations.SetupAction.ActionCall
+	nil,                                      // 54: Superplane.Organizations.SetupAction.Redirect.FormFieldsEntry
+	(*timestamp.Timestamp)(nil),              // 55: google.protobuf.Timestamp
+	(*_struct.Struct)(nil),                   // 56: google.protobuf.Struct
 }
 var file_organizations_proto_depIdxs = []int32{
-	42, // 0: Superplane.Organizations.Organization.metadata:type_name -> Superplane.Organizations.Organization.Metadata
-	0,  // 1: Superplane.Organizations.DescribeOrganizationResponse.organization:type_name -> Superplane.Organizations.Organization
-	0,  // 2: Superplane.Organizations.UpdateOrganizationRequest.organization:type_name -> Superplane.Organizations.Organization
-	0,  // 3: Superplane.Organizations.UpdateOrganizationResponse.organization:type_name -> Superplane.Organizations.Organization
-	49, // 4: Superplane.Organizations.Invitation.created_at:type_name -> google.protobuf.Timestamp
-	49, // 5: Superplane.Organizations.InviteLink.created_at:type_name -> google.protobuf.Timestamp
-	49, // 6: Superplane.Organizations.InviteLink.updated_at:type_name -> google.protobuf.Timestamp
-	7,  // 7: Superplane.Organizations.CreateInvitationResponse.invitation:type_name -> Superplane.Organizations.Invitation
-	7,  // 8: Superplane.Organizations.ListInvitationsResponse.invitations:type_name -> Superplane.Organizations.Invitation
-	8,  // 9: Superplane.Organizations.GetInviteLinkResponse.invite_link:type_name -> Superplane.Organizations.InviteLink
-	8,  // 10: Superplane.Organizations.UpdateInviteLinkResponse.invite_link:type_name -> Superplane.Organizations.InviteLink
-	8,  // 11: Superplane.Organizations.ResetInviteLinkResponse.invite_link:type_name -> Superplane.Organizations.InviteLink
-	36, // 12: Superplane.Organizations.ListIntegrationsResponse.integrations:type_name -> Superplane.Organizations.Integration
-	50, // 13: Superplane.Organizations.CreateIntegrationRequest.configuration:type_name -> google.protobuf.Struct
-	36, // 14: Superplane.Organizations.CreateIntegrationResponse.integration:type_name -> Superplane.Organizations.Integration
-	36, // 15: Superplane.Organizations.DescribeIntegrationResponse.integration:type_name -> Superplane.Organizations.Integration
-	43, // 16: Superplane.Organizations.ListIntegrationResourcesRequest.parameters:type_name -> Superplane.Organizations.ListIntegrationResourcesRequest.ParametersEntry
-	31, // 17: Superplane.Organizations.ListIntegrationResourcesResponse.resources:type_name -> Superplane.Organizations.IntegrationResourceRef
-	50, // 18: Superplane.Organizations.UpdateIntegrationRequest.configuration:type_name -> google.protobuf.Struct
-	36, // 19: Superplane.Organizations.UpdateIntegrationResponse.integration:type_name -> Superplane.Organizations.Integration
-	44, // 20: Superplane.Organizations.Integration.metadata:type_name -> Superplane.Organizations.Integration.Metadata
-	45, // 21: Superplane.Organizations.Integration.spec:type_name -> Superplane.Organizations.Integration.Spec
-	46, // 22: Superplane.Organizations.Integration.status:type_name -> Superplane.Organizations.Integration.Status
-	48, // 23: Superplane.Organizations.BrowserAction.form_fields:type_name -> Superplane.Organizations.BrowserAction.FormFieldsEntry
-	49, // 24: Superplane.Organizations.OrganizationCreated.timestamp:type_name -> google.protobuf.Timestamp
-	49, // 25: Superplane.Organizations.OrganizationUpdated.timestamp:type_name -> google.protobuf.Timestamp
-	49, // 26: Superplane.Organizations.OrganizationDeleted.timestamp:type_name -> google.protobuf.Timestamp
-	49, // 27: Superplane.Organizations.InvitationCreated.timestamp:type_name -> google.protobuf.Timestamp
-	49, // 28: Superplane.Organizations.Organization.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	49, // 29: Superplane.Organizations.Organization.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	49, // 30: Superplane.Organizations.Integration.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	49, // 31: Superplane.Organizations.Integration.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	50, // 32: Superplane.Organizations.Integration.Spec.configuration:type_name -> google.protobuf.Struct
-	50, // 33: Superplane.Organizations.Integration.Status.metadata:type_name -> google.protobuf.Struct
-	37, // 34: Superplane.Organizations.Integration.Status.browser_action:type_name -> Superplane.Organizations.BrowserAction
-	47, // 35: Superplane.Organizations.Integration.Status.used_in:type_name -> Superplane.Organizations.Integration.NodeRef
-	1,  // 36: Superplane.Organizations.Organizations.DescribeOrganization:input_type -> Superplane.Organizations.DescribeOrganizationRequest
-	3,  // 37: Superplane.Organizations.Organizations.UpdateOrganization:input_type -> Superplane.Organizations.UpdateOrganizationRequest
-	5,  // 38: Superplane.Organizations.Organizations.DeleteOrganization:input_type -> Superplane.Organizations.DeleteOrganizationRequest
-	21, // 39: Superplane.Organizations.Organizations.RemoveUser:input_type -> Superplane.Organizations.RemoveUserRequest
-	9,  // 40: Superplane.Organizations.Organizations.CreateInvitation:input_type -> Superplane.Organizations.CreateInvitationRequest
-	11, // 41: Superplane.Organizations.Organizations.ListInvitations:input_type -> Superplane.Organizations.ListInvitationsRequest
-	13, // 42: Superplane.Organizations.Organizations.RemoveInvitation:input_type -> Superplane.Organizations.RemoveInvitationRequest
-	15, // 43: Superplane.Organizations.Organizations.GetInviteLink:input_type -> Superplane.Organizations.GetInviteLinkRequest
-	17, // 44: Superplane.Organizations.Organizations.UpdateInviteLink:input_type -> Superplane.Organizations.UpdateInviteLinkRequest
-	19, // 45: Superplane.Organizations.Organizations.ResetInviteLink:input_type -> Superplane.Organizations.ResetInviteLinkRequest
-	8,  // 46: Superplane.Organizations.Organizations.AcceptInviteLink:input_type -> Superplane.Organizations.InviteLink
-	23, // 47: Superplane.Organizations.Organizations.ListIntegrations:input_type -> Superplane.Organizations.ListIntegrationsRequest
-	27, // 48: Superplane.Organizations.Organizations.DescribeIntegration:input_type -> Superplane.Organizations.DescribeIntegrationRequest
-	29, // 49: Superplane.Organizations.Organizations.ListIntegrationResources:input_type -> Superplane.Organizations.ListIntegrationResourcesRequest
-	25, // 50: Superplane.Organizations.Organizations.CreateIntegration:input_type -> Superplane.Organizations.CreateIntegrationRequest
-	32, // 51: Superplane.Organizations.Organizations.UpdateIntegration:input_type -> Superplane.Organizations.UpdateIntegrationRequest
-	34, // 52: Superplane.Organizations.Organizations.DeleteIntegration:input_type -> Superplane.Organizations.DeleteIntegrationRequest
-	2,  // 53: Superplane.Organizations.Organizations.DescribeOrganization:output_type -> Superplane.Organizations.DescribeOrganizationResponse
-	4,  // 54: Superplane.Organizations.Organizations.UpdateOrganization:output_type -> Superplane.Organizations.UpdateOrganizationResponse
-	6,  // 55: Superplane.Organizations.Organizations.DeleteOrganization:output_type -> Superplane.Organizations.DeleteOrganizationResponse
-	22, // 56: Superplane.Organizations.Organizations.RemoveUser:output_type -> Superplane.Organizations.RemoveUserResponse
-	10, // 57: Superplane.Organizations.Organizations.CreateInvitation:output_type -> Superplane.Organizations.CreateInvitationResponse
-	12, // 58: Superplane.Organizations.Organizations.ListInvitations:output_type -> Superplane.Organizations.ListInvitationsResponse
-	14, // 59: Superplane.Organizations.Organizations.RemoveInvitation:output_type -> Superplane.Organizations.RemoveInvitationResponse
-	16, // 60: Superplane.Organizations.Organizations.GetInviteLink:output_type -> Superplane.Organizations.GetInviteLinkResponse
-	18, // 61: Superplane.Organizations.Organizations.UpdateInviteLink:output_type -> Superplane.Organizations.UpdateInviteLinkResponse
-	20, // 62: Superplane.Organizations.Organizations.ResetInviteLink:output_type -> Superplane.Organizations.ResetInviteLinkResponse
-	50, // 63: Superplane.Organizations.Organizations.AcceptInviteLink:output_type -> google.protobuf.Struct
-	24, // 64: Superplane.Organizations.Organizations.ListIntegrations:output_type -> Superplane.Organizations.ListIntegrationsResponse
-	28, // 65: Superplane.Organizations.Organizations.DescribeIntegration:output_type -> Superplane.Organizations.DescribeIntegrationResponse
-	30, // 66: Superplane.Organizations.Organizations.ListIntegrationResources:output_type -> Superplane.Organizations.ListIntegrationResourcesResponse
-	26, // 67: Superplane.Organizations.Organizations.CreateIntegration:output_type -> Superplane.Organizations.CreateIntegrationResponse
-	33, // 68: Superplane.Organizations.Organizations.UpdateIntegration:output_type -> Superplane.Organizations.UpdateIntegrationResponse
-	35, // 69: Superplane.Organizations.Organizations.DeleteIntegration:output_type -> Superplane.Organizations.DeleteIntegrationResponse
-	53, // [53:70] is the sub-list for method output_type
-	36, // [36:53] is the sub-list for method input_type
-	36, // [36:36] is the sub-list for extension type_name
-	36, // [36:36] is the sub-list for extension extendee
-	0,  // [0:36] is the sub-list for field type_name
+	46, // 0: Superplane.Organizations.Organization.metadata:type_name -> Superplane.Organizations.Organization.Metadata
+	1,  // 1: Superplane.Organizations.DescribeOrganizationResponse.organization:type_name -> Superplane.Organizations.Organization
+	1,  // 2: Superplane.Organizations.UpdateOrganizationRequest.organization:type_name -> Superplane.Organizations.Organization
+	1,  // 3: Superplane.Organizations.UpdateOrganizationResponse.organization:type_name -> Superplane.Organizations.Organization
+	55, // 4: Superplane.Organizations.Invitation.created_at:type_name -> google.protobuf.Timestamp
+	55, // 5: Superplane.Organizations.InviteLink.created_at:type_name -> google.protobuf.Timestamp
+	55, // 6: Superplane.Organizations.InviteLink.updated_at:type_name -> google.protobuf.Timestamp
+	8,  // 7: Superplane.Organizations.CreateInvitationResponse.invitation:type_name -> Superplane.Organizations.Invitation
+	8,  // 8: Superplane.Organizations.ListInvitationsResponse.invitations:type_name -> Superplane.Organizations.Invitation
+	9,  // 9: Superplane.Organizations.GetInviteLinkResponse.invite_link:type_name -> Superplane.Organizations.InviteLink
+	9,  // 10: Superplane.Organizations.UpdateInviteLinkResponse.invite_link:type_name -> Superplane.Organizations.InviteLink
+	9,  // 11: Superplane.Organizations.ResetInviteLinkResponse.invite_link:type_name -> Superplane.Organizations.InviteLink
+	39, // 12: Superplane.Organizations.ListIntegrationsResponse.integrations:type_name -> Superplane.Organizations.Integration
+	56, // 13: Superplane.Organizations.CreateIntegrationRequest.configuration:type_name -> google.protobuf.Struct
+	39, // 14: Superplane.Organizations.CreateIntegrationResponse.integration:type_name -> Superplane.Organizations.Integration
+	39, // 15: Superplane.Organizations.DescribeIntegrationResponse.integration:type_name -> Superplane.Organizations.Integration
+	47, // 16: Superplane.Organizations.ListIntegrationResourcesRequest.parameters:type_name -> Superplane.Organizations.ListIntegrationResourcesRequest.ParametersEntry
+	32, // 17: Superplane.Organizations.ListIntegrationResourcesResponse.resources:type_name -> Superplane.Organizations.IntegrationResourceRef
+	56, // 18: Superplane.Organizations.UpdateIntegrationRequest.configuration:type_name -> google.protobuf.Struct
+	39, // 19: Superplane.Organizations.UpdateIntegrationResponse.integration:type_name -> Superplane.Organizations.Integration
+	56, // 20: Superplane.Organizations.InvokeIntegrationActionRequest.parameters:type_name -> google.protobuf.Struct
+	48, // 21: Superplane.Organizations.Integration.metadata:type_name -> Superplane.Organizations.Integration.Metadata
+	49, // 22: Superplane.Organizations.Integration.spec:type_name -> Superplane.Organizations.Integration.Spec
+	50, // 23: Superplane.Organizations.Integration.status:type_name -> Superplane.Organizations.Integration.Status
+	41, // 24: Superplane.Organizations.SetupInstruction.actions:type_name -> Superplane.Organizations.SetupAction
+	0,  // 25: Superplane.Organizations.SetupAction.type:type_name -> Superplane.Organizations.SetupAction.Type
+	52, // 26: Superplane.Organizations.SetupAction.redirect:type_name -> Superplane.Organizations.SetupAction.Redirect
+	53, // 27: Superplane.Organizations.SetupAction.action_call:type_name -> Superplane.Organizations.SetupAction.ActionCall
+	55, // 28: Superplane.Organizations.OrganizationCreated.timestamp:type_name -> google.protobuf.Timestamp
+	55, // 29: Superplane.Organizations.OrganizationUpdated.timestamp:type_name -> google.protobuf.Timestamp
+	55, // 30: Superplane.Organizations.OrganizationDeleted.timestamp:type_name -> google.protobuf.Timestamp
+	55, // 31: Superplane.Organizations.InvitationCreated.timestamp:type_name -> google.protobuf.Timestamp
+	55, // 32: Superplane.Organizations.Organization.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	55, // 33: Superplane.Organizations.Organization.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	55, // 34: Superplane.Organizations.Integration.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	55, // 35: Superplane.Organizations.Integration.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	56, // 36: Superplane.Organizations.Integration.Spec.configuration:type_name -> google.protobuf.Struct
+	56, // 37: Superplane.Organizations.Integration.Status.metadata:type_name -> google.protobuf.Struct
+	40, // 38: Superplane.Organizations.Integration.Status.instruction:type_name -> Superplane.Organizations.SetupInstruction
+	51, // 39: Superplane.Organizations.Integration.Status.used_in:type_name -> Superplane.Organizations.Integration.NodeRef
+	54, // 40: Superplane.Organizations.SetupAction.Redirect.form_fields:type_name -> Superplane.Organizations.SetupAction.Redirect.FormFieldsEntry
+	56, // 41: Superplane.Organizations.SetupAction.ActionCall.parameters:type_name -> google.protobuf.Struct
+	2,  // 42: Superplane.Organizations.Organizations.DescribeOrganization:input_type -> Superplane.Organizations.DescribeOrganizationRequest
+	4,  // 43: Superplane.Organizations.Organizations.UpdateOrganization:input_type -> Superplane.Organizations.UpdateOrganizationRequest
+	6,  // 44: Superplane.Organizations.Organizations.DeleteOrganization:input_type -> Superplane.Organizations.DeleteOrganizationRequest
+	22, // 45: Superplane.Organizations.Organizations.RemoveUser:input_type -> Superplane.Organizations.RemoveUserRequest
+	10, // 46: Superplane.Organizations.Organizations.CreateInvitation:input_type -> Superplane.Organizations.CreateInvitationRequest
+	12, // 47: Superplane.Organizations.Organizations.ListInvitations:input_type -> Superplane.Organizations.ListInvitationsRequest
+	14, // 48: Superplane.Organizations.Organizations.RemoveInvitation:input_type -> Superplane.Organizations.RemoveInvitationRequest
+	16, // 49: Superplane.Organizations.Organizations.GetInviteLink:input_type -> Superplane.Organizations.GetInviteLinkRequest
+	18, // 50: Superplane.Organizations.Organizations.UpdateInviteLink:input_type -> Superplane.Organizations.UpdateInviteLinkRequest
+	20, // 51: Superplane.Organizations.Organizations.ResetInviteLink:input_type -> Superplane.Organizations.ResetInviteLinkRequest
+	9,  // 52: Superplane.Organizations.Organizations.AcceptInviteLink:input_type -> Superplane.Organizations.InviteLink
+	24, // 53: Superplane.Organizations.Organizations.ListIntegrations:input_type -> Superplane.Organizations.ListIntegrationsRequest
+	28, // 54: Superplane.Organizations.Organizations.DescribeIntegration:input_type -> Superplane.Organizations.DescribeIntegrationRequest
+	30, // 55: Superplane.Organizations.Organizations.ListIntegrationResources:input_type -> Superplane.Organizations.ListIntegrationResourcesRequest
+	26, // 56: Superplane.Organizations.Organizations.CreateIntegration:input_type -> Superplane.Organizations.CreateIntegrationRequest
+	33, // 57: Superplane.Organizations.Organizations.UpdateIntegration:input_type -> Superplane.Organizations.UpdateIntegrationRequest
+	35, // 58: Superplane.Organizations.Organizations.DeleteIntegration:input_type -> Superplane.Organizations.DeleteIntegrationRequest
+	37, // 59: Superplane.Organizations.Organizations.InvokeIntegrationAction:input_type -> Superplane.Organizations.InvokeIntegrationActionRequest
+	3,  // 60: Superplane.Organizations.Organizations.DescribeOrganization:output_type -> Superplane.Organizations.DescribeOrganizationResponse
+	5,  // 61: Superplane.Organizations.Organizations.UpdateOrganization:output_type -> Superplane.Organizations.UpdateOrganizationResponse
+	7,  // 62: Superplane.Organizations.Organizations.DeleteOrganization:output_type -> Superplane.Organizations.DeleteOrganizationResponse
+	23, // 63: Superplane.Organizations.Organizations.RemoveUser:output_type -> Superplane.Organizations.RemoveUserResponse
+	11, // 64: Superplane.Organizations.Organizations.CreateInvitation:output_type -> Superplane.Organizations.CreateInvitationResponse
+	13, // 65: Superplane.Organizations.Organizations.ListInvitations:output_type -> Superplane.Organizations.ListInvitationsResponse
+	15, // 66: Superplane.Organizations.Organizations.RemoveInvitation:output_type -> Superplane.Organizations.RemoveInvitationResponse
+	17, // 67: Superplane.Organizations.Organizations.GetInviteLink:output_type -> Superplane.Organizations.GetInviteLinkResponse
+	19, // 68: Superplane.Organizations.Organizations.UpdateInviteLink:output_type -> Superplane.Organizations.UpdateInviteLinkResponse
+	21, // 69: Superplane.Organizations.Organizations.ResetInviteLink:output_type -> Superplane.Organizations.ResetInviteLinkResponse
+	56, // 70: Superplane.Organizations.Organizations.AcceptInviteLink:output_type -> google.protobuf.Struct
+	25, // 71: Superplane.Organizations.Organizations.ListIntegrations:output_type -> Superplane.Organizations.ListIntegrationsResponse
+	29, // 72: Superplane.Organizations.Organizations.DescribeIntegration:output_type -> Superplane.Organizations.DescribeIntegrationResponse
+	31, // 73: Superplane.Organizations.Organizations.ListIntegrationResources:output_type -> Superplane.Organizations.ListIntegrationResourcesResponse
+	27, // 74: Superplane.Organizations.Organizations.CreateIntegration:output_type -> Superplane.Organizations.CreateIntegrationResponse
+	34, // 75: Superplane.Organizations.Organizations.UpdateIntegration:output_type -> Superplane.Organizations.UpdateIntegrationResponse
+	36, // 76: Superplane.Organizations.Organizations.DeleteIntegration:output_type -> Superplane.Organizations.DeleteIntegrationResponse
+	38, // 77: Superplane.Organizations.Organizations.InvokeIntegrationAction:output_type -> Superplane.Organizations.InvokeIntegrationActionResponse
+	60, // [60:78] is the sub-list for method output_type
+	42, // [42:60] is the sub-list for method input_type
+	42, // [42:42] is the sub-list for extension type_name
+	42, // [42:42] is the sub-list for extension extendee
+	0,  // [0:42] is the sub-list for field type_name
 }
 
 func init() { file_organizations_proto_init() }
@@ -2824,13 +3195,14 @@ func file_organizations_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_organizations_proto_rawDesc), len(file_organizations_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   49,
+			NumEnums:      1,
+			NumMessages:   54,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_organizations_proto_goTypes,
 		DependencyIndexes: file_organizations_proto_depIdxs,
+		EnumInfos:         file_organizations_proto_enumTypes,
 		MessageInfos:      file_organizations_proto_msgTypes,
 	}.Build()
 	File_organizations_proto = out.File

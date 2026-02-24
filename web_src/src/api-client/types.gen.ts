@@ -615,15 +615,6 @@ export type NodeWidgetRef = {
   name?: string;
 };
 
-export type OrganizationsBrowserAction = {
-  url?: string;
-  method?: string;
-  formFields?: {
-    [key: string]: string;
-  };
-  description?: string;
-};
-
 export type OrganizationsCreateIntegrationBody = {
   name?: string;
   integrationName?: string;
@@ -696,7 +687,7 @@ export type OrganizationsIntegrationStatus = {
   metadata?: {
     [key: string]: unknown;
   };
-  browserAction?: OrganizationsBrowserAction;
+  instruction?: OrganizationsSetupInstruction;
   usedIn?: Array<IntegrationNodeRef>;
 };
 
@@ -715,6 +706,16 @@ export type OrganizationsInviteLink = {
   enabled?: boolean;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type OrganizationsInvokeIntegrationActionBody = {
+  parameters?: {
+    [key: string]: unknown;
+  };
+};
+
+export type OrganizationsInvokeIntegrationActionResponse = {
+  [key: string]: unknown;
 };
 
 export type OrganizationsListIntegrationResourcesResponse = {
@@ -747,6 +748,19 @@ export type OrganizationsRemoveUserResponse = {
 
 export type OrganizationsResetInviteLinkResponse = {
   inviteLink?: OrganizationsInviteLink;
+};
+
+export type OrganizationsSetupAction = {
+  type?: OrganizationsSetupActionType;
+  redirect?: SetupActionRedirect;
+  actionCall?: SetupActionActionCall;
+};
+
+export type OrganizationsSetupActionType = "TYPE_UNKNOWN" | "TYPE_REDIRECT" | "TYPE_ACTION_CALL";
+
+export type OrganizationsSetupInstruction = {
+  text?: string;
+  actions?: Array<OrganizationsSetupAction>;
 };
 
 export type OrganizationsUpdateIntegrationBody = {
@@ -973,6 +987,23 @@ export type ServiceAccountsUpdateServiceAccountBody = {
 
 export type ServiceAccountsUpdateServiceAccountResponse = {
   serviceAccount?: ServiceAccountsServiceAccount;
+};
+
+export type SetupActionActionCall = {
+  label?: string;
+  actionName?: string;
+  parameters?: {
+    [key: string]: unknown;
+  };
+};
+
+export type SetupActionRedirect = {
+  label?: string;
+  url?: string;
+  method?: string;
+  formFields?: {
+    [key: string]: string;
+  };
 };
 
 export type SuperplaneBlueprintsOutputChannel = {
@@ -2451,6 +2482,37 @@ export type OrganizationsUpdateIntegrationResponses = {
 
 export type OrganizationsUpdateIntegrationResponse2 =
   OrganizationsUpdateIntegrationResponses[keyof OrganizationsUpdateIntegrationResponses];
+
+export type OrganizationsInvokeIntegrationActionData = {
+  body: OrganizationsInvokeIntegrationActionBody;
+  path: {
+    id: string;
+    integrationId: string;
+    actionName: string;
+  };
+  query?: never;
+  url: "/api/v1/organizations/{id}/integrations/{integrationId}/actions/{actionName}";
+};
+
+export type OrganizationsInvokeIntegrationActionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type OrganizationsInvokeIntegrationActionError =
+  OrganizationsInvokeIntegrationActionErrors[keyof OrganizationsInvokeIntegrationActionErrors];
+
+export type OrganizationsInvokeIntegrationActionResponses = {
+  /**
+   * A successful response.
+   */
+  200: OrganizationsInvokeIntegrationActionResponse;
+};
+
+export type OrganizationsInvokeIntegrationActionResponse2 =
+  OrganizationsInvokeIntegrationActionResponses[keyof OrganizationsInvokeIntegrationActionResponses];
 
 export type OrganizationsListIntegrationResourcesData = {
   body?: never;

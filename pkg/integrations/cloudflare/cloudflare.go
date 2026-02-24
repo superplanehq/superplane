@@ -89,9 +89,11 @@ func (c *Cloudflare) Triggers() []core.Trigger {
 
 func (c *Cloudflare) Sync(ctx core.SyncContext) error {
 	if ctx.FirstSetup {
-		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: setupInstructions,
-		})
+		ctx.Integration.Instructions(
+			setupInstructions,
+			[]core.SetupAction{},
+		)
+
 		return nil
 	}
 

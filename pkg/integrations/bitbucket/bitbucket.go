@@ -136,9 +136,10 @@ func (b *Bitbucket) Sync(ctx core.SyncContext) error {
 	}
 
 	if ctx.FirstSetup {
-		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: installationInstructions,
-		})
+		ctx.Integration.Instructions(
+			installationInstructions,
+			[]core.SetupAction{},
+		)
 		return nil
 	}
 

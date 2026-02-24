@@ -37,6 +37,7 @@ const (
 	Organizations_CreateIntegration_FullMethodName        = "/Superplane.Organizations.Organizations/CreateIntegration"
 	Organizations_UpdateIntegration_FullMethodName        = "/Superplane.Organizations.Organizations/UpdateIntegration"
 	Organizations_DeleteIntegration_FullMethodName        = "/Superplane.Organizations.Organizations/DeleteIntegration"
+	Organizations_InvokeIntegrationAction_FullMethodName  = "/Superplane.Organizations.Organizations/InvokeIntegrationAction"
 )
 
 // OrganizationsClient is the client API for Organizations service.
@@ -60,6 +61,7 @@ type OrganizationsClient interface {
 	CreateIntegration(ctx context.Context, in *CreateIntegrationRequest, opts ...grpc.CallOption) (*CreateIntegrationResponse, error)
 	UpdateIntegration(ctx context.Context, in *UpdateIntegrationRequest, opts ...grpc.CallOption) (*UpdateIntegrationResponse, error)
 	DeleteIntegration(ctx context.Context, in *DeleteIntegrationRequest, opts ...grpc.CallOption) (*DeleteIntegrationResponse, error)
+	InvokeIntegrationAction(ctx context.Context, in *InvokeIntegrationActionRequest, opts ...grpc.CallOption) (*InvokeIntegrationActionResponse, error)
 }
 
 type organizationsClient struct {
@@ -240,6 +242,16 @@ func (c *organizationsClient) DeleteIntegration(ctx context.Context, in *DeleteI
 	return out, nil
 }
 
+func (c *organizationsClient) InvokeIntegrationAction(ctx context.Context, in *InvokeIntegrationActionRequest, opts ...grpc.CallOption) (*InvokeIntegrationActionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InvokeIntegrationActionResponse)
+	err := c.cc.Invoke(ctx, Organizations_InvokeIntegrationAction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrganizationsServer is the server API for Organizations service.
 // All implementations should embed UnimplementedOrganizationsServer
 // for forward compatibility.
@@ -261,6 +273,7 @@ type OrganizationsServer interface {
 	CreateIntegration(context.Context, *CreateIntegrationRequest) (*CreateIntegrationResponse, error)
 	UpdateIntegration(context.Context, *UpdateIntegrationRequest) (*UpdateIntegrationResponse, error)
 	DeleteIntegration(context.Context, *DeleteIntegrationRequest) (*DeleteIntegrationResponse, error)
+	InvokeIntegrationAction(context.Context, *InvokeIntegrationActionRequest) (*InvokeIntegrationActionResponse, error)
 }
 
 // UnimplementedOrganizationsServer should be embedded to have
@@ -320,6 +333,9 @@ func (UnimplementedOrganizationsServer) UpdateIntegration(context.Context, *Upda
 }
 func (UnimplementedOrganizationsServer) DeleteIntegration(context.Context, *DeleteIntegrationRequest) (*DeleteIntegrationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteIntegration not implemented")
+}
+func (UnimplementedOrganizationsServer) InvokeIntegrationAction(context.Context, *InvokeIntegrationActionRequest) (*InvokeIntegrationActionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InvokeIntegrationAction not implemented")
 }
 func (UnimplementedOrganizationsServer) testEmbeddedByValue() {}
 
@@ -647,6 +663,24 @@ func _Organizations_DeleteIntegration_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Organizations_InvokeIntegrationAction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InvokeIntegrationActionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).InvokeIntegrationAction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_InvokeIntegrationAction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).InvokeIntegrationAction(ctx, req.(*InvokeIntegrationActionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Organizations_ServiceDesc is the grpc.ServiceDesc for Organizations service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -721,6 +755,10 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteIntegration",
 			Handler:    _Organizations_DeleteIntegration_Handler,
+		},
+		{
+			MethodName: "InvokeIntegrationAction",
+			Handler:    _Organizations_InvokeIntegrationAction_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -151,15 +151,23 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("Failed to generate GitHub App state: %v", err)
 	}
 
-	ctx.Integration.NewBrowserAction(core.BrowserAction{
-		Description: appBootstrapDescription,
-		URL:         g.browserActionURL(config.Organization),
-		Method:      "POST",
-		FormFields: map[string]string{
-			"manifest": g.appManifest(ctx),
-			"state":    state,
+	ctx.Integration.Instructions(
+		appBootstrapDescription,
+		[]core.SetupAction{
+			{
+				Type: "redirect",
+				Redirect: &core.RedirectAction{
+					Label:  "Create GitHub App",
+					URL:    g.browserActionURL(config.Organization),
+					Method: "POST",
+					FormFields: map[string]string{
+						"manifest": g.appManifest(ctx),
+						"state":    state,
+					},
+				},
+			},
 		},
-	})
+	)
 
 	ctx.Integration.SetMetadata(Metadata{
 		Owner: config.Organization,
@@ -274,11 +282,18 @@ func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, metadata M
 
 		ctx.Integration.SetMetadata(metadata)
 		ctx.Integration.Error("error")
-		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: appInstallationDescription,
-			URL:         fmt.Sprintf("https://github.com/apps/%s/installations/new?state=%s", metadata.GitHubApp.Slug, state),
-			Method:      "GET",
-		})
+		ctx.Integration.Instructions(
+			appInstallationDescription,
+			[]core.SetupAction{
+				{
+					Type: "redirect",
+					Redirect: &core.RedirectAction{
+						URL:    fmt.Sprintf("https://github.com/apps/%s/installations/new?state=%s", metadata.GitHubApp.Slug, state),
+						Method: "GET",
+					},
+				},
+			},
+		)
 
 	default:
 		ctx.Logger.Warnf("ignoring action: %s", *event.Action)
@@ -457,7 +472,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 	metadata.State = ""
 
 	ctx.Integration.SetMetadata(metadata)
-	ctx.Integration.RemoveBrowserAction()
+	ctx.Integration.RemoveInstructions()
 	ctx.Integration.Ready()
 
 	ctx.Logger.Infof("Successfully installed GitHub App %s - installation=%s", metadata.GitHubApp.Slug, metadata.InstallationID)

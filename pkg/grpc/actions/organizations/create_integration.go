@@ -139,14 +139,41 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 		},
 	}
 
-	if instance.BrowserAction != nil {
-		browserAction := instance.BrowserAction.Data()
-		proto.Status.BrowserAction = &pb.BrowserAction{
-			Description: browserAction.Description,
-			Url:         browserAction.URL,
-			Method:      browserAction.Method,
-			FormFields:  browserAction.FormFields,
+	if instance.SetupInstruction != nil {
+		instruction := instance.SetupInstruction.Data()
+		pbInstruction := &pb.SetupInstruction{
+			Text:    instruction.Text,
+			Actions: make([]*pb.SetupAction, 0, len(instruction.Actions)),
 		}
+
+		for i, action := range instruction.Actions {
+			pbInstruction.Actions = append(pbInstruction.Actions, &pb.SetupAction{
+				Type: pb.SetupAction_Type(pb.SetupAction_Type_value[action.Type]),
+			})
+
+			switch action.Type {
+			case "redirect":
+				pbInstruction.Actions[i].Redirect = &pb.SetupAction_Redirect{
+					Label:      action.Redirect.Label,
+					Url:        action.Redirect.URL,
+					Method:     action.Redirect.Method,
+					FormFields: action.Redirect.FormFields,
+				}
+			case "action_call":
+				structParams, err := structpb.NewStruct(action.ActionCall.Parameters)
+				if err != nil {
+					return nil, err
+				}
+
+				pbInstruction.Actions[i].ActionCall = &pb.SetupAction_ActionCall{
+					Label:      action.ActionCall.Label,
+					ActionName: action.ActionCall.ActionName,
+					Parameters: structParams,
+				}
+			}
+		}
+
+		proto.Status.Instruction = pbInstruction
 	}
 
 	for _, nodeRef := range nodeRefs {

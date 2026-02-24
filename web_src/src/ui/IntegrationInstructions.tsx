@@ -1,33 +1,38 @@
 import ReactMarkdown from "react-markdown";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const INSTRUCTIONS_CLASSES =
-  "rounded-md border border-orange-950/15 bg-orange-100 p-4 text-sm text-gray-800 dark:border-orange-800 dark:bg-orange-950/30 dark:text-gray-200 [&_a]:!underline [&_a]:underline-offset-2 [&_a]:decoration-2 [&_a]:decoration-current [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1";
+  "rounded-md border border-orange-950/15 bg-orange-100 p-4 text-sm text-gray-800 dark:border-orange-900/40 dark:bg-orange-950/30 dark:text-gray-200 [&_a]:!underline [&_a]:underline-offset-2 [&_a]:decoration-2 [&_a]:decoration-current [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1";
 
 export interface IntegrationInstructionsProps {
   /** Markdown description (e.g. setup steps) */
   description?: string | null;
-  /** When provided, a "Continue" button is shown that calls this (e.g. open OAuth URL) */
-  onContinue?: () => void;
+  /** Optional actions rendered as buttons below the instruction text */
+  actions?: Array<{
+    label: string;
+    onClick: () => void;
+    external?: boolean;
+    disabled?: boolean;
+    isPending?: boolean;
+  }>;
   /** Optional class name for the wrapper */
   className?: string;
 }
 
 /**
  * Shared block for integration setup/configuration instructions.
- * Same styling everywhere: bg-blue-50, border-blue-200, text-gray-800.
  * Used in sidebar (Create/Configure integration dialogs) and org/integrations.
  */
-export function IntegrationInstructions({ description, onContinue, className = "" }: IntegrationInstructionsProps) {
+export function IntegrationInstructions({ description, actions, className = "" }: IntegrationInstructionsProps) {
   if (!description?.trim()) return null;
 
   const normalizedDescription = description.replace(/\r\n/g, "\n").replace(/\n(?!\n)/g, "  \n");
 
   return (
     <div className={`${INSTRUCTIONS_CLASSES} ${className}`.trim()}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
+      <div className="space-y-3">
+        <div className="min-w-0">
           <ReactMarkdown
             components={{
               h1: ({ children }) => <h1 className="text-base font-semibold mt-2 mb-2">{children}</h1>,
@@ -56,12 +61,24 @@ export function IntegrationInstructions({ description, onContinue, className = "
             {normalizedDescription}
           </ReactMarkdown>
         </div>
-        {onContinue && (
-          <Button type="button" variant="outline" onClick={onContinue} className="shrink-0 px-3 py-1.5">
-            <ExternalLink className="w-4 h-4" />
-            Continue
-          </Button>
-        )}
+        {actions && actions.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {actions.map((action, index) => (
+              <Button
+                key={`${action.label}-${index}`}
+                type="button"
+                variant="outline"
+                onClick={action.onClick}
+                className="px-3 py-1.5"
+                disabled={action.disabled || action.isPending}
+              >
+                {action.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {!action.isPending && action.external ? <ExternalLink className="w-4 h-4" /> : null}
+                {action.label}
+              </Button>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );

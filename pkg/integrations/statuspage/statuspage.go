@@ -63,9 +63,10 @@ func (s *Statuspage) Cleanup(ctx core.IntegrationCleanupContext) error {
 
 func (s *Statuspage) Sync(ctx core.SyncContext) error {
 	if ctx.FirstSetup {
-		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: "To get your API key: Open your Statuspage, click the icon in the top-right corner, select API info, then create an API key.",
-		})
+		ctx.Integration.Instructions(
+			"To get your API key: Open your Statuspage, click the icon in the top-right corner, select API info, then create an API key.",
+			[]core.SetupAction{},
+		)
 		return nil
 	}
 

@@ -138,6 +138,9 @@ import type {
   OrganizationsGetInviteLinkData,
   OrganizationsGetInviteLinkErrors,
   OrganizationsGetInviteLinkResponses,
+  OrganizationsInvokeIntegrationActionData,
+  OrganizationsInvokeIntegrationActionErrors,
+  OrganizationsInvokeIntegrationActionResponses,
   OrganizationsListIntegrationResourcesData,
   OrganizationsListIntegrationResourcesErrors,
   OrganizationsListIntegrationResourcesResponses,
@@ -957,6 +960,27 @@ export const organizationsUpdateIntegration = <ThrowOnError extends boolean = tr
     ThrowOnError
   >({
     url: "/api/v1/organizations/{id}/integrations/{integrationId}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Invoke integration action
+ *
+ * Invokes a custom action on an organization integration
+ */
+export const organizationsInvokeIntegrationAction = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsInvokeIntegrationActionData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    OrganizationsInvokeIntegrationActionResponses,
+    OrganizationsInvokeIntegrationActionErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/integrations/{integrationId}/actions/{actionName}",
     ...options,
     headers: {
       "Content-Type": "application/json",

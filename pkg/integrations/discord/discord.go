@@ -79,9 +79,10 @@ func (d *Discord) Triggers() []core.Trigger {
 
 func (d *Discord) Sync(ctx core.SyncContext) error {
 	if ctx.FirstSetup {
-		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: setupInstructions,
-		})
+		ctx.Integration.Instructions(
+			setupInstructions,
+			[]core.SetupAction{},
+		)
 		return nil
 	}
 

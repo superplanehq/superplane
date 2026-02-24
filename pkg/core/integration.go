@@ -216,11 +216,11 @@ type IntegrationContext interface {
 	Ready()
 	Error(message string)
 
-	//
-	// Control the browser action of the integration
-	//
-	NewBrowserAction(action BrowserAction)
-	RemoveBrowserAction()
+	/*
+	 * Allows the integration to set instructions and actions for the setup flow.
+	 */
+	Instructions(text string, actions []SetupAction)
+	RemoveInstructions()
 
 	//
 	// Control the secrets of the integration
@@ -265,6 +265,25 @@ type IntegrationSubscriptionContext interface {
 type IntegrationSecret struct {
 	Name  string
 	Value []byte
+}
+
+type SetupAction struct {
+	Type       string
+	Redirect   *RedirectAction
+	ActionCall *ActionCallAction
+}
+
+type RedirectAction struct {
+	Label      string
+	URL        string
+	Method     string
+	FormFields map[string]string
+}
+
+type ActionCallAction struct {
+	Label      string
+	ActionName string
+	Parameters map[string]any
 }
 
 type BrowserAction struct {

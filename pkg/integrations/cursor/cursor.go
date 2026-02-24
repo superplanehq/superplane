@@ -59,9 +59,11 @@ func (i *Cursor) Configuration() []configuration.Field {
 
 func (i *Cursor) Sync(ctx core.SyncContext) error {
 	if ctx.FirstSetup {
-		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: "To get your API keys, visit the [Cursor Dashboard](https://cursor.com/dashboard). You may need separate keys for Agents and Admin features.",
-		})
+		ctx.Integration.Instructions(
+			"To get your API keys, visit the [Cursor Dashboard](https://cursor.com/dashboard). You may need separate keys for Agents and Admin features.",
+			[]core.SetupAction{},
+		)
+
 		return nil
 	}
 

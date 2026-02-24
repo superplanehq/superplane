@@ -26,7 +26,7 @@ type Integration struct {
 	StateDescription string
 	Configuration    datatypes.JSONType[map[string]any]
 	Metadata         datatypes.JSONType[map[string]any]
-	BrowserAction    *datatypes.JSONType[BrowserAction]
+	SetupInstruction *datatypes.JSONType[SetupInstruction] `gorm:"column:browser_action"`
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
 	DeletedAt        gorm.DeletedAt `gorm:"index"`
@@ -50,11 +50,28 @@ func (a *IntegrationSecret) TableName() string {
 	return "app_installation_secrets"
 }
 
-type BrowserAction struct {
-	URL         string
-	Method      string
-	FormFields  map[string]string
-	Description string
+type SetupInstruction struct {
+	Text    string
+	Actions []SetupAction
+}
+
+type SetupAction struct {
+	Type       string
+	Redirect   *RedirectAction
+	ActionCall *ActionCallAction
+}
+
+type RedirectAction struct {
+	Label      string
+	URL        string
+	Method     string
+	FormFields map[string]string
+}
+
+type ActionCallAction struct {
+	Label      string
+	ActionName string
+	Parameters map[string]any
 }
 
 func CreateIntegration(id, orgID uuid.UUID, appName string, installationName string, config map[string]any) (*Integration, error) {

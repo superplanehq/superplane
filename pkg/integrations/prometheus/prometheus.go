@@ -163,9 +163,10 @@ func (p *Prometheus) Triggers() []core.Trigger {
 
 func (p *Prometheus) Sync(ctx core.SyncContext) error {
 	if ctx.FirstSetup {
-		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: setupInstructions,
-		})
+		ctx.Integration.Instructions(
+			setupInstructions,
+			[]core.SetupAction{},
+		)
 		return nil
 	}
 

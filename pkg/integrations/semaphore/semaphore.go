@@ -105,7 +105,7 @@ func (s *Semaphore) Sync(ctx core.SyncContext) error {
 	}
 
 	ctx.Integration.Ready()
-	ctx.Integration.RemoveBrowserAction()
+	ctx.Integration.RemoveInstructions()
 	return nil
 }
 

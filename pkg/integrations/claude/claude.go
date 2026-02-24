@@ -64,9 +64,10 @@ func (i *Claude) Cleanup(ctx core.IntegrationCleanupContext) error {
 
 func (i *Claude) Sync(ctx core.SyncContext) error {
 	if ctx.FirstSetup {
-		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: "To get new Claude API key, go to [platform.claude.com](https://platform.claude.com).",
-		})
+		ctx.Integration.Instructions(
+			"To get new Claude API key, go to [platform.claude.com](https://platform.claude.com).",
+			[]core.SetupAction{},
+		)
 		return nil
 	}
 
