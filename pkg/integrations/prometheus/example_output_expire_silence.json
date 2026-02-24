@@ -1,0 +1,8 @@
+{
+  "data": {
+    "silenceID": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+    "status": "expired"
+  },
+  "timestamp": "2026-02-12T17:45:10.987654321Z",
+  "type": "prometheus.silence.expired"
+}
