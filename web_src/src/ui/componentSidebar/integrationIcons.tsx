@@ -24,6 +24,7 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import octopusIcon from "@/assets/icons/integrations/octopus.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
@@ -62,6 +63,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   jfrogArtifactory: jfrogArtifactoryIcon,
   grafana: grafanaIcon,
   jira: jiraIcon,
+  octopus: octopusIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
   claude: claudeIcon,
@@ -99,6 +101,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   jfrogArtifactory: jfrogArtifactoryIcon,
   grafana: grafanaIcon,
   jira: jiraIcon,
+  octopus: octopusIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
   claude: claudeIcon,
