@@ -43,6 +43,17 @@ import { enableImageMapper } from "./ec2/enable_image";
 import { disableImageMapper } from "./ec2/disable_image";
 import { enableImageDeprecationMapper } from "./ec2/enable_image_deprecation";
 import { disableImageDeprecationMapper } from "./ec2/disable_image_deprecation";
+import {
+  createBucketMapper,
+  deleteBucketMapper,
+  headBucketMapper,
+  emptyBucketMapper,
+  copyObjectMapper,
+  deleteObjectMapper,
+  headObjectMapper,
+  getObjectAttributesMapper,
+  putObjectMapper,
+} from "./s3";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "codepipeline.getPipeline": getPipelineMapper,
@@ -86,6 +97,15 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "ec2.enableImage": enableImageMapper,
   "ec2.enableImageDeprecation": enableImageDeprecationMapper,
   "ec2.getImage": getEc2ImageMapper,
+  "s3.createBucket": createBucketMapper,
+  "s3.deleteBucket": deleteBucketMapper,
+  "s3.headBucket": headBucketMapper,
+  "s3.emptyBucket": emptyBucketMapper,
+  "s3.copyObject": copyObjectMapper,
+  "s3.deleteObject": deleteObjectMapper,
+  "s3.headObject": headObjectMapper,
+  "s3.getObjectAttributes": getObjectAttributesMapper,
+  "s3.putObject": putObjectMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -138,4 +158,13 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ec2.enableImage": buildActionStateRegistry("enabled"),
   "ec2.enableImageDeprecation": buildActionStateRegistry("enabled"),
   "ec2.getImage": buildActionStateRegistry("retrieved"),
+  "s3.createBucket": buildActionStateRegistry("created"),
+  "s3.deleteBucket": buildActionStateRegistry("deleted"),
+  "s3.headBucket": buildActionStateRegistry("retrieved"),
+  "s3.emptyBucket": buildActionStateRegistry("emptied"),
+  "s3.copyObject": buildActionStateRegistry("copied"),
+  "s3.deleteObject": buildActionStateRegistry("deleted"),
+  "s3.headObject": buildActionStateRegistry("retrieved"),
+  "s3.getObjectAttributes": buildActionStateRegistry("retrieved"),
+  "s3.putObject": buildActionStateRegistry("uploaded"),
 };

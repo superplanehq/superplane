@@ -1,0 +1,9 @@
+{
+  "type": "aws.s3.bucket.emptied",
+  "timestamp": "2026-02-24T12:00:00Z",
+  "data": {
+    "bucket": "my-bucket",
+    "emptied": true,
+    "objectsCount": 42
+  }
+}

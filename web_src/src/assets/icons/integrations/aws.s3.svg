@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="80px" height="80px" viewBox="0 0 80 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Icon-Architecture/64/Arch_Amazon-Simple-Storage-Service_64</title>
+    <defs>
+        <linearGradient x1="0%" y1="100%" x2="100%" y2="0%" id="s3-gradient">
+            <stop stop-color="#1B660F" offset="0%"></stop>
+            <stop stop-color="#6CAE3E" offset="100%"></stop>
+        </linearGradient>
+    </defs>
+    <g id="Icon-Architecture/64/Arch_Amazon-Simple-Storage-Service_64" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Icon-Architecture-BG/64/Storage" fill="url(#s3-gradient)">
+            <rect id="Rectangle" x="0" y="0" width="80" height="80"></rect>
+        </g>
+        <path d="M40.0195312,56.9482422 L22.8769531,51.3291016 L22.8769531,28.6708984 L40.0195312,23.0517578 L40.0195312,13.0195312 L14.0195312,21.0195312 L14.0195312,58.9804688 L40.0195312,66.9804688 L40.0195312,56.9482422 Z M42.0195312,66.9804688 L66.0195312,58.9804688 L66.0195312,21.0195312 L42.0195312,13.0195312 L42.0195312,23.0517578 L57.1621094,28.0068359 L57.1621094,51.9931641 L42.0195312,56.9482422 L42.0195312,66.9804688 Z M41.0195312,25.0195312 L26.0195312,30.0195312 L26.0195312,49.9804688 L41.0195312,54.9804688 L56.0195312,49.9804688 L56.0195312,30.0195312 L41.0195312,25.0195312 Z" id="S3-Bucket" fill="#FFFFFF"></path>
+    </g>
+</svg>

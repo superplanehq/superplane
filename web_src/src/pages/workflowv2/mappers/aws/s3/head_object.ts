@@ -1,0 +1,106 @@
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "../../types";
+import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getState, getStateMap, getTriggerRenderer } from "../..";
+import awsS3Icon from "@/assets/icons/integrations/aws.s3.svg";
+import { formatTimeAgo } from "@/utils/date";
+import { MetadataItem } from "@/ui/metadataList";
+import { stringOrDash } from "../../utils";
+
+interface HeadObjectConfiguration {
+  region?: string;
+  bucket?: string;
+  key?: string;
+}
+
+interface HeadObjectOutput {
+  bucket?: string;
+  key?: string;
+  contentLength?: string;
+  contentType?: string;
+  etag?: string;
+  lastModified?: string;
+}
+
+export const headObjectMapper: ComponentBaseMapper = {
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const componentName = context.componentDefinition.name || "unknown";
+
+    return {
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
+      iconSrc: awsS3Icon,
+      iconColor: getColorClass(context.componentDefinition.color),
+      collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
+      collapsed: context.node.isCollapsed,
+      eventSections: lastExecution ? headObjectEventSections(context.nodes, lastExecution, componentName) : undefined,
+      includeEmptyState: !lastExecution,
+      metadata: headObjectMetadataList(context.node),
+      eventStateMap: getStateMap(componentName),
+    };
+  },
+
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    const result = outputs?.default?.[0]?.data as HeadObjectOutput | undefined;
+
+    if (!result) {
+      return {};
+    }
+
+    return {
+      Bucket: stringOrDash(result.bucket),
+      Key: stringOrDash(result.key),
+      "Content Type": stringOrDash(result.contentType),
+      "Content Length": stringOrDash(result.contentLength),
+      ETag: stringOrDash(result.etag),
+    };
+  },
+
+  subtitle(context: SubtitleContext): string {
+    if (!context.execution.createdAt) {
+      return "";
+    }
+    return formatTimeAgo(new Date(context.execution.createdAt));
+  },
+};
+
+function headObjectMetadataList(node: NodeInfo): MetadataItem[] {
+  const metadata: MetadataItem[] = [];
+  const configuration = node.configuration as HeadObjectConfiguration | undefined;
+
+  const bucket = configuration?.bucket?.trim();
+  if (bucket) {
+    metadata.push({ icon: "database", label: bucket });
+  }
+
+  return metadata;
+}
+
+function headObjectEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+
+  return [
+    {
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventState: getState(componentName)(execution),
+      eventId: execution.rootEvent!.id!,
+    },
+  ];
+}
