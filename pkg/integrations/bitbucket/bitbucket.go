@@ -14,17 +14,19 @@ const (
 	AuthTypeWorkspaceAccessToken = "workspaceAccessToken"
 
 	installationInstructions = `
-To configure Bitbucket with SuperPlane:
+You can connect to Bitbucket using an API Token or a Workspace Access Token.
 
-- **API Token mode**:
-	- Go to **Atlassian Settings → Security → Create API token**.
-	- Select **Bitbucket** App.
-	- Create a token with admin:workspace:bitbucket scope.
+### Using an API Token
 
-- **Workspace Access Token mode**:
-   - Go to **Bitbucket Workspace Settings → Security → Access tokens**.
-   - Create a workspace access token.
+- Go to [Atlassian Settings → Security → API Tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
+- Create API token
+- Select **Bitbucket** App.
+- Create a token with ` + "`admin:workspace:bitbucket`" + ` scope.
 
+### Using a Workspace Access Token
+
+- Go to **Bitbucket Workspace Settings → Security → Access tokens**.
+- Create a workspace access token.
 - **Copy the token** and your workspace slug (for example: ` + "`my-workspace`" + `) below.
 `
 )

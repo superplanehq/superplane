@@ -326,29 +326,29 @@ func (a *AWS) cleanupIAM(ctx core.IntegrationCleanupContext, metadata *common.In
 }
 
 func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
-	ctx.Integration.Instructions(fmt.Sprintf(`
+	ctx.Integration.Instructions(`
 **1. Create Identity Provider**
 
-- Go to AWS IAM Console → Identity Providers → Add provider
-- Choose "OpenID Connect" as the provider type
-- Provider URL: **%s**
-- Audience: **%s**
+- Go to [AWS IAM Console → Identity Providers](https://console.aws.amazon.com/iam/home#/identity_providers)
+- Add new **OpenID Connect** provider
+- Provider URL: `+fmt.Sprintf("`%s`", ctx.BaseURL)+`
+- Audience: `+fmt.Sprintf("`%s`", ctx.Integration.ID().String())+`
 
 **2. Create IAM Role**
 
-- Go to AWS IAM Console → Roles → Create role
-- Choose "Web identity" as trusted entity type
+- Go to [AWS IAM Console → Roles](https://console.aws.amazon.com/iam/home#/roles)
+- Create new role, and choose **Web identity** as trusted entity type
 - Select the identity provider created in step 1
-- Add permissions for the integration to manage EventBridge connections, API destinations, and rules. To get started, you can use the **AmazonEventBridgeFullAccess** managed policy
-- Add permissions for the integration manage IAM roles needed for itself. To get started, you can use the **IAMFullAccess** managed policy
-- Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need.
+- Add permissions for the SuperPlane integration to manage EventBridge connections, API destinations, and rules. To get started, you can use the **AmazonEventBridgeFullAccess** managed policy
+- Add permissions for the SuperPlane integration to manage IAM roles needed for itself. To get started, you can use the **IAMFullAccess** managed policy
+- Depending on the SuperPlane components you will use, different permissions will be needed. Include the ones you need.
 - Give it a name and description, and create it
 
 **3. Complete the installation setup**
 
 - Copy the ARN of the IAM role created in step 2
 - Paste it into the "Role ARN" field in the installation configuration
-`, ctx.BaseURL, ctx.Integration.ID().String()), []core.SetupAction{})
+`, []core.SetupAction{})
 
 	return nil
 }

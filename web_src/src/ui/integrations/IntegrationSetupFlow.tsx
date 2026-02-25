@@ -17,6 +17,7 @@ import {
   useUpdateIntegration,
 } from "@/hooks/useIntegrations";
 import { executeSetupRedirectAction } from "@/utils/setupInstructions";
+import { parseDefaultValues } from "@/utils/components";
 
 interface IntegrationSetupFlowProps {
   organizationId: string;
@@ -60,6 +61,19 @@ export function IntegrationSetupFlow({
 
     return availableIntegrations.find((item) => item.name === integrationName);
   }, [availableIntegrations, integrationDefinition, integrationName]);
+
+  const defaultConfigValues = useMemo(() => {
+    const fields = activeDefinition?.configuration || [];
+    const parsedDefaults = parseDefaultValues(fields);
+
+    fields.forEach((field) => {
+      if (field.name && field.togglable) {
+        delete parsedDefaults[field.name];
+      }
+    });
+
+    return parsedDefaults;
+  }, [activeDefinition?.configuration]);
 
   const handleInstructionAction = useCallback(
     async (action: OrganizationsSetupAction, index: number) => {
@@ -109,11 +123,16 @@ export function IntegrationSetupFlow({
       }
 
       setCreatedIntegrationId(integrationId);
-      setConfigValues(result.data?.integration?.spec?.configuration || {});
+      const serverConfiguration = result.data?.integration?.spec?.configuration || {};
+      setConfigValues(
+        Object.keys(serverConfiguration).length === 0
+          ? { ...defaultConfigValues }
+          : { ...defaultConfigValues, ...serverConfiguration },
+      );
     } catch (error) {
       showErrorToast(`Failed to create integration: ${getApiErrorMessage(error)}`);
     }
-  }, [createMutation, installationName, integrationName]);
+  }, [createMutation, defaultConfigValues, installationName, integrationName]);
 
   const handleSave = useCallback(async () => {
     if (!createdIntegrationId) return;
@@ -129,8 +148,17 @@ export function IntegrationSetupFlow({
 
   useEffect(() => {
     if (!integration?.spec?.configuration) return;
-    setConfigValues(integration.spec.configuration);
-  }, [integration?.spec?.configuration]);
+    setConfigValues((prev) => {
+      if (Object.keys(prev).length > 0) {
+        return prev;
+      }
+
+      const serverConfiguration = integration?.spec?.configuration || {};
+      return Object.keys(serverConfiguration).length === 0
+        ? { ...defaultConfigValues }
+        : { ...defaultConfigValues, ...serverConfiguration };
+    });
+  }, [defaultConfigValues, integration?.spec?.configuration]);
 
   useEffect(() => {
     if (!integration?.metadata?.name) return;
@@ -194,8 +222,8 @@ export function IntegrationSetupFlow({
       ) : null}
 
       {isCreated && integration?.status?.instruction ? (
-        <div className="rounded-lg border border-orange-950/15 bg-orange-100 dark:border-orange-900/40 dark:bg-orange-950/30">
-          <div className="p-4">
+        <div className="min-w-0 rounded-lg border border-orange-950/15 bg-orange-100 dark:border-orange-900/40 dark:bg-orange-950/30">
+          <div className="min-w-0 p-4">
             <IntegrationInstructions
               description={integration.status.instruction.text}
               className="rounded-none border-0 bg-transparent p-0 text-gray-800 dark:text-gray-200"

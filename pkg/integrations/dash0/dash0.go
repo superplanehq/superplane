@@ -54,20 +54,20 @@ func (d *Dash0) Description() string {
 func (d *Dash0) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:        "baseURL",
+			Label:       "Prometheus API Base URL",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Description: "Your Dash0 Prometheus API base URL",
+			Default:     "https://api.us-west-2.aws.dash0.com",
+		},
+		{
 			Name:        "apiToken",
 			Label:       "API Token",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
 			Description: "Your Dash0 API token for authentication",
-		},
-		{
-			Name:        "baseURL",
-			Label:       "Prometheus API Base URL",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Your Dash0 Prometheus API base URL. Find this in Dash0 dashboard: Organization Settings > Endpoints > Prometheus API. You can use either the full endpoint URL (https://api.us-west-2.aws.dash0.com/api/prometheus) or just the base URL (https://api.us-west-2.aws.dash0.com)",
-			Placeholder: "https://api.us-west-2.aws.dash0.com",
 		},
 	}
 }
@@ -88,9 +88,32 @@ func (d *Dash0) Triggers() []core.Trigger {
 	}
 }
 
+const configurationInstructions = `
+### Find your Prometheus API base URL
+
+1. Go to [Organization Settings > Endpoints](https://app.dash0.com/settings/endpoints)
+2. Find the Prometheus API endpoint
+3. Copy the base URL (https://api.us-west-2.aws.dash0.com) and paste it below
+
+### Create API token
+
+1. Go to [Organization Settings > API Tokens](https://app.dash0.com/settings/auth-tokens), and add new token
+2. **Dataset**: "All datasets"
+3. **Permissions**: "All Permissions"
+4. Click "Create Token"
+5. Copy the token and paste it below
+`
+
+const notificationChannelInstructions = "" +
+	"Create a notification channel in Dash0:\n" +
+	"1. Go to [Organization Settings > Notification Channels](https://app.dash0.com/settings/notifications).\n" +
+	"2. Add a new notification channel.\n" +
+	"3. Use the webhook URL below as the destination:\n" +
+	"```text\n%s\n```\n"
+
 func (d *Dash0) Sync(ctx core.SyncContext) error {
 	if ctx.FirstSetup {
-		ctx.Integration.Instructions(`Configure your Dash0 API token and Prometheus API base URL, then save to continue setup.`, nil)
+		ctx.Integration.Instructions(configurationInstructions, nil)
 		return nil
 	}
 
@@ -105,7 +128,7 @@ func (d *Dash0) Sync(ctx core.SyncContext) error {
 	}
 
 	if configuration.BaseURL == "" {
-		return fmt.Errorf("baseURL is required for Dash0 Cloud. Find your API URL in Dash0 dashboard under Organization Settings > Endpoints Reference")
+		return fmt.Errorf("baseURL is required")
 	}
 
 	// Validate connection by creating a client and making a test query
@@ -138,10 +161,7 @@ func (d *Dash0) Sync(ctx core.SyncContext) error {
 
 	if !metadata.NotificationChannelCreated && !metadata.NotificationChannelSkipped {
 		ctx.Integration.Instructions(
-			fmt.Sprintf(
-				"### Dash0 Notification Webhook\n\nCreate a notification channel in Dash0:\n\n1. Go to [Organization Settings > Notification Channels](https://app.dash0.com/settings/notifications).\n2. Add a new notification channel.\n3. Copy the webhook URL below and paste it in the \"Webhook URL\" field.\n\nUse this webhook URL as the destination:\n\n`%s`",
-				metadata.WebhookURL,
-			),
+			fmt.Sprintf(notificationChannelInstructions, metadata.WebhookURL),
 			[]core.SetupAction{
 				{
 					Type: "action_call",
