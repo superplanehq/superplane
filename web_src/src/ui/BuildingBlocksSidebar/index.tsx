@@ -3,6 +3,7 @@ import type {
   SuperplaneBlueprintsOutputChannel,
   SuperplaneComponentsOutputChannel,
 } from "@/api-client";
+import { canvasesSendAiMessage } from "@/api-client/sdk.gen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -13,6 +14,7 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 import { resolveIcon } from "@/lib/utils";
 import { isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
+import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getComponentSubtype } from "../buildingBlocks";
 import { ChevronRight, GripVerticalIcon, Plug, Plus, Search, SendHorizontal, Settings2, Sparkles, StickyNote, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -88,6 +90,14 @@ export interface BuildingBlocksSidebarProps {
   onToggle: (open: boolean) => void;
   blocks: BuildingBlockCategory[];
   showAiBuilderTab?: boolean;
+  canvasId?: string;
+  canvasNodes?: Array<{
+    id: string;
+    name?: string;
+    label?: string;
+    type?: string;
+  }>;
+  onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
   integrations?: OrganizationsIntegration[];
   canvasZoom?: number;
   disabled?: boolean;
@@ -95,6 +105,32 @@ export interface BuildingBlocksSidebarProps {
   onBlockClick?: (block: BuildingBlock) => void;
   onAddNote?: () => void;
 }
+
+export type AiCanvasOperation =
+  | {
+      type: "add_node";
+      nodeKey?: string;
+      blockName: string;
+      nodeName?: string;
+      configuration?: Record<string, unknown>;
+      source?: {
+        nodeKey?: string;
+        nodeId?: string;
+        nodeName?: string;
+        handleId?: string | null;
+      };
+    }
+  | {
+      type: "connect_nodes";
+      source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null };
+      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
+    }
+  | {
+      type: "update_node_config";
+      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
+      configuration: Record<string, unknown>;
+      nodeName?: string;
+    };
 
 type AiBuilderMessage = {
   id: string;
@@ -105,7 +141,7 @@ type AiBuilderMessage = {
 type AiBuilderProposal = {
   id: string;
   summary: string;
-  operations: string[];
+  operations: AiCanvasOperation[];
 };
 
 export function BuildingBlocksSidebar({
@@ -113,6 +149,9 @@ export function BuildingBlocksSidebar({
   onToggle,
   blocks,
   showAiBuilderTab = false,
+  canvasId,
+  canvasNodes = [],
+  onApplyAiOperations,
   integrations = [],
   canvasZoom = 1,
   disabled = false,
@@ -198,6 +237,8 @@ export function BuildingBlocksSidebar({
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
+  const [isApplyingProposal, setIsApplyingProposal] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(null);
 
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -208,41 +249,10 @@ export function BuildingBlocksSidebar({
     "Add an approval step before production actions",
   ];
 
-  const buildProposalFromPrompt = useCallback((prompt: string): AiBuilderProposal => {
-    const lowerPrompt = prompt.toLowerCase();
-    const operations: string[] = [];
-
-    if (lowerPrompt.includes("webhook")) {
-      operations.push("Add a Webhook trigger node.");
-    }
-    if (lowerPrompt.includes("slack")) {
-      operations.push("Add a Slack action node for notifications.");
-      operations.push("Connect trigger output to the Slack action input.");
-    }
-    if (lowerPrompt.includes("approval")) {
-      operations.push("Insert an approval node before the final action.");
-    }
-    if (lowerPrompt.includes("retry") || lowerPrompt.includes("error")) {
-      operations.push("Update action node config with retry and error handling defaults.");
-    }
-
-    if (operations.length === 0) {
-      operations.push("Identify best matching trigger for the request.");
-      operations.push("Add one or more action nodes to complete the flow.");
-      operations.push("Connect outputs to inputs using compatible channels.");
-    }
-
-    return {
-      id: `proposal-${Date.now()}`,
-      summary: "I prepared a draft change set you can review and apply.",
-      operations,
-    };
-  }, []);
-
   const handleSendPrompt = useCallback(
-    (value?: string) => {
+    async (value?: string) => {
       const nextPrompt = (value ?? aiInput).trim();
-      if (!nextPrompt || isGeneratingResponse) {
+      if (!nextPrompt || isGeneratingResponse || !canvasId) {
         return;
       }
 
@@ -253,10 +263,38 @@ export function BuildingBlocksSidebar({
       };
       setAiMessages((prev) => [...prev, userMessage]);
       setAiInput("");
+      setAiError(null);
       setIsGeneratingResponse(true);
 
-      window.setTimeout(() => {
-        const proposal = buildProposalFromPrompt(nextPrompt);
+      try {
+        const availableBlocks = (blocks || []).flatMap((category) =>
+          category.blocks.map((block) => ({
+            name: block.name,
+            label: block.label || block.name,
+            type: block.type,
+          })),
+        );
+
+        const apiResponse = await canvasesSendAiMessage(
+          withOrganizationHeader({
+            path: { canvasId },
+            body: {
+              prompt: nextPrompt,
+              canvasContext: {
+                nodes: canvasNodes,
+                availableBlocks,
+              },
+            },
+          }),
+        );
+
+        const payload = apiResponse.data as { assistantMessage?: string; operations?: AiCanvasOperation[] } | undefined;
+        const proposal: AiBuilderProposal = {
+          id: `proposal-${Date.now()}`,
+          summary: payload?.assistantMessage || "I prepared a draft change set you can review and apply.",
+          operations: payload?.operations || [],
+        };
+
         const assistantMessage: AiBuilderMessage = {
           id: `assistant-${Date.now()}`,
           role: "assistant",
@@ -264,29 +302,68 @@ export function BuildingBlocksSidebar({
         };
         setAiMessages((prev) => [...prev, assistantMessage]);
         setPendingProposal(proposal);
+      } catch (error) {
+        const fallbackMessage = "I couldn't generate changes right now. Please try again.";
+        setAiError(error instanceof Error ? error.message : fallbackMessage);
+        setAiMessages((prev) => [
+          ...prev,
+          {
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            content: fallbackMessage,
+          },
+        ]);
+      } finally {
         setIsGeneratingResponse(false);
-      }, 400);
+      }
     },
-    [aiInput, buildProposalFromPrompt, isGeneratingResponse],
+    [aiInput, blocks, canvasId, canvasNodes, isGeneratingResponse],
   );
 
   const handleDiscardProposal = useCallback(() => {
     setPendingProposal(null);
   }, []);
 
-  const handleApplyProposal = useCallback(() => {
+  const formatOperation = useCallback((operation: AiCanvasOperation) => {
+    switch (operation.type) {
+      case "add_node":
+        return `Add node ${operation.nodeName || operation.blockName} (${operation.blockName})`;
+      case "connect_nodes":
+        return "Connect nodes";
+      case "update_node_config":
+        return `Update configuration for ${operation.nodeName || operation.target.nodeName || "node"}`;
+      default:
+        return "Update canvas";
+    }
+  }, []);
+
+  const handleApplyProposal = useCallback(async () => {
     if (!pendingProposal) return;
 
-    setAiMessages((prev) => [
-      ...prev,
-      {
-        id: `assistant-${Date.now()}`,
-        role: "assistant",
-        content: "Applied in UI-only mode. Backend persistence and server-side apply are coming in follow-up PRs.",
-      },
-    ]);
-    setPendingProposal(null);
-  }, [pendingProposal]);
+    if (!onApplyAiOperations) {
+      setAiError("Canvas apply handlers are not available.");
+      return;
+    }
+
+    setAiError(null);
+    setIsApplyingProposal(true);
+    try {
+      await onApplyAiOperations(pendingProposal.operations);
+      setAiMessages((prev) => [
+        ...prev,
+        {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: "Applied the proposed changes to the canvas.",
+        },
+      ]);
+      setPendingProposal(null);
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : "Failed to apply AI proposal.");
+    } finally {
+      setIsApplyingProposal(false);
+    }
+  }, [onApplyAiOperations, pendingProposal]);
 
   // Save sidebar width to localStorage whenever it changes
   useEffect(() => {
@@ -558,7 +635,7 @@ export function BuildingBlocksSidebar({
                           variant="outline"
                           className="justify-start h-auto py-2.5 px-3 text-left whitespace-normal"
                           onClick={() => handleSendPrompt(prompt)}
-                          disabled={disabled || isGeneratingResponse}
+                          disabled={disabled || isGeneratingResponse || !canvasId}
                         >
                           {prompt}
                         </Button>
@@ -585,19 +662,26 @@ export function BuildingBlocksSidebar({
                     <p className="text-sm font-medium text-blue-900">{pendingProposal.summary}</p>
                     <ul className="text-sm text-blue-900 list-disc pl-5 space-y-1">
                       {pendingProposal.operations.map((operation) => (
-                        <li key={`${pendingProposal.id}-${operation}`}>{operation}</li>
+                        <li key={`${pendingProposal.id}-${JSON.stringify(operation)}`}>{formatOperation(operation)}</li>
                       ))}
                     </ul>
                     <div className="flex items-center gap-2 pt-1">
-                      <Button size="sm" onClick={handleApplyProposal} disabled={disabled}>
+                      <Button
+                        size="sm"
+                        onClick={handleApplyProposal}
+                        disabled={disabled || isApplyingProposal || pendingProposal.operations.length === 0}
+                      >
                         Apply changes
                       </Button>
-                      <Button size="sm" variant="outline" onClick={handleDiscardProposal}>
+                      <Button size="sm" variant="outline" onClick={handleDiscardProposal} disabled={isApplyingProposal}>
                         Discard
                       </Button>
                     </div>
+                    {aiError ? <p className="text-xs text-red-700">{aiError}</p> : null}
                   </div>
                 )}
+
+                {!pendingProposal && aiError ? <p className="text-xs text-red-700">{aiError}</p> : null}
               </div>
 
               <div className="border-t border-border px-4 py-3">
@@ -612,12 +696,12 @@ export function BuildingBlocksSidebar({
                     value={aiInput}
                     onChange={(e) => setAiInput(e.target.value)}
                     placeholder="Describe your canvas changes..."
-                    disabled={disabled || isGeneratingResponse}
+                    disabled={disabled || isGeneratingResponse || !canvasId}
                   />
                   <Button
                     type="submit"
                     size="icon-sm"
-                    disabled={disabled || isGeneratingResponse || !aiInput.trim()}
+                    disabled={disabled || isGeneratingResponse || !canvasId || !aiInput.trim()}
                     aria-label="Send prompt"
                   >
                     <SendHorizontal size={14} />

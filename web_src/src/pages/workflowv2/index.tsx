@@ -2923,6 +2923,7 @@ export function WorkflowPageV2() {
         nodes={nodes}
         edges={edges}
         organizationId={organizationId}
+        canvasId={canvasId}
         onDirty={!isReadOnly ? () => markUnsavedChange("structural") : undefined}
         getSidebarData={getSidebarData}
         loadSidebarData={loadSidebarData}

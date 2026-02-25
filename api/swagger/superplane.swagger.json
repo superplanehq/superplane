@@ -281,6 +281,46 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasId}/ai/messages": {
+      "post": {
+        "summary": "Generate AI canvas proposal",
+        "description": "Generates a structured, non-persistent canvas proposal from a natural language prompt",
+        "operationId": "Canvases_SendAiMessage",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesSendAiMessageResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesSendAiMessageBody"
+            }
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasId}/events": {
       "get": {
         "summary": "List canvas events",
@@ -3547,6 +3587,56 @@
         }
       }
     },
+    "CanvasesCanvasAiBlockContext": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      }
+    },
+    "CanvasesCanvasAiContext": {
+      "type": "object",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasAiNodeContext"
+          }
+        },
+        "availableBlocks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasAiBlockContext"
+          }
+        }
+      }
+    },
+    "CanvasesCanvasAiNodeContext": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      }
+    },
     "CanvasesCanvasEvent": {
       "type": "object",
       "properties": {
@@ -3993,6 +4083,31 @@
     },
     "CanvasesResolveExecutionErrorsResponse": {
       "type": "object"
+    },
+    "CanvasesSendAiMessageBody": {
+      "type": "object",
+      "properties": {
+        "prompt": {
+          "type": "string"
+        },
+        "canvasContext": {
+          "$ref": "#/definitions/CanvasesCanvasAiContext"
+        }
+      }
+    },
+    "CanvasesSendAiMessageResponse": {
+      "type": "object",
+      "properties": {
+        "assistantMessage": {
+          "type": "string"
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     "CanvasesUpdateCanvasBody": {
       "type": "object",

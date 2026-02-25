@@ -39,6 +39,9 @@ docs/CanvasNodeExecutionResult.md
 docs/CanvasNodeExecutionResultReason.md
 docs/CanvasNodeExecutionState.md
 docs/CanvasesCanvas.md
+docs/CanvasesCanvasAiBlockContext.md
+docs/CanvasesCanvasAiContext.md
+docs/CanvasesCanvasAiNodeContext.md
 docs/CanvasesCanvasEvent.md
 docs/CanvasesCanvasEventWithExecutions.md
 docs/CanvasesCanvasMetadata.md
@@ -62,6 +65,8 @@ docs/CanvasesListNodeEventsResponse.md
 docs/CanvasesListNodeExecutionsResponse.md
 docs/CanvasesListNodeQueueItemsResponse.md
 docs/CanvasesResolveExecutionErrorsBody.md
+docs/CanvasesSendAiMessageBody.md
+docs/CanvasesSendAiMessageResponse.md
 docs/CanvasesUpdateCanvasBody.md
 docs/CanvasesUpdateCanvasResponse.md
 docs/CanvasesUpdateNodePauseBody.md
@@ -236,6 +241,9 @@ model_canvas_node_execution_result.go
 model_canvas_node_execution_result_reason.go
 model_canvas_node_execution_state.go
 model_canvases_canvas.go
+model_canvases_canvas_ai_block_context.go
+model_canvases_canvas_ai_context.go
+model_canvases_canvas_ai_node_context.go
 model_canvases_canvas_event.go
 model_canvases_canvas_event_with_executions.go
 model_canvases_canvas_metadata.go
@@ -259,6 +267,8 @@ model_canvases_list_node_events_response.go
 model_canvases_list_node_executions_response.go
 model_canvases_list_node_queue_items_response.go
 model_canvases_resolve_execution_errors_body.go
+model_canvases_send_ai_message_body.go
+model_canvases_send_ai_message_response.go
 model_canvases_update_canvas_body.go
 model_canvases_update_canvas_response.go
 model_canvases_update_node_pause_body.go

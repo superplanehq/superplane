@@ -31,7 +31,7 @@ import {
 import { parseDefaultValues } from "@/utils/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { AiSidebar } from "../ai";
-import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
+import { AiCanvasOperation, BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
 import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
@@ -125,6 +125,7 @@ export interface CanvasPageProps {
   breadcrumbs?: BreadcrumbItem[];
   headerBanner?: React.ReactNode;
   organizationId?: string;
+  canvasId?: string;
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
@@ -711,6 +712,121 @@ function CanvasPage(props: CanvasPageProps) {
     [state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen, readOnly],
   );
 
+  const handleApplyAiOperations = useCallback(
+    async (operations: AiCanvasOperation[]) => {
+      if (readOnly) {
+        throw new Error("This canvas is read-only.");
+      }
+      if (!operations.length) {
+        return;
+      }
+      if (!props.onNodeAdd) {
+        throw new Error("Node creation is not available for this canvas.");
+      }
+
+      const blockLookup = new Map<string, BuildingBlock>();
+      (props.buildingBlocks || []).forEach((category) => {
+        category.blocks.forEach((block) => {
+          blockLookup.set(block.name, block);
+        });
+      });
+
+      const createdNodeIdsByKey = new Map<string, string>();
+      const resolveNodeId = (ref?: { nodeKey?: string; nodeId?: string; nodeName?: string }) => {
+        if (!ref) return null;
+        if (ref.nodeKey && createdNodeIdsByKey.has(ref.nodeKey)) {
+          return createdNodeIdsByKey.get(ref.nodeKey) || null;
+        }
+        if (ref.nodeId) return ref.nodeId;
+        if (ref.nodeName) {
+          const byName = state.nodes.find((node) => {
+            const data = node.data as { nodeName?: string; label?: string };
+            return data.nodeName === ref.nodeName || data.label === ref.nodeName;
+          });
+          return byName?.id || null;
+        }
+        return null;
+      };
+
+      for (const operation of operations) {
+        if (operation.type === "add_node") {
+          const block = blockLookup.get(operation.blockName);
+          if (!block) {
+            throw new Error(`Unknown block: ${operation.blockName}`);
+          }
+
+          const defaultConfiguration = (() => {
+            const defaults = parseDefaultValues(block.configuration || []);
+            const filtered = { ...defaults };
+            block.configuration?.forEach((field) => {
+              if (field.name && field.togglable) {
+                delete filtered[field.name];
+              }
+            });
+            return filtered;
+          })();
+
+          const sourceNodeId = resolveNodeId(operation.source);
+          const createdNodeId = await props.onNodeAdd({
+            buildingBlock: block,
+            nodeName: operation.nodeName || block.name || "new-node",
+            configuration: { ...defaultConfiguration, ...(operation.configuration || {}) },
+            integrationName: block.integrationName,
+            sourceConnection:
+              sourceNodeId && operation.source
+                ? {
+                    nodeId: sourceNodeId,
+                    handleId: operation.source.handleId ?? null,
+                  }
+                : undefined,
+          });
+
+          if (operation.nodeKey) {
+            createdNodeIdsByKey.set(operation.nodeKey, createdNodeId);
+          }
+          continue;
+        }
+
+        if (operation.type === "connect_nodes") {
+          if (!props.onEdgeCreate) {
+            continue;
+          }
+          const sourceNodeId = resolveNodeId(operation.source);
+          const targetNodeId = resolveNodeId(operation.target);
+          if (!sourceNodeId || !targetNodeId) {
+            continue;
+          }
+          props.onEdgeCreate(sourceNodeId, targetNodeId, operation.source.handleId ?? null);
+          continue;
+        }
+
+        if (operation.type === "update_node_config") {
+          if (!props.onNodeConfigurationSave) {
+            continue;
+          }
+          const targetNodeId = resolveNodeId(operation.target);
+          if (!targetNodeId) {
+            continue;
+          }
+
+          const targetNode = state.nodes.find((node) => node.id === targetNodeId);
+          const currentNodeName =
+            operation.nodeName ||
+            String((targetNode?.data as { nodeName?: string })?.nodeName || operation.target.nodeName || "");
+          const currentConfiguration = ((targetNode?.data as { configuration?: Record<string, unknown> })?.configuration ||
+            {}) as Record<string, unknown>;
+
+          props.onNodeConfigurationSave(
+            targetNodeId,
+            { ...currentConfiguration, ...operation.configuration },
+            currentNodeName,
+          );
+        }
+      }
+    },
+    [props, readOnly, state.nodes],
+  );
+
   const handleSidebarToggle = useCallback(
     (open: boolean) => {
       hasUserToggledSidebarRef.current = true;
@@ -822,6 +938,14 @@ function CanvasPage(props: CanvasPageProps) {
           onToggle={handleSidebarToggle}
           blocks={props.buildingBlocks || []}
           showAiBuilderTab={props.showAiBuilderTab}
+          canvasId={props.canvasId}
+          canvasNodes={state.nodes.map((node) => ({
+            id: node.id,
+            name: String((node.data as { nodeName?: string })?.nodeName || ""),
+            label: String((node.data as { label?: string })?.label || ""),
+            type: String((node.data as { type?: string })?.type || ""),
+          }))}
+          onApplyAiOperations={handleApplyAiOperations}
           integrations={props.integrations}
           canvasZoom={canvasZoom}
           disabled={readOnly}

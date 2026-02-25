@@ -20,7 +20,7 @@ var _ MappedNullable = &SuperplaneCanvasesUserRef{}
 
 // SuperplaneCanvasesUserRef struct for SuperplaneCanvasesUserRef
 type SuperplaneCanvasesUserRef struct {
-	Id   *string `json:"id,omitempty"`
+	Id *string `json:"id,omitempty"`
 	Name *string `json:"name,omitempty"`
 }
 
@@ -106,7 +106,7 @@ func (o *SuperplaneCanvasesUserRef) SetName(v string) {
 }
 
 func (o SuperplaneCanvasesUserRef) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,3 +159,5 @@ func (v *NullableSuperplaneCanvasesUserRef) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+
