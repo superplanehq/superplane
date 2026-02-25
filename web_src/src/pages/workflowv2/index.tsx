@@ -2836,7 +2836,10 @@ export function WorkflowPageV2() {
           configuration: configuration ?? node.configuration,
         };
 
-        return renderer.render(buildNodeInfo(nodeWithConfiguration), Object.keys(context).length > 0 ? context : undefined);
+        return renderer.render(
+          buildNodeInfo(nodeWithConfiguration),
+          Object.keys(context).length > 0 ? context : undefined,
+        );
       };
     },
     [canvas],
