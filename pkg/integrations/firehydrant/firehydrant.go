@@ -9,6 +9,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+const installationInstructions = `
+To connect FireHydrant, create an API key:
+
+1. Go to **Settings → API Keys → Create API Key** in your FireHydrant account. This requires Owner permissions.
+2. The API key should have **Write Access** in order to create incidents and webhooks.
+3. Copy the API key and paste it into the configuration for this integration.
+`
+
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("firehydrant", &FireHydrant{}, &FireHydrantWebhookHandler{})
 }
@@ -40,7 +48,7 @@ func (f *FireHydrant) Description() string {
 }
 
 func (f *FireHydrant) Instructions() string {
-	return "To connect FireHydrant, create an API key in **Settings → API Keys**. This requires Owner permissions."
+	return installationInstructions
 }
 
 func (f *FireHydrant) Configuration() []configuration.Field {
