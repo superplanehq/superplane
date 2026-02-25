@@ -21,8 +21,14 @@ import {
   CanvasesCanvasNodeQueueItem,
   canvasesEmitNodeEvent,
   canvasesUpdateNodePause,
+  OrganizationsIntegration,
 } from "@/api-client";
-import { useOrganizationGroups, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import {
+  useOrganizationAgentSettings,
+  useOrganizationGroups,
+  useOrganizationRoles,
+  useOrganizationUsers,
+} from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
@@ -41,6 +47,7 @@ import {
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
+import { AiCanvasOperation } from "@/ui/BuildingBlocksSidebar";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import {
   CANVAS_SIDEBAR_STORAGE_KEY,
@@ -60,6 +67,14 @@ import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { CreateCanvasModal } from "@/components/CreateCanvasModal";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   getComponentAdditionalDataBuilder,
   getComponentBaseMapper,
   getTriggerRenderer,
@@ -72,6 +87,7 @@ import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
+import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
 import { useAccount } from "@/contexts/AccountContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
@@ -101,6 +117,7 @@ import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
 const CANVAS_AUTO_SAVE_STORAGE_KEY = "canvas-auto-save-enabled";
+const LOCAL_CANVAS_UPDATE_SUPPRESSION_MS = 2000;
 
 type UnsavedChangeKind = "position" | "structural";
 
@@ -127,12 +144,17 @@ export function WorkflowPageV2() {
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const { data: canvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId!, canvasId!);
   const { data: canvasEventsResponse } = useCanvasEvents(canvasId!);
+  const canReadOrg = canAct("org", "read");
+  const { data: agentSettings } = useOrganizationAgentSettings(organizationId || "", !!organizationId && canReadOrg);
   const canUpdateCanvas = canAct("canvases", "update");
+  const showAiBuilderTab = agentSettings?.agentModeEnabled ?? false;
 
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
 
   const isTemplate = canvas?.metadata?.isTemplate ?? false;
-  const isReadOnly = isTemplate || !canUpdateCanvas;
+  const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
+  const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
+  const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely;
   const isDev = import.meta.env.DEV;
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const createWorkflowMutation = useCreateCanvas(organizationId!);
@@ -211,6 +233,7 @@ export function WorkflowPageV2() {
   const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<CanvasesCanvas | null>(null);
   const lastSavedWorkflowRef = useRef<CanvasesCanvas | null>(null);
   const canvasRef = useRef<CanvasesCanvas | null>(canvas ?? null);
+  const lastLocalCanvasSaveAtRef = useRef<number>(0);
   useEffect(() => {
     canvasRef.current = canvas ?? null;
   }, [canvas]);
@@ -234,11 +257,11 @@ export function WorkflowPageV2() {
         (canvasError as any)?.message?.includes("not found") ||
         (canvasError as any)?.message?.includes("404");
 
-      if (is404 && organizationId) {
+      if (is404 && organizationId && !canvasDeletedRemotely) {
         navigate(`/${organizationId}`, { replace: true });
       }
     }
-  }, [canvasError, canvasLoading, navigate, organizationId]);
+  }, [canvasError, canvasLoading, navigate, organizationId, canvasDeletedRemotely]);
 
   // Initialize store from workflow.status on workflow load (only once per workflow)
   const hasInitializedStoreRef = useRef<string | null>(null);
@@ -264,6 +287,7 @@ export function WorkflowPageV2() {
     setHasNonPositionalUnsavedChanges(false);
     setInitialWorkflowSnapshot(null);
     lastSavedWorkflowRef.current = null;
+    lastLocalCanvasSaveAtRef.current = 0;
   }, [canvasId]);
 
   useEffect(() => {
@@ -272,6 +296,17 @@ export function WorkflowPageV2() {
       setHasNonPositionalUnsavedChanges(false);
     }
   }, [isTemplate, canvasId]);
+
+  useEffect(() => {
+    if (!remoteCanvasUpdatePending || hasUnsavedChanges || canvasDeletedRemotely || !organizationId || !canvasId) {
+      return;
+    }
+
+    queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+    queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+    setRemoteCanvasUpdatePending(false);
+    showSuccessToast("Canvas updated from another session");
+  }, [remoteCanvasUpdatePending, hasUnsavedChanges, canvasDeletedRemotely, organizationId, canvasId, queryClient]);
 
   // Build maps from store for canvas display (using initial data from workflow.status and websocket updates)
   // Rebuild whenever store version changes (indicates data was updated)
@@ -449,6 +484,7 @@ export function WorkflowPageV2() {
               : "Canvas changes saved";
 
             // Save the workflow with updated positions
+            lastLocalCanvasSaveAtRef.current = Date.now();
             await updateWorkflowMutation.mutateAsync({
               name: latestWorkflow.metadata?.name!,
               description: latestWorkflow.metadata?.description,
@@ -853,12 +889,42 @@ export function WorkflowPageV2() {
     [buildLiveRunEntryFromEvent, buildLiveRunItemFromExecution],
   );
 
+  const handleCanvasLifecycleEvent = useCallback(
+    (_payload: { id?: string; canvasId?: string }, eventName: string) => {
+      if (eventName === "canvas_deleted") {
+        setCanvasDeletedRemotely(true);
+        return;
+      }
+
+      const isLocalEcho =
+        eventName === "canvas_updated" &&
+        Date.now() - lastLocalCanvasSaveAtRef.current < LOCAL_CANVAS_UPDATE_SUPPRESSION_MS;
+      if (isLocalEcho) {
+        return;
+      }
+
+      if (eventName === "canvas_updated" && hasUnsavedChanges) {
+        setRemoteCanvasUpdatePending(true);
+      } else if (eventName === "canvas_updated") {
+        showSuccessToast("Canvas updated from another session");
+      }
+    },
+    [hasUnsavedChanges],
+  );
+
+  const shouldApplyCanvasUpdate = useCallback(
+    () => !hasUnsavedChanges && !canvasDeletedRemotely,
+    [hasUnsavedChanges, canvasDeletedRemotely],
+  );
+
   useCanvasWebsocket(
     canvasId!,
     organizationId!,
     handleNodeWebsocketEvent,
     handleWorkflowEventCreated,
     handleExecutionEvent,
+    handleCanvasLifecycleEvent,
+    shouldApplyCanvasUpdate,
   );
 
   const logEntries = useMemo(() => {
@@ -1297,6 +1363,7 @@ export function WorkflowPageV2() {
         : "Canvas changes saved";
 
       try {
+        lastLocalCanvasSaveAtRef.current = Date.now();
         await updateWorkflowMutation.mutateAsync({
           name: targetWorkflow.metadata?.name!,
           description: targetWorkflow.metadata?.description,
@@ -1764,6 +1831,46 @@ export function WorkflowPageV2() {
       handleSaveWorkflow,
       canAutoSave,
       markUnsavedChange,
+    ],
+  );
+
+  const handleApplyAiOperations = useCallback(
+    async (operations: AiCanvasOperation[]) => {
+      if (!operations.length || !organizationId || !canvasId) {
+        return;
+      }
+
+      const latestWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+      if (!latestWorkflow) {
+        throw new Error("Canvas not found.");
+      }
+
+      saveWorkflowSnapshot(latestWorkflow);
+      const updatedWorkflow = applyAiOperationsToWorkflow({
+        workflow: latestWorkflow,
+        operations,
+        buildingBlocks,
+      });
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+      if (canAutoSave) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      buildingBlocks,
+      canAutoSave,
+      canvas,
+      canvasId,
+      handleSaveWorkflow,
+      markUnsavedChange,
+      organizationId,
+      queryClient,
+      saveWorkflowSnapshot,
     ],
   );
 
@@ -2485,6 +2592,7 @@ export function WorkflowPageV2() {
         : "Canvas changes saved";
 
       try {
+        lastLocalCanvasSaveAtRef.current = Date.now();
         await updateWorkflowMutation.mutateAsync({
           name: canvas.metadata?.name!,
           description: canvas.metadata?.description,
@@ -2699,7 +2807,7 @@ export function WorkflowPageV2() {
   );
 
   const getCustomField = useCallback(
-    (nodeId: string, onRun?: (initialData?: string) => void) => {
+    (nodeId: string, onRun?: (initialData?: string) => void, integration?: OrganizationsIntegration) => {
       const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return null;
 
@@ -2715,9 +2823,23 @@ export function WorkflowPageV2() {
       const renderer = getCustomFieldRenderer(componentName);
       if (!renderer) return null;
 
+      const context: {
+        onRun?: (initialData?: string) => void;
+        integration?: OrganizationsIntegration;
+      } = onRun ? { onRun } : {};
+      if (integration) context.integration = integration;
+
       // Return a function that takes the current configuration
-      return () => {
-        return renderer.render(buildNodeInfo(node), onRun ? { onRun } : undefined);
+      return (configuration?: Record<string, unknown>) => {
+        const nodeWithConfiguration = {
+          ...node,
+          configuration: configuration ?? node.configuration,
+        };
+
+        return renderer.render(
+          buildNodeInfo(nodeWithConfiguration),
+          Object.keys(context).length > 0 ? context : undefined,
+        );
       };
     },
     [canvas],
@@ -2760,7 +2882,39 @@ export function WorkflowPageV2() {
     );
   }
 
+  const handleReloadRemoteCanvas = async () => {
+    if (!organizationId || !canvasId) {
+      return;
+    }
+
+    pendingPositionUpdatesRef.current.clear();
+    pendingAnnotationUpdatesRef.current.clear();
+    setHasUnsavedChanges(false);
+    setHasNonPositionalUnsavedChanges(false);
+    setInitialWorkflowSnapshot(null);
+    setRemoteCanvasUpdatePending(false);
+    lastSavedWorkflowRef.current = null;
+
+    await queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+    await queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+  };
+
   const hasRunBlockingChanges = hasUnsavedChanges && hasNonPositionalUnsavedChanges;
+  const remoteUpdateBanner = remoteCanvasUpdatePending ? (
+    <div className="bg-amber-100 px-4 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-sm font-medium text-gray-900">Canvas updated elsewhere</p>
+        <p className="text-[13px] text-black/60">
+          A newer canvas version is available. Reloading will discard your unsaved local changes.
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <Button size="sm" onClick={handleReloadRemoteCanvas}>
+          Reload remote
+        </Button>
+      </div>
+    </div>
+  ) : null;
   const templateBanner = isTemplate ? (
     <div className="bg-orange-100 px-4 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div>
@@ -2772,6 +2926,15 @@ export function WorkflowPageV2() {
       </Button>
     </div>
   ) : null;
+  const headerBanner =
+    remoteUpdateBanner && templateBanner ? (
+      <div className="flex flex-col">
+        {remoteUpdateBanner}
+        {templateBanner}
+      </div>
+    ) : (
+      remoteUpdateBanner || templateBanner
+    );
   const saveDisabled = !canUpdateCanvas;
   const saveDisabledTooltip = saveDisabled ? "You don't have permission to edit this canvas." : undefined;
   const autoSaveDisabled = !canUpdateCanvas;
@@ -2779,14 +2942,16 @@ export function WorkflowPageV2() {
   const saveButtonHidden = isTemplate || !canUpdateCanvas || !hasUnsavedChanges;
   const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas;
   const canUndo = !isTemplate && canUpdateCanvas && !isAutoSaveEnabled && initialWorkflowSnapshot !== null;
-  const runDisabled = hasRunBlockingChanges || isTemplate || !canUpdateCanvas;
-  const runDisabledTooltip = !canUpdateCanvas
-    ? "You don't have permission to emit events on this canvas."
-    : isTemplate
-      ? "Templates are read-only"
-      : hasRunBlockingChanges
-        ? "Save canvas changes before running"
-        : undefined;
+  const runDisabled = hasRunBlockingChanges || isTemplate || !canUpdateCanvas || canvasDeletedRemotely;
+  const runDisabledTooltip = canvasDeletedRemotely
+    ? "This canvas was deleted in another session."
+    : !canUpdateCanvas
+      ? "You don't have permission to emit events on this canvas."
+      : isTemplate
+        ? "Templates are read-only"
+        : hasRunBlockingChanges
+          ? "Save canvas changes before running"
+          : undefined;
 
   return (
     <>
@@ -2805,10 +2970,11 @@ export function WorkflowPageV2() {
           }
         }}
         title={canvas?.metadata?.name || "Canvas"}
-        headerBanner={templateBanner}
+        headerBanner={headerBanner}
         nodes={nodes}
         edges={edges}
         organizationId={organizationId}
+        canvasId={canvasId}
         onDirty={!isReadOnly ? () => markUnsavedChange("structural") : undefined}
         getSidebarData={getSidebarData}
         loadSidebarData={loadSidebarData}
@@ -2832,7 +2998,9 @@ export function WorkflowPageV2() {
         onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
         onConfigure={!isReadOnly ? handleConfigure : undefined}
         buildingBlocks={buildingBlocks}
+        showAiBuilderTab={showAiBuilderTab}
         onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
+        onApplyAiOperations={!isReadOnly ? handleApplyAiOperations : undefined}
         onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
         onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
         integrations={canReadIntegrations ? integrations : []}
@@ -2911,6 +3079,27 @@ export function WorkflowPageV2() {
           fromTemplate
         />
       ) : null}
+      <Dialog open={canvasDeletedRemotely} onOpenChange={() => {}}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Canvas deleted</DialogTitle>
+            <DialogDescription>
+              This canvas was deleted from another session. You can no longer edit or run it.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                if (organizationId) {
+                  navigate(`/${organizationId}`, { replace: true });
+                }
+              }}
+            >
+              Go to canvases
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

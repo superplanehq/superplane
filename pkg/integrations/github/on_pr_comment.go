@@ -1,22 +1,14 @@
 package github
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"regexp"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type OnPRComment struct{}
-
-type OnPRCommentConfiguration struct {
-	Repository    string `json:"repository" mapstructure:"repository"`
-	ContentFilter string `json:"contentFilter" mapstructure:"contentFilter"`
-}
 
 func (p *OnPRComment) Name() string {
 	return "github.onPRComment"
@@ -27,18 +19,17 @@ func (p *OnPRComment) Label() string {
 }
 
 func (p *OnPRComment) Description() string {
-	return "Listen to all comment events on pull requests"
+	return "Listen to PR conversation comment events"
 }
 
 func (p *OnPRComment) Documentation() string {
-	return `The On PR Comment trigger starts a workflow execution when comments are added to pull requests.
+	return `The On PR Comment trigger starts a workflow execution when comments are added on a pull request conversation.
 
 ## Use Cases
 
-- **Command processing**: Process slash commands in PR comments (e.g., /deploy, /test)
+- **Command processing**: Process slash commands in PR conversation comments (e.g., /deploy, /test)
 - **Bot interactions**: Respond to comments with automated actions
-- **Review automation**: Trigger workflows based on comment content
-- **Notification systems**: Notify teams when important comments are added
+- **Notification systems**: Notify teams when important PR conversation comments are added
 
 ## Configuration
 
@@ -49,9 +40,17 @@ func (p *OnPRComment) Documentation() string {
 
 Each comment event includes:
 - **comment**: Comment information including body, author, created timestamp
-- **pull_request**: PR information the comment was added to
+- **issue**: Issue/PR information; for this trigger it is always a pull request issue
 - **repository**: Repository information
 - **sender**: User who added the comment
+
+SuperPlane passes through the full GitHub webhook payload under data for the issue_comment event type.
+
+Common expression paths:
+- PR number: ` + "`root().data.issue.number`" + `
+- PR title: ` + "`root().data.issue.title`" + `
+- PR URL: ` + "`root().data.issue.pull_request.html_url`" + `
+- Comment body: ` + "`root().data.comment.body`" + `
 
 ## Webhook Setup
 
@@ -67,54 +66,11 @@ func (p *OnPRComment) Color() string {
 }
 
 func (p *OnPRComment) Configuration() []configuration.Field {
-	return []configuration.Field{
-		{
-			Name:     "repository",
-			Label:    "Repository",
-			Type:     configuration.FieldTypeIntegrationResource,
-			Required: true,
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type:           "repository",
-					UseNameAsValue: true,
-				},
-			},
-		},
-		{
-			Name:        "contentFilter",
-			Label:       "Content Filter",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Placeholder: "e.g., /solve",
-			Description: "Optional regex pattern to filter comments by content",
-		},
-	}
+	return prCommentConfigurationFields()
 }
 
 func (p *OnPRComment) Setup(ctx core.TriggerContext) error {
-	err := ensureRepoInMetadata(
-		ctx.Metadata,
-		ctx.Integration,
-		ctx.Configuration,
-	)
-
-	if err != nil {
-		return err
-	}
-
-	var config OnPRCommentConfiguration
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	// Request a single webhook that listens to all PR comment event types:
-	// - pull_request_review_comment: line-level code review comments
-	// - issue_comment: PR conversation comments (GitHub sends these for comments on PR's main tab)
-	// - pull_request_review: review submission comments (the main comment when clicking "Submit review")
-	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		EventTypes: []string{"pull_request_review_comment", "issue_comment", "pull_request_review"},
-		Repository: config.Repository,
-	})
+	return setupPRCommentTrigger(ctx, WebhookConfiguration{EventType: "issue_comment"})
 }
 
 func (p *OnPRComment) Actions() []core.Action {
@@ -126,103 +82,43 @@ func (p *OnPRComment) HandleAction(ctx core.TriggerActionContext) (map[string]an
 }
 
 func (p *OnPRComment) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	config := OnPRCommentConfiguration{}
-	err := mapstructure.Decode(ctx.Configuration, &config)
+	config, err := decodePRCommentConfiguration(ctx.Configuration)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, err
 	}
 
-	eventType := ctx.Headers.Get("X-GitHub-Event")
-	if eventType == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
+	eventType, err := extractGitHubEventType(ctx.Headers)
+	if err != nil {
+		return http.StatusBadRequest, err
 	}
 
-	// Accept all PR comment event types:
-	// - pull_request_review_comment: line-level code comments
-	// - issue_comment: PR conversation comments
-	// - pull_request_review: review submission comments
-	if eventType != "pull_request_review_comment" && eventType != "issue_comment" && eventType != "pull_request_review" {
+	if eventType != "issue_comment" {
 		return http.StatusOK, nil
 	}
 
-	code, err := verifySignature(ctx)
+	data, code, err := verifyAndParseWebhookData(ctx)
 	if err != nil {
 		return code, err
 	}
 
-	data := map[string]any{}
-	err = json.Unmarshal(ctx.Body, &data)
-	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
-	}
-
-	// For issue_comment events, only process if it's on a PR (not a regular issue)
-	// GitHub includes a pull_request field in the issue object for PR comments
-	if eventType == "issue_comment" {
-		issue, ok := data["issue"].(map[string]any)
-		if !ok {
-			return http.StatusOK, nil
-		}
-		if _, hasPR := issue["pull_request"]; !hasPR {
-			return http.StatusOK, nil
-		}
-	}
-
-	// Check action based on event type:
-	// - pull_request_review uses "submitted" action
-	// - other events use "created" action
-	action, ok := data["action"]
-	if !ok {
+	if !isPRIssueComment(data) {
 		return http.StatusOK, nil
 	}
 
-	if eventType == "pull_request_review" {
-		if action != "submitted" {
-			return http.StatusOK, nil
-		}
-	} else {
-		if action != "created" {
-			return http.StatusOK, nil
-		}
+	if !isExpectedPRCommentAction(eventType, data) {
+		return http.StatusOK, nil
 	}
 
-	// Apply content filter if configured
-	if config.ContentFilter != "" {
-		var body string
-
-		if eventType == "pull_request_review" {
-			// For review submissions, the body is in review.body
-			review, ok := data["review"].(map[string]any)
-			if !ok {
-				return http.StatusBadRequest, fmt.Errorf("invalid review structure")
-			}
-			// Review body can be empty (e.g., approving without a comment)
-			body, _ = review["body"].(string)
-		} else {
-			// For other events, the body is in comment.body
-			comment, ok := data["comment"].(map[string]any)
-			if !ok {
-				return http.StatusBadRequest, fmt.Errorf("invalid comment structure")
-			}
-			body, ok = comment["body"].(string)
-			if !ok {
-				return http.StatusBadRequest, fmt.Errorf("invalid comment body")
-			}
-		}
-
-		matched, err := regexp.MatchString(config.ContentFilter, body)
-		if err != nil {
-			return http.StatusBadRequest, fmt.Errorf("invalid regex pattern: %w", err)
-		}
-
-		if !matched {
-			return http.StatusOK, nil
-		}
-	}
-
-	err = ctx.Events.Emit("github.prComment", data)
-
+	matched, code, err := applyPRCommentContentFilter(config.ContentFilter, eventType, data)
 	if err != nil {
+		return code, err
+	}
+
+	if !matched {
+		return http.StatusOK, nil
+	}
+
+	if err := ctx.Events.Emit("github.prComment", data); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}
 

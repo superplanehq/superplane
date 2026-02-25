@@ -10,6 +10,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="On Incident" href="#on-incident" description="Listen to incident events" />
+  <LinkCard title="On Incident Timeline Event" href="#on-incident-timeline-event" description="Listen to incident timeline events" />
 </CardGrid>
 
 ## Actions
@@ -68,6 +69,87 @@ This trigger automatically sets up a Rootly webhook endpoint when configured. Th
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "rootly.onIncident"
+}
+```
+
+<a id="on-incident-timeline-event"></a>
+
+## On Incident Timeline Event
+
+The On Incident Timeline Event trigger starts a workflow execution when Rootly incident timeline events are created or updated.
+Only events with kind "event" are emitted.
+
+### Use Cases
+
+- **Note automation**: Run workflows when investigation notes are added
+- **Timeline sync**: Sync incident timeline events to Slack or external systems
+- **Annotation tracking**: Track updates to incident annotations
+- **Audit logging**: Capture timeline events for compliance or reporting
+
+### Configuration
+
+- **Incident Status**: Optional filter by incident status (open, resolved, etc.)
+- **Severity**: Optional filter by incident severity
+- **Service**: Optional filter by service name
+- **Team**: Optional filter by team name
+- **Event Source**: Optional filter by event source (web, api, system)
+- **Visibility**: Optional filter by event visibility (internal or external)
+
+### Event Data
+
+Each incident event includes:
+- **id**: Event ID
+- **event**: Event content
+- **event_raw**: Raw event content
+- **event_id**: Webhook event ID
+- **event_type**: Event type (incident_event.created or incident_event.updated)
+- **kind**: Event kind
+- **source**: Event source
+- **visibility**: Event visibility
+- **occurred_at**: When the event occurred
+- **created_at**: When the event was created
+- **updated_at**: When the event was last updated
+- **issued_at**: When the webhook was issued
+- **incident_id**: Incident ID
+- **incident**: Incident information
+
+### Webhook Setup
+
+This trigger automatically sets up a Rootly webhook endpoint when configured. The endpoint is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "created_at": "2026-02-22T09:46:23.868-08:00",
+    "event": "Investigation started, will update accordingly",
+    "event_id": "b3065ca8-69a6-4781-b6b4-94d6f0317ccf",
+    "event_raw": "Investigation started, will update accordingly",
+    "event_type": "incident_event.created",
+    "id": "56f7b488-e3c5-4091-9bb4-cf132007f98c",
+    "incident": {
+      "id": "64c39fde-1626-4f78-874e-9db91c0639d3",
+      "services": [
+        "UI - User Profile Block"
+      ],
+      "severity": "sev2",
+      "status": "mitigated",
+      "teams": [
+        "Customer Relations"
+      ],
+      "title": "new remake from main"
+    },
+    "incident_id": "64c39fde-1626-4f78-874e-9db91c0639d3",
+    "issued_at": "2026-02-22T09:46:24.018-08:00",
+    "kind": "event",
+    "occurred_at": "2026-02-22T09:46:23.868-08:00",
+    "source": "web",
+    "updated_at": "2026-02-22T09:46:23.868-08:00",
+    "visibility": "internal"
+  },
+  "timestamp": "2026-02-22T17:46:40.603539728Z",
+  "type": "rootly.onIncidentTimelineEvent"
 }
 ```
 
