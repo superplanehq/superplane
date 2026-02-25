@@ -63,10 +63,9 @@ Returns the created incident object including:
 - **number**: Incident number
 - **severity**: Severity level
 - **priority**: Priority level
-- **current_milestone**: Current milestone (e.g., started)
 - **created_at**: Creation timestamp
 - **started_at**: Start timestamp
-,- **tag_list**: List of tags associated with the incident
+- **tag_list**: List of tags associated with the incident
 - **impacts**: List of impacts associated with the incident
 - **milestones**: List of milestones associated with the incident`
 }

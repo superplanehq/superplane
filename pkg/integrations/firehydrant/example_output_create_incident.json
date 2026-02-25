@@ -10,7 +10,7 @@
   "started_at": "2026-01-19T12:00:00Z",
   "severity": "SEV1",
   "priority": "P1",
-  "tagList": [],
+  "tag_list": [],
   "impacts": [],
   "milestones": [
     {

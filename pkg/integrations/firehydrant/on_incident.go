@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"slices"
 
@@ -219,13 +220,35 @@ func buildIncidentPayload(payload WebhookPayload) map[string]any {
 	}
 
 	if payload.Data.Incident != nil {
-		result["incident"] = payload.Data.Incident
+		result["incident"] = normalizeIncident(payload.Data.Incident)
 	}
 
 	return result
 }
 
-// extractSeveritySlug pulls the severity slug from the webhook incident data.
+func normalizeIncident(raw map[string]any) map[string]any {
+	normalized := map[string]any{}
+	maps.Copy(normalized, raw)
+	if severity, ok := raw["severity"].(map[string]any); ok {
+		if slug, ok := severity["slug"].(string); ok {
+			normalized["severity"] = slug
+		}
+	}
+
+	if priority, ok := raw["priority"].(map[string]any); ok {
+		if slug, ok := priority["slug"].(string); ok {
+			normalized["priority"] = slug
+		}
+	}
+	if milestone, ok := raw["current_milestone"].(map[string]any); ok {
+		if slug, ok := milestone["slug"].(string); ok {
+			normalized["current_milestone"] = slug
+		}
+	}
+
+	return normalized
+}
+
 func extractSeveritySlug(payload WebhookPayload) string {
 	if payload.Data.Incident == nil {
 		return ""

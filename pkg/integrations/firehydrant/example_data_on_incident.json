@@ -49,8 +49,6 @@
         "description": "",
         "slug": "P4"
       },
-      "private_status_page_url": "https://app.firehydrant.io/incidents/internal/status_page/f8c9d62e-ed0c-49e6-814c-f76667ac7ed3/76a959cde572cc039221d5d0bb63d3ea2c0ff424f462de67f95419a448c943cdc9d96be07ef6af5cc4e4d9cb916ca1710868b53de8620f8bce3866147d59263041a68d05de708f1b28039a393b82ef473c9734506c14c2a026670f17987bef8f1a33337d",
-      "role_assignments": [],
       "severity": {
         "description": "Some customers (not all) are receiving intermittent errors on product pages or cannot use the product in possibly obscure ways. The product may be loading slowly or partially (missing images), and there is a workaround that customers can use.",
         "slug": "SEV3",
@@ -65,7 +63,7 @@
     }
   },
   "event": {
-    "operation": "UPDATED",
+    "operation": "CREATED",
     "resource_type": "incident"
   }
 }
