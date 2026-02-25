@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -150,6 +151,10 @@ func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *reg
 	protoCanvas, err := SerializeCanvas(existingCanvas, true)
 	if err != nil {
 		return nil, actions.ToStatus(err)
+	}
+
+	if err := messages.NewCanvasUpdatedMessage(existingCanvas.ID.String()).Publish(true); err != nil {
+		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", err)
 	}
 
 	return &pb.UpdateCanvasResponse{

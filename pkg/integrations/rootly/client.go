@@ -259,19 +259,43 @@ type IncidentEventResponse struct {
 	Data IncidentEventData `json:"data"`
 }
 
-// severityString extracts the severity slug from the API response.
-// Rootly returns severity as a string (slug) or an object with slug/name fields.
+// severityString extracts a severity slug/name from Rootly responses.
+// Rootly may return severity as a string, a flat object, or a JSON:API nested object.
 func severityString(v any) string {
 	switch s := v.(type) {
 	case string:
+		// Severity already provided as a slug/name string.
 		return s
 	case map[string]any:
-		if slug, ok := s["slug"].(string); ok {
-			return slug
+		// Severity provided as a flat object with slug/name fields.
+		if value := severityFromMap(s); value != "" {
+			return value
 		}
-		if name, ok := s["name"].(string); ok {
-			return name
+
+		// Severity provided as a nested JSON:API object: {data:{attributes:{slug/name}}}.
+		data, ok := s["data"].(map[string]any)
+		if !ok {
+			return ""
 		}
+
+		attrs, ok := data["attributes"].(map[string]any)
+		if !ok {
+			return ""
+		}
+
+		return severityFromMap(attrs)
+	default:
+		return ""
+	}
+}
+
+func severityFromMap(values map[string]any) string {
+	if slug, ok := values["slug"].(string); ok && slug != "" {
+		return slug
+	}
+
+	if name, ok := values["name"].(string); ok && name != "" {
+		return name
 	}
 
 	return ""
@@ -709,9 +733,11 @@ func (c *Client) UpdateIncident(id string, attrs UpdateIncidentAttributes) (*Inc
 
 // WebhookEndpoint represents a Rootly webhook endpoint
 type WebhookEndpoint struct {
-	ID     string `json:"id"`
-	URL    string `json:"url"`
-	Secret string `json:"secret"`
+	ID     string   `json:"id"`
+	Name   string   `json:"name"`
+	URL    string   `json:"url"`
+	Secret string   `json:"secret"`
+	Events []string `json:"event_types"`
 }
 
 type WebhookEndpointData struct {
@@ -721,6 +747,7 @@ type WebhookEndpointData struct {
 }
 
 type WebhookEndpointAttributes struct {
+	Name           string   `json:"name"`
 	URL            string   `json:"url"`
 	Secret         string   `json:"secret"`
 	EventTypes     []string `json:"event_types"`
@@ -730,6 +757,10 @@ type WebhookEndpointAttributes struct {
 
 type WebhookEndpointResponse struct {
 	Data WebhookEndpointData `json:"data"`
+}
+
+type WebhookEndpointsResponse struct {
+	Data []WebhookEndpointData `json:"data"`
 }
 
 type CreateWebhookEndpointRequest struct {
@@ -749,12 +780,12 @@ type CreateWebhookEndpointAttributes struct {
 	SigningEnabled bool     `json:"signing_enabled"`
 }
 
-func (c *Client) CreateWebhookEndpoint(url string, events []string) (*WebhookEndpoint, error) {
+func (c *Client) CreateWebhookEndpoint(name, url string, events []string) (*WebhookEndpoint, error) {
 	request := CreateWebhookEndpointRequest{
 		Data: CreateWebhookEndpointData{
 			Type: "webhooks_endpoints",
 			Attributes: CreateWebhookEndpointAttributes{
-				Name:           "SuperPlane",
+				Name:           name,
 				URL:            url,
 				EventTypes:     events,
 				Enabled:        true,
@@ -782,8 +813,75 @@ func (c *Client) CreateWebhookEndpoint(url string, events []string) (*WebhookEnd
 
 	return &WebhookEndpoint{
 		ID:     response.Data.ID,
+		Name:   response.Data.Attributes.Name,
 		URL:    response.Data.Attributes.URL,
 		Secret: response.Data.Attributes.Secret,
+		Events: response.Data.Attributes.EventTypes,
+	}, nil
+}
+
+func (c *Client) ListWebhookEndpoints() ([]WebhookEndpoint, error) {
+	apiURL := fmt.Sprintf("%s/webhooks/endpoints", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response WebhookEndpointsResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	endpoints := make([]WebhookEndpoint, 0, len(response.Data))
+	for _, data := range response.Data {
+		endpoints = append(endpoints, WebhookEndpoint{
+			ID:     data.ID,
+			Name:   data.Attributes.Name,
+			URL:    data.Attributes.URL,
+			Secret: data.Attributes.Secret,
+			Events: data.Attributes.EventTypes,
+		})
+	}
+
+	return endpoints, nil
+}
+
+func (c *Client) UpdateWebhookEndpoint(id, name, url string, events []string, enabled bool) (*WebhookEndpoint, error) {
+	request := CreateWebhookEndpointRequest{
+		Data: CreateWebhookEndpointData{
+			Type: "webhooks_endpoints",
+			Attributes: CreateWebhookEndpointAttributes{
+				Name:           name,
+				URL:            url,
+				EventTypes:     events,
+				Enabled:        enabled,
+				SigningEnabled: true,
+			},
+		},
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/webhooks/endpoints/%s", c.BaseURL, id)
+	responseBody, err := c.execRequest(http.MethodPut, apiURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response WebhookEndpointResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &WebhookEndpoint{
+		ID:     response.Data.ID,
+		Name:   response.Data.Attributes.Name,
+		URL:    response.Data.Attributes.URL,
+		Secret: response.Data.Attributes.Secret,
+		Events: response.Data.Attributes.EventTypes,
 	}, nil
 }
 

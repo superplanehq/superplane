@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -40,6 +41,10 @@ func DeleteCanvas(ctx context.Context, registry *registry.Registry, organization
 	if err != nil {
 		log.Errorf("failed to delete canvas %s: %v", canvas.ID.String(), err)
 		return nil, status.Error(codes.Internal, "failed to delete canvas")
+	}
+
+	if err := messages.NewCanvasDeletedMessage(canvas.ID.String()).Publish(false); err != nil {
+		log.Errorf("failed to publish canvas deleted RabbitMQ message: %v", err)
 	}
 
 	return &pb.DeleteCanvasResponse{}, nil

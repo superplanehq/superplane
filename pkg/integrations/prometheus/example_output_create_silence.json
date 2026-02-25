@@ -1,0 +1,26 @@
+{
+  "data": {
+    "silenceID": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+    "status": "active",
+    "matchers": [
+      {
+        "name": "alertname",
+        "value": "HighLatency",
+        "isRegex": false,
+        "isEqual": true
+      },
+      {
+        "name": "severity",
+        "value": "critical",
+        "isRegex": false,
+        "isEqual": true
+      }
+    ],
+    "startsAt": "2026-02-12T16:30:00Z",
+    "endsAt": "2026-02-12T17:30:00Z",
+    "createdBy": "SuperPlane",
+    "comment": "Scheduled maintenance window for database migration"
+  },
+  "timestamp": "2026-02-12T16:30:05.123456789Z",
+  "type": "prometheus.silence"
+}

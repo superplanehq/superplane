@@ -1,0 +1,24 @@
+{
+    "data": {
+        "name": "Initial Pipeline",
+        "ppl_id": "00000000-0000-0000-0000-000000000000",
+        "wf_id": "11111111-1111-1111-1111-111111111111",
+        "state": "done",
+        "result": "passed",
+        "result_reason": "test",
+        "branch_name": "main",
+        "commit_sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+        "commit_message": "feat: add new feature",
+        "yaml_file_name": "semaphore.yml",
+        "working_directory": ".semaphore",
+        "project_id": "22222222-2222-2222-2222-222222222222",
+        "created_at": "2026-01-22T15:32:47.000000Z",
+        "done_at": "2026-01-22T15:32:56.000000Z",
+        "running_at": "2026-01-22T15:32:48.000000Z",
+        "error_description": "",
+        "terminated_by": "",
+        "promotion_of": ""
+    },
+    "timestamp": "2026-01-22T15:32:56.061430218Z",
+    "type": "semaphore.pipeline"
+}

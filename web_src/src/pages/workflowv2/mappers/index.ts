@@ -81,12 +81,23 @@ import {
   eventStateRegistry as rootlyEventStateRegistry,
 } from "./rootly/index";
 import {
+  componentMappers as incidentComponentMappers,
+  triggerRenderers as incidentTriggerRenderers,
+  eventStateRegistry as incidentEventStateRegistry,
+  customFieldRenderers as incidentCustomFieldRenderers,
+} from "./incident/index";
+import {
   componentMappers as awsComponentMappers,
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
 import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
 import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
+import {
+  componentMappers as jfrogArtifactoryComponentMappers,
+  triggerRenderers as jfrogArtifactoryTriggerRenderers,
+  eventStateRegistry as jfrogArtifactoryEventStateRegistry,
+} from "./jfrogArtifactory/index";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
   componentMappers as digitaloceanComponentMappers,
@@ -98,6 +109,11 @@ import {
   triggerRenderers as discordTriggerRenderers,
   eventStateRegistry as discordEventStateRegistry,
 } from "./discord";
+import {
+  componentMappers as telegramComponentMappers,
+  triggerRenderers as telegramTriggerRenderers,
+  eventStateRegistry as telegramEventStateRegistry,
+} from "./telegram";
 import {
   componentMappers as openaiComponentMappers,
   triggerRenderers as openaiTriggerRenderers,
@@ -114,6 +130,11 @@ import {
   triggerRenderers as circleCITriggerRenderers,
   eventStateRegistry as circleCIEventStateRegistry,
 } from "./circleci/index";
+import {
+  componentMappers as harnessComponentMappers,
+  triggerRenderers as harnessTriggerRenderers,
+  eventStateRegistry as harnessEventStateRegistry,
+} from "./harness";
 import {
   componentMappers as claudeComponentMappers,
   triggerRenderers as claudeTriggerRenderers,
@@ -146,6 +167,19 @@ import {
   triggerRenderers as dockerhubTriggerRenderers,
   eventStateRegistry as dockerhubEventStateRegistry,
 } from "./dockerhub";
+import {
+  componentMappers as gcpComponentMappers,
+  customFieldRenderers as gcpCustomFieldRenderers,
+  triggerRenderers as gcpTriggerRenderers,
+  eventStateRegistry as gcpEventStateRegistry,
+} from "./gcp";
+import {
+  componentMappers as servicenowComponentMappers,
+  customFieldRenderers as servicenowCustomFieldRenderers,
+  triggerRenderers as servicenowTriggerRenderers,
+  eventStateRegistry as servicenowEventStateRegistry,
+} from "./servicenow/index";
+
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
@@ -193,17 +227,23 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   sendgrid: sendgridComponentMappers,
   render: renderComponentMappers,
   rootly: rootlyComponentMappers,
+  incident: incidentComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
+  telegram: telegramComponentMappers,
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
+  gcp: gcpComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
   hetzner: hetznerComponentMappers,
+  jfrogArtifactory: jfrogArtifactoryComponentMappers,
   statuspage: statuspageComponentMappers,
   dockerhub: dockerhubComponentMappers,
   newrelic: newrelicComponentMappers,
+  harness: harnessComponentMappers,
+  servicenow: servicenowComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -221,18 +261,24 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   sendgrid: sendgridTriggerRenderers,
   render: renderTriggerRenderers,
   rootly: rootlyTriggerRenderers,
+  incident: incidentTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
+  telegram: telegramTriggerRenderers,
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
+  gcp: gcpTriggerRenderers,
   grafana: grafanaTriggerRenderers,
   bitbucket: bitbucketTriggerRenderers,
   prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
+  jfrogArtifactory: jfrogArtifactoryTriggerRenderers,
   statuspage: statuspageTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
   newrelic: newrelicTriggerRenderers,
+  harness: harnessTriggerRenderers,
+  servicenow: servicenowTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -249,18 +295,24 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   sendgrid: sendgridEventStateRegistry,
   render: renderEventStateRegistry,
   discord: discordEventStateRegistry,
+  telegram: telegramEventStateRegistry,
   rootly: rootlyEventStateRegistry,
+  incident: incidentEventStateRegistry,
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
+  gcp: gcpEventStateRegistry,
   statuspage: statuspageEventStateRegistry,
   aws: awsEventStateRegistry,
   grafana: grafanaEventStateRegistry,
   prometheus: prometheusEventStateRegistry,
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
+  jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
   newrelic: newrelicEventStateRegistry,
+  harness: harnessEventStateRegistry,
+  servicenow: servicenowEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -289,6 +341,9 @@ const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer
   grafana: grafanaCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
+  incident: incidentCustomFieldRenderers,
+  gcp: gcpCustomFieldRenderers,
+  servicenow: servicenowCustomFieldRenderers,
 };
 
 /**
