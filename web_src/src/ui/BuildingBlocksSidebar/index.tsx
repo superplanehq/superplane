@@ -27,7 +27,7 @@ import {
   StickyNote,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
@@ -162,6 +162,7 @@ type AiBuilderProposal = {
 const AI_HISTORY_RECENT_TURNS = 8;
 const AI_HISTORY_OLDER_TURNS = 6;
 const AI_HISTORY_MAX_MESSAGE_CHARS = 320;
+const AI_MAX_STORED_MESSAGES = 50;
 
 function compactMessageContent(content: string): string {
   const normalized = content.replace(/\s+/g, " ").trim();
@@ -194,6 +195,16 @@ function buildPromptWithConversationContext(messages: AiBuilderMessage[], prompt
   ];
 
   return contextSections.join("\n\n");
+}
+
+function pushAiMessages(previous: AiBuilderMessage[], next: AiBuilderMessage | AiBuilderMessage[]): AiBuilderMessage[] {
+  const nextMessages = Array.isArray(next) ? next : [next];
+  const merged = [...previous, ...nextMessages];
+  if (merged.length <= AI_MAX_STORED_MESSAGES) {
+    return merged;
+  }
+
+  return merged.slice(-AI_MAX_STORED_MESSAGES);
 }
 
 export function BuildingBlocksSidebar({
@@ -309,7 +320,7 @@ export function BuildingBlocksSidebar({
         role: "user",
         content: nextPrompt,
       };
-      setAiMessages((prev) => [...prev, userMessage]);
+      setAiMessages((prev) => pushAiMessages(prev, userMessage));
       setAiInput("");
       requestAnimationFrame(() => {
         aiInputRef.current?.focus();
@@ -353,7 +364,7 @@ export function BuildingBlocksSidebar({
           role: "assistant",
           content: proposal.summary,
         };
-        setAiMessages((prev) => [...prev, assistantMessage]);
+        setAiMessages((prev) => pushAiMessages(prev, assistantMessage));
         if (proposal.operations.length > 0) {
           setPendingProposal(proposal);
         } else {
@@ -362,14 +373,13 @@ export function BuildingBlocksSidebar({
       } catch (error) {
         const fallbackMessage = "I couldn't generate changes right now. Please try again.";
         setAiError(error instanceof Error ? error.message : fallbackMessage);
-        setAiMessages((prev) => [
-          ...prev,
-          {
+        setAiMessages((prev) =>
+          pushAiMessages(prev, {
             id: `assistant-${Date.now()}`,
             role: "assistant",
             content: fallbackMessage,
-          },
-        ]);
+          }),
+        );
       } finally {
         setIsGeneratingResponse(false);
       }
@@ -459,14 +469,13 @@ export function BuildingBlocksSidebar({
     setIsApplyingProposal(true);
     try {
       await onApplyAiOperations(pendingProposal.operations);
-      setAiMessages((prev) => [
-        ...prev,
-        {
+      setAiMessages((prev) =>
+        pushAiMessages(prev, {
           id: `assistant-${Date.now()}`,
           role: "assistant",
           content: "Applied the proposed changes to the canvas.",
-        },
-      ]);
+        }),
+      );
       setPendingProposal(null);
     } catch (error) {
       setAiError(error instanceof Error ? error.message : "Failed to apply AI proposal.");
@@ -547,53 +556,149 @@ export function BuildingBlocksSidebar({
     }
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
-  const categoryOrder: Record<string, number> = {
-    Core: 0,
-    Bundles: 2,
-  };
+  const sortedCategories = useMemo(() => {
+    const categoryOrder: Record<string, number> = {
+      Core: 0,
+      Bundles: 2,
+    };
 
-  const filteredCategories = (blocks || []).filter((category) => {
-    if (category.name === "Bundles" && !isCustomComponentsEnabled()) {
-      return false;
-    }
-    return true;
-  });
-
-  const sortedCategories = [...filteredCategories].sort((a, b) => {
-    const aOrder = categoryOrder[a.name] ?? Infinity;
-    const bOrder = categoryOrder[b.name] ?? Infinity;
-
-    if (aOrder !== bOrder) {
-      return aOrder - bOrder;
-    }
-
-    if (showConnectedIntegrationsOnTop && aOrder === Infinity && bOrder === Infinity) {
-      const aIntegrationName = a.blocks.find((block) => block.integrationName)?.integrationName;
-      const bIntegrationName = b.blocks.find((block) => block.integrationName)?.integrationName;
-
-      const aHasConnectedIntegration = aIntegrationName
-        ? integrations.some(
-            (integration) =>
-              normalizeIntegrationName(integration.spec?.integrationName) ===
-              normalizeIntegrationName(aIntegrationName),
-          )
-        : false;
-
-      const bHasConnectedIntegration = bIntegrationName
-        ? integrations.some(
-            (integration) =>
-              normalizeIntegrationName(integration.spec?.integrationName) ===
-              normalizeIntegrationName(bIntegrationName),
-          )
-        : false;
-
-      if (aHasConnectedIntegration !== bHasConnectedIntegration) {
-        return aHasConnectedIntegration ? -1 : 1;
+    const filteredCategories = (blocks || []).filter((category) => {
+      if (category.name === "Bundles" && !isCustomComponentsEnabled()) {
+        return false;
       }
-    }
+      return true;
+    });
 
-    return a.name.localeCompare(b.name);
-  });
+    return [...filteredCategories].sort((a, b) => {
+      const aOrder = categoryOrder[a.name] ?? Infinity;
+      const bOrder = categoryOrder[b.name] ?? Infinity;
+
+      if (aOrder !== bOrder) {
+        return aOrder - bOrder;
+      }
+
+      if (showConnectedIntegrationsOnTop && aOrder === Infinity && bOrder === Infinity) {
+        const aIntegrationName = a.blocks.find((block) => block.integrationName)?.integrationName;
+        const bIntegrationName = b.blocks.find((block) => block.integrationName)?.integrationName;
+
+        const aHasConnectedIntegration = aIntegrationName
+          ? integrations.some(
+              (integration) =>
+                normalizeIntegrationName(integration.spec?.integrationName) ===
+                normalizeIntegrationName(aIntegrationName),
+            )
+          : false;
+
+        const bHasConnectedIntegration = bIntegrationName
+          ? integrations.some(
+              (integration) =>
+                normalizeIntegrationName(integration.spec?.integrationName) ===
+                normalizeIntegrationName(bIntegrationName),
+            )
+          : false;
+
+        if (aHasConnectedIntegration !== bHasConnectedIntegration) {
+          return aHasConnectedIntegration ? -1 : 1;
+        }
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [blocks, integrations, showConnectedIntegrationsOnTop]);
+
+  const componentsTabContent = useMemo(
+    () => (
+      <TabsContent value="components" className="mt-0 flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="flex items-center gap-2 px-5">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+            <Input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Filter components..."
+              className="pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as typeof typeFilter)}>
+            <SelectTrigger size="sm" className="w-[120px]">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="trigger">Trigger</SelectItem>
+              <SelectItem value="action">Action</SelectItem>
+              <SelectItem value="flow">Flow</SelectItem>
+            </SelectContent>
+          </Select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon-sm" className="h-8 w-8" aria-label="Sidebar settings">
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuCheckboxItem
+                checked={showIntegrationSetupStatus}
+                onCheckedChange={(checked) => setShowIntegrationSetupStatus(Boolean(checked))}
+              >
+                Show integration setup status
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={showConnectedIntegrationsOnTop}
+                onCheckedChange={(checked) => setShowConnectedIntegrationsOnTop(Boolean(checked))}
+              >
+                Connected integrations on top
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="gap-2 py-6">
+          {sortedCategories.map((category) => (
+            <CategorySection
+              key={category.name}
+              category={category}
+              integrations={integrations}
+              showIntegrationSetupStatus={showIntegrationSetupStatus}
+              canvasZoom={canvasZoom}
+              searchTerm={searchTerm}
+              typeFilter={typeFilter}
+              isDraggingRef={isDraggingRef}
+              setHoveredBlock={setHoveredBlock}
+              dragPreviewRef={dragPreviewRef}
+              onBlockClick={onBlockClick}
+            />
+          ))}
+
+          {/* Disabled overlay - only over items */}
+          {disabled && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 z-30 cursor-not-allowed" />
+              </TooltipTrigger>
+              <TooltipContent side="left" sideOffset={10}>
+                <p>{disabledTooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      </TabsContent>
+    ),
+    [
+      canvasZoom,
+      disabled,
+      disabledTooltip,
+      integrations,
+      onBlockClick,
+      searchTerm,
+      showConnectedIntegrationsOnTop,
+      showIntegrationSetupStatus,
+      sortedCategories,
+      typeFilter,
+    ],
+  );
 
   return (
     <div
@@ -665,86 +770,7 @@ export function BuildingBlocksSidebar({
             </div>
           </div>
         )}
-        <TabsContent value="components" className="mt-0 flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="flex items-center gap-2 px-5">
-            <div className="flex-1 relative">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                size={16}
-              />
-              <Input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Filter components..."
-                className="pl-9"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as typeof typeFilter)}>
-              <SelectTrigger size="sm" className="w-[120px]">
-                <SelectValue placeholder="All Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="trigger">Trigger</SelectItem>
-                <SelectItem value="action">Action</SelectItem>
-                <SelectItem value="flow">Flow</SelectItem>
-              </SelectContent>
-            </Select>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon-sm" className="h-8 w-8" aria-label="Sidebar settings">
-                  <Settings2 className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuCheckboxItem
-                  checked={showIntegrationSetupStatus}
-                  onCheckedChange={(checked) => setShowIntegrationSetupStatus(Boolean(checked))}
-                >
-                  Show integration setup status
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={showConnectedIntegrationsOnTop}
-                  onCheckedChange={(checked) => setShowConnectedIntegrationsOnTop(Boolean(checked))}
-                >
-                  Connected integrations on top
-                </DropdownMenuCheckboxItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          <div className="gap-2 py-6">
-            {sortedCategories.map((category) => (
-              <CategorySection
-                key={category.name}
-                category={category}
-                integrations={integrations}
-                showIntegrationSetupStatus={showIntegrationSetupStatus}
-                canvasZoom={canvasZoom}
-                searchTerm={searchTerm}
-                typeFilter={typeFilter}
-                isDraggingRef={isDraggingRef}
-                setHoveredBlock={setHoveredBlock}
-                dragPreviewRef={dragPreviewRef}
-                onBlockClick={onBlockClick}
-              />
-            ))}
-
-            {/* Disabled overlay - only over items */}
-            {disabled && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 z-30 cursor-not-allowed" />
-                </TooltipTrigger>
-                <TooltipContent side="left" sideOffset={10}>
-                  <p>{disabledTooltip}</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </div>
-        </TabsContent>
+        {(!showAiBuilderTab || activeTab === "components") && componentsTabContent}
 
         {showAiBuilderTab && (
           <TabsContent value="ai" className="mt-0 flex-1 overflow-hidden px-5 pb-5">
