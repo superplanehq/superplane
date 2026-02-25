@@ -130,11 +130,24 @@ type PipelineResponse struct {
 }
 
 type Pipeline struct {
-	PipelineName string `json:"name"`
-	PipelineID   string `json:"ppl_id"`
-	WorkflowID   string `json:"wf_id"`
-	State        string `json:"state"`
-	Result       string `json:"result"`
+	PipelineName     string `json:"name"`
+	PipelineID       string `json:"ppl_id"`
+	WorkflowID       string `json:"wf_id"`
+	State            string `json:"state"`
+	Result           string `json:"result"`
+	ResultReason     string `json:"result_reason"`
+	BranchName       string `json:"branch_name"`
+	CommitSHA        string `json:"commit_sha"`
+	CommitMessage    string `json:"commit_message"`
+	YAMLFileName     string `json:"yaml_file_name"`
+	WorkingDirectory string `json:"working_directory"`
+	ProjectID        string `json:"project_id"`
+	CreatedAt        string `json:"created_at"`
+	DoneAt           string `json:"done_at"`
+	RunningAt        string `json:"running_at"`
+	ErrorDescription string `json:"error_description"`
+	TerminatedBy     string `json:"terminated_by"`
+	PromotionOf      string `json:"promotion_of"`
 }
 
 func (c *Client) GetPipeline(id string) (*Pipeline, error) {

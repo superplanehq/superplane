@@ -1,10 +1,20 @@
 import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
 import { getAlertMapper } from "./get_alert";
+import { createSilenceMapper } from "./create_silence";
+import { expireSilenceMapper } from "./expire_silence";
+import { getSilenceMapper } from "./get_silence";
+import { queryMapper } from "./query";
+import { queryRangeMapper } from "./query_range";
 import { onAlertCustomFieldRenderer, onAlertTriggerRenderer } from "./on_alert";
 import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   getAlert: getAlertMapper,
+  createSilence: createSilenceMapper,
+  expireSilence: expireSilenceMapper,
+  getSilence: getSilenceMapper,
+  query: queryMapper,
+  queryRange: queryRangeMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -17,4 +27,9 @@ export const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getAlert: buildActionStateRegistry("retrieved"),
+  createSilence: buildActionStateRegistry("created"),
+  expireSilence: buildActionStateRegistry("expired"),
+  getSilence: buildActionStateRegistry("retrieved"),
+  query: buildActionStateRegistry("queried"),
+  queryRange: buildActionStateRegistry("queried"),
 };

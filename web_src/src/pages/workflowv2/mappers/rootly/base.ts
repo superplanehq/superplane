@@ -20,7 +20,7 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
   ];
 }
 
-export function getDetailsForIncident(incident: Incident): Record<string, string> {
+export function getDetailsForIncident(incident: Incident | undefined): Record<string, string> {
   const details: Record<string, string> = {};
 
   details.ID = incident?.id || "-";
