@@ -18,6 +18,12 @@ export function applyAiOperationsToWorkflow({
     buildingBlocks.flatMap((category) => category.blocks.map((block) => [block.name, block])),
   );
   const createdNodeIdsByKey = new Map<string, string>();
+  const addedNodeBlockNameByKey = new Map<string, string>();
+  for (const operation of operations) {
+    if (operation.type === "add_node" && operation.nodeKey) {
+      addedNodeBlockNameByKey.set(operation.nodeKey, operation.blockName);
+    }
+  }
   const minHorizontalGapDefault = 430;
   const minHorizontalGapNamed = 560;
   const minVerticalGap = 220;
@@ -156,6 +162,155 @@ export function applyAiOperationsToWorkflow({
       return found?.id || null;
     }
     return null;
+  };
+
+  const getBlockNameForNodeRef = (ref?: { nodeKey?: string; nodeId?: string; nodeName?: string }) => {
+    if (!ref) {
+      return null;
+    }
+
+    if (ref.nodeKey) {
+      const blockNameFromKey = addedNodeBlockNameByKey.get(ref.nodeKey);
+      if (blockNameFromKey) {
+        return blockNameFromKey;
+      }
+    }
+
+    const nodeId = resolveNodeId(ref);
+    if (!nodeId) {
+      return null;
+    }
+
+    const node = updatedNodes.find((candidate) => candidate.id === nodeId);
+    if (!node) {
+      return null;
+    }
+
+    if (node.type === "TYPE_TRIGGER") {
+      return node.trigger?.name || null;
+    }
+    if (node.type === "TYPE_COMPONENT") {
+      return node.component?.name || null;
+    }
+
+    return null;
+  };
+
+  const resolveOutputChannelsForSourceRef = (ref?: { nodeKey?: string; nodeId?: string; nodeName?: string }) => {
+    const blockName = getBlockNameForNodeRef(ref);
+    if (!blockName) {
+      return [];
+    }
+
+    const block = blockLookup.get(blockName);
+    if (!block?.outputChannels) {
+      return [];
+    }
+
+    return block.outputChannels
+      .map((channel) => ({
+        name: channel?.name || "",
+        label: "label" in channel ? channel.label || "" : "",
+        description: "description" in channel ? channel.description || "" : "",
+      }))
+      .filter((channel): channel is { name: string; label: string; description: string } => channel.name.length > 0);
+  };
+
+  const normalizedTokens = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+  const scoreChannelAsSuccessPath = (channel: { name: string; label: string; description: string }) => {
+    const text = `${channel.name} ${channel.label} ${channel.description}`.toLowerCase();
+    const tokens = new Set(normalizedTokens(text));
+
+    const hasToken = (token: string) => tokens.has(token);
+
+    const positiveTokens = [
+      "success",
+      "successful",
+      "succeeded",
+      "pass",
+      "passed",
+      "ok",
+      "done",
+      "complete",
+      "completed",
+      "finish",
+      "finished",
+      "next",
+      "continue",
+      "proceed",
+      "then",
+    ];
+    const negativeTokens = [
+      "fail",
+      "failed",
+      "failure",
+      "error",
+      "errored",
+      "cancel",
+      "cancelled",
+      "canceled",
+      "reject",
+      "rejected",
+      "deny",
+      "denied",
+      "abort",
+      "aborted",
+      "timeout",
+      "timedout",
+      "exception",
+    ];
+
+    let score = 0;
+    if (channel.name === "default") {
+      score += 100;
+    }
+    for (const token of positiveTokens) {
+      if (hasToken(token)) {
+        score += 20;
+      }
+    }
+    for (const token of negativeTokens) {
+      if (hasToken(token)) {
+        score -= 40;
+      }
+    }
+    if (text.includes("on success") || text.includes("when successful")) {
+      score += 30;
+    }
+    if (text.includes("on failure") || text.includes("when failed") || text.includes("on error")) {
+      score -= 60;
+    }
+
+    return score;
+  };
+
+  const resolveConnectionChannel = (source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null }) => {
+    const explicitChannel = source.handleId?.trim();
+    if (explicitChannel) {
+      return explicitChannel;
+    }
+
+    const outputChannels = resolveOutputChannelsForSourceRef(source);
+    const outputChannelNames = outputChannels.map((channel) => channel.name);
+    if (outputChannelNames.includes("default")) {
+      return "default";
+    }
+
+    if (outputChannels.length > 0) {
+      const sorted = [...outputChannels].sort((left, right) => {
+        return scoreChannelAsSuccessPath(right) - scoreChannelAsSuccessPath(left);
+      });
+      return sorted[0].name;
+    }
+
+    return "default";
   };
 
   const overlapsExistingNode = (position: { x: number; y: number }) => {
@@ -335,7 +490,7 @@ export function applyAiOperationsToWorkflow({
         updatedEdges.push({
           sourceId: sourceNodeId,
           targetId: newNodeId,
-          channel: operation.source?.handleId || "default",
+          channel: resolveConnectionChannel(operation.source || {}),
         });
       }
       continue;
@@ -347,7 +502,7 @@ export function applyAiOperationsToWorkflow({
       if (!sourceId || !targetId) {
         continue;
       }
-      const channel = operation.source.handleId || "default";
+      const channel = resolveConnectionChannel(operation.source);
 
       const sourceIndex = updatedNodes.findIndex((node) => node.id === sourceId);
       const targetIndex = updatedNodes.findIndex((node) => node.id === targetId);
