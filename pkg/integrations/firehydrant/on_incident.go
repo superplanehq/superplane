@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -164,7 +165,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	// Apply severity filter if configured
 	if len(config.Severities) > 0 {
 		incidentSeverity := extractSeveritySlug(payload)
-		if incidentSeverity != "" && !containsString(config.Severities, incidentSeverity) {
+		if incidentSeverity == "" || !containsString(config.Severities, incidentSeverity) {
 			return http.StatusOK, nil
 		}
 	}
@@ -261,40 +262,19 @@ func verifyWebhookSignature(signature string, body, secret []byte) error {
 	}
 
 	expectedSig := computeHMACSHA256(secret, body)
-	if !hmacEqual([]byte(signature), []byte(expectedSig)) {
+	if !hmac.Equal([]byte(signature), []byte(expectedSig)) {
 		return fmt.Errorf("signature mismatch")
 	}
 
 	return nil
 }
 
-// computeHMACSHA256 computes HMAC-SHA256 and returns hex-encoded result
 func computeHMACSHA256(key, data []byte) string {
 	h := hmac.New(sha256.New, key)
 	h.Write(data)
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-// hmacEqual compares two HMAC values in constant time
-func hmacEqual(a, b []byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	var result byte
-	for i := 0; i < len(a); i++ {
-		result |= a[i] ^ b[i]
-	}
-
-	return result == 0
-}
-
 func containsString(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(slice, item)
 }

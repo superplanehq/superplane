@@ -229,7 +229,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 0, eventContext.Count())
 	})
 
-	t.Run("no severity on incident with filter -> passes through", func(t *testing.T) {
+	t.Run("no severity on incident with filter -> no emit", func(t *testing.T) {
 		body := []byte(`{
 			"data": {
 				"incident": {
@@ -259,7 +259,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 
 		require.Equal(t, http.StatusOK, code)
 		require.NoError(t, err)
-		assert.Equal(t, 1, eventContext.Count())
+		assert.Equal(t, 0, eventContext.Count())
 	})
 }
 
