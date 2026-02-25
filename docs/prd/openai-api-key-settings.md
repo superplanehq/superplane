@@ -137,25 +137,26 @@ This slows activation, creates confusion in admin setup, and delays Agent Mode a
 
 ## Architecture Decision
 
-We intentionally separate Agent Mode settings from credential storage:
+We intentionally keep Agent Mode in a single organization-scoped table for v1:
 
-- `organization_agent_settings` stores feature state and non-sensitive metadata used by UI and policy checks.
-- `organization_agent_credentials` stores encrypted OpenAI key material with tighter access controls.
+- `organization_agent_settings` stores both feature state metadata and encrypted OpenAI key material.
 
-This separation keeps sensitive data isolated, supports future key rotation workflows (including versioned
-credentials), and avoids coupling Agent Mode to the existing Secrets feature.
+This keeps the data model simple while preserving security requirements (encryption at rest, no plaintext
+storage, and strict API access controls). We can split metadata and credentials later if needed.
 
 ## Database Structure
 
 ### Table: organization_agent_settings
 
-One row per organization controls Agent Mode state and stores non-sensitive key metadata only.
+One row per organization controls Agent Mode state and stores encrypted key material plus metadata.
 
 | Column | Type | Required | Notes |
 |---|---|---|---|
 | `id` | `uuid` | yes | Primary key. |
 | `organization_id` | `uuid` | yes | FK to `organizations.id`, unique. |
 | `agent_mode_enabled` | `boolean` | yes | Default `false`. |
+| `openai_api_key_ciphertext` | `bytea` or `text` | no | Encrypted key material only. |
+| `openai_key_encryption_key_id` | `varchar(255)` | no | KMS key reference used for encryption. |
 | `openai_key_last4` | `varchar(8)` | no | Last 4 chars for UI display only. |
 | `openai_key_status` | `varchar(32)` | yes | `not_configured`, `valid`, `invalid`, `unchecked`. |
 | `openai_key_validated_at` | `timestamp` | no | Last successful or failed validation time. |
@@ -164,29 +165,10 @@ One row per organization controls Agent Mode state and stores non-sensitive key 
 | `created_at` | `timestamp` | yes | Standard timestamp. |
 | `updated_at` | `timestamp` | yes | Standard timestamp. |
 
-### Table: organization_agent_credentials
-
-Dedicated encrypted credential store for Agent Mode. Not shared with the Secrets feature.
-
-| Column | Type | Required | Notes |
-|---|---|---|---|
-| `id` | `uuid` | yes | Primary key. |
-| `organization_id` | `uuid` | yes | FK to `organizations.id`, unique. |
-| `provider` | `varchar(64)` | yes | In v1 always `openai`. |
-| `api_key_ciphertext` | `bytea` or `text` | yes | Encrypted key material only. |
-| `encryption_key_id` | `varchar(255)` | yes | KMS key reference used for encryption. |
-| `key_last4` | `varchar(8)` | yes | Last 4 chars for display and support debugging. |
-| `created_by` | `uuid` | no | FK to `users.id` of creator. |
-| `updated_by` | `uuid` | no | FK to `users.id` of last updater. |
-| `created_at` | `timestamp` | yes | Standard timestamp. |
-| `updated_at` | `timestamp` | yes | Standard timestamp. |
-
 ### Database Constraints and Indexes
 
 - Unique index on `organization_agent_settings.organization_id`.
 - FK constraints for `organization_id` and `updated_by`.
-- Unique index on `organization_agent_credentials.organization_id`.
-- FK constraints for `organization_agent_credentials.organization_id`, `created_by`, and `updated_by`.
 - Check constraint for `openai_key_status` allowed values.
 - Never store plaintext OpenAI keys in any column.
 
@@ -265,7 +247,7 @@ Rules:
 
 - `api_key` is write-only and must never be returned.
 - If `validate=true`, perform format check plus provider validation call.
-- Store encrypted key in `organization_agent_credentials` and update metadata in one transaction.
+- Store encrypted key and metadata in `organization_agent_settings` in one transaction.
 
 Response `200`:
 
@@ -287,7 +269,7 @@ Response `204` with empty body.
 Post-conditions:
 
 - `openai_key_status` is set to `not_configured`.
-- `organization_agent_credentials` row for the organization is deleted.
+- `organization_agent_settings.openai_api_key_ciphertext` is cleared.
 - If Agent Mode remains enabled, runtime usage should fail with a clear reconfiguration error.
 
 ### Error Model

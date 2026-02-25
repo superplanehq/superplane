@@ -24,7 +24,7 @@ func TestAgentMode(t *testing.T) {
 		steps.whenISaveAgentModeKey()
 		steps.thenSetupModalCloses()
 		steps.thenAgentModeIsEnabledInDatabase()
-		steps.thenAgentCredentialExistsWithLast4("1234")
+		steps.thenAgentKeyIsStoredWithLast4("1234")
 		steps.thenISeeDisableAction()
 	})
 
@@ -34,13 +34,13 @@ func TestAgentMode(t *testing.T) {
 		steps.whenIClickSetup()
 		steps.whenIEnterOpenAIKey("sk-test-agent-mode-e2e-key-1234")
 		steps.whenISaveAgentModeKey()
-		steps.thenAgentCredentialExistsWithLast4("1234")
+		steps.thenAgentKeyIsStoredWithLast4("1234")
 
 		steps.whenIClickSetup()
 		steps.thenISeeConfigureModal()
 		steps.whenIEnterOpenAIKey("sk-test-agent-mode-e2e-key-5678")
 		steps.whenISaveAgentModeKey()
-		steps.thenAgentCredentialExistsWithLast4("5678")
+		steps.thenAgentKeyIsStoredWithLast4("5678")
 		steps.thenAgentModeIsEnabledInDatabase()
 	})
 
@@ -51,10 +51,10 @@ func TestAgentMode(t *testing.T) {
 		steps.whenIEnterOpenAIKey("sk-test-agent-mode-e2e-key-1234")
 		steps.whenISaveAgentModeKey()
 		steps.thenAgentModeIsEnabledInDatabase()
-		steps.thenAgentCredentialExistsWithLast4("1234")
+		steps.thenAgentKeyIsStoredWithLast4("1234")
 		steps.whenIClickDisable()
 		steps.thenAgentModeIsDisabledInDatabase()
-		steps.thenNoAgentCredentialExistsInDatabase()
+		steps.thenNoAgentKeyIsStoredInDatabase()
 		steps.thenISeeTheSetupAction()
 	})
 }
@@ -172,16 +172,21 @@ func (s *agentModeSteps) thenAgentModeIsEnabledInDatabase() {
 	assert.True(s.t, settings.AgentModeEnabled)
 }
 
-func (s *agentModeSteps) thenNoAgentCredentialExistsInDatabase() {
-	_, err := models.FindOrganizationAgentCredentialByOrganizationID(s.session.OrgID.String())
-	require.Error(s.t, err)
+func (s *agentModeSteps) thenNoAgentKeyIsStoredInDatabase() {
+	settings, err := models.FindOrganizationAgentSettingsByOrganizationID(s.session.OrgID.String())
+	require.NoError(s.t, err)
+	assert.Empty(s.t, settings.OpenAIApiKeyCiphertext)
+	assert.Nil(s.t, settings.OpenAIKeyEncryptionKeyID)
+	assert.Nil(s.t, settings.OpenAIKeyLast4)
 }
 
-func (s *agentModeSteps) thenAgentCredentialExistsWithLast4(last4 string) {
-	credential, err := models.FindOrganizationAgentCredentialByOrganizationID(s.session.OrgID.String())
+func (s *agentModeSteps) thenAgentKeyIsStoredWithLast4(last4 string) {
+	settings, err := models.FindOrganizationAgentSettingsByOrganizationID(s.session.OrgID.String())
 	require.NoError(s.t, err)
-	assert.Equal(s.t, models.OrganizationAgentCredentialProviderOpenAI, credential.Provider)
-	assert.Equal(s.t, last4, credential.KeyLast4)
+	assert.NotEmpty(s.t, settings.OpenAIApiKeyCiphertext)
+	assert.NotNil(s.t, settings.OpenAIKeyEncryptionKeyID)
+	require.NotNil(s.t, settings.OpenAIKeyLast4)
+	assert.Equal(s.t, last4, *settings.OpenAIKeyLast4)
 }
 
 func (s *agentModeSteps) thenOpenAIKeyInputIsHidden() {

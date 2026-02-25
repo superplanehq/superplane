@@ -47,22 +47,22 @@ func findOrCreateOrganizationAgentSettingsInTransaction(
 	return settings, nil
 }
 
-func isAgentModeEffective(settings *models.OrganizationAgentSettings, credential *models.OrganizationAgentCredential) bool {
-	if settings == nil || credential == nil {
+func isAgentModeEffective(settings *models.OrganizationAgentSettings) bool {
+	if settings == nil {
 		return false
 	}
 	if !settings.AgentModeEnabled {
+		return false
+	}
+	if len(settings.OpenAIApiKeyCiphertext) == 0 {
 		return false
 	}
 
 	return settings.OpenAIKeyStatus == models.OrganizationAgentOpenAIKeyStatusValid
 }
 
-func serializeAgentSettings(
-	settings *models.OrganizationAgentSettings,
-	credential *models.OrganizationAgentCredential,
-) *pb.AgentSettings {
-	configured := credential != nil
+func serializeAgentSettings(settings *models.OrganizationAgentSettings) *pb.AgentSettings {
+	configured := len(settings.OpenAIApiKeyCiphertext) > 0
 
 	openAIKey := &pb.AgentOpenAIKey{
 		Configured: configured,
@@ -71,8 +71,6 @@ func serializeAgentSettings(
 
 	if settings.OpenAIKeyLast4 != nil {
 		openAIKey.Last4 = *settings.OpenAIKeyLast4
-	} else if credential != nil {
-		openAIKey.Last4 = credential.KeyLast4
 	}
 	if settings.OpenAIKeyValidationError != nil {
 		openAIKey.ValidationError = *settings.OpenAIKeyValidationError
@@ -88,7 +86,7 @@ func serializeAgentSettings(
 	return &pb.AgentSettings{
 		OrganizationId:     settings.OrganizationID.String(),
 		AgentModeEnabled:   settings.AgentModeEnabled,
-		AgentModeEffective: isAgentModeEffective(settings, credential),
+		AgentModeEffective: isAgentModeEffective(settings),
 		OpenaiKey:          openAIKey,
 	}
 }

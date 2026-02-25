@@ -81,6 +81,11 @@ func Test__SetAgentOpenAIKey(t *testing.T) {
 		assert.Equal(t, models.OrganizationAgentOpenAIKeyStatusUnchecked, resp.AgentSettings.OpenaiKey.Status)
 		assert.Equal(t, "2345", resp.AgentSettings.OpenaiKey.Last4)
 		assert.False(t, resp.AgentSettings.AgentModeEffective)
+
+		settings, lookupErr := models.FindOrganizationAgentSettingsByOrganizationID(r.Organization.ID.String())
+		require.NoError(t, lookupErr)
+		assert.NotEmpty(t, settings.OpenAIApiKeyCiphertext)
+		assert.NotNil(t, settings.OpenAIKeyEncryptionKeyID)
 	})
 }
 
@@ -108,8 +113,10 @@ func Test__DeleteAgentOpenAIKey(t *testing.T) {
 	assert.Equal(t, models.OrganizationAgentOpenAIKeyStatusNotConfigured, resp.AgentSettings.OpenaiKey.Status)
 	assert.Empty(t, resp.AgentSettings.OpenaiKey.Last4)
 
-	_, err = models.FindOrganizationAgentCredentialByOrganizationID(r.Organization.ID.String())
-	assert.Error(t, err)
+	settings, err := models.FindOrganizationAgentSettingsByOrganizationID(r.Organization.ID.String())
+	require.NoError(t, err)
+	assert.Empty(t, settings.OpenAIApiKeyCiphertext)
+	assert.Nil(t, settings.OpenAIKeyEncryptionKeyID)
 }
 
 func Test__UpdateAgentSettings_InvalidUserID(t *testing.T) {

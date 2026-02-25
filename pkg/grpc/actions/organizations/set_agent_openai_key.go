@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -30,11 +29,6 @@ func SetAgentOpenAIKey(
 	apiKey = strings.TrimSpace(apiKey)
 	if !isOpenAIKeyFormatValid(apiKey) {
 		return nil, status.Error(codes.InvalidArgument, "invalid OpenAI API key format")
-	}
-
-	organizationUUID, err := uuid.Parse(orgID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid organization id")
 	}
 
 	updatedBy, err := optionalUUID(requesterUserID)
@@ -64,17 +58,7 @@ func SetAgentOpenAIKey(
 	last4 := openAIKeyLast4(apiKey)
 	now := time.Now()
 	var settings *models.OrganizationAgentSettings
-	credential := &models.OrganizationAgentCredential{
-		OrganizationID:   organizationUUID,
-		Provider:         models.OrganizationAgentCredentialProviderOpenAI,
-		APIKeyCiphertext: ciphertext,
-		EncryptionKeyID:  agentCredentialEncryptionKeyID,
-		KeyLast4:         last4,
-		CreatedBy:        updatedBy,
-		UpdatedBy:        updatedBy,
-		CreatedAt:        now,
-		UpdatedAt:        now,
-	}
+	encryptionKeyID := agentCredentialEncryptionKeyID
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		var txErr error
@@ -84,10 +68,8 @@ func SetAgentOpenAIKey(
 			return txErr
 		}
 
-		if txErr = models.UpsertOrganizationAgentCredentialInTransaction(tx, credential); txErr != nil {
-			return status.Error(codes.Internal, "failed to store OpenAI API key")
-		}
-
+		settings.OpenAIApiKeyCiphertext = ciphertext
+		settings.OpenAIKeyEncryptionKeyID = &encryptionKeyID
 		settings.OpenAIKeyLast4 = &last4
 		settings.OpenAIKeyStatus = validationStatus
 		settings.OpenAIKeyValidatedAt = validatedAt
@@ -106,7 +88,7 @@ func SetAgentOpenAIKey(
 	}
 
 	return &pb.SetAgentOpenAIKeyResponse{
-		AgentSettings: serializeAgentSettings(settings, credential),
+		AgentSettings: serializeAgentSettings(settings),
 	}, nil
 }
 

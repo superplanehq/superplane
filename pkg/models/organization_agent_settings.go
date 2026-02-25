@@ -20,6 +20,8 @@ type OrganizationAgentSettings struct {
 	ID                       uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
 	OrganizationID           uuid.UUID `gorm:"type:uuid;uniqueIndex"`
 	AgentModeEnabled         bool
+	OpenAIApiKeyCiphertext   []byte     `gorm:"column:openai_api_key_ciphertext"`
+	OpenAIKeyEncryptionKeyID *string    `gorm:"column:openai_key_encryption_key_id"`
 	OpenAIKeyLast4           *string    `gorm:"column:openai_key_last4"`
 	OpenAIKeyStatus          string     `gorm:"column:openai_key_status"`
 	OpenAIKeyValidatedAt     *time.Time `gorm:"column:openai_key_validated_at"`
@@ -65,6 +67,8 @@ func UpsertOrganizationAgentSettingsInTransaction(tx *gorm.DB, settings *Organiz
 				Columns: []clause.Column{{Name: "organization_id"}},
 				DoUpdates: clause.AssignmentColumns([]string{
 					"agent_mode_enabled",
+					"openai_api_key_ciphertext",
+					"openai_key_encryption_key_id",
 					"openai_key_last4",
 					"openai_key_status",
 					"openai_key_validated_at",

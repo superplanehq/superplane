@@ -266,25 +266,6 @@ CREATE TABLE public.installation_metadata (
 
 
 --
--- Name: organization_agent_credentials; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.organization_agent_credentials (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    organization_id uuid NOT NULL,
-    provider character varying(64) NOT NULL,
-    api_key_ciphertext bytea NOT NULL,
-    encryption_key_id character varying(255) NOT NULL,
-    key_last4 character varying(8) NOT NULL,
-    created_by uuid,
-    updated_by uuid,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT organization_agent_credentials_provider_check CHECK (((provider)::text = 'openai'::text))
-);
-
-
---
 -- Name: organization_agent_settings; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -292,6 +273,8 @@ CREATE TABLE public.organization_agent_settings (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     organization_id uuid NOT NULL,
     agent_mode_enabled boolean DEFAULT false NOT NULL,
+    openai_api_key_ciphertext bytea,
+    openai_key_encryption_key_id character varying(255),
     openai_key_last4 character varying(8),
     openai_key_status character varying(32) DEFAULT 'not_configured'::character varying NOT NULL,
     openai_key_validated_at timestamp without time zone,
@@ -730,22 +713,6 @@ ALTER TABLE ONLY public.installation_metadata
 
 
 --
--- Name: organization_agent_credentials organization_agent_credentials_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_agent_credentials
-    ADD CONSTRAINT organization_agent_credentials_organization_id_key UNIQUE (organization_id);
-
-
---
--- Name: organization_agent_credentials organization_agent_credentials_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_agent_credentials
-    ADD CONSTRAINT organization_agent_credentials_pkey PRIMARY KEY (id);
-
-
---
 -- Name: organization_agent_settings organization_agent_settings_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1078,13 +1045,6 @@ CREATE INDEX idx_node_requests_state_run_at ON public.workflow_node_requests USI
 
 
 --
--- Name: idx_organization_agent_credentials_organization_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_organization_agent_credentials_organization_id ON public.organization_agent_credentials USING btree (organization_id);
-
-
---
 -- Name: idx_organization_agent_settings_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1409,30 +1369,6 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
--- Name: organization_agent_credentials organization_agent_credentials_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_agent_credentials
-    ADD CONSTRAINT organization_agent_credentials_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE SET NULL;
-
-
---
--- Name: organization_agent_credentials organization_agent_credentials_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_agent_credentials
-    ADD CONSTRAINT organization_agent_credentials_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
-
-
---
--- Name: organization_agent_credentials organization_agent_credentials_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_agent_credentials
-    ADD CONSTRAINT organization_agent_credentials_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL;
-
-
---
 -- Name: organization_agent_settings organization_agent_settings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1656,7 +1592,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260224131131	f
+20260225082807	f
 \.
 
 

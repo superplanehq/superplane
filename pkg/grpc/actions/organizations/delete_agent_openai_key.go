@@ -1,7 +1,6 @@
 package organizations
 
 import (
-	"errors"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/database"
@@ -17,7 +16,6 @@ func DeleteAgentOpenAIKey(
 	requesterUserID string,
 ) (*pb.DeleteAgentOpenAIKeyResponse, error) {
 	var settings *models.OrganizationAgentSettings
-	var credential *models.OrganizationAgentCredential
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var txErr error
@@ -32,11 +30,9 @@ func DeleteAgentOpenAIKey(
 			return txErr
 		}
 
-		if txErr = models.DeleteOrganizationAgentCredentialByOrganizationIDInTransaction(tx, orgID); txErr != nil {
-			return status.Error(codes.Internal, "failed to delete OpenAI API key")
-		}
-
 		now := time.Now()
+		settings.OpenAIApiKeyCiphertext = nil
+		settings.OpenAIKeyEncryptionKeyID = nil
 		settings.OpenAIKeyLast4 = nil
 		settings.OpenAIKeyStatus = models.OrganizationAgentOpenAIKeyStatusNotConfigured
 		settings.OpenAIKeyValidatedAt = nil
@@ -48,14 +44,6 @@ func DeleteAgentOpenAIKey(
 			return status.Error(codes.Internal, "failed to update agent settings")
 		}
 
-		credential, txErr = models.FindOrganizationAgentCredentialByOrganizationIDInTransaction(tx, orgID)
-		if txErr != nil && !errors.Is(txErr, gorm.ErrRecordNotFound) {
-			return status.Error(codes.Internal, "failed to load agent credential")
-		}
-		if errors.Is(txErr, gorm.ErrRecordNotFound) {
-			credential = nil
-		}
-
 		return nil
 	})
 	if err != nil {
@@ -63,6 +51,6 @@ func DeleteAgentOpenAIKey(
 	}
 
 	return &pb.DeleteAgentOpenAIKeyResponse{
-		AgentSettings: serializeAgentSettings(settings, credential),
+		AgentSettings: serializeAgentSettings(settings),
 	}, nil
 }

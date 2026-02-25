@@ -1,7 +1,6 @@
 package organizations
 
 import (
-	"errors"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/database"
@@ -18,7 +17,6 @@ func UpdateAgentSettings(
 	requesterUserID string,
 ) (*pb.UpdateAgentSettingsResponse, error) {
 	var settings *models.OrganizationAgentSettings
-	var credential *models.OrganizationAgentCredential
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var txErr error
@@ -41,14 +39,6 @@ func UpdateAgentSettings(
 			return status.Error(codes.Internal, "failed to update agent settings")
 		}
 
-		credential, txErr = models.FindOrganizationAgentCredentialByOrganizationIDInTransaction(tx, orgID)
-		if txErr != nil && !errors.Is(txErr, gorm.ErrRecordNotFound) {
-			return status.Error(codes.Internal, "failed to load agent credential")
-		}
-		if errors.Is(txErr, gorm.ErrRecordNotFound) {
-			credential = nil
-		}
-
 		return nil
 	})
 	if err != nil {
@@ -56,6 +46,6 @@ func UpdateAgentSettings(
 	}
 
 	return &pb.UpdateAgentSettingsResponse{
-		AgentSettings: serializeAgentSettings(settings, credential),
+		AgentSettings: serializeAgentSettings(settings),
 	}, nil
 }
