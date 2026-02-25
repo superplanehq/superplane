@@ -30,7 +30,6 @@ const (
 type OnFeatureFlagChange struct{}
 
 type OnFeatureFlagChangeConfiguration struct {
-	Events  []string `json:"events" mapstructure:"events"`
 	Actions []string `json:"actions" mapstructure:"actions"`
 }
 
@@ -62,7 +61,6 @@ func (t *OnFeatureFlagChange) Documentation() string {
 
 ## Configuration
 
-- **Events**: Select which event kinds to listen for (e.g. feature flag changes)
 - **Actions**: Optionally filter by specific actions (e.g. only when a flag is turned on or off). Leave empty to receive all actions.
 
 ## Webhook Setup
@@ -82,20 +80,6 @@ func (t *OnFeatureFlagChange) Color() string {
 
 func (t *OnFeatureFlagChange) Configuration() []configuration.Field {
 	return []configuration.Field{
-		{
-			Name:     "events",
-			Label:    "Events",
-			Type:     configuration.FieldTypeMultiSelect,
-			Required: true,
-			Default:  []string{KindFlag},
-			TypeOptions: &configuration.TypeOptions{
-				MultiSelect: &configuration.MultiSelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Feature flag changes", Value: KindFlag},
-					},
-				},
-			},
-		},
 		{
 			Name:        "actions",
 			Label:       "Actions",
@@ -126,17 +110,11 @@ func (t *OnFeatureFlagChange) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if len(config.Events) == 0 {
-		return fmt.Errorf("at least one event type must be chosen")
-	}
-
 	if ctx.Integration == nil {
 		return fmt.Errorf("integration is required to set up the LaunchDarkly webhook trigger")
 	}
 
-	if err := ctx.Integration.RequestWebhook(WebhookConfiguration{
-		Events: config.Events,
-	}); err != nil {
+	if err := ctx.Integration.RequestWebhook(WebhookConfiguration{}); err != nil {
 		return err
 	}
 
@@ -212,14 +190,10 @@ func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int
 		return http.StatusBadRequest, fmt.Errorf("missing kind in payload")
 	}
 
-	// Filter by configured event kinds
-	acceptedEvents := config.Events
-	if len(acceptedEvents) == 0 {
-		acceptedEvents = []string{KindFlag}
-	}
-	if !slices.Contains(acceptedEvents, kind) {
+	// Only handle flag events
+	if kind != KindFlag {
 		if ctx.Logger != nil {
-			ctx.Logger.Infof("launchdarkly webhook: event kind %q not in trigger config (configured: %v), acknowledging without emitting", kind, config.Events)
+			ctx.Logger.Infof("launchdarkly webhook: event kind %q is not a flag event, acknowledging without emitting", kind)
 		}
 		return http.StatusOK, nil
 	}

@@ -35,6 +35,11 @@ type FeatureFlag struct {
 	Temporary    bool   `json:"temporary"`
 }
 
+// FeatureFlagListResponse is the API response for listing feature flags.
+type FeatureFlagListResponse struct {
+	Items []FeatureFlag `json:"items"`
+}
+
 type Client struct {
 	Token   string
 	BaseURL string
@@ -117,6 +122,22 @@ func (c *Client) GetFeatureFlag(projectKey, flagKey string) (map[string]any, err
 	}
 
 	return result, nil
+}
+
+// ListFeatureFlags returns all feature flags in a LaunchDarkly project.
+func (c *Client) ListFeatureFlags(projectKey string) ([]FeatureFlag, error) {
+	path := fmt.Sprintf("/api/v2/flags/%s", projectKey)
+	responseBody, err := c.execRequest(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response FeatureFlagListResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing feature flags response: %w", err)
+	}
+
+	return response.Items, nil
 }
 
 // DeleteFeatureFlag deletes a feature flag by project key and flag key.

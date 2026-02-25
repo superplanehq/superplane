@@ -72,19 +72,33 @@ func (c *GetFeatureFlag) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "projectKey",
-			Label:       "Project Key",
-			Type:        configuration.FieldTypeString,
+			Label:       "Project",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The key of the LaunchDarkly project",
-			Placeholder: "default",
+			Description: "The LaunchDarkly project",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "project",
+				},
+			},
 		},
 		{
 			Name:        "flagKey",
-			Label:       "Flag Key",
-			Type:        configuration.FieldTypeString,
+			Label:       "Feature Flag",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The key of the feature flag to retrieve",
-			Placeholder: "my-feature-flag",
+			Description: "The feature flag to retrieve",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "flag",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "projectKey",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "projectKey"},
+						},
+					},
+				},
+			},
 		},
 	}
 }
