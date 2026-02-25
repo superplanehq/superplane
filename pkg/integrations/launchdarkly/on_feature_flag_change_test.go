@@ -54,7 +54,7 @@ func hmacSignature(secret string, body []byte) string {
 func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 	trigger := &OnFeatureFlagChange{}
 
-	validConfig := map[string]any{}
+	validConfig := map[string]any{"projectKey": "default", "flagKey": "my-flag"}
 	validSecret := "test-signing-secret"
 
 	t.Run("missing signing secret -> 403", func(t *testing.T) {
@@ -115,7 +115,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
-			Configuration: map[string]any{},
+			Configuration: map[string]any{"projectKey": "default", "flagKey": "my-flag"},
 			Webhook:       wc,
 			Events:        eventContext,
 		})
@@ -187,7 +187,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
-			Configuration: map[string]any{"actions": []string{ActionUpdateOn}},
+			Configuration: map[string]any{"projectKey": "default", "flagKey": "my-flag", "actions": []string{ActionUpdateOn}},
 			Webhook:       wc,
 			Events:        eventContext,
 		})
@@ -209,7 +209,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
-			Configuration: map[string]any{"actions": []string{ActionUpdateOn}},
+			Configuration: map[string]any{"projectKey": "default", "flagKey": "my-flag", "actions": []string{ActionUpdateOn}},
 			Webhook:       wc,
 			Events:        eventContext,
 		})
@@ -232,7 +232,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
-			Configuration: map[string]any{},
+			Configuration: map[string]any{"projectKey": "default", "flagKey": "my-flag"},
 			Webhook:       wc,
 			Events:        eventContext,
 		})
@@ -282,16 +282,38 @@ func Test__OnFeatureFlagChange__HandleAction(t *testing.T) {
 func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 	trigger := &OnFeatureFlagChange{}
 
+	t.Run("missing project key -> error", func(t *testing.T) {
+		err := trigger.Setup(core.TriggerContext{
+			Integration:   &contexts.IntegrationContext{},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: OnFeatureFlagChangeConfiguration{FlagKey: "my-flag"},
+		})
+		require.ErrorContains(t, err, "project key is required")
+	})
+
+	t.Run("missing flag key -> error", func(t *testing.T) {
+		err := trigger.Setup(core.TriggerContext{
+			Integration:   &contexts.IntegrationContext{},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: OnFeatureFlagChangeConfiguration{ProjectKey: "default"},
+		})
+		require.ErrorContains(t, err, "flag key is required")
+	})
+
 	t.Run("valid config requests webhook", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
 		err := trigger.Setup(core.TriggerContext{
 			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
-			Configuration: OnFeatureFlagChangeConfiguration{},
+			Configuration: OnFeatureFlagChangeConfiguration{ProjectKey: "default", FlagKey: "my-flag"},
 		})
 
 		require.NoError(t, err)
 		require.Len(t, integrationCtx.WebhookRequests, 1)
+		req, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
+		require.True(t, ok, "expected WebhookRequests[0] to be WebhookConfiguration")
+		assert.Equal(t, "default", req.ProjectKey)
+		assert.Equal(t, "my-flag", req.FlagKey)
 	})
 
 	t.Run("setup stores webhook URL in metadata", func(t *testing.T) {
@@ -303,7 +325,7 @@ func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 			Integration:   integrationCtx,
 			Webhook:       webhookCtx,
 			Metadata:      metadataCtx,
-			Configuration: OnFeatureFlagChangeConfiguration{},
+			Configuration: OnFeatureFlagChangeConfiguration{ProjectKey: "default", FlagKey: "my-flag"},
 		})
 
 		require.NoError(t, err)

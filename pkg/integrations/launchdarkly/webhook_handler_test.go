@@ -1,6 +1,7 @@
 package launchdarkly
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -34,37 +35,28 @@ func (w *testHandlerWebhookContext) SetSecret(secret []byte) error {
 func Test__LaunchDarklyWebhookHandler__CompareConfig(t *testing.T) {
 	handler := &LaunchDarklyWebhookHandler{}
 
-	t.Run("identical events", func(t *testing.T) {
+	t.Run("same project and flag -> true", func(t *testing.T) {
 		equal, err := handler.CompareConfig(
-			WebhookConfiguration{Events: []string{KindFlag}},
-			WebhookConfiguration{Events: []string{KindFlag}},
+			WebhookConfiguration{ProjectKey: "default", FlagKey: "my-flag"},
+			WebhookConfiguration{ProjectKey: "default", FlagKey: "my-flag"},
 		)
 		require.NoError(t, err)
 		assert.True(t, equal)
 	})
 
-	t.Run("A superset of B", func(t *testing.T) {
+	t.Run("different project -> false", func(t *testing.T) {
 		equal, err := handler.CompareConfig(
-			WebhookConfiguration{Events: []string{KindFlag, "project"}},
-			WebhookConfiguration{Events: []string{KindFlag}},
+			WebhookConfiguration{ProjectKey: "default", FlagKey: "my-flag"},
+			WebhookConfiguration{ProjectKey: "other", FlagKey: "my-flag"},
 		)
 		require.NoError(t, err)
-		assert.True(t, equal)
+		assert.False(t, equal)
 	})
 
-	t.Run("A subset of B -> true", func(t *testing.T) {
+	t.Run("different flag -> false", func(t *testing.T) {
 		equal, err := handler.CompareConfig(
-			WebhookConfiguration{Events: []string{KindFlag}},
-			WebhookConfiguration{Events: []string{KindFlag, "project"}},
-		)
-		require.NoError(t, err)
-		assert.True(t, equal)
-	})
-
-	t.Run("different events -> false", func(t *testing.T) {
-		equal, err := handler.CompareConfig(
-			WebhookConfiguration{Events: []string{"project"}},
-			WebhookConfiguration{Events: []string{KindFlag}},
+			WebhookConfiguration{ProjectKey: "default", FlagKey: "flag-a"},
+			WebhookConfiguration{ProjectKey: "default", FlagKey: "flag-b"},
 		)
 		require.NoError(t, err)
 		assert.False(t, equal)
@@ -74,22 +66,9 @@ func Test__LaunchDarklyWebhookHandler__CompareConfig(t *testing.T) {
 func Test__LaunchDarklyWebhookHandler__Merge(t *testing.T) {
 	handler := &LaunchDarklyWebhookHandler{}
 
-	t.Run("Merge adds events when requested is superset of current", func(t *testing.T) {
-		merged, changed, err := handler.Merge(
-			WebhookConfiguration{Events: []string{KindFlag}},
-			WebhookConfiguration{Events: []string{KindFlag, "project"}},
-		)
-		require.NoError(t, err)
-		assert.True(t, changed)
-		assert.Equal(t, WebhookConfiguration{Events: []string{KindFlag, "project"}}, merged)
-	})
-
-	t.Run("Merge returns current when no change", func(t *testing.T) {
-		current := WebhookConfiguration{Events: []string{KindFlag}}
-		merged, changed, err := handler.Merge(
-			current,
-			WebhookConfiguration{Events: []string{KindFlag}},
-		)
+	t.Run("always returns current unchanged", func(t *testing.T) {
+		current := WebhookConfiguration{ProjectKey: "default", FlagKey: "my-flag"}
+		merged, changed, err := handler.Merge(current, WebhookConfiguration{ProjectKey: "default", FlagKey: "my-flag"})
 		require.NoError(t, err)
 		assert.False(t, changed)
 		assert.Equal(t, current, merged)
@@ -116,7 +95,8 @@ func Test__LaunchDarklyWebhookHandler__Setup(t *testing.T) {
 		}
 
 		webhookCtx := &testHandlerWebhookContext{
-			url: "https://example.com/api/v1/webhooks/w1",
+			url:           "https://example.com/api/v1/webhooks/w1",
+			configuration: WebhookConfiguration{ProjectKey: "default", FlagKey: "my-flag"},
 		}
 
 		result, err := handler.Setup(core.WebhookHandlerContext{
@@ -131,6 +111,18 @@ func Test__LaunchDarklyWebhookHandler__Setup(t *testing.T) {
 		assert.Equal(t, http.MethodPost, req.Method)
 		assert.Equal(t, "https://app.launchdarkly.com/api/v2/webhooks", req.URL.String())
 		assert.Equal(t, "auto-generated-secret", string(webhookCtx.secret))
+
+		// Verify statement scopes to the selected project and flag
+		bodyBytes, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(bodyBytes, &body))
+		statements, ok := body["statements"].([]any)
+		require.True(t, ok)
+		require.Len(t, statements, 1)
+		stmt := statements[0].(map[string]any)
+		resources := stmt["resources"].([]any)
+		assert.Equal(t, "proj/default:env/*:flag/my-flag", resources[0])
 
 		metadata, ok := result.(WebhookMetadata)
 		require.True(t, ok)

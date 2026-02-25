@@ -62,8 +62,14 @@ export const onFeatureFlagChangeTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const configuration = node.configuration as { actions?: string[] };
+    const configuration = node.configuration as { projectKey?: string; flagKey?: string; actions?: string[] };
     const metadataItems: { icon: string; label: string }[] = [];
+    if (configuration?.projectKey) {
+      metadataItems.push({ icon: "folder", label: configuration.projectKey });
+    }
+    if (configuration?.flagKey) {
+      metadataItems.push({ icon: "flag", label: configuration.flagKey });
+    }
     if (configuration?.actions?.length) {
       const formattedActions = configuration.actions.map(formatActionLabel).join(", ");
       metadataItems.push({ icon: "funnel", label: "Actions: " + formattedActions });
