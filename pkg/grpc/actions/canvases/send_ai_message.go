@@ -121,6 +121,8 @@ func generateCanvasAIPlan(
 		"- Use only blockName values present in availableBlocks.",
 		"- Prefer add_node with nodeKey so follow-up connect/update operations can reference new nodes.",
 		"- Keep operations minimal and valid.",
+		"- Never invent component names or use components not listed in availableBlocks.",
+		"- If the user asks for a step you cannot map to availableBlocks, ask a clarifying question and return operations as [].",
 		"- Prefer a left-to-right horizontal flow.",
 		"- For add_node, include position when possible.",
 		"- Use at least 420px horizontal spacing between sequential nodes to avoid overlap.",
@@ -189,7 +191,50 @@ func generateCanvasAIPlan(
 		parsedPlan.Operations = []map[string]interface{}{}
 	}
 
+	var hasFilteredInvalidAddNode bool
+	parsedPlan.Operations, hasFilteredInvalidAddNode = sanitizeCanvasOperations(parsedPlan.Operations, req.GetCanvasContext())
+	if hasFilteredInvalidAddNode && len(parsedPlan.Operations) == 0 {
+		parsedPlan.AssistantMessage = "I couldn't find one or more requested components in this workspace. Please tell me which existing component should be used instead."
+	}
+
 	return parsedPlan, nil
+}
+
+func sanitizeCanvasOperations(
+	operations []map[string]interface{},
+	canvasContext *pb.CanvasAiContext,
+) ([]map[string]interface{}, bool) {
+	allowedBlocks := map[string]struct{}{}
+	if canvasContext != nil {
+		for _, block := range canvasContext.GetAvailableBlocks() {
+			name := strings.TrimSpace(block.GetName())
+			if name == "" {
+				continue
+			}
+			allowedBlocks[name] = struct{}{}
+		}
+	}
+
+	filtered := make([]map[string]interface{}, 0, len(operations))
+	filteredInvalidAddNode := false
+
+	for _, operation := range operations {
+		opType, _ := operation["type"].(string)
+		if opType != "add_node" {
+			filtered = append(filtered, operation)
+			continue
+		}
+
+		blockName, _ := operation["blockName"].(string)
+		if _, ok := allowedBlocks[blockName]; !ok {
+			filteredInvalidAddNode = true
+			continue
+		}
+
+		filtered = append(filtered, operation)
+	}
+
+	return filtered, filteredInvalidAddNode
 }
 
 func buildCanvasContextJSON(ctx *pb.CanvasAiContext) ([]byte, error) {

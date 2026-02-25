@@ -269,11 +269,13 @@ export function BuildingBlocksSidebar({
 
       try {
         const availableBlocks = (blocks || []).flatMap((category) =>
-          category.blocks.map((block) => ({
-            name: block.name,
-            label: block.label || block.name,
-            type: block.type,
-          })),
+          category.blocks
+            .filter((block) => block.isLive && !block.deprecated)
+            .map((block) => ({
+              name: block.name,
+              label: block.label || block.name,
+              type: block.type,
+            })),
         );
 
         const apiResponse = await canvasesSendAiMessage(
