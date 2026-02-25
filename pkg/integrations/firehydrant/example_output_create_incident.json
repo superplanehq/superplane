@@ -1,33 +1,21 @@
 {
-  "type": "firehydrant.incident",
-  "data": {
-    "id": "04d9fd1a-ba9c-417d-b396-58a6e2c374de",
-    "name": "Database connection issues",
-    "number": 603,
-    "description": "Users are experiencing slow database queries and connection timeouts.",
-    "summary": "Database connection pool exhausted causing cascading failures.",
-    "customer_impact_summary": "",
-    "current_milestone": "started",
-    "created_at": "2026-01-19T12:00:00Z",
-    "updated_at": "2026-01-19T12:00:00Z",
-    "started_at": "2026-01-19T12:00:00Z",
-    "severity": {
-      "slug": "SEV1",
-      "description": "Critical issue affecting all users",
-      "type": "unexpected_downtime"
-    },
-    "priority": {
-      "slug": "P1",
-      "description": "Highest priority"
-    },
-    "milestones": [
-      {
-        "type": "started",
-        "occurred_at": "2026-01-19T12:00:00Z"
-      }
-    ],
-    "impacts": [],
-    "tags": []
-  },
-  "timestamp": "2026-01-19T12:00:00Z"
+  "id": "04d9fd1a-ba9c-417d-b396-58a6e2c374de",
+  "name": "Database connection issues",
+  "description": "Users are experiencing slow database queries and connection timeouts.",
+  "summary": "Database connection pool exhausted causing cascading failures.",
+  "customer_impact_summary": "Some customers are experiencing slow performance and intermittent errors when accessing the application.",
+  "current_milestone": "started",
+  "number": 603,
+  "created_at": "2026-01-19T12:00:00Z",
+  "started_at": "2026-01-19T12:00:00Z",
+  "severity": "SEV1",
+  "priority": "P1",
+  "tagList": [],
+  "impacts": [],
+  "milestones": [
+    {
+      "type": "started",
+      "occurred_at": "2026-01-19T12:00:00Z"
+    }
+  ]
 }

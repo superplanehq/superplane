@@ -82,11 +82,14 @@ func (t *OnIncident) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
-						{Label: "SEV0", Value: "SEV0"},
 						{Label: "SEV1", Value: "SEV1"},
 						{Label: "SEV2", Value: "SEV2"},
 						{Label: "SEV3", Value: "SEV3"},
 						{Label: "SEV4", Value: "SEV4"},
+						{Label: "SEV5", Value: "SEV5"},
+						{Label: "UNSET", Value: "UNSET"},
+						{Label: "MAINTENANCE", Value: "MAINTENANCE"},
+						{Label: "GAMEDAY", Value: "GAMEDAY"},
 					},
 				},
 			},
