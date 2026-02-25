@@ -166,7 +166,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	// Apply severity filter if configured
 	if len(config.Severities) > 0 {
 		incidentSeverity := extractSeveritySlug(payload)
-		if incidentSeverity == "" || !containsString(config.Severities, incidentSeverity) {
+		if incidentSeverity == "" || !slices.Contains(config.Severities, incidentSeverity) {
 			return http.StatusOK, nil
 		}
 	}
@@ -296,8 +296,4 @@ func computeHMACSHA256(key, data []byte) string {
 	h := hmac.New(sha256.New, key)
 	h.Write(data)
 	return fmt.Sprintf("%x", h.Sum(nil))
-}
-
-func containsString(slice []string, item string) bool {
-	return slices.Contains(slice, item)
 }
