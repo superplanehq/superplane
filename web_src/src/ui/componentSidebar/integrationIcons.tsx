@@ -43,6 +43,7 @@ import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
+import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
 
 /** Integration type name (e.g. "github") → logo src. Used for Settings tab and header. */
 export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
@@ -80,6 +81,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   harness: harnessIcon,
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
+  newrelic: newrelicIcon,
 };
 
 /** Block name first part (e.g. "github") or compound (e.g. aws.lambda) → logo src for header. */
@@ -116,6 +118,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   harness: harnessIcon,
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
+  newrelic: newrelicIcon,
   aws: {
     cloudwatch: awsCloudwatchIcon,
     codeArtifact: awsCodeArtifactIcon,
