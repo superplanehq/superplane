@@ -19,15 +19,22 @@ interface OnFeatureFlagChangeEventData {
   titleVerb?: string;
 }
 
+function getEventTitleAndSubtitle(
+  eventData: OnFeatureFlagChangeEventData | undefined,
+  createdAt?: string,
+): { title: string; subtitle: string } {
+  const title = eventData?.title || eventData?.name || "Feature Flag";
+  const verb = eventData?.titleVerb;
+  const kind = eventData?.kind ? formatEventLabel(eventData.kind) : "";
+  const contentParts = [verb || kind].filter(Boolean).join(" · ");
+  const subtitle = buildSubtitle(contentParts, createdAt);
+  return { title, subtitle };
+}
+
 export const onFeatureFlagChangeTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     const eventData = context.event?.data as OnFeatureFlagChangeEventData;
-    const title = eventData?.title || eventData?.name || "Feature Flag";
-    const verb = eventData?.titleVerb;
-    const kind = eventData?.kind ? formatEventLabel(eventData.kind) : "";
-    const contentParts = [verb || kind].filter(Boolean).join(" · ");
-    const subtitle = buildSubtitle(contentParts, context.event?.createdAt);
-    return { title, subtitle };
+    return getEventTitleAndSubtitle(eventData, context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -55,11 +62,7 @@ export const onFeatureFlagChangeTriggerRenderer: TriggerRenderer = {
     };
     if (lastEvent) {
       const eventData = lastEvent.data as OnFeatureFlagChangeEventData;
-      const title = eventData?.title || eventData?.name || "Feature Flag";
-      const verb = eventData?.titleVerb;
-      const kind = eventData?.kind ? formatEventLabel(eventData.kind) : "";
-      const contentParts = [verb || kind].filter(Boolean).join(" · ");
-      const subtitle = buildSubtitle(contentParts, lastEvent.createdAt);
+      const { title, subtitle } = getEventTitleAndSubtitle(eventData, lastEvent.createdAt);
       props.lastEventData = {
         title,
         subtitle,

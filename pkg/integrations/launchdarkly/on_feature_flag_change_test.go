@@ -148,7 +148,8 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, eventContext.Count())
 		assert.Equal(t, "launchdarkly.flag.updateOn", eventContext.Payloads[0].Type)
-		payload := eventContext.Payloads[0].Data.(map[string]any)
+		payload, ok := eventContext.Payloads[0].Data.(map[string]any)
+		require.True(t, ok, "expected Payloads[0].Data to be map[string]any")
 		assert.Equal(t, "flag", payload["kind"])
 		assert.Equal(t, "My Feature", payload["name"])
 	})
@@ -303,7 +304,8 @@ func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, integrationCtx.WebhookRequests, 1)
-		req := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
+		req, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
+		require.True(t, ok, "expected WebhookRequests[0] to be WebhookConfiguration")
 		assert.Equal(t, []string{KindFlag}, req.Events)
 	})
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -90,11 +91,11 @@ func (c *DeleteFeatureFlag) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if spec.ProjectKey == "" {
+	if strings.TrimSpace(spec.ProjectKey) == "" {
 		return errors.New("project key is required")
 	}
 
-	if spec.FlagKey == "" {
+	if strings.TrimSpace(spec.FlagKey) == "" {
 		return errors.New("flag key is required")
 	}
 
@@ -107,11 +108,11 @@ func (c *DeleteFeatureFlag) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if spec.ProjectKey == "" {
+	if strings.TrimSpace(spec.ProjectKey) == "" {
 		return errors.New("project key is required")
 	}
 
-	if spec.FlagKey == "" {
+	if strings.TrimSpace(spec.FlagKey) == "" {
 		return errors.New("flag key is required")
 	}
 

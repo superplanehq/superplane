@@ -5,7 +5,7 @@
     "name": "Another Toggle Feature",
     "description": "",
     "titleVerb": "turned off the flag",
-    "title": "Washington Kigani turned off the flag Another Toggle Feature in Test",
+    "title": "John Doe turned off the flag Another Toggle Feature in Test",
     "date": 1771939563356,
     "accesses": [
       {
@@ -15,8 +15,8 @@
     ],
     "member": {
       "email": "user@example.com",
-      "firstName": "Washington",
-      "lastName": "Kigani"
+      "firstName": "John",
+      "lastName": "Doe"
     },
     "target": {
       "name": "Another Toggle Feature",
