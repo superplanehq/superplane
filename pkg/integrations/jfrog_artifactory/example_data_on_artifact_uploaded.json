@@ -1,0 +1,11 @@
+{
+  "type": "jfrogArtifactory.artifactUploaded",
+  "data": {
+    "repo": "libs-release-local",
+    "path": "com/example/artifact-1.0.jar",
+    "name": "artifact-1.0.jar",
+    "size": 12345,
+    "sha256": "abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567"
+  },
+  "timestamp": "2026-01-23T12:00:00Z"
+}

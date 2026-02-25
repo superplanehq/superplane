@@ -2,45 +2,64 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
-import { BaseNodeMetadata, Comment, Issue } from "./types";
+import { BaseNodeMetadata, Comment, PullRequest } from "./types";
 import { buildGithubSubtitle } from "./utils";
 
-interface OnPullRequestReviewCommentConfiguration {
+interface OnPRReviewCommentConfiguration {
   contentFilter?: string;
 }
 
-interface OnPullRequestReviewCommentEventData {
+interface OnPRReviewCommentEventData {
   action?: string;
   comment?: Comment;
-  issue?: Issue;
+  pull_request?: PullRequest;
+  review?: {
+    body?: string;
+    user?: {
+      login?: string;
+    };
+  };
 }
 
 /**
- * Renderer for the "github.onPullRequestReviewComment" trigger
+ * Renderer for the "github.onPRReviewComment" trigger
  */
-export const onPullRequestReviewCommentTriggerRenderer: TriggerRenderer = {
+export const onPRReviewCommentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event?.data as OnPullRequestReviewCommentEventData;
-    const prNumber = eventData?.issue?.number || "";
+    const eventData = context.event?.data as OnPRReviewCommentEventData;
+    const prNumber = eventData?.pull_request?.number || "";
     const fileName = eventData?.comment?.path || "";
-    const title = fileName ? `#${prNumber} - Comment on ${fileName}` : `#${prNumber} - Review Comment`;
+    const title = fileName
+      ? `#${prNumber} - Review Comment on ${fileName}`
+      : eventData?.review
+        ? `#${prNumber} - PR Review`
+        : `#${prNumber} - PR Review Comment`;
+
+    const author = eventData?.comment?.user?.login || eventData?.review?.user?.login || "unknown";
 
     return {
-      title: title,
-      subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, context.event?.createdAt),
+      title,
+      subtitle: buildGithubSubtitle(`By ${author}`, context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as OnPullRequestReviewCommentEventData;
+    const eventData = context.event?.data as OnPRReviewCommentEventData;
 
     const rootValues: Record<string, string> = {
-      Author: eventData?.comment?.user?.login || "",
-      "Comment Body": eventData?.comment?.body || "",
-      "Comment URL": eventData?.comment?.html_url || "",
-      "PR Number": eventData?.issue?.number?.toString() || "",
-      "PR Title": eventData?.issue?.title || "",
-      "PR URL": eventData?.issue?.pull_request?.url || "",
+      "Received At": context.event?.createdAt ? new Date(context.event.createdAt).toLocaleString() : "-",
+      Author: eventData?.comment?.user?.login || eventData?.review?.user?.login || "-",
+      "Comment Body": eventData?.comment?.body || eventData?.review?.body || "-",
+      "Comment URL": eventData?.comment?.html_url || "-",
+      "PR Number": eventData?.pull_request?.number?.toString() || "-",
+      "PR Title": eventData?.pull_request?.title || "-",
+      "PR URL":
+        eventData?.pull_request?.html_url ||
+        eventData?.pull_request?._links?.html?.href ||
+        eventData?.pull_request?.url ||
+        "-",
+      "Branch Name": eventData?.pull_request?.head?.ref || "-",
+      "Head SHA": eventData?.pull_request?.head?.sha || "-",
     };
 
     if (eventData?.comment?.path) {
@@ -57,7 +76,7 @@ export const onPullRequestReviewCommentTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as BaseNodeMetadata;
-    const configuration = node.configuration as unknown as OnPullRequestReviewCommentConfiguration;
+    const configuration = node.configuration as unknown as OnPRReviewCommentConfiguration;
     const metadataItems = [];
 
     if (metadata?.repository?.name) {
@@ -83,14 +102,20 @@ export const onPullRequestReviewCommentTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnPullRequestReviewCommentEventData;
-      const prNumber = eventData?.issue?.number || "";
+      const eventData = lastEvent.data as OnPRReviewCommentEventData;
+      const prNumber = eventData?.pull_request?.number || "";
       const fileName = eventData?.comment?.path || "";
-      const title = fileName ? `#${prNumber} - Comment on ${fileName}` : `#${prNumber} - Review Comment`;
+      const title = fileName
+        ? `#${prNumber} - Review Comment on ${fileName}`
+        : eventData?.review
+          ? `#${prNumber} - PR Review`
+          : `#${prNumber} - PR Review Comment`;
+
+      const author = eventData?.comment?.user?.login || eventData?.review?.user?.login || "unknown";
 
       props.lastEventData = {
-        title: title,
-        subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, lastEvent.createdAt),
+        title,
+        subtitle: buildGithubSubtitle(`By ${author}`, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
         eventId: lastEvent.id,

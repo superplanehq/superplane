@@ -1,0 +1,16 @@
+{
+  "data": {
+    "eventType": "DeploymentSucceeded",
+    "timestamp": "2026-02-05T16:00:00.000+00:00",
+    "category": "DeploymentSucceeded",
+    "message": "Deploy to Production succeeded",
+    "occurredAt": "2026-02-05T16:00:00.000+00:00",
+    "projectId": "Projects-123",
+    "environmentId": "Environments-456",
+    "releaseId": "Releases-789",
+    "deploymentId": "Deployments-1011",
+    "serverUri": "https://my-company.octopus.app"
+  },
+  "timestamp": "2026-02-05T16:00:01.000+00:00",
+  "type": "octopus.deployment.succeeded"
+}

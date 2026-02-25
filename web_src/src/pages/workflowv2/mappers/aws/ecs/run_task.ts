@@ -1,19 +1,7 @@
-import {
-  ComponentBaseContext,
-  ComponentBaseMapper,
-  ExecutionDetailsContext,
-  ExecutionInfo,
-  NodeInfo,
-  OutputPayload,
-  SubtitleContext,
-} from "../../types";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
-import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { ComponentBaseMapper, ExecutionDetailsContext, NodeInfo, OutputPayload, SubtitleContext } from "../../types";
 import { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
+import { buildEcsComponentProps, ecsConsoleUrl, ecsSubtitle, MAX_METADATA_ITEMS } from "./common";
 
 interface RunTaskConfiguration {
   region?: string;
@@ -47,59 +35,43 @@ interface RunTaskOutput {
 }
 
 export const runTaskMapper: ComponentBaseMapper = {
-  props(context: ComponentBaseContext): ComponentBaseProps {
-    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const componentName = context.componentDefinition.name || "unknown";
-
-    return {
-      title:
-        context.node.name ||
-        context.componentDefinition.label ||
-        context.componentDefinition.name ||
-        "Unnamed component",
-      iconSrc: awsEcsIcon,
-      iconColor: getColorClass(context.componentDefinition.color),
-      collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
-      collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? runTaskEventSections(context.nodes, lastExecution, componentName) : undefined,
-      includeEmptyState: !lastExecution,
-      metadata: runTaskMetadataList(context.node),
-      eventStateMap: getStateMap(componentName),
-    };
+  props(context) {
+    return buildEcsComponentProps(context, runTaskMetadataList(context.node));
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const data = outputs?.default?.[0]?.data as RunTaskOutput | undefined;
+    const firstTask = data?.tasks?.[0];
+    const timestamp = context.execution.updatedAt
+      ? new Date(context.execution.updatedAt).toLocaleString()
+      : context.execution.createdAt
+        ? new Date(context.execution.createdAt).toLocaleString()
+        : "-";
 
-    if (!data) {
-      return {};
-    }
-
-    const firstTask = data.tasks?.[0];
-    return {
-      "Started At": stringOrDash(
-        context.execution.updatedAt ? new Date(context.execution.updatedAt).toLocaleString() : "-",
-      ),
-      "Tasks Started": String(data.tasks?.length || 0),
-      Failures: String(data.failures?.length || 0),
-      "Task ARN": stringOrDash(firstTask?.taskArn),
-      "Task Definition": stringOrDash(firstTask?.taskDefinitionArn),
-      "Cluster ARN": stringOrDash(firstTask?.clusterArn),
-      "Last Status": stringOrDash(firstTask?.lastStatus),
-      "Desired Status": stringOrDash(firstTask?.desiredStatus),
-      "Launch Type": stringOrDash(firstTask?.launchType),
-      "Platform Version": stringOrDash(firstTask?.platformVersion),
-      Group: stringOrDash(firstTask?.group),
-      "Started By": stringOrDash(firstTask?.startedBy),
+    const details: Record<string, string> = {
+      "Started At": timestamp,
     };
+    if (data) {
+      details["Tasks Started"] = String(data.tasks?.length ?? 0);
+      if (data.failures?.length) {
+        details["Failures"] = String(data.failures.length);
+      }
+      if (firstTask) {
+        details["Task ARN"] = stringOrDash(firstTask.taskArn);
+        details["Last Status"] = stringOrDash(firstTask.lastStatus);
+        const region = firstTask.clusterArn?.split(":")[2] ?? "";
+        const cluster = firstTask.clusterArn?.split("/").pop() ?? "";
+        if (region && cluster && firstTask.taskArn) {
+          details["ECS Console"] = ecsConsoleUrl(region, cluster, undefined, firstTask.taskArn);
+        }
+      }
+    }
+    return details;
   },
 
   subtitle(context: SubtitleContext): string {
-    if (!context.execution.createdAt) {
-      return "";
-    }
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return ecsSubtitle(context);
   },
 };
 
@@ -107,9 +79,6 @@ function runTaskMetadataList(node: NodeInfo): MetadataItem[] {
   const config = node.configuration as RunTaskConfiguration | undefined;
   const items: MetadataItem[] = [];
 
-  if (config?.region) {
-    items.push({ icon: "globe", label: config.region });
-  }
   if (config?.cluster) {
     items.push({ icon: "server", label: config.cluster });
   }
@@ -119,27 +88,9 @@ function runTaskMetadataList(node: NodeInfo): MetadataItem[] {
   if (config?.count && config.count > 1) {
     items.push({ icon: "hash", label: `count: ${config.count}` });
   }
-  if (config?.launchType) {
-    if (config.launchType !== "AUTO") {
-      items.push({ icon: "rocket", label: config.launchType });
-    }
+  if (items.length < MAX_METADATA_ITEMS && config?.launchType && config.launchType !== "AUTO") {
+    items.push({ icon: "rocket", label: config.launchType });
   }
 
-  return items;
-}
-
-function runTaskEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
-  return [
-    {
-      receivedAt: new Date(execution.createdAt ?? 0),
-      eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt ?? 0)),
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id ?? "",
-    },
-  ];
+  return items.slice(0, MAX_METADATA_ITEMS);
 }

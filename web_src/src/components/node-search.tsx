@@ -121,7 +121,7 @@ export function NodeSearch({ onSearch, onSelectNode }: NodeSearchProps) {
             <Search className="h-3 w-3" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Search nodes (Ctrl+K)</TooltipContent>
+        <TooltipContent>Search components (Ctrl/Cmd + K)</TooltipContent>
       </Tooltip>
       <CommandDialog open={open} onOpenChange={setOpen}>
         <NodeSearchInternal onSearch={onSearch} onSelectNode={onSelectNode} open={open} onOpenChange={setOpen} />
