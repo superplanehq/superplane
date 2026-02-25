@@ -112,13 +112,13 @@ func (l *LaunchDarkly) HandleAction(ctx core.IntegrationActionContext) error {
 }
 
 func (l *LaunchDarkly) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %w", err)
-	}
-
 	switch resourceType {
 	case "project":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
 		projects, err := client.ListProjects()
 		if err != nil {
 			return nil, fmt.Errorf("failed to list projects: %w", err)
@@ -138,6 +138,11 @@ func (l *LaunchDarkly) ListResources(resourceType string, ctx core.ListResources
 		projectKey := ctx.Parameters["projectKey"]
 		if projectKey == "" {
 			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
 		}
 
 		flags, err := client.ListFeatureFlags(projectKey)
