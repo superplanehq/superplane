@@ -291,7 +291,12 @@ export function applyAiOperationsToWorkflow({
     return score;
   };
 
-  const resolveConnectionChannel = (source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null }) => {
+  const resolveConnectionChannel = (source: {
+    nodeKey?: string;
+    nodeId?: string;
+    nodeName?: string;
+    handleId?: string | null;
+  }) => {
     const explicitChannel = source.handleId?.trim();
     if (explicitChannel) {
       return explicitChannel;
