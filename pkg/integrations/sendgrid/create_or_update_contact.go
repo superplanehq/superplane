@@ -3,7 +3,6 @@ package sendgrid
 import (
 	"fmt"
 	"net/mail"
-	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -38,8 +37,6 @@ type CreateOrUpdateContactFailure struct {
 	StatusCode   int    `json:"statusCode,omitempty"`
 	ResponseBody string `json:"responseBody,omitempty"`
 }
-
-var expressionPlaceholderRegex = regexp.MustCompile(`(?s)\{\{.*?\}\}`)
 
 func (c *CreateOrUpdateContact) Name() string {
 	return "sendgrid.createOrUpdateContact"
@@ -160,7 +157,7 @@ func (c *CreateOrUpdateContact) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("email is required")
 	}
 
-	if !expressionPlaceholderRegex.MatchString(config.Email) {
+	if !configuration.HasExpressionPlaceholder(config.Email) {
 		if _, err := mail.ParseAddress(config.Email); err != nil {
 			return fmt.Errorf("invalid 'email' address: %w", err)
 		}
