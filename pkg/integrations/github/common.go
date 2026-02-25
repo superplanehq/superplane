@@ -79,6 +79,15 @@ func getRepositoryFromConfiguration(c any) string {
 	return repository
 }
 
+func sanitizeAssignees(assignees []string) []string {
+	result := make([]string, len(assignees))
+	for i, a := range assignees {
+		result[i] = strings.TrimPrefix(a, "@")
+	}
+
+	return result
+}
+
 func verifySignature(ctx core.WebhookRequestContext) (int, error) {
 	signature := ctx.Headers.Get("X-Hub-Signature-256")
 	if signature == "" {

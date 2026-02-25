@@ -225,3 +225,22 @@
 .json-viewer-hide-types .w-rjv-type:not([data-type="null"]) {
   display: none !important;
 }
+
+@keyframes sp-ai-thinking-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.sp-ai-thinking {
+  display: inline-block;
+  background-image: linear-gradient(90deg, #64748b 0%, #9ca3af 45%, #64748b 90%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sp-ai-thinking-shimmer 1.4s linear infinite;
+}

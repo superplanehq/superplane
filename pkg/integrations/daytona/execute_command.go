@@ -3,6 +3,8 @@ package daytona
 import (
 	"fmt"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,17 +14,22 @@ import (
 )
 
 const (
-	ExecuteCommandPayloadType  = "daytona.command.response"
-	ExecuteCommandPollInterval = 5 * time.Second
+	ExecuteCommandPayloadType          = "daytona.command.response"
+	ExecuteCommandPollInterval         = 5 * time.Second
+	ExecuteCommandOutputChannelSuccess = "success"
+	ExecuteCommandOutputChannelFailed  = "failed"
 )
+
+var envVariableNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 type ExecuteCommand struct{}
 
 type ExecuteCommandSpec struct {
-	SandboxID string `json:"sandboxId"`
-	Command   string `json:"command"`
-	Cwd       string `json:"cwd,omitempty"`
-	Timeout   int    `json:"timeout,omitempty"`
+	SandboxID string        `json:"sandboxId"`
+	Command   string        `json:"command"`
+	Cwd       string        `json:"cwd,omitempty"`
+	Env       []EnvVariable `json:"env,omitempty"`
+	Timeout   int           `json:"timeout,omitempty"`
 }
 
 type ExecuteCommandMetadata struct {
@@ -60,11 +67,16 @@ func (e *ExecuteCommand) Documentation() string {
 - **Sandbox ID**: The ID of the sandbox (from createSandbox output)
 - **Command**: The shell command to execute
 - **Working Directory**: Optional working directory for the command
+- **Environment Variables**: Optional key-value pairs exported before command execution
 - **Timeout**: Optional execution timeout in seconds
 
 ## Output
 
-Returns the command result including:
+Routes to one of two channels:
+- **success**: Exit code is 0
+- **failed**: Exit code is non-zero
+
+The payload includes:
 - **exitCode**: The process exit code (0 for success)
 - **result**: The stdout/output from the command execution
 
@@ -84,7 +96,10 @@ func (e *ExecuteCommand) Color() string {
 }
 
 func (e *ExecuteCommand) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{core.DefaultOutputChannel}
+	return []core.OutputChannel{
+		{Name: ExecuteCommandOutputChannelSuccess, Label: "Success"},
+		{Name: ExecuteCommandOutputChannelFailed, Label: "Failed"},
+	}
 }
 
 func (e *ExecuteCommand) Configuration() []configuration.Field {
@@ -114,6 +129,35 @@ func (e *ExecuteCommand) Configuration() []configuration.Field {
 			Placeholder: "/home/daytona",
 		},
 		{
+			Name:  "env",
+			Label: "Environment Variables",
+			Type:  configuration.FieldTypeList,
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Variable",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:     "name",
+								Label:    "Name",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+							{
+								Name:     "value",
+								Label:    "Value",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+						},
+					},
+				},
+			},
+			Required:    false,
+			Description: "Environment variables to export before running the command",
+		},
+		{
 			Name:        "timeout",
 			Label:       "Timeout",
 			Type:        configuration.FieldTypeNumber,
@@ -138,6 +182,17 @@ func (e *ExecuteCommand) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("command is required")
 	}
 
+	for _, env := range spec.Env {
+		name := strings.TrimSpace(env.Name)
+		if name == "" {
+			return fmt.Errorf("env variable name is required")
+		}
+
+		if !envVariableNamePattern.MatchString(name) {
+			return fmt.Errorf("invalid env variable name: %s", env.Name)
+		}
+	}
+
 	return nil
 }
 
@@ -160,6 +215,22 @@ func (e *ExecuteCommand) Execute(ctx core.ExecutionContext) error {
 	command := spec.Command
 	if spec.Cwd != "" {
 		command = fmt.Sprintf("cd %s && %s", spec.Cwd, spec.Command)
+	}
+
+	if len(spec.Env) > 0 {
+		envExports := make([]string, 0, len(spec.Env))
+		for _, env := range spec.Env {
+			name := strings.TrimSpace(env.Name)
+			if name == "" {
+				continue
+			}
+
+			envExports = append(envExports, fmt.Sprintf("%s=%s", name, shellQuote(env.Value)))
+		}
+
+		if len(envExports) > 0 {
+			command = fmt.Sprintf("export %s && %s", strings.Join(envExports, " "), command)
+		}
 	}
 
 	response, err := client.ExecuteSessionCommand(spec.SandboxID, sessionID, command)
@@ -247,8 +318,13 @@ func (e *ExecuteCommand) poll(ctx core.ActionContext) error {
 		Result:   logs,
 	}
 
+	channel := ExecuteCommandOutputChannelFailed
+	if *cmd.ExitCode == 0 {
+		channel = ExecuteCommandOutputChannelSuccess
+	}
+
 	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
+		channel,
 		ExecuteCommandPayloadType,
 		[]any{result},
 	)
@@ -256,6 +332,14 @@ func (e *ExecuteCommand) poll(ctx core.ActionContext) error {
 
 func (e *ExecuteCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
+}
+
+func shellQuote(value string) string {
+	if value == "" {
+		return "''"
+	}
+
+	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
 }
 
 func (e *ExecuteCommand) Cleanup(ctx core.SetupContext) error {

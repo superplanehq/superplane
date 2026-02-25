@@ -16,13 +16,16 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   cloudflare: "Cloudflare",
   semaphore: "Semaphore",
   rootly: "Rootly",
+  incident: "Incident",
   statuspage: "Statuspage",
   daytona: "Daytona",
   dash0: "Dash0",
   aws: "AWS",
+  gcp: "GCP",
   smtp: "SMTP",
   sendgrid: "SendGrid",
   dockerhub: "DockerHub",
+  harness: "Harness",
 };
 
 /**

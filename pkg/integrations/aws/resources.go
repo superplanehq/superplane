@@ -3,12 +3,14 @@ package aws
 import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/codepipeline"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ec2"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecs"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/route53"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/sns"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/sqs"
 )
 
 func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -43,6 +45,11 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	case "codeartifact.domain":
 		return codeartifact.ListDomains(ctx, resourceType)
 
+	case "codepipeline.pipeline":
+		return codepipeline.ListPipelines(ctx, resourceType)
+
+	case "sqs.queue":
+		return sqs.ListQueues(ctx, resourceType)
 	case "route53.hostedZone":
 		return route53.ListHostedZones(ctx, resourceType)
 

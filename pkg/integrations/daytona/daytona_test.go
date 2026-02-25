@@ -146,3 +146,77 @@ func Test__Daytona__Metadata(t *testing.T) {
 		assert.True(t, ok, "metadata should be of type Metadata")
 	})
 }
+
+func Test__Daytona__ListResources(t *testing.T) {
+	d := &Daytona{}
+
+	t.Run("list snapshot resources", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"items":[{"id":"snap-1","name":"default"},{"id":"snap-2","name":"daytona-small"}]}`,
+					)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		resources, err := d.ListResources("snapshot", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: appCtx,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "snapshot", resources[0].Type)
+		assert.Equal(t, "default", resources[0].Name)
+		assert.Equal(t, "snap-1", resources[0].ID)
+	})
+
+	t.Run("list sandbox resources", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`[{"id":"sandbox-123","state":"started"},{"id":"sandbox-456","state":"stopped"}]`,
+					)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		resources, err := d.ListResources("sandbox", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: appCtx,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "sandbox", resources[0].Type)
+		assert.Equal(t, "sandbox-123", resources[0].Name)
+		assert.Equal(t, "sandbox-123", resources[0].ID)
+	})
+
+	t.Run("unknown resource type returns empty list", func(t *testing.T) {
+		resources, err := d.ListResources("unknown", core.ListResourcesContext{
+			HTTP:        &contexts.HTTPContext{},
+			Integration: &contexts.IntegrationContext{},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+	})
+}

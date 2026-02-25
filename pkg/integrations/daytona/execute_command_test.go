@@ -1,6 +1,7 @@
 package daytona
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -67,11 +68,37 @@ func Test__ExecuteCommand__Setup(t *testing.T) {
 				"sandboxId": "sandbox-123",
 				"command":   "pip install requests",
 				"cwd":       "/home/daytona",
-				"timeout":   60,
+				"env": []map[string]any{
+					{
+						"name":  "API_KEY",
+						"value": "123",
+					},
+				},
+				"timeout": 60,
 			},
 		})
 
 		require.NoError(t, err)
+	})
+
+	t.Run("invalid env name", func(t *testing.T) {
+		appCtx := &contexts.IntegrationContext{}
+		err := component.Setup(core.SetupContext{
+			Integration: appCtx,
+			Metadata:    &contexts.MetadataContext{},
+			Configuration: map[string]any{
+				"sandboxId": "sandbox-123",
+				"command":   "echo hello",
+				"env": []map[string]any{
+					{
+						"name":  "INVALID-NAME",
+						"value": "123",
+					},
+				},
+			},
+		})
+
+		require.ErrorContains(t, err, "invalid env variable name")
 	})
 }
 
@@ -202,6 +229,49 @@ func Test__ExecuteCommand__Execute(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create session")
 	})
+
+	t.Run("prepends exported env variables when env is set", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"cmdId":"cmd-001"}`))},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"sandboxId": "sandbox-123",
+				"command":   "env | grep API_KEY",
+				"env": []map[string]any{
+					{
+						"name":  "API_KEY",
+						"value": "secret'value",
+					},
+				},
+			},
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       &contexts.RequestContext{},
+		})
+
+		require.NoError(t, err)
+
+		require.Len(t, httpContext.Requests, 4)
+		body, _ := io.ReadAll(httpContext.Requests[3].Body)
+		req := SessionExecuteRequest{}
+		require.NoError(t, json.Unmarshal(body, &req))
+		assert.Contains(t, req.Command, `export API_KEY='secret'"'"'value'`)
+	})
 }
 
 func Test__ExecuteCommand__HandleAction(t *testing.T) {
@@ -287,6 +357,49 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, execCtx.Finished)
 		assert.True(t, execCtx.Passed)
+		assert.Equal(t, ExecuteCommandOutputChannelSuccess, execCtx.Channel)
+		assert.Equal(t, ExecuteCommandPayloadType, execCtx.Type)
+		require.Len(t, execCtx.Payloads, 1)
+	})
+
+	t.Run("poll emits failed channel when command exits non-zero", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-abc","commands":[{"id":"cmd-001","exitCode":1}]}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`command failed`))},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.HandleAction(core.ActionContext{
+			Name: "poll",
+			HTTP: httpContext,
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{
+					"sandboxId": "sandbox-123",
+					"sessionId": "session-abc",
+					"cmdId":     "cmd-001",
+					"startedAt": time.Now().Unix(),
+					"timeout":   300,
+				},
+			},
+			ExecutionState: execCtx,
+			Requests:       &contexts.RequestContext{},
+			Integration:    appCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+		assert.Equal(t, ExecuteCommandOutputChannelFailed, execCtx.Channel)
 		assert.Equal(t, ExecuteCommandPayloadType, execCtx.Type)
 		require.Len(t, execCtx.Payloads, 1)
 	})
@@ -389,7 +502,7 @@ func Test__ExecuteCommand__Configuration(t *testing.T) {
 	component := ExecuteCommand{}
 
 	config := component.Configuration()
-	assert.Len(t, config, 4)
+	assert.Len(t, config, 5)
 
 	fieldNames := make([]string, len(config))
 	for i, f := range config {
@@ -399,13 +512,14 @@ func Test__ExecuteCommand__Configuration(t *testing.T) {
 	assert.Contains(t, fieldNames, "sandboxId")
 	assert.Contains(t, fieldNames, "command")
 	assert.Contains(t, fieldNames, "cwd")
+	assert.Contains(t, fieldNames, "env")
 	assert.Contains(t, fieldNames, "timeout")
 
 	for _, f := range config {
 		if f.Name == "sandboxId" || f.Name == "command" {
 			assert.True(t, f.Required, "%s should be required", f.Name)
 		}
-		if f.Name == "cwd" || f.Name == "timeout" {
+		if f.Name == "cwd" || f.Name == "env" || f.Name == "timeout" {
 			assert.False(t, f.Required, "%s should be optional", f.Name)
 		}
 	}
@@ -415,6 +529,7 @@ func Test__ExecuteCommand__OutputChannels(t *testing.T) {
 	component := ExecuteCommand{}
 
 	channels := component.OutputChannels(nil)
-	require.Len(t, channels, 1)
-	assert.Equal(t, core.DefaultOutputChannel, channels[0])
+	require.Len(t, channels, 2)
+	assert.Equal(t, ExecuteCommandOutputChannelSuccess, channels[0].Name)
+	assert.Equal(t, ExecuteCommandOutputChannelFailed, channels[1].Name)
 }

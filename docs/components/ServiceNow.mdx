@@ -1,0 +1,213 @@
+---
+title: "ServiceNow"
+---
+
+Manage and react to incidents in ServiceNow
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in ServiceNow" />
+  <LinkCard title="Get Incident" href="#get-incident" description="Fetch a single ServiceNow incident by selecting it from the dropdown" />
+</CardGrid>
+
+## Instructions
+
+Requires a ServiceNow instance with OAuth API access.
+
+Before creating OAuth credentials, enable client credentials grant on your instance:
+- Go to **System Properties** (sys_properties_list.do) and search for:
+  - **Name**: glide.oauth.inbound.client.credential.grant_type.enabled
+  - (Important: the property name ends with **enabled**)
+- If it does not exist, create it with:
+  - **Application Scope**: Global
+  - **Type**: true | false
+  - **Value**: true
+
+Then configure OAuth:
+- Go to **System OAuth > Inbound Integrations**
+- Create a new integration with **OAuth - Client Credentials Grant**
+- Copy the generated **Client ID** and **Client Secret**
+- Assign required permissions to the integration account:
+  - **itil** role (required for incident read/write)
+  - Optionally **admin** if broader scoped access is needed
+- Optionally enable **Web Service Access Only** on the integration account to restrict it to API-only use.
+
+<a id="create-incident"></a>
+
+## Create Incident
+
+The Create Incident component creates a new incident in ServiceNow using the Table API.
+
+### Use Cases
+
+- **Alert escalation**: Create incidents from monitoring alerts
+- **Error tracking**: Automatically create incidents when errors are detected
+- **Manual incident creation**: Create incidents from workflow events
+- **Integration workflows**: Create incidents from external system events
+
+### Required Permissions
+
+The ServiceNow integration account needs:
+- **itil** role — grants read/write access to the Incident table
+
+### Configuration
+
+- **Short Description**: A brief summary of the incident (required, supports expressions)
+- **Description**: Detailed description of the incident (optional, supports expressions)
+- **Urgency**: Incident urgency level (1-High, 2-Medium, 3-Low)
+- **Impact**: Incident impact level (1-High, 2-Medium, 3-Low)
+- **Category**: Incident category (select from list)
+- **Subcategory**: Incident subcategory (depends on the selected category)
+- **Assignment Group**: The group responsible for resolving the incident (select from list)
+- **Assigned To**: The user assigned to resolve the incident (select from list)
+- **Caller**: The user reporting the incident (select from list)
+
+### Output
+
+Returns the created incident object from the ServiceNow Table API, including:
+- **sys_id**: Unique identifier
+- **number**: Human-readable incident number (e.g. INC0010001)
+- **state**: Current incident state
+- **short_description**: Incident summary
+- **created_on**: Creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "active": "true",
+    "activity_due": "2026-02-21 18:00:00",
+    "additional_assignee_list": "c1a2b3d4e5f60718293a4b5c6d7e8f90",
+    "approval": "not requested",
+    "approval_history": "",
+    "approval_set": "",
+    "assigned_to": "46d44a1b2f123010a9ad2572f699b6a7",
+    "assignment_group": "8a5055c9c61122780043563ef53438e3",
+    "business_duration": "1970-01-01 02:15:00",
+    "business_impact": "Moderate impact affecting internal users",
+    "business_service": "Email Service",
+    "business_stc": "2",
+    "calendar_duration": "1970-01-01 03:00:00",
+    "calendar_stc": "3",
+    "caller_id": "6816f79cc0a8016401c5a33be04be441",
+    "category": "inquiry",
+    "cause": "User mailbox quota exceeded",
+    "caused_by": "",
+    "child_incidents": "0",
+    "close_code": "",
+    "close_notes": "",
+    "closed_at": "",
+    "closed_by": "",
+    "cmdb_ci": "3f8a9d12db2310108f5d5e1234567890",
+    "comments": "User reported inability to send emails.",
+    "comments_and_work_notes": "",
+    "company": "Acme Corp",
+    "contact_type": "email",
+    "contract": "Standard IT Support",
+    "correlation_display": "",
+    "correlation_id": "EXT-EMAIL-20260220-001",
+    "delivery_plan": "",
+    "delivery_task": "",
+    "description": "User cannot send or receive emails since this morning. Outlook shows mailbox full error.",
+    "due_date": "2026-02-21 18:00:00",
+    "escalation": "0",
+    "expected_start": "2026-02-20 17:30:00",
+    "follow_up": "2026-02-22 10:00:00",
+    "group_list": "",
+    "hold_reason": "",
+    "impact": "2",
+    "incident_state": "2",
+    "knowledge": "false",
+    "location": "São Paulo - Office 3rd Floor",
+    "made_sla": "true",
+    "notify": "1",
+    "number": "INC0010456",
+    "opened_at": "2026-02-20 17:00:06",
+    "opened_by": {
+      "link": "https://dev194606.service-now.com/api/now/table/sys_user/6816f79cc0a8016401c5a33be04be441",
+      "value": "6816f79cc0a8016401c5a33be04be441"
+    },
+    "order": "",
+    "origin_id": "",
+    "origin_table": "",
+    "parent": "",
+    "parent_incident": "",
+    "priority": "3",
+    "problem_id": "",
+    "reassignment_count": "1",
+    "reopen_count": "0",
+    "reopened_by": "",
+    "reopened_time": "",
+    "resolved_at": "",
+    "resolved_by": "",
+    "rfc": "",
+    "route_reason": "",
+    "service_offering": "Corporate Email - Exchange Online",
+    "severity": "3",
+    "short_description": "User unable to send emails - mailbox full",
+    "sla_due": "2026-02-21 18:00:00",
+    "state": "2",
+    "subcategory": "email",
+    "sys_class_name": "incident",
+    "sys_created_by": "admin",
+    "sys_created_on": "2026-02-20 17:00:06",
+    "sys_domain": {
+      "link": "https://dev194606.service-now.com/api/now/table/sys_user_group/global",
+      "value": "global"
+    },
+    "sys_domain_path": "/",
+    "sys_id": "5fd8a0b983c332104005f7efeeaad999",
+    "sys_mod_count": "3",
+    "sys_tags": "email,quota,user-issue",
+    "sys_updated_by": "it.support",
+    "sys_updated_on": "2026-02-20 18:45:22",
+    "task_effective_number": "INC0010456",
+    "time_worked": "5400",
+    "universal_request": "",
+    "upon_approval": "proceed",
+    "upon_reject": "cancel",
+    "urgency": "2",
+    "user_input": "Cannot send emails since 9 AM.",
+    "watch_list": "manager@acme.com,it-team@acme.com",
+    "work_end": "",
+    "work_notes": "Mailbox cleaned and quota increased to 100GB. Issue under monitoring.",
+    "work_notes_list": "",
+    "work_start": "2026-02-20 17:30:00"
+  },
+  "timestamp": "2026-02-20T18:45:25.123456789Z",
+  "type": "servicenow.incident"
+}
+```
+
+<a id="get-incident"></a>
+
+## Get Incident
+
+Fetch a single ServiceNow incident by selecting it from the dropdown
+
+### Example Output
+
+```json
+{
+  "data": {
+    "category": "Network",
+    "impact": "2",
+    "number": "INC0010001",
+    "priority": "3",
+    "short_description": "Server is unresponsive",
+    "state": "1",
+    "subcategory": "DNS",
+    "sys_created_on": "2026-01-19 12:00:00",
+    "sys_id": "a1b2c3d4e5f6g7h8i9j0",
+    "sys_updated_on": "2026-01-19 12:00:00",
+    "urgency": "2"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "servicenow.incident"
+}
+```
+

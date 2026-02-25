@@ -1,0 +1,17 @@
+{
+  "data": {
+    "resultType": "vector",
+    "result": [
+      {
+        "metric": {
+          "__name__": "up",
+          "instance": "localhost:9090",
+          "job": "prometheus"
+        },
+        "value": [1708000000, "1"]
+      }
+    ]
+  },
+  "timestamp": "2026-02-12T16:30:05.123456789Z",
+  "type": "prometheus.query"
+}

@@ -1,0 +1,8 @@
+{
+  "type": "aws.sqs.queue.purged",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+    "purged": true
+  }
+}
