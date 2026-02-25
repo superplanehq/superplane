@@ -74,6 +74,7 @@ import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
+import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -1051,6 +1052,7 @@ function CategorySection({
     harness: harnessIcon,
     servicenow: servicenowIcon,
     statuspage: statuspageIcon,
+    newrelic: newrelicIcon,
     aws: {
       ec2: awsEc2Icon,
       codeArtifact: awsIcon,
@@ -1178,6 +1180,7 @@ function CategorySection({
             harness: harnessIcon,
             servicenow: servicenowIcon,
             statuspage: statuspageIcon,
+            newrelic: newrelicIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
               codepipeline: awsCodePipelineIcon,

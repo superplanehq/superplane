@@ -157,6 +157,11 @@ import {
   eventStateRegistry as statuspageEventStateRegistry,
 } from "./statuspage";
 import {
+  componentMappers as newrelicComponentMappers,
+  triggerRenderers as newrelicTriggerRenderers,
+  eventStateRegistry as newrelicEventStateRegistry,
+} from "./newrelic/index";
+import {
   componentMappers as dockerhubComponentMappers,
   customFieldRenderers as dockerhubCustomFieldRenderers,
   triggerRenderers as dockerhubTriggerRenderers,
@@ -236,6 +241,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   jfrogArtifactory: jfrogArtifactoryComponentMappers,
   statuspage: statuspageComponentMappers,
   dockerhub: dockerhubComponentMappers,
+  newrelic: newrelicComponentMappers,
   harness: harnessComponentMappers,
   servicenow: servicenowComponentMappers,
 };
@@ -270,6 +276,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   jfrogArtifactory: jfrogArtifactoryTriggerRenderers,
   statuspage: statuspageTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
+  newrelic: newrelicTriggerRenderers,
   harness: harnessTriggerRenderers,
   servicenow: servicenowTriggerRenderers,
 };
@@ -303,6 +310,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   gitlab: gitlabEventStateRegistry,
   jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
+  newrelic: newrelicEventStateRegistry,
   harness: harnessEventStateRegistry,
   servicenow: servicenowEventStateRegistry,
 };
