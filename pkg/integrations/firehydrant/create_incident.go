@@ -61,10 +61,9 @@ Returns the created incident object including:
 - **customer_impact_summary**: Summary of customer impact
 - **current_milestone**: Current milestone (e.g., started, acknowledged)
 - **number**: Incident number
+- **incident_url**: URL to the incident in FireHydrant
 - **severity**: Severity level
 - **priority**: Priority level
-- **created_at**: Creation timestamp
-- **started_at**: Start timestamp
 - **tag_list**: List of tags associated with the incident
 - **impacts**: List of impacts associated with the incident
 - **milestones**: List of milestones associated with the incident`

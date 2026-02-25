@@ -55,7 +55,6 @@ Each incident event includes:
 - **severity**: Severity level
 - **priority**: Priority level
 - **current_milestone**: Current milestone (e.g., started, acknowledged)
-- **created_at**: Creation timestamp
 - **summary**: Incident summary
 
 ## Webhook Setup

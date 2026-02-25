@@ -20,7 +20,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-To connect FireHydrant, create an API key in **Settings → API Keys**. This requires Owner permissions.
+To connect FireHydrant, create an API key:
+
+1. Go to **Settings → API Keys → Create API Key** in your FireHydrant account. This requires Owner permissions.
+2. The API key should have **Write Access** in order to create incidents and webhooks.
+3. Copy the API key and paste it into the configuration for this integration.
 
 <a id="on-new-incident"></a>
 
@@ -47,7 +51,6 @@ Each incident event includes:
 - **severity**: Severity level
 - **priority**: Priority level
 - **current_milestone**: Current milestone (e.g., started, acknowledged)
-- **created_at**: Creation timestamp
 - **summary**: Incident summary
 
 ### Webhook Setup
@@ -163,10 +166,9 @@ Returns the created incident object including:
 - **customer_impact_summary**: Summary of customer impact
 - **current_milestone**: Current milestone (e.g., started, acknowledged)
 - **number**: Incident number
+- **incident_url**: URL to the incident in FireHydrant
 - **severity**: Severity level
 - **priority**: Priority level
-- **created_at**: Creation timestamp
-- **started_at**: Start timestamp
 - **tag_list**: List of tags associated with the incident
 - **impacts**: List of impacts associated with the incident
 - **milestones**: List of milestones associated with the incident
@@ -175,12 +177,12 @@ Returns the created incident object including:
 
 ```json
 {
-  "created_at": "2026-01-19T12:00:00Z",
   "current_milestone": "started",
   "customer_impact_summary": "Some customers are experiencing slow performance and intermittent errors when accessing the application.",
   "description": "Users are experiencing slow database queries and connection timeouts.",
   "id": "04d9fd1a-ba9c-417d-b396-58a6e2c374de",
   "impacts": [],
+  "incident_url": "https://app.firehydrant.com/incidents/04d9fd1a-ba9c-417d-b396-58a6e2c374de",
   "milestones": [
     {
       "occurred_at": "2026-01-19T12:00:00Z",
@@ -191,7 +193,6 @@ Returns the created incident object including:
   "number": 603,
   "priority": "P1",
   "severity": "SEV1",
-  "started_at": "2026-01-19T12:00:00Z",
   "summary": "Database connection pool exhausted causing cascading failures.",
   "tag_list": []
 }

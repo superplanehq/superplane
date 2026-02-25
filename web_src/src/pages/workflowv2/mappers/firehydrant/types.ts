@@ -7,7 +7,6 @@ export interface Incident {
   severity?: string;
   priority?: string;
   current_milestone?: string;
-  created_at?: string;
-  started_at?: string;
+  incident_url?: string;
   customer_impact_summary?: string;
 }

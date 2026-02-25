@@ -65,13 +65,8 @@ export function getDetailsForIncident(incident: Incident | undefined): Record<st
   if (incident?.current_milestone) {
     details.Milestone = incident.current_milestone;
   }
-
-  if (incident?.created_at) {
-    details["Created At"] = new Date(incident.created_at).toLocaleString();
-  }
-
-  if (incident?.started_at) {
-    details["Started At"] = new Date(incident.started_at).toLocaleString();
+  if (incident?.incident_url) {
+    details.URL = incident.incident_url;
   }
 
   return details;

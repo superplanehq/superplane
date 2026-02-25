@@ -178,6 +178,7 @@ type Incident struct {
 	Number                int         `json:"number"`
 	CreatedAt             string      `json:"created_at"`
 	StartedAt             string      `json:"started_at"`
+	IncidentURL           string      `json:"incident_url"`
 	Severity              string      `json:"severity"`
 	Priority              string      `json:"priority"`
 	TagList               []string    `json:"tag_list"`
