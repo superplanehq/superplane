@@ -625,6 +625,10 @@ func (e *HTTP) executeRequest(httpCtx core.HTTPContext, spec Spec, timeout time.
 
 	resp, err := httpCtx.Do(req)
 	if err != nil {
+		if reqCtx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("request timed out after %s", timeout)
+		}
+
 		return nil, err
 	}
 

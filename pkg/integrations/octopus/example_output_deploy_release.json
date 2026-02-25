@@ -1,0 +1,14 @@
+{
+  "data": {
+    "deploymentId": "Deployments-1011",
+    "taskState": "Success",
+    "projectId": "Projects-123",
+    "releaseId": "Releases-789",
+    "environmentId": "Environments-456",
+    "created": "2026-02-05T16:00:00.000+00:00",
+    "completedTime": "2026-02-05T16:05:00.000+00:00",
+    "duration": "5 minutes"
+  },
+  "timestamp": "2026-02-05T16:05:00.000+00:00",
+  "type": "octopus.deployment.finished"
+}
