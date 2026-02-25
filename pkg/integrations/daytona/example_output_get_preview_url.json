@@ -1,0 +1,12 @@
+{
+  "type": "daytona.preview.response",
+  "data": {
+    "sandbox": "sandbox-abc123def456",
+    "port": 3000,
+    "signed": true,
+    "url": "https://3000-signed-token-abc123.preview.daytona.app",
+    "token": "signed-token-abc123",
+    "expiresInSeconds": 3600
+  },
+  "timestamp": "2026-01-19T12:00:00Z"
+}
