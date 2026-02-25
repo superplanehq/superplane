@@ -653,18 +653,25 @@ export function BuildingBlocksSidebar({
                     </div>
                   </div>
                 ) : (
-                  aiMessages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={
-                        message.role === "user"
-                          ? "ml-6 rounded-md bg-blue-600 text-white px-3 py-2 text-sm"
-                          : "mr-6 rounded-md bg-white border border-border px-3 py-2 text-sm text-gray-800"
-                      }
-                    >
-                      {message.content}
-                    </div>
-                  ))
+                  <>
+                    {aiMessages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={
+                          message.role === "user"
+                            ? "ml-6 rounded-md bg-blue-600 text-white px-3 py-2 text-sm"
+                            : "mr-6 rounded-md bg-white border border-border px-3 py-2 text-sm text-gray-800"
+                        }
+                      >
+                        {message.content}
+                      </div>
+                    ))}
+                    {isGeneratingResponse ? (
+                      <div className="sp-ai-thinking text-xs text-gray-500 px-1 py-1 rounded-sm">
+                        Planing next steps...
+                      </div>
+                    ) : null}
+                  </>
                 )}
 
                 {pendingProposal && (
