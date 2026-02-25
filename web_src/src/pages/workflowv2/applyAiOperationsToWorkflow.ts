@@ -1,4 +1,4 @@
-import type { CanvasesCanvas, ComponentsEdge, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvas, ComponentsEdge, ComponentsIntegrationRef, ComponentsNode, OrganizationsIntegration } from "@/api-client";
 import type { AiCanvasOperation, BuildingBlockCategory } from "@/ui/BuildingBlocksSidebar";
 import { filterVisibleConfiguration } from "@/utils/components";
 import { generateNodeId, generateUniqueNodeName } from "./utils";
@@ -7,12 +7,47 @@ type ApplyAiOperationsToWorkflowInput = {
   workflow: CanvasesCanvas;
   operations: AiCanvasOperation[];
   buildingBlocks: BuildingBlockCategory[];
+  integrations?: OrganizationsIntegration[];
 };
+
+function normalizeIntegrationName(name?: string): string {
+  return (name || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+function resolveIntegrationRefForBlock(
+  blockIntegrationName: string | undefined,
+  integrations: OrganizationsIntegration[],
+): ComponentsIntegrationRef | undefined {
+  const normalized = normalizeIntegrationName(blockIntegrationName);
+  if (!normalized) {
+    return undefined;
+  }
+
+  const matchingIntegrations = integrations.filter((integration) => {
+    return normalizeIntegrationName(integration.spec?.integrationName) === normalized;
+  });
+  if (matchingIntegrations.length === 0) {
+    return undefined;
+  }
+
+  const selectedIntegration =
+    matchingIntegrations.find((integration) => (integration.status?.state || "").toLowerCase() === "ready") ||
+    matchingIntegrations[0];
+  if (!selectedIntegration.metadata?.id && !selectedIntegration.metadata?.name) {
+    return undefined;
+  }
+
+  return {
+    id: selectedIntegration.metadata?.id,
+    name: selectedIntegration.metadata?.name,
+  };
+}
 
 export function applyAiOperationsToWorkflow({
   workflow,
   operations,
   buildingBlocks,
+  integrations = [],
 }: ApplyAiOperationsToWorkflowInput): CanvasesCanvas {
   const blockLookup = new Map(
     buildingBlocks.flatMap((category) => category.blocks.map((block) => [block.name, block])),
@@ -473,6 +508,11 @@ export function applyAiOperationsToWorkflow({
         configuration: filteredConfiguration,
         position: nonOverlappingPosition,
       };
+
+      const integrationRef = resolveIntegrationRefForBlock(block.integrationName, integrations);
+      if (integrationRef) {
+        newNode.integration = integrationRef;
+      }
 
       if (block.name === "annotation") {
         newNode.widget = { name: "annotation" };

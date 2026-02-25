@@ -18,9 +18,10 @@ It is suitable for PR command handling, review automation, and comment-driven de
 When generating workflow operations that include `github.onPRComment`:
 
 1. Always set `configuration.repository`.
-2. Only set `configuration.contentFilter` when the user asks for filtering behavior.
-3. Treat `contentFilter` as a regex, not a simple substring.
-4. Use downstream branching for complex conditions instead of overloading a single regex.
+2. If the user did not specify a repository, ask a clarifying question for the repository name only (not `owner/repo`) before proposing operations.
+3. Only set `configuration.contentFilter` when the user asks for filtering behavior.
+4. Treat `contentFilter` as a regex, not a simple substring.
+5. Use downstream branching for complex conditions instead of overloading a single regex.
 
 ## Event Semantics
 
@@ -39,5 +40,7 @@ When generating workflow operations that include `github.onPRComment`:
 ## Mistakes To Avoid
 
 - Omitting `repository`.
+- Guessing or inferring `repository` when the user has not provided it.
+- Asking for `owner/repo` format instead of just the repository name.
 - Assuming `contentFilter` is not regex.
 - Using this trigger when the request is explicitly about non-PR issue comments only.

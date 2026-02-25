@@ -153,6 +153,7 @@ func generateCanvasAIPlan(
 		"- For embedded string interpolation, use literal text plus handlebars (example: root@{{ $[\"Create Hetzner Machine\"].data.ipv4 }}).",
 		"- previous() means immediate upstream only; use previous(<depth>) only when depth-based access is explicitly intended.",
 		"- root() refers to the root trigger event payload.",
+		"- Never use root() or previous() to configure fields on the root trigger node itself (for example github.onIssueComment.repository); those fields must be set as fixed values.",
 		"- Never use non-SuperPlane syntaxes like {{steps.create_hetzner.ipv4}} or other steps.* references.",
 		"- When configuring fields like SSH host/IP, identify the actual producer node in the run chain and reference that node by name instead of assuming previous().",
 		"",

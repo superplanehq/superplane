@@ -18,9 +18,10 @@ It is intended for comment-driven automations like command handling, triage, and
 When generating workflow operations that include `github.onIssueComment`:
 
 1. Always set `configuration.repository`.
-2. Only set `configuration.contentFilter` when the user asks for filtering behavior.
-3. Treat `contentFilter` as a regex, not a plain substring.
-4. Prefer downstream branching with `if` if user intent requires complex logic beyond one regex.
+2. If the user did not specify a repository, ask a clarifying question for the repository name only (not `owner/repo`) before proposing operations.
+3. Only set `configuration.contentFilter` when the user asks for filtering behavior.
+4. Treat `contentFilter` as a regex, not a plain substring.
+5. Prefer downstream branching with `if` if user intent requires complex logic beyond one regex.
 
 ## Event Semantics
 
@@ -36,5 +37,6 @@ When generating workflow operations that include `github.onIssueComment`:
 ## Mistakes To Avoid
 
 - Omitting `repository`.
+- Asking for `owner/repo` format instead of just the repository name.
 - Treating `contentFilter` as non-regex text.
 - Assuming this trigger handles pull request review comments.
