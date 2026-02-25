@@ -121,7 +121,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 0, eventContext.Count())
 	})
 
-	t.Run("CREATED incident -> event emitted", func(t *testing.T) {
+	t.Run("CREATED incident -> event emitted with normalized fields", func(t *testing.T) {
 		body := []byte(`{
 			"data": {
 				"incident": {
@@ -129,6 +129,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 					"name": "API Outage",
 					"number": 42,
 					"severity": {"slug": "SEV1", "description": "Critical"},
+					"priority": {"slug": "P1", "description": "High"},
 					"current_milestone": "started"
 				}
 			},
@@ -156,9 +157,16 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 
 		payload := eventContext.Payloads[0]
 		assert.Equal(t, "firehydrant.incident.created", payload.Type)
-		assert.Equal(t, "incident.created", payload.Data.(map[string]any)["event"])
-		assert.Equal(t, "CREATED", payload.Data.(map[string]any)["operation"])
-		assert.NotNil(t, payload.Data.(map[string]any)["incident"])
+
+		data := payload.Data.(map[string]any)
+		assert.Equal(t, "incident.created", data["event"])
+		assert.Equal(t, "CREATED", data["operation"])
+
+		incident := data["incident"].(map[string]any)
+		assert.Equal(t, "SEV1", incident["severity"], "severity should be flattened to slug string")
+		assert.Equal(t, "P1", incident["priority"], "priority should be flattened to slug string")
+		assert.Equal(t, "API Outage", incident["name"], "scalar fields should be preserved")
+		assert.Equal(t, "started", incident["current_milestone"], "scalar fields should be preserved")
 	})
 
 	t.Run("severity filter match -> event emitted", func(t *testing.T) {
@@ -335,5 +343,118 @@ func Test__verifyWebhookSignature(t *testing.T) {
 
 		err := verifyWebhookSignature(sig, body, secret)
 		require.NoError(t, err)
+	})
+}
+
+func Test__buildIncidentPayload(t *testing.T) {
+	t.Run("nested severity and priority are flattened to slugs", func(t *testing.T) {
+		payload := WebhookPayload{
+			Data: WebhookData{
+				Incident: map[string]any{
+					"id":       "inc-1",
+					"name":     "Outage",
+					"severity": map[string]any{"slug": "SEV1", "description": "Critical"},
+					"priority": map[string]any{"slug": "P0", "description": "Urgent"},
+				},
+			},
+			Event: WebhookEvent{Operation: "CREATED", ResourceType: "incident"},
+		}
+
+		result := buildIncidentPayload(payload)
+		incident := result["incident"].(map[string]any)
+
+		assert.Equal(t, "SEV1", incident["severity"])
+		assert.Equal(t, "P0", incident["priority"])
+		assert.Equal(t, "inc-1", incident["id"])
+		assert.Equal(t, "Outage", incident["name"])
+	})
+
+	t.Run("nil severity and priority are left unchanged", func(t *testing.T) {
+		payload := WebhookPayload{
+			Data: WebhookData{
+				Incident: map[string]any{
+					"id":   "inc-2",
+					"name": "No Severity",
+				},
+			},
+			Event: WebhookEvent{Operation: "CREATED", ResourceType: "incident"},
+		}
+
+		result := buildIncidentPayload(payload)
+		incident := result["incident"].(map[string]any)
+
+		_, hasSeverity := incident["severity"]
+		_, hasPriority := incident["priority"]
+		assert.False(t, hasSeverity)
+		assert.False(t, hasPriority)
+		assert.Equal(t, "inc-2", incident["id"])
+	})
+
+	t.Run("severity already a string is preserved", func(t *testing.T) {
+		payload := WebhookPayload{
+			Data: WebhookData{
+				Incident: map[string]any{
+					"id":       "inc-3",
+					"severity": "SEV2",
+					"priority": "P1",
+				},
+			},
+			Event: WebhookEvent{Operation: "CREATED", ResourceType: "incident"},
+		}
+
+		result := buildIncidentPayload(payload)
+		incident := result["incident"].(map[string]any)
+
+		assert.Equal(t, "SEV2", incident["severity"])
+		assert.Equal(t, "P1", incident["priority"])
+	})
+
+	t.Run("nested object without slug key is left unchanged", func(t *testing.T) {
+		payload := WebhookPayload{
+			Data: WebhookData{
+				Incident: map[string]any{
+					"id":       "inc-4",
+					"severity": map[string]any{"description": "Critical"},
+					"priority": map[string]any{"level": 1},
+				},
+			},
+			Event: WebhookEvent{Operation: "CREATED", ResourceType: "incident"},
+		}
+
+		result := buildIncidentPayload(payload)
+		incident := result["incident"].(map[string]any)
+
+		assert.Equal(t, map[string]any{"description": "Critical"}, incident["severity"])
+		assert.Equal(t, map[string]any{"level": 1}, incident["priority"])
+	})
+
+	t.Run("nil incident data -> no incident key", func(t *testing.T) {
+		payload := WebhookPayload{
+			Data:  WebhookData{Incident: nil},
+			Event: WebhookEvent{Operation: "CREATED", ResourceType: "incident"},
+		}
+
+		result := buildIncidentPayload(payload)
+
+		_, hasIncident := result["incident"]
+		assert.False(t, hasIncident)
+		assert.Equal(t, "incident.created", result["event"])
+	})
+
+	t.Run("does not mutate the original incident map", func(t *testing.T) {
+		original := map[string]any{
+			"id":       "inc-5",
+			"severity": map[string]any{"slug": "SEV1", "description": "Critical"},
+		}
+		payload := WebhookPayload{
+			Data:  WebhookData{Incident: original},
+			Event: WebhookEvent{Operation: "CREATED", ResourceType: "incident"},
+		}
+
+		_ = buildIncidentPayload(payload)
+
+		// The original map should still have the nested object
+		_, isMap := original["severity"].(map[string]any)
+		assert.True(t, isMap, "original incident map should not be mutated")
 	})
 }
