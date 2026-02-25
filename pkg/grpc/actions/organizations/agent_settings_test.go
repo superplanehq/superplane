@@ -47,13 +47,13 @@ func Test__SetAgentOpenAIKey(t *testing.T) {
 	r := support.Setup(t)
 	ctx := context.Background()
 
-	t.Run("invalid format returns error", func(t *testing.T) {
+	t.Run("empty key returns error", func(t *testing.T) {
 		_, err := SetAgentOpenAIKey(
 			ctx,
 			r.Encryptor,
 			r.Organization.ID.String(),
 			r.User.String(),
-			"not-a-real-key",
+			"   ",
 			false,
 		)
 		require.Error(t, err)
