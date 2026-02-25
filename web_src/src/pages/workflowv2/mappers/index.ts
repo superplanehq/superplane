@@ -136,6 +136,11 @@ import {
   eventStateRegistry as statuspageEventStateRegistry,
 } from "./statuspage";
 import {
+  componentMappers as newrelicComponentMappers,
+  triggerRenderers as newrelicTriggerRenderers,
+  eventStateRegistry as newrelicEventStateRegistry,
+} from "./newrelic/index";
+import {
   componentMappers as dockerhubComponentMappers,
   customFieldRenderers as dockerhubCustomFieldRenderers,
   triggerRenderers as dockerhubTriggerRenderers,
@@ -198,6 +203,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   hetzner: hetznerComponentMappers,
   statuspage: statuspageComponentMappers,
   dockerhub: dockerhubComponentMappers,
+  newrelic: newrelicComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -226,6 +232,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   cursor: cursorTriggerRenderers,
   statuspage: statuspageTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
+  newrelic: newrelicTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -253,6 +260,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
+  newrelic: newrelicEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {

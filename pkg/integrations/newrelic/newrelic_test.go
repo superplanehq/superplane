@@ -2,11 +2,13 @@ package newrelic
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -515,6 +517,127 @@ func Test__Client__ValidateAPIKey(t *testing.T) {
 		assert.Contains(t, err.Error(), "GraphQL errors")
 		assert.Contains(t, err.Error(), "Invalid API key")
 	})
+}
+
+func Test__NewrelicWebhookHandler__Setup(t *testing.T) {
+	handler := &NewrelicWebhookHandler{}
+
+	t.Run("Setup - auto-provisions destination and channel", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				nerdGraphSearchDestinationsResponse(nil), // Not found
+				nerdGraphDestinationResponse("dest-123"),
+				nerdGraphSearchChannelsResponse(nil), // Not found
+				nerdGraphChannelResponse("chan-456"),
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"userApiKey": "NRAK-TEST",
+				"site":       "US",
+			},
+		}
+
+		ctx := core.WebhookHandlerContext{
+			Integration: integrationCtx,
+			Webhook:     &mockWebhook{id: uuid.New(), url: "https://superplane.io/webhook/123", config: map[string]any{"account": "123456"}, secret: "test-secret"},
+			HTTP:        httpCtx,
+		}
+
+		result, err := handler.Setup(ctx)
+		require.NoError(t, err)
+
+		metadata, ok := result.(WebhookMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "dest-123", metadata.DestinationID)
+		assert.Equal(t, "chan-456", metadata.ChannelID)
+
+		// Verify NerdGraph calls
+		require.Len(t, httpCtx.Requests, 4)
+	})
+}
+
+type mockWebhook struct {
+	id     uuid.UUID
+	url    string
+	config any
+	secret string
+	meta   any
+}
+
+func (w *mockWebhook) GetID() string                 { return w.id.String() }
+func (w *mockWebhook) GetURL() string                { return w.url }
+func (w *mockWebhook) GetConfiguration() any         { return w.config }
+func (w *mockWebhook) GetSecret() ([]byte, error)    { return []byte(w.secret), nil }
+func (w *mockWebhook) SetSecret(secret []byte) error { w.secret = string(secret); return nil }
+func (w *mockWebhook) GetMetadata() any              { return w.meta }
+func (w *mockWebhook) SetMetadata(meta any)          { w.meta = meta }
+
+func nerdGraphDestinationResponse(destID string) *http.Response {
+	body := `{
+		"data": {
+			"aiNotificationsCreateDestination": {
+				"destination": { "id": "` + destID + `" },
+				"errors": []
+			}
+		}
+	}`
+	return jsonResponse(http.StatusOK, body)
+}
+
+func nerdGraphChannelResponse(channelID string) *http.Response {
+	body := `{
+		"data": {
+			"aiNotificationsCreateChannel": {
+				"channel": { "id": "` + channelID + `" },
+				"errors": []
+			}
+		}
+	}`
+	return jsonResponse(http.StatusOK, body)
+}
+
+func nerdGraphSearchDestinationsResponse(destinations []map[string]string) *http.Response {
+	var entities []string
+	for _, d := range destinations {
+		entities = append(entities, fmt.Sprintf(`{"id": "%s", "name": "%s"}`, d["id"], d["name"]))
+	}
+	body := `{
+		"data": {
+			"actor": {
+				"account": {
+					"aiNotifications": {
+						"destinations": {
+							"entities": [` + strings.Join(entities, ",") + `]
+						}
+					}
+				}
+			}
+		}
+	}`
+	return jsonResponse(http.StatusOK, body)
+}
+
+func nerdGraphSearchChannelsResponse(channels []map[string]string) *http.Response {
+	var entities []string
+	for _, c := range channels {
+		entities = append(entities, fmt.Sprintf(`{"id": "%s", "name": "%s"}`, c["id"], c["name"]))
+	}
+	body := `{
+		"data": {
+			"actor": {
+				"account": {
+					"aiNotifications": {
+						"channels": {
+							"entities": [` + strings.Join(entities, ",") + `]
+						}
+					}
+				}
+			}
+		}
+	}`
+	return jsonResponse(http.StatusOK, body)
 }
 
 func Test__Newrelic__Name(t *testing.T) {
