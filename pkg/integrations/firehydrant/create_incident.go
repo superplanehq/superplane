@@ -56,12 +56,19 @@ func (c *CreateIncident) Documentation() string {
 Returns the created incident object including:
 - **id**: Incident ID
 - **name**: Incident name
+- **description**: Incident description
+- **summary**: Incident summary
+- **customer_impact_summary**: Summary of customer impact
+- **current_milestone**: Current milestone (e.g., started, acknowledged)
 - **number**: Incident number
 - **severity**: Severity level
 - **priority**: Priority level
 - **current_milestone**: Current milestone (e.g., started)
 - **created_at**: Creation timestamp
-- **summary**: Incident summary`
+- **started_at**: Start timestamp
+,- **tag_list**: List of tags associated with the incident
+- **impacts**: List of impacts associated with the incident
+- **milestones**: List of milestones associated with the incident`
 }
 
 func (c *CreateIncident) Icon() string {
