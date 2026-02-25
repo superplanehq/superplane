@@ -2,14 +2,14 @@ package firehydrant
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type WebhookConfiguration struct {
-	// FireHydrant webhooks subscribe to all incident events;
-	// filtering is done in the trigger's HandleWebhook.
+	Subscriptions []string `json:"subscriptions" mapstructure:"subscriptions"`
 }
 
 type WebhookMetadata struct {
@@ -19,16 +19,60 @@ type WebhookMetadata struct {
 type FireHydrantWebhookHandler struct{}
 
 func (h *FireHydrantWebhookHandler) CompareConfig(a, b any) (bool, error) {
-	// FireHydrant webhooks are coarse (all incident events per webhook),
-	// so any two webhook configs are compatible — they can share a webhook.
-	return true, nil
+	configA := WebhookConfiguration{}
+	configB := WebhookConfiguration{}
+
+	if err := mapstructure.Decode(a, &configA); err != nil {
+		return false, err
+	}
+
+	if err := mapstructure.Decode(b, &configB); err != nil {
+		return false, err
+	}
+
+	eventsMatch := subscriptionsSubsetOrEqual(configA.Subscriptions, configB.Subscriptions) ||
+		subscriptionsSubsetOrEqual(configB.Subscriptions, configA.Subscriptions)
+
+	return eventsMatch, nil
+}
+
+func subscriptionsSubsetOrEqual(a, b []string) bool {
+	for _, x := range a {
+		if !slices.Contains(b, x) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (h *FireHydrantWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	cur := WebhookConfiguration{}
+	req := WebhookConfiguration{}
+
+	if err := mapstructure.Decode(current, &cur); err != nil {
+		return nil, false, err
+	}
+
+	if err := mapstructure.Decode(requested, &req); err != nil {
+		return nil, false, err
+	}
+
+	// If the current subscriptions are a strict subset of the requested ones, expand.
+	if subscriptionsSubsetOrEqual(cur.Subscriptions, req.Subscriptions) && !slices.Equal(cur.Subscriptions, req.Subscriptions) {
+		cur.Subscriptions = req.Subscriptions
+		return cur, true, nil
+	}
+
 	return current, false, nil
 }
 
 func (h *FireHydrantWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
+	config := WebhookConfiguration{}
+	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config); err != nil {
+		return nil, fmt.Errorf("error decoding webhook configuration: %v", err)
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
@@ -40,7 +84,7 @@ func (h *FireHydrantWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, 
 	}
 
 	webhookURL := ctx.Webhook.GetURL()
-	webhook, err := client.CreateWebhook(webhookURL, string(secret))
+	webhook, err := client.CreateWebhook(webhookURL, string(secret), config.Subscriptions)
 	if err != nil {
 		return nil, fmt.Errorf("error creating webhook: %v", err)
 	}

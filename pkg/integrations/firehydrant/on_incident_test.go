@@ -269,12 +269,46 @@ func Test__OnIncident__Setup(t *testing.T) {
 	t.Run("valid configuration -> webhook requested", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   integrationCtx,
-			Configuration: map[string]any{},
+			Integration: integrationCtx,
+			Configuration: map[string]any{
+				"subscriptions": []any{"incidents"},
+			},
 		})
 
 		require.NoError(t, err)
 		assert.Len(t, integrationCtx.WebhookRequests, 1)
+
+		webhookConfig, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
+		require.True(t, ok)
+		assert.Equal(t, []string{"incidents"}, webhookConfig.Subscriptions)
+	})
+
+	t.Run("both subscriptions -> webhook requested with both", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{}
+		err := trigger.Setup(core.TriggerContext{
+			Integration: integrationCtx,
+			Configuration: map[string]any{
+				"subscriptions": []any{"incidents", "private_incidents"},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, integrationCtx.WebhookRequests, 1)
+
+		webhookConfig, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
+		require.True(t, ok)
+		assert.Equal(t, []string{"incidents", "private_incidents"}, webhookConfig.Subscriptions)
+	})
+
+	t.Run("no subscriptions -> error", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{}
+		err := trigger.Setup(core.TriggerContext{
+			Integration:   integrationCtx,
+			Configuration: map[string]any{},
+		})
+
+		require.ErrorContains(t, err, "at least one event type must be selected")
+		assert.Empty(t, integrationCtx.WebhookRequests)
 	})
 }
 
