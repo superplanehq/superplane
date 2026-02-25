@@ -48,28 +48,15 @@ The On Issue trigger starts a workflow execution when New Relic issues are creat
 
 ### Configuration
 
+- **Account**: The New Relic account to monitor for issues.
 - **Priorities**: Filter by priority (CRITICAL, HIGH, MEDIUM, LOW). Leave empty for all.
 - **States**: Filter by state (ACTIVATED, CLOSED, CREATED). Leave empty for all.
 
-### Webhook Setup
+### How It Works
 
-This trigger generates a webhook URL and a Secret. You must configure a **Workflow** in New Relic to send a webhook to this URL.
+When you save this trigger, Superplane automatically creates a **Webhook Destination** and a **Notification Channel** in your New Relic account via the NerdGraph API. New Relic issues matching your filter criteria will be forwarded to Superplane automatically — no manual configuration required.
 
-**IMPORTANT**: You must add a custom header `X-Superplane-Secret` in your New Relic Webhook configuration, using the Secret provided by Superplane.
-
-**Payload**:
-You must use the following JSON payload template in your New Relic Webhook configuration:
-
-```json
-{
-  "issue_id": "{{issueId}}",
-  "title": "{{annotations.title.[0]}}",
-  "priority": "{{priority}}",
-  "issue_url": "{{issuePageUrl}}",
-  "state": "{{state}}",
-  "owner": "{{owner}}"
-}
-```
+When the trigger is deleted, the destination and channel are automatically cleaned up from your New Relic account.
 
 ### Example Data
 
