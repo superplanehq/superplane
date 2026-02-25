@@ -1,7 +1,7 @@
 {
   "type": "daytona.preview.response",
   "data": {
-    "sandboxId": "sandbox-abc123def456",
+    "sandbox": "sandbox-abc123def456",
     "port": 3000,
     "signed": true,
     "url": "https://3000-signed-token-abc123.preview.daytona.app",

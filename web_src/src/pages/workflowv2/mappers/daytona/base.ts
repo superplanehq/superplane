@@ -48,8 +48,8 @@ export const baseMapper: ComponentBaseMapper = {
     }
 
     if (context.node.componentName === "daytona.getPreviewUrl") {
-      if (typeof responseData.sandboxId === "string" && responseData.sandboxId.length > 0) {
-        details["Sandbox ID"] = responseData.sandboxId;
+      if (typeof responseData.sandbox === "string" && responseData.sandbox.length > 0) {
+        details["Sandbox"] = responseData.sandbox;
       }
 
       if (typeof responseData.port === "number") {

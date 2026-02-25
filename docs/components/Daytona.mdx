@@ -220,7 +220,7 @@ The Get Preview URL component generates a Daytona preview URL for a specific san
 ### Output
 
 Returns preview URL information including:
-- **sandboxId**: The sandbox ID used in the request
+- **sandbox**: The sandbox ID used in the request
 - **port**: The target sandbox port
 - **signed**: Whether the generated URL is signed
 - **url**: Generated preview URL
@@ -240,7 +240,7 @@ Returns preview URL information including:
   "data": {
     "expiresInSeconds": 3600,
     "port": 3000,
-    "sandboxId": "sandbox-abc123def456",
+    "sandbox": "sandbox-abc123def456",
     "signed": true,
     "token": "signed-token-abc123",
     "url": "https://3000-signed-token-abc123.preview.daytona.app"

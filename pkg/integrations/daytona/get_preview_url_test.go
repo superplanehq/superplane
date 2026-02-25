@@ -115,7 +115,7 @@ func Test__PreviewURL__Execute(t *testing.T) {
 		payloadData, ok := wrappedPayload["data"].(PreviewURLPayload)
 		require.True(t, ok)
 
-		assert.Equal(t, "sandbox-123", payloadData.SandboxID)
+		assert.Equal(t, "sandbox-123", payloadData.Sandbox)
 		assert.Equal(t, 3000, payloadData.Port)
 		assert.True(t, payloadData.Signed)
 		assert.Equal(t, "signed-token-abc", payloadData.Token)

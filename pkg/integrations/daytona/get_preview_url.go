@@ -30,7 +30,7 @@ type PreviewURLSpec struct {
 }
 
 type PreviewURLPayload struct {
-	SandboxID        string `json:"sandboxId"`
+	Sandbox          string `json:"sandbox"`
 	Port             int    `json:"port"`
 	Signed           bool   `json:"signed"`
 	URL              string `json:"url"`
@@ -76,7 +76,7 @@ func (p *GetPreviewURLComponent) Documentation() string {
 ## Output
 
 Returns preview URL information including:
-- **sandboxId**: The sandbox ID used in the request
+- **sandbox**: The sandbox ID used in the request
 - **port**: The target sandbox port
 - **signed**: Whether the generated URL is signed
 - **url**: Generated preview URL
@@ -210,9 +210,9 @@ func (p *GetPreviewURLComponent) Execute(ctx core.ExecutionContext) error {
 	signed := resolveSignedPreview(spec.Signed)
 
 	payload := PreviewURLPayload{
-		SandboxID: spec.Sandbox,
-		Port:      port,
-		Signed:    signed,
+		Sandbox: spec.Sandbox,
+		Port:    port,
+		Signed:  signed,
 	}
 
 	if signed {
@@ -222,7 +222,7 @@ func (p *GetPreviewURLComponent) Execute(ctx core.ExecutionContext) error {
 			return fmt.Errorf("failed to generate signed preview URL: %v", err)
 		}
 
-		payload.SandboxID = signedPreviewURL.SandboxID
+		payload.Sandbox = signedPreviewURL.SandboxID
 		if signedPreviewURL.Port > 0 {
 			payload.Port = signedPreviewURL.Port
 		}
@@ -235,7 +235,7 @@ func (p *GetPreviewURLComponent) Execute(ctx core.ExecutionContext) error {
 			return fmt.Errorf("failed to generate preview URL: %v", err)
 		}
 
-		payload.SandboxID = previewURL.SandboxID
+		payload.Sandbox = previewURL.SandboxID
 		payload.URL = previewURL.URL
 		payload.Token = previewURL.Token
 	}
