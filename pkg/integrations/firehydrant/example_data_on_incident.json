@@ -1,40 +1,74 @@
 {
-  "type": "firehydrant.onIncident",
   "data": {
-    "event": "incident.created",
-    "operation": "CREATED",
-    "resource_type": "incident",
     "incident": {
-      "id": "04d9fd1a-ba9c-417d-b396-58a6e2c374de",
-      "name": "API latency spike detected",
-      "number": 602,
-      "description": "Multiple endpoints experiencing high latency",
-      "summary": "API response times have increased significantly across all endpoints.",
-      "customer_impact_summary": "Users are experiencing slow page loads and timeouts.",
+      "conference_bridges": [],
+      "counts": {
+        "starred_events": 0,
+        "starred_messages": 0
+      },
+      "created_at": "2026-02-24 19:33:52 UTC",
       "current_milestone": "started",
-      "created_at": "2026-01-19T12:00:00Z",
-      "updated_at": "2026-01-19T12:00:00Z",
-      "started_at": "2026-01-19T12:00:00Z",
-      "severity": {
-        "slug": "SEV2",
-        "description": "A significant issue affecting a subset of users",
-        "type": "unexpected_downtime"
-      },
-      "priority": {
-        "slug": "P3",
-        "description": ""
-      },
-      "milestones": [
+      "custom_fields": [
         {
-          "type": "started",
-          "occurred_at": "2026-01-19T12:00:00Z"
+          "display_name": "Detected by",
+          "id": "ab3964ed-fd26-4ceb-a372-80eab5c1f4e7",
+          "value": ""
         }
       ],
-      "impacts": [],
-      "tags": [],
+      "customer_impact_summary": "",
+      "description": "Deployments are impacted: [add more details]",
+      "follow_ups": [],
+      "id": "92deafc9-bd0e-459d-8fd7-785c10792d3b",
+      "impacts": [
+        {
+          "added_at": "2026-02-24 19:33:52 UTC",
+          "condition": "Unavailable",
+          "description": "",
+          "id": "e1c8fa62-66ef-42d0-b6be-f5e7b441c973",
+          "name": "Platform - Deployments",
+          "type": "Functionality"
+        }
+      ],
+      "incident_channels": [],
+      "labels": [],
+      "last_note": null,
+      "milestones": [
+        {
+          "created_at": "2026-01-01 12:00:00 UTC",
+          "duration": "",
+          "id": "0a1a7f8a-0a8b-42c0-b373-3970987395aa",
+          "name": "Started",
+          "occurred_at": "2026-01-01 12:00:00 UTC",
+          "original_milestone_id": "3cc9e5d3-1baf-499b-aea3-032dac56b6a5",
+          "type": "started",
+          "updated_at": "2026-01-01 12:00:00 UTC",
+          "updated_by_id": "7b491815-a0de-4103-969c-1dfaa1344686",
+          "updated_by_type": "User"
+        }
+      ],
+      "name": "Deployments are impacted: [add more details]",
+      "number": 14,
+      "priority": {
+        "description": "",
+        "slug": "P4"
+      },
+      "private_status_page_url": "https://app.firehydrant.io/incidents/internal/status_page/f8c9d62e-ed0c-49e6-814c-f76667ac7ed3/76a959cde572cc039221d5d0bb63d3ea2c0ff424f462de67f95419a448c943cdc9d96be07ef6af5cc4e4d9cb916ca1710868b53de8620f8bce3866147d59263041a68d05de708f1b28039a393b82ef473c9734506c14c2a026670f17987bef8f1a33337d",
       "role_assignments": [],
-      "team_assignments": []
+      "severity": {
+        "description": "Some customers (not all) are receiving intermittent errors on product pages or cannot use the product in possibly obscure ways. The product may be loading slowly or partially (missing images), and there is a workaround that customers can use.",
+        "slug": "SEV3",
+        "type": "unexpected_downtime"
+      },
+      "started_at": "2026-01-01 12:00:00 UTC",
+      "summary": "",
+      "tags": [],
+      "tasks": [],
+      "team_assignments": [],
+      "updated_at": "2026-01-01 12:00:00 UTC"
     }
   },
-  "timestamp": "2026-01-19T12:00:00Z"
+  "event": {
+    "operation": "UPDATED",
+    "resource_type": "incident"
+  }
 }

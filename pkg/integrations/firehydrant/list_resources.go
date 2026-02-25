@@ -3,7 +3,6 @@ package firehydrant
 import (
 	"fmt"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -23,13 +22,18 @@ func (f *FireHydrant) ListResources(resourceType string, ctx core.ListResourcesC
 }
 
 func listResourcesForSeverity(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	metadata := Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
-		return nil, fmt.Errorf("failed to decode application metadata: %w", err)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
-	resources := make([]core.IntegrationResource, 0, len(metadata.Severities))
-	for _, severity := range metadata.Severities {
+	severities, err := client.ListSeverities()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list severities: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(severities))
+	for _, severity := range severities {
 		resources = append(resources, core.IntegrationResource{
 			Type: "severity",
 			Name: severity.Slug,

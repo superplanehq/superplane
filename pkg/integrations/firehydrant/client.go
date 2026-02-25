@@ -66,6 +66,7 @@ type Severity struct {
 	Type        string `json:"type"`
 }
 
+// SeveritiesResponse represents the JSON:API response for listing severities
 type SeveritiesResponse struct {
 	Data []Severity `json:"data"`
 }
@@ -92,6 +93,7 @@ type Priority struct {
 	Description string `json:"description"`
 }
 
+// PrioritiesResponse represents the JSON:API response for listing priorities
 type PrioritiesResponse struct {
 	Data []Priority `json:"data"`
 }
@@ -141,10 +143,8 @@ func (c *Client) ListServices() ([]Service, error) {
 
 // Team represents a FireHydrant team
 type Team struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Slug        string `json:"slug"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type TeamsResponse struct {
@@ -171,17 +171,16 @@ func (c *Client) ListTeams() ([]Team, error) {
 type Incident struct {
 	ID                    string      `json:"id"`
 	Name                  string      `json:"name"`
-	Number                int         `json:"number"`
 	Description           string      `json:"description"`
 	Summary               string      `json:"summary"`
 	CustomerImpactSummary string      `json:"customer_impact_summary"`
 	CurrentMilestone      string      `json:"current_milestone"`
+	Number                int         `json:"number"`
 	CreatedAt             string      `json:"created_at"`
-	UpdatedAt             string      `json:"updated_at"`
 	StartedAt             string      `json:"started_at"`
-	Severity              *Severity   `json:"severity"`
-	Priority              *Priority   `json:"priority"`
-	Tags                  []string    `json:"tags"`
+	Severity              string      `json:"severity"`
+	Priority              string      `json:"priority"`
+	TagList               []string    `json:"tag_list"`
 	Impacts               []any       `json:"impacts"`
 	Milestones            []Milestone `json:"milestones"`
 }
@@ -227,10 +226,9 @@ func (c *Client) CreateIncident(request CreateIncidentRequest) (*Incident, error
 
 // Webhook represents a FireHydrant webhook configuration
 type Webhook struct {
-	ID     string `json:"id"`
-	URL    string `json:"url"`
-	State  string `json:"state"`
-	Secret string `json:"secret"`
+	ID    string `json:"id"`
+	URL   string `json:"url"`
+	State string `json:"state"`
 }
 
 type WebhooksResponse struct {
@@ -238,16 +236,16 @@ type WebhooksResponse struct {
 }
 
 type CreateWebhookRequest struct {
-	URL    string `json:"url"`
-	State  string `json:"state,omitempty"`
-	Secret string `json:"secret,omitempty"`
+	URL           string   `json:"url"`
+	Secret        string   `json:"secret,omitempty"`
+	Subscriptions []string `json:"subscriptions,omitempty"`
 }
 
 func (c *Client) CreateWebhook(webhookURL, secret string) (*Webhook, error) {
 	request := CreateWebhookRequest{
-		URL:    webhookURL,
-		State:  "active",
-		Secret: secret,
+		URL:           webhookURL,
+		Secret:        secret,
+		Subscriptions: []string{"incidents"},
 	}
 
 	body, err := json.Marshal(request)
