@@ -47,7 +47,9 @@ export function applyAiOperationsToWorkflow({
 
   const addedNodeKeys = new Set(
     operations
-      .filter((operation): operation is Extract<AiCanvasOperation, { type: "add_node" }> => operation.type === "add_node")
+      .filter(
+        (operation): operation is Extract<AiCanvasOperation, { type: "add_node" }> => operation.type === "add_node",
+      )
       .map((operation) => operation.nodeKey)
       .filter((nodeKey): nodeKey is string => !!nodeKey),
   );
@@ -131,9 +133,7 @@ export function applyAiOperationsToWorkflow({
     .map((node) => node.position?.x)
     .filter((x): x is number => typeof x === "number");
   const startX =
-    existingNodeXs.length > 0
-      ? existingNodeXs.reduce((minX, x) => (x < minX ? x : minX), Number.POSITIVE_INFINITY)
-      : 0;
+    existingNodeXs.length > 0 ? existingNodeXs.reduce((minX, x) => (x < minX ? x : minX), Number.POSITIVE_INFINITY) : 0;
   const maxYFromExistingNodes = existingNodes
     .map((node) => node.position?.y)
     .filter((y): y is number => typeof y === "number")
@@ -498,19 +498,33 @@ export function applyAiOperationsToWorkflow({
       if (positioned.length === 0) {
         return null;
       }
-      const minX = positioned.reduce((value, node) => Math.min(value, node.position.x ?? value), Number.POSITIVE_INFINITY);
-      const minY = positioned.reduce((value, node) => Math.min(value, node.position.y ?? value), Number.POSITIVE_INFINITY);
-      const maxY = positioned.reduce((value, node) => Math.max(value, node.position.y ?? value), Number.NEGATIVE_INFINITY);
+      const minX = positioned.reduce(
+        (value, node) => Math.min(value, node.position.x ?? value),
+        Number.POSITIVE_INFINITY,
+      );
+      const minY = positioned.reduce(
+        (value, node) => Math.min(value, node.position.y ?? value),
+        Number.POSITIVE_INFINITY,
+      );
+      const maxY = positioned.reduce(
+        (value, node) => Math.max(value, node.position.y ?? value),
+        Number.NEGATIVE_INFINITY,
+      );
       return { minX, minY, maxY };
     };
 
     const existingComponents = components.filter(componentHasExisting);
     const detachedComponents = components.filter((component) => !componentHasExisting(component));
     if (existingComponents.length > 0 && detachedComponents.length > 0) {
-      const existingMetrics = existingComponents.map(positionedMetrics).filter((metric): metric is NonNullable<typeof metric> => !!metric);
+      const existingMetrics = existingComponents
+        .map(positionedMetrics)
+        .filter((metric): metric is NonNullable<typeof metric> => !!metric);
       const detachedWithMetrics = detachedComponents
         .map((component) => ({ component, metrics: positionedMetrics(component) }))
-        .filter((entry): entry is { component: string[]; metrics: NonNullable<ReturnType<typeof positionedMetrics>> } => !!entry.metrics)
+        .filter(
+          (entry): entry is { component: string[]; metrics: NonNullable<ReturnType<typeof positionedMetrics>> } =>
+            !!entry.metrics,
+        )
         .sort((left, right) => {
           if (left.metrics.minY !== right.metrics.minY) {
             return left.metrics.minY - right.metrics.minY;
@@ -519,8 +533,14 @@ export function applyAiOperationsToWorkflow({
         });
 
       if (existingMetrics.length > 0) {
-        const existingStartX = existingMetrics.reduce((value, metric) => Math.min(value, metric.minX), Number.POSITIVE_INFINITY);
-        const existingMaxY = existingMetrics.reduce((value, metric) => Math.max(value, metric.maxY), Number.NEGATIVE_INFINITY);
+        const existingStartX = existingMetrics.reduce(
+          (value, metric) => Math.min(value, metric.minX),
+          Number.POSITIVE_INFINITY,
+        );
+        const existingMaxY = existingMetrics.reduce(
+          (value, metric) => Math.max(value, metric.maxY),
+          Number.NEGATIVE_INFINITY,
+        );
         let nextLaneY = existingMaxY + disconnectedFlowVerticalGap;
 
         for (const { component, metrics } of detachedWithMetrics) {
