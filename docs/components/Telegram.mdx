@@ -1,0 +1,136 @@
+---
+title: "Telegram"
+---
+
+Send messages and react to events via Telegram bots
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Mention" href="#on-mention" description="Fires when the bot is mentioned in a message" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Send Message" href="#send-message" description="Send a text message to a Telegram chat" />
+</CardGrid>
+
+## Instructions
+
+To set up Telegram integration:
+
+1. Get a bot token from @BotFather and paste it in the field below
+2. Disable privacy mode so the bot can receive messages in groups: send /setprivacy to @BotFather, select your bot, and choose Disable
+3. Add the bot to your group or channel
+
+Note: if the bot was already in a group before disabling privacy mode, remove and re-add it for the change to take effect.
+
+<a id="on-mention"></a>
+
+## On Mention
+
+The On Mention trigger starts a workflow execution when the Telegram bot is mentioned in a message.
+
+### Use Cases
+
+- **Bot commands**: Process commands from Telegram messages
+- **Bot interactions**: Create interactive Telegram bots
+- **Team workflows**: Trigger workflows from Telegram conversations
+- **Notification processing**: Process and respond to mentions
+
+### Configuration
+
+- **Chat ID**: Optional chat filter - if specified, only mentions in this chat will trigger (leave empty to listen to all chats)
+
+### Event Data
+
+Each mention event includes:
+- **message_id**: The unique message identifier
+- **from**: User who mentioned the bot
+- **chat**: Chat where the mention occurred
+- **text**: The message text containing the mention
+- **date**: Unix timestamp of the message
+
+### Setup
+
+This trigger automatically sets up a webhook subscription when configured. The subscription is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "chat": {
+      "id": -9876543210,
+      "title": "My Group",
+      "type": "group"
+    },
+    "date": 1737028800,
+    "entities": [
+      {
+        "length": 6,
+        "offset": 0,
+        "type": "mention"
+      }
+    ],
+    "from": {
+      "first_name": "John",
+      "id": 111222333,
+      "is_bot": false,
+      "username": "johndoe"
+    },
+    "message_id": 1234,
+    "text": "@mybot hello!"
+  },
+  "type": "telegram.message.mention"
+}
+```
+
+<a id="send-message"></a>
+
+## Send Message
+
+The Send Message component sends a text message to a Telegram chat.
+
+### Use Cases
+
+- **Notifications**: Send notifications about workflow events or system status
+- **Alerts**: Alert teams about important events or errors
+- **Updates**: Provide status updates on long-running processes
+- **Bot interactions**: Send automated responses to users
+
+### Configuration
+
+- **Chat ID**: The Telegram chat ID (can be a user, group, or channel)
+- **Text**: The message text to send
+- **Parse Mode**: Optional formatting mode (Markdown)
+
+### Output
+
+Returns metadata about the sent message including message ID, chat ID, text, and timestamp.
+
+### Notes
+
+- The bot must have permission to post messages in the specified chat
+- For groups and channels, add the bot as a member first
+- Use parse mode for rich text formatting in your messages
+- Chat ID can be negative for groups and channels
+
+### Example Output
+
+```json
+{
+  "data": {
+    "chat_id": -9876543210,
+    "date": 1737028800,
+    "message_id": 1234,
+    "text": "Hello from SuperPlane"
+  },
+  "timestamp": "2026-01-16T12:00:00.000Z",
+  "type": "telegram.message.sent"
+}
+```
+

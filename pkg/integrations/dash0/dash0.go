@@ -1,7 +1,11 @@
 package dash0
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -21,7 +25,7 @@ type Configuration struct {
 }
 
 type Metadata struct {
-	// No metadata needed initially
+	WebhookURL string `json:"webhookUrl" mapstructure:"webhookUrl"`
 }
 
 func (d *Dash0) Name() string {
@@ -76,7 +80,9 @@ func (d *Dash0) Components() []core.Component {
 }
 
 func (d *Dash0) Triggers() []core.Trigger {
-	return []core.Trigger{}
+	return []core.Trigger{
+		&OnNotification{},
+	}
 }
 
 func (d *Dash0) Sync(ctx core.SyncContext) error {
@@ -107,7 +113,14 @@ func (d *Dash0) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error validating connection: %v", err)
 	}
 
-	ctx.Integration.SetMetadata(Metadata{})
+	ctx.Integration.SetMetadata(Metadata{
+		WebhookURL: fmt.Sprintf(
+			"%s/api/v1/integrations/%s/webhook",
+			strings.TrimRight(ctx.WebhooksBaseURL, "/"),
+			ctx.Integration.ID().String(),
+		),
+	})
+
 	ctx.Integration.Ready()
 	return nil
 }
@@ -211,8 +224,47 @@ func extractSyntheticCheckIDAndName(check map[string]any) (id, name string) {
 	return id, name
 }
 
+type SubscriptionConfiguration struct{}
+
 func (d *Dash0) HandleRequest(ctx core.HTTPRequestContext) {
-	// no-op
+	if !strings.HasSuffix(ctx.Request.URL.Path, "/webhook") {
+		ctx.Response.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if ctx.Request.Method != http.MethodPost {
+		ctx.Response.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.Logger.Errorf("failed to read dash0 webhook request body: %v", err)
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	payload := map[string]any{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		ctx.Logger.Errorf("failed to parse dash0 webhook request body: %v", err)
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	subscriptions, err := ctx.Integration.ListSubscriptions()
+	if err != nil {
+		ctx.Logger.Errorf("failed to list dash0 subscriptions: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	for _, subscription := range subscriptions {
+		if err := subscription.SendMessage(payload); err != nil {
+			ctx.Logger.Errorf("failed to send dash0 notification to subscription: %v", err)
+		}
+	}
+
+	ctx.Response.WriteHeader(http.StatusOK)
 }
 
 func (d *Dash0) Actions() []core.Action {

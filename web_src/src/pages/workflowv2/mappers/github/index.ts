@@ -6,7 +6,8 @@ import { onIssueCommentTriggerRenderer } from "./on_issue_comment";
 import { onReleaseTriggerRenderer } from "./on_release";
 import { onTagCreatedTriggerRenderer } from "./on_tag_created";
 import { onBranchCreatedTriggerRenderer } from "./on_branch_created";
-import { onPullRequestReviewCommentTriggerRenderer } from "./on_pr_review_comment";
+import { onPRCommentTriggerRenderer } from "./on_pr_comment";
+import { onPRReviewCommentTriggerRenderer } from "./on_pr_review_comment";
 import { onWorkflowRunTriggerRenderer } from "./on_workflow_run";
 import { baseIssueMapper } from "./base";
 import { RUN_WORKFLOW_STATE_REGISTRY, runWorkflowMapper, runWorkflowCustomFieldRenderer } from "./run_workflow";
@@ -18,6 +19,7 @@ import { deleteReleaseMapper } from "./delete_release";
 import { getReleaseMapper } from "./get_release";
 import { createReviewMapper } from "./create_review";
 import { getWorkflowUsageMapper } from "./get_workflow_usage";
+import { labelsMapper } from "./labels";
 import { buildActionStateRegistry } from "../utils";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
@@ -33,6 +35,10 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   deleteRelease: buildActionStateRegistry("deleted"),
   getRelease: buildActionStateRegistry("retrieved"),
   getWorkflowUsage: buildActionStateRegistry("retrieved"),
+  addIssueLabel: buildActionStateRegistry("added"),
+  removeIssueLabel: buildActionStateRegistry("removed"),
+  addIssueAssignee: buildActionStateRegistry("added"),
+  removeIssueAssignee: buildActionStateRegistry("removed"),
 };
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -48,12 +54,17 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   deleteRelease: deleteReleaseMapper,
   getRelease: getReleaseMapper,
   getWorkflowUsage: getWorkflowUsageMapper,
+  addIssueLabel: labelsMapper,
+  removeIssueLabel: labelsMapper,
+  addIssueAssignee: baseIssueMapper,
+  removeIssueAssignee: baseIssueMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   onPush: onPushTriggerRenderer,
   onPullRequest: onPullRequestTriggerRenderer,
-  onPRComment: onPullRequestReviewCommentTriggerRenderer,
+  onPRComment: onPRCommentTriggerRenderer,
+  onPRReviewComment: onPRReviewCommentTriggerRenderer,
   onIssue: onIssueTriggerRenderer,
   onIssueComment: onIssueCommentTriggerRenderer,
   onRelease: onReleaseTriggerRenderer,
