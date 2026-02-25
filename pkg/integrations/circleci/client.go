@@ -80,10 +80,33 @@ func (c *Client) GetCurrentUser() (*UserResponse, error) {
 	return &user, nil
 }
 
+type CollaborationResponse struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Slug    string `json:"slug"`
+	VCSType string `json:"vcs-type"`
+}
+
+func (c *Client) GetCollaborations() ([]CollaborationResponse, error) {
+	reqURL := fmt.Sprintf("%s/me/collaborations", baseURL)
+	responseBody, err := c.execRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var collaborations []CollaborationResponse
+	if err := json.Unmarshal(responseBody, &collaborations); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return collaborations, nil
+}
+
 type ProjectResponse struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Slug string `json:"slug"`
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	Slug             string `json:"slug"`
+	OrganizationName string `json:"organization_name"`
 }
 
 func (c *Client) GetProject(projectSlug string) (*ProjectResponse, error) {
@@ -117,8 +140,8 @@ type AllPipelinesResponse struct {
 	NextPageToken string             `json:"next_page_token"`
 }
 
-func (c *Client) GetAllPipelines() (*AllPipelinesResponse, error) {
-	reqURL := fmt.Sprintf("%s/pipeline", baseURL)
+func (c *Client) GetPipelinesByOrg(orgSlug string) (*AllPipelinesResponse, error) {
+	reqURL := fmt.Sprintf("%s/pipeline?org-slug=%s", baseURL, url.QueryEscape(orgSlug))
 	responseBody, err := c.execRequest("GET", reqURL, nil)
 	if err != nil {
 		return nil, err

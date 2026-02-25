@@ -2,6 +2,7 @@ package circleci
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -17,23 +18,44 @@ func ListProjectSlugs(ctx core.ListResourcesContext) ([]core.IntegrationResource
 		return nil, fmt.Errorf("failed to create client: %v", err)
 	}
 
-	pipelines, err := client.GetAllPipelines()
+	collaborations, err := client.GetCollaborations()
 	if err != nil {
-		return nil, fmt.Errorf("failed to list pipelines: %v", err)
+		return nil, fmt.Errorf("failed to list collaborations: %v", err)
 	}
 
 	seen := make(map[string]bool)
 	resources := []core.IntegrationResource{}
-	for _, p := range pipelines.Items {
-		if p.ProjectSlug == "" || seen[p.ProjectSlug] {
+
+	for _, collab := range collaborations {
+		if collab.Slug == "" {
 			continue
 		}
-		seen[p.ProjectSlug] = true
-		resources = append(resources, core.IntegrationResource{
-			Type: ResourceTypeProject,
-			Name: p.ProjectSlug,
-			ID:   p.ProjectSlug,
-		})
+
+		pipelines, err := client.GetPipelinesByOrg(collab.Slug)
+		if err != nil {
+			continue
+		}
+
+		for _, p := range pipelines.Items {
+			if p.ProjectSlug == "" || seen[p.ProjectSlug] {
+				continue
+			}
+			seen[p.ProjectSlug] = true
+
+			name := p.ProjectSlug
+			if strings.HasPrefix(p.ProjectSlug, "circleci/") {
+				project, err := client.GetProject(p.ProjectSlug)
+				if err == nil && project.Name != "" {
+					name = fmt.Sprintf("%s/%s", project.OrganizationName, project.Name)
+				}
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: ResourceTypeProject,
+				Name: name,
+				ID:   p.ProjectSlug,
+			})
+		}
 	}
 
 	return resources, nil
