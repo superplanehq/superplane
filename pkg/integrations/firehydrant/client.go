@@ -241,11 +241,11 @@ type CreateWebhookRequest struct {
 	Subscriptions []string `json:"subscriptions,omitempty"`
 }
 
-func (c *Client) CreateWebhook(webhookURL, secret string) (*Webhook, error) {
+func (c *Client) CreateWebhook(webhookURL, secret string, subscriptions []string) (*Webhook, error) {
 	request := CreateWebhookRequest{
 		URL:           webhookURL,
 		Secret:        secret,
-		Subscriptions: []string{"incidents"},
+		Subscriptions: subscriptions,
 	}
 
 	body, err := json.Marshal(request)

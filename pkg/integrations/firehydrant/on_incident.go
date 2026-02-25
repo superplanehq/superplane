@@ -15,7 +15,8 @@ import (
 type OnIncident struct{}
 
 type OnIncidentConfiguration struct {
-	Severities []string `json:"severities"`
+	Severities    []string `json:"severities"`
+	Subscriptions []string `json:"subscriptions"`
 }
 
 func (t *OnIncident) Name() string {
@@ -41,6 +42,7 @@ func (t *OnIncident) Documentation() string {
 
 ## Configuration
 
+- **Event Types** (required): Choose which event types to subscribe to — Incidents, Private Incidents, or both. At least one must be selected.
 - **Severities** (optional): Filter by severity levels. Only incidents matching the selected severities will trigger the workflow. If empty, all new incidents will trigger.
 
 ## Event Data
@@ -74,6 +76,21 @@ func (t *OnIncident) Color() string {
 func (t *OnIncident) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:        "subscriptions",
+			Label:       "Event Types",
+			Type:        configuration.FieldTypeMultiSelect,
+			Required:    true,
+			Description: "Choose which event types to subscribe to. Select at least one.",
+			TypeOptions: &configuration.TypeOptions{
+				MultiSelect: &configuration.MultiSelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Incidents", Value: "incidents"},
+						{Label: "Private Incidents", Value: "incidents.private"},
+					},
+				},
+			},
+		},
+		{
 			Name:        "severities",
 			Label:       "Severities",
 			Type:        configuration.FieldTypeMultiSelect,
@@ -98,7 +115,18 @@ func (t *OnIncident) Configuration() []configuration.Field {
 }
 
 func (t *OnIncident) Setup(ctx core.TriggerContext) error {
-	return ctx.Integration.RequestWebhook(WebhookConfiguration{})
+	config := OnIncidentConfiguration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if len(config.Subscriptions) == 0 {
+		return fmt.Errorf("at least one event type must be selected")
+	}
+
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
+		Subscriptions: config.Subscriptions,
+	})
 }
 
 func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
