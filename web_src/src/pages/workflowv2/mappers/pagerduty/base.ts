@@ -16,7 +16,7 @@ export function getIncidentFromExecution(execution: CanvasesCanvasNodeExecution)
   return outputs.default[0].data.incident as Incident;
 }
 
-export function getDetailsForIncident(incident: Incident, agent?: ResourceRef): Record<string, string> {
+export function getDetailsForIncident(incident: Incident | undefined, agent?: ResourceRef): Record<string, string> {
   const details: Record<string, string> = {};
   Object.assign(details, {
     "Created At": incident?.created_at ? new Date(incident.created_at).toLocaleString() : "-",

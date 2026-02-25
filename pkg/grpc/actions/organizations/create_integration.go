@@ -116,7 +116,11 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 		return nil, err
 	}
 
-	metadata, err := structpb.NewStruct(instance.Metadata.Data())
+	metadataMap := instance.Metadata.Data()
+	if metadataMap == nil {
+		metadataMap = map[string]any{}
+	}
+	metadata, err := structpb.NewStruct(metadataMap)
 	if err != nil {
 		return nil, err
 	}

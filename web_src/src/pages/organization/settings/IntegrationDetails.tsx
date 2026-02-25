@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import type { ConfigurationField } from "@/api-client";
-import { showErrorToast } from "@/utils/toast";
+import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { getApiErrorMessage } from "@/utils/errors";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
@@ -56,6 +56,52 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   useEffect(() => {
     setIntegrationName(integration?.metadata?.name || integration?.spec?.integrationName || "");
   }, [integration?.metadata?.name, integration?.spec?.integrationName]);
+
+  // Full instructions (same for all integrations)
+  const instructionsContent = useMemo(() => {
+    const raw = integrationDef?.instructions?.trim();
+    if (!raw) return null;
+    return <IntegrationInstructions description={raw} />;
+  }, [integrationDef?.instructions]);
+
+  // Webhook block: show when integration exposes a webhook URL in metadata (generic, no integration name check)
+  const webhookSection = useMemo(() => {
+    const webhookUrl =
+      integration?.status?.metadata && typeof integration.status.metadata.webhookUrl === "string"
+        ? integration.status.metadata.webhookUrl
+        : null;
+    if (!webhookUrl) return null;
+    const webhookConfigured =
+      integration?.status?.metadata &&
+      typeof integration.status.metadata.webhookSigningSecretConfigured === "boolean" &&
+      integration.status.metadata.webhookSigningSecretConfigured === true;
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
+        <div className="p-6">
+          <h2 className="text-lg font-medium mb-4">Webhook</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+            {webhookConfigured
+              ? "Webhook is configured. You can copy the URL below if needed."
+              : "Add this URL in your external service to receive webhooks. Complete any setup steps described in the instructions above."}
+          </p>
+          <div className="flex items-center gap-2">
+            <Input type="text" value={webhookUrl} readOnly className="font-mono text-sm flex-1" />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                await navigator.clipboard.writeText(webhookUrl);
+                showSuccessToast("Webhook URL copied");
+              }}
+            >
+              Copy
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }, [integration?.status?.metadata?.webhookUrl, integration?.status?.metadata?.webhookSigningSecretConfigured]);
 
   // Group usedIn nodes by workflow
   const workflowGroups = useMemo(() => {
@@ -248,6 +294,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
           />
         )}
 
+        {instructionsContent}
         {metadataContent}
 
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
@@ -317,6 +364,8 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
             )}
           </div>
         </div>
+
+        {webhookSection}
 
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
           <div className="p-6">

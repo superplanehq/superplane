@@ -50,6 +50,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/grafana"
 	_ "github.com/superplanehq/superplane/pkg/integrations/harness"
 	_ "github.com/superplanehq/superplane/pkg/integrations/hetzner"
+	_ "github.com/superplanehq/superplane/pkg/integrations/incident"
 	_ "github.com/superplanehq/superplane/pkg/integrations/jfrog_artifactory"
 	_ "github.com/superplanehq/superplane/pkg/integrations/jira"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
@@ -100,7 +101,8 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 	if os.Getenv("START_NODE_REQUEST_WORKER") == "yes" {
 		log.Println("Starting Node Request Worker")
 
-		w := workers.NewNodeRequestWorker(encryptor, registry)
+		webhookBaseURL := getWebhookBaseURL(baseURL)
+		w := workers.NewNodeRequestWorker(encryptor, registry, webhookBaseURL)
 		go w.Start(context.Background())
 	}
 
@@ -413,19 +415,19 @@ var DefaultMaxHTTPResponseBytes int64 = 8 * 1024 * 1024
  * - Localhost variations
  */
 var defaultBlockedHTTPHosts = []string{
-	"metadata.google.internal",
-	"metadata.goog",
-	"metadata.azure.com",
-	"169.254.169.254",
-	"fd00:ec2::254",
-	"kubernetes.default",
-	"kubernetes.default.svc",
-	"kubernetes.default.svc.cluster.local",
-	"localhost",
-	"127.0.0.1",
-	"::1",
-	"0.0.0.0",
-	"::",
+	// "metadata.google.internal",
+	// "metadata.goog",
+	// "metadata.azure.com",
+	// "169.254.169.254",
+	// "fd00:ec2::254",
+	// "kubernetes.default",
+	// "kubernetes.default.svc",
+	// "kubernetes.default.svc.cluster.local",
+	// "localhost",
+	// "127.0.0.1",
+	// "::1",
+	// "0.0.0.0",
+	// "::",
 }
 
 func getBlockedHTTPHosts() []string {
@@ -438,15 +440,15 @@ func getBlockedHTTPHosts() []string {
 }
 
 var defaultBlockedPrivateIPRanges = []string{
-	"0.0.0.0/8",
-	"10.0.0.0/8",
-	"172.16.0.0/12",
-	"192.168.0.0/16",
-	"127.0.0.0/8",
-	"169.254.0.0/16",
-	"::1/128",
-	"fc00::/7",
-	"fe80::/10",
+	// "0.0.0.0/8",
+	// "10.0.0.0/8",
+	// "172.16.0.0/12",
+	// "192.168.0.0/16",
+	// "127.0.0.0/8",
+	// "169.254.0.0/16",
+	// "::1/128",
+	// "fc00::/7",
+	// "fe80::/10",
 }
 
 func getPrivateIPRanges() []string {

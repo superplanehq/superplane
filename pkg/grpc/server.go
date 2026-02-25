@@ -119,7 +119,7 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 	blueprintService := NewBlueprintService(registry)
 	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
 
-	canvasService := NewCanvasService(authService, registry, encryptor, webhooksBaseURL+basePath)
+	canvasService := NewCanvasService(authService, registry, encryptor, webhooksBaseURL)
 	pbCanvases.RegisterCanvasesServer(grpcServer, canvasService)
 
 	integrationService := NewIntegrationService(encryptor, registry)
