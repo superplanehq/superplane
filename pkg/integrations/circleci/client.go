@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -102,12 +103,33 @@ func (c *Client) GetProject(projectSlug string) (*ProjectResponse, error) {
 }
 
 type PipelineResponse struct {
-	ID        string                 `json:"id"`
-	Number    int                    `json:"number"`
-	State     string                 `json:"state"`
-	CreatedAt string                 `json:"created_at"`
-	UpdatedAt string                 `json:"updated_at"`
-	VCS       map[string]interface{} `json:"vcs"`
+	ID          string                 `json:"id"`
+	Number      int                    `json:"number"`
+	State       string                 `json:"state"`
+	ProjectSlug string                 `json:"project_slug"`
+	CreatedAt   string                 `json:"created_at"`
+	UpdatedAt   string                 `json:"updated_at"`
+	VCS         map[string]interface{} `json:"vcs"`
+}
+
+type AllPipelinesResponse struct {
+	Items         []PipelineResponse `json:"items"`
+	NextPageToken string             `json:"next_page_token"`
+}
+
+func (c *Client) GetAllPipelines() (*AllPipelinesResponse, error) {
+	reqURL := fmt.Sprintf("%s/pipeline", baseURL)
+	responseBody, err := c.execRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response AllPipelinesResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &response, nil
 }
 
 func (c *Client) GetPipeline(pipelineID string) (*PipelineResponse, error) {
@@ -360,6 +382,70 @@ func (c *Client) DeleteWebhook(webhookID string) error {
 	}
 
 	return nil
+}
+
+type JobResponse struct {
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Type          string `json:"type"`
+	Status        string `json:"status"`
+	StartedAt     string `json:"started_at"`
+	StoppedAt     string `json:"stopped_at"`
+	JobNumber     int    `json:"job_number"`
+	ProjectSlug   string `json:"project_slug"`
+	ApprovalReqID string `json:"approval_request_id,omitempty"`
+}
+
+func (c *Client) GetWorkflowJobs(workflowID string) ([]JobResponse, error) {
+	url := fmt.Sprintf("%s/workflow/%s/job", baseURL, workflowID)
+	responseBody, err := c.execRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Items []JobResponse `json:"items"`
+	}
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return response.Items, nil
+}
+
+type ProjectPipelinesResponse struct {
+	Items         []PipelineResponse `json:"items"`
+	NextPageToken string             `json:"next_page_token"`
+}
+
+func (c *Client) GetProjectPipelinesWithPageToken(projectSlug, branch, pageToken string) (*ProjectPipelinesResponse, error) {
+	reqURL := fmt.Sprintf("%s/project/%s/pipeline", baseURL, projectSlug)
+
+	query := url.Values{}
+	if branch != "" {
+		query.Set("branch", branch)
+	}
+	if pageToken != "" {
+		query.Set("page-token", pageToken)
+	}
+
+	if len(query) > 0 {
+		reqURL = fmt.Sprintf("%s?%s", reqURL, query.Encode())
+	}
+
+	responseBody, err := c.execRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response ProjectPipelinesResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &response, nil
 }
 
 type PipelineDefinitionResponse struct {
