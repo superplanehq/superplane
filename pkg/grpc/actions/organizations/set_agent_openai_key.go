@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -44,7 +45,7 @@ func SetAgentOpenAIKey(
 	validationStatus := models.OrganizationAgentOpenAIKeyStatusUnchecked
 	var validationError *string
 	var validatedAt *time.Time
-	if validate {
+	if validate && shouldValidateOpenAIKeyLive() {
 		validationStatus, validationError, validatedAt = validateOpenAIKeyLive(ctx, apiKey)
 	}
 	if validationStatus == models.OrganizationAgentOpenAIKeyStatusInvalid {
@@ -150,4 +151,9 @@ func validateOpenAIKeyLive(
 
 	msg := "OpenAI rejected the provided API key"
 	return models.OrganizationAgentOpenAIKeyStatusInvalid, &msg, &now
+}
+
+func shouldValidateOpenAIKeyLive() bool {
+	// E2E runs against superplane_test and should not depend on external OpenAI availability.
+	return strings.TrimSpace(os.Getenv("DB_NAME")) != "superplane_test"
 }

@@ -84,7 +84,7 @@ func (s *agentModeSteps) thenISeeTheAgentModeCard() {
 
 func (s *agentModeSteps) thenISeeTheSetupAction() {
 	page := s.session.Page()
-	setup := page.GetByTestId("agent-mode-configure-button")
+	setup := page.GetByTestId("agent-mode-setup-button")
 	err := setup.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
 	require.NoError(s.t, err)
 }
@@ -98,8 +98,16 @@ func (s *agentModeSteps) thenISeeDisableAction() {
 
 func (s *agentModeSteps) whenIClickSetup() {
 	page := s.session.Page()
-	setup := page.GetByTestId("agent-mode-configure-button")
-	err := setup.Click()
+	setup := page.GetByTestId("agent-mode-setup-button")
+	if count, countErr := setup.Count(); countErr == nil && count > 0 {
+		err := setup.Click()
+		require.NoError(s.t, err)
+		s.session.Sleep(500)
+		return
+	}
+
+	update := page.GetByTestId("agent-mode-update-key-button")
+	err := update.Click()
 	require.NoError(s.t, err)
 	s.session.Sleep(500)
 }
