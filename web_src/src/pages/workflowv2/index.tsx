@@ -1851,6 +1851,9 @@ export function WorkflowPageV2() {
       const minHorizontalGapDefault = 430;
       const minHorizontalGapNamed = 560;
       const minVerticalGap = 220;
+      const estimatedNodeWidth = 420;
+      const estimatedNodeHeight = 180;
+      const nodePadding = 40;
 
       const resolveNodeId = (ref?: { nodeKey?: string; nodeId?: string; nodeName?: string }) => {
         if (!ref) return null;
@@ -1868,6 +1871,65 @@ export function WorkflowPageV2() {
       const updatedNodes = [...(latestWorkflow.spec?.nodes || [])];
       const updatedEdges = [...(latestWorkflow.spec?.edges || [])];
 
+      const overlapsExistingNode = (position: { x: number; y: number }) => {
+        const bounds = {
+          minX: position.x - nodePadding,
+          minY: position.y - nodePadding,
+          maxX: position.x + estimatedNodeWidth + nodePadding,
+          maxY: position.y + estimatedNodeHeight + nodePadding,
+        };
+
+        return updatedNodes.some((node) => {
+          if (!node.position) {
+            return false;
+          }
+
+          const nodeBounds = {
+            minX: node.position.x || 0,
+            minY: node.position.y || 0,
+            maxX: (node.position.x || 0) + estimatedNodeWidth,
+            maxY: (node.position.y || 0) + estimatedNodeHeight,
+          };
+
+          return !(
+            bounds.maxX < nodeBounds.minX ||
+            bounds.minX > nodeBounds.maxX ||
+            bounds.maxY < nodeBounds.minY ||
+            bounds.minY > nodeBounds.maxY
+          );
+        });
+      };
+
+      const findAvailablePosition = (initialPosition: { x: number; y: number }) => {
+        if (!overlapsExistingNode(initialPosition)) {
+          return initialPosition;
+        }
+
+        const horizontalStep = 460;
+        const verticalStep = 240;
+        const maxSearchRadius = 8;
+
+        for (let radius = 1; radius <= maxSearchRadius; radius += 1) {
+          for (let dx = -radius; dx <= radius; dx += 1) {
+            for (let dy = -radius; dy <= radius; dy += 1) {
+              if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
+              const candidate = {
+                x: initialPosition.x + dx * horizontalStep,
+                y: initialPosition.y + dy * verticalStep,
+              };
+              if (!overlapsExistingNode(candidate)) {
+                return candidate;
+              }
+            }
+          }
+        }
+
+        return {
+          x: initialPosition.x + horizontalStep,
+          y: initialPosition.y + verticalStep,
+        };
+      };
+
       for (const operation of operations) {
         if (operation.type === "add_node") {
           const block = blockLookup.get(operation.blockName);
@@ -1884,6 +1946,31 @@ export function WorkflowPageV2() {
           const uniqueNodeName = generateUniqueNodeName(operation.nodeName || block.name || "node", existingNodeNames);
           const newNodeId = generateNodeId(block.name || "node", uniqueNodeName);
 
+          const initialPosition = (() => {
+            if (operation.position) {
+              return {
+                x: Math.round(operation.position.x),
+                y: Math.round(operation.position.y),
+              };
+            }
+
+            const sourceNodeId = resolveNodeId(operation.source);
+            const sourceNode = sourceNodeId ? updatedNodes.find((node) => node.id === sourceNodeId) : undefined;
+            if (sourceNode?.position) {
+              return {
+                x: Math.round((sourceNode.position.x || 0) + 460),
+                y: Math.round(sourceNode.position.y || 100),
+              };
+            }
+
+            return {
+              x: (updatedNodes.length || 0) * 460,
+              y: 100,
+            };
+          })();
+
+          const nonOverlappingPosition = findAvailablePosition(initialPosition);
+
           const newNode: ComponentsNode = {
             id: newNodeId,
             name: uniqueNodeName,
@@ -1896,28 +1983,7 @@ export function WorkflowPageV2() {
                     ? "TYPE_WIDGET"
                     : "TYPE_COMPONENT",
             configuration: filteredConfiguration,
-            position: (() => {
-              if (operation.position) {
-                return {
-                  x: Math.round(operation.position.x),
-                  y: Math.round(operation.position.y),
-                };
-              }
-
-              const sourceNodeId = resolveNodeId(operation.source);
-              const sourceNode = sourceNodeId ? updatedNodes.find((node) => node.id === sourceNodeId) : undefined;
-              if (sourceNode?.position) {
-                return {
-                  x: Math.round((sourceNode.position.x || 0) + 460),
-                  y: Math.round(sourceNode.position.y || 100),
-                };
-              }
-
-              return {
-                x: (updatedNodes.length || 0) * 460,
-                y: 100,
-              };
-            })(),
+            position: nonOverlappingPosition,
           };
 
           if (block.name === "annotation") {
@@ -2016,6 +2082,28 @@ export function WorkflowPageV2() {
               ...(operation.configuration || {}),
             },
           };
+          continue;
+        }
+
+        if (operation.type === "delete_node") {
+          const targetId = resolveNodeId(operation.target);
+          if (!targetId) {
+            continue;
+          }
+
+          const nodeIndex = updatedNodes.findIndex((node) => node.id === targetId);
+          if (nodeIndex === -1) {
+            continue;
+          }
+
+          updatedNodes.splice(nodeIndex, 1);
+
+          for (let edgeIndex = updatedEdges.length - 1; edgeIndex >= 0; edgeIndex -= 1) {
+            const edge = updatedEdges[edgeIndex];
+            if (edge.sourceId === targetId || edge.targetId === targetId) {
+              updatedEdges.splice(edgeIndex, 1);
+            }
+          }
         }
       }
 

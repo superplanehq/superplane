@@ -116,7 +116,7 @@ func generateCanvasAIPlan(
 	prompt := strings.Join([]string{
 		"You are an AI planner for a workflow canvas editor.",
 		"Return strict JSON only with this schema:",
-		`{"assistantMessage":"string","operations":[{"type":"add_node","nodeKey":"optional-string","blockName":"required-block-name","nodeName":"optional","configuration":{"optional":"object"},"position":{"x":123,"y":456},"source":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional","handleId":"optional-or-null"}},{"type":"connect_nodes","source":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional","handleId":"optional-or-null"},"target":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional"}},{"type":"update_node_config","target":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional"},"configuration":{"required":"object"},"nodeName":"optional"}]}`,
+		`{"assistantMessage":"string","operations":[{"type":"add_node","nodeKey":"optional-string","blockName":"required-block-name","nodeName":"optional","configuration":{"optional":"object"},"position":{"x":123,"y":456},"source":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional","handleId":"optional-or-null"}},{"type":"connect_nodes","source":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional","handleId":"optional-or-null"},"target":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional"}},{"type":"update_node_config","target":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional"},"configuration":{"required":"object"},"nodeName":"optional"},{"type":"delete_node","target":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional"}}]}`,
 		"Rules:",
 		"- Use only blockName values present in availableBlocks.",
 		"- Prefer add_node with nodeKey so follow-up connect/update operations can reference new nodes.",
@@ -124,6 +124,7 @@ func generateCanvasAIPlan(
 		"- Never invent component names or use components not listed in availableBlocks.",
 		"- If the user asks for a step you cannot map to availableBlocks, ask a clarifying question and return operations as [].",
 		"- Prefer a left-to-right horizontal flow.",
+		"- Use delete_node when the user explicitly asks to remove/delete a node.",
 		"- For add_node, include position when possible.",
 		"- Use at least 420px horizontal spacing between sequential nodes to avoid overlap.",
 		"- Keep nodes in the same path on the same y lane when possible.",

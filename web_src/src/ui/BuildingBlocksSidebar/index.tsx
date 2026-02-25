@@ -131,6 +131,10 @@ export type AiCanvasOperation =
       target: { nodeKey?: string; nodeId?: string; nodeName?: string };
       configuration: Record<string, unknown>;
       nodeName?: string;
+    }
+  | {
+      type: "delete_node";
+      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
     };
 
 type AiBuilderMessage = {
@@ -241,6 +245,7 @@ export function BuildingBlocksSidebar({
   const [isApplyingProposal, setIsApplyingProposal] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(null);
+  const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
 
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const starterPrompts = [
@@ -304,7 +309,11 @@ export function BuildingBlocksSidebar({
           content: proposal.summary,
         };
         setAiMessages((prev) => [...prev, assistantMessage]);
-        setPendingProposal(proposal);
+        if (proposal.operations.length > 0) {
+          setPendingProposal(proposal);
+        } else {
+          setPendingProposal(null);
+        }
       } catch (error) {
         const fallbackMessage = "I couldn't generate changes right now. Please try again.";
         setAiError(error instanceof Error ? error.message : fallbackMessage);
@@ -354,9 +363,43 @@ export function BuildingBlocksSidebar({
         return `Connect ${resolveRefLabel(operation.source)} -> ${resolveRefLabel(operation.target)}`;
       case "update_node_config":
         return `Update configuration for ${operation.nodeName || operation.target.nodeName || "node"}`;
+      case "delete_node":
+        return `Delete node ${resolveRefLabel(operation.target)}`;
       default:
         return "Update canvas";
     }
+  }, []);
+
+  const extractAssistantOptions = useCallback((content: string): string[] => {
+    const optionSet = new Set<string>();
+
+    const lines = content
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    for (const line of lines) {
+      const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+      const numberedMatch = line.match(/^\d+[.)]\s+(.+)$/);
+      const optionText = bulletMatch?.[1] || numberedMatch?.[1];
+      if (!optionText) continue;
+
+      const normalized = optionText.replace(/\s+/g, " ").trim();
+      if (normalized.length < 2 || normalized.length > 140) continue;
+      optionSet.add(normalized.replace(/[.;,\s]+$/, ""));
+    }
+
+    if (optionSet.size === 0) {
+      const codeMatches = [...content.matchAll(/`([^`]+)`/g)];
+      for (const match of codeMatches) {
+        const value = (match[1] || "").trim();
+        if (!value || value.length > 80) continue;
+        if (value.toLowerCase() === "etc.") continue;
+        optionSet.add(value);
+      }
+    }
+
+    return Array.from(optionSet).slice(0, 8);
   }, []);
 
   const handleApplyProposal = useCallback(async () => {
@@ -397,6 +440,19 @@ export function BuildingBlocksSidebar({
       setActiveTab("components");
     }
   }, [showAiBuilderTab, activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "ai") {
+      return;
+    }
+
+    const container = aiMessagesContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    container.scrollTop = container.scrollHeight;
+  }, [activeTab, aiMessages, pendingProposal, isGeneratingResponse, aiError]);
 
   // Auto-focus search input when sidebar opens
   useEffect(() => {
@@ -631,7 +687,7 @@ export function BuildingBlocksSidebar({
         {showAiBuilderTab && (
           <TabsContent value="ai" className="mt-0 flex-1 overflow-hidden px-5 pb-5">
             <div className="h-full rounded-md border border-border bg-slate-50/30 flex flex-col">
-              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+              <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                 {aiMessages.length === 0 ? (
                   <div className="text-sm text-gray-600 space-y-3">
                     <div className="flex items-start gap-2">
@@ -655,15 +711,39 @@ export function BuildingBlocksSidebar({
                 ) : (
                   <>
                     {aiMessages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={
-                          message.role === "user"
-                            ? "ml-6 rounded-md bg-blue-600 text-white px-3 py-2 text-sm"
-                            : "mr-6 rounded-md bg-white border border-border px-3 py-2 text-sm text-gray-800"
-                        }
-                      >
-                        {message.content}
+                      <div key={message.id} className={message.role === "user" ? "ml-6" : "mr-6"}>
+                        <div
+                          className={
+                            message.role === "user"
+                              ? "rounded-md bg-blue-600 text-white px-3 py-2 text-sm"
+                              : "rounded-md bg-white border border-border px-3 py-2 text-sm text-gray-800"
+                          }
+                        >
+                          {message.content}
+                        </div>
+                        {message.role === "assistant" && !pendingProposal ? (
+                          (() => {
+                            const options = extractAssistantOptions(message.content);
+                            if (options.length === 0) return null;
+                            return (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {options.map((option) => (
+                                  <Button
+                                    key={`${message.id}-${option}`}
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs"
+                                    onClick={() => handleSendPrompt(option)}
+                                    disabled={disabled || isGeneratingResponse || !canvasId}
+                                  >
+                                    {option}
+                                  </Button>
+                                ))}
+                              </div>
+                            );
+                          })()
+                        ) : null}
                       </div>
                     ))}
                     {isGeneratingResponse ? (
