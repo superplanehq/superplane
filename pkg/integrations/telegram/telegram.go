@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -75,6 +80,7 @@ func (t *Telegram) Configuration() []configuration.Field {
 func (t *Telegram) Components() []core.Component {
 	return []core.Component{
 		&SendMessage{},
+		&WaitForButtonClick{},
 	}
 }
 
@@ -141,6 +147,11 @@ func (t *Telegram) HandleRequest(ctx core.HTTPRequestContext) {
 	if err := json.Unmarshal(body, &update); err != nil {
 		ctx.Logger.Errorf("error unmarshaling update: %v", err)
 		ctx.Response.WriteHeader(400)
+		return
+	}
+
+	if update.CallbackQuery != nil {
+		t.handleCallbackQuery(ctx, update)
 		return
 	}
 
@@ -268,11 +279,126 @@ func (t *Telegram) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }
 
+func (t *Telegram) handleCallbackQuery(ctx core.HTTPRequestContext, update Update) {
+	query := update.CallbackQuery
+	if query.Message == nil {
+		ctx.Response.WriteHeader(200)
+		return
+	}
+
+	messageID := query.Message.MessageID
+	chatID := query.Message.Chat.ID
+	chatIDStr := strconv.FormatInt(chatID, 10)
+
+	subscriptions, err := ctx.Integration.ListSubscriptions()
+	if err != nil {
+		ctx.Logger.Errorf("error listing subscriptions: %v", err)
+		ctx.Response.WriteHeader(500)
+		return
+	}
+
+	var matchedSubscription core.IntegrationSubscriptionContext
+	for _, sub := range subscriptions {
+		cfg, ok := sub.Configuration().(map[string]any)
+		if !ok {
+			continue
+		}
+
+		subType, _ := cfg["type"].(string)
+		subChatID, _ := cfg["chat_id"].(string)
+
+		var subMessageID int64
+		switch v := cfg["message_id"].(type) {
+		case int64:
+			subMessageID = v
+		case float64:
+			subMessageID = int64(v)
+		}
+
+		if subType == "button_click" && subMessageID == messageID && subChatID == chatIDStr {
+			matchedSubscription = sub
+			break
+		}
+	}
+
+	if matchedSubscription == nil {
+		ctx.Response.WriteHeader(200)
+		return
+	}
+
+	cfg, _ := matchedSubscription.Configuration().(map[string]any)
+	executionIDStr, _ := cfg["execution_id"].(string)
+	executionID, err := uuid.Parse(executionIDStr)
+	if err != nil {
+		ctx.Logger.Errorf("error parsing execution ID: %v", err)
+		ctx.Response.WriteHeader(200)
+		return
+	}
+
+	var clickedBy map[string]any
+	if query.From != nil {
+		clickedBy = map[string]any{
+			"id":       query.From.ID,
+			"username": query.From.Username,
+		}
+	}
+
+	if err := t.createButtonClickAction(executionID, query.Data, clickedBy); err != nil {
+		ctx.Logger.Errorf("error creating button click action: %v", err)
+		ctx.Response.WriteHeader(500)
+		return
+	}
+
+	client, err := NewClient(ctx.Integration)
+	if err != nil {
+		ctx.Logger.Errorf("error creating Telegram client: %v", err)
+		ctx.Response.WriteHeader(200)
+		return
+	}
+
+	if err := client.AnswerCallbackQuery(query.ID); err != nil {
+		ctx.Logger.Errorf("error answering callback query: %v", err)
+	}
+
+	ctx.Response.WriteHeader(200)
+}
+
+func (t *Telegram) createButtonClickAction(executionID uuid.UUID, buttonValue string, clickedBy map[string]any) error {
+	var execution models.CanvasNodeExecution
+	err := database.Conn().Where("id = ?", executionID).First(&execution).Error
+	if err != nil {
+		return fmt.Errorf("failed to find execution: %w", err)
+	}
+
+	parameters := map[string]any{
+		"value": buttonValue,
+	}
+	if len(clickedBy) > 0 {
+		parameters["clicked_by"] = clickedBy
+	}
+
+	runAt := time.Now()
+	return execution.CreateRequest(database.Conn(), models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
+		InvokeAction: &models.InvokeAction{
+			ActionName: ActionButtonClick,
+			Parameters: parameters,
+		},
+	}, &runAt)
+}
+
 // Telegram API types for parsing webhook updates
 
 type Update struct {
-	UpdateID int64            `json:"update_id"`
-	Message  *TelegramMessage `json:"message,omitempty"`
+	UpdateID      int64            `json:"update_id"`
+	Message       *TelegramMessage `json:"message,omitempty"`
+	CallbackQuery *CallbackQuery   `json:"callback_query,omitempty"`
+}
+
+type CallbackQuery struct {
+	ID      string           `json:"id"`
+	From    *User            `json:"from,omitempty"`
+	Message *TelegramMessage `json:"message,omitempty"`
+	Data    string           `json:"data"`
 }
 
 type TelegramMessage struct {
