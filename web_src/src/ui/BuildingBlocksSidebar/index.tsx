@@ -31,6 +31,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
+import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
@@ -223,6 +224,7 @@ export function BuildingBlocksSidebar({
   onAddNote,
 }: BuildingBlocksSidebarProps) {
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
+  const persistedAiState = loadAiBuilderState<AiCanvasOperation>(canvasId);
 
   if (!isOpen) {
     const addNoteButton = (
@@ -297,13 +299,15 @@ export function BuildingBlocksSidebar({
   const dragPreviewRef = useRef<HTMLDivElement>(null);
   const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(true);
   const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(false);
-  const [activeTab, setActiveTab] = useState<"components" | "ai">("components");
+  const [activeTab, setActiveTab] = useState<"components" | "ai">(persistedAiState?.activeTab || "components");
   const [aiInput, setAiInput] = useState("");
-  const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
+  const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>(persistedAiState?.messages || []);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [isApplyingProposal, setIsApplyingProposal] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(null);
+  const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(
+    persistedAiState?.pendingProposal || null,
+  );
   const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
 
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -494,6 +498,23 @@ export function BuildingBlocksSidebar({
       setActiveTab("components");
     }
   }, [showAiBuilderTab, activeTab]);
+
+  useEffect(() => {
+    const nextPersistedState = loadAiBuilderState<AiCanvasOperation>(canvasId);
+    setActiveTab(nextPersistedState?.activeTab || "components");
+    setAiMessages(nextPersistedState?.messages || []);
+    setPendingProposal(nextPersistedState?.pendingProposal || null);
+    setAiError(null);
+    setAiInput("");
+  }, [canvasId]);
+
+  useEffect(() => {
+    saveAiBuilderState<AiCanvasOperation>(canvasId, {
+      activeTab,
+      messages: aiMessages,
+      pendingProposal,
+    });
+  }, [activeTab, aiMessages, canvasId, pendingProposal]);
 
   useEffect(() => {
     if (activeTab !== "ai") {
