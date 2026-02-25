@@ -86,10 +86,10 @@ func serializeAgentSettings(
 	}
 
 	return &pb.AgentSettings{
-		OrganizationId:    settings.OrganizationID.String(),
-		AgentModeEnabled:  settings.AgentModeEnabled,
+		OrganizationId:     settings.OrganizationID.String(),
+		AgentModeEnabled:   settings.AgentModeEnabled,
 		AgentModeEffective: isAgentModeEffective(settings, credential),
-		OpenaiKey:         openAIKey,
+		OpenaiKey:          openAIKey,
 	}
 }
 

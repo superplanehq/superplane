@@ -21,13 +21,13 @@ var _ MappedNullable = &CanvasesCanvasEvent{}
 
 // CanvasesCanvasEvent struct for CanvasesCanvasEvent
 type CanvasesCanvasEvent struct {
-	Id *string `json:"id,omitempty"`
-	CanvasId *string `json:"canvasId,omitempty"`
-	NodeId *string `json:"nodeId,omitempty"`
-	Channel *string `json:"channel,omitempty"`
-	CustomName *string `json:"customName,omitempty"`
-	Data map[string]interface{} `json:"data,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	Id         *string                `json:"id,omitempty"`
+	CanvasId   *string                `json:"canvasId,omitempty"`
+	NodeId     *string                `json:"nodeId,omitempty"`
+	Channel    *string                `json:"channel,omitempty"`
+	CustomName *string                `json:"customName,omitempty"`
+	Data       map[string]interface{} `json:"data,omitempty"`
+	CreatedAt  *time.Time             `json:"createdAt,omitempty"`
 }
 
 // NewCanvasesCanvasEvent instantiates a new CanvasesCanvasEvent object
@@ -272,7 +272,7 @@ func (o *CanvasesCanvasEvent) SetCreatedAt(v time.Time) {
 }
 
 func (o CanvasesCanvasEvent) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -340,5 +340,3 @@ func (v *NullableCanvasesCanvasEvent) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

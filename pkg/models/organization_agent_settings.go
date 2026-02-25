@@ -17,8 +17,8 @@ const (
 )
 
 type OrganizationAgentSettings struct {
-	ID                       uuid.UUID  `gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
-	OrganizationID           uuid.UUID  `gorm:"type:uuid;uniqueIndex"`
+	ID                       uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
+	OrganizationID           uuid.UUID `gorm:"type:uuid;uniqueIndex"`
 	AgentModeEnabled         bool
 	OpenAIKeyLast4           *string    `gorm:"column:openai_key_last4"`
 	OpenAIKeyStatus          string     `gorm:"column:openai_key_status"`

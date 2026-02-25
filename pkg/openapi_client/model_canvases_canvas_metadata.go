@@ -21,14 +21,14 @@ var _ MappedNullable = &CanvasesCanvasMetadata{}
 
 // CanvasesCanvasMetadata struct for CanvasesCanvasMetadata
 type CanvasesCanvasMetadata struct {
-	Id *string `json:"id,omitempty"`
-	OrganizationId *string `json:"organizationId,omitempty"`
-	Name *string `json:"name,omitempty"`
-	Description *string `json:"description,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
-	CreatedBy *SuperplaneCanvasesUserRef `json:"createdBy,omitempty"`
-	IsTemplate *bool `json:"isTemplate,omitempty"`
+	Id             *string                    `json:"id,omitempty"`
+	OrganizationId *string                    `json:"organizationId,omitempty"`
+	Name           *string                    `json:"name,omitempty"`
+	Description    *string                    `json:"description,omitempty"`
+	CreatedAt      *time.Time                 `json:"createdAt,omitempty"`
+	UpdatedAt      *time.Time                 `json:"updatedAt,omitempty"`
+	CreatedBy      *SuperplaneCanvasesUserRef `json:"createdBy,omitempty"`
+	IsTemplate     *bool                      `json:"isTemplate,omitempty"`
 }
 
 // NewCanvasesCanvasMetadata instantiates a new CanvasesCanvasMetadata object
@@ -305,7 +305,7 @@ func (o *CanvasesCanvasMetadata) SetIsTemplate(v bool) {
 }
 
 func (o CanvasesCanvasMetadata) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -376,5 +376,3 @@ func (v *NullableCanvasesCanvasMetadata) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

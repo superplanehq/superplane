@@ -14,7 +14,14 @@ import {
   useDeleteOrganizationAgentOpenAIKey,
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { getApiErrorMessage } from "@/utils/errors";
@@ -288,10 +295,17 @@ export function General({ organization }: GeneralProps) {
                     className={agentApiKeyError ? "border-red-300 focus-visible:ring-red-200" : undefined}
                     aria-invalid={agentApiKeyError ? "true" : "false"}
                   />
-                  {agentApiKeyError && <p className="text-sm text-red-600 mt-1 whitespace-pre-line">{agentApiKeyError}</p>}
+                  {agentApiKeyError && (
+                    <p className="text-sm text-red-600 mt-1 whitespace-pre-line">{agentApiKeyError}</p>
+                  )}
                 </div>
                 <DialogFooter className="mt-4">
-                  <Button type="button" variant="outline" onClick={handleCancelConfigureAgentMode} disabled={agentSettingsBusy}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancelConfigureAgentMode}
+                    disabled={agentSettingsBusy}
+                  >
                     Cancel
                   </Button>
                   <Button

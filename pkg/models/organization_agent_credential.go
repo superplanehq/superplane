@@ -12,8 +12,8 @@ import (
 const OrganizationAgentCredentialProviderOpenAI = "openai"
 
 type OrganizationAgentCredential struct {
-	ID               uuid.UUID  `gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
-	OrganizationID   uuid.UUID  `gorm:"type:uuid;uniqueIndex"`
+	ID               uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
+	OrganizationID   uuid.UUID `gorm:"type:uuid;uniqueIndex"`
 	Provider         string
 	APIKeyCiphertext []byte
 	EncryptionKeyID  string
