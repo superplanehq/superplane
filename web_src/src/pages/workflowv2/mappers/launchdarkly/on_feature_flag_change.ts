@@ -12,6 +12,20 @@ function formatEventLabel(event: string): string {
   return eventLabels[event] ?? event;
 }
 
+const actionLabels: Record<string, string> = {
+  updateOn: "Turned on / off",
+  updateTargets: "Targeting changed",
+  updateRules: "Rules changed",
+  updateFallthrough: "Default rule changed",
+  updateOffVariation: "Off variation changed",
+  createFlag: "Flag created",
+  deleteFlag: "Flag deleted",
+};
+
+function formatActionLabel(action: string): string {
+  return actionLabels[action] ?? action;
+}
+
 interface OnFeatureFlagChangeEventData {
   kind?: string;
   name?: string;
@@ -48,11 +62,11 @@ export const onFeatureFlagChangeTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const configuration = node.configuration as { events?: string[] };
+    const configuration = node.configuration as { actions?: string[] };
     const metadataItems: { icon: string; label: string }[] = [];
-    if (configuration?.events?.length) {
-      const formattedEvents = configuration.events.map(formatEventLabel).join(", ");
-      metadataItems.push({ icon: "funnel", label: "Events: " + formattedEvents });
+    if (configuration?.actions?.length) {
+      const formattedActions = configuration.actions.map(formatActionLabel).join(", ");
+      metadataItems.push({ icon: "funnel", label: "Actions: " + formattedActions });
     }
     const props: TriggerProps = {
       title: node.name!,
