@@ -2031,16 +2031,21 @@ export function WorkflowPageV2() {
             const sourcePos = updatedNodes[sourceIndex].position;
             const targetPos = updatedNodes[targetIndex].position;
             if (sourcePos && targetPos) {
-              const nextX = targetPos.x < sourcePos.x + minHorizontalGap ? sourcePos.x + minHorizontalGap : targetPos.x;
+              const sourceX = sourcePos.x ?? 0;
+              const sourceY = sourcePos.y ?? 100;
+              const targetX = targetPos.x ?? sourceX + minHorizontalGap;
+              const targetY = targetPos.y ?? sourceY;
 
-              let nextY = targetPos.y;
-              const isNearlySameLane = Math.abs(targetPos.y - sourcePos.y) < 80;
+              const nextX = targetX < sourceX + minHorizontalGap ? sourceX + minHorizontalGap : targetX;
+
+              let nextY = targetY;
+              const isNearlySameLane = Math.abs(targetY - sourceY) < 80;
               const hasMultipleEdgesFromSource = updatedEdges.some((edge) => edge.sourceId === sourceId);
               if (hasMultipleEdgesFromSource && isNearlySameLane) {
-                nextY = sourcePos.y + minVerticalGap;
+                nextY = sourceY + minVerticalGap;
               }
 
-              if (nextX !== targetPos.x || nextY !== targetPos.y) {
+              if (nextX !== targetX || nextY !== targetY) {
                 updatedNodes[targetIndex] = {
                   ...updatedNodes[targetIndex],
                   position: {
