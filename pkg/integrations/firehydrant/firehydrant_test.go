@@ -8,9 +8,29 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+func Test__FireHydrant__Configuration(t *testing.T) {
+	fh := &FireHydrant{}
+
+	t.Run("returns one field", func(t *testing.T) {
+		fields := fh.Configuration()
+		require.Len(t, fields, 1)
+	})
+
+	t.Run("apiKey field is a required sensitive string", func(t *testing.T) {
+		field := fh.Configuration()[0]
+		assert.Equal(t, "apiKey", field.Name)
+		assert.Equal(t, "API Key", field.Label)
+		assert.Equal(t, configuration.FieldTypeString, field.Type)
+		assert.True(t, field.Required)
+		assert.True(t, field.Sensitive)
+		assert.Contains(t, field.Description, "API key from FireHydrant")
+	})
+}
 
 func Test__FireHydrant__Sync(t *testing.T) {
 	fh := &FireHydrant{}
