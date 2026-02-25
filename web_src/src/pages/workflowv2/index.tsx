@@ -1848,6 +1848,9 @@ export function WorkflowPageV2() {
 
       const blockLookup = new Map(buildingBlocks.flatMap((category) => category.blocks.map((block) => [block.name, block])));
       const createdNodeIdsByKey = new Map<string, string>();
+      const minHorizontalGapDefault = 430;
+      const minHorizontalGapNamed = 560;
+      const minVerticalGap = 220;
 
       const resolveNodeId = (ref?: { nodeKey?: string; nodeId?: string; nodeName?: string }) => {
         if (!ref) return null;
@@ -1893,10 +1896,28 @@ export function WorkflowPageV2() {
                     ? "TYPE_WIDGET"
                     : "TYPE_COMPONENT",
             configuration: filteredConfiguration,
-            position: {
-              x: (updatedNodes.length || 0) * 250,
-              y: 100,
-            },
+            position: (() => {
+              if (operation.position) {
+                return {
+                  x: Math.round(operation.position.x),
+                  y: Math.round(operation.position.y),
+                };
+              }
+
+              const sourceNodeId = resolveNodeId(operation.source);
+              const sourceNode = sourceNodeId ? updatedNodes.find((node) => node.id === sourceNodeId) : undefined;
+              if (sourceNode?.position) {
+                return {
+                  x: Math.round((sourceNode.position.x || 0) + 460),
+                  y: Math.round(sourceNode.position.y || 100),
+                };
+              }
+
+              return {
+                x: (updatedNodes.length || 0) * 460,
+                y: 100,
+              };
+            })(),
           };
 
           if (block.name === "annotation") {
@@ -1932,8 +1953,36 @@ export function WorkflowPageV2() {
           if (!sourceId || !targetId) {
             continue;
           }
-
           const channel = operation.source.handleId || "default";
+
+          const sourceIndex = updatedNodes.findIndex((node) => node.id === sourceId);
+          const targetIndex = updatedNodes.findIndex((node) => node.id === targetId);
+          if (sourceIndex !== -1 && targetIndex !== -1) {
+            const minHorizontalGap = channel === "default" ? minHorizontalGapDefault : minHorizontalGapNamed;
+            const sourcePos = updatedNodes[sourceIndex].position;
+            const targetPos = updatedNodes[targetIndex].position;
+            if (sourcePos && targetPos) {
+              const nextX = targetPos.x < sourcePos.x+minHorizontalGap ? sourcePos.x + minHorizontalGap : targetPos.x;
+
+              let nextY = targetPos.y;
+              const isNearlySameLane = Math.abs(targetPos.y - sourcePos.y) < 80;
+              const hasMultipleEdgesFromSource = updatedEdges.some((edge) => edge.sourceId === sourceId);
+              if (hasMultipleEdgesFromSource && isNearlySameLane) {
+                nextY = sourcePos.y + minVerticalGap;
+              }
+
+              if (nextX !== targetPos.x || nextY !== targetPos.y) {
+                updatedNodes[targetIndex] = {
+                  ...updatedNodes[targetIndex],
+                  position: {
+                    x: Math.round(nextX),
+                    y: Math.round(nextY),
+                  },
+                };
+              }
+            }
+          }
+
           const edgeExists = updatedEdges.some(
             (edge) => edge.sourceId === sourceId && edge.targetId === targetId && edge.channel === channel,
           );
