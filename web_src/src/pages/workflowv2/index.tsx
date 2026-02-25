@@ -23,7 +23,12 @@ import {
   canvasesUpdateNodePause,
   OrganizationsIntegration,
 } from "@/api-client";
-import { useOrganizationGroups, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import {
+  useOrganizationAgentSettings,
+  useOrganizationGroups,
+  useOrganizationRoles,
+  useOrganizationUsers,
+} from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
@@ -137,7 +142,10 @@ export function WorkflowPageV2() {
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const { data: canvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId!, canvasId!);
   const { data: canvasEventsResponse } = useCanvasEvents(canvasId!);
+  const canReadOrg = canAct("org", "read");
+  const { data: agentSettings } = useOrganizationAgentSettings(organizationId || "", !!organizationId && canReadOrg);
   const canUpdateCanvas = canAct("canvases", "update");
+  const showAiBuilderTab = agentSettings?.agentModeEnabled ?? false;
 
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
 
@@ -2938,6 +2946,7 @@ export function WorkflowPageV2() {
         onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
         onConfigure={!isReadOnly ? handleConfigure : undefined}
         buildingBlocks={buildingBlocks}
+        showAiBuilderTab={showAiBuilderTab}
         onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
         onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
         onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}

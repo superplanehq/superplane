@@ -198,6 +198,7 @@ export interface CanvasPageProps {
 
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
+  showAiBuilderTab?: boolean;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
@@ -820,6 +821,7 @@ function CanvasPage(props: CanvasPageProps) {
           isOpen={isBuildingBlocksSidebarOpen}
           onToggle={handleSidebarToggle}
           blocks={props.buildingBlocks || []}
+          showAiBuilderTab={props.showAiBuilderTab}
           integrations={props.integrations}
           canvasZoom={canvasZoom}
           disabled={readOnly}

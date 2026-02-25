@@ -6,6 +6,7 @@ import type {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
@@ -13,7 +14,7 @@ import { resolveIcon } from "@/lib/utils";
 import { isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getComponentSubtype } from "../buildingBlocks";
-import { ChevronRight, GripVerticalIcon, Plug, Plus, Search, Settings2, StickyNote, X } from "lucide-react";
+import { ChevronRight, GripVerticalIcon, Plug, Plus, Search, SendHorizontal, Settings2, Sparkles, StickyNote, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
@@ -86,6 +87,7 @@ export interface BuildingBlocksSidebarProps {
   isOpen: boolean;
   onToggle: (open: boolean) => void;
   blocks: BuildingBlockCategory[];
+  showAiBuilderTab?: boolean;
   integrations?: OrganizationsIntegration[];
   canvasZoom?: number;
   disabled?: boolean;
@@ -94,10 +96,23 @@ export interface BuildingBlocksSidebarProps {
   onAddNote?: () => void;
 }
 
+type AiBuilderMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+};
+
+type AiBuilderProposal = {
+  id: string;
+  summary: string;
+  operations: string[];
+};
+
 export function BuildingBlocksSidebar({
   isOpen,
   onToggle,
   blocks,
+  showAiBuilderTab = false,
   integrations = [],
   canvasZoom = 1,
   disabled = false,
@@ -179,13 +194,110 @@ export function BuildingBlocksSidebar({
   const dragPreviewRef = useRef<HTMLDivElement>(null);
   const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(true);
   const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(false);
+  const [activeTab, setActiveTab] = useState<"components" | "ai">("components");
+  const [aiInput, setAiInput] = useState("");
+  const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
+  const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
+  const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(null);
 
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const starterPrompts = [
+    "Create a webhook -> Slack alert flow",
+    "Add retries and error handling to this canvas",
+    "Propose a CI workflow for deployments",
+    "Add an approval step before production actions",
+  ];
+
+  const buildProposalFromPrompt = useCallback((prompt: string): AiBuilderProposal => {
+    const lowerPrompt = prompt.toLowerCase();
+    const operations: string[] = [];
+
+    if (lowerPrompt.includes("webhook")) {
+      operations.push("Add a Webhook trigger node.");
+    }
+    if (lowerPrompt.includes("slack")) {
+      operations.push("Add a Slack action node for notifications.");
+      operations.push("Connect trigger output to the Slack action input.");
+    }
+    if (lowerPrompt.includes("approval")) {
+      operations.push("Insert an approval node before the final action.");
+    }
+    if (lowerPrompt.includes("retry") || lowerPrompt.includes("error")) {
+      operations.push("Update action node config with retry and error handling defaults.");
+    }
+
+    if (operations.length === 0) {
+      operations.push("Identify best matching trigger for the request.");
+      operations.push("Add one or more action nodes to complete the flow.");
+      operations.push("Connect outputs to inputs using compatible channels.");
+    }
+
+    return {
+      id: `proposal-${Date.now()}`,
+      summary: "I prepared a draft change set you can review and apply.",
+      operations,
+    };
+  }, []);
+
+  const handleSendPrompt = useCallback(
+    (value?: string) => {
+      const nextPrompt = (value ?? aiInput).trim();
+      if (!nextPrompt || isGeneratingResponse) {
+        return;
+      }
+
+      const userMessage: AiBuilderMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: nextPrompt,
+      };
+      setAiMessages((prev) => [...prev, userMessage]);
+      setAiInput("");
+      setIsGeneratingResponse(true);
+
+      window.setTimeout(() => {
+        const proposal = buildProposalFromPrompt(nextPrompt);
+        const assistantMessage: AiBuilderMessage = {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: proposal.summary,
+        };
+        setAiMessages((prev) => [...prev, assistantMessage]);
+        setPendingProposal(proposal);
+        setIsGeneratingResponse(false);
+      }, 400);
+    },
+    [aiInput, buildProposalFromPrompt, isGeneratingResponse],
+  );
+
+  const handleDiscardProposal = useCallback(() => {
+    setPendingProposal(null);
+  }, []);
+
+  const handleApplyProposal = useCallback(() => {
+    if (!pendingProposal) return;
+
+    setAiMessages((prev) => [
+      ...prev,
+      {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: "Applied in UI-only mode. Backend persistence and server-side apply are coming in follow-up PRs.",
+      },
+    ]);
+    setPendingProposal(null);
+  }, [pendingProposal]);
 
   // Save sidebar width to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (!showAiBuilderTab && activeTab === "ai") {
+      setActiveTab("components");
+    }
+  }, [showAiBuilderTab, activeTab]);
 
   // Auto-focus search input when sidebar opens
   useEffect(() => {
@@ -322,82 +434,200 @@ export function BuildingBlocksSidebar({
         </div>
       </div>
 
-      {/* Search and Filter */}
-      <div className="flex items-center gap-2 px-5">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
-          <Input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Filter components..."
-            className="pl-9"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as typeof typeFilter)}>
-          <SelectTrigger size="sm" className="w-[120px]">
-            <SelectValue placeholder="All Types" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="trigger">Trigger</SelectItem>
-            <SelectItem value="action">Action</SelectItem>
-            <SelectItem value="flow">Flow</SelectItem>
-          </SelectContent>
-        </Select>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon-sm" className="h-8 w-8" aria-label="Sidebar settings">
-              <Settings2 className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuCheckboxItem
-              checked={showIntegrationSetupStatus}
-              onCheckedChange={(checked) => setShowIntegrationSetupStatus(Boolean(checked))}
-            >
-              Show integration setup status
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={showConnectedIntegrationsOnTop}
-              onCheckedChange={(checked) => setShowConnectedIntegrationsOnTop(Boolean(checked))}
-            >
-              Connected integrations on top
-            </DropdownMenuCheckboxItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <div className="gap-2 py-6">
-        {sortedCategories.map((category) => (
-          <CategorySection
-            key={category.name}
-            category={category}
-            integrations={integrations}
-            showIntegrationSetupStatus={showIntegrationSetupStatus}
-            canvasZoom={canvasZoom}
-            searchTerm={searchTerm}
-            typeFilter={typeFilter}
-            isDraggingRef={isDraggingRef}
-            setHoveredBlock={setHoveredBlock}
-            dragPreviewRef={dragPreviewRef}
-            onBlockClick={onBlockClick}
-          />
-        ))}
-
-        {/* Disabled overlay - only over items */}
-        {disabled && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 z-30 cursor-not-allowed" />
-            </TooltipTrigger>
-            <TooltipContent side="left" sideOffset={10}>
-              <p>{disabledTooltip}</p>
-            </TooltipContent>
-          </Tooltip>
+      <Tabs
+        value={showAiBuilderTab ? activeTab : "components"}
+        onValueChange={(value) => setActiveTab(value as "components" | "ai")}
+        className="flex h-[calc(100%-82px)] flex-col"
+      >
+        {showAiBuilderTab && (
+          <div className="px-5 pb-3">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="components">Components</TabsTrigger>
+              <TabsTrigger value="ai" className="gap-1.5">
+                <span>AI Builder</span>
+                {pendingProposal ? <span className="h-2 w-2 rounded-full bg-blue-500" /> : null}
+              </TabsTrigger>
+            </TabsList>
+          </div>
         )}
-      </div>
+
+        <TabsContent value="components" className="mt-0 flex-1 overflow-hidden">
+          <div className="flex items-center gap-2 px-5">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+              <Input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Filter components..."
+                className="pl-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as typeof typeFilter)}>
+              <SelectTrigger size="sm" className="w-[120px]">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="trigger">Trigger</SelectItem>
+                <SelectItem value="action">Action</SelectItem>
+                <SelectItem value="flow">Flow</SelectItem>
+              </SelectContent>
+            </Select>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon-sm" className="h-8 w-8" aria-label="Sidebar settings">
+                  <Settings2 className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuCheckboxItem
+                  checked={showIntegrationSetupStatus}
+                  onCheckedChange={(checked) => setShowIntegrationSetupStatus(Boolean(checked))}
+                >
+                  Show integration setup status
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={showConnectedIntegrationsOnTop}
+                  onCheckedChange={(checked) => setShowConnectedIntegrationsOnTop(Boolean(checked))}
+                >
+                  Connected integrations on top
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          <div className="gap-2 py-6">
+            {sortedCategories.map((category) => (
+              <CategorySection
+                key={category.name}
+                category={category}
+                integrations={integrations}
+                showIntegrationSetupStatus={showIntegrationSetupStatus}
+                canvasZoom={canvasZoom}
+                searchTerm={searchTerm}
+                typeFilter={typeFilter}
+                isDraggingRef={isDraggingRef}
+                setHoveredBlock={setHoveredBlock}
+                dragPreviewRef={dragPreviewRef}
+                onBlockClick={onBlockClick}
+              />
+            ))}
+
+            {/* Disabled overlay - only over items */}
+            {disabled && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 z-30 cursor-not-allowed" />
+                </TooltipTrigger>
+                <TooltipContent side="left" sideOffset={10}>
+                  <p>{disabledTooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        </TabsContent>
+
+        {showAiBuilderTab && (
+          <TabsContent value="ai" className="mt-0 flex-1 overflow-hidden px-5 pb-5">
+            <div className="h-full rounded-md border border-border bg-slate-50/30 flex flex-col">
+              <div className="border-b border-border px-4 py-3 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-medium">AI Canvas Builder</h3>
+                  <p className="text-xs text-gray-500">UI-only preview mode (no backend persistence).</p>
+                </div>
+                {pendingProposal ? (
+                  <span className="text-[11px] font-medium text-blue-700 bg-blue-100 px-2 py-1 rounded">
+                    Changes pending
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+                {aiMessages.length === 0 ? (
+                  <div className="text-sm text-gray-600 space-y-3">
+                    <div className="flex items-start gap-2">
+                      <Sparkles size={16} className="mt-0.5 text-blue-600" />
+                      <p>Describe the flow you want and I will draft a proposed change set for review.</p>
+                    </div>
+                    <div className="grid gap-2">
+                      {starterPrompts.map((prompt) => (
+                        <Button
+                          key={prompt}
+                          variant="outline"
+                          className="justify-start h-auto py-2.5 px-3 text-left whitespace-normal"
+                          onClick={() => handleSendPrompt(prompt)}
+                          disabled={disabled || isGeneratingResponse}
+                        >
+                          {prompt}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  aiMessages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={
+                        message.role === "user"
+                          ? "ml-6 rounded-md bg-blue-600 text-white px-3 py-2 text-sm"
+                          : "mr-6 rounded-md bg-white border border-border px-3 py-2 text-sm text-gray-800"
+                      }
+                    >
+                      {message.content}
+                    </div>
+                  ))
+                )}
+
+                {pendingProposal && (
+                  <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-3 space-y-2">
+                    <p className="text-sm font-medium text-blue-900">{pendingProposal.summary}</p>
+                    <ul className="text-sm text-blue-900 list-disc pl-5 space-y-1">
+                      {pendingProposal.operations.map((operation) => (
+                        <li key={`${pendingProposal.id}-${operation}`}>{operation}</li>
+                      ))}
+                    </ul>
+                    <div className="flex items-center gap-2 pt-1">
+                      <Button size="sm" onClick={handleApplyProposal} disabled={disabled}>
+                        Apply changes
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleDiscardProposal}>
+                        Discard
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-border px-4 py-3">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSendPrompt();
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Input
+                    value={aiInput}
+                    onChange={(e) => setAiInput(e.target.value)}
+                    placeholder="Describe your canvas changes..."
+                    disabled={disabled || isGeneratingResponse}
+                  />
+                  <Button
+                    type="submit"
+                    size="icon-sm"
+                    disabled={disabled || isGeneratingResponse || !aiInput.trim()}
+                    aria-label="Send prompt"
+                  >
+                    <SendHorizontal size={14} />
+                  </Button>
+                </form>
+              </div>
+            </div>
+          </TabsContent>
+        )}
+      </Tabs>
 
       {/* Hidden drag preview - pre-rendered and ready for drag */}
       <div
