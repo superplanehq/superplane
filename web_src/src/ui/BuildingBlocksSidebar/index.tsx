@@ -228,6 +228,7 @@ export function BuildingBlocksSidebar({
   const [typeFilter, setTypeFilter] = useState<"all" | "trigger" | "action" | "flow">("all");
   const sidebarRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const aiInputRef = useRef<HTMLInputElement>(null);
   const isDraggingRef = useRef(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -269,6 +270,9 @@ export function BuildingBlocksSidebar({
       };
       setAiMessages((prev) => [...prev, userMessage]);
       setAiInput("");
+      requestAnimationFrame(() => {
+        aiInputRef.current?.focus();
+      });
       setAiError(null);
       setIsGeneratingResponse(true);
 
@@ -572,41 +576,55 @@ export function BuildingBlocksSidebar({
         />
       </div>
 
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 px-5 py-4 relative">
-        <div className="flex flex-col items-start gap-3 w-full">
-          <div className="flex justify-between gap-3 w-full">
-            <div className="flex flex-col gap-0.5">
-              <h2 className="text-base font-medium">Add Component</h2>
+      {!showAiBuilderTab && (
+        <div className="flex items-center justify-between gap-3 px-5 py-4 relative">
+          <div className="flex flex-col items-start gap-3 w-full">
+            <div className="flex justify-between gap-3 w-full">
+              <div className="flex flex-col gap-0.5">
+                <h2 className="text-base font-medium">Add Component</h2>
+              </div>
+            </div>
+            <div
+              onClick={() => onToggle(false)}
+              className="absolute top-4 right-4 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
+            >
+              <X size={16} />
             </div>
           </div>
-          <div
-            onClick={() => onToggle(false)}
-            className="absolute top-4 right-4 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
-          >
-            <X size={16} />
-          </div>
         </div>
-      </div>
+      )}
 
       <Tabs
         value={showAiBuilderTab ? activeTab : "components"}
         onValueChange={(value) => setActiveTab(value as "components" | "ai")}
-        className="flex h-[calc(100%-82px)] flex-col"
+        className={`flex ${showAiBuilderTab ? "h-full" : "h-[calc(100%-82px)]"} flex-col`}
       >
         {showAiBuilderTab && (
-          <div className="px-5 pb-3">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="components">Components</TabsTrigger>
-              <TabsTrigger value="ai" className="gap-1.5">
+          <div className="px-4 pt-3 pb-3 flex items-center gap-1.5 relative">
+            <TabsList className="grid h-8 w-auto grid-cols-2 gap-0.5 bg-transparent p-0">
+              <TabsTrigger
+                value="components"
+                className="h-7 rounded-sm px-2 text-xs text-muted-foreground shadow-none data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              >
+                Components
+              </TabsTrigger>
+              <TabsTrigger
+                value="ai"
+                className="h-7 gap-1 rounded-sm px-2 text-xs text-muted-foreground shadow-none data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              >
                 <span>AI Builder</span>
                 {pendingProposal ? <span className="h-2 w-2 rounded-full bg-blue-500" /> : null}
               </TabsTrigger>
             </TabsList>
+            <div
+              onClick={() => onToggle(false)}
+              className="absolute top-4 right-4 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
+            >
+              <X size={16} />
+            </div>
           </div>
         )}
-
-        <TabsContent value="components" className="mt-0 flex-1 overflow-hidden">
+        <TabsContent value="components" className="mt-0 flex-1 overflow-y-auto overflow-x-hidden">
           <div className="flex items-center gap-2 px-5">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
@@ -793,10 +811,11 @@ export function BuildingBlocksSidebar({
                   className="flex items-center gap-2"
                 >
                   <Input
+                    ref={aiInputRef}
                     value={aiInput}
                     onChange={(e) => setAiInput(e.target.value)}
                     placeholder="Describe your canvas changes..."
-                    disabled={disabled || isGeneratingResponse || !canvasId}
+                    disabled={disabled || !canvasId}
                   />
                   <Button
                     type="submit"
