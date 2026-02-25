@@ -112,27 +112,50 @@ func (l *LaunchDarkly) HandleAction(ctx core.IntegrationActionContext) error {
 }
 
 func (l *LaunchDarkly) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != "project" {
-		return []core.IntegrationResource{}, nil
-	}
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
-	projects, err := client.ListProjects()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list projects: %w", err)
-	}
+	switch resourceType {
+	case "project":
+		projects, err := client.ListProjects()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list projects: %w", err)
+		}
 
-	resources := make([]core.IntegrationResource, 0, len(projects))
-	for _, p := range projects {
-		resources = append(resources, core.IntegrationResource{
-			Type: "project",
-			Name: p.Name,
-			ID:   p.Key,
-		})
+		resources := make([]core.IntegrationResource, 0, len(projects))
+		for _, p := range projects {
+			resources = append(resources, core.IntegrationResource{
+				Type: "project",
+				Name: p.Name,
+				ID:   p.Key,
+			})
+		}
+		return resources, nil
+
+	case "flag":
+		projectKey := ctx.Parameters["projectKey"]
+		if projectKey == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		flags, err := client.ListFeatureFlags(projectKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list feature flags: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(flags))
+		for _, f := range flags {
+			resources = append(resources, core.IntegrationResource{
+				Type: "flag",
+				Name: f.Name,
+				ID:   f.Key,
+			})
+		}
+		return resources, nil
+
+	default:
+		return []core.IntegrationResource{}, nil
 	}
-	return resources, nil
 }
