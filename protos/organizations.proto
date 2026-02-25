@@ -139,6 +139,52 @@ service Organizations {
     };
   }
 
+  rpc GetAgentSettings(GetAgentSettingsRequest) returns (GetAgentSettingsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/agent-settings"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get organization Agent Mode settings";
+      description: "Returns Agent Mode enablement and OpenAI key status for an organization";
+      tags: "Organization";
+    };
+  }
+
+  rpc UpdateAgentSettings(UpdateAgentSettingsRequest) returns (UpdateAgentSettingsResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/organizations/{id}/agent-settings"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update organization Agent Mode settings";
+      description: "Updates Agent Mode enablement for an organization";
+      tags: "Organization";
+    };
+  }
+
+  rpc SetAgentOpenAIKey(SetAgentOpenAIKeyRequest) returns (SetAgentOpenAIKeyResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/organizations/{id}/agent-settings/openai-key"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create or update organization OpenAI key for Agent Mode";
+      description: "Sets the OpenAI key used by organization Agent Mode";
+      tags: "Organization";
+    };
+  }
+
+  rpc DeleteAgentOpenAIKey(DeleteAgentOpenAIKeyRequest) returns (DeleteAgentOpenAIKeyResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/organizations/{id}/agent-settings/openai-key"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete organization OpenAI key for Agent Mode";
+      description: "Deletes the OpenAI key used by organization Agent Mode";
+      tags: "Organization";
+    };
+  }
+
   rpc AcceptInviteLink(InviteLink) returns (google.protobuf.Struct) {
     option (google.api.http) = {
       post: "/api/v1/invite-links/{token}/accept"
@@ -271,6 +317,23 @@ message InviteLink {
   google.protobuf.Timestamp updated_at = 6;
 }
 
+message AgentOpenAIKey {
+  bool configured = 1;
+  string last4 = 2;
+  string status = 3;
+  string validation_error = 4;
+  google.protobuf.Timestamp validated_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  string updated_by = 7;
+}
+
+message AgentSettings {
+  string organization_id = 1;
+  bool agent_mode_enabled = 2;
+  bool agent_mode_effective = 3;
+  AgentOpenAIKey openai_key = 4;
+}
+
 message CreateInvitationRequest {
   string id = 1;
   string email = 2;
@@ -318,6 +381,41 @@ message ResetInviteLinkRequest {
 
 message ResetInviteLinkResponse {
   InviteLink invite_link = 1;
+}
+
+message GetAgentSettingsRequest {
+  string id = 1;
+}
+
+message GetAgentSettingsResponse {
+  AgentSettings agent_settings = 1;
+}
+
+message UpdateAgentSettingsRequest {
+  string id = 1;
+  bool agent_mode_enabled = 2;
+}
+
+message UpdateAgentSettingsResponse {
+  AgentSettings agent_settings = 1;
+}
+
+message SetAgentOpenAIKeyRequest {
+  string id = 1;
+  string api_key = 2;
+  bool validate = 3;
+}
+
+message SetAgentOpenAIKeyResponse {
+  AgentSettings agent_settings = 1;
+}
+
+message DeleteAgentOpenAIKeyRequest {
+  string id = 1;
+}
+
+message DeleteAgentOpenAIKeyResponse {
+  AgentSettings agent_settings = 1;
 }
 
 message RemoveUserRequest {

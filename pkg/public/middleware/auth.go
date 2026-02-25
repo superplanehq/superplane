@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -21,6 +22,8 @@ type contextKey string
 
 const AccountContextKey contextKey = "account"
 const UserContextKey contextKey = "user"
+const OrganizationNotFoundError string = "organization_not_found_error"
+const AccountNotFoundError string = "account_not_found_error"
 
 var ownerSetupEnabled = os.Getenv("OWNER_SETUP_ENABLED") == "yes"
 
@@ -168,6 +171,11 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			//
 			user, err := authenticateUserByCookie(jwtSigner, r)
 			if err != nil {
+				if err.Error() == OrganizationNotFoundError {
+					http.Error(w, "Not Found", http.StatusNotFound)
+					return
+				}
+
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -197,20 +205,25 @@ func authenticateUserByToken(r *http.Request) (*models.User, error) {
 func authenticateUserByCookie(jwtSigner *jwt.Signer, r *http.Request) (*models.User, error) {
 	accountID, err := getAccountFromCookie(r, jwtSigner)
 	if err != nil {
-		return nil, err
+		return nil, errors.New(AccountNotFoundError)
 	}
 
 	organizationID := findOrganizationID(r)
 	if organizationID == "" {
-		return nil, fmt.Errorf("organization ID not found")
+		return nil, errors.New(OrganizationNotFoundError)
 	}
 
 	account, err := models.FindAccountByID(accountID)
 	if err != nil {
-		return nil, err
+		return nil, errors.New(AccountNotFoundError)
 	}
 
-	return models.FindActiveUserByEmail(organizationID, account.Email)
+	user, err := models.FindActiveUserByEmail(organizationID, account.Email)
+	if err != nil {
+		return nil, errors.New(OrganizationNotFoundError)
+	}
+
+	return user, nil
 }
 
 func findOrganizationID(r *http.Request) string {

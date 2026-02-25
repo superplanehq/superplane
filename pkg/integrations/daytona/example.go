@@ -16,6 +16,9 @@ var exampleOutputExecuteCodeBytes []byte
 //go:embed example_output_execute_command.json
 var exampleOutputExecuteCommandBytes []byte
 
+//go:embed example_output_get_preview_url.json
+var exampleOutputGetPreviewURLBytes []byte
+
 //go:embed example_output_delete_sandbox.json
 var exampleOutputDeleteSandboxBytes []byte
 
@@ -27,6 +30,9 @@ var exampleOutputExecuteCode map[string]any
 
 var exampleOutputExecuteCommandOnce sync.Once
 var exampleOutputExecuteCommand map[string]any
+
+var exampleOutputGetPreviewURLOnce sync.Once
+var exampleOutputGetPreviewURL map[string]any
 
 var exampleOutputDeleteSandboxOnce sync.Once
 var exampleOutputDeleteSandbox map[string]any
@@ -41,6 +47,10 @@ func (e *ExecuteCode) ExampleOutput() map[string]any {
 
 func (e *ExecuteCommand) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputExecuteCommandOnce, exampleOutputExecuteCommandBytes, &exampleOutputExecuteCommand)
+}
+
+func (p *GetPreviewURLComponent) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetPreviewURLOnce, exampleOutputGetPreviewURLBytes, &exampleOutputGetPreviewURL)
 }
 
 func (d *DeleteSandbox) ExampleOutput() map[string]any {

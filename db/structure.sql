@@ -266,6 +266,27 @@ CREATE TABLE public.installation_metadata (
 
 
 --
+-- Name: organization_agent_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_agent_settings (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    agent_mode_enabled boolean DEFAULT false NOT NULL,
+    openai_api_key_ciphertext bytea,
+    openai_key_encryption_key_id character varying(255),
+    openai_key_last4 character varying(8),
+    openai_key_status character varying(32) DEFAULT 'not_configured'::character varying NOT NULL,
+    openai_key_validated_at timestamp without time zone,
+    openai_key_validation_error text,
+    updated_by uuid,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT organization_agent_settings_openai_key_status_check CHECK (((openai_key_status)::text = ANY ((ARRAY['not_configured'::character varying, 'valid'::character varying, 'invalid'::character varying, 'unchecked'::character varying])::text[])))
+);
+
+
+--
 -- Name: organization_invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -692,6 +713,22 @@ ALTER TABLE ONLY public.installation_metadata
 
 
 --
+-- Name: organization_agent_settings organization_agent_settings_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_agent_settings
+    ADD CONSTRAINT organization_agent_settings_organization_id_key UNIQUE (organization_id);
+
+
+--
+-- Name: organization_agent_settings organization_agent_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_agent_settings
+    ADD CONSTRAINT organization_agent_settings_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organization_invitations organization_invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1005,6 +1042,13 @@ CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (gro
 --
 
 CREATE INDEX idx_node_requests_state_run_at ON public.workflow_node_requests USING btree (state, run_at) WHERE ((state)::text = 'pending'::text);
+
+
+--
+-- Name: idx_organization_agent_settings_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_agent_settings_organization_id ON public.organization_agent_settings USING btree (organization_id);
 
 
 --
@@ -1325,6 +1369,22 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
+-- Name: organization_agent_settings organization_agent_settings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_agent_settings
+    ADD CONSTRAINT organization_agent_settings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_agent_settings organization_agent_settings_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_agent_settings
+    ADD CONSTRAINT organization_agent_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
 -- Name: organization_invitations organization_invitations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1532,7 +1592,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260216151135	f
+20260225082807	f
 \.
 
 
