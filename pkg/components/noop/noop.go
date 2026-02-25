@@ -62,6 +62,18 @@ func (c *NoOp) Configuration() []configuration.Field {
 }
 
 func (c *NoOp) Execute(ctx core.ExecutionContext) error {
+	artifact, err := ctx.Artifacts.Execution.Create("test.txt")
+	if err != nil {
+		return err
+	}
+
+	_, err = artifact.Write([]byte("writing an artifact from a component implementation"))
+	if err != nil {
+		return err
+	}
+
+	defer artifact.Close()
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		PayloadType,

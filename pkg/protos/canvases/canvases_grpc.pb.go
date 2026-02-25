@@ -8,6 +8,7 @@ package canvases
 
 import (
 	context "context"
+	httpbody "google.golang.org/genproto/googleapis/api/httpbody"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -37,6 +38,12 @@ const (
 	Canvases_ResolveExecutionErrors_FullMethodName    = "/Superplane.Canvases.Canvases/ResolveExecutionErrors"
 	Canvases_ListCanvasEvents_FullMethodName          = "/Superplane.Canvases.Canvases/ListCanvasEvents"
 	Canvases_ListEventExecutions_FullMethodName       = "/Superplane.Canvases.Canvases/ListEventExecutions"
+	Canvases_ListCanvasArtifacts_FullMethodName       = "/Superplane.Canvases.Canvases/ListCanvasArtifacts"
+	Canvases_GetCanvasArtifact_FullMethodName         = "/Superplane.Canvases.Canvases/GetCanvasArtifact"
+	Canvases_ListNodeArtifacts_FullMethodName         = "/Superplane.Canvases.Canvases/ListNodeArtifacts"
+	Canvases_GetNodeArtifact_FullMethodName           = "/Superplane.Canvases.Canvases/GetNodeArtifact"
+	Canvases_ListExecutionArtifacts_FullMethodName    = "/Superplane.Canvases.Canvases/ListExecutionArtifacts"
+	Canvases_GetExecutionArtifact_FullMethodName      = "/Superplane.Canvases.Canvases/GetExecutionArtifact"
 	Canvases_SendAiMessage_FullMethodName             = "/Superplane.Canvases.Canvases/SendAiMessage"
 )
 
@@ -62,6 +69,12 @@ type CanvasesClient interface {
 	ResolveExecutionErrors(ctx context.Context, in *ResolveExecutionErrorsRequest, opts ...grpc.CallOption) (*ResolveExecutionErrorsResponse, error)
 	ListCanvasEvents(ctx context.Context, in *ListCanvasEventsRequest, opts ...grpc.CallOption) (*ListCanvasEventsResponse, error)
 	ListEventExecutions(ctx context.Context, in *ListEventExecutionsRequest, opts ...grpc.CallOption) (*ListEventExecutionsResponse, error)
+	ListCanvasArtifacts(ctx context.Context, in *ListCanvasArtifactsRequest, opts ...grpc.CallOption) (*ListArtifactsResponse, error)
+	GetCanvasArtifact(ctx context.Context, in *GetCanvasArtifactRequest, opts ...grpc.CallOption) (*httpbody.HttpBody, error)
+	ListNodeArtifacts(ctx context.Context, in *ListNodeArtifactsRequest, opts ...grpc.CallOption) (*ListArtifactsResponse, error)
+	GetNodeArtifact(ctx context.Context, in *GetNodeArtifactRequest, opts ...grpc.CallOption) (*httpbody.HttpBody, error)
+	ListExecutionArtifacts(ctx context.Context, in *ListExecutionArtifactsRequest, opts ...grpc.CallOption) (*ListArtifactsResponse, error)
+	GetExecutionArtifact(ctx context.Context, in *GetExecutionArtifactRequest, opts ...grpc.CallOption) (*httpbody.HttpBody, error)
 	SendAiMessage(ctx context.Context, in *SendAiMessageRequest, opts ...grpc.CallOption) (*SendAiMessageResponse, error)
 }
 
@@ -253,6 +266,66 @@ func (c *canvasesClient) ListEventExecutions(ctx context.Context, in *ListEventE
 	return out, nil
 }
 
+func (c *canvasesClient) ListCanvasArtifacts(ctx context.Context, in *ListCanvasArtifactsRequest, opts ...grpc.CallOption) (*ListArtifactsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListArtifactsResponse)
+	err := c.cc.Invoke(ctx, Canvases_ListCanvasArtifacts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) GetCanvasArtifact(ctx context.Context, in *GetCanvasArtifactRequest, opts ...grpc.CallOption) (*httpbody.HttpBody, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(httpbody.HttpBody)
+	err := c.cc.Invoke(ctx, Canvases_GetCanvasArtifact_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) ListNodeArtifacts(ctx context.Context, in *ListNodeArtifactsRequest, opts ...grpc.CallOption) (*ListArtifactsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListArtifactsResponse)
+	err := c.cc.Invoke(ctx, Canvases_ListNodeArtifacts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) GetNodeArtifact(ctx context.Context, in *GetNodeArtifactRequest, opts ...grpc.CallOption) (*httpbody.HttpBody, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(httpbody.HttpBody)
+	err := c.cc.Invoke(ctx, Canvases_GetNodeArtifact_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) ListExecutionArtifacts(ctx context.Context, in *ListExecutionArtifactsRequest, opts ...grpc.CallOption) (*ListArtifactsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListArtifactsResponse)
+	err := c.cc.Invoke(ctx, Canvases_ListExecutionArtifacts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) GetExecutionArtifact(ctx context.Context, in *GetExecutionArtifactRequest, opts ...grpc.CallOption) (*httpbody.HttpBody, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(httpbody.HttpBody)
+	err := c.cc.Invoke(ctx, Canvases_GetExecutionArtifact_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *canvasesClient) SendAiMessage(ctx context.Context, in *SendAiMessageRequest, opts ...grpc.CallOption) (*SendAiMessageResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SendAiMessageResponse)
@@ -285,6 +358,12 @@ type CanvasesServer interface {
 	ResolveExecutionErrors(context.Context, *ResolveExecutionErrorsRequest) (*ResolveExecutionErrorsResponse, error)
 	ListCanvasEvents(context.Context, *ListCanvasEventsRequest) (*ListCanvasEventsResponse, error)
 	ListEventExecutions(context.Context, *ListEventExecutionsRequest) (*ListEventExecutionsResponse, error)
+	ListCanvasArtifacts(context.Context, *ListCanvasArtifactsRequest) (*ListArtifactsResponse, error)
+	GetCanvasArtifact(context.Context, *GetCanvasArtifactRequest) (*httpbody.HttpBody, error)
+	ListNodeArtifacts(context.Context, *ListNodeArtifactsRequest) (*ListArtifactsResponse, error)
+	GetNodeArtifact(context.Context, *GetNodeArtifactRequest) (*httpbody.HttpBody, error)
+	ListExecutionArtifacts(context.Context, *ListExecutionArtifactsRequest) (*ListArtifactsResponse, error)
+	GetExecutionArtifact(context.Context, *GetExecutionArtifactRequest) (*httpbody.HttpBody, error)
 	SendAiMessage(context.Context, *SendAiMessageRequest) (*SendAiMessageResponse, error)
 }
 
@@ -348,6 +427,24 @@ func (UnimplementedCanvasesServer) ListCanvasEvents(context.Context, *ListCanvas
 }
 func (UnimplementedCanvasesServer) ListEventExecutions(context.Context, *ListEventExecutionsRequest) (*ListEventExecutionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListEventExecutions not implemented")
+}
+func (UnimplementedCanvasesServer) ListCanvasArtifacts(context.Context, *ListCanvasArtifactsRequest) (*ListArtifactsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCanvasArtifacts not implemented")
+}
+func (UnimplementedCanvasesServer) GetCanvasArtifact(context.Context, *GetCanvasArtifactRequest) (*httpbody.HttpBody, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCanvasArtifact not implemented")
+}
+func (UnimplementedCanvasesServer) ListNodeArtifacts(context.Context, *ListNodeArtifactsRequest) (*ListArtifactsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListNodeArtifacts not implemented")
+}
+func (UnimplementedCanvasesServer) GetNodeArtifact(context.Context, *GetNodeArtifactRequest) (*httpbody.HttpBody, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetNodeArtifact not implemented")
+}
+func (UnimplementedCanvasesServer) ListExecutionArtifacts(context.Context, *ListExecutionArtifactsRequest) (*ListArtifactsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListExecutionArtifacts not implemented")
+}
+func (UnimplementedCanvasesServer) GetExecutionArtifact(context.Context, *GetExecutionArtifactRequest) (*httpbody.HttpBody, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetExecutionArtifact not implemented")
 }
 func (UnimplementedCanvasesServer) SendAiMessage(context.Context, *SendAiMessageRequest) (*SendAiMessageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendAiMessage not implemented")
@@ -696,6 +793,114 @@ func _Canvases_ListEventExecutions_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Canvases_ListCanvasArtifacts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCanvasArtifactsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).ListCanvasArtifacts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_ListCanvasArtifacts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).ListCanvasArtifacts(ctx, req.(*ListCanvasArtifactsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_GetCanvasArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCanvasArtifactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).GetCanvasArtifact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_GetCanvasArtifact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).GetCanvasArtifact(ctx, req.(*GetCanvasArtifactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_ListNodeArtifacts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListNodeArtifactsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).ListNodeArtifacts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_ListNodeArtifacts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).ListNodeArtifacts(ctx, req.(*ListNodeArtifactsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_GetNodeArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetNodeArtifactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).GetNodeArtifact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_GetNodeArtifact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).GetNodeArtifact(ctx, req.(*GetNodeArtifactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_ListExecutionArtifacts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListExecutionArtifactsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).ListExecutionArtifacts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_ListExecutionArtifacts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).ListExecutionArtifacts(ctx, req.(*ListExecutionArtifactsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_GetExecutionArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetExecutionArtifactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).GetExecutionArtifact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_GetExecutionArtifact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).GetExecutionArtifact(ctx, req.(*GetExecutionArtifactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Canvases_SendAiMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SendAiMessageRequest)
 	if err := dec(in); err != nil {
@@ -792,6 +997,30 @@ var Canvases_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListEventExecutions",
 			Handler:    _Canvases_ListEventExecutions_Handler,
+		},
+		{
+			MethodName: "ListCanvasArtifacts",
+			Handler:    _Canvases_ListCanvasArtifacts_Handler,
+		},
+		{
+			MethodName: "GetCanvasArtifact",
+			Handler:    _Canvases_GetCanvasArtifact_Handler,
+		},
+		{
+			MethodName: "ListNodeArtifacts",
+			Handler:    _Canvases_ListNodeArtifacts_Handler,
+		},
+		{
+			MethodName: "GetNodeArtifact",
+			Handler:    _Canvases_GetNodeArtifact_Handler,
+		},
+		{
+			MethodName: "ListExecutionArtifacts",
+			Handler:    _Canvases_ListExecutionArtifacts_Handler,
+		},
+		{
+			MethodName: "GetExecutionArtifact",
+			Handler:    _Canvases_GetExecutionArtifact_Handler,
 		},
 		{
 			MethodName: "SendAiMessage",

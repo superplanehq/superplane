@@ -873,6 +873,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
 				Logger:         logging.ForExecution(execution, nil),
 				Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
+				Artifacts:      registry.NewLocalArtifactStorageContext(execution.WorkflowID.String(), execution.NodeID, execution.ID.String()),
 			}, nil
 		},
 	})

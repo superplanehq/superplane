@@ -154,6 +154,7 @@ type ExecutionContext struct {
 	Notifications  NotificationContext
 	Secrets        SecretsContext
 	Webhook        NodeWebhookContext
+	Artifacts      ArtifactStorageContext
 }
 
 /*
@@ -331,4 +332,29 @@ type User struct {
 	ID    string `mapstructure:"id" json:"id"`
 	Name  string `mapstructure:"name" json:"name"`
 	Email string `mapstructure:"email" json:"email"`
+}
+
+/*
+ * ArtifactStorageContext allows the component to store and retrieve artifacts.
+ * Artifacts can be stored at the canvas, node, and execution levels.
+ */
+type ArtifactStorageContext struct {
+	Canvas    ArtifactStorage
+	Node      ArtifactStorage
+	Execution ArtifactStorage
+}
+
+type ArtifactStorage interface {
+	Create(name string) (Artifact, error)
+	Get(name string) (Artifact, error)
+	List() ([]string, error)
+}
+
+/*
+ * Artifact can be used both as a io.Writer and a io.Reader
+ */
+type Artifact interface {
+	Write(data []byte) (int, error)
+	Read(buf []byte) (int, error)
+	Close() error
 }

@@ -272,6 +272,126 @@ func (a *CanvasNodeAPIService) CanvasesEmitNodeEventExecute(r ApiCanvasesEmitNod
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiCanvasesGetNodeArtifactRequest struct {
+	ctx        context.Context
+	ApiService *CanvasNodeAPIService
+	canvasId   string
+	nodeId     string
+	name       string
+}
+
+func (r ApiCanvasesGetNodeArtifactRequest) Execute() (*ApiHttpBody, *http.Response, error) {
+	return r.ApiService.CanvasesGetNodeArtifactExecute(r)
+}
+
+/*
+CanvasesGetNodeArtifact Get node artifact
+
+Returns artifact content for a node
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param canvasId
+	@param nodeId
+	@param name
+	@return ApiCanvasesGetNodeArtifactRequest
+*/
+func (a *CanvasNodeAPIService) CanvasesGetNodeArtifact(ctx context.Context, canvasId string, nodeId string, name string) ApiCanvasesGetNodeArtifactRequest {
+	return ApiCanvasesGetNodeArtifactRequest{
+		ApiService: a,
+		ctx:        ctx,
+		canvasId:   canvasId,
+		nodeId:     nodeId,
+		name:       name,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ApiHttpBody
+func (a *CanvasNodeAPIService) CanvasesGetNodeArtifactExecute(r ApiCanvasesGetNodeArtifactRequest) (*ApiHttpBody, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ApiHttpBody
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasNodeAPIService.CanvasesGetNodeArtifact")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/nodes/{nodeId}/artifacts/{name}"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"nodeId"+"}", url.PathEscape(parameterValueToString(r.nodeId, "nodeId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"name"+"}", url.PathEscape(parameterValueToString(r.name, "name")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiCanvasesInvokeNodeTriggerActionRequest struct {
 	ctx        context.Context
 	ApiService *CanvasNodeAPIService
@@ -358,6 +478,122 @@ func (a *CanvasNodeAPIService) CanvasesInvokeNodeTriggerActionExecute(r ApiCanva
 	}
 	// body params
 	localVarPostBody = r.body
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiCanvasesListNodeArtifactsRequest struct {
+	ctx        context.Context
+	ApiService *CanvasNodeAPIService
+	canvasId   string
+	nodeId     string
+}
+
+func (r ApiCanvasesListNodeArtifactsRequest) Execute() (*CanvasesListArtifactsResponse, *http.Response, error) {
+	return r.ApiService.CanvasesListNodeArtifactsExecute(r)
+}
+
+/*
+CanvasesListNodeArtifacts List node artifacts
+
+Returns a list of artifact names for a node
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param canvasId
+	@param nodeId
+	@return ApiCanvasesListNodeArtifactsRequest
+*/
+func (a *CanvasNodeAPIService) CanvasesListNodeArtifacts(ctx context.Context, canvasId string, nodeId string) ApiCanvasesListNodeArtifactsRequest {
+	return ApiCanvasesListNodeArtifactsRequest{
+		ApiService: a,
+		ctx:        ctx,
+		canvasId:   canvasId,
+		nodeId:     nodeId,
+	}
+}
+
+// Execute executes the request
+//
+//	@return CanvasesListArtifactsResponse
+func (a *CanvasNodeAPIService) CanvasesListNodeArtifactsExecute(r ApiCanvasesListNodeArtifactsRequest) (*CanvasesListArtifactsResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *CanvasesListArtifactsResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasNodeAPIService.CanvasesListNodeArtifacts")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/nodes/{nodeId}/artifacts"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"nodeId"+"}", url.PathEscape(parameterValueToString(r.nodeId, "nodeId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err

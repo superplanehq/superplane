@@ -36,12 +36,24 @@ import type {
   CanvasesEmitNodeEventData,
   CanvasesEmitNodeEventErrors,
   CanvasesEmitNodeEventResponses,
+  CanvasesGetCanvasArtifactData,
+  CanvasesGetCanvasArtifactErrors,
+  CanvasesGetCanvasArtifactResponses,
+  CanvasesGetExecutionArtifactData,
+  CanvasesGetExecutionArtifactErrors,
+  CanvasesGetExecutionArtifactResponses,
+  CanvasesGetNodeArtifactData,
+  CanvasesGetNodeArtifactErrors,
+  CanvasesGetNodeArtifactResponses,
   CanvasesInvokeNodeExecutionActionData,
   CanvasesInvokeNodeExecutionActionErrors,
   CanvasesInvokeNodeExecutionActionResponses,
   CanvasesInvokeNodeTriggerActionData,
   CanvasesInvokeNodeTriggerActionErrors,
   CanvasesInvokeNodeTriggerActionResponses,
+  CanvasesListCanvasArtifactsData,
+  CanvasesListCanvasArtifactsErrors,
+  CanvasesListCanvasArtifactsResponses,
   CanvasesListCanvasesData,
   CanvasesListCanvasesErrors,
   CanvasesListCanvasesResponses,
@@ -54,6 +66,12 @@ import type {
   CanvasesListEventExecutionsData,
   CanvasesListEventExecutionsErrors,
   CanvasesListEventExecutionsResponses,
+  CanvasesListExecutionArtifactsData,
+  CanvasesListExecutionArtifactsErrors,
+  CanvasesListExecutionArtifactsResponses,
+  CanvasesListNodeArtifactsData,
+  CanvasesListNodeArtifactsErrors,
+  CanvasesListNodeArtifactsResponses,
   CanvasesListNodeEventsData,
   CanvasesListNodeEventsErrors,
   CanvasesListNodeEventsResponses,
@@ -400,6 +418,31 @@ export const canvasesSendAiMessage = <ThrowOnError extends boolean = true>(
   });
 
 /**
+ * List artifacts
+ *
+ * Returns a list of artifact names for a canvas
+ */
+export const canvasesListCanvasArtifacts = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesListCanvasArtifactsData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<CanvasesListCanvasArtifactsResponses, CanvasesListCanvasArtifactsErrors, ThrowOnError>(
+    { url: "/api/v1/canvases/{canvasId}/artifacts", ...options },
+  );
+
+/**
+ * Get artifact
+ *
+ * Returns artifact content for a canvas
+ */
+export const canvasesGetCanvasArtifact = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesGetCanvasArtifactData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<CanvasesGetCanvasArtifactResponses, CanvasesGetCanvasArtifactErrors, ThrowOnError>({
+    url: "/api/v1/canvases/{canvasId}/artifacts/{name}",
+    ...options,
+  });
+
+/**
  * List canvas events
  *
  * Returns a list of root events that triggered executions in a canvas
@@ -467,6 +510,34 @@ export const canvasesInvokeNodeExecutionAction = <ThrowOnError extends boolean =
   });
 
 /**
+ * List execution artifacts
+ *
+ * Returns a list of artifact names for an execution
+ */
+export const canvasesListExecutionArtifacts = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesListExecutionArtifactsData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<
+    CanvasesListExecutionArtifactsResponses,
+    CanvasesListExecutionArtifactsErrors,
+    ThrowOnError
+  >({ url: "/api/v1/canvases/{canvasId}/executions/{executionId}/artifacts", ...options });
+
+/**
+ * Get execution artifact
+ *
+ * Returns artifact content for an execution
+ */
+export const canvasesGetExecutionArtifact = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesGetExecutionArtifactData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<
+    CanvasesGetExecutionArtifactResponses,
+    CanvasesGetExecutionArtifactErrors,
+    ThrowOnError
+  >({ url: "/api/v1/canvases/{canvasId}/executions/{executionId}/artifacts/{name}", ...options });
+
+/**
  * Cancel execution
  *
  * Cancels a running canvas node execution
@@ -502,6 +573,32 @@ export const canvasesListChildExecutions = <ThrowOnError extends boolean = true>
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * List node artifacts
+ *
+ * Returns a list of artifact names for a node
+ */
+export const canvasesListNodeArtifacts = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesListNodeArtifactsData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<CanvasesListNodeArtifactsResponses, CanvasesListNodeArtifactsErrors, ThrowOnError>({
+    url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/artifacts",
+    ...options,
+  });
+
+/**
+ * Get node artifact
+ *
+ * Returns artifact content for a node
+ */
+export const canvasesGetNodeArtifact = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesGetNodeArtifactData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<CanvasesGetNodeArtifactResponses, CanvasesGetNodeArtifactErrors, ThrowOnError>({
+    url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/artifacts/{name}",
+    ...options,
   });
 
 /**

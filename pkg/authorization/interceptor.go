@@ -120,6 +120,12 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbCanvases.Canvases_ListNodeEvents_FullMethodName:            {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbCanvases.Canvases_EmitNodeEvent_FullMethodName:             {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbCanvases.Canvases_SendAiMessage_FullMethodName:             {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListCanvasArtifacts_FullMethodName:       {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_GetCanvasArtifact_FullMethodName:         {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListNodeArtifacts_FullMethodName:         {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_GetNodeArtifact_FullMethodName:           {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListExecutionArtifacts_FullMethodName:    {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_GetExecutionArtifact_FullMethodName:      {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
 
 		// Service Accounts rules
 		pbServiceAccounts.ServiceAccounts_CreateServiceAccount_FullMethodName:          {Resource: "service_accounts", Action: "create", DomainType: models.DomainTypeOrganization},

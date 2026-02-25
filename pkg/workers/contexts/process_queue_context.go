@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -127,6 +128,7 @@ func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *model
 			Requests:       NewExecutionRequestContext(tx, &execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), &execution, nil),
 			Notifications:  NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
+			Artifacts:      registry.NewLocalArtifactStorageContext(execution.WorkflowID.String(), execution.NodeID, execution.ID.String()),
 		}, nil
 	}
 
@@ -223,6 +225,7 @@ func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *model
 			Requests:       NewExecutionRequestContext(tx, execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), execution, nil),
 			Notifications:  NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
+			Artifacts:      registry.NewLocalArtifactStorageContext(execution.WorkflowID.String(), execution.NodeID, execution.ID.String()),
 		}, nil
 	}
 

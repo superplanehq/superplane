@@ -6,6 +6,7 @@ import "components.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "google/api/annotations.proto";
+import "google/api/httpbody.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "github.com/superplanehq/superplane/pkg/protos/canvases";
@@ -231,6 +232,72 @@ service Canvases {
       summary: "List event executions";
       description: "Returns a list of all node executions triggered by a root event";
       tags: "CanvasEvent";
+    };
+  }
+
+  rpc ListCanvasArtifacts(ListCanvasArtifactsRequest) returns (ListArtifactsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/artifacts"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List artifacts";
+      description: "Returns a list of artifact names for a canvas";
+      tags: "Canvas";
+    };
+  }
+
+  rpc GetCanvasArtifact(GetCanvasArtifactRequest) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/artifacts/{name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get artifact";
+      description: "Returns artifact content for a canvas";
+      tags: "Canvas";
+    };
+  }
+
+  rpc ListNodeArtifacts(ListNodeArtifactsRequest) returns (ListArtifactsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/artifacts"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List node artifacts";
+      description: "Returns a list of artifact names for a node";
+      tags: "CanvasNode";
+    };
+  }
+
+  rpc GetNodeArtifact(GetNodeArtifactRequest) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/artifacts/{name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get node artifact";
+      description: "Returns artifact content for a node";
+      tags: "CanvasNode";
+    };
+  }
+
+  rpc ListExecutionArtifacts(ListExecutionArtifactsRequest) returns (ListArtifactsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/executions/{execution_id}/artifacts"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List execution artifacts";
+      description: "Returns a list of artifact names for an execution";
+      tags: "CanvasNodeExecution";
+    };
+  }
+
+  rpc GetExecutionArtifact(GetExecutionArtifactRequest) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/executions/{execution_id}/artifacts/{name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get execution artifact";
+      description: "Returns artifact content for an execution";
+      tags: "CanvasNodeExecution";
     };
   }
 
@@ -512,6 +579,41 @@ message ListEventExecutionsRequest {
 
 message ListEventExecutionsResponse {
   repeated CanvasNodeExecution executions = 1;
+}
+
+message ListCanvasArtifactsRequest {
+  string canvas_id = 1;
+}
+
+message ListNodeArtifactsRequest {
+  string canvas_id = 1;
+  string node_id = 2;
+}
+
+message ListExecutionArtifactsRequest {
+  string canvas_id = 1;
+  string execution_id = 2;
+}
+
+message ListArtifactsResponse {
+  repeated string names = 1;
+}
+
+message GetCanvasArtifactRequest {
+  string canvas_id = 1;
+  string name = 2;
+}
+
+message GetNodeArtifactRequest {
+  string canvas_id = 1;
+  string node_id = 2;
+  string name = 3;
+}
+
+message GetExecutionArtifactRequest {
+  string canvas_id = 1;
+  string execution_id = 2;
+  string name = 3;
 }
 
 message CancelExecutionRequest {

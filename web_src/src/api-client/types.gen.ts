@@ -243,6 +243,10 @@ export type CanvasesInvokeNodeTriggerActionResponse = {
   };
 };
 
+export type CanvasesListArtifactsResponse = {
+  names?: Array<string>;
+};
+
 export type CanvasesListCanvasEventsResponse = {
   events?: Array<CanvasesCanvasEventWithExecutions>;
   totalCount?: number;
@@ -1181,13 +1185,116 @@ export type WidgetsWidget = {
   configuration?: Array<ConfigurationField>;
 };
 
+/**
+ * Message for handling arbitrary HTTP body content in gRPC-Gateway responses.
+ */
+export type ApiHttpBody = {
+  contentType?: string;
+  data?: string;
+  extensions?: Array<ProtobufAny>;
+};
+
 export type GooglerpcStatus = {
   code?: number;
   message?: string;
   details?: Array<ProtobufAny>;
 };
 
+/**
+ * `Any` contains an arbitrary serialized protocol buffer message along with a
+ * URL that describes the type of the serialized message.
+ *
+ * Protobuf library provides support to pack/unpack Any values in the form
+ * of utility functions or additional generated methods of the Any type.
+ *
+ * Example 1: Pack and unpack a message in C++.
+ *
+ * Foo foo = ...;
+ * Any any;
+ * any.PackFrom(foo);
+ * ...
+ * if (any.UnpackTo(&foo)) {
+ * ...
+ * }
+ *
+ * Example 2: Pack and unpack a message in Java.
+ *
+ * Foo foo = ...;
+ * Any any = Any.pack(foo);
+ * ...
+ * if (any.is(Foo.class)) {
+ * foo = any.unpack(Foo.class);
+ * }
+ *
+ * Example 3: Pack and unpack a message in Python.
+ *
+ * foo = Foo(...)
+ * any = Any()
+ * any.Pack(foo)
+ * ...
+ * if any.Is(Foo.DESCRIPTOR):
+ * any.Unpack(foo)
+ * ...
+ *
+ * The pack methods provided by protobuf library will by default use
+ * 'type.googleapis.com/full.type.name' as the type URL and the unpack
+ * methods only use the fully qualified type name after the last '/'
+ * in the type URL, for example "foo.bar.com/x/y.z" will yield type
+ * name "y.z".
+ *
+ *
+ * JSON
+ * ====
+ * The JSON representation of an `Any` value uses the regular
+ * representation of the deserialized, embedded message, with an
+ * additional field `@type` which contains the type URL. Example:
+ *
+ * package google.profile;
+ * message Person {
+ * string first_name = 1;
+ * string last_name = 2;
+ * }
+ *
+ * {
+ * "@type": "type.googleapis.com/google.profile.Person",
+ * "firstName": <string>,
+ * "lastName": <string>
+ * }
+ *
+ * If the embedded message type is well-known and has a custom JSON
+ * representation, that representation will be embedded adding a field
+ * `value` which holds the custom JSON in addition to the `@type`
+ * field. Example (for message [google.protobuf.Duration][]):
+ *
+ * {
+ * "@type": "type.googleapis.com/google.protobuf.Duration",
+ * "value": "1.212s"
+ * }
+ */
 export type ProtobufAny = {
+  /**
+   * A URL/resource name whose content describes the type of the
+   * serialized protocol buffer message.
+   *
+   * For URLs which use the scheme `http`, `https`, or no scheme, the
+   * following restrictions and interpretations apply:
+   *
+   * * If no scheme is provided, `https` is assumed.
+   * * The last segment of the URL's path must represent the fully
+   * qualified name of the type (as in `path/google.protobuf.Duration`).
+   * The name should be in a canonical form (e.g., leading "." is
+   * not accepted).
+   * * An HTTP GET on the URL must yield a [google.protobuf.Type][]
+   * value in binary format, or produce an error.
+   * * Applications are allowed to cache lookup results based on the
+   * URL, or have them precompiled into a binary to avoid any
+   * lookup. Therefore, binary compatibility needs to be preserved
+   * on changes to types. (Use versioned type names to manage
+   * breaking changes.)
+   *
+   * Schemes other than `http`, `https` (or the empty scheme) might be
+   * used with implementation specific semantics.
+   */
   "@type"?: string;
   [key: string]: unknown | string | undefined;
 };
@@ -1418,6 +1525,64 @@ export type CanvasesSendAiMessageResponses = {
 
 export type CanvasesSendAiMessageResponse2 = CanvasesSendAiMessageResponses[keyof CanvasesSendAiMessageResponses];
 
+export type CanvasesListCanvasArtifactsData = {
+  body?: never;
+  path: {
+    canvasId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/artifacts";
+};
+
+export type CanvasesListCanvasArtifactsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesListCanvasArtifactsError =
+  CanvasesListCanvasArtifactsErrors[keyof CanvasesListCanvasArtifactsErrors];
+
+export type CanvasesListCanvasArtifactsResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesListArtifactsResponse;
+};
+
+export type CanvasesListCanvasArtifactsResponse =
+  CanvasesListCanvasArtifactsResponses[keyof CanvasesListCanvasArtifactsResponses];
+
+export type CanvasesGetCanvasArtifactData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    name: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/artifacts/{name}";
+};
+
+export type CanvasesGetCanvasArtifactErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesGetCanvasArtifactError = CanvasesGetCanvasArtifactErrors[keyof CanvasesGetCanvasArtifactErrors];
+
+export type CanvasesGetCanvasArtifactResponses = {
+  /**
+   * A successful response.
+   */
+  200: ApiHttpBody;
+};
+
+export type CanvasesGetCanvasArtifactResponse =
+  CanvasesGetCanvasArtifactResponses[keyof CanvasesGetCanvasArtifactResponses];
+
 export type CanvasesListCanvasEventsData = {
   body?: never;
   path: {
@@ -1539,6 +1704,67 @@ export type CanvasesInvokeNodeExecutionActionResponses = {
 export type CanvasesInvokeNodeExecutionActionResponse2 =
   CanvasesInvokeNodeExecutionActionResponses[keyof CanvasesInvokeNodeExecutionActionResponses];
 
+export type CanvasesListExecutionArtifactsData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    executionId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/executions/{executionId}/artifacts";
+};
+
+export type CanvasesListExecutionArtifactsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesListExecutionArtifactsError =
+  CanvasesListExecutionArtifactsErrors[keyof CanvasesListExecutionArtifactsErrors];
+
+export type CanvasesListExecutionArtifactsResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesListArtifactsResponse;
+};
+
+export type CanvasesListExecutionArtifactsResponse =
+  CanvasesListExecutionArtifactsResponses[keyof CanvasesListExecutionArtifactsResponses];
+
+export type CanvasesGetExecutionArtifactData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    executionId: string;
+    name: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/executions/{executionId}/artifacts/{name}";
+};
+
+export type CanvasesGetExecutionArtifactErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesGetExecutionArtifactError =
+  CanvasesGetExecutionArtifactErrors[keyof CanvasesGetExecutionArtifactErrors];
+
+export type CanvasesGetExecutionArtifactResponses = {
+  /**
+   * A successful response.
+   */
+  200: ApiHttpBody;
+};
+
+export type CanvasesGetExecutionArtifactResponse =
+  CanvasesGetExecutionArtifactResponses[keyof CanvasesGetExecutionArtifactResponses];
+
 export type CanvasesCancelExecutionData = {
   body: CanvasesCancelExecutionBody;
   path: {
@@ -1596,6 +1822,64 @@ export type CanvasesListChildExecutionsResponses = {
 
 export type CanvasesListChildExecutionsResponse2 =
   CanvasesListChildExecutionsResponses[keyof CanvasesListChildExecutionsResponses];
+
+export type CanvasesListNodeArtifactsData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    nodeId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/artifacts";
+};
+
+export type CanvasesListNodeArtifactsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesListNodeArtifactsError = CanvasesListNodeArtifactsErrors[keyof CanvasesListNodeArtifactsErrors];
+
+export type CanvasesListNodeArtifactsResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesListArtifactsResponse;
+};
+
+export type CanvasesListNodeArtifactsResponse =
+  CanvasesListNodeArtifactsResponses[keyof CanvasesListNodeArtifactsResponses];
+
+export type CanvasesGetNodeArtifactData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    nodeId: string;
+    name: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/artifacts/{name}";
+};
+
+export type CanvasesGetNodeArtifactErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesGetNodeArtifactError = CanvasesGetNodeArtifactErrors[keyof CanvasesGetNodeArtifactErrors];
+
+export type CanvasesGetNodeArtifactResponses = {
+  /**
+   * A successful response.
+   */
+  200: ApiHttpBody;
+};
+
+export type CanvasesGetNodeArtifactResponse = CanvasesGetNodeArtifactResponses[keyof CanvasesGetNodeArtifactResponses];
 
 export type CanvasesListNodeEventsData = {
   body?: never;

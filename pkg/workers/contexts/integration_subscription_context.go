@@ -136,5 +136,6 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 		Integration:    c.integrationCtx,
 		Logger:         logging.WithExecution(logging.ForNode(*c.node), execution, nil),
 		Notifications:  NewNotificationContext(c.tx, c.integration.OrganizationID, execution.WorkflowID),
+		Artifacts:      registry.NewLocalArtifactStorageContext(execution.WorkflowID.String(), execution.NodeID, execution.ID.String()),
 	}, nil
 }

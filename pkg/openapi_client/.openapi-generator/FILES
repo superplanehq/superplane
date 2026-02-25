@@ -21,6 +21,7 @@ api_users.go
 api_widget.go
 client.go
 configuration.go
+docs/ApiHttpBody.md
 docs/AuthorizationDomainType.md
 docs/AuthorizationPermission.md
 docs/BlueprintAPI.md
@@ -57,6 +58,7 @@ docs/CanvasesEmitNodeEventResponse.md
 docs/CanvasesInvokeNodeExecutionActionBody.md
 docs/CanvasesInvokeNodeTriggerActionBody.md
 docs/CanvasesInvokeNodeTriggerActionResponse.md
+docs/CanvasesListArtifactsResponse.md
 docs/CanvasesListCanvasEventsResponse.md
 docs/CanvasesListCanvasesResponse.md
 docs/CanvasesListChildExecutionsResponse.md
@@ -228,6 +230,7 @@ docs/WidgetsDescribeWidgetResponse.md
 docs/WidgetsListWidgetsResponse.md
 docs/WidgetsWidget.md
 git_push.sh
+model_api_http_body.go
 model_authorization_domain_type.go
 model_authorization_permission.go
 model_blueprints_blueprint.go
@@ -259,6 +262,7 @@ model_canvases_emit_node_event_response.go
 model_canvases_invoke_node_execution_action_body.go
 model_canvases_invoke_node_trigger_action_body.go
 model_canvases_invoke_node_trigger_action_response.go
+model_canvases_list_artifacts_response.go
 model_canvases_list_canvas_events_response.go
 model_canvases_list_canvases_response.go
 model_canvases_list_child_executions_response.go

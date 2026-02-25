@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/genproto/googleapis/api/httpbody"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -182,6 +183,36 @@ func (s *CanvasService) ListCanvasEvents(ctx context.Context, req *pb.ListCanvas
 
 func (s *CanvasService) ListEventExecutions(ctx context.Context, req *pb.ListEventExecutionsRequest) (*pb.ListEventExecutionsResponse, error) {
 	return canvases.ListEventExecutions(ctx, s.registry, req.CanvasId, req.EventId)
+}
+
+func (s *CanvasService) ListCanvasArtifacts(ctx context.Context, req *pb.ListCanvasArtifactsRequest) (*pb.ListArtifactsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListCanvasArtifacts(ctx, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) GetCanvasArtifact(ctx context.Context, req *pb.GetCanvasArtifactRequest) (*httpbody.HttpBody, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.GetCanvasArtifact(ctx, organizationID, req.CanvasId, req.Name)
+}
+
+func (s *CanvasService) ListNodeArtifacts(ctx context.Context, req *pb.ListNodeArtifactsRequest) (*pb.ListArtifactsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListNodeArtifacts(ctx, organizationID, req.CanvasId, req.NodeId)
+}
+
+func (s *CanvasService) GetNodeArtifact(ctx context.Context, req *pb.GetNodeArtifactRequest) (*httpbody.HttpBody, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.GetNodeArtifact(ctx, organizationID, req.CanvasId, req.NodeId, req.Name)
+}
+
+func (s *CanvasService) ListExecutionArtifacts(ctx context.Context, req *pb.ListExecutionArtifactsRequest) (*pb.ListArtifactsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListExecutionArtifacts(ctx, organizationID, req.CanvasId, req.ExecutionId)
+}
+
+func (s *CanvasService) GetExecutionArtifact(ctx context.Context, req *pb.GetExecutionArtifactRequest) (*httpbody.HttpBody, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.GetExecutionArtifact(ctx, organizationID, req.CanvasId, req.ExecutionId, req.Name)
 }
 
 func (s *CanvasService) ListChildExecutions(ctx context.Context, req *pb.ListChildExecutionsRequest) (*pb.ListChildExecutionsResponse, error) {
