@@ -40,7 +40,6 @@ export function General({ organization }: GeneralProps) {
   const [showDeleteForm, setShowDeleteForm] = useState(false);
   const [agentApiKey, setAgentApiKey] = useState("");
   const [agentApiKeyError, setAgentApiKeyError] = useState<string | null>(null);
-  const [agentError, setAgentError] = useState<string | null>(null);
   const [showAgentConfigureModal, setShowAgentConfigureModal] = useState(false);
 
   // Use React Query mutation hook
@@ -114,14 +113,11 @@ export function General({ organization }: GeneralProps) {
 
     try {
       setAgentApiKeyError(null);
-      setAgentError(null);
       const saveResult = await setAgentOpenAIKeyMutation.mutateAsync({
         apiKey: agentApiKey.trim(),
         validate: true,
       });
       const savedKeyStatus = saveResult?.agentSettings?.openaiKey?.status;
-      const savedKeyLast4 = saveResult?.agentSettings?.openaiKey?.last4 || "";
-      const savedKeyValidationError = saveResult?.agentSettings?.openaiKey?.validationError;
 
       if (savedKeyStatus === "invalid") {
         setAgentApiKeyError("Invalid OpenAI API key.");
@@ -141,14 +137,12 @@ export function General({ organization }: GeneralProps) {
 
   const handleConfigureAgentMode = () => {
     if (!canUpdateOrg) return;
-    setAgentError(null);
     setShowAgentConfigureModal(true);
   };
 
   const handleCancelConfigureAgentMode = () => {
     setAgentApiKey("");
     setAgentApiKeyError(null);
-    setAgentError(null);
     setShowAgentConfigureModal(false);
   };
 
@@ -156,15 +150,13 @@ export function General({ organization }: GeneralProps) {
     if (!canUpdateOrg || !organizationId) return;
 
     try {
-      setAgentError(null);
       await deleteAgentOpenAIKeyMutation.mutateAsync();
       await updateAgentSettingsMutation.mutateAsync(false);
       setAgentApiKey("");
       setAgentApiKeyError(null);
       setShowAgentConfigureModal(false);
     } catch (_err) {
-      setAgentError(`Failed to disable Agent Mode: ${getApiErrorMessage(_err)}`);
-      setTimeout(() => setAgentError(null), 3000);
+      console.error(`Failed to disable Agent Mode: ${getApiErrorMessage(_err)}`);
     }
   };
 
@@ -257,12 +249,6 @@ export function General({ organization }: GeneralProps) {
               )}
             </div>
           </div>
-
-          {agentError && (
-            <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded mt-4">
-              <p className="text-sm">{agentError}</p>
-            </div>
-          )}
 
           <Dialog open={showAgentConfigureModal} onOpenChange={setShowAgentConfigureModal}>
             <DialogContent showCloseButton={!agentSettingsBusy}>
