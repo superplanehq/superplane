@@ -16,6 +16,7 @@ import (
 type OnIssue struct{}
 
 type OnIssueConfiguration struct {
+	Account    string   `json:"account" yaml:"account" mapstructure:"account"`
 	Priorities []string `json:"priorities" yaml:"priorities" mapstructure:"priorities"`
 	States     []string `json:"states" yaml:"states" mapstructure:"states"`
 }
@@ -42,33 +43,20 @@ func (t *OnIssue) Documentation() string {
 
 ## Configuration
 
+- **Account**: The New Relic account to monitor for issues.
 - **Priorities**: Filter by priority (CRITICAL, HIGH, MEDIUM, LOW). Leave empty for all.
 - **States**: Filter by state (ACTIVATED, CLOSED, CREATED). Leave empty for all.
 
-## Webhook Setup
+## How It Works
 
-This trigger generates a webhook URL and a Secret. You must configure a **Workflow** in New Relic to send a webhook to this URL.
+When you save this trigger, Superplane automatically creates a **Webhook Destination** and a **Notification Channel** in your New Relic account via the NerdGraph API. New Relic issues matching your filter criteria will be forwarded to Superplane automatically — no manual configuration required.
 
-**IMPORTANT**: You must add a custom header ` + "`X-Superplane-Secret`" + ` in your New Relic Webhook configuration, using the Secret provided by Superplane.
-
-**Payload**:
-You must use the following JSON payload template in your New Relic Webhook configuration:
-
-` + "```json" + `
-{
-  "issue_id": "{{issueId}}",
-  "title": "{{annotations.title.[0]}}",
-  "priority": "{{priority}}",
-  "issue_url": "{{issuePageUrl}}",
-  "state": "{{state}}",
-  "owner": "{{owner}}"
-}
-` + "```" + `
+When the trigger is deleted, the destination and channel are automatically cleaned up from your New Relic account.
 `
 }
 
 func (t *OnIssue) Icon() string {
-	return "alert-triangle"
+	return "newrelic"
 }
 
 func (t *OnIssue) Color() string {
@@ -77,6 +65,19 @@ func (t *OnIssue) Color() string {
 
 func (t *OnIssue) Configuration() []configuration.Field {
 	return []configuration.Field{
+		{
+			Name:        "account",
+			Label:       "Account",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "The New Relic account to monitor for issues",
+			Placeholder: "Select an account",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "account",
+				},
+			},
+		},
 		{
 			Name:        "priorities",
 			Label:       "Priorities",
@@ -113,51 +114,30 @@ func (t *OnIssue) Configuration() []configuration.Field {
 	}
 }
 
-// OnIssueMetadata holds the metadata stored on the canvas node for the UI.
-type OnIssueMetadata struct {
-	URL    string `json:"url" mapstructure:"url"`
-	Manual bool   `json:"manual" mapstructure:"manual"`
-}
+// No trigger-specific metadata needed anymore as it's managed by the WebhookHandler
 
 func (t *OnIssue) Setup(ctx core.TriggerContext) error {
+	// NerdGraph API calls (creating/deleting destinations and channels) require a User API Key
 	userAPIKey, err := ctx.Integration.GetConfig("userApiKey")
 	if err != nil || len(userAPIKey) == 0 {
-		msg := "User API Key is required for this component. Please configure it in the Integration settings."
+		msg := "User API Key is required for this trigger. Please configure it in the Integration settings."
 		return fmt.Errorf("%s", msg)
 	}
 
-	// 1. Always ensure manual: true in metadata so the UI refreshes correctly
-	//    to show the webhook URL once set up.
-	var metadata OnIssueMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		// If decode fails, start fresh
-		metadata = OnIssueMetadata{}
+	config := OnIssueConfiguration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	metadata.Manual = true
-	if err := ctx.Metadata.Set(metadata); err != nil {
-		return fmt.Errorf("failed to set metadata: %w", err)
+	if config.Account == "" {
+		return fmt.Errorf("account is required")
 	}
 
-	// 2. Check if URL is already set (idempotency guard)
-	if metadata.URL != "" {
-		return nil
-	}
-
-	// 4. Create the webhook and get the URL
-	webhookURL, err := ctx.Webhook.Setup()
-	if err != nil {
-		return fmt.Errorf("failed to setup webhook: %w", err)
-	}
-
-	// 5. Store the URL in node metadata
-	metadata.URL = webhookURL
-	if err := ctx.Metadata.Set(metadata); err != nil {
-		return fmt.Errorf("failed to set metadata: %w", err)
-	}
-
-	ctx.Logger.Infof("New Relic OnIssue webhook URL: %s", webhookURL)
-	return nil
+	// Request the webhook with the account ID.
+	// This will trigger NewrelicWebhookHandler.Setup, which creates the destination and channel.
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
+		Account: config.Account,
+	})
 }
 
 func (t *OnIssue) Actions() []core.Action {
@@ -178,11 +158,6 @@ type NewrelicIssue struct {
 }
 
 // HandleWebhook processes incoming New Relic webhook requests
-//
-// Represents the "Azure Pattern" adapted for New Relic:
-// 1. Handshake/Validation check (Test notification)
-// 2. Mapstructure decoding
-// 3. Event processing
 func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	// 0. Verify Authentication
 	secret, err := ctx.Webhook.GetSecret()
@@ -217,10 +192,8 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusBadRequest, fmt.Errorf("error parsing webhook body: %w", err)
 	}
 
-	// 3. Handshake Logic (Mirroring Azure SubscriptionValidation)
-	// If the payload is missing issue_id (indicating a Newrelic "Test Connection" ping)
+	// 3. Handshake Logic
 	_, hasIssueID := rawPayload["issue_id"]
-
 	if !hasIssueID {
 		log.Infof("New Relic Validation Ping Received")
 		return http.StatusOK, nil
@@ -295,5 +268,6 @@ func allowedState(state string, allowed []string) bool {
 }
 
 func (t *OnIssue) Cleanup(ctx core.TriggerContext) error {
+	// Webhook cleanup is handled by the core calling NewrelicWebhookHandler.Cleanup
 	return nil
 }

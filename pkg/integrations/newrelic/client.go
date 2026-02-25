@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -139,6 +140,8 @@ func (c *Client) doNerdGraphRequest(ctx context.Context, query string, variables
 		return fmt.Errorf("failed to marshal GraphQL request: %w", err)
 	}
 
+	log.Debugf("NerdGraph request: %s", string(bodyBytes))
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.NerdGraphURL, bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create NerdGraph request: %w", err)
@@ -158,6 +161,8 @@ func (c *Client) doNerdGraphRequest(ctx context.Context, query string, variables
 	if err != nil {
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
+
+	log.Debugf("NerdGraph response (status %d): %s", resp.StatusCode, string(responseBody))
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return parseErrorResponse(c.NerdGraphURL, responseBody, resp.StatusCode)
@@ -342,4 +347,336 @@ func (c *Client) executeNRQLGraphQL(ctx context.Context, graphqlQuery string) (*
 	}
 
 	return nil, fmt.Errorf("invalid GraphQL response: missing nrql or nrqlQueryProgress")
+}
+
+// CreateAIDestination creates a NerdGraph WEBHOOK AI notification destination.
+// It passes the webhook URL and the Superplane secret as a custom request header.
+// Returns the destination ID on success.
+func (c *Client) CreateAIDestination(ctx context.Context, accountID int64, name, webhookURL, secret string) (string, error) {
+	mutation := `
+	mutation CreateDestination($accountId: Int!, $destination: AiNotificationsDestinationInput!) {
+	  aiNotificationsCreateDestination(accountId: $accountId, destination: $destination) {
+	    destination { id name }
+	    errors {
+	      __typename
+	      ... on AiNotificationsResponseError {
+	        description
+	        type
+	        details
+	      }
+	      ... on AiNotificationsSuggestionError {
+	        description
+	        type
+	        details
+	      }
+	      ... on AiNotificationsDataValidationError {
+	        details
+	      }
+	    }
+	  }
+	}`
+
+	variables := map[string]any{
+		"accountId": accountID,
+		"destination": map[string]any{
+			"type": "WEBHOOK",
+			"name": name,
+			"properties": []map[string]any{
+				{"key": "url", "value": webhookURL},
+			},
+			"auth": map[string]any{
+				"type": "CUSTOM_HEADERS",
+				"customHeaders": map[string]any{
+					"customHeaders": []map[string]any{
+						{"key": "X-Superplane-Secret", "value": secret},
+					},
+				},
+			},
+		},
+	}
+
+	var response struct {
+		AiNotificationsCreateDestination struct {
+			Destination struct {
+				ID string `json:"id"`
+			} `json:"destination"`
+			Errors []struct {
+				TypeName    string `json:"__typename"`
+				Description string `json:"description"`
+				Type        string `json:"type"`
+				Details     any    `json:"details"`
+			} `json:"errors"`
+		} `json:"aiNotificationsCreateDestination"`
+	}
+
+	if err := c.doNerdGraphRequest(ctx, mutation, variables, &response); err != nil {
+		return "", fmt.Errorf("failed to create AI destination: %w", err)
+	}
+
+	// Check domain-level errors in the mutation response
+	for _, e := range response.AiNotificationsCreateDestination.Errors {
+		detailsStr := ""
+		if e.Details != nil {
+			if s, ok := e.Details.(string); ok {
+				detailsStr = s
+			} else if b, err := json.Marshal(e.Details); err == nil {
+				detailsStr = string(b)
+			} else {
+				detailsStr = fmt.Sprintf("%v", e.Details)
+			}
+		}
+
+		log.Errorf("NerdGraph destination error: typename=%q type=%q description=%q details=%q",
+			e.TypeName, e.Type, e.Description, detailsStr)
+		desc := e.Description
+		if desc == "" && detailsStr != "" {
+			desc = detailsStr
+		}
+		if desc == "" {
+			desc = fmt.Sprintf("(unknown error type: %s)", e.TypeName)
+		}
+		return "", fmt.Errorf("NerdGraph error creating destination: [%s] %s", e.Type, desc)
+	}
+
+	destID := response.AiNotificationsCreateDestination.Destination.ID
+	if destID == "" {
+		return "", fmt.Errorf("NerdGraph returned no destination ID and no errors — check request payload")
+	}
+
+	return destID, nil
+}
+
+// DeleteAIDestination deletes a NerdGraph AI notification destination by ID.
+func (c *Client) DeleteAIDestination(ctx context.Context, accountID int64, destinationID string) error {
+	mutation := `
+	mutation DeleteDestination($accountId: Int!, $destinationId: ID!) {
+	  aiNotificationsDeleteDestination(accountId: $accountId, destinationId: $destinationId) {
+	    ids
+	    errors {
+	      ... on AiNotificationsResponseError {
+	        description
+	        type
+	      }
+	    }
+	  }
+	}`
+
+	variables := map[string]any{
+		"accountId":     accountID,
+		"destinationId": destinationID,
+	}
+
+	var response struct {
+		AiNotificationsDeleteDestination struct {
+			IDs    []string `json:"ids"`
+			Errors []struct {
+				Description string `json:"description"`
+				Type        string `json:"type"`
+			} `json:"errors"`
+		} `json:"aiNotificationsDeleteDestination"`
+	}
+
+	if err := c.doNerdGraphRequest(ctx, mutation, variables, &response); err != nil {
+		return fmt.Errorf("failed to delete AI destination: %w", err)
+	}
+
+	if len(response.AiNotificationsDeleteDestination.Errors) > 0 {
+		err := response.AiNotificationsDeleteDestination.Errors[0]
+		return fmt.Errorf("NerdGraph error deleting destination: [%s] %s", err.Type, err.Description)
+	}
+
+	return nil
+}
+
+// CreateAIChannel creates a NerdGraph AI notification channel linked to a destination.
+// Returns the channel ID on success.
+func (c *Client) CreateAIChannel(ctx context.Context, accountID int64, name, destinationID string) (string, error) {
+	mutation := `
+	mutation CreateChannel($accountId: Int!, $channel: AiNotificationsChannelInput!) {
+	  aiNotificationsCreateChannel(accountId: $accountId, channel: $channel) {
+	    channel { id name }
+	    errors {
+	      ... on AiNotificationsResponseError {
+	        description
+	        type
+	      }
+	    }
+	  }
+	}`
+
+	variables := map[string]any{
+		"accountId": accountID,
+		"channel": map[string]any{
+			"type":          "WEBHOOK",
+			"name":          name,
+			"destinationId": destinationID,
+			"product":       "IINT",
+			"properties":    []map[string]any{},
+		},
+	}
+
+	var response struct {
+		AiNotificationsCreateChannel struct {
+			Channel struct {
+				ID string `json:"id"`
+			} `json:"channel"`
+			Errors []struct {
+				Description string `json:"description"`
+				Type        string `json:"type"`
+			} `json:"errors"`
+		} `json:"aiNotificationsCreateChannel"`
+	}
+
+	if err := c.doNerdGraphRequest(ctx, mutation, variables, &response); err != nil {
+		return "", fmt.Errorf("failed to create AI channel: %w", err)
+	}
+
+	if len(response.AiNotificationsCreateChannel.Errors) > 0 {
+		err := response.AiNotificationsCreateChannel.Errors[0]
+		return "", fmt.Errorf("NerdGraph error creating channel: [%s] %s", err.Type, err.Description)
+	}
+
+	return response.AiNotificationsCreateChannel.Channel.ID, nil
+}
+
+// DeleteAIChannel deletes a NerdGraph AI notification channel by ID.
+func (c *Client) DeleteAIChannel(ctx context.Context, accountID int64, channelID string) error {
+	mutation := `
+	mutation DeleteChannel($accountId: Int!, $channelId: ID!) {
+	  aiNotificationsDeleteChannel(accountId: $accountId, channelId: $channelId) {
+	    ids
+	    errors {
+	      ... on AiNotificationsResponseError {
+	        description
+	        type
+	      }
+	    }
+	  }
+	}`
+
+	variables := map[string]any{
+		"accountId": accountID,
+		"channelId": channelID,
+	}
+
+	var response struct {
+		AiNotificationsDeleteChannel struct {
+			IDs    []string `json:"ids"`
+			Errors []struct {
+				Description string `json:"description"`
+				Type        string `json:"type"`
+			} `json:"errors"`
+		} `json:"aiNotificationsDeleteChannel"`
+	}
+
+	if err := c.doNerdGraphRequest(ctx, mutation, variables, &response); err != nil {
+		return fmt.Errorf("failed to delete AI channel: %w", err)
+	}
+
+	if len(response.AiNotificationsDeleteChannel.Errors) > 0 {
+		err := response.AiNotificationsDeleteChannel.Errors[0]
+		return fmt.Errorf("NerdGraph error deleting channel: [%s] %s", err.Type, err.Description)
+	}
+
+	return nil
+}
+
+// FindAIDestinationByName searches for an existing AI destination by name.
+func (c *Client) FindAIDestinationByName(ctx context.Context, accountID int64, name string) (string, error) {
+	query := `
+	query GetDestinations($accountId: Int!) {
+	  actor {
+	    account(id: $accountId) {
+	      aiNotifications {
+	        destinations {
+	          entities {
+	            id
+	            name
+	          }
+	        }
+	      }
+	    }
+	  }
+	}`
+
+	variables := map[string]any{
+		"accountId": accountID,
+	}
+
+	var response struct {
+		Actor struct {
+			Account struct {
+				AiNotifications struct {
+					Destinations struct {
+						Entities []struct {
+							ID   string `json:"id"`
+							Name string `json:"name"`
+						} `json:"entities"`
+					} `json:"destinations"`
+				} `json:"aiNotifications"`
+			} `json:"account"`
+		} `json:"actor"`
+	}
+
+	if err := c.doNerdGraphRequest(ctx, query, variables, &response); err != nil {
+		return "", fmt.Errorf("failed to fetch AI destinations: %w", err)
+	}
+
+	for _, dest := range response.Actor.Account.AiNotifications.Destinations.Entities {
+		if dest.Name == name {
+			return dest.ID, nil
+		}
+	}
+
+	return "", nil
+}
+
+// FindAIChannelByName searches for an existing AI channel by name.
+func (c *Client) FindAIChannelByName(ctx context.Context, accountID int64, name string) (string, error) {
+	query := `
+	query GetChannels($accountId: Int!) {
+	  actor {
+	    account(id: $accountId) {
+	      aiNotifications {
+	        channels {
+	          entities {
+	            id
+	            name
+	          }
+	        }
+	      }
+	    }
+	  }
+	}`
+
+	variables := map[string]any{
+		"accountId": accountID,
+	}
+
+	var response struct {
+		Actor struct {
+			Account struct {
+				AiNotifications struct {
+					Channels struct {
+						Entities []struct {
+							ID   string `json:"id"`
+							Name string `json:"name"`
+						} `json:"entities"`
+					} `json:"channels"`
+				} `json:"aiNotifications"`
+			} `json:"account"`
+		} `json:"actor"`
+	}
+
+	if err := c.doNerdGraphRequest(ctx, query, variables, &response); err != nil {
+		return "", fmt.Errorf("failed to fetch AI channels: %w", err)
+	}
+
+	for _, channel := range response.Actor.Account.AiNotifications.Channels.Entities {
+		if channel.Name == name {
+			return channel.ID, nil
+		}
+	}
+
+	return "", nil
 }
