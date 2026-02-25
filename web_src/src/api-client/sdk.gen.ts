@@ -123,6 +123,9 @@ import type {
   OrganizationsCreateInvitationData,
   OrganizationsCreateInvitationErrors,
   OrganizationsCreateInvitationResponses,
+  OrganizationsDeleteAgentOpenAiKeyData,
+  OrganizationsDeleteAgentOpenAiKeyErrors,
+  OrganizationsDeleteAgentOpenAiKeyResponses,
   OrganizationsDeleteIntegrationData,
   OrganizationsDeleteIntegrationErrors,
   OrganizationsDeleteIntegrationResponses,
@@ -135,6 +138,9 @@ import type {
   OrganizationsDescribeOrganizationData,
   OrganizationsDescribeOrganizationErrors,
   OrganizationsDescribeOrganizationResponses,
+  OrganizationsGetAgentSettingsData,
+  OrganizationsGetAgentSettingsErrors,
+  OrganizationsGetAgentSettingsResponses,
   OrganizationsGetInviteLinkData,
   OrganizationsGetInviteLinkErrors,
   OrganizationsGetInviteLinkResponses,
@@ -156,6 +162,12 @@ import type {
   OrganizationsResetInviteLinkData,
   OrganizationsResetInviteLinkErrors,
   OrganizationsResetInviteLinkResponses,
+  OrganizationsSetAgentOpenAiKeyData,
+  OrganizationsSetAgentOpenAiKeyErrors,
+  OrganizationsSetAgentOpenAiKeyResponses,
+  OrganizationsUpdateAgentSettingsData,
+  OrganizationsUpdateAgentSettingsErrors,
+  OrganizationsUpdateAgentSettingsResponses,
   OrganizationsUpdateIntegrationData,
   OrganizationsUpdateIntegrationErrors,
   OrganizationsUpdateIntegrationResponses,
@@ -873,6 +885,76 @@ export const organizationsUpdateOrganization = <ThrowOnError extends boolean = t
     ThrowOnError
   >({
     url: "/api/v1/organizations/{id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get organization Agent Mode settings
+ *
+ * Returns Agent Mode enablement and OpenAI key status for an organization
+ */
+export const organizationsGetAgentSettings = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsGetAgentSettingsData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<
+    OrganizationsGetAgentSettingsResponses,
+    OrganizationsGetAgentSettingsErrors,
+    ThrowOnError
+  >({ url: "/api/v1/organizations/{id}/agent-settings", ...options });
+
+/**
+ * Update organization Agent Mode settings
+ *
+ * Updates Agent Mode enablement for an organization
+ */
+export const organizationsUpdateAgentSettings = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsUpdateAgentSettingsData, ThrowOnError>,
+) =>
+  (options.client ?? client).patch<
+    OrganizationsUpdateAgentSettingsResponses,
+    OrganizationsUpdateAgentSettingsErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/agent-settings",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete organization OpenAI key for Agent Mode
+ *
+ * Deletes the OpenAI key used by organization Agent Mode
+ */
+export const organizationsDeleteAgentOpenAiKey = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsDeleteAgentOpenAiKeyData, ThrowOnError>,
+) =>
+  (options.client ?? client).delete<
+    OrganizationsDeleteAgentOpenAiKeyResponses,
+    OrganizationsDeleteAgentOpenAiKeyErrors,
+    ThrowOnError
+  >({ url: "/api/v1/organizations/{id}/agent-settings/openai-key", ...options });
+
+/**
+ * Create or update organization OpenAI key for Agent Mode
+ *
+ * Sets the OpenAI key used by organization Agent Mode
+ */
+export const organizationsSetAgentOpenAiKey = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsSetAgentOpenAiKeyData, ThrowOnError>,
+) =>
+  (options.client ?? client).put<
+    OrganizationsSetAgentOpenAiKeyResponses,
+    OrganizationsSetAgentOpenAiKeyErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/agent-settings/openai-key",
     ...options,
     headers: {
       "Content-Type": "application/json",
