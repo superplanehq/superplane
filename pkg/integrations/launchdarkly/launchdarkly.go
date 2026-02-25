@@ -2,6 +2,7 @@ package launchdarkly
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -81,7 +82,7 @@ func (l *LaunchDarkly) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode config: %w", err)
 	}
 
-	if config.APIKey == "" {
+	if strings.TrimSpace(config.APIKey) == "" {
 		return fmt.Errorf("API access token is required")
 	}
 

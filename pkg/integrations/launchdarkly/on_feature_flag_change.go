@@ -151,8 +151,12 @@ func (t *OnFeatureFlagChange) Setup(ctx core.TriggerContext) error {
 
 	if ctx.Metadata != nil {
 		metadata := OnFeatureFlagChangeMetadata{}
-		_ = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
-		metadata.WebhookURL = webhookURL
+		if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+			return fmt.Errorf("failed to decode metadata: %w", err)
+		}
+		if webhookURL != "" {
+			metadata.WebhookURL = webhookURL
+		}
 		if err := ctx.Metadata.Set(metadata); err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
