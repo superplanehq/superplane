@@ -1,4 +1,10 @@
-import type { CanvasesCanvas, ComponentsEdge, ComponentsIntegrationRef, ComponentsNode, OrganizationsIntegration } from "@/api-client";
+import type {
+  CanvasesCanvas,
+  ComponentsEdge,
+  ComponentsIntegrationRef,
+  ComponentsNode,
+  OrganizationsIntegration,
+} from "@/api-client";
 import type { AiCanvasOperation, BuildingBlockCategory } from "@/ui/BuildingBlocksSidebar";
 import { filterVisibleConfiguration } from "@/utils/components";
 import { generateNodeId, generateUniqueNodeName } from "./utils";
@@ -11,7 +17,10 @@ type ApplyAiOperationsToWorkflowInput = {
 };
 
 function normalizeIntegrationName(name?: string): string {
-  return (name || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+  return (name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
 }
 
 function resolveIntegrationRefForBlock(
