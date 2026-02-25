@@ -47,6 +47,7 @@ import {
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
+import { AiCanvasOperation } from "@/ui/BuildingBlocksSidebar";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import {
   CANVAS_SIDEBAR_STORAGE_KEY,
@@ -1832,6 +1833,173 @@ export function WorkflowPageV2() {
     ],
   );
 
+  const handleApplyAiOperations = useCallback(
+    async (operations: AiCanvasOperation[]) => {
+      if (!operations.length || !organizationId || !canvasId) {
+        return;
+      }
+
+      const latestWorkflow = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+      if (!latestWorkflow) {
+        throw new Error("Canvas not found.");
+      }
+
+      saveWorkflowSnapshot(latestWorkflow);
+
+      const blockLookup = new Map(buildingBlocks.flatMap((category) => category.blocks.map((block) => [block.name, block])));
+      const createdNodeIdsByKey = new Map<string, string>();
+
+      const resolveNodeId = (ref?: { nodeKey?: string; nodeId?: string; nodeName?: string }) => {
+        if (!ref) return null;
+        if (ref.nodeKey && createdNodeIdsByKey.has(ref.nodeKey)) {
+          return createdNodeIdsByKey.get(ref.nodeKey) || null;
+        }
+        if (ref.nodeId) return ref.nodeId;
+        if (ref.nodeName) {
+          const found = updatedNodes.find((node) => node.id === ref.nodeName || node.name === ref.nodeName);
+          return found?.id || null;
+        }
+        return null;
+      };
+
+      const updatedNodes = [...(latestWorkflow.spec?.nodes || [])];
+      const updatedEdges = [...(latestWorkflow.spec?.edges || [])];
+
+      for (const operation of operations) {
+        if (operation.type === "add_node") {
+          const block = blockLookup.get(operation.blockName);
+          if (!block) {
+            continue;
+          }
+
+          const filteredConfiguration = filterVisibleConfiguration(
+            operation.configuration || {},
+            block.configuration || [],
+          );
+
+          const existingNodeNames = updatedNodes.map((node) => node.name || "").filter(Boolean);
+          const uniqueNodeName = generateUniqueNodeName(operation.nodeName || block.name || "node", existingNodeNames);
+          const newNodeId = generateNodeId(block.name || "node", uniqueNodeName);
+
+          const newNode: ComponentsNode = {
+            id: newNodeId,
+            name: uniqueNodeName,
+            type:
+              block.type === "trigger"
+                ? "TYPE_TRIGGER"
+                : block.type === "blueprint"
+                  ? "TYPE_BLUEPRINT"
+                  : block.name === "annotation"
+                    ? "TYPE_WIDGET"
+                    : "TYPE_COMPONENT",
+            configuration: filteredConfiguration,
+            position: {
+              x: (updatedNodes.length || 0) * 250,
+              y: 100,
+            },
+          };
+
+          if (block.name === "annotation") {
+            newNode.widget = { name: "annotation" };
+            newNode.configuration = { text: "", color: "yellow" };
+          } else if (block.type === "component") {
+            newNode.component = { name: block.name };
+          } else if (block.type === "trigger") {
+            newNode.trigger = { name: block.name };
+          } else if (block.type === "blueprint") {
+            newNode.blueprint = { id: block.id };
+          }
+
+          updatedNodes.push(newNode);
+          if (operation.nodeKey) {
+            createdNodeIdsByKey.set(operation.nodeKey, newNodeId);
+          }
+
+          const sourceNodeId = resolveNodeId(operation.source);
+          if (sourceNodeId) {
+            updatedEdges.push({
+              sourceId: sourceNodeId,
+              targetId: newNodeId,
+              channel: operation.source?.handleId || "default",
+            });
+          }
+          continue;
+        }
+
+        if (operation.type === "connect_nodes") {
+          const sourceId = resolveNodeId(operation.source);
+          const targetId = resolveNodeId(operation.target);
+          if (!sourceId || !targetId) {
+            continue;
+          }
+
+          const channel = operation.source.handleId || "default";
+          const edgeExists = updatedEdges.some(
+            (edge) => edge.sourceId === sourceId && edge.targetId === targetId && edge.channel === channel,
+          );
+          if (!edgeExists) {
+            updatedEdges.push({
+              sourceId,
+              targetId,
+              channel,
+            });
+          }
+          continue;
+        }
+
+        if (operation.type === "update_node_config") {
+          const targetId = resolveNodeId(operation.target);
+          if (!targetId) {
+            continue;
+          }
+
+          const nodeIndex = updatedNodes.findIndex((node) => node.id === targetId);
+          if (nodeIndex === -1) {
+            continue;
+          }
+
+          const targetNode = updatedNodes[nodeIndex];
+          updatedNodes[nodeIndex] = {
+            ...targetNode,
+            name: operation.nodeName || targetNode.name,
+            configuration: {
+              ...(targetNode.configuration || {}),
+              ...(operation.configuration || {}),
+            },
+          };
+        }
+      }
+
+      const updatedWorkflow: CanvasesCanvas = {
+        ...latestWorkflow,
+        spec: {
+          ...latestWorkflow.spec,
+          nodes: updatedNodes,
+          edges: updatedEdges,
+        },
+      };
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+      if (canAutoSave) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      buildingBlocks,
+      canAutoSave,
+      canvas,
+      canvasId,
+      handleSaveWorkflow,
+      markUnsavedChange,
+      organizationId,
+      queryClient,
+      saveWorkflowSnapshot,
+    ],
+  );
+
   const handlePlaceholderAdd = useCallback(
     async (data: {
       position: { x: number; y: number };
@@ -2949,6 +3117,7 @@ export function WorkflowPageV2() {
         buildingBlocks={buildingBlocks}
         showAiBuilderTab={showAiBuilderTab}
         onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
+        onApplyAiOperations={!isReadOnly ? handleApplyAiOperations : undefined}
         onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
         onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
         integrations={canReadIntegrations ? integrations : []}

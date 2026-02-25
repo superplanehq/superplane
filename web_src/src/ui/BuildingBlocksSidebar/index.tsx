@@ -609,24 +609,20 @@ export function BuildingBlocksSidebar({
         {showAiBuilderTab && (
           <TabsContent value="ai" className="mt-0 flex-1 overflow-hidden px-5 pb-5">
             <div className="h-full rounded-md border border-border bg-slate-50/30 flex flex-col">
-              <div className="border-b border-border px-4 py-3 flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-medium">AI Canvas Builder</h3>
-                  <p className="text-xs text-gray-500">UI-only preview mode (no backend persistence).</p>
-                </div>
-                {pendingProposal ? (
+              {pendingProposal ? (
+                <div className="border-b border-border px-4 py-2.5 flex justify-end">
                   <span className="text-[11px] font-medium text-blue-700 bg-blue-100 px-2 py-1 rounded">
                     Changes pending
                   </span>
-                ) : null}
-              </div>
+                </div>
+              ) : null}
 
               <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                 {aiMessages.length === 0 ? (
                   <div className="text-sm text-gray-600 space-y-3">
                     <div className="flex items-start gap-2">
                       <Sparkles size={16} className="mt-0.5 text-blue-600" />
-                      <p>Describe the flow you want and I will draft a proposed change set for review.</p>
+                      <p>Describe your flow and I will propose changes.</p>
                     </div>
                     <div className="grid gap-2">
                       {starterPrompts.map((prompt) => (
