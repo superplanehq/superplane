@@ -46,6 +46,33 @@ export const baseMapper: ComponentBaseMapper = {
     if (payload?.timestamp) {
       details["Executed At"] = new Date(payload.timestamp).toLocaleString();
     }
+
+    if (context.node.componentName === "daytona.getPreviewUrl") {
+      if (typeof responseData.sandbox === "string" && responseData.sandbox.length > 0) {
+        details["Sandbox"] = responseData.sandbox;
+      }
+
+      if (typeof responseData.port === "number") {
+        details["Port"] = String(responseData.port);
+      }
+
+      if (typeof responseData.signed === "boolean") {
+        details["Signed URL"] = responseData.signed ? "true" : "false";
+      }
+
+      if (typeof responseData.expiresInSeconds === "number") {
+        details["Expires In Seconds"] = String(responseData.expiresInSeconds);
+      }
+
+      if (typeof responseData.token === "string" && responseData.token.length > 0) {
+        details["Token"] = responseData.token;
+      }
+
+      if (typeof responseData.url === "string" && responseData.url.length > 0) {
+        details["Preview URL"] = responseData.url;
+      }
+    }
+
     try {
       const formatted = JSON.stringify(responseData, null, 2);
       details["Response"] = formatted;

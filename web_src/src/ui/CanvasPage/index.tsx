@@ -820,6 +820,7 @@ function CanvasPage(props: CanvasPageProps) {
           isOpen={isBuildingBlocksSidebarOpen}
           onToggle={handleSidebarToggle}
           blocks={props.buildingBlocks || []}
+          integrations={props.integrations}
           canvasZoom={canvasZoom}
           disabled={readOnly}
           disabledMessage="You don't have permission to edit this canvas."
@@ -1443,8 +1444,6 @@ function CanvasContent({
 
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
-  const [isSelectionModeEnabled, setIsSelectionModeEnabled] = useState(false);
-  const [isTemporarilyEnabled, setIsTemporarilyEnabled] = useState(false);
   const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(false);
   const [logFilter, setLogFilter] = useState<LogTypeFilter>(new Set());
   const [logScope, setLogScope] = useState<LogScopeFilter>("all");
@@ -1695,45 +1694,6 @@ function CanvasContent({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleToggleCollapse]);
-
-  // Handle temporary selection mode activation with Cmd/Ctrl
-  // When button is OFF and user presses Cmd/Ctrl, visually enable the button
-  // When Cmd/Ctrl is released, visually disable the button (if it was temporarily enabled)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // If button is off and user presses Cmd/Ctrl, temporarily enable it visually
-      if (!isSelectionModeEnabled && !isTemporarilyEnabled && (e.ctrlKey || e.metaKey)) {
-        setIsSelectionModeEnabled(true);
-        setIsTemporarilyEnabled(true);
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      // If button was temporarily enabled and user releases Cmd/Ctrl, disable it
-      if (isTemporarilyEnabled && !e.ctrlKey && !e.metaKey) {
-        setIsSelectionModeEnabled(false);
-        setIsTemporarilyEnabled(false);
-      }
-    };
-
-    const handleMouseUp = (e: MouseEvent) => {
-      // If button was temporarily enabled and user releases mouse, disable it
-      // Only if Cmd/Ctrl is not still pressed
-      if (isTemporarilyEnabled && !e.ctrlKey && !e.metaKey) {
-        setIsSelectionModeEnabled(false);
-        setIsTemporarilyEnabled(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("keyup", handleKeyUp);
-    document.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("keyup", handleKeyUp);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isSelectionModeEnabled, isTemporarilyEnabled]);
 
   const handlePaneClick = useCallback(() => {
     // Do not close sidebar or reset state while creating a new component
@@ -2106,14 +2066,10 @@ function CanvasContent({
             zoomOnPinch={true}
             zoomOnDoubleClick={false}
             panOnScroll={true}
-            panOnDrag={!isSelectionModeEnabled || isTemporarilyEnabled}
+            panOnDrag={true}
             selectionOnDrag={true}
-            {...(isSelectionModeEnabled && !isTemporarilyEnabled
-              ? {}
-              : {
-                  selectionKeyCode: selectionKey,
-                  multiSelectionKeyCode: selectionKey,
-                })}
+            selectionKeyCode={selectionKey}
+            multiSelectionKeyCode={selectionKey}
             snapToGrid={isSnapToGridEnabled}
             snapGrid={[48, 48]}
             panOnScrollSpeed={0.8}
@@ -2142,11 +2098,6 @@ function CanvasContent({
             <ZoomSlider
               position="bottom-left"
               orientation="horizontal"
-              isSelectionModeEnabled={isSelectionModeEnabled}
-              onSelectionModeToggle={() => {
-                setIsSelectionModeEnabled((prev) => !prev);
-                setIsTemporarilyEnabled(false);
-              }}
               screenshotName={title}
               isSnapToGridEnabled={isSnapToGridEnabled}
               onSnapToGridToggle={() => setIsSnapToGridEnabled((prev) => !prev)}
@@ -2185,7 +2136,7 @@ function CanvasContent({
             <Panel
               position="bottom-left"
               className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8"
-              style={{ marginLeft: 380 }}
+              style={{ marginLeft: 336 }}
             >
               <Tooltip>
                 <TooltipTrigger asChild>
