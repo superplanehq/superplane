@@ -135,19 +135,14 @@ type PipelineResponse struct {
 	VCS         map[string]interface{} `json:"vcs"`
 }
 
-type AllPipelinesResponse struct {
-	Items         []PipelineResponse `json:"items"`
-	NextPageToken string             `json:"next_page_token"`
-}
-
-func (c *Client) GetPipelinesByOrg(orgSlug string) (*AllPipelinesResponse, error) {
+func (c *Client) GetPipelinesByOrg(orgSlug string) (*ProjectPipelinesResponse, error) {
 	reqURL := fmt.Sprintf("%s/pipeline?org-slug=%s", baseURL, url.QueryEscape(orgSlug))
 	responseBody, err := c.execRequest("GET", reqURL, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var response AllPipelinesResponse
+	var response ProjectPipelinesResponse
 	if err := json.Unmarshal(responseBody, &response); err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
