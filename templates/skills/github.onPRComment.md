@@ -18,10 +18,12 @@ It is suitable for PR command handling, review automation, and comment-driven de
 When generating workflow operations that include `github.onPRComment`:
 
 1. Always set `configuration.repository`.
-2. If the user did not specify a repository, ask a clarifying question for the repository name only (not `owner/repo`) before proposing operations.
-3. Only set `configuration.contentFilter` when the user asks for filtering behavior.
-4. Treat `contentFilter` as a regex, not a simple substring.
-5. Use downstream branching for complex conditions instead of overloading a single regex.
+2. If the user did not specify a repository, ask one short clarifying question for the repository name only (not `owner/repo`) before proposing operations.
+3. If the user then replies with a short repository value (for example `front`), treat it as the answer and proceed without asking again.
+4. If a repository is already known in the current flow (from user input or an existing GitHub node), reuse that repository for related GitHub nodes unless the user asks for a different one.
+5. Only set `configuration.contentFilter` when the user asks for filtering behavior.
+6. Treat `contentFilter` as a regex, not a simple substring.
+7. Use downstream branching for complex conditions instead of overloading a single regex.
 
 ## Event Semantics
 
@@ -30,6 +32,20 @@ When generating workflow operations that include `github.onPRComment`:
   - PR conversation comments
   - review submission comments
 - Do not treat it as issue-only comment handling.
+- Event payload shape for this trigger uses issue-comment style fields.
+
+## Payload Field Mapping (Important)
+
+For `github.prComment` events:
+
+- PR number: `root().data.issue.number`
+- Repository name: `root().data.repository.name`
+- Repository owner/org login: `root().data.repository.owner.login`
+- Full repo name: `root().data.repository.full_name`
+- Comment text: `root().data.comment.body`
+- Comment URL: `root().data.comment.html_url`
+- PR URL: `root().data.issue.pull_request.html_url`
+- For PR workflow context values, use the `issue` and `repository` paths above.
 
 ## Common Pattern
 
