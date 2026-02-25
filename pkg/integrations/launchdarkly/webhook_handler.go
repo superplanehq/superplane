@@ -2,7 +2,6 @@ package launchdarkly
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -10,8 +9,10 @@ import (
 )
 
 // WebhookConfiguration is the config stored with the webhook.
+// Each unique project+flag combination gets its own webhook in LaunchDarkly.
 type WebhookConfiguration struct {
-	Events []string `json:"events"`
+	ProjectKey string `json:"projectKey" mapstructure:"projectKey"`
+	FlagKey    string `json:"flagKey" mapstructure:"flagKey"`
 }
 
 // WebhookMetadata is stored after Setup. It holds the LaunchDarkly webhook ID
@@ -29,46 +30,14 @@ func (h *LaunchDarklyWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	if err := mapstructure.Decode(a, &configA); err != nil {
 		return false, err
 	}
-
 	if err := mapstructure.Decode(b, &configB); err != nil {
 		return false, err
 	}
 
-	eventsMatch := subsetOrEqual(configA.Events, configB.Events) || subsetOrEqual(configB.Events, configA.Events)
-	return eventsMatch, nil
-}
-
-// subsetOrEqual returns true when a is a subset of or equal to b.
-func subsetOrEqual(a, b []string) bool {
-	for _, x := range a {
-		if !slices.Contains(b, x) {
-			return false
-		}
-	}
-	return true
+	return configA.ProjectKey == configB.ProjectKey && configA.FlagKey == configB.FlagKey, nil
 }
 
 func (h *LaunchDarklyWebhookHandler) Merge(current, requested any) (any, bool, error) {
-	cur := WebhookConfiguration{}
-	req := WebhookConfiguration{}
-
-	if err := mapstructure.Decode(current, &cur); err != nil {
-		return nil, false, err
-	}
-	if err := mapstructure.Decode(requested, &req); err != nil {
-		return nil, false, err
-	}
-
-	changed := false
-
-	if subsetOrEqual(cur.Events, req.Events) && !slices.Equal(cur.Events, req.Events) {
-		cur.Events = req.Events
-		changed = true
-	}
-
-	if changed {
-		return cur, true, nil
-	}
 	return current, false, nil
 }
 
@@ -80,11 +49,24 @@ func (h *LaunchDarklyWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any,
 		return nil, fmt.Errorf("failed to create LaunchDarkly client: %w", err)
 	}
 
+	config := WebhookConfiguration{}
+	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config); err != nil {
+		return nil, fmt.Errorf("failed to decode webhook configuration: %w", err)
+	}
+
+	resource := fmt.Sprintf("proj/%s:env/*:flag/%s", config.ProjectKey, config.FlagKey)
 	webhook, err := client.CreateWebhook(CreateWebhookRequest{
 		URL:  ctx.Webhook.GetURL(),
 		Sign: true,
 		On:   true,
 		Name: "SuperPlane",
+		Statements: []WebhookStatement{
+			{
+				Effect:    "allow",
+				Resources: []string{resource},
+				Actions:   []string{"*"},
+			},
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create webhook in LaunchDarkly: %w", err)

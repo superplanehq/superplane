@@ -32,24 +32,26 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## On Feature Flag Change
 
-The On Feature Flag Change trigger starts a workflow execution when LaunchDarkly sends webhooks for feature flag events.
+The On Feature Flag Change trigger starts a workflow execution when LaunchDarkly sends webhooks for a specific feature flag.
 
 ### Use Cases
 
-- **Deployment automation**: Trigger deployments or rollbacks when feature flags change
-- **Audit workflows**: Track and log all feature flag changes for compliance
-- **Notification workflows**: Send notifications when flags are created, updated, or deleted
+- **Deployment automation**: Trigger deployments or rollbacks when a feature flag changes
+- **Audit workflows**: Track and log changes to a specific flag for compliance
+- **Notification workflows**: Send notifications when a flag is created, updated, or deleted
 - **Integration workflows**: Sync flag changes with external systems
 
 ### Configuration
 
+- **Project**: The LaunchDarkly project containing the flag to monitor
+- **Feature Flag**: The specific flag to monitor
 - **Actions**: Optionally filter by specific actions (e.g. only when a flag is turned on or off). Leave empty to receive all actions.
 
 ### Webhook Setup
 
 The webhook is automatically created in LaunchDarkly when you save the canvas. No manual setup is required.
 
-SuperPlane uses the LaunchDarkly API (via your configured API access token) to create a signed webhook and securely stores the auto-generated signing secret. When LaunchDarkly sends events, SuperPlane verifies the signature automatically.
+SuperPlane uses the LaunchDarkly API (via your configured API access token) to create a signed webhook scoped to the selected project and flag, and securely stores the auto-generated signing secret. When LaunchDarkly sends events, SuperPlane verifies the signature automatically.
 
 ### Example Data
 

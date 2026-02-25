@@ -147,12 +147,21 @@ func (c *Client) DeleteFeatureFlag(projectKey, flagKey string) error {
 	return err
 }
 
+// WebhookStatement is a policy statement that filters which resource/action combinations
+// the webhook responds to.
+type WebhookStatement struct {
+	Effect    string   `json:"effect"`
+	Resources []string `json:"resources,omitempty"`
+	Actions   []string `json:"actions,omitempty"`
+}
+
 // CreateWebhookRequest is the request body for creating a LaunchDarkly webhook.
 type CreateWebhookRequest struct {
-	URL  string `json:"url"`
-	Sign bool   `json:"sign"`
-	On   bool   `json:"on"`
-	Name string `json:"name,omitempty"`
+	URL        string             `json:"url"`
+	Sign       bool               `json:"sign"`
+	On         bool               `json:"on"`
+	Name       string             `json:"name,omitempty"`
+	Statements []WebhookStatement `json:"statements,omitempty"`
 }
 
 // LDWebhook is the response from creating a webhook. The _id field is the webhook ID

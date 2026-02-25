@@ -30,7 +30,9 @@ const (
 type OnFeatureFlagChange struct{}
 
 type OnFeatureFlagChangeConfiguration struct {
-	Actions []string `json:"actions" mapstructure:"actions"`
+	ProjectKey string   `json:"projectKey" mapstructure:"projectKey"`
+	FlagKey    string   `json:"flagKey" mapstructure:"flagKey"`
+	Actions    []string `json:"actions" mapstructure:"actions"`
 }
 
 type OnFeatureFlagChangeMetadata struct {
@@ -50,24 +52,26 @@ func (t *OnFeatureFlagChange) Description() string {
 }
 
 func (t *OnFeatureFlagChange) Documentation() string {
-	return `The On Feature Flag Change trigger starts a workflow execution when LaunchDarkly sends webhooks for feature flag events.
+	return `The On Feature Flag Change trigger starts a workflow execution when LaunchDarkly sends webhooks for a specific feature flag.
 
 ## Use Cases
 
-- **Deployment automation**: Trigger deployments or rollbacks when feature flags change
-- **Audit workflows**: Track and log all feature flag changes for compliance
-- **Notification workflows**: Send notifications when flags are created, updated, or deleted
+- **Deployment automation**: Trigger deployments or rollbacks when a feature flag changes
+- **Audit workflows**: Track and log changes to a specific flag for compliance
+- **Notification workflows**: Send notifications when a flag is created, updated, or deleted
 - **Integration workflows**: Sync flag changes with external systems
 
 ## Configuration
 
+- **Project**: The LaunchDarkly project containing the flag to monitor
+- **Feature Flag**: The specific flag to monitor
 - **Actions**: Optionally filter by specific actions (e.g. only when a flag is turned on or off). Leave empty to receive all actions.
 
 ## Webhook Setup
 
 The webhook is automatically created in LaunchDarkly when you save the canvas. No manual setup is required.
 
-SuperPlane uses the LaunchDarkly API (via your configured API access token) to create a signed webhook and securely stores the auto-generated signing secret. When LaunchDarkly sends events, SuperPlane verifies the signature automatically.`
+SuperPlane uses the LaunchDarkly API (via your configured API access token) to create a signed webhook scoped to the selected project and flag, and securely stores the auto-generated signing secret. When LaunchDarkly sends events, SuperPlane verifies the signature automatically.`
 }
 
 func (t *OnFeatureFlagChange) Icon() string {
@@ -80,6 +84,36 @@ func (t *OnFeatureFlagChange) Color() string {
 
 func (t *OnFeatureFlagChange) Configuration() []configuration.Field {
 	return []configuration.Field{
+		{
+			Name:        "projectKey",
+			Label:       "Project",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "The LaunchDarkly project containing the flag to monitor",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "project",
+				},
+			},
+		},
+		{
+			Name:        "flagKey",
+			Label:       "Feature Flag",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "The feature flag to monitor",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "flag",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "projectKey",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "projectKey"},
+						},
+					},
+				},
+			},
+		},
 		{
 			Name:        "actions",
 			Label:       "Actions",
@@ -110,11 +144,22 @@ func (t *OnFeatureFlagChange) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	if strings.TrimSpace(config.ProjectKey) == "" {
+		return fmt.Errorf("project key is required")
+	}
+
+	if strings.TrimSpace(config.FlagKey) == "" {
+		return fmt.Errorf("flag key is required")
+	}
+
 	if ctx.Integration == nil {
 		return fmt.Errorf("integration is required to set up the LaunchDarkly webhook trigger")
 	}
 
-	if err := ctx.Integration.RequestWebhook(WebhookConfiguration{}); err != nil {
+	if err := ctx.Integration.RequestWebhook(WebhookConfiguration{
+		ProjectKey: config.ProjectKey,
+		FlagKey:    config.FlagKey,
+	}); err != nil {
 		return err
 	}
 
