@@ -296,7 +296,7 @@ func Test__OnIncident__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Integration: integrationCtx,
 			Configuration: map[string]any{
-				"subscriptions": []any{"incidents", "private_incidents"},
+				"subscriptions": []any{"incidents", "incidents.private"},
 			},
 		})
 
@@ -305,7 +305,7 @@ func Test__OnIncident__Setup(t *testing.T) {
 
 		webhookConfig, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
 		require.True(t, ok)
-		assert.Equal(t, []string{"incidents", "private_incidents"}, webhookConfig.Subscriptions)
+		assert.Equal(t, []string{"incidents", "incidents.private"}, webhookConfig.Subscriptions)
 	})
 
 	t.Run("no subscriptions -> error", func(t *testing.T) {
