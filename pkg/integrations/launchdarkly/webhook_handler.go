@@ -1,21 +1,24 @@
 package launchdarkly
 
 import (
+	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 // WebhookConfiguration is the config stored with the webhook.
-// The signing secret is stored in the encrypted webhook.Secret via the setSecret action.
 type WebhookConfiguration struct {
 	Events []string `json:"events"`
 }
 
-// WebhookMetadata is stored after Setup. We do not create a webhook via API,
-// so metadata can be empty.
-type WebhookMetadata struct{}
+// WebhookMetadata is stored after Setup. It holds the LaunchDarkly webhook ID
+// so we can delete it when the trigger is removed.
+type WebhookMetadata struct {
+	LDWebhookID string `json:"ldWebhookId"`
+}
 
 type LaunchDarklyWebhookHandler struct{}
 
@@ -69,12 +72,54 @@ func (h *LaunchDarklyWebhookHandler) Merge(current, requested any) (any, bool, e
 	return current, false, nil
 }
 
-// Setup does not call LaunchDarkly API (no API to create webhook endpoints programmatically with signing).
-// The user adds the webhook URL in LaunchDarkly Integrations > Webhooks and pastes the signing secret into the trigger.
+// Setup creates a signed webhook in LaunchDarkly via the API using the integration's API key.
+// LaunchDarkly auto-generates the signing secret, which we store encrypted for later verification.
 func (h *LaunchDarklyWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
-	return WebhookMetadata{}, nil
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create LaunchDarkly client: %w", err)
+	}
+
+	webhook, err := client.CreateWebhook(CreateWebhookRequest{
+		URL:  ctx.Webhook.GetURL(),
+		Sign: true,
+		On:   true,
+		Name: "SuperPlane",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create webhook in LaunchDarkly: %w", err)
+	}
+
+	if err := ctx.Webhook.SetSecret([]byte(webhook.Secret)); err != nil {
+		return nil, fmt.Errorf("failed to store webhook signing secret: %w", err)
+	}
+
+	return WebhookMetadata{LDWebhookID: webhook.ID}, nil
 }
 
+// Cleanup deletes the webhook from LaunchDarkly when the trigger is removed.
 func (h *LaunchDarklyWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
+	metadata := WebhookMetadata{}
+	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode webhook metadata: %w", err)
+	}
+
+	if metadata.LDWebhookID == "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create LaunchDarkly client: %w", err)
+	}
+
+	if err := client.DeleteWebhook(metadata.LDWebhookID); err != nil {
+		// If the webhook is already gone in LaunchDarkly, treat as success.
+		if strings.Contains(err.Error(), "404") {
+			return nil
+		}
+		return fmt.Errorf("failed to delete webhook from LaunchDarkly: %w", err)
+	}
+
 	return nil
 }

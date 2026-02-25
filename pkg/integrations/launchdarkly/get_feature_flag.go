@@ -111,6 +111,14 @@ func (c *GetFeatureFlag) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	if spec.ProjectKey == "" {
+		return errors.New("project key is required")
+	}
+
+	if spec.FlagKey == "" {
+		return errors.New("flag key is required")
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create LaunchDarkly client: %w", err)

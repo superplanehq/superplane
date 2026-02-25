@@ -30,13 +30,11 @@ const (
 type OnFeatureFlagChange struct{}
 
 type OnFeatureFlagChangeConfiguration struct {
-	Events                  []string `json:"events" mapstructure:"events"`
-	SigningSecretConfigured bool     `json:"signingSecretConfigured" mapstructure:"signingSecretConfigured"`
+	Events []string `json:"events" mapstructure:"events"`
 }
 
 type OnFeatureFlagChangeMetadata struct {
-	WebhookURL              string `json:"webhookUrl" mapstructure:"webhookUrl"`
-	SigningSecretConfigured bool   `json:"signingSecretConfigured" mapstructure:"signingSecretConfigured"`
+	WebhookURL string `json:"webhookUrl" mapstructure:"webhookUrl"`
 }
 
 func (t *OnFeatureFlagChange) Name() string {
@@ -63,29 +61,13 @@ func (t *OnFeatureFlagChange) Documentation() string {
 
 ## Configuration
 
-- **Events**: Select which events to listen for (Flag created, Flag updated, Flag deleted)
-- **Webhook signing secret**: Use the **Set signing secret** action below (after creating the webhook in LaunchDarkly) to store the signing secret. It is stored securely and never in the workflow configuration.
+- **Events**: Select which events to listen for
 
 ## Webhook Setup
 
-After adding this trigger:
+The webhook is automatically created in LaunchDarkly when you save the canvas. No manual setup is required.
 
-1. Save the canvas to generate the webhook URL, then copy it from this panel.
-2. In [LaunchDarkly Integrations > Webhooks](https://app.launchdarkly.com/settings/integrations), click **Add webhook**.
-3. Paste the webhook URL and optionally provide a name.
-4. Check **Sign this webhook** and copy the generated **secret**.
-5. Use **Set signing secret** below to store the secret securely.
-6. Optionally configure a policy to filter which flag events are sent. For example:
-` + "```json" + `
-[
-  {
-    "resources": ["proj/*:env/*:flag/*"],
-    "actions": ["*"],
-    "effect": "allow"
-  }
-]
-` + "```" + `
-7. Save the webhook in LaunchDarkly.`
+SuperPlane uses the LaunchDarkly API (via your configured API access token) to create a signed webhook and securely stores the auto-generated signing secret. When LaunchDarkly sends events, SuperPlane verifies the signature automatically.`
 }
 
 func (t *OnFeatureFlagChange) Icon() string {
@@ -130,14 +112,8 @@ func (t *OnFeatureFlagChange) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("integration is required to set up the LaunchDarkly webhook trigger")
 	}
 
-	// Default to flag events if no events configured
-	events := config.Events
-	if len(events) == 0 {
-		events = []string{KindFlag}
-	}
-
 	if err := ctx.Integration.RequestWebhook(WebhookConfiguration{
-		Events: events,
+		Events: config.Events,
 	}); err != nil {
 		return err
 	}
@@ -164,59 +140,11 @@ func (t *OnFeatureFlagChange) Setup(ctx core.TriggerContext) error {
 }
 
 func (t *OnFeatureFlagChange) Actions() []core.Action {
-	return []core.Action{
-		{
-			Name:           "setSecret",
-			Description:    "Set or clear the webhook signing secret from your LaunchDarkly webhook",
-			UserAccessible: true,
-			Parameters: []configuration.Field{
-				{
-					Name:        "webhookSigningSecret",
-					Label:       "Webhook signing secret",
-					Type:        configuration.FieldTypeString,
-					Required:    false,
-					Sensitive:   true,
-					Description: "Paste the signing secret from your LaunchDarkly webhook configuration. Leave empty to clear.",
-				},
-			},
-		},
-	}
+	return nil
 }
 
 func (t *OnFeatureFlagChange) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	if ctx.Name != "setSecret" {
-		return nil, fmt.Errorf("action %s not supported", ctx.Name)
-	}
-	return t.setSecret(ctx)
-}
-
-func (t *OnFeatureFlagChange) setSecret(ctx core.TriggerActionContext) (map[string]any, error) {
-	if ctx.Webhook == nil {
-		return nil, fmt.Errorf("webhook is not available")
-	}
-
-	var secret string
-	if v, ok := ctx.Parameters["webhookSigningSecret"]; ok && v != nil {
-		if s, ok := v.(string); ok {
-			secret = strings.TrimSpace(s)
-		}
-	}
-
-	if err := ctx.Webhook.SetSecret([]byte(secret)); err != nil {
-		return nil, fmt.Errorf("failed to set webhook signing secret: %w", err)
-	}
-
-	configured := secret != ""
-	if ctx.Metadata != nil {
-		metadata := OnFeatureFlagChangeMetadata{}
-		_ = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
-		metadata.SigningSecretConfigured = configured
-		if err := ctx.Metadata.Set(metadata); err != nil {
-			return nil, fmt.Errorf("failed to update metadata: %w", err)
-		}
-	}
-
-	return map[string]any{"ok": true, "signingSecretConfigured": configured}, nil
+	return nil, fmt.Errorf("action %s not supported", ctx.Name)
 }
 
 func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
@@ -233,7 +161,7 @@ func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int
 	// Verify webhook signature
 	signingSecret := resolveSigningSecret(ctx)
 	if signingSecret == "" {
-		return http.StatusForbidden, fmt.Errorf("signing secret is required for webhook verification; use the Set signing secret action for this trigger")
+		return http.StatusForbidden, fmt.Errorf("signing secret is required for webhook verification; the webhook may still be provisioning")
 	}
 
 	signature := ctx.Headers.Get("X-LD-Signature")
