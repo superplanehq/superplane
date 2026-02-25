@@ -63,6 +63,7 @@ func (d *Daytona) Configuration() []configuration.Field {
 func (d *Daytona) Components() []core.Component {
 	return []core.Component{
 		&CreateSandbox{},
+		&GetPreviewURLComponent{},
 		&ExecuteCode{},
 		&ExecuteCommand{},
 		&DeleteSandbox{},
@@ -110,30 +111,52 @@ func (d *Daytona) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (d *Daytona) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != "snapshot" {
+	switch resourceType {
+	case "snapshot":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, err
+		}
+
+		snapshots, err := client.ListSnapshots()
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(snapshots))
+		for _, s := range snapshots {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: s.Name,
+				ID:   s.ID,
+			})
+		}
+
+		return resources, nil
+	case "sandbox":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, err
+		}
+
+		sandboxes, err := client.ListSandboxes()
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(sandboxes))
+		for _, s := range sandboxes {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: s.ID,
+				ID:   s.ID,
+			})
+		}
+
+		return resources, nil
+	default:
 		return []core.IntegrationResource{}, nil
 	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return nil, err
-	}
-
-	snapshots, err := client.ListSnapshots()
-	if err != nil {
-		return nil, err
-	}
-
-	resources := make([]core.IntegrationResource, 0, len(snapshots))
-	for _, s := range snapshots {
-		resources = append(resources, core.IntegrationResource{
-			Type: resourceType,
-			Name: s.Name,
-			ID:   s.ID,
-		})
-	}
-
-	return resources, nil
 }
 
 func (d *Daytona) Actions() []core.Action {

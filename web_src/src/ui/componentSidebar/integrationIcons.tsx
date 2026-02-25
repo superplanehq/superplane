@@ -2,11 +2,13 @@ import { resolveIcon } from "@/lib/utils";
 import React from "react";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
+import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
+import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
+import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.svg";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
-import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
@@ -17,15 +19,18 @@ import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import digitaloceanIcon from "@/assets/icons/integrations/digitalocean.svg";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
+import telegramIcon from "@/assets/icons/integrations/telegram.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
+import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
+import incidentIcon from "@/assets/icons/integrations/incident.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
@@ -34,6 +39,9 @@ import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
+import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
+import harnessIcon from "@/assets/icons/integrations/harness.svg";
+import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
 
@@ -48,9 +56,11 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   daytona: daytonaIcon,
   digitalocean: digitaloceanIcon,
   discord: discordIcon,
+  telegram: telegramIcon,
   github: githubIcon,
   gitlab: gitlabIcon,
   hetzner: hetznerIcon,
+  jfrogArtifactory: jfrogArtifactoryIcon,
   grafana: grafanaIcon,
   jira: jiraIcon,
   openai: openAiIcon,
@@ -59,6 +69,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   cursor: cursorIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
+  incident: incidentIcon,
   semaphore: SemaphoreLogo,
   slack: slackIcon,
   smtp: smtpIcon,
@@ -66,6 +77,9 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   prometheus: prometheusIcon,
   render: renderIcon,
   dockerhub: dockerIcon,
+  gcp: gcpIcon,
+  harness: harnessIcon,
+  servicenow: servicenowIcon,
   statuspage: statuspageIcon,
   newrelic: newrelicIcon,
 };
@@ -80,9 +94,11 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   daytona: daytonaIcon,
   digitalocean: digitaloceanIcon,
   discord: discordIcon,
+  telegram: telegramIcon,
   github: githubIcon,
   gitlab: gitlabIcon,
   hetzner: hetznerIcon,
+  jfrogArtifactory: jfrogArtifactoryIcon,
   grafana: grafanaIcon,
   jira: jiraIcon,
   openai: openAiIcon,
@@ -91,6 +107,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   cursor: cursorIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
+  incident: incidentIcon,
   semaphore: SemaphoreLogo,
   slack: slackIcon,
   smtp: smtpIcon,
@@ -98,18 +115,23 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   prometheus: prometheusIcon,
   render: renderIcon,
   dockerhub: dockerIcon,
+  harness: harnessIcon,
+  servicenow: servicenowIcon,
   statuspage: statuspageIcon,
   newrelic: newrelicIcon,
   aws: {
     cloudwatch: awsCloudwatchIcon,
     codeArtifact: awsCodeArtifactIcon,
+    codepipeline: awsCodePipelineIcon,
     ecr: awsEcrIcon,
     lambda: awsLambdaIcon,
+    sqs: awsSqsIcon,
     ec2: awsEc2Icon,
     route53: awsRoute53Icon,
     ecs: awsEcsIcon,
     sns: awsSnsIcon,
   },
+  gcp: gcpIcon,
 };
 
 /**

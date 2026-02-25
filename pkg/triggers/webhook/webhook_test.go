@@ -116,6 +116,24 @@ func Test__Webhook__HandleAction__ResetAuthentication(t *testing.T) {
 		require.Equal(t, "bearer-secret", result["secret"])
 	})
 
+	t.Run("resets header token authentication", func(t *testing.T) {
+		webhook := &Webhook{}
+		webhookCtx := &contexts.WebhookContext{Secret: "header-token-secret"}
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: Metadata{Authentication: "header_token"},
+		}
+
+		result, err := webhook.HandleAction(core.TriggerActionContext{
+			Name:          "resetAuthentication",
+			Configuration: Configuration{Authentication: "header_token"},
+			Metadata:      metadataCtx,
+			Webhook:       webhookCtx,
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, "header-token-secret", result["secret"])
+	})
+
 	t.Run("rejects unsupported authentication", func(t *testing.T) {
 		webhook := &Webhook{}
 		metadataCtx := &contexts.MetadataContext{
@@ -241,6 +259,76 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		headers, ok := data["headers"].(http.Header)
 		require.True(t, ok)
 		require.Equal(t, "Bearer ********", headers.Get("Authorization"))
+	})
+
+	t.Run("rejects missing header token", func(t *testing.T) {
+		webhook := &Webhook{}
+		ctx, _ := webhookRequestContext([]byte(`{"ok":true}`), "header_token", "secret")
+		config, ok := ctx.Configuration.(map[string]any)
+		require.True(t, ok)
+		config["headerName"] = "X-Test-Token"
+
+		status, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusUnauthorized, status)
+		require.Error(t, err)
+	})
+
+	t.Run("rejects invalid header token", func(t *testing.T) {
+		webhook := &Webhook{}
+		ctx, _ := webhookRequestContext([]byte(`{"ok":true}`), "header_token", "secret")
+		config, ok := ctx.Configuration.(map[string]any)
+		require.True(t, ok)
+		config["headerName"] = "X-Test-Token"
+		ctx.Headers.Set("X-Test-Token", "wrong")
+
+		status, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusUnauthorized, status)
+		require.Error(t, err)
+	})
+
+	t.Run("accepts header token and masks configured header", func(t *testing.T) {
+		webhook := &Webhook{}
+		ctx, eventCtx := webhookRequestContext([]byte(`{"ok":true}`), "header_token", "secret")
+		config, ok := ctx.Configuration.(map[string]any)
+		require.True(t, ok)
+		config["headerName"] = "X-Test-Token"
+		ctx.Headers.Set("X-Test-Token", "secret")
+
+		status, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, eventCtx.Count())
+		payload := eventCtx.Payloads[0]
+		require.Equal(t, "webhook", payload.Type)
+
+		data, ok := payload.Data.(map[string]any)
+		require.True(t, ok)
+
+		headers, ok := data["headers"].(http.Header)
+		require.True(t, ok)
+		require.Equal(t, "********", headers.Get("X-Test-Token"))
+	})
+
+	t.Run("accepts header token with default header name", func(t *testing.T) {
+		webhook := &Webhook{}
+		ctx, eventCtx := webhookRequestContext([]byte(`{"ok":true}`), "header_token", "secret")
+		ctx.Headers.Set(DefaultHeaderTokenName, "secret")
+
+		status, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, eventCtx.Count())
+		payload := eventCtx.Payloads[0]
+		require.Equal(t, "webhook", payload.Type)
+
+		data, ok := payload.Data.(map[string]any)
+		require.True(t, ok)
+
+		headers, ok := data["headers"].(http.Header)
+		require.True(t, ok)
+		require.Equal(t, "********", headers.Get(DefaultHeaderTokenName))
 	})
 }
 

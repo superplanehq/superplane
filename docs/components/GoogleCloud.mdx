@@ -1,0 +1,122 @@
+---
+title: "Google Cloud"
+---
+
+Manage and use Google Cloud resources in your workflows
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="Compute • On VM Instance" href="#compute-•-on-vm-instance" description="Listen to GCP Compute Engine VM instance lifecycle events" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Virtual Machine" href="#create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
+</CardGrid>
+
+## Instructions
+
+## Connection method
+
+### Service Account Key
+
+1. Go to [IAM & Admin → Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts) in the Google Cloud Console.
+2. Select a service account → **Keys** → **Add Key** → **JSON**.
+3. Paste the downloaded JSON below.
+
+### Workload Identity Federation (keyless)
+
+1. Create a [Workload Identity Pool](https://cloud.google.com/iam/docs/workload-identity-federation) with an OIDC provider.
+2. Set the **Issuer URL** to this SuperPlane instance's URL.
+3. Set the **Audience** to the pool provider resource name.
+4. Grant the federated identity permission to [impersonate a service account](https://cloud.google.com/iam/docs/workload-identity-federation-with-other-providers#mapping) with the roles your workflows need.
+5. Enter the **pool provider resource name** and **Project ID** below.
+
+## Required IAM roles
+
+- `roles/logging.configWriter` — create logging sinks for event triggers
+- `roles/pubsub.admin` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
+- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management)
+
+<a id="compute-•-on-vm-instance"></a>
+
+## Compute • On VM Instance
+
+The On VM Instance trigger starts a workflow execution when a Compute Engine VM instance lifecycle event occurs.
+
+**Trigger behavior:** SuperPlane creates a Cloud Logging sink that captures Compute Engine audit log events and routes them to a shared Pub/Sub topic. Events are pushed to SuperPlane and matched to this trigger automatically.
+
+### Use Cases
+
+- **Post-provisioning automation**: Run configuration, monitoring, or security setup after a VM is created
+- **Inventory and compliance**: Record new VMs or trigger audits
+- **Notifications**: Notify teams or systems when new VMs appear in a project or zone
+
+### Setup
+
+**Required GCP setup:** Ensure the **Pub/Sub** API is enabled in your project and the integration's service account has `roles/logging.configWriter` and `roles/pubsub.admin` permissions.
+
+SuperPlane automatically creates a Cloud Logging sink to capture VM instance events.
+
+### Event Data
+
+Each event includes the audit log entry with resourceName (e.g. projects/my-project/zones/us-central1-a/instances/my-vm), serviceName (compute.googleapis.com), methodName (v1.compute.instances.insert), and the full log entry data.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "protoPayload": {
+      "methodName": "v1.compute.instances.insert",
+      "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
+      "serviceName": "compute.googleapis.com"
+    }
+  },
+  "logName": "projects/my-project/logs/cloudaudit.googleapis.com%2Factivity",
+  "methodName": "v1.compute.instances.insert",
+  "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
+  "serviceName": "compute.googleapis.com",
+  "timestamp": "2025-02-14T12:00:00Z"
+}
+```
+
+<a id="create-virtual-machine"></a>
+
+## Create Virtual Machine
+
+Creates a new Google Compute Engine VM.
+
+### Steps
+
+1. **Machine Configuration** – Region, zone, machine type, provisioning model (Spot/Standard), instance name.
+2. **OS & Storage** – Boot disk source (public/custom image, snapshot, existing disk), disk type, size, snapshot schedule.
+3. **Security** – Shielded VM (secure boot, vTPM, integrity monitoring), Confidential VM (AMD SEV/SEV-SNP, Intel TDX).
+4. **Identity & API access** – VM service account, OAuth scopes, OS Login, block project-wide SSH keys.
+5. **Networking** – VPC, subnet, NIC type, internal/external IP (including static), network tags, firewall rules.
+6. **Management** – Metadata, startup script, automatic restart, on host maintenance, maintenance policy.
+7. **Advanced** – GPU accelerators, placement policy (min node CPUs), sole-tenant/host affinity, resource policies.
+
+### Output
+
+Emits a payload with instance details: instanceId, selfLink, internalIP, externalIP, status, zone, name, machineType.
+
+### Example Output
+
+```json
+{
+  "externalIP": "34.1.2.3",
+  "instanceId": "1234567890123456789",
+  "internalIP": "10.0.0.2",
+  "machineType": "e2-medium",
+  "name": "my-vm",
+  "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
+  "status": "RUNNING",
+  "zone": "us-central1-a"
+}
+```
+
