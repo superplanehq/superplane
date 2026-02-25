@@ -27,10 +27,6 @@ type Configuration struct {
 	APIKey string `json:"apiKey"`
 }
 
-type Metadata struct {
-	Severities []Severity `json:"severities"`
-}
-
 func (f *FireHydrant) Name() string {
 	return "firehydrant"
 }
@@ -97,12 +93,10 @@ func (f *FireHydrant) Sync(ctx core.SyncContext) error {
 	}
 
 	// Validate connection by listing severities
-	severities, err := client.ListSeverities()
-	if err != nil {
+	if _, err = client.ListSeverities(); err != nil {
 		return fmt.Errorf("error listing severities: %v", err)
 	}
 
-	ctx.Integration.SetMetadata(Metadata{Severities: severities})
 	ctx.Integration.Ready()
 	return nil
 }

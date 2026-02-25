@@ -1,69 +1,27 @@
 {
+  "type": "firehydrant.incident",
+  "timestamp": "2026-01-19T12:00:00Z",
   "data": {
+    "event": "incident.created",
     "incident": {
-      "conference_bridges": [],
-      "counts": {
-        "starred_events": 0,
-        "starred_messages": 0
-      },
-      "created_at": "2026-02-24 19:33:52 UTC",
+      "id": "04d9fd1a-ba9c-417d-b396-58a6e2c374de",
+      "name": "Database connection issues",
+      "description": "Users are experiencing slow database queries and connection timeouts.",
+      "summary": "Database connection pool exhausted causing cascading failures.",
+      "customer_impact_summary": "Some customers are experiencing slow performance and intermittent errors when accessingthe application.",
       "current_milestone": "started",
-      "custom_fields": [
-        {
-          "display_name": "Detected by",
-          "id": "ab3964ed-fd26-4ceb-a372-80eab5c1f4e7",
-          "value": ""
-        }
-      ],
-      "customer_impact_summary": "",
-      "description": "Deployments are impacted: [add more details]",
-      "follow_ups": [],
-      "id": "92deafc9-bd0e-459d-8fd7-785c10792d3b",
-      "impacts": [
-        {
-          "added_at": "2026-02-24 19:33:52 UTC",
-          "condition": "Unavailable",
-          "description": "",
-          "id": "e1c8fa62-66ef-42d0-b6be-f5e7b441c973",
-          "name": "Platform - Deployments",
-          "type": "Functionality"
-        }
-      ],
+      "number": 603,
+      "incident_url": "https://app.firehydrant.com/incidents/04d9fd1a-ba9c-417d-b396-58a6e2c374de",
+      "severity": "SEV1",
+      "priority": "P1",
+      "tag_list": [],
+      "impacts": [],
       "milestones": [
         {
-          "created_at": "2026-01-01 12:00:00 UTC",
-          "duration": "",
-          "id": "0a1a7f8a-0a8b-42c0-b373-3970987395aa",
-          "name": "Started",
-          "occurred_at": "2026-01-01 12:00:00 UTC",
-          "original_milestone_id": "3cc9e5d3-1baf-499b-aea3-032dac56b6a5",
           "type": "started",
-          "updated_at": "2026-01-01 12:00:00 UTC",
-          "updated_by_id": "7b491815-a0de-4103-969c-1dfaa1344686",
-          "updated_by_type": "User"
+          "occurred_at": "2026-01-19T12:00:00Z"
         }
-      ],
-      "name": "Deployments are impacted: [add more details]",
-      "number": 14,
-      "priority": {
-        "description": "",
-        "slug": "P4"
-      },
-      "severity": {
-        "description": "Some customers (not all) are receiving intermittent errors on product pages or cannot use the product in possibly obscure ways. The product may be loading slowly or partially (missing images), and there is a workaround that customers can use.",
-        "slug": "SEV3",
-        "type": "unexpected_downtime"
-      },
-      "started_at": "2026-01-01 12:00:00 UTC",
-      "summary": "",
-      "tags": [],
-      "tasks": [],
-      "team_assignments": [],
-      "updated_at": "2026-01-01 12:00:00 UTC"
+      ]
     }
-  },
-  "event": {
-    "operation": "CREATED",
-    "resource_type": "incident"
   }
 }

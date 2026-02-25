@@ -17,8 +17,7 @@ import (
 type OnIncident struct{}
 
 type OnIncidentConfiguration struct {
-	Severities    []string `json:"severities"`
-	Subscriptions []string `json:"subscriptions"`
+	Severities []string `json:"severities"`
 }
 
 func (t *OnIncident) Name() string {
@@ -77,21 +76,6 @@ func (t *OnIncident) Color() string {
 func (t *OnIncident) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "subscriptions",
-			Label:       "Event Types",
-			Type:        configuration.FieldTypeMultiSelect,
-			Required:    true,
-			Description: "Choose which event types to subscribe to. Select at least one.",
-			TypeOptions: &configuration.TypeOptions{
-				MultiSelect: &configuration.MultiSelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Incidents", Value: "incidents"},
-						{Label: "Private Incidents", Value: "incidents.private"},
-					},
-				},
-			},
-		},
-		{
 			Name:        "severities",
 			Label:       "Severities",
 			Type:        configuration.FieldTypeMultiSelect,
@@ -121,12 +105,8 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if len(config.Subscriptions) == 0 {
-		return fmt.Errorf("at least one event type must be selected")
-	}
-
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		Subscriptions: config.Subscriptions,
+		Subscriptions: []string{"incidents"},
 	})
 }
 

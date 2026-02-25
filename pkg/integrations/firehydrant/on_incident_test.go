@@ -274,13 +274,11 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 func Test__OnIncident__Setup(t *testing.T) {
 	trigger := &OnIncident{}
 
-	t.Run("valid configuration -> webhook requested", func(t *testing.T) {
+	t.Run("valid configuration -> webhook requested with incidents subscription", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			Integration: integrationCtx,
-			Configuration: map[string]any{
-				"subscriptions": []any{"incidents"},
-			},
+			Integration:   integrationCtx,
+			Configuration: map[string]any{},
 		})
 
 		require.NoError(t, err)
@@ -291,12 +289,12 @@ func Test__OnIncident__Setup(t *testing.T) {
 		assert.Equal(t, []string{"incidents"}, webhookConfig.Subscriptions)
 	})
 
-	t.Run("both subscriptions -> webhook requested with both", func(t *testing.T) {
+	t.Run("configuration with severities -> webhook requested", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
 		err := trigger.Setup(core.TriggerContext{
 			Integration: integrationCtx,
 			Configuration: map[string]any{
-				"subscriptions": []any{"incidents", "incidents.private"},
+				"severities": []any{"SEV1", "SEV2"},
 			},
 		})
 
@@ -305,18 +303,7 @@ func Test__OnIncident__Setup(t *testing.T) {
 
 		webhookConfig, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
 		require.True(t, ok)
-		assert.Equal(t, []string{"incidents", "incidents.private"}, webhookConfig.Subscriptions)
-	})
-
-	t.Run("no subscriptions -> error", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{}
-		err := trigger.Setup(core.TriggerContext{
-			Integration:   integrationCtx,
-			Configuration: map[string]any{},
-		})
-
-		require.ErrorContains(t, err, "at least one event type must be selected")
-		assert.Empty(t, integrationCtx.WebhookRequests)
+		assert.Equal(t, []string{"incidents"}, webhookConfig.Subscriptions)
 	})
 }
 

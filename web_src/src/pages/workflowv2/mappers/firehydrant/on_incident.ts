@@ -31,16 +31,8 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const configuration = node.configuration as { severities?: string[]; subscriptions?: string[] };
+    const configuration = node.configuration as { severities?: string[] };
     const metadataItems = [];
-
-    if (configuration?.subscriptions?.length) {
-      const labels = configuration.subscriptions.map((s) => subscriptionLabel(s));
-      metadataItems.push({
-        icon: "rss",
-        label: "Events: " + labels.join(", "),
-      });
-    }
 
     if (configuration?.severities?.length) {
       const formattedSeverities = configuration.severities.join(", ");
@@ -83,13 +75,4 @@ function buildSubtitle(content: string, createdAt?: string): string {
   }
 
   return content || timeAgo;
-}
-
-const subscriptionLabels: Record<string, string> = {
-  incidents: "Incidents",
-  "incidents.private": "Private Incidents",
-};
-
-function subscriptionLabel(value: string): string {
-  return subscriptionLabels[value] || value;
 }
