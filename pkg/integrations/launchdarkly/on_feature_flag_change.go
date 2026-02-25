@@ -216,8 +216,8 @@ func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int
 		}
 	}
 
-	// Filter by configured flag key
-	if config.FlagKey != "" && flagKey != config.FlagKey {
+	// Filter by configured flag key (skip if flag key could not be extracted from payload)
+	if config.FlagKey != "" && flagKey != "" && flagKey != config.FlagKey {
 		ctx.Logger.Infof("launchdarkly webhook: flag %q does not match configured flag %q, acknowledging without emitting", flagKey, config.FlagKey)
 		return http.StatusOK, nil
 	}

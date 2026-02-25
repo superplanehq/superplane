@@ -8,11 +8,14 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+var testLogger = logrus.NewEntry(logrus.New())
 
 type testWebhookContext struct {
 	setupCalled bool
@@ -63,6 +66,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 			Configuration: validConfig,
 			Webhook:       &contexts.WebhookContext{},
 			Events:        &contexts.EventContext{},
+			Logger:        testLogger,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -78,6 +82,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 			Configuration: validConfig,
 			Webhook:       wc,
 			Events:        &contexts.EventContext{},
+			Logger:        testLogger,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -97,6 +102,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 			Configuration: validConfig,
 			Webhook:       wc,
 			Events:        &contexts.EventContext{},
+			Logger:        testLogger,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -118,6 +124,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{"projectKey": "default", "flagKey": "my-flag"},
 			Webhook:       wc,
 			Events:        eventContext,
+			Logger:        testLogger,
 		})
 
 		require.Equal(t, http.StatusOK, code)
@@ -126,7 +133,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("valid signature and flag event -> emit", func(t *testing.T) {
-		body := []byte(`{"kind":"flag","name":"My Feature","titleVerb":"turned on the flag","title":"User turned on the flag My Feature","accesses":[{"action":"updateOn","resource":"proj/default:env/test:flag/my-feature"}]}`)
+		body := []byte(`{"kind":"flag","name":"My Feature","titleVerb":"turned on the flag","title":"User turned on the flag My Feature","accesses":[{"action":"updateOn","resource":"proj/default:env/test:flag/my-flag"}]}`)
 		sig := hmacSignature(validSecret, body)
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
@@ -140,6 +147,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 			Configuration: validConfig,
 			Webhook:       wc,
 			Events:        eventContext,
+			Logger:        testLogger,
 		})
 
 		require.Equal(t, http.StatusOK, code)
@@ -167,6 +175,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 			Configuration: validConfig,
 			Webhook:       wc,
 			Events:        eventContext,
+			Logger:        testLogger,
 		})
 
 		require.Equal(t, http.StatusOK, code)
@@ -176,7 +185,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("action not in configured actions -> no emit", func(t *testing.T) {
-		body := []byte(`{"kind":"flag","name":"My Feature","accesses":[{"action":"updateRules","resource":"proj/default:env/test:flag/my-feature"}]}`)
+		body := []byte(`{"kind":"flag","name":"My Feature","accesses":[{"action":"updateRules","resource":"proj/default:env/test:flag/my-flag"}]}`)
 		sig := hmacSignature(validSecret, body)
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
@@ -190,6 +199,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{"projectKey": "default", "flagKey": "my-flag", "actions": []string{ActionUpdateOn}},
 			Webhook:       wc,
 			Events:        eventContext,
+			Logger:        testLogger,
 		})
 
 		require.Equal(t, http.StatusOK, code)
@@ -198,7 +208,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("action in configured actions -> emit", func(t *testing.T) {
-		body := []byte(`{"kind":"flag","name":"My Feature","accesses":[{"action":"updateOn","resource":"proj/default:env/test:flag/my-feature"}]}`)
+		body := []byte(`{"kind":"flag","name":"My Feature","accesses":[{"action":"updateOn","resource":"proj/default:env/test:flag/my-flag"}]}`)
 		sig := hmacSignature(validSecret, body)
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
@@ -212,6 +222,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{"projectKey": "default", "flagKey": "my-flag", "actions": []string{ActionUpdateOn}},
 			Webhook:       wc,
 			Events:        eventContext,
+			Logger:        testLogger,
 		})
 
 		require.Equal(t, http.StatusOK, code)
@@ -221,7 +232,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("empty actions config -> all actions accepted", func(t *testing.T) {
-		body := []byte(`{"kind":"flag","name":"My Feature","accesses":[{"action":"deleteFlag","resource":"proj/default:flag/my-feature"}]}`)
+		body := []byte(`{"kind":"flag","name":"My Feature","accesses":[{"action":"deleteFlag","resource":"proj/default:env/test:flag/my-flag"}]}`)
 		sig := hmacSignature(validSecret, body)
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
@@ -235,6 +246,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{"projectKey": "default", "flagKey": "my-flag"},
 			Webhook:       wc,
 			Events:        eventContext,
+			Logger:        testLogger,
 		})
 
 		require.Equal(t, http.StatusOK, code)
@@ -257,6 +269,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 			Configuration: validConfig,
 			Webhook:       wc,
 			Events:        &contexts.EventContext{},
+			Logger:        testLogger,
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
