@@ -273,19 +273,3 @@ func (c *Client) DeleteWebhook(id string) error {
 	_, err := c.execRequest(http.MethodDelete, url, nil)
 	return err
 }
-
-func (c *Client) ListWebhooks() ([]Webhook, error) {
-	url := fmt.Sprintf("%s/webhooks", c.BaseURL)
-	responseBody, err := c.execRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var response WebhooksResponse
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return response.Data, nil
-}
