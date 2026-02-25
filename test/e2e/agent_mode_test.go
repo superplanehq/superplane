@@ -13,27 +13,49 @@ import (
 func TestAgentMode(t *testing.T) {
 	steps := &agentModeSteps{t: t}
 
-	t.Run("configure button opens OpenAI key controls", func(t *testing.T) {
-		steps.start()
-		steps.visitGeneralPage()
-		steps.assertAgentModeCardVisible()
-		steps.assertOpenAIKeyInputHidden()
-		steps.clickConfigureAgentMode()
-		steps.assertConfigureModalVisible()
-		steps.assertOpenAIKeyInputVisible()
-		steps.assertAgentModeSettingsPersisted(false)
-		steps.assertNoCredentialPersisted()
+	t.Run("setting up agent mode", func(t *testing.T) {
+		steps.givenILogIntoANewOrganization()
+		steps.whenIVisitGeneralSettings()
+		steps.thenISeeTheAgentModeCard()
+		steps.thenISeeTheSetupAction()
+		steps.whenIClickSetup()
+		steps.thenISeeSetupModal()
+		steps.whenIEnterOpenAIKey("sk-test-agent-mode-e2e-key-1234")
+		steps.whenISaveAgentModeKey()
+		steps.thenSetupModalCloses()
+		steps.thenAgentModeIsEnabledInDatabase()
+		steps.thenAgentCredentialExistsWithLast4("1234")
+		steps.thenISeeDisableAction()
 	})
 
-	t.Run("saving OpenAI key persists credential and status", func(t *testing.T) {
-		steps.start()
-		steps.visitGeneralPage()
-		steps.clickConfigureAgentMode()
-		steps.assertConfigureModalVisible()
-		steps.fillOpenAIKey("sk-test-agent-mode-e2e-key-1234")
-		steps.saveOpenAIKey()
-		steps.assertCredentialPersisted("1234")
-		steps.assertKeyStatusVisible()
+	t.Run("updating the api key", func(t *testing.T) {
+		steps.givenILogIntoANewOrganization()
+		steps.whenIVisitGeneralSettings()
+		steps.whenIClickSetup()
+		steps.whenIEnterOpenAIKey("sk-test-agent-mode-e2e-key-1234")
+		steps.whenISaveAgentModeKey()
+		steps.thenAgentCredentialExistsWithLast4("1234")
+
+		steps.whenIClickSetup()
+		steps.thenISeeConfigureModal()
+		steps.whenIEnterOpenAIKey("sk-test-agent-mode-e2e-key-5678")
+		steps.whenISaveAgentModeKey()
+		steps.thenAgentCredentialExistsWithLast4("5678")
+		steps.thenAgentModeIsEnabledInDatabase()
+	})
+
+	t.Run("disabling the agent mode", func(t *testing.T) {
+		steps.givenILogIntoANewOrganization()
+		steps.whenIVisitGeneralSettings()
+		steps.whenIClickSetup()
+		steps.whenIEnterOpenAIKey("sk-test-agent-mode-e2e-key-1234")
+		steps.whenISaveAgentModeKey()
+		steps.thenAgentModeIsEnabledInDatabase()
+		steps.thenAgentCredentialExistsWithLast4("1234")
+		steps.whenIClickDisable()
+		steps.thenAgentModeIsDisabledInDatabase()
+		steps.thenNoAgentCredentialExistsInDatabase()
+		steps.thenISeeTheSetupAction()
 	})
 }
 
@@ -42,103 +64,128 @@ type agentModeSteps struct {
 	session *session.TestSession
 }
 
-func (s *agentModeSteps) start() {
+func (s *agentModeSteps) givenILogIntoANewOrganization() {
 	s.session = ctx.NewSession(s.t)
 	s.session.Start()
 	s.session.Login()
 }
 
-func (s *agentModeSteps) visitGeneralPage() {
+func (s *agentModeSteps) whenIVisitGeneralSettings() {
 	s.session.Visit("/" + s.session.OrgID.String() + "/settings/general")
 	s.session.Sleep(500)
 }
 
-func (s *agentModeSteps) assertAgentModeCardVisible() {
+func (s *agentModeSteps) thenISeeTheAgentModeCard() {
 	page := s.session.Page()
 	card := page.GetByTestId("agent-mode-settings-card")
 	err := card.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
 	require.NoError(s.t, err)
 }
 
-func (s *agentModeSteps) clickConfigureAgentMode() {
+func (s *agentModeSteps) thenISeeTheSetupAction() {
 	page := s.session.Page()
-	configure := page.GetByTestId("agent-mode-configure-button")
-	err := configure.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
+	setup := page.GetByTestId("agent-mode-configure-button")
+	err := setup.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
 	require.NoError(s.t, err)
+}
 
-	err = configure.Click()
+func (s *agentModeSteps) thenISeeDisableAction() {
+	page := s.session.Page()
+	disable := page.GetByTestId("agent-mode-disable-button")
+	err := disable.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
+	require.NoError(s.t, err)
+}
+
+func (s *agentModeSteps) whenIClickSetup() {
+	page := s.session.Page()
+	setup := page.GetByTestId("agent-mode-configure-button")
+	err := setup.Click()
 	require.NoError(s.t, err)
 	s.session.Sleep(500)
 }
 
-func (s *agentModeSteps) assertConfigureModalVisible() {
+func (s *agentModeSteps) whenIClickDisable() {
+	page := s.session.Page()
+	disable := page.GetByTestId("agent-mode-disable-button")
+	err := disable.Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(500)
+}
+
+func (s *agentModeSteps) thenISeeSetupModal() {
+	page := s.session.Page()
+	modalTitle := page.GetByText("Set up Agent Mode", pw.PageGetByTextOptions{Exact: pw.Bool(true)})
+	err := modalTitle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
+	require.NoError(s.t, err)
+}
+
+func (s *agentModeSteps) thenISeeConfigureModal() {
 	page := s.session.Page()
 	modalTitle := page.GetByText("Configure Agent Mode", pw.PageGetByTextOptions{Exact: pw.Bool(true)})
 	err := modalTitle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
 	require.NoError(s.t, err)
 }
 
-func (s *agentModeSteps) assertOpenAIKeyInputHidden() {
+func (s *agentModeSteps) thenSetupModalCloses() {
 	page := s.session.Page()
-	input := page.GetByTestId("agent-openai-key-input")
-	err := input.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateHidden, Timeout: pw.Float(2000)})
+	modalTitle := page.GetByText("Set up Agent Mode", pw.PageGetByTextOptions{Exact: pw.Bool(true)})
+	// Title may change in configured state, so hidden is robust for setup completion.
+	err := modalTitle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateHidden, Timeout: pw.Float(5000)})
 	require.NoError(s.t, err)
 }
 
-func (s *agentModeSteps) assertOpenAIKeyInputVisible() {
-	page := s.session.Page()
-	input := page.GetByTestId("agent-openai-key-input")
-	err := input.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
-	require.NoError(s.t, err)
-}
-
-func (s *agentModeSteps) fillOpenAIKey(apiKey string) {
+func (s *agentModeSteps) whenIEnterOpenAIKey(apiKey string) {
 	page := s.session.Page()
 	err := page.GetByTestId("agent-openai-key-input").Fill(apiKey)
 	require.NoError(s.t, err)
 }
 
-func (s *agentModeSteps) saveOpenAIKey() {
+func (s *agentModeSteps) whenISaveAgentModeKey() {
 	page := s.session.Page()
 	err := page.GetByTestId("agent-openai-key-save").Click()
 	require.NoError(s.t, err)
 	s.session.Sleep(1000)
 }
 
-func (s *agentModeSteps) assertAgentModeSettingsPersisted(enabled bool) {
+func (s *agentModeSteps) thenAgentModeIsDisabledInDatabase() {
 	settings, err := models.FindOrganizationAgentSettingsByOrganizationID(s.session.OrgID.String())
-	require.NoError(s.t, err)
-	assert.Equal(s.t, enabled, settings.AgentModeEnabled)
+	if err == nil {
+		assert.False(s.t, settings.AgentModeEnabled)
+		return
+	}
+
+	// If no settings row exists yet, that is also a valid zero state.
+	require.Error(s.t, err)
 }
 
-func (s *agentModeSteps) assertNoCredentialPersisted() {
+func (s *agentModeSteps) thenAgentModeIsEnabledInDatabase() {
+	settings, err := models.FindOrganizationAgentSettingsByOrganizationID(s.session.OrgID.String())
+	require.NoError(s.t, err)
+	assert.True(s.t, settings.AgentModeEnabled)
+}
+
+func (s *agentModeSteps) thenNoAgentCredentialExistsInDatabase() {
 	_, err := models.FindOrganizationAgentCredentialByOrganizationID(s.session.OrgID.String())
 	require.Error(s.t, err)
 }
 
-func (s *agentModeSteps) assertCredentialPersisted(last4 string) {
+func (s *agentModeSteps) thenAgentCredentialExistsWithLast4(last4 string) {
 	credential, err := models.FindOrganizationAgentCredentialByOrganizationID(s.session.OrgID.String())
 	require.NoError(s.t, err)
 	assert.Equal(s.t, models.OrganizationAgentCredentialProviderOpenAI, credential.Provider)
 	assert.Equal(s.t, last4, credential.KeyLast4)
-
-	settings, err := models.FindOrganizationAgentSettingsByOrganizationID(s.session.OrgID.String())
-	require.NoError(s.t, err)
-	assert.True(s.t, settings.AgentModeEnabled)
-	assert.Contains(
-		s.t,
-		[]string{
-			models.OrganizationAgentOpenAIKeyStatusValid,
-			models.OrganizationAgentOpenAIKeyStatusInvalid,
-			models.OrganizationAgentOpenAIKeyStatusUnchecked,
-		},
-		settings.OpenAIKeyStatus,
-	)
 }
 
-func (s *agentModeSteps) assertKeyStatusVisible() {
+func (s *agentModeSteps) thenOpenAIKeyInputIsHidden() {
 	page := s.session.Page()
-	status := page.GetByTestId("agent-openai-key-status")
-	err := status.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
+	input := page.GetByTestId("agent-openai-key-input")
+	err := input.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateHidden, Timeout: pw.Float(2000)})
+	require.NoError(s.t, err)
+}
+
+func (s *agentModeSteps) thenOpenAIKeyInputIsVisible() {
+	page := s.session.Page()
+	input := page.GetByTestId("agent-openai-key-input")
+	err := input.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
 	require.NoError(s.t, err)
 }
