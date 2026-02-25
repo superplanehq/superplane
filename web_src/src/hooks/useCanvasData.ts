@@ -48,7 +48,15 @@ export const canvasKeys = {
     [...canvasKeys.nodeExecutions(), "infinite", canvasId, nodeId] as const,
   nodeQueueItemHistory: (canvasId: string, nodeId: string) =>
     [...canvasKeys.nodeQueueItems(), "infinite", canvasId, nodeId] as const,
+  canvasData: () => [...canvasKeys.all, "canvasData"] as const,
+  canvasDataEntries: (canvasId: string) => [...canvasKeys.canvasData(), canvasId] as const,
 };
+
+export interface CanvasDataEntry {
+  key: string;
+  value: unknown;
+  updatedAt: string;
+}
 
 export const triggerKeys = {
   all: ["triggers"] as const,
@@ -250,6 +258,29 @@ export const useCanvasEvents = (canvasId: string) => {
       return response.data;
     },
     refetchOnWindowFocus: false,
+    enabled: !!canvasId,
+  });
+};
+
+export const useCanvasDataEntries = (canvasId: string) => {
+  return useQuery({
+    queryKey: canvasKeys.canvasDataEntries(canvasId),
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/v1/canvases/${canvasId}/data`,
+        withOrganizationHeader({
+          method: "GET",
+        }),
+      );
+      if (!response.ok) {
+        throw new Error("failed to fetch canvas data");
+      }
+
+      const data = (await response.json()) as { items?: CanvasDataEntry[] };
+      return data.items || [];
+    },
+    refetchOnWindowFocus: false,
+    refetchInterval: 3000,
     enabled: !!canvasId,
   });
 };

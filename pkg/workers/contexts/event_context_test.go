@@ -44,4 +44,16 @@ func Test__EventContext__Emit(t *testing.T) {
 		assert.Contains(t, err.Error(), "event payload too large")
 		support.VerifyCanvasEventsCount(t, canvas.ID, 0)
 	})
+
+	t.Run("stores continuation key when provided", func(t *testing.T) {
+		ctx := NewEventContext(database.Conn(), &nodes[0])
+		err := ctx.EmitWithContinuation("test.payload", map[string]any{"ok": true}, "github:owner/repo:pr:42")
+		require.NoError(t, err)
+
+		events, err := models.ListCanvasEvents(canvas.ID, triggerNodeID, 10, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+		require.NotNil(t, events[0].ContinuationKey)
+		assert.Equal(t, "github:owner/repo:pr:42", *events[0].ContinuationKey)
+	})
 }

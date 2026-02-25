@@ -414,6 +414,20 @@ CREATE TABLE public.webhooks (
 
 
 --
+-- Name: workflow_data_kvs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_data_kvs (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    workflow_id uuid NOT NULL,
+    key text NOT NULL,
+    value jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: workflow_events; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -426,7 +440,8 @@ CREATE TABLE public.workflow_events (
     state character varying(32) NOT NULL,
     execution_id uuid,
     created_at timestamp without time zone NOT NULL,
-    custom_name text
+    custom_name text,
+    continuation_key text
 );
 
 
@@ -523,6 +538,21 @@ CREATE TABLE public.workflow_nodes (
     deleted_at timestamp with time zone,
     app_installation_id uuid,
     state_reason character varying(255) DEFAULT NULL::character varying
+);
+
+
+--
+-- Name: workflow_run_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_run_sessions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    workflow_id uuid NOT NULL,
+    continuation_key text NOT NULL,
+    root_event_id uuid NOT NULL,
+    last_execution_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -841,6 +871,22 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
+-- Name: workflow_data_kvs workflow_data_kvs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_data_kvs
+    ADD CONSTRAINT workflow_data_kvs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_data_kvs workflow_data_kvs_workflow_id_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_data_kvs
+    ADD CONSTRAINT workflow_data_kvs_workflow_id_key_key UNIQUE (workflow_id, key);
+
+
+--
 -- Name: workflow_events workflow_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -886,6 +932,30 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 
 ALTER TABLE ONLY public.workflow_nodes
     ADD CONSTRAINT workflow_nodes_pkey PRIMARY KEY (workflow_id, node_id);
+
+
+--
+-- Name: workflow_run_sessions workflow_run_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_run_sessions
+    ADD CONSTRAINT workflow_run_sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_run_sessions workflow_run_sessions_workflow_id_continuation_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_run_sessions
+    ADD CONSTRAINT workflow_run_sessions_workflow_id_continuation_key_key UNIQUE (workflow_id, continuation_key);
+
+
+--
+-- Name: workflow_run_sessions workflow_run_sessions_workflow_id_root_event_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_run_sessions
+    ADD CONSTRAINT workflow_run_sessions_workflow_id_root_event_id_key UNIQUE (workflow_id, root_event_id);
 
 
 --
@@ -1080,6 +1150,13 @@ CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at)
 
 
 --
+-- Name: idx_workflow_data_kvs_workflow_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_data_kvs_workflow_id ON public.workflow_data_kvs USING btree (workflow_id);
+
+
+--
 -- Name: idx_workflow_events_execution_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1091,6 +1168,13 @@ CREATE INDEX idx_workflow_events_execution_id ON public.workflow_events USING bt
 --
 
 CREATE INDEX idx_workflow_events_state ON public.workflow_events USING btree (state);
+
+
+--
+-- Name: idx_workflow_events_workflow_continuation_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_events_workflow_continuation_key ON public.workflow_events USING btree (workflow_id, continuation_key) WHERE (continuation_key IS NOT NULL);
 
 
 --
@@ -1203,6 +1287,13 @@ CREATE INDEX idx_workflow_nodes_parent ON public.workflow_nodes USING btree (wor
 --
 
 CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (state);
+
+
+--
+-- Name: idx_workflow_run_sessions_workflow_root; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_run_sessions_workflow_root ON public.workflow_run_sessions USING btree (workflow_id, root_event_id);
 
 
 --
@@ -1433,6 +1524,14 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
+-- Name: workflow_data_kvs workflow_data_kvs_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_data_kvs
+    ADD CONSTRAINT workflow_data_kvs_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
 -- Name: workflow_events workflow_events_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1561,6 +1660,30 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
+-- Name: workflow_run_sessions workflow_run_sessions_last_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_run_sessions
+    ADD CONSTRAINT workflow_run_sessions_last_execution_id_fkey FOREIGN KEY (last_execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE SET NULL;
+
+
+--
+-- Name: workflow_run_sessions workflow_run_sessions_root_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_run_sessions
+    ADD CONSTRAINT workflow_run_sessions_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_run_sessions workflow_run_sessions_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_run_sessions
+    ADD CONSTRAINT workflow_run_sessions_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
 -- PostgreSQL database dump complete
 --
 
@@ -1592,7 +1715,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260225082807	f
+20260225172642	f
 \.
 
 

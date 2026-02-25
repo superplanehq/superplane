@@ -15,8 +15,9 @@ import (
 type OnPullRequest struct{}
 
 type OnPullRequestConfiguration struct {
-	Repository string   `json:"repository" mapstructure:"repository"`
-	Actions    []string `json:"actions" mapstructure:"actions"`
+	Repository          string   `json:"repository" mapstructure:"repository"`
+	Actions             []string `json:"actions" mapstructure:"actions"`
+	ContinuationEnabled bool     `json:"continuationEnabled" mapstructure:"continuationEnabled"`
 }
 
 func (p *OnPullRequest) Name() string {
@@ -102,6 +103,14 @@ func (p *OnPullRequest) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "continuationEnabled",
+			Label:       "Continue Previous Run",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "When enabled, events for the same PR resume a shared run session.",
+		},
 	}
 }
 
@@ -166,7 +175,15 @@ func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 		return http.StatusOK, nil
 	}
 
-	err = ctx.Events.Emit("github.pullRequest", data)
+	if config.ContinuationEnabled && ctx.EmitWithContinuation != nil {
+		if continuationKey, ok := buildPRContinuationKey(data); ok {
+			err = ctx.EmitWithContinuation("github.pullRequest", data, continuationKey)
+		} else {
+			err = ctx.Events.Emit("github.pullRequest", data)
+		}
+	} else {
+		err = ctx.Events.Emit("github.pullRequest", data)
+	}
 
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)

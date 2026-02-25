@@ -14,8 +14,9 @@ import (
 type OnPRComment struct{}
 
 type OnPRCommentConfiguration struct {
-	Repository    string `json:"repository" mapstructure:"repository"`
-	ContentFilter string `json:"contentFilter" mapstructure:"contentFilter"`
+	Repository          string `json:"repository" mapstructure:"repository"`
+	ContentFilter       string `json:"contentFilter" mapstructure:"contentFilter"`
+	ContinuationEnabled bool   `json:"continuationEnabled" mapstructure:"continuationEnabled"`
 }
 
 func (p *OnPRComment) Name() string {
@@ -87,6 +88,14 @@ func (p *OnPRComment) Configuration() []configuration.Field {
 			Required:    false,
 			Placeholder: "e.g., /solve",
 			Description: "Optional regex pattern to filter comments by content",
+		},
+		{
+			Name:        "continuationEnabled",
+			Label:       "Continue Previous Run",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "When enabled, events for the same PR resume a shared run session.",
 		},
 	}
 }
@@ -220,7 +229,15 @@ func (p *OnPRComment) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		}
 	}
 
-	err = ctx.Events.Emit("github.prComment", data)
+	if config.ContinuationEnabled && ctx.EmitWithContinuation != nil {
+		if continuationKey, ok := buildPRContinuationKey(data); ok {
+			err = ctx.EmitWithContinuation("github.prComment", data, continuationKey)
+		} else {
+			err = ctx.Events.Emit("github.prComment", data)
+		}
+	} else {
+		err = ctx.Events.Emit("github.prComment", data)
+	}
 
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)

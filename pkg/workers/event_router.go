@@ -137,6 +137,10 @@ func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models
 }
 
 func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, error) {
+	if event.ContinuationKey != nil && *event.ContinuationKey != "" {
+		return w.processContinuationRootEvent(tx, canvas, event, *event.ContinuationKey)
+	}
+
 	now := time.Now()
 
 	w.logger.Infof("Processing root event %s", event.ID)
@@ -169,6 +173,64 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, event
 	}
 
 	err := event.RoutedInTransaction(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return queueItems, nil
+}
+
+func (w *EventRouter) processContinuationRootEvent(
+	tx *gorm.DB,
+	canvas *models.Canvas,
+	event *models.CanvasEvent,
+	continuationKey string,
+) ([]models.CanvasNodeQueueItem, error) {
+	now := time.Now()
+
+	session, created, err := models.FindOrCreateWorkflowRunSessionByKeyForUpdateInTransaction(
+		tx,
+		canvas.ID,
+		continuationKey,
+		event.ID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	rootEventID := session.RootEventID
+	if created {
+		rootEventID = event.ID
+	}
+
+	edges := canvas.FindEdges(event.NodeID, event.Channel)
+	var queueItems []models.CanvasNodeQueueItem
+	for _, edge := range edges {
+		targetNode, err := models.FindCanvasNode(tx, canvas.ID, edge.TargetID)
+		if err != nil {
+			return nil, err
+		}
+
+		if targetNode.State == models.CanvasNodeStateError {
+			continue
+		}
+
+		queueItem := models.CanvasNodeQueueItem{
+			WorkflowID:  canvas.ID,
+			NodeID:      targetNode.NodeID,
+			RootEventID: rootEventID,
+			EventID:     event.ID,
+			CreatedAt:   &now,
+		}
+
+		if err := tx.Create(&queueItem).Error; err != nil {
+			return nil, err
+		}
+
+		queueItems = append(queueItems, queueItem)
+	}
+
+	err = event.RoutedInTransaction(tx)
 	if err != nil {
 		return nil, err
 	}

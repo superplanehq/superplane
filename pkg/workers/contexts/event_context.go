@@ -22,6 +22,14 @@ func NewEventContext(tx *gorm.DB, node *models.CanvasNode) *EventContext {
 }
 
 func (s *EventContext) Emit(payloadType string, payload any) error {
+	return s.emit(payloadType, payload, nil)
+}
+
+func (s *EventContext) EmitWithContinuation(payloadType string, payload any, continuationKey string) error {
+	return s.emit(payloadType, payload, &continuationKey)
+}
+
+func (s *EventContext) emit(payloadType string, payload any, continuationKey *string) error {
 	structuredPayload := map[string]any{
 		"type":      payloadType,
 		"timestamp": time.Now(),
@@ -43,12 +51,13 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	// We use RawMessage here to avoid a second marshal when GORM persists the JSONType.
 	//
 	event := models.CanvasEvent{
-		WorkflowID: s.node.WorkflowID,
-		NodeID:     s.node.NodeID,
-		Channel:    "default",
-		Data:       datatypes.NewJSONType[any](json.RawMessage(data)),
-		State:      models.CanvasEventStatePending,
-		CreatedAt:  &now,
+		WorkflowID:      s.node.WorkflowID,
+		NodeID:          s.node.NodeID,
+		Channel:         "default",
+		ContinuationKey: continuationKey,
+		Data:            datatypes.NewJSONType[any](json.RawMessage(data)),
+		State:           models.CanvasEventStatePending,
+		CreatedAt:       &now,
 	}
 
 	wrappedPayload := map[string]any{"data": payload}

@@ -41,6 +41,7 @@ import {
   useTriggers,
   useUpdateCanvas,
   useCanvas,
+  useCanvasDataEntries,
   useCanvasEvents,
   useWidgets,
   canvasKeys,
@@ -90,6 +91,7 @@ import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
 import { useAccount } from "@/contexts/AccountContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { CanvasDataView } from "./CanvasDataBanner";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
 import {
   buildRunEntryFromEvent,
@@ -144,6 +146,8 @@ export function WorkflowPageV2() {
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const { data: canvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId!, canvasId!);
   const { data: canvasEventsResponse } = useCanvasEvents(canvasId!);
+  const { data: canvasDataEntries = [] } = useCanvasDataEntries(canvasId!);
+  const [topViewMode, setTopViewMode] = useState<"canvas" | "data">("canvas");
   const canReadOrg = canAct("org", "read");
   const { data: agentSettings } = useOrganizationAgentSettings(organizationId || "", !!organizationId && canReadOrg);
   const canUpdateCanvas = canAct("canvases", "update");
@@ -2972,6 +2976,9 @@ export function WorkflowPageV2() {
         }}
         title={canvas?.metadata?.name || "Canvas"}
         headerBanner={headerBanner}
+        topViewMode={topViewMode}
+        onTopViewModeChange={setTopViewMode}
+        dataViewContent={<CanvasDataView entries={canvasDataEntries} />}
         nodes={nodes}
         edges={edges}
         organizationId={organizationId}

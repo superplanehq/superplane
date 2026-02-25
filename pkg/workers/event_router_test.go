@@ -2,11 +2,13 @@ package workers
 
 import (
 	"testing"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
@@ -132,6 +134,70 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 
 	assert.True(t, eventConsumer.HasReceivedMessage())
 	assert.True(t, queueConsumer.HasReceivedMessage())
+}
+
+func Test__EventRouter_ProcessContinuationRootEvent(t *testing.T) {
+	router := NewEventRouter()
+	logger := log.NewEntry(log.New())
+	r := support.Setup(t)
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
+			{NodeID: componentNode, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	continuationKey := "github:acme/service:pr:99"
+	firstEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	require.NoError(t, database.Conn().Model(firstEvent).Update("continuation_key", continuationKey).Error)
+	require.NoError(t, router.LockAndProcessEvent(logger, *firstEvent))
+
+	firstExecution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, firstEvent.ID, firstEvent.ID, nil)
+	require.NoError(t, models.UpdateWorkflowRunSessionLastExecutionByRootEventInTransaction(
+		database.Conn(),
+		canvas.ID,
+		firstEvent.ID,
+		firstExecution.ID,
+	))
+
+	now := time.Now()
+	secondEvent := models.CanvasEvent{
+		WorkflowID:      canvas.ID,
+		NodeID:          triggerNode,
+		Channel:         "default",
+		ContinuationKey: &continuationKey,
+		Data: datatypes.NewJSONType[any](map[string]any{
+			"type": "github.pullRequest",
+			"data": map[string]any{"action": "closed"},
+		}),
+		State:     models.CanvasEventStatePending,
+		CreatedAt: &now,
+	}
+	require.NoError(t, database.Conn().Create(&secondEvent).Error)
+	require.NoError(t, router.LockAndProcessEvent(logger, secondEvent))
+
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	require.NoError(t, err)
+
+	var resumedQueueItem *models.CanvasNodeQueueItem
+	for i := range queueItems {
+		if queueItems[i].EventID == secondEvent.ID {
+			resumedQueueItem = &queueItems[i]
+			break
+		}
+	}
+
+	require.NotNil(t, resumedQueueItem)
+	assert.Equal(t, firstEvent.ID, resumedQueueItem.RootEventID)
 }
 
 func Test__EventRouter_CustomComponent_RespectsOutputChannels(t *testing.T) {

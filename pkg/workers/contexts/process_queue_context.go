@@ -38,8 +38,14 @@ func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *model
 	configBuilder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
-		WithPreviousExecution(event.ExecutionID).
 		WithInput(map[string]any{event.NodeID: event.Data.Data()})
+	previousExecutionID, err := resolvePreviousExecutionID(tx, queueItem.WorkflowID, event)
+	if err != nil {
+		return nil, err
+	}
+	if previousExecutionID != nil {
+		configBuilder = configBuilder.WithPreviousExecution(previousExecutionID)
+	}
 	if len(configFields) > 0 {
 		configBuilder = configBuilder.WithConfigurationFields(configFields)
 	}
@@ -78,8 +84,8 @@ func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *model
 			WithNodeID(node.NodeID).
 			WithRootEvent(&queueItem.RootEventID).
 			WithInput(map[string]any{event.NodeID: event.Data.Data()})
-		if event.ExecutionID != nil {
-			builder = builder.WithPreviousExecution(event.ExecutionID)
+		if previousExecutionID != nil {
+			builder = builder.WithPreviousExecution(previousExecutionID)
 		}
 		return builder.BuildExpressionEnv(expression)
 	}
@@ -92,7 +98,7 @@ func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *model
 			NodeID:              node.NodeID,
 			RootEventID:         queueItem.RootEventID,
 			EventID:             event.ID,
-			PreviousExecutionID: event.ExecutionID,
+			PreviousExecutionID: previousExecutionID,
 			State:               models.CanvasNodeExecutionStatePending,
 			Configuration:       datatypes.NewJSONType(config),
 			CreatedAt:           &now,
@@ -114,6 +120,15 @@ func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *model
 		if err != nil {
 			return nil, err
 		}
+		err = models.UpdateWorkflowRunSessionLastExecutionByRootEventInTransaction(
+			tx,
+			queueItem.WorkflowID,
+			queueItem.RootEventID,
+			execution.ID,
+		)
+		if err != nil {
+			return nil, err
+		}
 
 		return &core.ExecutionContext{
 			ID:             execution.ID,
@@ -123,6 +138,7 @@ func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *model
 			HTTP:           httpCtx,
 			Metadata:       NewExecutionMetadataContext(tx, &execution),
 			NodeMetadata:   NewNodeMetadataContext(tx, node),
+			CanvasData:     NewCanvasDataContext(tx, execution.WorkflowID),
 			ExecutionState: NewExecutionStateContext(tx, &execution),
 			Requests:       NewExecutionRequestContext(tx, &execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), &execution, nil),
@@ -219,6 +235,7 @@ func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *model
 			HTTP:           httpCtx,
 			Metadata:       NewExecutionMetadataContext(tx, execution),
 			NodeMetadata:   NewNodeMetadataContext(tx, node),
+			CanvasData:     NewCanvasDataContext(tx, execution.WorkflowID),
 			ExecutionState: NewExecutionStateContext(tx, execution),
 			Requests:       NewExecutionRequestContext(tx, execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), execution, nil),
@@ -227,4 +244,25 @@ func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *model
 	}
 
 	return ctx, nil
+}
+
+func resolvePreviousExecutionID(tx *gorm.DB, workflowID uuid.UUID, event *models.CanvasEvent) (*uuid.UUID, error) {
+	if event.ExecutionID != nil {
+		return event.ExecutionID, nil
+	}
+
+	if event.ContinuationKey == nil || *event.ContinuationKey == "" {
+		return nil, nil
+	}
+
+	session, err := models.FindWorkflowRunSessionByKeyInTransaction(tx, workflowID, *event.ContinuationKey)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return session.LastExecutionID, nil
 }

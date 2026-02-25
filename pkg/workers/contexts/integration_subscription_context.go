@@ -131,6 +131,7 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 		HTTP:           c.registry.HTTPContext(),
 		Metadata:       NewExecutionMetadataContext(c.tx, execution),
 		NodeMetadata:   NewNodeMetadataContext(c.tx, c.node),
+		CanvasData:     NewCanvasDataContext(c.tx, execution.WorkflowID),
 		ExecutionState: NewExecutionStateContext(c.tx, execution),
 		Requests:       NewExecutionRequestContext(c.tx, execution),
 		Integration:    c.integrationCtx,

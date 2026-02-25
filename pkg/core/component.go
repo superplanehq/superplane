@@ -147,6 +147,7 @@ type ExecutionContext struct {
 	HTTP           HTTPContext
 	Metadata       MetadataContext
 	NodeMetadata   MetadataContext
+	CanvasData     CanvasDataContext
 	ExecutionState ExecutionStateContext
 	Requests       RequestContext
 	Auth           AuthContext
@@ -189,6 +190,12 @@ type SetupContext struct {
 type MetadataContext interface {
 	Get() any
 	Set(any) error
+}
+
+type CanvasDataContext interface {
+	Set(key string, value any) error
+	Get(key string) (any, bool, error)
+	List() (map[string]any, error)
 }
 
 /*

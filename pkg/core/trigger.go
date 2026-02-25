@@ -110,16 +110,17 @@ type TriggerActionContext struct {
 }
 
 type WebhookRequestContext struct {
-	Body          []byte
-	Headers       http.Header
-	WorkflowID    string
-	NodeID        string
-	Configuration any
-	Metadata      MetadataContext
-	Logger        *log.Entry
-	Webhook       NodeWebhookContext
-	Events        EventContext
-	Integration   IntegrationContext
+	Body                 []byte
+	Headers              http.Header
+	WorkflowID           string
+	NodeID               string
+	Configuration        any
+	Metadata             MetadataContext
+	Logger               *log.Entry
+	Webhook              NodeWebhookContext
+	Events               EventContext
+	Integration          IntegrationContext
+	EmitWithContinuation func(payloadType string, payload any, continuationKey string) error
 
 	//
 	// Return an execution context for a given execution,

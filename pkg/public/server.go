@@ -244,6 +244,13 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
+	// Canvas-level key/value data endpoint.
+	s.Router.Handle(
+		"/api/v1/canvases/{canvasId}/data",
+		middleware.OrganizationAuthMiddleware(s.jwt).
+			Middleware(http.HandlerFunc(s.listCanvasData)),
+	).Methods("GET")
+
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
@@ -478,6 +485,57 @@ func respondJSON(w http.ResponseWriter, payload any) {
 	if err := encoder.Encode(payload); err != nil {
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 	}
+}
+
+type canvasDataItem struct {
+	Key       string    `json:"key"`
+	Value     any       `json:"value"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type listCanvasDataResponse struct {
+	Items []canvasDataItem `json:"items"`
+}
+
+func (s *Server) listCanvasData(w http.ResponseWriter, r *http.Request) {
+	user, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	vars := mux.Vars(r)
+	canvasID, err := uuid.Parse(vars["canvasId"])
+	if err != nil {
+		http.Error(w, "invalid canvas id", http.StatusBadRequest)
+		return
+	}
+
+	_, err = models.FindCanvas(user.OrganizationID, canvasID)
+	if err != nil {
+		http.Error(w, "canvas not found", http.StatusNotFound)
+		return
+	}
+
+	records, err := models.ListCanvasDataKVs(canvasID)
+	if err != nil {
+		http.Error(w, "failed to list canvas data", http.StatusInternalServerError)
+		return
+	}
+
+	items := make([]canvasDataItem, 0, len(records))
+	for _, record := range records {
+		if record.UpdatedAt == nil {
+			continue
+		}
+		items = append(items, canvasDataItem{
+			Key:       record.Key,
+			Value:     record.Value.Data(),
+			UpdatedAt: *record.UpdatedAt,
+		})
+	}
+
+	respondJSON(w, listCanvasDataResponse{Items: items})
 }
 
 func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request) {
@@ -796,6 +854,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 
 	logger := logging.ForNode(node)
 	tx := database.Conn()
+	eventCtx := contexts.NewEventContext(tx, &node)
 	var integrationCtx core.IntegrationContext
 	if node.AppInstallationID != nil {
 		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
@@ -817,8 +876,15 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		Logger:        logger,
 		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
-		Events:        contexts.NewEventContext(tx, &node),
+		Events:        eventCtx,
 		Integration:   integrationCtx,
+		EmitWithContinuation: func(payloadType string, payload any, continuationKey string) error {
+			if continuationKey == "" {
+				return eventCtx.Emit(payloadType, payload)
+			}
+
+			return eventCtx.EmitWithContinuation(payloadType, payload, continuationKey)
+		},
 	})
 }
 
@@ -831,6 +897,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 
 	logger := logging.ForNode(node)
 	tx := database.Conn()
+	eventCtx := contexts.NewEventContext(tx, &node)
 	var integrationCtx core.IntegrationContext
 	if node.AppInstallationID != nil {
 		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
@@ -852,8 +919,15 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 		Logger:        logger,
 		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
-		Events:        contexts.NewEventContext(tx, &node),
+		Events:        eventCtx,
 		Integration:   integrationCtx,
+		EmitWithContinuation: func(payloadType string, payload any, continuationKey string) error {
+			if continuationKey == "" {
+				return eventCtx.Emit(payloadType, payload)
+			}
+
+			return eventCtx.EmitWithContinuation(payloadType, payload, continuationKey)
+		},
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
 			if err != nil {
@@ -869,6 +943,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 				HTTP:           s.registry.HTTPContext(),
 				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
+				CanvasData:     contexts.NewCanvasDataContext(tx, execution.WorkflowID),
 				ExecutionState: contexts.NewExecutionStateContext(tx, execution),
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
 				Logger:         logging.ForExecution(execution, nil),

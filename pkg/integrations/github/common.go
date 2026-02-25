@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/google/go-github/v74/github"
@@ -86,6 +87,85 @@ func sanitizeAssignees(assignees []string) []string {
 	}
 
 	return result
+}
+
+func buildPRContinuationKey(data map[string]any) (string, bool) {
+	repoFullName, ok := extractRepositoryFullName(data)
+	if !ok || repoFullName == "" {
+		return "", false
+	}
+
+	prNumber, ok := extractPRNumber(data)
+	if !ok {
+		return "", false
+	}
+
+	return fmt.Sprintf("github:%s:pr:%d", repoFullName, prNumber), true
+}
+
+func extractRepositoryFullName(data map[string]any) (string, bool) {
+	repository, ok := data["repository"].(map[string]any)
+	if !ok {
+		return "", false
+	}
+
+	if fullName, ok := repository["full_name"].(string); ok && fullName != "" {
+		return fullName, true
+	}
+
+	name, nameOK := repository["name"].(string)
+	if !nameOK || name == "" {
+		return "", false
+	}
+
+	owner, ownerOK := repository["owner"].(map[string]any)
+	if !ownerOK {
+		return "", false
+	}
+
+	login, loginOK := owner["login"].(string)
+	if !loginOK || login == "" {
+		return "", false
+	}
+
+	return fmt.Sprintf("%s/%s", login, name), true
+}
+
+func extractPRNumber(data map[string]any) (int64, bool) {
+	// issue_comment events for PR comments expose issue.number
+	if issue, ok := data["issue"].(map[string]any); ok {
+		if number, ok := parseNumericID(issue["number"]); ok {
+			return number, true
+		}
+	}
+
+	// pull_request and review events expose pull_request.number
+	if pr, ok := data["pull_request"].(map[string]any); ok {
+		if number, ok := parseNumericID(pr["number"]); ok {
+			return number, true
+		}
+	}
+
+	return 0, false
+}
+
+func parseNumericID(value any) (int64, bool) {
+	switch typed := value.(type) {
+	case float64:
+		return int64(typed), true
+	case int:
+		return int64(typed), true
+	case int64:
+		return typed, true
+	case string:
+		parsed, err := strconv.ParseInt(typed, 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		return parsed, true
+	default:
+		return 0, false
+	}
 }
 
 func verifySignature(ctx core.WebhookRequestContext) (int, error) {

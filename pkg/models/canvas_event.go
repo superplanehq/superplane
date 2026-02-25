@@ -16,15 +16,16 @@ const (
 )
 
 type CanvasEvent struct {
-	ID          uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
-	WorkflowID  uuid.UUID
-	NodeID      string
-	Channel     string
-	CustomName  *string
-	Data        datatypes.JSONType[any]
-	ExecutionID *uuid.UUID
-	State       string
-	CreatedAt   *time.Time
+	ID              uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
+	WorkflowID      uuid.UUID
+	NodeID          string
+	Channel         string
+	CustomName      *string
+	ContinuationKey *string
+	Data            datatypes.JSONType[any]
+	ExecutionID     *uuid.UUID
+	State           string
+	CreatedAt       *time.Time
 }
 
 func (e *CanvasEvent) TableName() string {
