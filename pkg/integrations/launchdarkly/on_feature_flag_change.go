@@ -30,7 +30,8 @@ const (
 type OnFeatureFlagChange struct{}
 
 type OnFeatureFlagChangeConfiguration struct {
-	Events []string `json:"events" mapstructure:"events"`
+	Events  []string `json:"events" mapstructure:"events"`
+	Actions []string `json:"actions" mapstructure:"actions"`
 }
 
 type OnFeatureFlagChangeMetadata struct {
@@ -61,7 +62,8 @@ func (t *OnFeatureFlagChange) Documentation() string {
 
 ## Configuration
 
-- **Events**: Select which events to listen for
+- **Events**: Select which event kinds to listen for (e.g. feature flag changes)
+- **Actions**: Optionally filter by specific actions (e.g. only when a flag is turned on or off). Leave empty to receive all actions.
 
 ## Webhook Setup
 
@@ -90,6 +92,26 @@ func (t *OnFeatureFlagChange) Configuration() []configuration.Field {
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
 						{Label: "Feature flag changes", Value: KindFlag},
+					},
+				},
+			},
+		},
+		{
+			Name:        "actions",
+			Label:       "Actions",
+			Type:        configuration.FieldTypeMultiSelect,
+			Required:    false,
+			Description: "Filter by specific actions. Leave empty to receive all actions.",
+			TypeOptions: &configuration.TypeOptions{
+				MultiSelect: &configuration.MultiSelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Turned on / off", Value: ActionUpdateOn},
+						{Label: "Targeting changed", Value: ActionUpdateTargets},
+						{Label: "Rules changed", Value: ActionUpdateRules},
+						{Label: "Default rule changed", Value: ActionUpdateFallthrough},
+						{Label: "Off variation changed", Value: ActionUpdateOffVariation},
+						{Label: "Flag created", Value: ActionCreateFlag},
+						{Label: "Flag deleted", Value: ActionDeleteFlag},
 					},
 				},
 			},
@@ -198,14 +220,26 @@ func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int
 		return http.StatusOK, nil
 	}
 
-	// Determine a more specific payload type from the accesses array
-	payloadType := "launchdarkly." + kind
+	// Extract the action from the accesses array
+	action := ""
 	if accesses, ok := payload["accesses"].([]any); ok && len(accesses) > 0 {
 		if access, ok := accesses[0].(map[string]any); ok {
-			if action, ok := access["action"].(string); ok && action != "" {
-				payloadType = "launchdarkly." + kind + "." + action
-			}
+			action, _ = access["action"].(string)
 		}
+	}
+
+	// Filter by configured actions (optional — empty means accept all)
+	if len(config.Actions) > 0 && !slices.Contains(config.Actions, action) {
+		if ctx.Logger != nil {
+			ctx.Logger.Infof("launchdarkly webhook: action %q not in trigger config (configured: %v), acknowledging without emitting", action, config.Actions)
+		}
+		return http.StatusOK, nil
+	}
+
+	// Determine a more specific payload type from the kind and action
+	payloadType := "launchdarkly." + kind
+	if action != "" {
+		payloadType = "launchdarkly." + kind + "." + action
 	}
 	if err := ctx.Events.Emit(payloadType, payload); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %w", err)

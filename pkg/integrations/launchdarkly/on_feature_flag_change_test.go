@@ -176,6 +176,74 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "launchdarkly.flag", eventContext.Payloads[0].Type)
 	})
 
+	t.Run("action not in configured actions -> no emit", func(t *testing.T) {
+		body := []byte(`{"kind":"flag","name":"My Feature","accesses":[{"action":"updateRules","resource":"proj/default:env/test:flag/my-feature"}]}`)
+		sig := hmacSignature(validSecret, body)
+		headers := http.Header{}
+		headers.Set("X-LD-Signature", sig)
+
+		wc := &contexts.WebhookContext{}
+		require.NoError(t, wc.SetSecret([]byte(validSecret)))
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Configuration: map[string]any{"events": []string{KindFlag}, "actions": []string{ActionUpdateOn}},
+			Webhook:       wc,
+			Events:        eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("action in configured actions -> emit", func(t *testing.T) {
+		body := []byte(`{"kind":"flag","name":"My Feature","accesses":[{"action":"updateOn","resource":"proj/default:env/test:flag/my-feature"}]}`)
+		sig := hmacSignature(validSecret, body)
+		headers := http.Header{}
+		headers.Set("X-LD-Signature", sig)
+
+		wc := &contexts.WebhookContext{}
+		require.NoError(t, wc.SetSecret([]byte(validSecret)))
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Configuration: map[string]any{"events": []string{KindFlag}, "actions": []string{ActionUpdateOn}},
+			Webhook:       wc,
+			Events:        eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventContext.Count())
+		assert.Equal(t, "launchdarkly.flag.updateOn", eventContext.Payloads[0].Type)
+	})
+
+	t.Run("empty actions config -> all actions accepted", func(t *testing.T) {
+		body := []byte(`{"kind":"flag","name":"My Feature","accesses":[{"action":"deleteFlag","resource":"proj/default:flag/my-feature"}]}`)
+		sig := hmacSignature(validSecret, body)
+		headers := http.Header{}
+		headers.Set("X-LD-Signature", sig)
+
+		wc := &contexts.WebhookContext{}
+		require.NoError(t, wc.SetSecret([]byte(validSecret)))
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Configuration: map[string]any{"events": []string{KindFlag}},
+			Webhook:       wc,
+			Events:        eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventContext.Count())
+		assert.Equal(t, "launchdarkly.flag.deleteFlag", eventContext.Payloads[0].Type)
+	})
+
 	t.Run("missing kind in payload -> 400", func(t *testing.T) {
 		body := []byte(`{"name":"No Kind Field"}`)
 		sig := hmacSignature(validSecret, body)
