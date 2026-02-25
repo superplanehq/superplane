@@ -59,7 +59,8 @@ func (h *FireHydrantWebhookHandler) Merge(current, requested any) (any, bool, er
 	}
 
 	// If the current subscriptions are a strict subset of the requested ones, expand.
-	if subscriptionsSubsetOrEqual(cur.Subscriptions, req.Subscriptions) && !slices.Equal(cur.Subscriptions, req.Subscriptions) {
+	if subscriptionsSubsetOrEqual(cur.Subscriptions, req.Subscriptions) &&
+		!subscriptionsSubsetOrEqual(req.Subscriptions, cur.Subscriptions) {
 		cur.Subscriptions = req.Subscriptions
 		return cur, true, nil
 	}

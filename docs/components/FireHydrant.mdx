@@ -112,8 +112,6 @@ FireHydrant webhooks deliver all incident events. This trigger filters for only 
         "description": "",
         "slug": "P4"
       },
-      "private_status_page_url": "https://app.firehydrant.io/incidents/internal/status_page/f8c9d62e-ed0c-49e6-814c-f76667ac7ed3/76a959cde572cc039221d5d0bb63d3ea2c0ff424f462de67f95419a448c943cdc9d96be07ef6af5cc4e4d9cb916ca1710868b53de8620f8bce3866147d59263041a68d05de708f1b28039a393b82ef473c9734506c14c2a026670f17987bef8f1a33337d",
-      "role_assignments": [],
       "severity": {
         "description": "Some customers (not all) are receiving intermittent errors on product pages or cannot use the product in possibly obscure ways. The product may be loading slowly or partially (missing images), and there is a workaround that customers can use.",
         "slug": "SEV3",
@@ -128,7 +126,7 @@ FireHydrant webhooks deliver all incident events. This trigger filters for only 
     }
   },
   "event": {
-    "operation": "UPDATED",
+    "operation": "CREATED",
     "resource_type": "incident"
   }
 }
@@ -167,10 +165,9 @@ Returns the created incident object including:
 - **number**: Incident number
 - **severity**: Severity level
 - **priority**: Priority level
-- **current_milestone**: Current milestone (e.g., started)
 - **created_at**: Creation timestamp
 - **started_at**: Start timestamp
-,- **tag_list**: List of tags associated with the incident
+- **tag_list**: List of tags associated with the incident
 - **impacts**: List of impacts associated with the incident
 - **milestones**: List of milestones associated with the incident
 
@@ -196,7 +193,7 @@ Returns the created incident object including:
   "severity": "SEV1",
   "started_at": "2026-01-19T12:00:00Z",
   "summary": "Database connection pool exhausted causing cascading failures.",
-  "tagList": []
+  "tag_list": []
 }
 ```
 
