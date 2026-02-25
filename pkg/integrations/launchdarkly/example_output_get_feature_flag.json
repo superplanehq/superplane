@@ -1,0 +1,23 @@
+{
+  "data": {
+    "key": "toggle-feature",
+    "name": "Toggle Feature",
+    "description": "Controls access to the new feature",
+    "kind": "boolean",
+    "creationDate": 1704067200000,
+    "archived": false,
+    "temporary": false,
+    "variations": [
+      {
+        "value": true,
+        "name": "Enabled"
+      },
+      {
+        "value": false,
+        "name": "Disabled"
+      }
+    ]
+  },
+  "type": "launchdarkly.flag",
+  "timestamp": "2026-01-19T12:00:00Z"
+}
