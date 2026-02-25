@@ -1,0 +1,40 @@
+{
+  "data": {
+    "mostFailedTests": [
+      {
+        "testName": "TestUserAuthentication",
+        "classname": "auth_test.go",
+        "failedRuns": 5,
+        "totalRuns": 42,
+        "flaky": true
+      }
+    ],
+    "slowestTests": [
+      {
+        "testName": "TestDatabaseMigration",
+        "classname": "migration_test.go",
+        "failedRuns": 1,
+        "totalRuns": 42,
+        "flaky": false,
+        "p50DurationSecs": 12.5
+      }
+    ],
+    "totalTestRuns": 42,
+    "testRuns": [
+      {
+        "pipelineNumber": 130,
+        "workflowId": "fda08377-fe7e-46b1-8992-3a7aaecac9c3",
+        "successRate": 0.95,
+        "testCounts": {
+          "error": 0,
+          "failure": 2,
+          "skipped": 1,
+          "success": 38,
+          "total": 41
+        }
+      }
+    ]
+  },
+  "timestamp": "2021-09-01T22:55:34.317Z",
+  "type": "circleci.testMetrics"
+}
