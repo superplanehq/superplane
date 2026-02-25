@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect } from "react";
-import { Camera, Grid3X3, Maximize, Minus, MousePointer2, Plus } from "lucide-react";
+import { Camera, Grid3X3, Maximize, Minus, Plus, SquareDot } from "lucide-react";
 import { toPng } from "html-to-image";
 
 import {
@@ -23,8 +23,6 @@ export function ZoomSlider({
   className,
   orientation = "horizontal",
   children,
-  isSelectionModeEnabled,
-  onSelectionModeToggle,
   screenshotName,
   isSnapToGridEnabled,
   onSnapToGridToggle,
@@ -32,8 +30,6 @@ export function ZoomSlider({
 }: Omit<PanelProps, "children"> & {
   orientation?: "horizontal" | "vertical";
   children?: React.ReactNode;
-  isSelectionModeEnabled?: boolean;
-  onSelectionModeToggle?: () => void;
   screenshotName?: string;
   isSnapToGridEnabled?: boolean;
   onSnapToGridToggle?: () => void;
@@ -196,7 +192,7 @@ export function ZoomSlider({
               <Maximize className="h-3 w-3" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Fit all nodes in view (Ctrl/Cmd + 1)</TooltipContent>
+          <TooltipContent>Fit all components in view (Ctrl/Cmd + 1)</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -206,35 +202,11 @@ export function ZoomSlider({
           </TooltipTrigger>
           <TooltipContent>Download screenshot (Ctrl/Cmd + Shift + S)</TooltipContent>
         </Tooltip>
-        {onSelectionModeToggle && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={isSelectionModeEnabled ? "default" : "ghost"}
-                size="icon-sm"
-                className="h-8 w-8"
-                onClick={onSelectionModeToggle}
-              >
-                <MousePointer2 className="h-3 w-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {isSelectionModeEnabled
-                ? "Disable rectangle selection mode"
-                : "Select and move multiple components at once (Ctrl/Cmd + drag)"}
-            </TooltipContent>
-          </Tooltip>
-        )}
         {onSnapToGridToggle && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant={isSnapToGridEnabled ? "default" : "ghost"}
-                size="icon-sm"
-                className="h-8 w-8"
-                onClick={onSnapToGridToggle}
-              >
-                <Grid3X3 className="h-3 w-3" />
+              <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={onSnapToGridToggle}>
+                {isSnapToGridEnabled ? <SquareDot className="h-3 w-3" /> : <Grid3X3 className="h-3 w-3" />}
               </Button>
             </TooltipTrigger>
             <TooltipContent>{isSnapToGridEnabled ? "Disable snap to grid" : "Enable snap to grid"}</TooltipContent>

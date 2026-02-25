@@ -89,7 +89,7 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 	//
 	// Initialize services exposed by this server.
 	//
-	organizationService := NewOrganizationService(authService, registry, oidcProvider, baseURL, webhooksBaseURL)
+	organizationService := NewOrganizationService(authService, encryptor, registry, oidcProvider, baseURL, webhooksBaseURL)
 	organizationPb.RegisterOrganizationsServer(grpcServer, organizationService)
 
 	userService := NewUsersService(authService)
@@ -119,7 +119,7 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 	blueprintService := NewBlueprintService(registry)
 	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
 
-	canvasService := NewCanvasService(authService, registry, encryptor, webhooksBaseURL+basePath)
+	canvasService := NewCanvasService(authService, registry, encryptor, webhooksBaseURL)
 	pbCanvases.RegisterCanvasesServer(grpcServer, canvasService)
 
 	integrationService := NewIntegrationService(encryptor, registry)

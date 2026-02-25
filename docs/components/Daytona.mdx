@@ -13,6 +13,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Sandbox" href="#delete-sandbox" description="Delete a sandbox environment" />
   <LinkCard title="Execute Code" href="#execute-code" description="Execute code in a sandbox environment" />
   <LinkCard title="Execute Command" href="#execute-command" description="Run a shell command in a sandbox environment" />
+  <LinkCard title="Get Preview URL" href="#get-preview-url" description="Generate a preview URL for a sandbox port" />
 </CardGrid>
 
 <a id="create-sandbox"></a>
@@ -187,6 +188,65 @@ Returns the command result including:
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "daytona.command.response"
+}
+```
+
+<a id="get-preview-url"></a>
+
+## Get Preview URL
+
+The Get Preview URL component generates a Daytona preview URL for a specific sandbox port.
+
+### Use Cases
+
+- **Open sandbox web apps**: Access a web app running in a sandbox from a browser
+- **Share previews**: Generate signed URLs that can be opened without custom headers
+- **Automation**: Generate preview links for downstream steps and notifications
+
+### Configuration
+
+- **Sandbox**: Sandbox to generate the preview URL for
+- **Port**: Sandbox port to preview (default: 3000)
+- **Signed URL**: Whether to generate a signed preview URL (default: true)
+- **Expires In Seconds**: Signed URL expiration in seconds (default: 60, max: 86400)
+
+### URL Formats
+
+- **Standard URL** (`signed=false`): `https://{port}-{sandboxId}.{daytonaProxyDomain}`
+  Requires `x-daytona-preview-token` header with the returned token
+- **Signed URL** (`signed=true`): `https://{port}-{token}.{daytonaProxyDomain}`
+  Authentication is embedded in the URL, no custom header required
+
+### Output
+
+Returns preview URL information including:
+- **sandbox**: The sandbox ID used in the request
+- **port**: The target sandbox port
+- **signed**: Whether the generated URL is signed
+- **url**: Generated preview URL
+- **token**: Preview token (embedded token for signed URLs, header token for standard URLs)
+- **expiresInSeconds**: Expiration for signed URLs
+
+### Notes
+
+- The target port must be serving HTTP traffic in the sandbox, otherwise preview access may fail
+- Signed URLs can be opened directly in browsers
+- Standard URLs require `x-daytona-preview-token` header for private sandboxes
+
+### Example Output
+
+```json
+{
+  "data": {
+    "expiresInSeconds": 3600,
+    "port": 3000,
+    "sandbox": "sandbox-abc123def456",
+    "signed": true,
+    "token": "signed-token-abc123",
+    "url": "https://3000-signed-token-abc123.preview.daytona.app"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "daytona.preview.response"
 }
 ```
 

@@ -231,3 +231,8 @@ func (s *CanvasService) ResolveExecutionErrors(ctx context.Context, req *pb.Reso
 
 	return canvases.ResolveExecutionErrors(ctx, canvasID, executionIDs)
 }
+
+func (s *CanvasService) SendAiMessage(ctx context.Context, req *pb.SendAiMessageRequest) (*pb.SendAiMessageResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.SendAiMessage(ctx, s.registry, s.encryptor, organizationID, req)
+}

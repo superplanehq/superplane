@@ -528,7 +528,7 @@ func (e *HTTP) scheduleRetry(ctx core.ExecutionContext, lastError string, retryM
 		return err
 	}
 
-	return ctx.Requests.ScheduleActionCall("retryRequest", map[string]any{}, 1*time.Second)
+	return ctx.Requests.ScheduleActionCall("retryRequest", map[string]any{}, e.calculateTimeoutForAttempt(retryMetadata.TimeoutStrategy, 1, retryMetadata.Attempt-1))
 }
 
 func (e *HTTP) handleRetryRequest(ctx core.ActionContext) error {

@@ -1,0 +1,142 @@
+---
+title: "JFrog Artifactory"
+---
+
+Manage artifacts in JFrog Artifactory repositories
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Artifact Uploaded" href="#on-artifact-uploaded" description="Triggers when an artifact is deployed to JFrog Artifactory" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Delete Artifact" href="#delete-artifact" description="Delete an artifact from JFrog Artifactory" />
+  <LinkCard title="Get Artifact Info" href="#get-artifact-info" description="Get metadata about an artifact in JFrog Artifactory" />
+</CardGrid>
+
+## Instructions
+
+To set up the JFrog Artifactory integration:
+
+1. Log in to your JFrog Platform
+2. Go to **User Menu** (top right) -> **Edit Profile** -> **Authentication Settings**
+3. Click **Generate an Identity Token**
+4. Copy the token and paste it in the **Access Token** field below
+5. Enter your JFrog Platform URL without the /artifactory suffix (e.g. https://mycompany.jfrog.io)
+
+<a id="on-artifact-uploaded"></a>
+
+## On Artifact Uploaded
+
+The On Artifact Uploaded trigger starts a workflow execution when an artifact is deployed to JFrog Artifactory.
+
+### Configuration
+
+- **Repository** (optional): Filter events to a specific repository. Leave empty to trigger for all repositories.
+
+### Outputs
+
+- **Default channel**: Emits artifact deploy data including repo, path, name, size, and sha256.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "name": "artifact-1.0.jar",
+    "path": "com/example/artifact-1.0.jar",
+    "repo": "libs-release-local",
+    "sha256": "abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567",
+    "size": 12345
+  },
+  "timestamp": "2026-01-23T12:00:00Z",
+  "type": "jfrogArtifactory.artifactUploaded"
+}
+```
+
+<a id="delete-artifact"></a>
+
+## Delete Artifact
+
+The Delete Artifact component removes an artifact from a JFrog Artifactory repository.
+
+### Use Cases
+
+- **Cleanup pipelines**: Remove outdated or temporary artifacts after a release
+- **Storage management**: Delete artifacts that are no longer needed
+- **Automated housekeeping**: Trigger deletions based on workflow conditions
+
+### Configuration
+
+- **Repository**: Select the Artifactory repository containing the artifact
+- **Path**: The path to the artifact within the repository (supports expressions)
+
+### Output
+
+Returns the repository and path of the deleted artifact.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "path": "/com/example/artifact/1.0/artifact-1.0.jar",
+    "repo": "libs-release-local"
+  },
+  "timestamp": "2026-01-23T12:00:00Z",
+  "type": "jfrogArtifactory.artifact.deleted"
+}
+```
+
+<a id="get-artifact-info"></a>
+
+## Get Artifact Info
+
+The Get Artifact Info component retrieves metadata about an artifact stored in JFrog Artifactory.
+
+### Use Cases
+
+- **Artifact verification**: Check artifact existence and checksums before deployment
+- **Pipeline metadata**: Retrieve artifact details for downstream workflow steps
+- **Audit and tracking**: Get creation time, size, and author information
+
+### Configuration
+
+- **Repository**: Select the Artifactory repository containing the artifact
+- **Path**: The path to the artifact within the repository (supports expressions)
+
+### Output
+
+Returns artifact metadata including repository, path, size, checksums, download URI, and timestamps.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "checksums": {
+      "md5": "d41d8cd98f00b204e9800998ecf8427e",
+      "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "created": "2026-01-15T10:30:00.000Z",
+    "createdBy": "admin",
+    "downloadUri": "https://mycompany.jfrog.io/artifactory/libs-release-local/com/example/artifact/1.0/artifact-1.0.jar",
+    "lastModified": "2026-01-15T10:30:00.000Z",
+    "mimeType": "application/java-archive",
+    "modifiedBy": "admin",
+    "path": "/com/example/artifact/1.0/artifact-1.0.jar",
+    "repo": "libs-release-local",
+    "size": "12345",
+    "uri": "https://mycompany.jfrog.io/artifactory/api/storage/libs-release-local/com/example/artifact/1.0/artifact-1.0.jar"
+  },
+  "timestamp": "2026-01-23T12:00:00Z",
+  "type": "jfrogArtifactory.artifact.info"
+}
+```
+

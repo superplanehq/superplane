@@ -1,0 +1,31 @@
+{
+  "data": {
+    "created_at": "2026-02-22T09:46:23.868-08:00",
+    "event": "Investigation started, will update accordingly",
+    "event_id": "b3065ca8-69a6-4781-b6b4-94d6f0317ccf",
+    "event_raw": "Investigation started, will update accordingly",
+    "event_type": "incident_event.created",
+    "id": "56f7b488-e3c5-4091-9bb4-cf132007f98c",
+    "incident": {
+      "id": "64c39fde-1626-4f78-874e-9db91c0639d3",
+      "services": [
+        "UI - User Profile Block"
+      ],
+      "severity": "sev2",
+      "status": "mitigated",
+      "teams": [
+        "Customer Relations"
+      ],
+      "title": "new remake from main"
+    },
+    "incident_id": "64c39fde-1626-4f78-874e-9db91c0639d3",
+    "issued_at": "2026-02-22T09:46:24.018-08:00",
+    "kind": "event",
+    "occurred_at": "2026-02-22T09:46:23.868-08:00",
+    "source": "web",
+    "updated_at": "2026-02-22T09:46:23.868-08:00",
+    "visibility": "internal"
+  },
+  "timestamp": "2026-02-22T17:46:40.603539728Z",
+  "type": "rootly.onIncidentTimelineEvent"
+}

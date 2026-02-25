@@ -80,6 +80,10 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbOrganization.Organizations_GetInviteLink_FullMethodName:            {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_UpdateInviteLink_FullMethodName:         {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_ResetInviteLink_FullMethodName:          {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_GetAgentSettings_FullMethodName:         {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_UpdateAgentSettings_FullMethodName:      {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_SetAgentOpenAIKey_FullMethodName:        {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_DeleteAgentOpenAIKey_FullMethodName:     {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_RemoveUser_FullMethodName:               {Resource: "members", Action: "delete", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_DeleteOrganization_FullMethodName:       {Resource: "org", Action: "delete", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_CreateIntegration_FullMethodName:        {Resource: "integrations", Action: "create", DomainType: models.DomainTypeOrganization},
@@ -115,6 +119,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbCanvases.Canvases_InvokeNodeTriggerAction_FullMethodName:   {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbCanvases.Canvases_ListNodeEvents_FullMethodName:            {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbCanvases.Canvases_EmitNodeEvent_FullMethodName:             {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_SendAiMessage_FullMethodName:             {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
 
 		// Service Accounts rules
 		pbServiceAccounts.ServiceAccounts_CreateServiceAccount_FullMethodName:          {Resource: "service_accounts", Action: "create", DomainType: models.DomainTypeOrganization},

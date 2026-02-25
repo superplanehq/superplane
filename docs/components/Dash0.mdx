@@ -6,6 +6,12 @@ Connect to Dash0 to query data using Prometheus API
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Notification" href="#on-notification" description="Listen to Dash0 notification webhook events" />
+</CardGrid>
+
 ## Actions
 
 <CardGrid>
@@ -15,6 +21,80 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
   <LinkCard title="Update HTTP Synthetic Check" href="#update-http-synthetic-check" description="Update an existing HTTP synthetic check in Dash0 by ID" />
 </CardGrid>
+
+<a id="on-notification"></a>
+
+## On Notification
+
+The On Notification trigger starts a workflow execution when Dash0 sends a notification webhook.
+
+### Setup
+
+1. Configure the Dash0 integration in SuperPlane.
+2. Copy the webhook URL shown in the integration configuration.
+3. In Dash0, configure notifications to send HTTP POST requests to that URL.
+
+### Event Data
+
+The trigger emits the full JSON payload received from Dash0 as `dash0.notification`.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "issue": {
+      "checkrules": [
+        {
+          "annotations": {
+            "summary": "High error rate detected"
+          },
+          "description": "Alert when API error rate is high",
+          "expression": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) \u003e 0.05",
+          "for": "5m",
+          "id": "check_456",
+          "interval": "1m",
+          "keepFiringFor": "10m",
+          "labels": {
+            "env": "prod",
+            "service": "api"
+          },
+          "name": "API availability",
+          "thresholds": {
+            "critical": 0.05
+          },
+          "url": "https://app.dash0.com/check-rules/check_456"
+        }
+      ],
+      "dataset": "default",
+      "description": "Error rate exceeded threshold for API availability check.",
+      "end": "",
+      "id": "issue_123",
+      "issueIdentifier": "availability-api-high-error-rate",
+      "labels": [
+        {
+          "key": "service",
+          "value": {
+            "stringValue": "api"
+          }
+        },
+        {
+          "key": "env",
+          "value": {
+            "stringValue": "prod"
+          }
+        }
+      ],
+      "start": "2026-02-20T12:00:00Z",
+      "status": "critical",
+      "summary": "High error rate on API availability check",
+      "url": "https://app.dash0.com/issues/issue_123"
+    }
+  },
+  "timestamp": "2026-02-20T12:00:00Z",
+  "type": "dash0.notification"
+}
+```
 
 <a id="create-http-synthetic-check"></a>
 
