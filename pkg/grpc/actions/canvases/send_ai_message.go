@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -22,6 +25,9 @@ import (
 const (
 	canvasAIOpenAIModel                  = "gpt-5.3-codex"
 	canvasAIAssociatedEncryptionDataName = "agent_mode_openai_api_key"
+	componentSkillMaxCharsPerBlock       = 3000
+	componentSkillMaxCharsTotal          = 14000
+	componentSkillMissingPreviewLimit    = 10
 )
 
 type openAIResponsesRequest struct {
@@ -46,6 +52,12 @@ type openAIResponsesOutputText struct {
 type openAICanvasPlan struct {
 	AssistantMessage string                   `json:"assistantMessage"`
 	Operations       []map[string]interface{} `json:"operations"`
+}
+
+type canvasSkillPromptContext struct {
+	PromptSection string
+	AppliedBlocks []string
+	MissingBlocks []string
 }
 
 func SendAiMessage(
@@ -112,6 +124,7 @@ func generateCanvasAIPlan(
 	if err != nil {
 		return nil, err
 	}
+	skillContext := buildCanvasSkillPromptContext(req.GetCanvasContext())
 
 	prompt := strings.Join([]string{
 		"You are an AI planner for a workflow canvas editor.",
@@ -132,9 +145,13 @@ func generateCanvasAIPlan(
 		"- Keep nodes in the same path on the same y lane when possible.",
 		"- For branches, use vertical lane offsets of at least 220px.",
 		"- If you used assumptions, mention them briefly in assistantMessage while still returning operations.",
+		"- If component skill guidance is provided below, treat it as the source of truth for those blocks.",
+		"- Never mention skills, skill files, or internal guidance sources in assistantMessage.",
 		"",
 		"Current canvas context JSON:",
 		string(canvasContextJSON),
+		"",
+		skillContext.PromptSection,
 		"",
 		"User request:",
 		req.GetPrompt(),
@@ -190,6 +207,7 @@ func generateCanvasAIPlan(
 	if parsedPlan.AssistantMessage == "" {
 		parsedPlan.AssistantMessage = "I prepared a draft change set you can review and apply."
 	}
+	parsedPlan.AssistantMessage = sanitizeAssistantMessage(parsedPlan.AssistantMessage)
 	if parsedPlan.Operations == nil {
 		parsedPlan.Operations = []map[string]interface{}{}
 	}
@@ -311,4 +329,189 @@ func extractOpenAIText(result openAIResponsesResult) string {
 	}
 
 	return strings.TrimSpace(strings.Join(texts, "\n"))
+}
+
+func buildCanvasSkillPromptContext(canvasContext *pb.CanvasAiContext) canvasSkillPromptContext {
+	if canvasContext == nil {
+		return canvasSkillPromptContext{
+			PromptSection: "Component skill guidance:\n- None (no canvas context provided).",
+		}
+	}
+
+	type blockRef struct {
+		name string
+		kind string
+	}
+
+	seen := map[string]struct{}{}
+	blocks := make([]blockRef, 0, len(canvasContext.GetAvailableBlocks()))
+	for _, block := range canvasContext.GetAvailableBlocks() {
+		name := strings.TrimSpace(block.GetName())
+		kind := strings.TrimSpace(block.GetType())
+		if name == "" || (kind != "component" && kind != "trigger") {
+			continue
+		}
+
+		key := kind + ":" + name
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		blocks = append(blocks, blockRef{name: name, kind: kind})
+	}
+
+	sort.Slice(blocks, func(i, j int) bool {
+		if blocks[i].kind == blocks[j].kind {
+			return blocks[i].name < blocks[j].name
+		}
+		return blocks[i].kind < blocks[j].kind
+	})
+
+	sectionLines := []string{"Component skill guidance:"}
+	applied := make([]string, 0, len(blocks))
+	missing := make([]string, 0)
+	totalChars := 0
+
+	for _, block := range blocks {
+		content, sourcePath, ok := loadComponentSkillContent(block.name, block.kind)
+		if !ok {
+			missing = append(missing, fmt.Sprintf("%s (%s)", block.name, block.kind))
+			continue
+		}
+
+		remaining := componentSkillMaxCharsTotal - totalChars
+		if remaining <= 0 {
+			break
+		}
+
+		content = strings.TrimSpace(content)
+		if content == "" {
+			missing = append(missing, fmt.Sprintf("%s (%s)", block.name, block.kind))
+			continue
+		}
+
+		if len(content) > componentSkillMaxCharsPerBlock {
+			content = content[:componentSkillMaxCharsPerBlock]
+		}
+		if len(content) > remaining {
+			content = content[:remaining]
+		}
+		content = strings.TrimSpace(content)
+		if content == "" {
+			continue
+		}
+
+		sectionLines = append(
+			sectionLines,
+			fmt.Sprintf("BEGIN_SKILL %s (%s) source=%s", block.name, block.kind, sourcePath),
+			content,
+			fmt.Sprintf("END_SKILL %s (%s)", block.name, block.kind),
+		)
+
+		totalChars += len(content)
+		applied = append(applied, fmt.Sprintf("%s (%s)", block.name, block.kind))
+	}
+
+	if len(applied) == 0 {
+		sectionLines = append(sectionLines, "- No component skill files found for currently available blocks.")
+	}
+	if len(missing) > 0 {
+		sectionLines = append(sectionLines, fmt.Sprintf("Missing component skills: %d block(s).", len(missing)))
+		missingPreview := missing
+		if len(missingPreview) > componentSkillMissingPreviewLimit {
+			missingPreview = missingPreview[:componentSkillMissingPreviewLimit]
+		}
+		sectionLines = append(sectionLines, "- Example missing blocks: "+strings.Join(missingPreview, ", "))
+	}
+
+	return canvasSkillPromptContext{
+		PromptSection: strings.Join(sectionLines, "\n"),
+		AppliedBlocks: applied,
+		MissingBlocks: missing,
+	}
+}
+
+func loadComponentSkillContent(blockName, blockType string) (string, string, bool) {
+	for _, candidatePath := range candidateSkillPaths(blockName, blockType) {
+		content, err := os.ReadFile(candidatePath)
+		if err != nil {
+			continue
+		}
+
+		trimmed := strings.TrimSpace(string(content))
+		if trimmed == "" {
+			continue
+		}
+
+		return trimmed, candidatePath, true
+	}
+
+	return "", "", false
+}
+
+func candidateSkillPaths(blockName, blockType string) []string {
+	name := strings.TrimSpace(blockName)
+	if name == "" {
+		return []string{}
+	}
+
+	nameSlash := strings.ReplaceAll(name, ".", string(filepath.Separator))
+	baseDir := filepath.Join("templates", "skills")
+	blockTypeDir := strings.TrimSpace(blockType)
+
+	paths := []string{
+		filepath.Join(baseDir, name+".md"),
+		filepath.Join(baseDir, nameSlash+".md"),
+	}
+
+	if blockTypeDir != "" {
+		paths = append(paths,
+			filepath.Join(baseDir, blockTypeDir, name+".md"),
+			filepath.Join(baseDir, blockTypeDir, nameSlash+".md"),
+		)
+	}
+
+	unique := make([]string, 0, len(paths))
+	seen := map[string]struct{}{}
+	for _, p := range paths {
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		unique = append(unique, p)
+	}
+
+	return unique
+}
+
+func sanitizeAssistantMessage(message string) string {
+	trimmed := strings.TrimSpace(message)
+	if trimmed == "" {
+		return "I prepared a draft change set you can review and apply."
+	}
+
+	parts := strings.FieldsFunc(trimmed, func(r rune) bool {
+		return r == '\n' || r == '.' || r == '!' || r == '?'
+	})
+
+	filteredParts := make([]string, 0, len(parts))
+	for _, part := range parts {
+		sentence := strings.TrimSpace(part)
+		if sentence == "" {
+			continue
+		}
+
+		lower := strings.ToLower(sentence)
+		if strings.Contains(lower, "skill") || strings.Contains(lower, "guidance file") {
+			continue
+		}
+
+		filteredParts = append(filteredParts, sentence)
+	}
+
+	if len(filteredParts) == 0 {
+		return "I prepared a draft change set you can review and apply."
+	}
+
+	return strings.TrimSpace(strings.Join(filteredParts, ". ") + ".")
 }
