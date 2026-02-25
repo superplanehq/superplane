@@ -1,0 +1,202 @@
+---
+title: "FireHydrant"
+---
+
+Manage and react to incidents in FireHydrant
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On New Incident" href="#on-new-incident" description="Runs when a new incident is created in FireHydrant" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in FireHydrant" />
+</CardGrid>
+
+## Instructions
+
+To connect FireHydrant, create an API key in **Settings → API Keys** (requires Owner permissions). The key is shown only once at creation time.
+
+<a id="on-new-incident"></a>
+
+## On New Incident
+
+The On New Incident trigger starts a workflow execution when a new incident is created in FireHydrant.
+
+### Use Cases
+
+- **Incident response**: Automatically notify Slack, update a status page, or create a Jira ticket when an incident is opened
+- **Alert escalation**: Trigger escalation workflows when critical incidents are created
+- **Cross-tool sync**: Sync new FireHydrant incidents to other incident management tools
+
+### Configuration
+
+- **Event Types** (required): Choose which event types to subscribe to — Incidents, Private Incidents, or both. At least one must be selected.
+- **Severities** (optional): Filter by severity levels. Only incidents matching the selected severities will trigger the workflow. If empty, all new incidents will trigger.
+
+### Event Data
+
+Each incident event includes:
+- **name**: Incident name/title
+- **number**: Incident number
+- **severity**: Severity level
+- **priority**: Priority level
+- **current_milestone**: Current milestone (e.g., started, acknowledged)
+- **created_at**: Creation timestamp
+- **summary**: Incident summary
+
+### Webhook Setup
+
+This trigger automatically sets up a FireHydrant webhook endpoint when configured. The endpoint is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Note
+
+FireHydrant webhooks deliver all incident events. This trigger filters for only `CREATED` operations, ensuring only new incidents fire the workflow.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "incident": {
+      "conference_bridges": [],
+      "counts": {
+        "starred_events": 0,
+        "starred_messages": 0
+      },
+      "created_at": "2026-02-24 19:33:52 UTC",
+      "current_milestone": "started",
+      "custom_fields": [
+        {
+          "display_name": "Detected by",
+          "id": "ab3964ed-fd26-4ceb-a372-80eab5c1f4e7",
+          "value": ""
+        }
+      ],
+      "customer_impact_summary": "",
+      "description": "Deployments are impacted: [add more details]",
+      "follow_ups": [],
+      "id": "92deafc9-bd0e-459d-8fd7-785c10792d3b",
+      "impacts": [
+        {
+          "added_at": "2026-02-24 19:33:52 UTC",
+          "condition": "Unavailable",
+          "description": "",
+          "id": "e1c8fa62-66ef-42d0-b6be-f5e7b441c973",
+          "name": "Platform - Deployments",
+          "type": "Functionality"
+        }
+      ],
+      "milestones": [
+        {
+          "created_at": "2026-01-01 12:00:00 UTC",
+          "duration": "",
+          "id": "0a1a7f8a-0a8b-42c0-b373-3970987395aa",
+          "name": "Started",
+          "occurred_at": "2026-01-01 12:00:00 UTC",
+          "original_milestone_id": "3cc9e5d3-1baf-499b-aea3-032dac56b6a5",
+          "type": "started",
+          "updated_at": "2026-01-01 12:00:00 UTC",
+          "updated_by_id": "7b491815-a0de-4103-969c-1dfaa1344686",
+          "updated_by_type": "User"
+        }
+      ],
+      "name": "Deployments are impacted: [add more details]",
+      "number": 14,
+      "priority": {
+        "description": "",
+        "slug": "P4"
+      },
+      "private_status_page_url": "https://app.firehydrant.io/incidents/internal/status_page/f8c9d62e-ed0c-49e6-814c-f76667ac7ed3/76a959cde572cc039221d5d0bb63d3ea2c0ff424f462de67f95419a448c943cdc9d96be07ef6af5cc4e4d9cb916ca1710868b53de8620f8bce3866147d59263041a68d05de708f1b28039a393b82ef473c9734506c14c2a026670f17987bef8f1a33337d",
+      "role_assignments": [],
+      "severity": {
+        "description": "Some customers (not all) are receiving intermittent errors on product pages or cannot use the product in possibly obscure ways. The product may be loading slowly or partially (missing images), and there is a workaround that customers can use.",
+        "slug": "SEV3",
+        "type": "unexpected_downtime"
+      },
+      "started_at": "2026-01-01 12:00:00 UTC",
+      "summary": "",
+      "tags": [],
+      "tasks": [],
+      "team_assignments": [],
+      "updated_at": "2026-01-01 12:00:00 UTC"
+    }
+  },
+  "event": {
+    "operation": "UPDATED",
+    "resource_type": "incident"
+  }
+}
+```
+
+<a id="create-incident"></a>
+
+## Create Incident
+
+The Create Incident component creates a new incident in FireHydrant.
+
+### Use Cases
+
+- **Alert escalation**: Create incidents from monitoring alerts or error tracking
+- **Cross-tool sync**: Open a FireHydrant incident from other SuperPlane triggers (e.g., PagerDuty, Rootly, GitHub)
+- **Manual incident creation**: Create incidents from workflow events
+- **Automated response**: Automatically declare incidents when thresholds are breached
+
+### Configuration
+
+- **Name**: Incident name/title (required, supports expressions)
+- **Summary**: Short summary of the incident (optional, supports expressions)
+- **Description**: Detailed description of the incident (optional, supports expressions)
+- **Severity**: Severity level, e.g., SEV1, SEV2 (optional, populated from FireHydrant)
+- **Priority**: Priority level, e.g., P1, P2 (optional, populated from FireHydrant)
+
+### Output
+
+Returns the created incident object including:
+- **id**: Incident ID
+- **name**: Incident name
+- **description**: Incident description
+- **summary**: Incident summary
+- **customer_impact_summary**: Summary of customer impact
+- **current_milestone**: Current milestone (e.g., started, acknowledged)
+- **number**: Incident number
+- **severity**: Severity level
+- **priority**: Priority level
+- **current_milestone**: Current milestone (e.g., started)
+- **created_at**: Creation timestamp
+- **started_at**: Start timestamp
+,- **tag_list**: List of tags associated with the incident
+- **impacts**: List of impacts associated with the incident
+- **milestones**: List of milestones associated with the incident
+
+### Example Output
+
+```json
+{
+  "created_at": "2026-01-19T12:00:00Z",
+  "current_milestone": "started",
+  "customer_impact_summary": "Some customers are experiencing slow performance and intermittent errors when accessing the application.",
+  "description": "Users are experiencing slow database queries and connection timeouts.",
+  "id": "04d9fd1a-ba9c-417d-b396-58a6e2c374de",
+  "impacts": [],
+  "milestones": [
+    {
+      "occurred_at": "2026-01-19T12:00:00Z",
+      "type": "started"
+    }
+  ],
+  "name": "Database connection issues",
+  "number": 603,
+  "priority": "P1",
+  "severity": "SEV1",
+  "started_at": "2026-01-19T12:00:00Z",
+  "summary": "Database connection pool exhausted causing cascading failures.",
+  "tagList": []
+}
+```
+
