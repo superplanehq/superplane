@@ -1,0 +1,122 @@
+---
+title: "FireHydrant"
+---
+
+Manage and react to incidents in FireHydrant
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On New Incident" href="#on-new-incident" description="Listen for new incident events in FireHydrant" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in FireHydrant" />
+</CardGrid>
+
+<a id="on-new-incident"></a>
+
+## On New Incident
+
+The On New Incident trigger starts a workflow execution when a new incident is created in FireHydrant.
+
+### Use Cases
+
+- **Incident automation**: Automate responses when new incidents are created
+- **Notification workflows**: Send notifications to Slack, email, or other channels when an incident is opened
+- **Integration workflows**: Create Jira tickets, update status pages, or sync with other systems when incidents are created
+- **Escalation workflows**: Trigger escalation processes when new incidents are detected
+
+### Configuration
+
+- **Events**: Select which incident events to listen for (currently focused on new incident creation)
+
+### Event Data
+
+Each incident event includes:
+- **event**: Event type identifier
+- **incident**: Complete incident information including name, severity, description, status, and more
+
+### Webhook Setup
+
+This trigger automatically sets up a FireHydrant webhook endpoint when configured. The endpoint is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+FireHydrant verifies webhooks using HMAC-SHA256 signatures sent in the `fh-signature` header.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event": "incident_created",
+    "incident": {
+      "active": true,
+      "created_at": "2026-01-19T12:00:00.000Z",
+      "current_milestone": "started",
+      "description": "The API response times have increased significantly across all endpoints.",
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "incident_url": "https://app.firehydrant.io/incidents/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "API latency spike detected",
+      "private": false,
+      "severity": "SEV2",
+      "started_at": "2026-01-19T12:00:00.000Z"
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "firehydrant.incident_created"
+}
+```
+
+<a id="create-incident"></a>
+
+## Create Incident
+
+The Create Incident component creates a new incident in FireHydrant.
+
+### Use Cases
+
+- **Alert escalation**: Create incidents from monitoring alerts
+- **Error tracking**: Automatically create incidents when errors are detected
+- **Manual incident creation**: Create incidents from workflow events
+- **Integration workflows**: Create incidents from external system events
+
+### Configuration
+
+- **Name**: The name of the incident (required, supports expressions)
+- **Severity**: The severity level of the incident (optional, supports expressions)
+- **Description**: A longer description or summary of the incident (optional, supports expressions)
+
+### Output
+
+Returns the created incident object including:
+- **id**: Incident ID
+- **name**: Incident name
+- **severity**: Incident severity
+- **current_milestone**: Current incident milestone
+- **created_at**: Incident creation timestamp
+- **incident_url**: Link to the incident in FireHydrant
+
+### Example Output
+
+```json
+{
+  "data": {
+    "active": true,
+    "created_at": "2026-01-19T12:00:00.000Z",
+    "current_milestone": "started",
+    "description": "Users are experiencing slow database queries and connection timeouts.",
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "incident_url": "https://app.firehydrant.io/incidents/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Database connection issues",
+    "private": false,
+    "severity": "SEV1",
+    "started_at": "2026-01-19T12:00:00.000Z"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "firehydrant.incident"
+}
+```
