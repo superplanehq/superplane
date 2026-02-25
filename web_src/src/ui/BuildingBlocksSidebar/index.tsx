@@ -16,7 +16,17 @@ import { isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getComponentSubtype } from "../buildingBlocks";
-import { ChevronRight, GripVerticalIcon, Plug, Plus, Search, SendHorizontal, Settings2, StickyNote, X } from "lucide-react";
+import {
+  ChevronRight,
+  GripVerticalIcon,
+  Plug,
+  Plus,
+  Search,
+  SendHorizontal,
+  Settings2,
+  StickyNote,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
@@ -658,7 +668,10 @@ export function BuildingBlocksSidebar({
         <TabsContent value="components" className="mt-0 flex-1 overflow-y-auto overflow-x-hidden">
           <div className="flex items-center gap-2 px-5">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                size={16}
+              />
               <Input
                 ref={searchInputRef}
                 type="text"
@@ -756,29 +769,29 @@ export function BuildingBlocksSidebar({
                         >
                           {message.content}
                         </div>
-                        {message.role === "assistant" && !pendingProposal ? (
-                          (() => {
-                            const options = extractAssistantOptions(message.content);
-                            if (options.length === 0) return null;
-                            return (
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                {options.map((option) => (
-                                  <Button
-                                    key={`${message.id}-${option}`}
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-xs"
-                                    onClick={() => handleSendPrompt(option)}
-                                    disabled={disabled || isGeneratingResponse || !canvasId}
-                                  >
-                                    {option}
-                                  </Button>
-                                ))}
-                              </div>
-                            );
-                          })()
-                        ) : null}
+                        {message.role === "assistant" && !pendingProposal
+                          ? (() => {
+                              const options = extractAssistantOptions(message.content);
+                              if (options.length === 0) return null;
+                              return (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {options.map((option) => (
+                                    <Button
+                                      key={`${message.id}-${option}`}
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs"
+                                      onClick={() => handleSendPrompt(option)}
+                                      disabled={disabled || isGeneratingResponse || !canvasId}
+                                    >
+                                      {option}
+                                    </Button>
+                                  ))}
+                                </div>
+                              );
+                            })()
+                          : null}
                       </div>
                     ))}
                     {isGeneratingResponse ? (

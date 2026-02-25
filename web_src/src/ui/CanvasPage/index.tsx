@@ -31,7 +31,12 @@ import {
 import { parseDefaultValues } from "@/utils/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { AiSidebar } from "../ai";
-import { AiCanvasOperation, BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
+import {
+  AiCanvasOperation,
+  BuildingBlock,
+  BuildingBlockCategory,
+  BuildingBlocksSidebar,
+} from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
 import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";

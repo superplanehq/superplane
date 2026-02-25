@@ -20,7 +20,7 @@ var _ MappedNullable = &UsersUserSpec{}
 
 // UsersUserSpec struct for UsersUserSpec
 type UsersUserSpec struct {
-	DisplayName *string `json:"displayName,omitempty"`
+	DisplayName      *string                `json:"displayName,omitempty"`
 	AccountProviders []UsersAccountProvider `json:"accountProviders,omitempty"`
 }
 
@@ -106,7 +106,7 @@ func (o *UsersUserSpec) SetAccountProviders(v []UsersAccountProvider) {
 }
 
 func (o UsersUserSpec) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,5 +159,3 @@ func (v *NullableUsersUserSpec) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

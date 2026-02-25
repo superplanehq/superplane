@@ -21,11 +21,11 @@ var _ MappedNullable = &SuperplaneMeUser{}
 
 // SuperplaneMeUser struct for SuperplaneMeUser
 type SuperplaneMeUser struct {
-	Id *string `json:"id,omitempty"`
-	Email *string `json:"email,omitempty"`
-	OrganizationId *string `json:"organizationId,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
-	HasToken *bool `json:"hasToken,omitempty"`
+	Id             *string    `json:"id,omitempty"`
+	Email          *string    `json:"email,omitempty"`
+	OrganizationId *string    `json:"organizationId,omitempty"`
+	CreatedAt      *time.Time `json:"createdAt,omitempty"`
+	HasToken       *bool      `json:"hasToken,omitempty"`
 }
 
 // NewSuperplaneMeUser instantiates a new SuperplaneMeUser object
@@ -206,7 +206,7 @@ func (o *SuperplaneMeUser) SetHasToken(v bool) {
 }
 
 func (o SuperplaneMeUser) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -268,5 +268,3 @@ func (v *NullableSuperplaneMeUser) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

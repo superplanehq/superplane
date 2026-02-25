@@ -1839,14 +1839,17 @@ export function WorkflowPageV2() {
         return;
       }
 
-      const latestWorkflow = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+      const latestWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
       if (!latestWorkflow) {
         throw new Error("Canvas not found.");
       }
 
       saveWorkflowSnapshot(latestWorkflow);
 
-      const blockLookup = new Map(buildingBlocks.flatMap((category) => category.blocks.map((block) => [block.name, block])));
+      const blockLookup = new Map(
+        buildingBlocks.flatMap((category) => category.blocks.map((block) => [block.name, block])),
+      );
       const createdNodeIdsByKey = new Map<string, string>();
       const minHorizontalGapDefault = 430;
       const minHorizontalGapNamed = 560;
@@ -2028,7 +2031,7 @@ export function WorkflowPageV2() {
             const sourcePos = updatedNodes[sourceIndex].position;
             const targetPos = updatedNodes[targetIndex].position;
             if (sourcePos && targetPos) {
-              const nextX = targetPos.x < sourcePos.x+minHorizontalGap ? sourcePos.x + minHorizontalGap : targetPos.x;
+              const nextX = targetPos.x < sourcePos.x + minHorizontalGap ? sourcePos.x + minHorizontalGap : targetPos.x;
 
               let nextY = targetPos.y;
               const isNearlySameLane = Math.abs(targetPos.y - sourcePos.y) < 80;

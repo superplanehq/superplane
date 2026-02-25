@@ -20,9 +20,9 @@ var _ MappedNullable = &OrganizationsCreateIntegrationBody{}
 
 // OrganizationsCreateIntegrationBody struct for OrganizationsCreateIntegrationBody
 type OrganizationsCreateIntegrationBody struct {
-	Name *string `json:"name,omitempty"`
-	IntegrationName *string `json:"integrationName,omitempty"`
-	Configuration map[string]interface{} `json:"configuration,omitempty"`
+	Name            *string                `json:"name,omitempty"`
+	IntegrationName *string                `json:"integrationName,omitempty"`
+	Configuration   map[string]interface{} `json:"configuration,omitempty"`
 }
 
 // NewOrganizationsCreateIntegrationBody instantiates a new OrganizationsCreateIntegrationBody object
@@ -139,7 +139,7 @@ func (o *OrganizationsCreateIntegrationBody) SetConfiguration(v map[string]inter
 }
 
 func (o OrganizationsCreateIntegrationBody) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,5 +195,3 @@ func (v *NullableOrganizationsCreateIntegrationBody) UnmarshalJSON(src []byte) e
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

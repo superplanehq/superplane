@@ -21,12 +21,12 @@ var _ MappedNullable = &CanvasesCanvasNodeQueueItem{}
 
 // CanvasesCanvasNodeQueueItem struct for CanvasesCanvasNodeQueueItem
 type CanvasesCanvasNodeQueueItem struct {
-	Id *string `json:"id,omitempty"`
-	CanvasId *string `json:"canvasId,omitempty"`
-	NodeId *string `json:"nodeId,omitempty"`
-	Input map[string]interface{} `json:"input,omitempty"`
-	RootEvent *CanvasesCanvasEvent `json:"rootEvent,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	Id        *string                `json:"id,omitempty"`
+	CanvasId  *string                `json:"canvasId,omitempty"`
+	NodeId    *string                `json:"nodeId,omitempty"`
+	Input     map[string]interface{} `json:"input,omitempty"`
+	RootEvent *CanvasesCanvasEvent   `json:"rootEvent,omitempty"`
+	CreatedAt *time.Time             `json:"createdAt,omitempty"`
 }
 
 // NewCanvasesCanvasNodeQueueItem instantiates a new CanvasesCanvasNodeQueueItem object
@@ -239,7 +239,7 @@ func (o *CanvasesCanvasNodeQueueItem) SetCreatedAt(v time.Time) {
 }
 
 func (o CanvasesCanvasNodeQueueItem) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -304,5 +304,3 @@ func (v *NullableCanvasesCanvasNodeQueueItem) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-
