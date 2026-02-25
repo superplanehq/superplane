@@ -40,7 +40,7 @@ func (f *FireHydrant) Description() string {
 }
 
 func (f *FireHydrant) Instructions() string {
-	return "To connect FireHydrant, create an API key in **Settings → API Keys** (requires Owner permissions). The key is shown only once at creation time."
+	return "To connect FireHydrant, create an API key in **Settings → API Keys**. This requires Owner permissions."
 }
 
 func (f *FireHydrant) Configuration() []configuration.Field {
