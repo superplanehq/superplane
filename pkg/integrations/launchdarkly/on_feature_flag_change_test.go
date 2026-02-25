@@ -197,73 +197,12 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 	})
 }
 
-func Test__OnFeatureFlagChange__HandleAction__SetSecret(t *testing.T) {
+func Test__OnFeatureFlagChange__HandleAction(t *testing.T) {
 	trigger := &OnFeatureFlagChange{}
-
-	t.Run("setSecret stores secret and updates metadata", func(t *testing.T) {
-		webhookCtx := &testWebhookContext{}
-		webhookCtx.setupCalled = true
-		metadataCtx := &contexts.MetadataContext{}
-		metadataCtx.Metadata = OnFeatureFlagChangeMetadata{WebhookURL: "https://example.com/webhook"}
-
-		result, err := trigger.HandleAction(core.TriggerActionContext{
-			Name:       "setSecret",
-			Parameters: map[string]any{"webhookSigningSecret": "my-ld-secret"},
-			Webhook:    webhookCtx,
-			Metadata:   metadataCtx,
-		})
-
-		require.NoError(t, err)
-		require.NotNil(t, result)
-		assert.Equal(t, true, result["ok"])
-		assert.Equal(t, true, result["signingSecretConfigured"])
-		assert.Equal(t, "my-ld-secret", string(webhookCtx.secret))
-
-		metadata, ok := metadataCtx.Metadata.(OnFeatureFlagChangeMetadata)
-		require.True(t, ok)
-		assert.True(t, metadata.SigningSecretConfigured)
-		assert.Equal(t, "https://example.com/webhook", metadata.WebhookURL)
-	})
-
-	t.Run("setSecret with empty string clears secret", func(t *testing.T) {
-		webhookCtx := &testWebhookContext{}
-		webhookCtx.setupCalled = true
-		webhookCtx.secret = []byte("existing-secret")
-		metadataCtx := &contexts.MetadataContext{}
-		metadataCtx.Metadata = OnFeatureFlagChangeMetadata{WebhookURL: "https://example.com/webhook", SigningSecretConfigured: true}
-
-		result, err := trigger.HandleAction(core.TriggerActionContext{
-			Name:       "setSecret",
-			Parameters: map[string]any{"webhookSigningSecret": ""},
-			Webhook:    webhookCtx,
-			Metadata:   metadataCtx,
-		})
-
-		require.NoError(t, err)
-		assert.Equal(t, true, result["ok"])
-		assert.Equal(t, false, result["signingSecretConfigured"])
-		assert.Equal(t, []byte{}, webhookCtx.secret)
-
-		metadata, ok := metadataCtx.Metadata.(OnFeatureFlagChangeMetadata)
-		require.True(t, ok)
-		assert.False(t, metadata.SigningSecretConfigured)
-	})
-
-	t.Run("setSecret without webhook returns error", func(t *testing.T) {
-		result, err := trigger.HandleAction(core.TriggerActionContext{
-			Name:       "setSecret",
-			Parameters: map[string]any{"webhookSigningSecret": "secret"},
-			Webhook:    nil,
-		})
-
-		assert.Error(t, err)
-		assert.Nil(t, result)
-		assert.ErrorContains(t, err, "webhook is not available")
-	})
 
 	t.Run("unsupported action returns error", func(t *testing.T) {
 		result, err := trigger.HandleAction(core.TriggerActionContext{
-			Name:    "unknownAction",
+			Name:    "setSecret",
 			Webhook: &testWebhookContext{setupCalled: true},
 		})
 
@@ -300,7 +239,7 @@ func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 		assert.Equal(t, []string{KindFlag}, req.Events)
 	})
 
-	t.Run("setup webhook URL and metadata", func(t *testing.T) {
+	t.Run("setup stores webhook URL in metadata", func(t *testing.T) {
 		webhookCtx := &testWebhookContext{}
 		metadataCtx := &contexts.MetadataContext{}
 		integrationCtx := &contexts.IntegrationContext{}
@@ -314,11 +253,9 @@ func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.True(t, webhookCtx.setupCalled)
-		assert.Nil(t, webhookCtx.secret)
 
 		metadata, ok := metadataCtx.Metadata.(OnFeatureFlagChangeMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "https://example.com/api/v1/webhooks/webhook-123", metadata.WebhookURL)
-		assert.False(t, metadata.SigningSecretConfigured)
 	})
 }

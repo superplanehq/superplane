@@ -112,4 +112,40 @@ func Test__GetFeatureFlag__Execute(t *testing.T) {
 		assert.Equal(t, "my-feature", data["key"])
 		assert.Equal(t, "My Feature", data["name"])
 	})
+
+	t.Run("missing project key returns error before API call", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-api-key"},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			ID:             uuid.New(),
+			Configuration:  map[string]any{"flagKey": "my-feature"},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+		})
+
+		require.ErrorContains(t, err, "project key is required")
+		assert.Empty(t, httpContext.Requests)
+	})
+
+	t.Run("missing flag key returns error before API call", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-api-key"},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			ID:             uuid.New(),
+			Configuration:  map[string]any{"projectKey": "default"},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+		})
+
+		require.ErrorContains(t, err, "flag key is required")
+		assert.Empty(t, httpContext.Requests)
+	})
 }

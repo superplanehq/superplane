@@ -1,10 +1,12 @@
 package launchdarkly
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -45,8 +47,13 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 		return nil, fmt.Errorf("error getting API key: %w", err)
 	}
 
+	token := strings.TrimSpace(string(apiKey))
+	if token == "" {
+		return nil, fmt.Errorf("api key is required")
+	}
+
 	return &Client{
-		Token:   string(apiKey),
+		Token:   token,
 		BaseURL: BaseURL,
 		http:    http,
 	}, nil
@@ -116,5 +123,47 @@ func (c *Client) GetFeatureFlag(projectKey, flagKey string) (map[string]any, err
 func (c *Client) DeleteFeatureFlag(projectKey, flagKey string) error {
 	path := fmt.Sprintf("/api/v2/flags/%s/%s", projectKey, flagKey)
 	_, err := c.execRequest(http.MethodDelete, path, nil)
+	return err
+}
+
+// CreateWebhookRequest is the request body for creating a LaunchDarkly webhook.
+type CreateWebhookRequest struct {
+	URL  string `json:"url"`
+	Sign bool   `json:"sign"`
+	On   bool   `json:"on"`
+	Name string `json:"name,omitempty"`
+}
+
+// LDWebhook is the response from creating a webhook. The _id field is the webhook ID
+// needed later for deletion.
+type LDWebhook struct {
+	ID     string `json:"_id"`
+	Secret string `json:"secret"`
+}
+
+// CreateWebhook creates a new signed webhook in LaunchDarkly. LaunchDarkly auto-generates
+// the signing secret if one is not provided in the request.
+func (c *Client) CreateWebhook(req CreateWebhookRequest) (*LDWebhook, error) {
+	bodyBytes, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error encoding request: %w", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, "/api/v2/webhooks", bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	var result LDWebhook
+	if err := json.Unmarshal(responseBody, &result); err != nil {
+		return nil, fmt.Errorf("error parsing webhook response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// DeleteWebhook deletes a webhook from LaunchDarkly by its ID.
+func (c *Client) DeleteWebhook(id string) error {
+	_, err := c.execRequest(http.MethodDelete, "/api/v2/webhooks/"+id, nil)
 	return err
 }
