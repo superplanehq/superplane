@@ -43,7 +43,8 @@ The On Feature Flag Change trigger starts a workflow execution when LaunchDarkly
 
 ### Configuration
 
-- **Events**: Select which events to listen for
+- **Events**: Select which event kinds to listen for (e.g. feature flag changes)
+- **Actions**: Optionally filter by specific actions (e.g. only when a flag is turned on or off). Leave empty to receive all actions.
 
 ### Webhook Setup
 
@@ -67,8 +68,8 @@ SuperPlane uses the LaunchDarkly API (via your configured API access token) to c
     "kind": "flag",
     "member": {
       "email": "user@example.com",
-      "firstName": "Washington",
-      "lastName": "Kigani"
+      "firstName": "John",
+      "lastName": "Doe"
     },
     "name": "Another Toggle Feature",
     "parent": {
@@ -81,7 +82,7 @@ SuperPlane uses the LaunchDarkly API (via your configured API access token) to c
         "proj/default:env/test:flag/another-toggle-feature"
       ]
     },
-    "title": "Washington Kigani turned off the flag Another Toggle Feature in Test",
+    "title": "John Doe turned off the flag Another Toggle Feature in Test",
     "titleVerb": "turned off the flag"
   },
   "timestamp": "2026-02-24T12:00:00Z",
