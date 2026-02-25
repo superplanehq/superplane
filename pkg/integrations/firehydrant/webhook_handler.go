@@ -1,7 +1,6 @@
 package firehydrant
 
 import (
-	"crypto/sha256"
 	"fmt"
 
 	"github.com/mitchellh/mapstructure"
@@ -26,7 +25,6 @@ func (h *FireHydrantWebhookHandler) CompareConfig(a, b any) (bool, error) {
 }
 
 func (h *FireHydrantWebhookHandler) Merge(current, requested any) (any, bool, error) {
-	// Nothing to merge since all incident events are delivered to the same webhook.
 	return current, false, nil
 }
 
@@ -36,24 +34,15 @@ func (h *FireHydrantWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, 
 		return nil, err
 	}
 
-	webhookURL := ctx.Webhook.GetURL()
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		return nil, fmt.Errorf("error getting webhook secret: %v", err)
 	}
 
+	webhookURL := ctx.Webhook.GetURL()
 	webhook, err := client.CreateWebhook(webhookURL, string(secret))
 	if err != nil {
 		return nil, fmt.Errorf("error creating webhook: %v", err)
-	}
-
-	// If FireHydrant returned a secret (when we didn't provide one),
-	// update the stored secret for signature verification.
-	if webhook.Secret != "" && len(secret) == 0 {
-		err = ctx.Webhook.SetSecret([]byte(webhook.Secret))
-		if err != nil {
-			return nil, fmt.Errorf("error updating webhook secret: %v", err)
-		}
 	}
 
 	return WebhookMetadata{
@@ -83,12 +72,4 @@ func (h *FireHydrantWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) erro
 	}
 
 	return nil
-}
-
-// firehydrantWebhookName creates a deterministic webhook name based on the webhook ID.
-func firehydrantWebhookName(webhookID string) string {
-	hash := sha256.New()
-	hash.Write([]byte(webhookID))
-	suffix := fmt.Sprintf("%x", hash.Sum(nil))
-	return fmt.Sprintf("SuperPlane-%s", suffix[:12])
 }
