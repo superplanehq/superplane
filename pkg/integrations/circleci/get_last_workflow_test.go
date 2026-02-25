@@ -1,6 +1,7 @@
 package circleci
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -262,5 +263,101 @@ func Test__GetLastWorkflow__Execute(t *testing.T) {
 		require.Len(t, execState.Payloads, 1)
 		require.Len(t, httpContext.Requests, 4)
 		assert.Contains(t, httpContext.Requests[2].URL.String(), "page-token=next-page-1")
+	})
+
+	t.Run("repeated pagination token -> returns cycle detection error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"items": [{"id": "pipeline-1", "number": 130, "state": "created"}],
+						"next_page_token": "repeat-token"
+					}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"items": [{"id": "wf-1", "name": "build", "status": "failed"}]
+					}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"items": [{"id": "pipeline-2", "number": 129, "state": "created"}],
+						"next_page_token": "repeat-token"
+					}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"items": [{"id": "wf-2", "name": "deploy", "status": "failed"}]
+					}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "test-token",
+			},
+		}
+
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"projectSlug": "gh/acme/my-app",
+				"status":      "success",
+			},
+			HTTP:           httpContext,
+			ExecutionState: execState,
+			Integration:    integrationCtx,
+		})
+
+		require.ErrorContains(t, err, "detected pagination cycle")
+		require.Len(t, httpContext.Requests, 4)
+	})
+
+	t.Run("exceeded pagination page limit -> returns limit error", func(t *testing.T) {
+		responses := make([]*http.Response, 0, maxGetLastWorkflowPipelinePages*2)
+		for i := 1; i <= maxGetLastWorkflowPipelinePages; i++ {
+			responses = append(responses, &http.Response{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(fmt.Sprintf(`{
+					"items": [{"id": "pipeline-%d", "number": %d, "state": "created"}],
+					"next_page_token": "token-%d"
+				}`, i, i, i))),
+			})
+			responses = append(responses, &http.Response{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"items": [{"id": "wf-1", "name": "build", "status": "failed"}]
+				}`)),
+			})
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: responses,
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "test-token",
+			},
+		}
+
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"projectSlug": "gh/acme/my-app",
+				"status":      "success",
+			},
+			HTTP:           httpContext,
+			ExecutionState: execState,
+			Integration:    integrationCtx,
+		})
+
+		require.ErrorContains(t, err, "exceeded maximum pipeline pages")
+		require.Len(t, httpContext.Requests, maxGetLastWorkflowPipelinePages*2)
 	})
 }

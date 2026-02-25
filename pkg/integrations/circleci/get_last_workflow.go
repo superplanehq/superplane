@@ -12,6 +12,7 @@ import (
 )
 
 const GetLastWorkflowPayloadType = "circleci.workflow"
+const maxGetLastWorkflowPipelinePages = 20
 
 type GetLastWorkflow struct{}
 
@@ -147,7 +148,14 @@ func (c *GetLastWorkflow) Execute(ctx core.ExecutionContext) error {
 	}
 
 	nextPageToken := ""
+	seenPageTokens := map[string]struct{}{}
+	pageCount := 0
 	for {
+		pageCount++
+		if pageCount > maxGetLastWorkflowPipelinePages {
+			return fmt.Errorf("failed to get last workflow: exceeded maximum pipeline pages (%d)", maxGetLastWorkflowPipelinePages)
+		}
+
 		pipelines, err := client.GetProjectPipelinesWithPageToken(spec.ProjectSlug, spec.Branch, nextPageToken)
 		if err != nil {
 			return fmt.Errorf("failed to get project pipelines: %w", err)
@@ -184,6 +192,12 @@ func (c *GetLastWorkflow) Execute(ctx core.ExecutionContext) error {
 		if pipelines.NextPageToken == "" {
 			break
 		}
+
+		if _, exists := seenPageTokens[pipelines.NextPageToken]; exists {
+			return fmt.Errorf("failed to get last workflow: detected pagination cycle for pipeline pages")
+		}
+
+		seenPageTokens[pipelines.NextPageToken] = struct{}{}
 		nextPageToken = pipelines.NextPageToken
 	}
 
