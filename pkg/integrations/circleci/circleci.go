@@ -110,10 +110,13 @@ func (c *CircleCI) ListResources(resourceType string, ctx core.ListResourcesCont
 	case ResourceTypeWorkflow:
 		return ListWorkflowNames(ctx)
 	case ResourceTypePipelineDefinition:
+		return c.listPipelineDefinitions(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
+}
 
+func (c *CircleCI) listPipelineDefinitions(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	projectID := ctx.Parameters["project_id"]
 	if projectID == "" {
 		// Try to get project_id from projectSlug if provided

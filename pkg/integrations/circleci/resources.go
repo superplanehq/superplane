@@ -64,6 +64,9 @@ func ListProjectSlugs(ctx core.ListResourcesContext) ([]core.IntegrationResource
 func ListWorkflowNames(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	projectSlug := ctx.Parameters["projectSlug"]
 	if projectSlug == "" {
+		projectSlug = ctx.Parameters["project_slug"]
+	}
+	if projectSlug == "" {
 		return []core.IntegrationResource{}, nil
 	}
 
@@ -80,14 +83,18 @@ func ListWorkflowNames(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 	seen := make(map[string]bool)
 	resources := []core.IntegrationResource{}
 	for _, w := range summaries.Items {
-		if w.Name == "" || seen[w.Name] {
+		name := w.Name
+		if name == "" {
+			name = w.ID
+		}
+		if name == "" || seen[name] {
 			continue
 		}
-		seen[w.Name] = true
+		seen[name] = true
 		resources = append(resources, core.IntegrationResource{
 			Type: ResourceTypeWorkflow,
-			Name: w.Name,
-			ID:   w.Name,
+			Name: name,
+			ID:   name,
 		})
 	}
 

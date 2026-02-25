@@ -7,6 +7,7 @@ import (
 )
 
 type WorkflowSummary struct {
+	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
@@ -16,15 +17,41 @@ type WorkflowSummariesResponse struct {
 }
 
 func (c *Client) ListWorkflowSummaries(projectSlug string) (*WorkflowSummariesResponse, error) {
-	reqURL := fmt.Sprintf("%s/insights/%s/workflows", baseURL, projectSlug)
-	responseBody, err := c.execRequest("GET", reqURL, nil)
-	if err != nil {
-		return nil, err
+	response := WorkflowSummariesResponse{
+		Items: []WorkflowSummary{},
 	}
+	pageToken := ""
+	seenPageTokens := map[string]struct{}{}
 
-	var response WorkflowSummariesResponse
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	for {
+		reqURL := fmt.Sprintf("%s/insights/%s/workflows", baseURL, projectSlug)
+		query := url.Values{}
+		query.Set("all-branches", "true")
+		if pageToken != "" {
+			query.Set("page-token", pageToken)
+		}
+		reqURL = fmt.Sprintf("%s?%s", reqURL, query.Encode())
+
+		responseBody, err := c.execRequest("GET", reqURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var page WorkflowSummariesResponse
+		if err := json.Unmarshal(responseBody, &page); err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		}
+
+		response.Items = append(response.Items, page.Items...)
+		if page.NextPageToken == "" {
+			break
+		}
+
+		if _, ok := seenPageTokens[page.NextPageToken]; ok {
+			break
+		}
+		seenPageTokens[page.NextPageToken] = struct{}{}
+		pageToken = page.NextPageToken
 	}
 
 	return &response, nil
