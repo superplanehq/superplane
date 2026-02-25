@@ -35,10 +35,6 @@ type OnFeatureFlagChangeConfiguration struct {
 	Actions    []string `json:"actions" mapstructure:"actions"`
 }
 
-type OnFeatureFlagChangeMetadata struct {
-	WebhookURL string `json:"webhookUrl" mapstructure:"webhookUrl"`
-}
-
 func (t *OnFeatureFlagChange) Name() string {
 	return "launchdarkly.onFeatureFlagChange"
 }
@@ -71,7 +67,7 @@ func (t *OnFeatureFlagChange) Documentation() string {
 
 The webhook is automatically created in LaunchDarkly when you save the canvas. No manual setup is required.
 
-SuperPlane uses the LaunchDarkly API (via your configured API access token) to create a signed webhook scoped to the selected project and flag, and securely stores the auto-generated signing secret. When LaunchDarkly sends events, SuperPlane verifies the signature automatically.`
+SuperPlane uses the LaunchDarkly API (via your configured API access token) to create a signed webhook scoped to the selected project, and securely stores the auto-generated signing secret. When LaunchDarkly sends events, SuperPlane verifies the signature and filters to the configured flag automatically.`
 }
 
 func (t *OnFeatureFlagChange) Icon() string {
@@ -139,8 +135,7 @@ func (t *OnFeatureFlagChange) Configuration() []configuration.Field {
 
 func (t *OnFeatureFlagChange) Setup(ctx core.TriggerContext) error {
 	config := OnFeatureFlagChangeConfiguration{}
-	err := mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
@@ -152,40 +147,9 @@ func (t *OnFeatureFlagChange) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("flag key is required")
 	}
 
-	if ctx.Integration == nil {
-		return fmt.Errorf("integration is required to set up the LaunchDarkly webhook trigger")
-	}
-
-	if err := ctx.Integration.RequestWebhook(WebhookConfiguration{
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		ProjectKey: config.ProjectKey,
-		FlagKey:    config.FlagKey,
-	}); err != nil {
-		return err
-	}
-
-	var webhookURL string
-	if ctx.Webhook != nil {
-		var err error
-		webhookURL, err = ctx.Webhook.Setup()
-		if err != nil {
-			return fmt.Errorf("failed to get webhook URL: %w", err)
-		}
-	}
-
-	if ctx.Metadata != nil {
-		metadata := OnFeatureFlagChangeMetadata{}
-		if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-			return fmt.Errorf("failed to decode metadata: %w", err)
-		}
-		if webhookURL != "" {
-			metadata.WebhookURL = webhookURL
-		}
-		if err := ctx.Metadata.Set(metadata); err != nil {
-			return fmt.Errorf("failed to set metadata: %w", err)
-		}
-	}
-
-	return nil
+	})
 }
 
 func (t *OnFeatureFlagChange) Actions() []core.Action {
@@ -197,13 +161,10 @@ func (t *OnFeatureFlagChange) HandleAction(ctx core.TriggerActionContext) (map[s
 }
 
 func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	if ctx.Logger != nil {
-		ctx.Logger.Infof("launchdarkly webhook: received for workflow %s", ctx.WorkflowID)
-	}
+	ctx.Logger.Infof("launchdarkly webhook: received for workflow %s", ctx.WorkflowID)
 
 	config := OnFeatureFlagChangeConfiguration{}
-	err := mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
@@ -237,25 +198,33 @@ func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int
 
 	// Only handle flag events
 	if kind != KindFlag {
-		if ctx.Logger != nil {
-			ctx.Logger.Infof("launchdarkly webhook: event kind %q is not a flag event, acknowledging without emitting", kind)
-		}
+		ctx.Logger.Infof("launchdarkly webhook: event kind %q is not a flag event, acknowledging without emitting", kind)
 		return http.StatusOK, nil
 	}
 
-	// Extract the action from the accesses array
+	// Extract action and flag key from the accesses array.
+	// Resource format: proj/<projKey>:env/<envKey>:flag/<flagKey>
 	action := ""
+	flagKey := ""
 	if accesses, ok := payload["accesses"].([]any); ok && len(accesses) > 0 {
 		if access, ok := accesses[0].(map[string]any); ok {
 			action, _ = access["action"].(string)
+			resource, _ := access["resource"].(string)
+			if parts := strings.Split(resource, ":flag/"); len(parts) == 2 {
+				flagKey = parts[1]
+			}
 		}
+	}
+
+	// Filter by configured flag key
+	if config.FlagKey != "" && flagKey != config.FlagKey {
+		ctx.Logger.Infof("launchdarkly webhook: flag %q does not match configured flag %q, acknowledging without emitting", flagKey, config.FlagKey)
+		return http.StatusOK, nil
 	}
 
 	// Filter by configured actions (optional — empty means accept all)
 	if len(config.Actions) > 0 && !slices.Contains(config.Actions, action) {
-		if ctx.Logger != nil {
-			ctx.Logger.Infof("launchdarkly webhook: action %q not in trigger config (configured: %v), acknowledging without emitting", action, config.Actions)
-		}
+		ctx.Logger.Infof("launchdarkly webhook: action %q not in trigger config (configured: %v), acknowledging without emitting", action, config.Actions)
 		return http.StatusOK, nil
 	}
 
@@ -264,14 +233,12 @@ func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int
 	if action != "" {
 		payloadType = "launchdarkly." + kind + "." + action
 	}
+
 	if err := ctx.Events.Emit(payloadType, payload); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %w", err)
 	}
 
-	if ctx.Logger != nil {
-		ctx.Logger.Infof("launchdarkly webhook: emitted %s for workflow %s", payloadType, ctx.WorkflowID)
-	}
-
+	ctx.Logger.Infof("launchdarkly webhook: emitted %s for workflow %s", payloadType, ctx.WorkflowID)
 	return http.StatusOK, nil
 }
 

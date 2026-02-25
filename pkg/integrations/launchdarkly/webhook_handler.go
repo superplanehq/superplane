@@ -9,10 +9,9 @@ import (
 )
 
 // WebhookConfiguration is the config stored with the webhook.
-// Each unique project+flag combination gets its own webhook in LaunchDarkly.
+// Each unique project gets its own webhook in LaunchDarkly.
 type WebhookConfiguration struct {
 	ProjectKey string `json:"projectKey" mapstructure:"projectKey"`
-	FlagKey    string `json:"flagKey" mapstructure:"flagKey"`
 }
 
 // WebhookMetadata is stored after Setup. It holds the LaunchDarkly webhook ID
@@ -34,7 +33,7 @@ func (h *LaunchDarklyWebhookHandler) CompareConfig(a, b any) (bool, error) {
 		return false, err
 	}
 
-	return configA.ProjectKey == configB.ProjectKey && configA.FlagKey == configB.FlagKey, nil
+	return configA.ProjectKey == configB.ProjectKey, nil
 }
 
 func (h *LaunchDarklyWebhookHandler) Merge(current, requested any) (any, bool, error) {
@@ -54,7 +53,7 @@ func (h *LaunchDarklyWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any,
 		return nil, fmt.Errorf("failed to decode webhook configuration: %w", err)
 	}
 
-	resource := fmt.Sprintf("proj/%s:env/*:flag/%s", config.ProjectKey, config.FlagKey)
+	resource := fmt.Sprintf("proj/%s:env/*:flag/*", config.ProjectKey)
 	webhook, err := client.CreateWebhook(CreateWebhookRequest{
 		URL:  ctx.Webhook.GetURL(),
 		Sign: true,

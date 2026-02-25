@@ -51,7 +51,7 @@ The On Feature Flag Change trigger starts a workflow execution when LaunchDarkly
 
 The webhook is automatically created in LaunchDarkly when you save the canvas. No manual setup is required.
 
-SuperPlane uses the LaunchDarkly API (via your configured API access token) to create a signed webhook scoped to the selected project and flag, and securely stores the auto-generated signing secret. When LaunchDarkly sends events, SuperPlane verifies the signature automatically.
+SuperPlane uses the LaunchDarkly API (via your configured API access token) to create a signed webhook scoped to the selected project, and securely stores the auto-generated signing secret. When LaunchDarkly sends events, SuperPlane verifies the signature and filters to the configured flag automatically.
 
 ### Example Data
 

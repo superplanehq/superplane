@@ -313,26 +313,5 @@ func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 		req, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
 		require.True(t, ok, "expected WebhookRequests[0] to be WebhookConfiguration")
 		assert.Equal(t, "default", req.ProjectKey)
-		assert.Equal(t, "my-flag", req.FlagKey)
-	})
-
-	t.Run("setup stores webhook URL in metadata", func(t *testing.T) {
-		webhookCtx := &testWebhookContext{}
-		metadataCtx := &contexts.MetadataContext{}
-		integrationCtx := &contexts.IntegrationContext{}
-
-		err := trigger.Setup(core.TriggerContext{
-			Integration:   integrationCtx,
-			Webhook:       webhookCtx,
-			Metadata:      metadataCtx,
-			Configuration: OnFeatureFlagChangeConfiguration{ProjectKey: "default", FlagKey: "my-flag"},
-		})
-
-		require.NoError(t, err)
-		assert.True(t, webhookCtx.setupCalled)
-
-		metadata, ok := metadataCtx.Metadata.(OnFeatureFlagChangeMetadata)
-		require.True(t, ok)
-		assert.Equal(t, "https://example.com/api/v1/webhooks/webhook-123", metadata.WebhookURL)
 	})
 }

@@ -35,10 +35,10 @@ func (w *testHandlerWebhookContext) SetSecret(secret []byte) error {
 func Test__LaunchDarklyWebhookHandler__CompareConfig(t *testing.T) {
 	handler := &LaunchDarklyWebhookHandler{}
 
-	t.Run("same project and flag -> true", func(t *testing.T) {
+	t.Run("same project -> true", func(t *testing.T) {
 		equal, err := handler.CompareConfig(
-			WebhookConfiguration{ProjectKey: "default", FlagKey: "my-flag"},
-			WebhookConfiguration{ProjectKey: "default", FlagKey: "my-flag"},
+			WebhookConfiguration{ProjectKey: "default"},
+			WebhookConfiguration{ProjectKey: "default"},
 		)
 		require.NoError(t, err)
 		assert.True(t, equal)
@@ -46,17 +46,8 @@ func Test__LaunchDarklyWebhookHandler__CompareConfig(t *testing.T) {
 
 	t.Run("different project -> false", func(t *testing.T) {
 		equal, err := handler.CompareConfig(
-			WebhookConfiguration{ProjectKey: "default", FlagKey: "my-flag"},
-			WebhookConfiguration{ProjectKey: "other", FlagKey: "my-flag"},
-		)
-		require.NoError(t, err)
-		assert.False(t, equal)
-	})
-
-	t.Run("different flag -> false", func(t *testing.T) {
-		equal, err := handler.CompareConfig(
-			WebhookConfiguration{ProjectKey: "default", FlagKey: "flag-a"},
-			WebhookConfiguration{ProjectKey: "default", FlagKey: "flag-b"},
+			WebhookConfiguration{ProjectKey: "default"},
+			WebhookConfiguration{ProjectKey: "other"},
 		)
 		require.NoError(t, err)
 		assert.False(t, equal)
@@ -67,8 +58,8 @@ func Test__LaunchDarklyWebhookHandler__Merge(t *testing.T) {
 	handler := &LaunchDarklyWebhookHandler{}
 
 	t.Run("always returns current unchanged", func(t *testing.T) {
-		current := WebhookConfiguration{ProjectKey: "default", FlagKey: "my-flag"}
-		merged, changed, err := handler.Merge(current, WebhookConfiguration{ProjectKey: "default", FlagKey: "my-flag"})
+		current := WebhookConfiguration{ProjectKey: "default"}
+		merged, changed, err := handler.Merge(current, WebhookConfiguration{ProjectKey: "default"})
 		require.NoError(t, err)
 		assert.False(t, changed)
 		assert.Equal(t, current, merged)
@@ -96,7 +87,7 @@ func Test__LaunchDarklyWebhookHandler__Setup(t *testing.T) {
 
 		webhookCtx := &testHandlerWebhookContext{
 			url:           "https://example.com/api/v1/webhooks/w1",
-			configuration: WebhookConfiguration{ProjectKey: "default", FlagKey: "my-flag"},
+			configuration: WebhookConfiguration{ProjectKey: "default"},
 		}
 
 		result, err := handler.Setup(core.WebhookHandlerContext{
@@ -112,7 +103,7 @@ func Test__LaunchDarklyWebhookHandler__Setup(t *testing.T) {
 		assert.Equal(t, "https://app.launchdarkly.com/api/v2/webhooks", req.URL.String())
 		assert.Equal(t, "auto-generated-secret", string(webhookCtx.secret))
 
-		// Verify statement scopes to the selected project and flag
+		// Verify statement scopes to the selected project (all flags)
 		bodyBytes, err := io.ReadAll(httpContext.Requests[0].Body)
 		require.NoError(t, err)
 		var body map[string]any
@@ -122,7 +113,7 @@ func Test__LaunchDarklyWebhookHandler__Setup(t *testing.T) {
 		require.Len(t, statements, 1)
 		stmt := statements[0].(map[string]any)
 		resources := stmt["resources"].([]any)
-		assert.Equal(t, "proj/default:env/*:flag/my-flag", resources[0])
+		assert.Equal(t, "proj/default:env/*:flag/*", resources[0])
 
 		metadata, ok := result.(WebhookMetadata)
 		require.True(t, ok)
