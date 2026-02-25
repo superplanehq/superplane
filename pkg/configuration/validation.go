@@ -3,7 +3,6 @@ package configuration
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -12,8 +11,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/robfig/cron/v3"
 )
-
-var expressionPlaceholderRegex = regexp.MustCompile(`(?s)\{\{.*?\}\}`)
 
 func ValidateConfiguration(fields []Field, config map[string]any) error {
 	for _, field := range fields {
@@ -259,9 +256,9 @@ func validateDaysOfWeek(_ Field, value any) error {
 func validateObject(field Field, value any) error {
 	if text, ok := value.(string); ok {
 		normalized := text
-		hasExpressions := expressionPlaceholderRegex.MatchString(text)
+		hasExpressions := HasExpressionPlaceholder(text)
 		if hasExpressions {
-			normalized = expressionPlaceholderRegex.ReplaceAllString(text, "{}")
+			normalized = ReplaceExpressionPlaceholders(text, "{}")
 		}
 
 		var parsed any

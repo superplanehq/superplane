@@ -4,17 +4,15 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/google/go-github/v74/github"
 	"github.com/mitchellh/mapstructure"
+	config "github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 )
-
-var expressionPlaceholderRegex = regexp.MustCompile(`(?s)\{\{.*?\}\}`)
 
 type Repository struct {
 	ID   int64  `json:"id"`
@@ -37,7 +35,7 @@ func ensureRepoInMetadata(ctx core.MetadataContext, app core.IntegrationContext,
 	if repository == "" {
 		return fmt.Errorf("repository is required")
 	}
-	if expressionPlaceholderRegex.MatchString(repository) {
+	if config.HasExpressionPlaceholder(repository) {
 		return nil
 	}
 
