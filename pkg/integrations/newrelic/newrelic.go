@@ -3,7 +3,8 @@ package newrelic
 import (
 	"context"
 	"fmt"
-	"reflect"
+	"strconv"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -191,22 +192,112 @@ func (n *Newrelic) ListResources(resourceType string, ctx core.ListResourcesCont
 	return resources, nil
 }
 
+type WebhookConfiguration struct {
+	Account string `json:"account" mapstructure:"account"`
+}
+
+type WebhookMetadata struct {
+	DestinationID string `json:"destinationID"`
+	ChannelID     string `json:"channelID"`
+}
+
 type NewrelicWebhookHandler struct{}
 
 func (h *NewrelicWebhookHandler) CompareConfig(a, b any) (bool, error) {
-	if a == nil && b == nil {
-		return true, nil
+	configA := WebhookConfiguration{}
+	configB := WebhookConfiguration{}
+
+	if err := mapstructure.Decode(a, &configA); err != nil {
+		return false, err
 	}
-	return reflect.DeepEqual(a, b), nil
+	if err := mapstructure.Decode(b, &configB); err != nil {
+		return false, err
+	}
+
+	return configA.Account == configB.Account, nil
 }
 
 func (h *NewrelicWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
-	return map[string]any{"manual": true}, nil
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	config := WebhookConfiguration{}
+	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config); err != nil {
+		return nil, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	accountID, err := strconv.ParseInt(strings.TrimSpace(config.Account), 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid account ID %q: %w", config.Account, err)
+	}
+
+	webhookURL := ctx.Webhook.GetURL()
+	// Mock localhost for local development if not using a tunnel
+	if strings.Contains(webhookURL, "localhost") || strings.Contains(webhookURL, "127.0.0.1") {
+		return WebhookMetadata{
+			DestinationID: "mock-destination-id",
+			ChannelID:     "mock-channel-id",
+		}, nil
+	}
+
+	secretBytes, err := ctx.Webhook.GetSecret()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get webhook secret: %w", err)
+	}
+	secret := string(secretBytes)
+
+	destName := "Superplane - Webhook Destination"
+	channelName := "Superplane - AI Notification Channel"
+
+	// 1. Destination
+	destID, err := client.FindAIDestinationByName(context.Background(), accountID, destName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search for destination: %w", err)
+	}
+	if destID == "" {
+		destID, err = client.CreateAIDestination(context.Background(), accountID, destName, webhookURL, secret)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create AI destination: %w", err)
+		}
+	}
+
+	// 2. Channel
+	channelID, err := client.FindAIChannelByName(context.Background(), accountID, channelName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search for channel: %w", err)
+	}
+	if channelID == "" {
+		channelID, err = client.CreateAIChannel(context.Background(), accountID, channelName, destID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create AI channel: %w", err)
+		}
+	}
+
+	return WebhookMetadata{
+		DestinationID: destID,
+		ChannelID:     channelID,
+	}, nil
 }
 
 func (h *NewrelicWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
+	// We might want to keep the destination/channel for other nodes,
+	// but the core will only call Cleanup when the last node using this webhook is removed.
+	metadata := WebhookMetadata{}
+	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata); err != nil {
+		return nil // Non-critical
+	}
+
+	if metadata.DestinationID == "" || metadata.DestinationID == "mock-destination-id" {
+		return nil
+	}
+
+	// For now, we'll leave the Destination/Channel to avoid accidental deletion
+	// if they were shared or if we want to avoid recreating them frequently.
 	return nil
 }
+
 func (h *NewrelicWebhookHandler) Merge(prev, curr any) (any, bool, error) {
 	return curr, true, nil
 }

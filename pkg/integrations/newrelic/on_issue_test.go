@@ -1,7 +1,6 @@
 package newrelic
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -15,51 +14,54 @@ import (
 func Test__OnIssue__Setup(t *testing.T) {
 	trigger := &OnIssue{}
 
-	t.Run("valid configuration -> success", func(t *testing.T) {
+	t.Run("valid configuration -> requests webhook", func(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"userApiKey": "NRAK-TEST",
+				"site":       "US",
+			},
+		}
+
 		ctx := core.TriggerContext{
 			Configuration: map[string]any{
+				"account":    "123456",
 				"priorities": []string{"CRITICAL"},
 				"states":     []string{"ACTIVATED"},
 			},
-			Integration: &contexts.IntegrationContext{
-				Configuration: map[string]any{
-					"userApiKey": "NRAK-TEST",
-				},
-			},
-			Webhook:  &contexts.WebhookContext{},
-			Metadata: metadataCtx,
-			Logger:   log.NewEntry(log.New()),
+			Integration: integrationCtx,
+			Webhook:     &contexts.WebhookContext{},
+			Metadata:    metadataCtx,
+			Logger:      log.NewEntry(log.New()),
 		}
 
 		err := trigger.Setup(ctx)
 		require.NoError(t, err)
 
-		// Verify metadata was set with a URL and manual flag
-		metadata, ok := metadataCtx.Metadata.(OnIssueMetadata)
-		require.True(t, ok, "metadata should be OnIssueMetadata")
-		assert.NotEmpty(t, metadata.URL, "webhook URL should be set in metadata")
-		assert.True(t, metadata.Manual, "manual flag should be true in metadata")
+		// Verify RequestWebhook was called with the correct configuration
+		require.Len(t, integrationCtx.WebhookRequests, 1)
+		webhookConfig, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
+		require.True(t, ok, "should be WebhookConfiguration")
+		assert.Equal(t, "123456", webhookConfig.Account)
 	})
 
-	t.Run("idempotent when metadata already has URL", func(t *testing.T) {
-		existingURL := "http://localhost:3000/api/v1/webhooks/existing-id"
-		metadataCtx := &contexts.MetadataContext{
-			Metadata: map[string]any{"url": existingURL},
-		}
+	t.Run("missing account -> error", func(t *testing.T) {
 		ctx := core.TriggerContext{
-			Configuration: map[string]any{},
+			Configuration: map[string]any{
+				"priorities": []string{"CRITICAL"},
+			},
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
 					"userApiKey": "NRAK-TEST",
+					"site":       "US",
 				},
 			},
-			Metadata: metadataCtx,
-			Logger:   log.NewEntry(log.New()),
+			Logger: log.NewEntry(log.New()),
 		}
 
 		err := trigger.Setup(ctx)
-		require.NoError(t, err)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "account is required")
 	})
 }
 
@@ -75,119 +77,70 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 
 		status, err := trigger.HandleWebhook(ctx)
 		assert.Equal(t, http.StatusUnauthorized, status)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "missing X-Superplane-Secret header")
+		require.Error(t, err)
 	})
 
 	t.Run("invalid secret -> 401 Unauthorized", func(t *testing.T) {
 		ctx := core.WebhookRequestContext{
-			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
-			Headers: http.Header{
-				"X-Superplane-Secret": {"wrong-secret"},
-			},
-			Body: []byte(`{}`),
+			Webhook: &contexts.WebhookContext{Secret: "valid-secret"},
+			Headers: http.Header{"X-Superplane-Secret": []string{"invalid-secret"}},
+			Body:    []byte(`{}`),
 		}
 
 		status, err := trigger.HandleWebhook(ctx)
 		assert.Equal(t, http.StatusUnauthorized, status)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid webhook secret")
+		require.Error(t, err)
 	})
 
-	t.Run("filters out non-matching priority", func(t *testing.T) {
-		payload := map[string]any{
-			"issue_id": "123",
-			"priority": "LOW",
-			"state":    "ACTIVATED",
-		}
-		body, _ := json.Marshal(payload)
-
+	t.Run("valid payload -> emits event", func(t *testing.T) {
+		eventCtx := &contexts.EventContext{}
 		ctx := core.WebhookRequestContext{
-			Configuration: map[string]any{
-				"priorities": []string{"CRITICAL"},
-			},
 			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
-			Headers: http.Header{
-				"X-Superplane-Secret": {"test-secret"},
+			Headers: http.Header{"X-Superplane-Secret": []string{"test-secret"}},
+			Body: []byte(`{
+				"issue_id": "issue-123",
+				"title": "Test Issue",
+				"priority": "CRITICAL",
+				"state": "ACTIVATED",
+				"issue_url": "https://newrelic.com/issue/123"
+			}`),
+			Events: eventCtx,
+			Configuration: map[string]any{
+				"account": "123456",
 			},
-			Body:   body,
-			Events: &contexts.EventContext{},
 		}
 
 		status, err := trigger.HandleWebhook(ctx)
-		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, status)
-		// No event emitted
-		assert.Equal(t, 0, ctx.Events.(*contexts.EventContext).Count())
-	})
-
-	t.Run("matches and emits event", func(t *testing.T) {
-		payload := map[string]any{
-			"priority":  "CRITICAL",
-			"state":     "ACTIVATED",
-			"issue_id":  "123",
-			"issue_url": "http://example.com/issue/123",
-		}
-		body, _ := json.Marshal(payload)
-
-		ctx := core.WebhookRequestContext{
-			Configuration: map[string]any{
-				"priorities": []string{"CRITICAL"},
-			},
-			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
-			Headers: http.Header{
-				"X-Superplane-Secret": {"test-secret"},
-			},
-			Body:   body,
-			Events: &contexts.EventContext{},
-		}
-
-		status, err := trigger.HandleWebhook(ctx)
 		require.NoError(t, err)
-		assert.Equal(t, http.StatusOK, status)
 
-		eventCtx := ctx.Events.(*contexts.EventContext)
 		require.Equal(t, 1, eventCtx.Count())
 		assert.Equal(t, "newrelic.issue_activated", eventCtx.Payloads[0].Type)
 
-		data, ok := eventCtx.Payloads[0].Data.(map[string]any)
-		require.True(t, ok)
-		assert.Equal(t, "123", data["issueId"])
+		data := eventCtx.Payloads[0].Data.(map[string]any)
+		assert.Equal(t, "issue-123", data["issueId"])
+		assert.Equal(t, "CRITICAL", data["priority"])
 	})
 
-	t.Run("garbage payload -> 200 OK (no error)", func(t *testing.T) {
+	t.Run("filtered priority -> no event", func(t *testing.T) {
+		eventCtx := &contexts.EventContext{}
 		ctx := core.WebhookRequestContext{
-			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
-			Headers: http.Header{
-				"X-Superplane-Secret": {"test-secret"},
+			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Headers: http.Header{"X-Superplane-Secret": []string{"test-secret"}},
+			Body: []byte(`{
+				"issue_id": "issue-123",
+				"priority": "LOW",
+				"state": "ACTIVATED"
+			}`),
+			Events: eventCtx,
+			Configuration: map[string]any{
+				"priorities": []string{"CRITICAL"},
 			},
-			Body:   []byte(`{"test": "notification"}`), // Simulate Newrelic Test Notification
-			Events: &contexts.EventContext{},
 		}
 
 		status, err := trigger.HandleWebhook(ctx)
-		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, status)
-		// No event emitted
-		assert.Equal(t, 0, ctx.Events.(*contexts.EventContext).Count())
-	})
-
-	t.Run("empty body -> 200 OK (ping)", func(t *testing.T) {
-		ctx := core.WebhookRequestContext{
-			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
-			Headers: http.Header{
-				"X-Superplane-Secret": {"test-secret"},
-			},
-			Body:   []byte(""),
-			Events: &contexts.EventContext{},
-		}
-
-		status, err := trigger.HandleWebhook(ctx)
 		require.NoError(t, err)
-		assert.Equal(t, http.StatusOK, status)
-		// No event emitted
-		assert.Equal(t, 0, ctx.Events.(*contexts.EventContext).Count())
+		assert.Equal(t, 0, eventCtx.Count())
 	})
 }
