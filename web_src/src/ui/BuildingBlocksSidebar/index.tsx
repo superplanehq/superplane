@@ -317,6 +317,18 @@ export function BuildingBlocksSidebar({
       if (!nextPrompt || isGeneratingResponse || !canvasId) {
         return;
       }
+
+      if (nextPrompt.toLowerCase() === "/clear") {
+        setAiMessages([]);
+        setPendingProposal(null);
+        setAiError(null);
+        setAiInput("");
+        requestAnimationFrame(() => {
+          aiInputRef.current?.focus();
+        });
+        return;
+      }
+
       const contextualPrompt = buildPromptWithConversationContext(aiMessages, nextPrompt);
 
       const userMessage: AiBuilderMessage = {
