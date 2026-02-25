@@ -119,6 +119,26 @@ func (c *Client) GetPipelineExecutionDetails(pipelineName, executionID string) (
 	return &response, nil
 }
 
+type RetryStageExecutionResponse struct {
+	PipelineExecutionID string `json:"pipelineExecutionId"`
+}
+
+func (c *Client) RetryStageExecution(pipelineName, stageName, executionID, retryMode string) (*RetryStageExecutionResponse, error) {
+	payload := map[string]any{
+		"pipelineName":        pipelineName,
+		"stageName":           stageName,
+		"pipelineExecutionId": executionID,
+		"retryMode":           retryMode,
+	}
+
+	var response RetryStageExecutionResponse
+	if err := c.postJSON("RetryStageExecution", payload, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
 func (c *Client) StopPipelineExecution(pipelineName, executionID, reason string, abandon bool) error {
 	payload := map[string]any{
 		"pipelineName":        pipelineName,

@@ -146,6 +146,7 @@ func (a *AWS) Components() []core.Component {
 		&codeartifact.UpdatePackageVersionsStatus{},
 		&codepipeline.GetPipeline{},
 		&codepipeline.GetPipelineExecution{},
+		&codepipeline.RetryStageExecution{},
 		&codepipeline.RunPipeline{},
 		&ecs.CreateService{},
 		&ecs.DescribeService{},

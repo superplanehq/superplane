@@ -1,0 +1,13 @@
+{
+  "data": {
+    "pipeline": {
+      "name": "my-pipeline",
+      "stage": "Deploy",
+      "retryMode": "FAILED_ACTIONS",
+      "sourceExecutionId": "1111-2222-3333",
+      "newExecutionId": "4444-5555-6666"
+    }
+  },
+  "timestamp": "2026-02-23T10:00:00.000000000Z",
+  "type": "aws.codepipeline.stage.retry"
+}
