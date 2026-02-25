@@ -16,7 +16,7 @@ import { isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getComponentSubtype } from "../buildingBlocks";
-import { ChevronRight, GripVerticalIcon, Plug, Plus, Search, SendHorizontal, Settings2, Sparkles, StickyNote, X } from "lucide-react";
+import { ChevronRight, GripVerticalIcon, Plug, Plus, Search, SendHorizontal, Settings2, StickyNote, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
@@ -149,6 +149,43 @@ type AiBuilderProposal = {
   operations: AiCanvasOperation[];
 };
 
+const AI_HISTORY_RECENT_TURNS = 8;
+const AI_HISTORY_OLDER_TURNS = 6;
+const AI_HISTORY_MAX_MESSAGE_CHARS = 320;
+
+function compactMessageContent(content: string): string {
+  const normalized = content.replace(/\s+/g, " ").trim();
+  if (normalized.length <= AI_HISTORY_MAX_MESSAGE_CHARS) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, AI_HISTORY_MAX_MESSAGE_CHARS)}...`;
+}
+
+function formatConversationTurns(messages: AiBuilderMessage[]): string[] {
+  return messages
+    .map((message) => `${message.role}: ${compactMessageContent(message.content)}`)
+    .filter((line) => line.length > 0);
+}
+
+function buildPromptWithConversationContext(messages: AiBuilderMessage[], prompt: string): string {
+  const turns = formatConversationTurns(messages);
+  if (turns.length === 0) {
+    return prompt;
+  }
+
+  const recentTurns = turns.slice(-AI_HISTORY_RECENT_TURNS);
+  const olderTurns = turns.slice(0, -AI_HISTORY_RECENT_TURNS).slice(-AI_HISTORY_OLDER_TURNS);
+  const contextSections = [
+    "Conversation context (use this for continuity and intent resolution):",
+    ...(olderTurns.length > 0 ? [`Earlier turns summary:\n${olderTurns.join("\n")}`] : []),
+    `Recent turns:\n${recentTurns.join("\n")}`,
+    `Current user request:\n${prompt}`,
+  ];
+
+  return contextSections.join("\n\n");
+}
+
 export function BuildingBlocksSidebar({
   isOpen,
   onToggle,
@@ -249,19 +286,13 @@ export function BuildingBlocksSidebar({
   const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
 
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const starterPrompts = [
-    "Create a webhook -> Slack alert flow",
-    "Add retries and error handling to this canvas",
-    "Propose a CI workflow for deployments",
-    "Add an approval step before production actions",
-  ];
-
   const handleSendPrompt = useCallback(
     async (value?: string) => {
       const nextPrompt = (value ?? aiInput).trim();
       if (!nextPrompt || isGeneratingResponse || !canvasId) {
         return;
       }
+      const contextualPrompt = buildPromptWithConversationContext(aiMessages, nextPrompt);
 
       const userMessage: AiBuilderMessage = {
         id: `user-${Date.now()}`,
@@ -291,7 +322,7 @@ export function BuildingBlocksSidebar({
           withOrganizationHeader({
             path: { canvasId },
             body: {
-              prompt: nextPrompt,
+              prompt: contextualPrompt,
               canvasContext: {
                 nodes: canvasNodes,
                 availableBlocks,
@@ -333,7 +364,7 @@ export function BuildingBlocksSidebar({
         setIsGeneratingResponse(false);
       }
     },
-    [aiInput, blocks, canvasId, canvasNodes, isGeneratingResponse],
+    [aiInput, aiMessages, blocks, canvasId, canvasNodes, isGeneratingResponse],
   );
 
   const handleDiscardProposal = useCallback(() => {
@@ -707,23 +738,9 @@ export function BuildingBlocksSidebar({
             <div className="h-full rounded-md border border-border bg-slate-50/30 flex flex-col">
               <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                 {aiMessages.length === 0 ? (
-                  <div className="text-sm text-gray-600 space-y-3">
+                  <div className="text-sm text-gray-600">
                     <div className="flex items-start gap-2">
-                      <Sparkles size={16} className="mt-0.5 text-blue-600" />
                       <p>Describe your flow and I will propose changes.</p>
-                    </div>
-                    <div className="grid gap-2">
-                      {starterPrompts.map((prompt) => (
-                        <Button
-                          key={prompt}
-                          variant="outline"
-                          className="justify-start h-auto py-2.5 px-3 text-left whitespace-normal"
-                          onClick={() => handleSendPrompt(prompt)}
-                          disabled={disabled || isGeneratingResponse || !canvasId}
-                        >
-                          {prompt}
-                        </Button>
-                      ))}
                     </div>
                   </div>
                 ) : (
