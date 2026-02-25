@@ -21,11 +21,11 @@ type testHandlerWebhookContext struct {
 	configuration any
 }
 
-func (w *testHandlerWebhookContext) GetID() string            { return w.id }
-func (w *testHandlerWebhookContext) GetURL() string           { return w.url }
+func (w *testHandlerWebhookContext) GetID() string              { return w.id }
+func (w *testHandlerWebhookContext) GetURL() string             { return w.url }
 func (w *testHandlerWebhookContext) GetSecret() ([]byte, error) { return w.secret, nil }
-func (w *testHandlerWebhookContext) GetMetadata() any         { return w.metadata }
-func (w *testHandlerWebhookContext) GetConfiguration() any    { return w.configuration }
+func (w *testHandlerWebhookContext) GetMetadata() any           { return w.metadata }
+func (w *testHandlerWebhookContext) GetConfiguration() any      { return w.configuration }
 func (w *testHandlerWebhookContext) SetSecret(secret []byte) error {
 	w.secret = secret
 	return nil

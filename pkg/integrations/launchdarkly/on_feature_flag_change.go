@@ -140,7 +140,7 @@ func (t *OnFeatureFlagChange) Setup(ctx core.TriggerContext) error {
 }
 
 func (t *OnFeatureFlagChange) Actions() []core.Action {
-	return nil
+	return []core.Action{}
 }
 
 func (t *OnFeatureFlagChange) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
