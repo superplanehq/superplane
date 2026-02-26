@@ -20,13 +20,14 @@ When generating workflow operations that include `github.onPRComment`:
 1. Always set `configuration.repository`.
 2. If the user did not specify a repository, ask one short clarifying question for the repository name only (not `owner/repo`) before proposing operations.
 3. If the user then replies with a short repository value (for example `front`), treat it as the answer and proceed without asking again.
-4. If a repository is already known in the current flow (from user input or an existing GitHub node), reuse that repository for related GitHub nodes unless the user asks for a different one.
-5. Only set `configuration.contentFilter` when the user asks for filtering behavior.
-6. Treat `contentFilter` as a regex, not a simple substring.
-7. For simple comment-command matching, prefer `configuration.contentFilter` on the trigger (for example `^create env\b`, `^destroy\b`) instead of adding an `if` node.
-8. Use downstream `if` branching only for logic that cannot be expressed cleanly as a single trigger filter (multi-field checks, combined predicates, non-comment payload logic).
-9. If the user wants to listen to separate commands (for example "give me envs" and "destroy"), create separate `github.onPRComment` trigger nodes with separate `contentFilter` values.
-10. Do not merge distinct command listeners into a single trigger regex just to reduce node count.
+4. If the previous assistant turn asked for repository and the user responds with a short text value, never ask for repository again in the next turn.
+5. If a repository is already known in the current flow (from user input or an existing GitHub node), reuse that repository for related GitHub nodes unless the user asks for a different one.
+6. Only set `configuration.contentFilter` when the user asks for filtering behavior.
+7. Treat `contentFilter` as a regex, not a simple substring.
+8. For simple comment-command matching, prefer `configuration.contentFilter` on the trigger (for example `^create env\b`, `^destroy\b`) instead of adding an `if` node.
+9. Use downstream `if` branching only for logic that cannot be expressed cleanly as a single trigger filter (multi-field checks, combined predicates, non-comment payload logic).
+10. If the user wants to listen to separate commands (for example "give me envs" and "destroy"), create separate `github.onPRComment` trigger nodes with separate `contentFilter` values.
+11. Do not merge distinct command listeners into a single trigger regex just to reduce node count.
 
 ## Event Semantics
 
@@ -67,6 +68,7 @@ For multiple independent PR comment commands:
 - Omitting `repository`.
 - Guessing or inferring `repository` when the user has not provided it.
 - Asking for `owner/repo` format instead of just the repository name.
+- Re-asking for repository after user already provided a short repository answer (for example `front`).
 - Assuming `contentFilter` is not regex.
 - Adding an unnecessary `if` node when a trigger `contentFilter` is sufficient.
 - Combining separate command listeners into one overloaded trigger/filter.
