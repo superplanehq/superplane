@@ -32,6 +32,7 @@ import { getSubscriptionMapper } from "./sns/get_subscription";
 import { getTopicMapper } from "./sns/get_topic";
 import { publishMessageMapper } from "./sns/publish_message";
 import { getPipelineExecutionMapper } from "./codepipeline/get_pipeline_execution";
+import { retryStageExecutionMapper } from "./codepipeline/retry_stage_execution";
 import { RUN_PIPELINE_STATE_REGISTRY, runPipelineMapper } from "./codepipeline/run_pipeline";
 import { getPipelineMapper } from "./codepipeline/get_pipeline";
 import { onPipelineTriggerRenderer } from "./codepipeline/on_pipeline";
@@ -48,6 +49,7 @@ import { disableImageDeprecationMapper } from "./ec2/disable_image_deprecation";
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "codepipeline.getPipeline": getPipelineMapper,
   "codepipeline.getPipelineExecution": getPipelineExecutionMapper,
+  "codepipeline.retryStageExecution": retryStageExecutionMapper,
   "codepipeline.runPipeline": runPipelineMapper,
   "lambda.runFunction": runFunctionMapper,
   "ecs.createService": createServiceMapper,
@@ -102,6 +104,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "codepipeline.getPipeline": buildActionStateRegistry("retrieved"),
   "codepipeline.getPipelineExecution": buildActionStateRegistry("retrieved"),
+  "codepipeline.retryStageExecution": buildActionStateRegistry("retried"),
   "codepipeline.runPipeline": RUN_PIPELINE_STATE_REGISTRY,
   "ecs.createService": buildActionStateRegistry("created"),
   "ecs.describeService": buildActionStateRegistry("described"),
