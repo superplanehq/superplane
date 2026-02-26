@@ -51,11 +51,13 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:          body,
-			Headers:       http.Header{},
-			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: ""},
-			Events:        eventContext,
+			Body:    body,
+			Headers: http.Header{},
+			Configuration: map[string]any{
+				"current_milestone": []any{"started"},
+			},
+			Webhook: &contexts.WebhookContext{Secret: ""},
+			Events:  eventContext,
 		})
 
 		require.Equal(t, http.StatusOK, code)
@@ -144,11 +146,13 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:          body,
-			Headers:       headers,
-			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
-			Events:        eventContext,
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"current_milestone": []any{"started"},
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		require.Equal(t, http.StatusOK, code)
@@ -192,7 +196,8 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
-				"severities": []any{"SEV1", "SEV0"},
+				"current_milestone": []any{"started"},
+				"severities":        []any{"SEV1", "SEV0"},
 			},
 			Webhook: &contexts.WebhookContext{Secret: secret},
 			Events:  eventContext,
@@ -380,7 +385,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 0, eventContext.Count())
 	})
 
-	t.Run("CREATED with matching milestone filter -> no emit", func(t *testing.T) {
+	t.Run("CREATED with matching milestone filter -> event emitted", func(t *testing.T) {
 		body := []byte(`{
 			"data": {
 				"incident": {
@@ -412,7 +417,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 
 		require.Equal(t, http.StatusOK, code)
 		require.NoError(t, err)
-		assert.Equal(t, 0, eventContext.Count())
+		assert.Equal(t, 1, eventContext.Count())
 	})
 
 	t.Run("UPDATED with milestone and severity filter both matching -> event emitted", func(t *testing.T) {
