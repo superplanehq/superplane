@@ -20,7 +20,7 @@ type OnAlertFiredConfiguration struct {
 }
 
 type OnAlertFiredNodeMetadata struct {
-	TriggerID string `json:"triggerId"`
+	TriggerID string `json:"triggerId" mapstructure:"triggerId"`
 }
 
 func (t *OnAlertFired) Name() string {
