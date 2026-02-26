@@ -25,10 +25,10 @@ func Test__RetryStageExecution__Setup(t *testing.T) {
 	t.Run("missing region -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"pipeline":            "my-pipeline",
-				"stage":               "Deploy",
-				"pipelineExecution":   "old-exec-123",
-				"retryMode":           "FAILED_ACTIONS",
+				"pipeline":          "my-pipeline",
+				"stage":             "Deploy",
+				"pipelineExecution": "old-exec-123",
+				"retryMode":         "FAILED_ACTIONS",
 			},
 		})
 		require.ErrorContains(t, err, "region is required")
@@ -37,10 +37,10 @@ func Test__RetryStageExecution__Setup(t *testing.T) {
 	t.Run("missing pipeline -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"region":              "us-east-1",
-				"stage":               "Deploy",
-				"pipelineExecution":   "old-exec-123",
-				"retryMode":           "FAILED_ACTIONS",
+				"region":            "us-east-1",
+				"stage":             "Deploy",
+				"pipelineExecution": "old-exec-123",
+				"retryMode":         "FAILED_ACTIONS",
 			},
 		})
 		require.ErrorContains(t, err, "pipeline is required")
@@ -49,10 +49,10 @@ func Test__RetryStageExecution__Setup(t *testing.T) {
 	t.Run("missing stage -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"region":              "us-east-1",
-				"pipeline":            "my-pipeline",
-				"pipelineExecution":   "old-exec-123",
-				"retryMode":           "FAILED_ACTIONS",
+				"region":            "us-east-1",
+				"pipeline":          "my-pipeline",
+				"pipelineExecution": "old-exec-123",
+				"retryMode":         "FAILED_ACTIONS",
 			},
 		})
 		require.ErrorContains(t, err, "stage is required")
@@ -73,11 +73,11 @@ func Test__RetryStageExecution__Setup(t *testing.T) {
 	t.Run("invalid retry mode -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"region":              "us-east-1",
-				"pipeline":            "my-pipeline",
-				"stage":               "Deploy",
-				"pipelineExecution":   "old-exec-123",
-				"retryMode":           "INVALID",
+				"region":            "us-east-1",
+				"pipeline":          "my-pipeline",
+				"stage":             "Deploy",
+				"pipelineExecution": "old-exec-123",
+				"retryMode":         "INVALID",
 			},
 		})
 		require.ErrorContains(t, err, "retry mode must be one of")
@@ -86,11 +86,11 @@ func Test__RetryStageExecution__Setup(t *testing.T) {
 	t.Run("valid configuration -> ok", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"region":              "us-east-1",
-				"pipeline":            "my-pipeline",
-				"stage":               "Deploy",
-				"pipelineExecution":   "old-exec-123",
-				"retryMode":           "FAILED_ACTIONS",
+				"region":            "us-east-1",
+				"pipeline":          "my-pipeline",
+				"stage":             "Deploy",
+				"pipelineExecution": "old-exec-123",
+				"retryMode":         "FAILED_ACTIONS",
 			},
 		})
 		require.NoError(t, err)
@@ -111,11 +111,11 @@ func Test__RetryStageExecution__Execute(t *testing.T) {
 	t.Run("missing credentials -> error", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"region":              "us-east-1",
-				"pipeline":            "my-pipeline",
-				"stage":               "Deploy",
-				"pipelineExecution":   "old-exec-123",
-				"retryMode":           "FAILED_ACTIONS",
+				"region":            "us-east-1",
+				"pipeline":          "my-pipeline",
+				"stage":             "Deploy",
+				"pipelineExecution": "old-exec-123",
+				"retryMode":         "FAILED_ACTIONS",
 			},
 			Integration:    &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{}},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
@@ -135,11 +135,11 @@ func Test__RetryStageExecution__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"region":              "us-east-1",
-				"pipeline":            "my-pipeline",
-				"stage":               "Deploy",
-				"pipelineExecution":   "old-exec-123",
-				"retryMode":           "FAILED_ACTIONS",
+				"region":            "us-east-1",
+				"pipeline":          "my-pipeline",
+				"stage":             "Deploy",
+				"pipelineExecution": "old-exec-123",
+				"retryMode":         "FAILED_ACTIONS",
 			},
 			HTTP:           httpContext,
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
@@ -165,11 +165,11 @@ func Test__RetryStageExecution__Execute(t *testing.T) {
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"region":              "us-east-1",
-				"pipeline":            "my-pipeline",
-				"stage":               "Deploy",
-				"pipelineExecution":   "old-exec-123",
-				"retryMode":           "FAILED_ACTIONS",
+				"region":            "us-east-1",
+				"pipeline":          "my-pipeline",
+				"stage":             "Deploy",
+				"pipelineExecution": "old-exec-123",
+				"retryMode":         "FAILED_ACTIONS",
 			},
 			HTTP:           httpContext,
 			ExecutionState: execState,
