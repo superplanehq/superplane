@@ -340,16 +340,6 @@ func (c *CreateRepositorySandbox) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	sandbox, err := client.CreateSandbox(&CreateSandboxRequest{
-		Snapshot:         spec.Snapshot,
-		Target:           spec.Target,
-		AutoStopInterval: spec.AutoStopInterval,
-		Env:              envMap,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create sandbox: %v", err)
-	}
-
 	repositoryDirectory, err := c.getDirectoryName(spec.Repository)
 	if err != nil {
 		return fmt.Errorf("failed to determine repository directory name: %v", err)
@@ -359,6 +349,19 @@ func (c *CreateRepositorySandbox) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
+
+	sandbox, err := client.CreateSandbox(&CreateSandboxRequest{
+		Snapshot:         spec.Snapshot,
+		Target:           spec.Target,
+		AutoStopInterval: spec.AutoStopInterval,
+		Env:              envMap,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to create sandbox: %v", err)
+	}
+
+	ctx.Logger.Infof("Created sandbox %s", sandbox.ID)
 
 	metadata := CreateRepositorySandboxMetadata{
 		Stage:            repositorySandboxStageWaitingSandbox,
@@ -417,7 +420,8 @@ func (c *CreateRepositorySandbox) poll(ctx core.ActionContext) error {
 
 	timeout := time.Duration(metadata.Timeout) * time.Second
 	if time.Since(startedAt) > timeout {
-		return fmt.Errorf("bootstrapping repository sandbox %s timed out after %v", metadata.SandboxID, metadata.Timeout)
+		ctx.Logger.Errorf("sandbox creation failed on stage %s after %v", metadata.Stage, timeout)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("sandbox creation failed on stage %s after %v", metadata.Stage, timeout))
 	}
 
 	switch metadata.Stage {
