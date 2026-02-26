@@ -1,0 +1,161 @@
+---
+title: "FireHydrant"
+---
+
+Manage and react to incidents in FireHydrant
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Incident" href="#on-incident" description="Runs when an incident is created or reaches a specific milestone in FireHydrant" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in FireHydrant" />
+</CardGrid>
+
+## Instructions
+
+To connect FireHydrant, create an API key:
+
+1. Go to **Settings → API Keys → Create API Key** in your FireHydrant account. This requires Owner permissions.
+2. The API key should have **Write Access** in order to create incidents and webhooks.
+3. Copy the API key and paste it into the configuration for this integration.
+
+<a id="on-incident"></a>
+
+## On Incident
+
+The On Incident trigger starts a workflow execution when a FireHydrant incident is created or reaches a specific milestone.
+
+### Use Cases
+
+- **Incident response**: Automatically notify Slack, update a status page, or create a Jira ticket when an incident is opened
+- **Alert escalation**: Trigger escalation workflows when critical incidents are created
+- **Milestone tracking**: React to incidents reaching specific milestones such as mitigated or resolved
+- **Cross-tool sync**: Sync new FireHydrant incidents to other incident management tools
+
+### Configuration
+
+- **Current Milestone**: Select which incident milestones to trigger on (started, acknowledged, mitigated, resolved, etc.). The workflow will trigger when an incident is created or updated to match any of the selected milestones.
+- **Severities** (optional): Filter by severity levels. Only incidents matching the selected severities will trigger the workflow. If empty, all severities are accepted.
+
+### Event Data
+
+Each incident event includes:
+- **name**: Incident name/title
+- **number**: Incident number
+- **severity**: Severity level
+- **priority**: Priority level
+- **current_milestone**: Current milestone (e.g., started, acknowledged)
+- **summary**: Incident summary
+
+### Webhook Setup
+
+This trigger automatically sets up a FireHydrant webhook endpoint when configured. The endpoint is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event": "incident.created",
+    "incident": {
+      "current_milestone": "started",
+      "customer_impact_summary": "Some customers are experiencing slow performance and intermittent errors when accessing the application.",
+      "description": "Users are experiencing slow database queries and connection timeouts.",
+      "id": "04d9fd1a-ba9c-417d-b396-58a6e2c374de",
+      "impacts": [],
+      "incident_url": "https://app.firehydrant.com/incidents/04d9fd1a-ba9c-417d-b396-58a6e2c374de",
+      "milestones": [
+        {
+          "occurred_at": "2026-01-19T12:00:00Z",
+          "type": "started"
+        }
+      ],
+      "name": "Database connection issues",
+      "number": 603,
+      "priority": "P1",
+      "severity": "SEV1",
+      "summary": "Database connection pool exhausted causing cascading failures.",
+      "tag_list": []
+    },
+    "operation": "CREATED",
+    "resource_type": "incident"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "firehydrant.incident.created"
+}
+```
+
+<a id="create-incident"></a>
+
+## Create Incident
+
+The Create Incident component creates a new incident in FireHydrant.
+
+### Use Cases
+
+- **Alert escalation**: Create incidents from monitoring alerts or error tracking
+- **Cross-tool sync**: Open a FireHydrant incident from other SuperPlane triggers (e.g., PagerDuty, Rootly, GitHub)
+- **Manual incident creation**: Create incidents from workflow events
+- **Automated response**: Automatically declare incidents when thresholds are breached
+
+### Configuration
+
+- **Name**: Incident name/title (required, supports expressions)
+- **Summary**: Short summary of the incident (optional, supports expressions)
+- **Description**: Detailed description of the incident (optional, supports expressions)
+- **Severity**: Severity level, e.g., SEV1, SEV2 (optional, populated from FireHydrant)
+- **Priority**: Priority level, e.g., P1, P2 (optional, populated from FireHydrant)
+
+### Output
+
+Returns the created incident object including:
+- **id**: Incident ID
+- **name**: Incident name
+- **description**: Incident description
+- **summary**: Incident summary
+- **customer_impact_summary**: Summary of customer impact
+- **current_milestone**: Current milestone (e.g., started, acknowledged)
+- **number**: Incident number
+- **incident_url**: URL to the incident in FireHydrant
+- **severity**: Severity level
+- **priority**: Priority level
+- **tag_list**: List of tags associated with the incident
+- **impacts**: List of impacts associated with the incident
+- **milestones**: List of milestones associated with the incident
+
+### Example Output
+
+```json
+{
+  "data": {
+    "current_milestone": "started",
+    "customer_impact_summary": "Some customers are experiencing slow performance and intermittent errors when accessing the application.",
+    "description": "Users are experiencing slow database queries and connection timeouts.",
+    "id": "04d9fd1a-ba9c-417d-b396-58a6e2c374de",
+    "impacts": [],
+    "incident_url": "https://app.firehydrant.com/incidents/04d9fd1a-ba9c-417d-b396-58a6e2c374de",
+    "milestones": [
+      {
+        "occurred_at": "2026-01-19T12:00:00Z",
+        "type": "started"
+      }
+    ],
+    "name": "Database connection issues",
+    "number": 603,
+    "priority": "P1",
+    "severity": "SEV1",
+    "summary": "Database connection pool exhausted causing cascading failures.",
+    "tag_list": []
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "firehydrant.incident"
+}
+```
+
