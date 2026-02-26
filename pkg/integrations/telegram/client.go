@@ -37,6 +37,11 @@ type apiResponse struct {
 	Result json.RawMessage `json:"result"`
 }
 
+type InlineKeyboardButton struct {
+	Text         string `json:"text"`
+	CallbackData string `json:"callback_data"`
+}
+
 // GetMe retrieves information about the bot
 func (c *Client) GetMe() (*User, error) {
 	responseBody, err := c.doRequest(http.MethodGet, "/getMe", nil)
@@ -144,6 +149,49 @@ func (c *Client) SendMessage(chatID string, text string, parseMode string) (*Tel
 	}
 
 	return &message, nil
+}
+
+// SendMessageWithInlineKeyboard sends a message with inline keyboard buttons
+func (c *Client) SendMessageWithInlineKeyboard(chatID string, text string, buttons [][]InlineKeyboardButton) (*TelegramMessage, error) {
+	payload := map[string]any{
+		"chat_id": chatID,
+		"text":    text,
+		"reply_markup": map[string]any{
+			"inline_keyboard": buttons,
+		},
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	responseBody, err := c.doRequest(http.MethodPost, "/sendMessage", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var message TelegramMessage
+	if err := json.Unmarshal(responseBody, &message); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &message, nil
+}
+
+// AnswerCallbackQuery acknowledges a callback query from an inline button click
+func (c *Client) AnswerCallbackQuery(callbackQueryID string) error {
+	payload := map[string]string{
+		"callback_query_id": callbackQueryID,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	_, err = c.doRequest(http.MethodPost, "/answerCallbackQuery", bytes.NewReader(body))
+	return err
 }
 
 // doRequest executes an HTTP request to the Telegram Bot API

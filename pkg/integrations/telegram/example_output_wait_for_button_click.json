@@ -1,0 +1,12 @@
+{
+  "data": {
+    "value": "approve",
+    "clicked_at": "2026-02-10T21:00:00Z",
+    "clicked_by": {
+      "id": 123456789,
+      "username": "john"
+    }
+  },
+  "timestamp": "2026-02-10T21:00:00Z",
+  "type": "telegram.button.clicked"
+}
