@@ -116,7 +116,7 @@ The Execute Code component runs code in an existing Daytona sandbox.
 
 ### Configuration
 
-- **Sandbox ID**: The ID of the sandbox (from createSandbox output)
+- **Sandbox**: The sandbox ID to execute code in (from createSandbox output). Supports expressions, e.g. `{{ $["daytona.createSandbox"].data.id }}`
 - **Code**: The code to execute (supports expressions)
 - **Language**: The programming language (python, typescript, javascript)
 - **Timeout**: Optional execution timeout in milliseconds
@@ -161,7 +161,7 @@ The Execute Command component runs shell commands in an existing Daytona sandbox
 
 ### Configuration
 
-- **Sandbox ID**: The ID of the sandbox (from createSandbox output)
+- **Sandbox**: The sandbox ID to run commands in (from createSandbox output). Supports expressions, e.g. `{{ $["daytona.createSandbox"].data.id }}`
 - **Command**: The shell command to execute
 - **Working Directory**: Optional working directory for the command
 - **Environment Variables**: Optional key-value pairs exported before command execution

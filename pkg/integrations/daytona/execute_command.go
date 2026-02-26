@@ -25,11 +25,11 @@ var envVariableNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 type ExecuteCommand struct{}
 
 type ExecuteCommandSpec struct {
-	SandboxID string        `json:"sandboxId"`
-	Command   string        `json:"command"`
-	Cwd       string        `json:"cwd,omitempty"`
-	Env       []EnvVariable `json:"env,omitempty"`
-	Timeout   int           `json:"timeout,omitempty"`
+	Sandbox string        `json:"sandbox"`
+	Command string        `json:"command"`
+	Cwd     string        `json:"cwd,omitempty"`
+	Env     []EnvVariable `json:"env,omitempty"`
+	Timeout int           `json:"timeout,omitempty"`
 }
 
 type ExecuteCommandMetadata struct {
@@ -64,7 +64,7 @@ func (e *ExecuteCommand) Documentation() string {
 
 ## Configuration
 
-- **Sandbox ID**: The ID of the sandbox (from createSandbox output)
+- **Sandbox**: The sandbox ID to run commands in (from createSandbox output). Supports expressions, e.g. ` + "`" + `{{ $["daytona.createSandbox"].data.id }}` + "`" + `
 - **Command**: The shell command to execute
 - **Working Directory**: Optional working directory for the command
 - **Environment Variables**: Optional key-value pairs exported before command execution
@@ -105,12 +105,16 @@ func (e *ExecuteCommand) OutputChannels(configuration any) []core.OutputChannel 
 func (e *ExecuteCommand) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "sandboxId",
-			Label:       "Sandbox ID",
-			Type:        configuration.FieldTypeExpression,
+			Name:        "sandbox",
+			Label:       "Sandbox",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The ID of the sandbox to run the command in",
-			Placeholder: `{{ $["daytona.createSandbox"].data.id }}`,
+			Description: "Sandbox to run the command in",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "sandbox",
+				},
+			},
 		},
 		{
 			Name:        "command",
@@ -174,8 +178,8 @@ func (e *ExecuteCommand) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
-	if spec.SandboxID == "" {
-		return fmt.Errorf("sandboxId is required")
+	if spec.Sandbox == "" {
+		return fmt.Errorf("sandbox is required")
 	}
 
 	if spec.Command == "" {
@@ -208,7 +212,7 @@ func (e *ExecuteCommand) Execute(ctx core.ExecutionContext) error {
 	}
 
 	sessionID := uuid.New().String()
-	if err := client.CreateSession(spec.SandboxID, sessionID); err != nil {
+	if err := client.CreateSession(spec.Sandbox, sessionID); err != nil {
 		return fmt.Errorf("failed to create session: %v", err)
 	}
 
@@ -233,7 +237,7 @@ func (e *ExecuteCommand) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	response, err := client.ExecuteSessionCommand(spec.SandboxID, sessionID, command)
+	response, err := client.ExecuteSessionCommand(spec.Sandbox, sessionID, command)
 	if err != nil {
 		return fmt.Errorf("failed to execute command: %v", err)
 	}
@@ -244,7 +248,7 @@ func (e *ExecuteCommand) Execute(ctx core.ExecutionContext) error {
 	}
 
 	metadata := ExecuteCommandMetadata{
-		SandboxID: spec.SandboxID,
+		SandboxID: spec.Sandbox,
 		SessionID: sessionID,
 		CmdID:     response.CmdID,
 		StartedAt: time.Now().Unix(),
