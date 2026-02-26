@@ -3,7 +3,6 @@ import {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  OutputPayload,
   SubtitleContext,
 } from "../types";
 import { baseMapper } from "./base";
