@@ -14,6 +14,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+const (
+	createdOperation = "CREATED"
+	updatedOperation = "UPDATED"
+)
+
 type OnIncident struct{}
 
 type OnIncidentConfiguration struct {
@@ -158,15 +163,19 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 
 	op := payload.Event.Operation
 
+	if op != createdOperation && op != updatedOperation {
+		return http.StatusOK, nil
+	}
+
 	// Only trigger on CREATED event when "started" milestone is configured.
-	if op == "CREATED" {
+	if op == createdOperation {
 		if !slices.Contains(config.CurrentMilestone, "started") {
 			return http.StatusOK, nil
 		}
 	}
 
 	// Only trigger on UPDATED event when the current milestone is configured.
-	if op == "UPDATED" {
+	if op == updatedOperation {
 		// Prevent triggering on duplicate events on incident creation
 		if milestones, ok := payload.Data.Incident["milestones"].([]any); ok && len(milestones) == 1 {
 			return http.StatusOK, nil
@@ -187,7 +196,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	}
 
 	emitType := "firehydrant.incident.created"
-	if payload.Event.Operation == "UPDATED" {
+	if payload.Event.Operation == updatedOperation {
 		emitType = "firehydrant.incident.updated"
 	}
 
