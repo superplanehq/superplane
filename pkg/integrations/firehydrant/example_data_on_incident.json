@@ -1,8 +1,9 @@
 {
-  "type": "firehydrant.incident",
+  "type": "firehydrant.incident.created",
   "timestamp": "2026-01-19T12:00:00Z",
   "data": {
     "event": "incident.created",
+    "operation": "CREATED",
     "incident": {
       "id": "04d9fd1a-ba9c-417d-b396-58a6e2c374de",
       "name": "Database connection issues",
@@ -22,6 +23,7 @@
           "occurred_at": "2026-01-19T12:00:00Z"
         }
       ]
-    }
+    },
+    "resource_type": "incident"
   }
 }

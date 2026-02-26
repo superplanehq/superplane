@@ -380,7 +380,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 0, eventContext.Count())
 	})
 
-	t.Run("CREATED with matching milestone filter -> event emitted", func(t *testing.T) {
+	t.Run("CREATED with matching milestone filter -> no emit", func(t *testing.T) {
 		body := []byte(`{
 			"data": {
 				"incident": {
@@ -412,14 +412,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 
 		require.Equal(t, http.StatusOK, code)
 		require.NoError(t, err)
-		require.Equal(t, 1, eventContext.Count())
-
-		payload := eventContext.Payloads[0]
-		assert.Equal(t, "firehydrant.incident.created", payload.Type)
-
-		data := payload.Data.(map[string]any)
-		assert.Equal(t, "incident.created", data["event"])
-		assert.Equal(t, "CREATED", data["operation"])
+		assert.Equal(t, 0, eventContext.Count())
 	})
 
 	t.Run("UPDATED with milestone and severity filter both matching -> event emitted", func(t *testing.T) {

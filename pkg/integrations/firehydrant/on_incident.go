@@ -46,7 +46,7 @@ func (t *OnIncident) Documentation() string {
 ## Configuration
 
 - **Severities** (optional): Filter by severity levels. Only incidents matching the selected severities will trigger the workflow. If empty, all severities are accepted.
-- **Current Milestone** (optional): Filter by milestone. When set, the trigger fires on incident updates matching the selected milestones instead of on new incidents. If empty, the trigger fires only on newly created incidents.
+- **Current Milestone** (optional): Filter by milestone. When set, only UPDATED operations where the incident's current milestone matches a configured value will trigger the workflow. If empty, the trigger fires only on newly created incidents.
 
 ## Event Data
 
@@ -64,7 +64,7 @@ This trigger automatically sets up a FireHydrant webhook endpoint when configure
 
 ## Note
 
-FireHydrant webhooks deliver all incident events. When no milestone filter is configured, this trigger processes only ` + "`CREATED`" + ` operations, ensuring only new incidents fire the workflow. When a milestone filter is set, the trigger processes both ` + "`CREATED`" + ` and ` + "`UPDATED`" + ` operations and matches the incident's current milestone against the configured values.`
+FireHydrant webhooks deliver all incident events. When no milestone filter is configured, this trigger processes only new incidents. When a milestone filter is set, the trigger processes incidents where the current milestone matches one of the configured values.`
 }
 
 func (t *OnIncident) Icon() string {
@@ -103,11 +103,10 @@ func (t *OnIncident) Configuration() []configuration.Field {
 			Label:       "Current Milestone",
 			Type:        configuration.FieldTypeMultiSelect,
 			Required:    false,
-			Description: "Only trigger for incidents with these milestones. When set, the trigger fires on incident updates matching the selected milestones instead of new incidents.",
+			Description: "Only trigger for incident updates matching the selected milestones. When set, only UPDATED operations are accepted. When empty, only newly created incidents trigger the workflow.",
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
-						{Label: "Started", Value: "started"},
 						{Label: "Detected", Value: "detected"},
 						{Label: "Acknowledged", Value: "acknowledged"},
 						{Label: "Identified", Value: "identified"},
@@ -168,17 +167,15 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 
 	allowedOp := "CREATED"
 
-	// If current milestone filter is configured, match on UPDATED events
-	// whose current_milestone matches the filter.
+	// If a current milestone filter is configured, only accept UPDATED
+	// operations where the incident's current_milestone matches the filter.
+	// Without a milestone filter, only CREATED operations are accepted.
 	if len(config.CurrentMilestone) > 0 {
+		allowedOp = "UPDATED"
+
 		milestone, ok := payload.Data.Incident["current_milestone"].(string)
 		if !ok || milestone == "" || !slices.Contains(config.CurrentMilestone, milestone) {
 			return http.StatusOK, nil
-		}
-
-		// If multiple milestones exist allow UPDATED events
-		if milestones, ok := payload.Data.Incident["milestones"].([]any); ok && len(milestones) > 1 {
-			allowedOp = "UPDATED"
 		}
 	}
 

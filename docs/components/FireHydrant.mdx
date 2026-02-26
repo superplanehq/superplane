@@ -42,7 +42,7 @@ The On Incident trigger starts a workflow execution when a FireHydrant incident 
 ### Configuration
 
 - **Severities** (optional): Filter by severity levels. Only incidents matching the selected severities will trigger the workflow. If empty, all severities are accepted.
-- **Current Milestone** (optional): Filter by milestone. When set, the trigger fires on incident updates matching the selected milestones instead of on new incidents. If empty, the trigger fires only on newly created incidents.
+- **Current Milestone** (optional): Filter by milestone. When set, only UPDATED operations where the incident's current milestone matches a configured value will trigger the workflow. If empty, the trigger fires only on newly created incidents.
 
 ### Event Data
 
@@ -60,7 +60,7 @@ This trigger automatically sets up a FireHydrant webhook endpoint when configure
 
 ### Note
 
-FireHydrant webhooks deliver all incident events. When no milestone filter is configured, this trigger processes only `CREATED` operations, ensuring only new incidents fire the workflow. When a milestone filter is set, the trigger processes both `CREATED` and `UPDATED` operations and matches the incident's current milestone against the configured values.
+FireHydrant webhooks deliver all incident events. When no milestone filter is configured, this trigger processes only new incidents. When a milestone filter is set, the trigger processes incidents where the current milestone matches one of the configured values.
 
 ### Example Data
 
@@ -87,10 +87,12 @@ FireHydrant webhooks deliver all incident events. When no milestone filter is co
       "severity": "SEV1",
       "summary": "Database connection pool exhausted causing cascading failures.",
       "tag_list": []
-    }
+    },
+    "operation": "CREATED",
+    "resource_type": "incident"
   },
   "timestamp": "2026-01-19T12:00:00Z",
-  "type": "firehydrant.incident"
+  "type": "firehydrant.incident.created"
 }
 ```
 
