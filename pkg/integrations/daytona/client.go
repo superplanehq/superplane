@@ -78,6 +78,7 @@ type ExecuteCommandRequest struct {
 // ExecuteCommandResponse represents the response from command execution
 type ExecuteCommandResponse struct {
 	ExitCode int    `json:"exitCode"`
+	Timeout  bool   `json:"timeout"`
 	Result   string `json:"result"`
 }
 

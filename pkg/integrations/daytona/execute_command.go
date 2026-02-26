@@ -78,6 +78,7 @@ Routes to one of two channels:
 
 The payload includes:
 - **exitCode**: The process exit code (0 for success)
+- **timeout**: Whether the command timed out
 - **result**: The stdout/output from the command execution
 
 ## Notes
@@ -294,7 +295,11 @@ func (e *ExecuteCommand) poll(ctx core.ActionContext) error {
 	}
 
 	if time.Now().Unix()-metadata.StartedAt > int64(metadata.Timeout) {
-		return fmt.Errorf("command timed out after %d seconds", metadata.Timeout)
+		return ctx.ExecutionState.Emit(ExecuteCommandOutputChannelFailed, ExecuteCommandPayloadType, []any{map[string]any{
+			"exitCode": nil,
+			"timeout":  true,
+			"result":   fmt.Sprintf("command timed out after %d seconds", metadata.Timeout),
+		}})
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -319,6 +324,7 @@ func (e *ExecuteCommand) poll(ctx core.ActionContext) error {
 
 	result := &ExecuteCommandResponse{
 		ExitCode: *cmd.ExitCode,
+		Timeout:  false,
 		Result:   logs,
 	}
 

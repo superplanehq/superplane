@@ -33,6 +33,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
+  <LinkCard title="Get Repository Permission" href="#get-repository-permission" description="Get the role and permission level for a user on a GitHub repository" />
   <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Retrieve billable GitHub Actions usage (minutes) for the organization" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Remove Issue Assignee" href="#remove-issue-assignee" description="Remove assignees from a GitHub issue" />
@@ -2072,6 +2073,37 @@ Returns release information including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="get-repository-permission"></a>
+
+## Get Repository Permission
+
+The Get Repository Permission component retrieves a user's effective permission level for a GitHub repository.
+
+### Use Cases
+
+- **Access checks**: Verify if a user has expected repository access
+- **Automation gates**: Branch workflow behavior by repository permissions
+- **Auditing**: Inspect repository roles in automated compliance checks
+- **Triage routing**: Route incidents based on whether a user can push/administer
+
+### Example Output
+
+```json
+{
+  "data": {
+    "permission": "admin",
+    "role_name": "admin",
+    "user": {
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-02-26T14:30:00Z",
+  "type": "github.repositoryPermission"
 }
 ```
 
