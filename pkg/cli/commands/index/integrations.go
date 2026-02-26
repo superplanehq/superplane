@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 func newIntegrationsCommand(options core.BindOptions) *cobra.Command {
@@ -64,11 +65,83 @@ func (c *integrationsCommand) getIntegrationByName(ctx core.CommandContext, name
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		_, _ = fmt.Fprintf(stdout, "Name: %s\n", integration.GetName())
-		_, _ = fmt.Fprintf(stdout, "Label: %s\n", integration.GetLabel())
-		_, _ = fmt.Fprintf(stdout, "Description: %s\n", integration.GetDescription())
-		_, _ = fmt.Fprintf(stdout, "Components: %d\n", len(integration.GetComponents()))
-		_, err := fmt.Fprintf(stdout, "Triggers: %d\n", len(integration.GetTriggers()))
-		return err
+		return renderIntegrationText(stdout, integration)
 	})
+}
+
+func renderIntegrationText(stdout io.Writer, integration openapi_client.IntegrationsIntegrationDefinition) error {
+	_, err := fmt.Fprintf(stdout, "Name: %s\n", integration.GetName())
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintf(stdout, "Label: %s\n", integration.GetLabel())
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintf(stdout, "Description: %s\n", integration.GetDescription())
+	if err != nil {
+		return err
+	}
+
+	err = renderConfigurationText(stdout, integration.GetConfiguration())
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintln(stdout)
+	if err != nil {
+		return err
+	}
+
+	err = renderIntegrationComponentsText(stdout, integration.GetComponents())
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintln(stdout)
+	if err != nil {
+		return err
+	}
+
+	return renderIntegrationTriggersText(stdout, integration.GetTriggers())
+}
+
+func renderIntegrationComponentsText(stdout io.Writer, components []openapi_client.ComponentsComponent) error {
+	_, err := fmt.Fprintln(stdout, "Components:")
+	if err != nil {
+		return err
+	}
+
+	if len(components) == 0 {
+		_, err = fmt.Fprintln(stdout, "  (none)")
+		return err
+	}
+
+	writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
+	_, _ = fmt.Fprintln(writer, "  NAME\tLABEL\tDESCRIPTION")
+	for _, component := range components {
+		_, _ = fmt.Fprintf(writer, "  %s\t%s\t%s\n", component.GetName(), component.GetLabel(), component.GetDescription())
+	}
+	return writer.Flush()
+}
+
+func renderIntegrationTriggersText(stdout io.Writer, triggers []openapi_client.TriggersTrigger) error {
+	_, err := fmt.Fprintln(stdout, "Triggers:")
+	if err != nil {
+		return err
+	}
+
+	if len(triggers) == 0 {
+		_, err = fmt.Fprintln(stdout, "  (none)")
+		return err
+	}
+
+	writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
+	_, _ = fmt.Fprintln(writer, "  NAME\tLABEL\tDESCRIPTION")
+	for _, trigger := range triggers {
+		_, _ = fmt.Fprintf(writer, "  %s\t%s\t%s\n", trigger.GetName(), trigger.GetLabel(), trigger.GetDescription())
+	}
+	return writer.Flush()
 }

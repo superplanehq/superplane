@@ -1,6 +1,7 @@
 package index
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -70,11 +71,144 @@ func (c *componentsCommand) getComponentByName(ctx core.CommandContext, name str
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		_, _ = fmt.Fprintf(stdout, "Name: %s\n", component.GetName())
-		_, _ = fmt.Fprintf(stdout, "Label: %s\n", component.GetLabel())
-		_, err := fmt.Fprintf(stdout, "Description: %s\n", component.GetDescription())
-		return err
+		return renderComponentText(stdout, component)
 	})
+}
+
+func renderComponentText(stdout io.Writer, component openapi_client.ComponentsComponent) error {
+	_, err := fmt.Fprintf(stdout, "Name: %s\n", component.GetName())
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintf(stdout, "Label: %s\n", component.GetLabel())
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintf(stdout, "Description: %s\n", component.GetDescription())
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintln(stdout)
+	if err != nil {
+		return err
+	}
+
+	err = renderComponentOutputChannelsText(stdout, component.GetOutputChannels())
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintln(stdout)
+	if err != nil {
+		return err
+	}
+
+	err = renderConfigurationText(stdout, component.GetConfiguration())
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintln(stdout)
+	if err != nil {
+		return err
+	}
+
+	return renderExamplePayloadText(stdout, component.GetExampleOutput())
+}
+
+func renderComponentOutputChannelsText(stdout io.Writer, channels []openapi_client.SuperplaneComponentsOutputChannel) error {
+	_, err := fmt.Fprintln(stdout, "Output Channels:")
+	if err != nil {
+		return err
+	}
+
+	if len(channels) == 0 {
+		_, err = fmt.Fprintln(stdout, "  (none)")
+		return err
+	}
+
+	for _, channel := range channels {
+		channelName := channel.GetName()
+		if channelName == "" {
+			channelName = "(unnamed)"
+		}
+
+		channelLabel := channel.GetLabel()
+		channelDescription := channel.GetDescription()
+
+		if channelLabel != "" && channelLabel != channelName {
+			channelName = fmt.Sprintf("%s (%s)", channelName, channelLabel)
+		}
+
+		if channelDescription == "" {
+			_, err = fmt.Fprintf(stdout, "  - %s\n", channelName)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		_, err = fmt.Fprintf(stdout, "  - %s: %s\n", channelName, channelDescription)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func renderConfigurationText(stdout io.Writer, configuration []openapi_client.ConfigurationField) error {
+	_, err := fmt.Fprintln(stdout, "Configuration:")
+	if err != nil {
+		return err
+	}
+
+	if len(configuration) == 0 {
+		_, err = fmt.Fprintln(stdout, "  (none)")
+		return err
+	}
+
+	writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
+	_, _ = fmt.Fprintln(writer, "  NAME\tTYPE\tREQUIRED\tDESCRIPTION")
+	for _, field := range configuration {
+		required := "no"
+		if field.GetRequired() {
+			required = "yes"
+		}
+
+		_, _ = fmt.Fprintf(writer, "  %s\t%s\t%s\t%s\n", field.GetName(), field.GetType(), required, field.GetDescription())
+	}
+
+	return writer.Flush()
+}
+
+func renderExamplePayloadText(stdout io.Writer, examplePayload map[string]interface{}) error {
+	_, err := fmt.Fprintln(stdout, "Example Payload:")
+	if err != nil {
+		return err
+	}
+
+	if len(examplePayload) == 0 {
+		_, err = fmt.Fprintln(stdout, "  (none)")
+		return err
+	}
+
+	serializedPayload, err := json.MarshalIndent(examplePayload, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	for _, line := range strings.Split(string(serializedPayload), "\n") {
+		_, err = fmt.Fprintf(stdout, "  %s\n", line)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *componentsCommand) listComponents(ctx core.CommandContext, from string) ([]openapi_client.ComponentsComponent, error) {
