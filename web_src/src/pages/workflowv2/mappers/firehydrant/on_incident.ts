@@ -31,7 +31,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const configuration = node.configuration as { severities?: string[] };
+    const configuration = node.configuration as { severities?: string[]; current_milestone?: string[] };
     const metadataItems = [];
 
     if (configuration?.severities?.length) {
@@ -39,6 +39,14 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
       metadataItems.push({
         icon: "funnel",
         label: "Severities: " + formattedSeverities,
+      });
+    }
+
+    if (configuration?.current_milestone?.length) {
+      const formattedMilestones = configuration.current_milestone.join(", ");
+      metadataItems.push({
+        icon: "funnel",
+        label: "Milestones: " + formattedMilestones,
       });
     }
 

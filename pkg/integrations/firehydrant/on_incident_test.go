@@ -101,7 +101,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 0, eventContext.Count())
 	})
 
-	t.Run("UPDATED operation -> no emit", func(t *testing.T) {
+	t.Run("UPDATED operation without milestone filter -> no emit", func(t *testing.T) {
 		body := []byte(`{"data":{"incident":{"id":"inc-123"}},"event":{"operation":"UPDATED","resource_type":"incident"}}`)
 		secret := "test-secret"
 		headers := http.Header{}
@@ -260,6 +260,232 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Headers: headers,
 			Configuration: map[string]any{
 				"severities": []any{"SEV1"},
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("UPDATED with matching milestone filter -> event emitted", func(t *testing.T) {
+		body := []byte(`{
+			"data": {
+				"incident": {
+					"id": "inc-789",
+					"name": "Mitigated Outage",
+					"current_milestone": "mitigated",
+					"milestones": [{"type": "started"}, {"type": "mitigated"}],
+					"severity": {"slug": "SEV1", "description": "Critical"}
+				}
+			},
+			"event": {
+				"operation": "UPDATED",
+				"resource_type": "incident"
+			}
+		}`)
+		secret := "test-secret"
+		headers := http.Header{}
+		headers.Set("fh-signature", signatureFor(secret, body))
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"current_milestone": []any{"mitigated", "resolved"},
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventContext.Count())
+
+		payload := eventContext.Payloads[0]
+		assert.Equal(t, "firehydrant.incident.updated", payload.Type)
+
+		data := payload.Data.(map[string]any)
+		assert.Equal(t, "incident.updated", data["event"])
+		assert.Equal(t, "UPDATED", data["operation"])
+	})
+
+	t.Run("UPDATED with non-matching milestone filter -> no emit", func(t *testing.T) {
+		body := []byte(`{
+			"data": {
+				"incident": {
+					"id": "inc-789",
+					"name": "Started Outage",
+					"current_milestone": "started"
+				}
+			},
+			"event": {
+				"operation": "UPDATED",
+				"resource_type": "incident"
+			}
+		}`)
+		secret := "test-secret"
+		headers := http.Header{}
+		headers.Set("fh-signature", signatureFor(secret, body))
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"current_milestone": []any{"mitigated", "resolved"},
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("CREATED with milestone filter configured but no match -> no emit", func(t *testing.T) {
+		body := []byte(`{
+			"data": {
+				"incident": {
+					"id": "inc-100",
+					"name": "New Incident"
+				}
+			},
+			"event": {
+				"operation": "CREATED",
+				"resource_type": "incident"
+			}
+		}`)
+		secret := "test-secret"
+		headers := http.Header{}
+		headers.Set("fh-signature", signatureFor(secret, body))
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"current_milestone": []any{"mitigated"},
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("CREATED with matching milestone filter -> event emitted", func(t *testing.T) {
+		body := []byte(`{
+			"data": {
+				"incident": {
+					"id": "inc-101",
+					"name": "New Incident With Milestone",
+					"current_milestone": "started",
+					"severity": {"slug": "SEV1", "description": "Critical"}
+				}
+			},
+			"event": {
+				"operation": "CREATED",
+				"resource_type": "incident"
+			}
+		}`)
+		secret := "test-secret"
+		headers := http.Header{}
+		headers.Set("fh-signature", signatureFor(secret, body))
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"current_milestone": []any{"started"},
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventContext.Count())
+
+		payload := eventContext.Payloads[0]
+		assert.Equal(t, "firehydrant.incident.created", payload.Type)
+
+		data := payload.Data.(map[string]any)
+		assert.Equal(t, "incident.created", data["event"])
+		assert.Equal(t, "CREATED", data["operation"])
+	})
+
+	t.Run("UPDATED with milestone and severity filter both matching -> event emitted", func(t *testing.T) {
+		body := []byte(`{
+			"data": {
+				"incident": {
+					"id": "inc-200",
+					"name": "Resolved Critical",
+					"current_milestone": "resolved",
+					"milestones": [{"type": "started"}, {"type": "resolved"}],
+					"severity": {"slug": "SEV1", "description": "Critical"}
+				}
+			},
+			"event": {
+				"operation": "UPDATED",
+				"resource_type": "incident"
+			}
+		}`)
+		secret := "test-secret"
+		headers := http.Header{}
+		headers.Set("fh-signature", signatureFor(secret, body))
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"current_milestone": []any{"resolved"},
+				"severities":        []any{"SEV1"},
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Equal(t, 1, eventContext.Count())
+	})
+
+	t.Run("UPDATED with milestone match but severity mismatch -> no emit", func(t *testing.T) {
+		body := []byte(`{
+			"data": {
+				"incident": {
+					"id": "inc-201",
+					"name": "Resolved Minor",
+					"current_milestone": "resolved",
+					"milestones": [{"type": "started"}, {"type": "resolved"}],
+					"severity": {"slug": "SEV3", "description": "Minor"}
+				}
+			},
+			"event": {
+				"operation": "UPDATED",
+				"resource_type": "incident"
+			}
+		}`)
+		secret := "test-secret"
+		headers := http.Header{}
+		headers.Set("fh-signature", signatureFor(secret, body))
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"current_milestone": []any{"resolved"},
+				"severities":        []any{"SEV1"},
 			},
 			Webhook: &contexts.WebhookContext{Secret: secret},
 			Events:  eventContext,

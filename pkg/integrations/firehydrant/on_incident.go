@@ -17,7 +17,8 @@ import (
 type OnIncident struct{}
 
 type OnIncidentConfiguration struct {
-	Severities []string `json:"severities"`
+	Severities       []string `json:"severities"`
+	CurrentMilestone []string `json:"current_milestone" mapstructure:"current_milestone"`
 }
 
 func (t *OnIncident) Name() string {
@@ -25,26 +26,27 @@ func (t *OnIncident) Name() string {
 }
 
 func (t *OnIncident) Label() string {
-	return "On New Incident"
+	return "On Incident"
 }
 
 func (t *OnIncident) Description() string {
-	return "Runs when a new incident is created in FireHydrant"
+	return "Runs when an incident is created or reaches a specific milestone in FireHydrant"
 }
 
 func (t *OnIncident) Documentation() string {
-	return `The On New Incident trigger starts a workflow execution when a new incident is created in FireHydrant.
+	return `The On Incident trigger starts a workflow execution when a FireHydrant incident is created or reaches a specific milestone.
 
 ## Use Cases
 
 - **Incident response**: Automatically notify Slack, update a status page, or create a Jira ticket when an incident is opened
 - **Alert escalation**: Trigger escalation workflows when critical incidents are created
+- **Milestone tracking**: React to incidents reaching specific milestones such as mitigated or resolved
 - **Cross-tool sync**: Sync new FireHydrant incidents to other incident management tools
 
 ## Configuration
 
-- **Event Types** (required): Choose which event types to subscribe to — Incidents, Private Incidents, or both. At least one must be selected.
-- **Severities** (optional): Filter by severity levels. Only incidents matching the selected severities will trigger the workflow. If empty, all new incidents will trigger.
+- **Severities** (optional): Filter by severity levels. Only incidents matching the selected severities will trigger the workflow. If empty, all severities are accepted.
+- **Current Milestone** (optional): Filter by milestone. When set, the trigger fires on incident updates matching the selected milestones instead of on new incidents. If empty, the trigger fires only on newly created incidents.
 
 ## Event Data
 
@@ -62,7 +64,7 @@ This trigger automatically sets up a FireHydrant webhook endpoint when configure
 
 ## Note
 
-FireHydrant webhooks deliver all incident events. This trigger filters for only ` + "`CREATED`" + ` operations, ensuring only new incidents fire the workflow.`
+FireHydrant webhooks deliver all incident events. When no milestone filter is configured, this trigger processes only ` + "`CREATED`" + ` operations, ensuring only new incidents fire the workflow. When a milestone filter is set, the trigger processes both ` + "`CREATED`" + ` and ` + "`UPDATED`" + ` operations and matches the incident's current milestone against the configured values.`
 }
 
 func (t *OnIncident) Icon() string {
@@ -92,6 +94,28 @@ func (t *OnIncident) Configuration() []configuration.Field {
 						{Label: "UNSET", Value: "UNSET"},
 						{Label: "MAINTENANCE", Value: "MAINTENANCE"},
 						{Label: "GAMEDAY", Value: "GAMEDAY"},
+					},
+				},
+			},
+		},
+		{
+			Name:        "current_milestone",
+			Label:       "Current Milestone",
+			Type:        configuration.FieldTypeMultiSelect,
+			Required:    false,
+			Description: "Only trigger for incidents with these milestones. When set, the trigger fires on incident updates matching the selected milestones instead of new incidents.",
+			TypeOptions: &configuration.TypeOptions{
+				MultiSelect: &configuration.MultiSelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Started", Value: "started"},
+						{Label: "Detected", Value: "detected"},
+						{Label: "Acknowledged", Value: "acknowledged"},
+						{Label: "Identified", Value: "identified"},
+						{Label: "Mitigated", Value: "mitigated"},
+						{Label: "Resolved", Value: "resolved"},
+						{Label: "Retrospective Started", Value: "retrospective_started"},
+						{Label: "Retrospective Completed", Value: "retrospective_completed"},
+						{Label: "Closed", Value: "closed"},
 					},
 				},
 			},
@@ -137,8 +161,28 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	// Only process incident creation events
-	if payload.Event.ResourceType != "incident" || payload.Event.Operation != "CREATED" {
+	// Only process incident events
+	if payload.Event.ResourceType != "incident" {
+		return http.StatusOK, nil
+	}
+
+	allowedOp := "CREATED"
+
+	// If current milestone filter is configured, match on UPDATED events
+	// whose current_milestone matches the filter.
+	if len(config.CurrentMilestone) > 0 {
+		milestone, ok := payload.Data.Incident["current_milestone"].(string)
+		if !ok || milestone == "" || !slices.Contains(config.CurrentMilestone, milestone) {
+			return http.StatusOK, nil
+		}
+
+		// If multiple milestones exist allow UPDATED events
+		if milestones, ok := payload.Data.Incident["milestones"].([]any); ok && len(milestones) > 1 {
+			allowedOp = "UPDATED"
+		}
+	}
+
+	if payload.Event.Operation != allowedOp {
 		return http.StatusOK, nil
 	}
 
@@ -150,8 +194,13 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 		}
 	}
 
+	emitType := "firehydrant.incident.created"
+	if payload.Event.Operation == "UPDATED" {
+		emitType = "firehydrant.incident.updated"
+	}
+
 	err = ctx.Events.Emit(
-		"firehydrant.incident.created",
+		emitType,
 		buildIncidentPayload(payload),
 	)
 
@@ -192,8 +241,13 @@ type WebhookEvent struct {
 }
 
 func buildIncidentPayload(payload WebhookPayload) map[string]any {
+	eventName := "incident.created"
+	if payload.Event.Operation == "UPDATED" {
+		eventName = "incident.updated"
+	}
+
 	result := map[string]any{
-		"event":         "incident.created",
+		"event":         eventName,
 		"operation":     payload.Event.Operation,
 		"resource_type": payload.Event.ResourceType,
 	}
@@ -217,11 +271,6 @@ func normalizeIncident(raw map[string]any) map[string]any {
 	if priority, ok := raw["priority"].(map[string]any); ok {
 		if slug, ok := priority["slug"].(string); ok {
 			normalized["priority"] = slug
-		}
-	}
-	if milestone, ok := raw["current_milestone"].(map[string]any); ok {
-		if slug, ok := milestone["slug"].(string); ok {
-			normalized["current_milestone"] = slug
 		}
 	}
 
