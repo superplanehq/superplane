@@ -27,6 +27,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/iam"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/route53"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/s3"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/sns"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/sqs"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -178,6 +179,7 @@ func (a *AWS) Components() []core.Component {
 		&route53.CreateRecord{},
 		&route53.UpsertRecord{},
 		&route53.DeleteRecord{},
+		&s3.CreateBucket{},
 	}
 }
 

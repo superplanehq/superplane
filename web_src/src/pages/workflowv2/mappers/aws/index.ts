@@ -44,6 +44,7 @@ import { enableImageMapper } from "./ec2/enable_image";
 import { disableImageMapper } from "./ec2/disable_image";
 import { enableImageDeprecationMapper } from "./ec2/enable_image_deprecation";
 import { disableImageDeprecationMapper } from "./ec2/disable_image_deprecation";
+import { createBucketMapper } from "./s3";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "codepipeline.getPipeline": getPipelineMapper,
@@ -87,6 +88,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "ec2.enableImage": enableImageMapper,
   "ec2.enableImageDeprecation": enableImageDeprecationMapper,
   "ec2.getImage": getEc2ImageMapper,
+  "s3.createBucket": createBucketMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -140,4 +142,5 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ec2.enableImage": buildActionStateRegistry("enabled"),
   "ec2.enableImageDeprecation": buildActionStateRegistry("enabled"),
   "ec2.getImage": buildActionStateRegistry("retrieved"),
+  "s3.createBucket": buildActionStateRegistry("created"),
 };

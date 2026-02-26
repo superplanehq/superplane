@@ -50,6 +50,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="ECS • Update Service" href="#ecs-•-update-service" description="Update an AWS ECS service configuration" />
   <LinkCard title="Lambda • Run Function" href="#lambda-•-run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
   <LinkCard title="Route 53 • Create DNS Record" href="#route-53-•-create-dns-record" description="Create a DNS record in an AWS Route 53 hosted zone" />
+  <LinkCard title="S3 • Create Bucket" href="#s3-•-create-bucket" description="Create a new S3 bucket" />
   <LinkCard title="Route 53 • Delete DNS Record" href="#route-53-•-delete-dns-record" description="Delete a DNS record from an AWS Route 53 hosted zone" />
   <LinkCard title="Route 53 • Upsert DNS Record" href="#route-53-•-upsert-dns-record" description="Create or update a DNS record in an AWS Route 53 hosted zone" />
   <LinkCard title="SNS • Create Topic" href="#sns-•-create-topic" description="Create an AWS SNS topic" />
@@ -2090,6 +2091,37 @@ The Send Message component publishes a message to an AWS SQS queue.
   },
   "timestamp": "2026-02-11T12:00:00Z",
   "type": "aws.sqs.message"
+}
+```
+
+<a id="s3-•-create-bucket"></a>
+
+## S3 • Create Bucket
+
+The Create Bucket component creates a new AWS S3 bucket.
+
+### Use Cases
+
+- **Infrastructure provisioning**: Create S3 buckets as part of automated infrastructure setup workflows
+- **Environment setup**: Provision storage buckets for new projects or environments
+- **Data pipeline preparation**: Create staging or output buckets before running data processing workflows
+
+### Configuration
+
+- **Region**: AWS region for the S3 bucket
+- **Bucket Name**: Name of the bucket to create
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucketName": "my-example-bucket",
+    "region": "us-east-1",
+    "location": "/my-example-bucket"
+  },
+  "timestamp": "2026-02-26T12:00:00Z",
+  "type": "aws.s3.bucket"
 }
 ```
 
