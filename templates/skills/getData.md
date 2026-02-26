@@ -5,6 +5,10 @@ Use this guidance when planning or configuring the `getData` component.
 ## Purpose
 
 `getData` reads canvas-level stored data so downstream nodes can use values persisted by prior runs.
+It emits on two output channels:
+
+- `found`: value/lookup match exists
+- `notFound`: key or lookup match is missing
 
 ## Required Configuration Shape
 
@@ -28,8 +32,9 @@ When generating workflow operations that include `getData`:
 3. If only one field is needed downstream, set lookup to return that specific field (for example `sandbox_id`).
 4. Use expression-capable matching where appropriate (for example matching by trigger payload values).
 5. Wire downstream deletion/cleanup components to the `getData` output, not to guessed/static IDs.
-6. Always set `mode` explicitly in generated operations (do not rely on UI default).
-7. For PR sandbox destroy flows, prefer `mode: "listLookup"` with:
+6. Route normal delete/continue logic from `found`, and fallback/reply logic from `notFound`.
+7. Always set `mode` explicitly in generated operations (do not rely on UI default).
+8. For PR sandbox destroy flows, prefer `mode: "listLookup"` with:
    - `matchBy: "pull_request"`
    - `matchValue` from PR event expression
    - `returnField: "sandbox_id"`

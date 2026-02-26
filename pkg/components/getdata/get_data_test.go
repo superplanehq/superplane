@@ -40,9 +40,18 @@ func TestGetData_Execute(t *testing.T) {
 	})
 
 	assert.NoError(t, err)
-	assert.Equal(t, "default", stateCtx.Channel)
+	assert.Equal(t, "found", stateCtx.Channel)
 	assert.Equal(t, PayloadType, stateCtx.Type)
 	assert.Len(t, stateCtx.Payloads, 1)
+}
+
+func TestGetData_OutputChannels(t *testing.T) {
+	component := &GetData{}
+	channels := component.OutputChannels(nil)
+
+	assert.Len(t, channels, 2)
+	assert.Equal(t, "found", channels[0].Name)
+	assert.Equal(t, "notFound", channels[1].Name)
 }
 
 func TestGetData_Execute_ListLookupWithReturnField(t *testing.T) {
@@ -70,6 +79,7 @@ func TestGetData_Execute_ListLookupWithReturnField(t *testing.T) {
 	})
 
 	assert.NoError(t, err)
+	assert.Equal(t, "found", stateCtx.Channel)
 	assert.Len(t, stateCtx.Payloads, 1)
 	payload, ok := stateCtx.Payloads[0].(map[string]any)
 	assert.True(t, ok)
@@ -102,6 +112,7 @@ func TestGetData_Execute_ListLookup_NotFound(t *testing.T) {
 	})
 
 	assert.NoError(t, err)
+	assert.Equal(t, "notFound", stateCtx.Channel)
 	assert.Len(t, stateCtx.Payloads, 1)
 	payload, ok := stateCtx.Payloads[0].(map[string]any)
 	assert.True(t, ok)

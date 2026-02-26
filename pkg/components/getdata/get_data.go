@@ -14,6 +14,10 @@ import (
 
 const ComponentName = "getData"
 const PayloadType = "data.get"
+const (
+	channelFound    = "found"
+	channelNotFound = "notFound"
+)
 
 func init() {
 	registry.RegisterComponent(ComponentName, &GetData{})
@@ -54,7 +58,7 @@ func (c *GetData) Documentation() string {
 
 1. Reads ` + "`key`" + ` from configuration
 2. Optionally filters list values by a field and value
-3. Emits a ` + "`data.get`" + ` event with ` + "`key`" + `, ` + "`value`" + `, and ` + "`exists`" + ``
+3. Emits a ` + "`data.get`" + ` event on either ` + "`found`" + ` or ` + "`notFound`" + ` with ` + "`key`" + `, ` + "`value`" + `, and ` + "`exists`" + ``
 }
 
 func (c *GetData) Icon() string {
@@ -66,7 +70,10 @@ func (c *GetData) Color() string {
 }
 
 func (c *GetData) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{core.DefaultOutputChannel}
+	return []core.OutputChannel{
+		{Name: channelFound, Label: "Found"},
+		{Name: channelNotFound, Label: "Not Found"},
+	}
 }
 
 func (c *GetData) Configuration() []configuration.Field {
@@ -160,8 +167,13 @@ func (c *GetData) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
+	channel := channelNotFound
+	if selectedExists {
+		channel = channelFound
+	}
+
 	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
+		channel,
 		PayloadType,
 		[]any{
 			map[string]any{
