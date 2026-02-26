@@ -2,6 +2,7 @@ import { ComponentBaseMapper, TriggerRenderer, EventStateRegistry } from "../typ
 import { baseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
 import { createRepositorySandboxMapper } from "./create_repository_sandbox";
+import { EXECUTE_COMMAND_STATE_REGISTRY } from "./execute_command";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createSandbox: baseMapper,
@@ -19,6 +20,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createRepositorySandbox: buildActionStateRegistry("created"),
   getPreviewUrl: buildActionStateRegistry("generated"),
   executeCode: buildActionStateRegistry("executed"),
-  executeCommand: buildActionStateRegistry("executed"),
+  executeCommand: EXECUTE_COMMAND_STATE_REGISTRY,
   deleteSandbox: buildActionStateRegistry("deleted"),
 };

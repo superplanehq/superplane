@@ -219,6 +219,7 @@ Routes to one of two channels:
 
 The payload includes:
 - **exitCode**: The process exit code (0 for success)
+- **timeout**: Whether the command timed out
 - **result**: The stdout/output from the command execution
 
 ### Notes
@@ -233,7 +234,8 @@ The payload includes:
 {
   "data": {
     "exitCode": 0,
-    "result": "Successfully installed requests-2.31.0\n"
+    "result": "Successfully installed requests-2.31.0\n",
+    "timeout": false
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "daytona.command.response"
