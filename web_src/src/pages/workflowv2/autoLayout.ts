@@ -12,6 +12,11 @@ type ApplyHorizontalAutoLayoutOptions = {
   nodeIds?: string[];
 };
 
+type LayoutPosition = {
+  x: number;
+  y: number;
+};
+
 function estimateNodeSize(node: ComponentsNode): { width: number; height: number } {
   if (node.type === "TYPE_WIDGET") {
     return {
@@ -26,21 +31,11 @@ function estimateNodeSize(node: ComponentsNode): { width: number; height: number
   };
 }
 
-export async function applyHorizontalAutoLayout(
-  workflow: CanvasesCanvas,
-  options?: ApplyHorizontalAutoLayoutOptions,
-): Promise<CanvasesCanvas> {
-  const nodes = workflow.spec?.nodes || [];
-  if (nodes.length === 0) {
-    return workflow;
-  }
+function resolveFlowNodes(nodes: ComponentsNode[]): ComponentsNode[] {
+  return nodes.filter((node) => !!node.id && node.type !== "TYPE_WIDGET");
+}
 
-  const flowNodes = nodes.filter((node) => !!node.id && node.type !== "TYPE_WIDGET");
-  if (flowNodes.length === 0) {
-    return workflow;
-  }
-
-  const requestedNodeIDs = options?.nodeIds || [];
+function resolveLayoutNodes(flowNodes: ComponentsNode[], requestedNodeIDs: string[]): ComponentsNode[] {
   const normalizedRequestedNodeIDs = Array.from(
     new Set(requestedNodeIDs.map((nodeId) => nodeId.trim()).filter((nodeId) => nodeId.length > 0)),
   );
@@ -49,20 +44,26 @@ export async function applyHorizontalAutoLayout(
   const hasScopedSelection = scopedNodeIDs.length > 0;
   const scopedNodeIDSet = new Set(scopedNodeIDs);
 
-  const layoutNodes = hasScopedSelection
-    ? flowNodes.filter((node) => scopedNodeIDSet.has(node.id as string))
-    : flowNodes;
-  if (layoutNodes.length === 0) {
-    return workflow;
+  if (hasScopedSelection) {
+    return flowNodes.filter((node) => scopedNodeIDSet.has(node.id as string));
   }
 
+  return flowNodes;
+}
+
+function resolveLayoutEdges(workflow: CanvasesCanvas, layoutNodes: ComponentsNode[]) {
   const layoutNodeIDs = new Set(layoutNodes.map((node) => node.id as string));
-  const layoutEdges = (workflow.spec?.edges || []).filter(
+
+  return (workflow.spec?.edges || []).filter(
     (edge) =>
       !!edge.sourceId && !!edge.targetId && layoutNodeIDs.has(edge.sourceId) && layoutNodeIDs.has(edge.targetId),
   );
+}
 
-  const graph = {
+function buildElkGraph(workflow: CanvasesCanvas, layoutNodes: ComponentsNode[]) {
+  const layoutEdges = resolveLayoutEdges(workflow, layoutNodes);
+
+  return {
     id: "root",
     layoutOptions: {
       "elk.algorithm": "layered",
@@ -85,9 +86,10 @@ export async function applyHorizontalAutoLayout(
       targets: [edge.targetId!],
     })),
   };
+}
 
-  const layoutedGraph = await elk.layout(graph);
-  const layoutedPositions = new Map<string, { x: number; y: number }>();
+function extractLayoutedPositions(layoutedGraph: { children?: Array<{ id: string; x?: number; y?: number }> }) {
+  const layoutedPositions = new Map<string, LayoutPosition>();
   for (const child of layoutedGraph.children || []) {
     layoutedPositions.set(child.id, {
       x: child.x || 0,
@@ -95,32 +97,45 @@ export async function applyHorizontalAutoLayout(
     });
   }
 
-  if (layoutedPositions.size === 0) {
-    return workflow;
+  return layoutedPositions;
+}
+
+function resolveMinPositionFromNodes(nodes: ComponentsNode[]): LayoutPosition {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+
+  for (const node of nodes) {
+    minX = Math.min(minX, node.position?.x || 0);
+    minY = Math.min(minY, node.position?.y || 0);
   }
 
-  let minCurrentX = Number.POSITIVE_INFINITY;
-  let minCurrentY = Number.POSITIVE_INFINITY;
-  for (const node of layoutNodes) {
-    minCurrentX = Math.min(minCurrentX, node.position?.x || 0);
-    minCurrentY = Math.min(minCurrentY, node.position?.y || 0);
-  }
-  if (!Number.isFinite(minCurrentX)) minCurrentX = 0;
-  if (!Number.isFinite(minCurrentY)) minCurrentY = 0;
+  if (!Number.isFinite(minX)) minX = 0;
+  if (!Number.isFinite(minY)) minY = 0;
 
-  let minLayoutX = Number.POSITIVE_INFINITY;
-  let minLayoutY = Number.POSITIVE_INFINITY;
+  return { x: minX, y: minY };
+}
+
+function resolveMinPositionFromLayout(layoutedPositions: Map<string, LayoutPosition>): LayoutPosition {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+
   layoutedPositions.forEach((position) => {
-    minLayoutX = Math.min(minLayoutX, position.x);
-    minLayoutY = Math.min(minLayoutY, position.y);
+    minX = Math.min(minX, position.x);
+    minY = Math.min(minY, position.y);
   });
-  if (!Number.isFinite(minLayoutX)) minLayoutX = 0;
-  if (!Number.isFinite(minLayoutY)) minLayoutY = 0;
 
-  const offsetX = minCurrentX - minLayoutX;
-  const offsetY = minCurrentY - minLayoutY;
+  if (!Number.isFinite(minX)) minX = 0;
+  if (!Number.isFinite(minY)) minY = 0;
 
-  const updatedNodes = nodes.map((node) => {
+  return { x: minX, y: minY };
+}
+
+function applyLayoutedPositions(
+  nodes: ComponentsNode[],
+  layoutedPositions: Map<string, LayoutPosition>,
+  offset: LayoutPosition,
+): ComponentsNode[] {
+  return nodes.map((node) => {
     const nodeID = node.id;
     if (!nodeID) {
       return node;
@@ -134,10 +149,45 @@ export async function applyHorizontalAutoLayout(
     return {
       ...node,
       position: {
-        x: Math.round(position.x + offsetX),
-        y: Math.round(position.y + offsetY),
+        x: Math.round(position.x + offset.x),
+        y: Math.round(position.y + offset.y),
       },
     };
+  });
+}
+
+export async function applyHorizontalAutoLayout(
+  workflow: CanvasesCanvas,
+  options?: ApplyHorizontalAutoLayoutOptions,
+): Promise<CanvasesCanvas> {
+  const nodes = workflow.spec?.nodes || [];
+  if (nodes.length === 0) {
+    return workflow;
+  }
+
+  const flowNodes = resolveFlowNodes(nodes);
+  if (flowNodes.length === 0) {
+    return workflow;
+  }
+
+  const layoutNodes = resolveLayoutNodes(flowNodes, options?.nodeIds || []);
+  if (layoutNodes.length === 0) {
+    return workflow;
+  }
+
+  const graph = buildElkGraph(workflow, layoutNodes);
+  const layoutedGraph = await elk.layout(graph);
+  const layoutedPositions = extractLayoutedPositions(layoutedGraph);
+
+  if (layoutedPositions.size === 0) {
+    return workflow;
+  }
+
+  const minCurrentPosition = resolveMinPositionFromNodes(layoutNodes);
+  const minLayoutPosition = resolveMinPositionFromLayout(layoutedPositions);
+  const updatedNodes = applyLayoutedPositions(nodes, layoutedPositions, {
+    x: minCurrentPosition.x - minLayoutPosition.x,
+    y: minCurrentPosition.y - minLayoutPosition.y,
   });
 
   return {

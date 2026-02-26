@@ -23,52 +23,6 @@ context to your AI agent.
 We encourage you to use these files with your AI agents and contribute improvements to them. The goal is to
 encode good taste into these files, the patterns, principles, and preferences that make code and product feel right.
 
-## Where AI Canvas Behavior Is Defined
-
-When you need to document or update AI behavior for the canvas builder, these are the source-of-truth locations:
-
-- **Runtime component skill loading (AI chat grounding):**
-  - `pkg/grpc/actions/canvases/send_ai_message.go`
-  - `templates/skills/*.md`
-  - Key functions: `buildCanvasSkillPromptContext`, `loadComponentSkillContent`, `candidateSkillPaths`
-- **Canvas auto-layout API contract (backend + CLI + UI):**
-  - `protos/canvases.proto` (`CanvasAutoLayout` and `UpdateCanvasRequest.auto_layout`)
-  - Generated types:
-    - `pkg/protos/canvases/canvases.pb.go`
-    - `pkg/openapi_client/model_canvases_canvas_auto_layout.go`
-    - `web_src/src/api-client/types.gen.ts`
-- **Backend auto-layout behavior:**
-  - `pkg/grpc/actions/canvases/auto_layout.go`
-  - `pkg/grpc/actions/canvases/update_canvas.go`
-  - Includes scope resolution (`FULL_CANVAS`, `CONNECTED_COMPONENT`, `EXACT_SET`) and anchor-relative positioning (selected subgraph keeps its top-left anchor)
-- **CLI surface used by AI agents and scripts:**
-  - `pkg/cli/commands/canvases/root.go` (flags)
-  - `pkg/cli/commands/canvases/update.go` (parsing + request body)
-  - Main flags: `--auto-layout`, `--auto-layout-scope`, `--auto-layout-node`
-
-If behavior is component-specific, update `templates/skills/` first. If behavior is operation-level (like canvas layout),
-update the protobuf/API contract and the CLI/backend implementation docs together.
-
-### CLI Examples
-
-```bash
-# Layout full canvas
-superplane canvases update <canvas-id> --auto-layout horizontal
-
-# Layout only the connected subgraph around one seed node
-superplane canvases update <canvas-id> \
-  --auto-layout horizontal \
-  --auto-layout-scope connected-component \
-  --auto-layout-node <node-id>
-
-# Layout only an explicit set of nodes
-superplane canvases update <canvas-id> \
-  --auto-layout horizontal \
-  --auto-layout-scope exact-set \
-  --auto-layout-node <node-a> \
-  --auto-layout-node <node-b>
-```
-
 ## Component State Coverage
 
 When developing a new component, ensure every statemap includes an explicit error state and a clear state resolution

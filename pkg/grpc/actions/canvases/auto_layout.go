@@ -317,68 +317,119 @@ func resolveScopedNodeIDs(
 ) ([]string, error) {
 	switch scope {
 	case pb.CanvasAutoLayout_SCOPE_FULL_CANVAS:
-		return append([]string(nil), flowNodeIDs...), nil
+		return cloneNodeIDs(flowNodeIDs), nil
 	case pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT:
-		if len(seedNodeIDs) == 0 {
-			return append([]string(nil), flowNodeIDs...), nil
-		}
-
-		adjacencyByNodeID := make(map[string][]string, len(flowNodeIDs))
-		for _, nodeID := range flowNodeIDs {
-			adjacencyByNodeID[nodeID] = []string{}
-		}
-
-		for _, edge := range edges {
-			if _, ok := flowNodeSet[edge.SourceID]; !ok {
-				continue
-			}
-			if _, ok := flowNodeSet[edge.TargetID]; !ok {
-				continue
-			}
-			adjacencyByNodeID[edge.SourceID] = append(adjacencyByNodeID[edge.SourceID], edge.TargetID)
-			adjacencyByNodeID[edge.TargetID] = append(adjacencyByNodeID[edge.TargetID], edge.SourceID)
-		}
-
-		for nodeID := range adjacencyByNodeID {
-			sort.SliceStable(adjacencyByNodeID[nodeID], func(i, j int) bool {
-				return nodeOrderLess(adjacencyByNodeID[nodeID][i], adjacencyByNodeID[nodeID][j], nodes, nodeIndexByID)
-			})
-		}
-
-		selectedNodeSet := make(map[string]struct{}, len(flowNodeIDs))
-		queue := make([]string, 0, len(seedNodeIDs))
-		queue = append(queue, seedNodeIDs...)
-
-		for len(queue) > 0 {
-			current := queue[0]
-			queue = queue[1:]
-
-			if _, exists := selectedNodeSet[current]; exists {
-				continue
-			}
-			selectedNodeSet[current] = struct{}{}
-
-			for _, neighbor := range adjacencyByNodeID[current] {
-				if _, exists := selectedNodeSet[neighbor]; exists {
-					continue
-				}
-				queue = append(queue, neighbor)
-			}
-		}
-
-		selectedNodeIDs := make([]string, 0, len(selectedNodeSet))
-		for _, nodeID := range flowNodeIDs {
-			if _, exists := selectedNodeSet[nodeID]; exists {
-				selectedNodeIDs = append(selectedNodeIDs, nodeID)
-			}
-		}
-		return selectedNodeIDs, nil
+		return resolveConnectedComponentNodeIDs(seedNodeIDs, flowNodeIDs, flowNodeSet, nodeIndexByID, nodes, edges), nil
 	case pb.CanvasAutoLayout_SCOPE_EXACT_SET:
-		if len(seedNodeIDs) == 0 {
-			return nil, status.Error(codes.InvalidArgument, "auto_layout.node_ids is required when scope is EXACT_SET")
-		}
-		return append([]string(nil), seedNodeIDs...), nil
+		return resolveExactSetNodeIDs(seedNodeIDs)
 	default:
 		return nil, status.Errorf(codes.InvalidArgument, "unsupported auto layout scope: %s", scope.String())
 	}
+}
+
+func cloneNodeIDs(nodeIDs []string) []string {
+	return append([]string(nil), nodeIDs...)
+}
+
+func resolveExactSetNodeIDs(seedNodeIDs []string) ([]string, error) {
+	if len(seedNodeIDs) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "auto_layout.node_ids is required when scope is EXACT_SET")
+	}
+
+	return cloneNodeIDs(seedNodeIDs), nil
+}
+
+func resolveConnectedComponentNodeIDs(
+	seedNodeIDs []string,
+	flowNodeIDs []string,
+	flowNodeSet map[string]struct{},
+	nodeIndexByID map[string]int,
+	nodes []models.Node,
+	edges []models.Edge,
+) []string {
+	if len(seedNodeIDs) == 0 {
+		return cloneNodeIDs(flowNodeIDs)
+	}
+
+	adjacencyByNodeID := buildFlowAdjacency(flowNodeIDs, flowNodeSet, edges)
+	sortAdjacencyByNodeOrder(adjacencyByNodeID, nodes, nodeIndexByID)
+
+	selectedNodeSet := traverseConnectedNodeSet(seedNodeIDs, adjacencyByNodeID, len(flowNodeIDs))
+	return collectSelectedNodeIDs(flowNodeIDs, selectedNodeSet)
+}
+
+func buildFlowAdjacency(
+	flowNodeIDs []string,
+	flowNodeSet map[string]struct{},
+	edges []models.Edge,
+) map[string][]string {
+	adjacencyByNodeID := make(map[string][]string, len(flowNodeIDs))
+	for _, nodeID := range flowNodeIDs {
+		adjacencyByNodeID[nodeID] = []string{}
+	}
+
+	for _, edge := range edges {
+		if _, ok := flowNodeSet[edge.SourceID]; !ok {
+			continue
+		}
+		if _, ok := flowNodeSet[edge.TargetID]; !ok {
+			continue
+		}
+		adjacencyByNodeID[edge.SourceID] = append(adjacencyByNodeID[edge.SourceID], edge.TargetID)
+		adjacencyByNodeID[edge.TargetID] = append(adjacencyByNodeID[edge.TargetID], edge.SourceID)
+	}
+
+	return adjacencyByNodeID
+}
+
+func sortAdjacencyByNodeOrder(
+	adjacencyByNodeID map[string][]string,
+	nodes []models.Node,
+	nodeIndexByID map[string]int,
+) {
+	for nodeID := range adjacencyByNodeID {
+		sort.SliceStable(adjacencyByNodeID[nodeID], func(i, j int) bool {
+			return nodeOrderLess(adjacencyByNodeID[nodeID][i], adjacencyByNodeID[nodeID][j], nodes, nodeIndexByID)
+		})
+	}
+}
+
+func traverseConnectedNodeSet(
+	seedNodeIDs []string,
+	adjacencyByNodeID map[string][]string,
+	capacity int,
+) map[string]struct{} {
+	selectedNodeSet := make(map[string]struct{}, capacity)
+	queue := make([]string, 0, len(seedNodeIDs))
+	queue = append(queue, seedNodeIDs...)
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		if _, exists := selectedNodeSet[current]; exists {
+			continue
+		}
+		selectedNodeSet[current] = struct{}{}
+
+		for _, neighbor := range adjacencyByNodeID[current] {
+			if _, exists := selectedNodeSet[neighbor]; exists {
+				continue
+			}
+			queue = append(queue, neighbor)
+		}
+	}
+
+	return selectedNodeSet
+}
+
+func collectSelectedNodeIDs(flowNodeIDs []string, selectedNodeSet map[string]struct{}) []string {
+	selectedNodeIDs := make([]string, 0, len(selectedNodeSet))
+	for _, nodeID := range flowNodeIDs {
+		if _, exists := selectedNodeSet[nodeID]; exists {
+			selectedNodeIDs = append(selectedNodeIDs, nodeID)
+		}
+	}
+
+	return selectedNodeIDs
 }
