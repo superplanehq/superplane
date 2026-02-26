@@ -20,6 +20,7 @@ When generating workflow operations that include `daytona.deleteSandbox`:
 3. For same-run cleanup, map `sandbox` from the create step output.
 4. For cross-run cleanup (for example destroy PR command), retrieve sandbox ID via `getData` first, then map `sandbox` from `getData` output.
 5. Only set `force` when user explicitly asks for force deletion or workflow requires best-effort cleanup of running sandboxes.
+6. If you maintain PR->sandbox mappings in canvas data, follow delete with `clearData` to remove the matched mapping entry.
 
 ## Canonical Config Examples
 

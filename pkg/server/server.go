@@ -24,6 +24,7 @@ import (
 
 	// Import integrations, components and triggers to register them via init()
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
+	_ "github.com/superplanehq/superplane/pkg/components/cleardata"
 	_ "github.com/superplanehq/superplane/pkg/components/filter"
 	_ "github.com/superplanehq/superplane/pkg/components/getdata"
 	_ "github.com/superplanehq/superplane/pkg/components/http"

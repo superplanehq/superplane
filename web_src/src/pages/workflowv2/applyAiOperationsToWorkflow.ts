@@ -14,11 +14,11 @@ type ApplyAiOperationsToWorkflowInput = {
 const elk = new ELK();
 const AI_AUTO_LAYOUT = {
   direction: "RIGHT",
-  nodeSpacing: 280,
+  nodeSpacing: 130,
   layerSpacing: 140,
   edgeNodeSpacing: 80,
   estimatedNodeWidth: 420,
-  estimatedNodeHeight: 240,
+  estimatedNodeHeight: 180,
 } as const;
 
 async function autoLayoutNodes(nodes: ComponentsNode[], edges: ComponentsEdge[]): Promise<ComponentsNode[]> {
