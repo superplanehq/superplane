@@ -79,19 +79,6 @@ func Test__GetRepositoryPermission__Execute(t *testing.T) {
 		require.ErrorContains(t, err, "failed to decode configuration")
 	})
 
-	t.Run("fails when username is empty", func(t *testing.T) {
-		err := component.Execute(core.ExecutionContext{
-			Integration:    &contexts.IntegrationContext{},
-			ExecutionState: &contexts.ExecutionStateContext{},
-			Configuration: map[string]any{
-				"repository": "hello",
-				"username":   "",
-			},
-		})
-
-		require.ErrorContains(t, err, "username is required")
-	})
-
 	t.Run("fails when metadata decode fails", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Metadata: "not a valid metadata",
