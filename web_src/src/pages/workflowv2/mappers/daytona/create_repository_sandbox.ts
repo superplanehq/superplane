@@ -1,10 +1,5 @@
 import { MetadataItem } from "@/ui/metadataList";
-import {
-  ComponentBaseContext,
-  ComponentBaseMapper,
-  ExecutionDetailsContext,
-  SubtitleContext,
-} from "../types";
+import { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
 import { baseMapper } from "./base";
 
 interface CreateRepositorySandboxConfiguration {
