@@ -9,12 +9,78 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Repository Sandbox" href="#create-repository-sandbox" description="Create a sandbox, clone a repository, and run a bootstrap script" />
   <LinkCard title="Create Sandbox" href="#create-sandbox" description="Create an isolated sandbox environment for code execution" />
   <LinkCard title="Delete Sandbox" href="#delete-sandbox" description="Delete a sandbox environment" />
   <LinkCard title="Execute Code" href="#execute-code" description="Execute code in a sandbox environment" />
   <LinkCard title="Execute Command" href="#execute-command" description="Run a shell command in a sandbox environment" />
   <LinkCard title="Get Preview URL" href="#get-preview-url" description="Generate a preview URL for a sandbox port" />
 </CardGrid>
+
+<a id="create-repository-sandbox"></a>
+
+## Create Repository Sandbox
+
+The Create Repository Sandbox component creates a new Daytona sandbox, clones a repository, and runs a bootstrap script.
+
+### Use Cases
+
+- **Ephemeral dev environments**: Spin up a fresh environment for a repository on demand
+- **CI-like workflows**: Clone code and run setup scripts before downstream tasks
+- **Automated validation**: Prepare repository state before executing tests or commands
+
+### Configuration
+
+- **Snapshot**: Base environment snapshot (optional, defaults to "default")
+- **Target**: Target region for the sandbox (optional)
+- **Auto Stop Interval**: Time in minutes before the sandbox auto-stops
+- **Environment Variables**: Environment variables for the sandbox
+- **Repository**: Repository URL to clone
+- **Bootstrap**: Object with one of the following forms:
+  - `{ "from": "inline", "script": "npm ci && npm test" }`
+  - `{ "from": "file", "path": "scripts/bootstrap.sh" }`
+  - `{ "from": "url", "url": "https://example.com/bootstrap.sh" }`
+- **Command Timeout**: Timeout in seconds for clone and bootstrap commands
+
+### Output
+
+Returns:
+- **sandbox**: The started sandbox information
+- **repository**: Repository URL used for cloning
+- **directory**: Full clone directory path
+- **clone**: Clone command result
+- **bootstrap**: Bootstrap command result
+
+### Notes
+
+- The component waits for the sandbox to reach the "started" state
+- Clone and bootstrap run sequentially in the same session
+- If clone or bootstrap fails, the component returns an error
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bootstrap": {
+      "exitCode": 0,
+      "result": "Dependencies installed successfully\n"
+    },
+    "clone": {
+      "exitCode": 0,
+      "result": "Cloning into 'example-app'...\n"
+    },
+    "directory": "/home/daytona/example-app",
+    "repository": "https://github.com/superplanehq/example-app.git",
+    "sandbox": {
+      "id": "sandbox-abc123def456",
+      "state": "started"
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "daytona.repository.sandbox"
+}
+```
 
 <a id="create-sandbox"></a>
 
@@ -254,4 +320,3 @@ Returns preview URL information including:
   "type": "daytona.preview.response"
 }
 ```
-
