@@ -109,9 +109,34 @@ func (c *GetPipelineExecution) Configuration() []configuration.Field {
 		{
 			Name:        "executionId",
 			Label:       "Execution ID",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Pipeline execution ID to retrieve (supports expressions)",
+			Description: "Pipeline execution to retrieve",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "codepipeline.pipelineExecution",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+						{
+							Name: "pipeline",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "pipeline",
+							},
+						},
+					},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "pipeline",
+					Values: []string{"*"},
+				},
+			},
 		},
 	}
 }
