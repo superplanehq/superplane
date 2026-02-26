@@ -1,0 +1,1 @@
+{"data":{"id":"gen-xxxxxxxxxxxxxx","model":"openai/gpt-4o","text":"Here is the summary you requested...","usage":{"prompt_tokens":45,"completion_tokens":120,"total_tokens":165},"finishReason":"stop"},"timestamp":"2026-02-20T12:00:00Z","type":"openrouter.message"}

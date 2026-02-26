@@ -103,6 +103,7 @@ export interface NodeEditData {
   configurationFields: ConfigurationField[];
   integrationName?: string;
   blockName?: string;
+  componentDescription?: string;
   integrationRef?: ComponentsIntegrationRef;
 }
 
@@ -1202,6 +1203,7 @@ function Sidebar({
       nodeName={editingNodeData?.nodeName || ""}
       nodeLabel={editingNodeData?.displayLabel}
       blockName={editingNodeData?.blockName}
+      componentDescription={editingNodeData?.componentDescription}
       nodeConfiguration={editingNodeData?.configuration || {}}
       nodeConfigurationFields={editingNodeData?.configurationFields || []}
       onNodeConfigSave={onSaveConfiguration}

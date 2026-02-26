@@ -21,6 +21,7 @@ interface SettingsTabProps {
   nodeId?: string;
   nodeName: string;
   nodeLabel?: string;
+  componentDescription?: string;
   configuration: Record<string, unknown>;
   configurationFields: ConfigurationField[];
   onSave: (
@@ -49,6 +50,7 @@ export function SettingsTab({
   nodeId: _nodeId,
   nodeName,
   nodeLabel: _nodeLabel,
+  componentDescription,
   configuration,
   configurationFields,
   onSave,
@@ -504,6 +506,10 @@ export function SettingsTab({
           </div>
         )}
       </div>
+
+      {componentDescription && (
+        <p className="text-sm text-muted-foreground mt-4 leading-snug">{componentDescription}</p>
+      )}
 
       <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
         <Button data-testid="save-node-button" variant="default" onClick={handleSave} disabled={isReadOnly}>
