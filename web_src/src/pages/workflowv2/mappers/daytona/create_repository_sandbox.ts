@@ -19,19 +19,21 @@ interface CreateRepositorySandboxConfiguration {
   };
 }
 
-interface CreateRepositorySandboxOutput {
-  sandbox?: {
-    id?: string;
-    state?: string;
-  };
+interface CreateRepositorySandboxMetadata {
+  stage?: string;
+  sandboxId?: string;
+  sandboxStartedAt?: string;
+  sessionId?: string;
+  timeout?: number;
   repository?: string;
   directory?: string;
   clone?: {
-    exitCode?: number;
-    result?: string;
+    cmdId?: string;
   };
   bootstrap?: {
-    from?: string;
+    cmdId?: string;
+    startedAt?: string;
+    finishedAt?: string;
     exitCode?: number;
     result?: string;
   };
@@ -51,33 +53,21 @@ export const createRepositorySandboxMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const details = baseMapper.getExecutionDetails(context);
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const data = outputs?.default?.[0]?.data as CreateRepositorySandboxOutput | undefined;
-    if (!data) {
-      return details;
+    const metadata = context.execution.metadata as CreateRepositorySandboxMetadata | undefined;
+    const details: Record<string, string> = {};
+
+    if (metadata?.stage) {
+      details["Step"] = metadata.stage;
     }
 
-    if (data.sandbox?.id) {
-      details["Sandbox ID"] = data.sandbox.id;
+    if (metadata?.sandboxId) {
+      details["Sandbox ID"] = metadata.sandboxId;
     }
-    if (data.sandbox?.state) {
-      details["Sandbox State"] = data.sandbox.state;
+    if (metadata?.repository) {
+      details["Repository"] = metadata.repository;
     }
-    if (data.repository) {
-      details["Repository"] = data.repository;
-    }
-    if (data.directory) {
-      details["Directory"] = data.directory;
-    }
-    if (typeof data.clone?.exitCode === "number") {
-      details["Clone Exit Code"] = String(data.clone.exitCode);
-    }
-    if (typeof data.bootstrap?.exitCode === "number") {
-      details["Bootstrap Exit Code"] = String(data.bootstrap.exitCode);
-    }
-    if (data.bootstrap?.from) {
-      details["Bootstrap From"] = data.bootstrap.from;
+    if (metadata?.directory) {
+      details["Directory"] = metadata.directory;
     }
 
     return details;

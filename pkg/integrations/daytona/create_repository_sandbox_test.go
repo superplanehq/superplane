@@ -194,7 +194,7 @@ func Test__CreateRepositorySandbox__Execute(t *testing.T) {
 	assert.Equal(t, "https://github.com/superplanehq/superplane.git", metadata.Repository)
 	assert.Equal(t, "/home/daytona/superplane", metadata.Directory)
 	require.NotNil(t, metadata.SandboxStartedAt)
-	assert.Equal(t, time.Duration(CreateRepositorySandboxDefaultTimeout), metadata.Timeout)
+	assert.Equal(t, int(CreateRepositorySandboxDefaultTimeout.Seconds()), metadata.Timeout)
 	require.NotNil(t, metadata.Bootstrap)
 	assert.Equal(t, SandboxBootstrapFromInline, metadata.Bootstrap.From)
 	require.NotNil(t, metadata.Bootstrap.Script)
@@ -205,13 +205,12 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 	component := CreateRepositorySandbox{}
 
 	t.Run("waits while sandbox is creating", func(t *testing.T) {
-		now := time.Now()
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: CreateRepositorySandboxMetadata{
 				Stage:            repositorySandboxStageWaitingSandbox,
 				SandboxID:        "sandbox-123",
-				SandboxStartedAt: &now,
-				Timeout:          5 * time.Minute,
+				SandboxStartedAt: time.Now().Format(time.RFC3339),
+				Timeout:          int(5 * time.Minute.Seconds()),
 			},
 		}
 
@@ -239,13 +238,12 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 	})
 
 	t.Run("starts clone when sandbox is ready", func(t *testing.T) {
-		now := time.Now()
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: CreateRepositorySandboxMetadata{
 				Stage:            repositorySandboxStageWaitingSandbox,
 				SandboxID:        "sandbox-123",
-				SandboxStartedAt: &now,
-				Timeout:          5 * time.Minute,
+				SandboxStartedAt: time.Now().Format(time.RFC3339),
+				Timeout:          int(5 * time.Minute.Seconds()),
 				Repository:       "https://github.com/superplanehq/superplane.git",
 				Directory:        "/home/daytona/superplane",
 				Bootstrap: &BootstrapMetadata{
@@ -306,13 +304,12 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 	})
 
 	t.Run("clone stage with command not finished reschedules", func(t *testing.T) {
-		now := time.Now()
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: CreateRepositorySandboxMetadata{
 				Stage:            repositorySandboxStageCloningRepo,
 				SandboxID:        "sandbox-123",
-				SandboxStartedAt: &now,
-				Timeout:          5 * time.Minute,
+				SandboxStartedAt: time.Now().Format(time.RFC3339),
+				Timeout:          int(5 * time.Minute.Seconds()),
 				SessionID:        "session-1",
 				Clone: &CloneMetadata{
 					CmdID: "cmd-clone",
@@ -345,13 +342,12 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 	})
 
 	t.Run("clone stage failure returns error", func(t *testing.T) {
-		now := time.Now()
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: CreateRepositorySandboxMetadata{
 				Stage:            repositorySandboxStageCloningRepo,
 				SandboxID:        "sandbox-123",
-				SandboxStartedAt: &now,
-				Timeout:          5 * time.Minute,
+				SandboxStartedAt: time.Now().Format(time.RFC3339),
+				Timeout:          int(5 * time.Minute.Seconds()),
 				SessionID:        "session-1",
 				Clone: &CloneMetadata{
 					CmdID: "cmd-clone",
@@ -390,13 +386,12 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 	})
 
 	t.Run("clone stage success starts bootstrap", func(t *testing.T) {
-		now := time.Now()
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: CreateRepositorySandboxMetadata{
 				Stage:            repositorySandboxStageCloningRepo,
 				SandboxID:        "sandbox-123",
-				SandboxStartedAt: &now,
-				Timeout:          5 * time.Minute,
+				SandboxStartedAt: time.Now().Format(time.RFC3339),
+				Timeout:          int(5 * time.Minute.Seconds()),
 				SessionID:        "session-1",
 				Repository:       "https://github.com/superplanehq/superplane.git",
 				Directory:        "/home/daytona/superplane",
@@ -454,13 +449,12 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 	})
 
 	t.Run("bootstrap stage success emits payload", func(t *testing.T) {
-		now := time.Now()
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: CreateRepositorySandboxMetadata{
 				Stage:            repositorySandboxStageBootstrapping,
 				SandboxID:        "sandbox-123",
-				SandboxStartedAt: &now,
-				Timeout:          5 * time.Minute,
+				SandboxStartedAt: time.Now().Format(time.RFC3339),
+				Timeout:          int(5 * time.Minute.Seconds()),
 				SessionID:        "session-1",
 				Repository:       "https://github.com/superplanehq/superplane.git",
 				Directory:        "/home/daytona/superplane",
@@ -507,9 +501,9 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 
 		wrapped, ok := execCtx.Payloads[0].(map[string]any)
 		require.True(t, ok)
-		payload, ok := wrapped["data"].(CreateRepositorySandboxPayload)
+		payload, ok := wrapped["data"].(CreateRepositorySandboxMetadata)
 		require.True(t, ok)
-		assert.Equal(t, "sandbox-123", payload.Sandbox.ID)
+		assert.Equal(t, "sandbox-123", payload.SandboxID)
 		assert.Equal(t, "/home/daytona/superplane", payload.Directory)
 		assert.Equal(t, "clone logs", payload.Clone.Result)
 		assert.Equal(t, "bootstrap logs", payload.Bootstrap.Result)
@@ -517,13 +511,12 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 	})
 
 	t.Run("bootstrap stage failure returns error", func(t *testing.T) {
-		now := time.Now()
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: CreateRepositorySandboxMetadata{
 				Stage:            repositorySandboxStageBootstrapping,
 				SandboxID:        "sandbox-123",
-				SandboxStartedAt: &now,
-				Timeout:          5 * time.Minute,
+				SandboxStartedAt: time.Now().Format(time.RFC3339),
+				Timeout:          int(5 * time.Minute.Seconds()),
 				SessionID:        "session-1",
 				Bootstrap: &BootstrapMetadata{
 					CmdID: "cmd-bootstrap",
@@ -562,15 +555,14 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 	})
 
 	t.Run("times out when sandbox startup exceeded timeout", func(t *testing.T) {
-		start := time.Now().Add(-2 * time.Minute)
 		err := component.HandleAction(core.ActionContext{
 			Name: "poll",
 			Metadata: &contexts.MetadataContext{
 				Metadata: CreateRepositorySandboxMetadata{
 					Stage:            repositorySandboxStageWaitingSandbox,
 					SandboxID:        "sandbox-123",
-					SandboxStartedAt: &start,
-					Timeout:          time.Minute,
+					SandboxStartedAt: time.Now().Add(-2 * time.Minute).Format(time.RFC3339),
+					Timeout:          int(time.Minute.Seconds()),
 				},
 			},
 			ExecutionState: &contexts.ExecutionStateContext{},

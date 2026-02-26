@@ -29,28 +29,6 @@ The Create Repository Sandbox component creates a new Daytona sandbox, clones a 
 - **CI-like workflows**: Clone code and run setup scripts before downstream tasks
 - **Automated validation**: Prepare repository state before executing tests or commands
 
-### Configuration
-
-- **Snapshot**: Base environment snapshot (optional, defaults to "default")
-- **Target**: Target region for the sandbox (optional)
-- **Auto Stop Interval**: Time in minutes before the sandbox auto-stops
-- **Environment Variables**: Environment variables for the sandbox
-- **Repository**: Repository URL to clone
-- **Bootstrap**: Object with one of the following forms:
-  - `{ "from": "inline", "script": "npm ci && npm test" }`
-  - `{ "from": "file", "path": "scripts/bootstrap.sh" }`
-  - `{ "from": "url", "url": "https://example.com/bootstrap.sh" }`
-- **Command Timeout**: Timeout in seconds for clone and bootstrap commands
-
-### Output
-
-Returns:
-- **sandbox**: The started sandbox information
-- **repository**: Repository URL used for cloning
-- **directory**: Full clone directory path
-- **clone**: Clone command result
-- **bootstrap**: Bootstrap command result
-
 ### Notes
 
 - The component waits for the sandbox to reach the "started" state
@@ -320,3 +298,4 @@ Returns preview URL information including:
   "type": "daytona.preview.response"
 }
 ```
+

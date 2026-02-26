@@ -30,6 +30,7 @@ const (
 	repositorySandboxStageWaitingSandbox = "waitingSandbox"
 	repositorySandboxStageCloningRepo    = "cloningRepository"
 	repositorySandboxStageBootstrapping  = "bootstrapping"
+	repositorySandboxStageDone           = "done"
 )
 
 type CreateRepositorySandbox struct{}
@@ -53,13 +54,13 @@ type CreateRepositorySandboxBootstrapSpec struct {
 type CreateRepositorySandboxMetadata struct {
 	Stage            string             `json:"stage" mapstructure:"stage"`
 	SandboxID        string             `json:"sandboxId" mapstructure:"sandboxId"`
-	SandboxStartedAt *time.Time         `json:"sandboxStartedAt" mapstructure:"sandboxStartedAt"`
+	SandboxStartedAt string             `json:"sandboxStartedAt" mapstructure:"sandboxStartedAt"`
 	SessionID        string             `json:"sessionId" mapstructure:"sessionId"`
-	Timeout          time.Duration      `json:"timeout" mapstructure:"timeout"`
+	Timeout          int                `json:"timeout" mapstructure:"timeout"`
 	Repository       string             `json:"repository" mapstructure:"repository"`
 	Directory        string             `json:"directory" mapstructure:"directory"`
-	Clone            *CloneMetadata     `json:"clone" mapstructure:"clone"`
-	Bootstrap        *BootstrapMetadata `json:"bootstrap" mapstructure:"bootstrap"`
+	Clone            *CloneMetadata     `json:"clone,omitempty" mapstructure:"clone,omitempty"`
+	Bootstrap        *BootstrapMetadata `json:"bootstrap,omitempty" mapstructure:"bootstrap,omitempty"`
 }
 
 type CloneMetadata struct {
@@ -77,17 +78,9 @@ type BootstrapMetadata struct {
 	ExitCode   int     `json:"exitCode" mapstructure:"exitCode"`
 	Result     string  `json:"result" mapstructure:"result"`
 	From       string  `json:"from" mapstructure:"from"`
-	Script     *string `json:"script" mapstructure:"script"`
-	Path       *string `json:"path" mapstructure:"path"`
-	URL        *string `json:"url" mapstructure:"url"`
-}
-
-type CreateRepositorySandboxPayload struct {
-	Sandbox    Sandbox           `json:"sandbox"`
-	Repository string            `json:"repository"`
-	Directory  string            `json:"directory"`
-	Clone      CloneMetadata     `json:"clone"`
-	Bootstrap  BootstrapMetadata `json:"bootstrap"`
+	Script     *string `json:"script,omitempty" mapstructure:"script,omitempty"`
+	Path       *string `json:"path,omitempty" mapstructure:"path,omitempty"`
+	URL        *string `json:"url,omitempty" mapstructure:"url,omitempty"`
 }
 
 func (c *CreateRepositorySandbox) Name() string {
@@ -367,12 +360,11 @@ func (c *CreateRepositorySandbox) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	now := time.Now()
 	metadata := CreateRepositorySandboxMetadata{
 		Stage:            repositorySandboxStageWaitingSandbox,
 		SandboxID:        sandbox.ID,
-		SandboxStartedAt: &now,
-		Timeout:          CreateRepositorySandboxDefaultTimeout,
+		SandboxStartedAt: time.Now().Format(time.RFC3339),
+		Timeout:          int(CreateRepositorySandboxDefaultTimeout.Seconds()),
 		Repository:       strings.TrimSpace(spec.Repository),
 		Directory:        path.Join(CreateRepositorySandboxCloneBasePath, repositoryDirectory),
 		Bootstrap:        bootstrapMetadata,
@@ -418,7 +410,13 @@ func (c *CreateRepositorySandbox) poll(ctx core.ActionContext) error {
 		return fmt.Errorf("failed to decode metadata: %v", err)
 	}
 
-	if time.Since(*metadata.SandboxStartedAt) > metadata.Timeout {
+	startedAt, err := time.Parse(time.RFC3339, metadata.SandboxStartedAt)
+	if err != nil {
+		return fmt.Errorf("failed to parse sandbox started at: %v", err)
+	}
+
+	timeout := time.Duration(metadata.Timeout) * time.Second
+	if time.Since(startedAt) > timeout {
 		return fmt.Errorf("bootstrapping repository sandbox %s timed out after %v", metadata.SandboxID, metadata.Timeout)
 	}
 
@@ -575,21 +573,16 @@ func (c *CreateRepositorySandbox) pollBootstrapping(ctx core.ActionContext, meta
 }
 
 func (c *CreateRepositorySandbox) finish(ctx core.ActionContext, metadata *CreateRepositorySandboxMetadata) error {
-	payload := CreateRepositorySandboxPayload{
-		Sandbox: Sandbox{
-			ID:    metadata.SandboxID,
-			State: "started",
-		},
-		Repository: metadata.Repository,
-		Directory:  metadata.Directory,
-		Clone:      *metadata.Clone,
-		Bootstrap:  *metadata.Bootstrap,
+	metadata.Stage = repositorySandboxStageDone
+	err := ctx.Metadata.Set(*metadata)
+	if err != nil {
+		return err
 	}
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		CreateRepositorySandboxPayloadType,
-		[]any{payload},
+		[]any{*metadata},
 	)
 }
 
