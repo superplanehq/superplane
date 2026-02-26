@@ -182,6 +182,8 @@ func generateCanvasAIPlan(
 		"- For multiple resources, use list append/upsert in setData and list lookup in getData by a stable key (for example pull request number).",
 		"- For setData nodes, always include configuration.valueList with at least one {name, value} item; do not leave valueList empty.",
 		"- For PR sandbox lifecycle flows, prefer setData key 'pr_sandboxes' with operation 'append', uniqueBy 'pull_request', and fields including pull_request + sandbox_id.",
+		"- For getData nodes, always include configuration.mode explicitly ('value' or 'listLookup'); do not omit mode.",
+		"- When reading PR sandbox mappings from list storage, prefer getData mode 'listLookup' with matchBy 'pull_request' and returnField 'sandbox_id'.",
 		"",
 		"Current canvas context JSON:",
 		string(canvasContextJSON),

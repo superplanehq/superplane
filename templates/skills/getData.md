@@ -6,6 +6,19 @@ Use this guidance when planning or configuring the `getData` component.
 
 `getData` reads canvas-level stored data so downstream nodes can use values persisted by prior runs.
 
+## Required Configuration Shape
+
+`getData` must include:
+
+- `key` (required string)
+- `mode` (required: `value` or `listLookup`)
+
+For `mode: "listLookup"`, also include:
+
+- `matchBy` (required string)
+- `matchValue` (required expression/string/number)
+- `returnField` (optional string; use when downstream needs one field like `sandbox_id`)
+
 ## Planning Rules
 
 When generating workflow operations that include `getData`:
@@ -15,6 +28,11 @@ When generating workflow operations that include `getData`:
 3. If only one field is needed downstream, set lookup to return that specific field (for example `sandbox_id`).
 4. Use expression-capable matching where appropriate (for example matching by trigger payload values).
 5. Wire downstream deletion/cleanup components to the `getData` output, not to guessed/static IDs.
+6. Always set `mode` explicitly in generated operations (do not rely on UI default).
+7. For PR sandbox destroy flows, prefer `mode: "listLookup"` with:
+   - `matchBy: "pull_request"`
+   - `matchValue` from PR event expression
+   - `returnField: "sandbox_id"`
 
 ## Common Lifecycle Pattern
 
@@ -22,8 +40,27 @@ When generating workflow operations that include `getData`:
 2. Later trigger path runs `getData` with `matchBy: pull_request` and dynamic `matchValue`.
 3. Cleanup node reads returned `sandbox_id` and deletes the correct resource.
 
+## Canonical Operation Example
+
+```json
+{
+  "type": "add_node",
+  "blockName": "getData",
+  "nodeName": "Get PR Sandbox Mapping",
+  "configuration": {
+    "key": "pr_sandboxes",
+    "mode": "listLookup",
+    "matchBy": "pull_request",
+    "matchValue": "{{ root().data.issue.number }}",
+    "returnField": "sandbox_id"
+  }
+}
+```
+
 ## Mistakes To Avoid
 
 - Attempting cleanup with hardcoded IDs when stored data exists.
 - Looking up list entries without a deterministic key.
 - Returning full objects when downstream node expects a single scalar field.
+- Omitting `mode` (can leave node invalid in generated proposals).
+- Using `mode: "value"` when the key stores a list and lookup by identifier is required.
