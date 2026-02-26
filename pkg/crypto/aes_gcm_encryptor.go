@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"errors"
 )
 
 type AESGCMEncryptor struct {
@@ -52,6 +53,9 @@ func (e *AESGCMEncryptor) Decrypt(ctx context.Context, cyphertext []byte, associ
 	// We know the nonce is prepended in the cyphertext
 	// and we know its size, so can easily separate the two.
 	nonceSize := gcm.NonceSize()
+	if len(cyphertext) < nonceSize {
+		return nil, errors.New("ciphertext too short for nonce")
+	}
 	nonce := cyphertext[:nonceSize]
 	ciphertext := cyphertext[nonceSize:]
 

@@ -7,10 +7,23 @@ import { canvasKeys } from "./useCanvasData";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/`;
 
+type CanvasWebsocketPayload = {
+  id?: string;
+  canvasId?: string;
+};
+
+type CanvasLifecycleEventName = "canvas_updated" | "canvas_deleted";
+
+type WebsocketPayload =
+  | CanvasesCanvasNodeExecution
+  | CanvasesCanvasEvent
+  | CanvasesCanvasNodeQueueItem
+  | CanvasWebsocketPayload;
+
 interface QueuedMessage {
   data: {
     event: string;
-    payload: CanvasesCanvasNodeExecution | CanvasesCanvasEvent | CanvasesCanvasNodeQueueItem;
+    payload: WebsocketPayload;
   };
   timestamp: number;
 }
@@ -21,6 +34,8 @@ export function useCanvasWebsocket(
   onNodeEvent?: (nodeId: string, event: string) => void,
   onWorkflowEvent?: (event: CanvasesCanvasEvent, eventName: string) => void,
   onExecutionEvent?: (execution: CanvasesCanvasNodeExecution, eventName: string) => void,
+  onCanvasLifecycleEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasLifecycleEventName) => void,
+  shouldApplyCanvasUpdate?: () => boolean,
 ): void {
   const nodeExecutionStore = useNodeExecutionStore();
   const queryClient = useQueryClient();
@@ -80,11 +95,42 @@ export function useCanvasWebsocket(
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
           break;
+        case "canvas_updated":
+        case "canvas_deleted": {
+          // Canvas structure changed from another actor (e.g. CLI), refresh cache.
+          const canvasMessage = payload as CanvasWebsocketPayload;
+          if (canvasMessage.canvasId && canvasMessage.canvasId !== canvasId) {
+            break;
+          }
+          onCanvasLifecycleEvent?.(canvasMessage, data.event);
+
+          if (data.event === "canvas_deleted") {
+            queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+            break;
+          }
+
+          if (!shouldApplyCanvasUpdate?.()) {
+            break;
+          }
+
+          queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+          queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+          break;
+        }
         default:
           break;
       }
     },
-    [nodeExecutionStore, queryClient, canvasId, onNodeEvent, onWorkflowEvent, onExecutionEvent],
+    [
+      nodeExecutionStore,
+      queryClient,
+      canvasId,
+      onNodeEvent,
+      onWorkflowEvent,
+      onExecutionEvent,
+      onCanvasLifecycleEvent,
+      shouldApplyCanvasUpdate,
+    ],
   );
 
   const processQueue = useCallback(

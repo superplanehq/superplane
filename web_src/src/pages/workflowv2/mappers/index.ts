@@ -81,6 +81,12 @@ import {
   eventStateRegistry as rootlyEventStateRegistry,
 } from "./rootly/index";
 import {
+  componentMappers as incidentComponentMappers,
+  triggerRenderers as incidentTriggerRenderers,
+  eventStateRegistry as incidentEventStateRegistry,
+  customFieldRenderers as incidentCustomFieldRenderers,
+} from "./incident/index";
+import {
   componentMappers as awsComponentMappers,
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
@@ -108,6 +114,11 @@ import {
   triggerRenderers as telegramTriggerRenderers,
   eventStateRegistry as telegramEventStateRegistry,
 } from "./telegram";
+import {
+  componentMappers as octopusComponentMappers,
+  triggerRenderers as octopusTriggerRenderers,
+  eventStateRegistry as octopusEventStateRegistry,
+} from "./octopus/index";
 import {
   componentMappers as openaiComponentMappers,
   triggerRenderers as openaiTriggerRenderers,
@@ -222,9 +233,11 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   sendgrid: sendgridComponentMappers,
   render: renderComponentMappers,
   rootly: rootlyComponentMappers,
+  incident: incidentComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
   telegram: telegramComponentMappers,
+  octopus: octopusComponentMappers,
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
@@ -255,9 +268,11 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   sendgrid: sendgridTriggerRenderers,
   render: renderTriggerRenderers,
   rootly: rootlyTriggerRenderers,
+  incident: incidentTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
   telegram: telegramTriggerRenderers,
+  octopus: octopusTriggerRenderers,
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
@@ -290,6 +305,8 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   discord: discordEventStateRegistry,
   telegram: telegramEventStateRegistry,
   rootly: rootlyEventStateRegistry,
+  incident: incidentEventStateRegistry,
+  octopus: octopusEventStateRegistry,
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
@@ -333,6 +350,7 @@ const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer
   grafana: grafanaCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
+  incident: incidentCustomFieldRenderers,
   gcp: gcpCustomFieldRenderers,
   servicenow: servicenowCustomFieldRenderers,
 };

@@ -12,7 +12,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to GitHub branch creation events" />
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events" />
   <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events" />
-  <LinkCard title="On PR Comment" href="#on-pr-comment" description="Listen to all comment events on pull requests" />
+  <LinkCard title="On PR Comment" href="#on-pr-comment" description="Listen to PR conversation comment events" />
+  <LinkCard title="On PR Review Comment" href="#on-pr-review-comment" description="Listen to pull request review comment events" />
   <LinkCard title="On Pull Request" href="#on-pull-request" description="Listen to pull request events" />
   <LinkCard title="On Push" href="#on-push" description="Listen to GitHub push events" />
   <LinkCard title="On Release" href="#on-release" description="Listen to release events" />
@@ -225,14 +226,13 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 
 ## On PR Comment
 
-The On PR Comment trigger starts a workflow execution when comments are added to pull requests.
+The On PR Comment trigger starts a workflow execution when comments are added on a pull request conversation.
 
 ### Use Cases
 
-- **Command processing**: Process slash commands in PR comments (e.g., /deploy, /test)
+- **Command processing**: Process slash commands in PR conversation comments (e.g., /deploy, /test)
 - **Bot interactions**: Respond to comments with automated actions
-- **Review automation**: Trigger workflows based on comment content
-- **Notification systems**: Notify teams when important comments are added
+- **Notification systems**: Notify teams when important PR conversation comments are added
 
 ### Configuration
 
@@ -243,9 +243,17 @@ The On PR Comment trigger starts a workflow execution when comments are added to
 
 Each comment event includes:
 - **comment**: Comment information including body, author, created timestamp
-- **pull_request**: PR information the comment was added to
+- **issue**: Issue/PR information; for this trigger it is always a pull request issue
 - **repository**: Repository information
 - **sender**: User who added the comment
+
+SuperPlane passes through the full GitHub webhook payload under data for the issue_comment event type.
+
+Common expression paths:
+- PR number: `root().data.issue.number`
+- PR title: `root().data.issue.title`
+- PR URL: `root().data.issue.pull_request.html_url`
+- Comment body: `root().data.comment.body`
 
 ### Webhook Setup
 
@@ -258,28 +266,718 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
   "data": {
     "action": "created",
     "comment": {
-      "body": "Looks good to me",
-      "html_url": "https://github.com/acme/widgets/pull/101#discussion_r7001",
-      "id": 7001
+      "author_association": "CONTRIBUTOR",
+      "body": "Looks good to me — can we also update the README example to match the new title?",
+      "created_at": "2026-02-25T18:14:22Z",
+      "html_url": "https://github.com/acme-labs/snaketoy/pull/42#issuecomment-4928173041",
+      "id": 4928173041,
+      "issue_url": "https://api.github.com/repos/acme-labs/snaketoy/issues/42",
+      "node_id": "IC_kwDOQ7c2jM7zXq2R",
+      "performed_via_github_app": null,
+      "pin": null,
+      "reactions": {
+        "+1": 2,
+        "-1": 0,
+        "confused": 0,
+        "eyes": 1,
+        "heart": 0,
+        "hooray": 1,
+        "laugh": 0,
+        "rocket": 0,
+        "total_count": 4,
+        "url": "https://api.github.com/repos/acme-labs/snaketoy/issues/comments/4928173041/reactions"
+      },
+      "updated_at": "2026-02-25T18:14:29Z",
+      "url": "https://api.github.com/repos/acme-labs/snaketoy/issues/comments/4928173041",
+      "user": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/124578901?v=4",
+        "events_url": "https://api.github.com/users/jules-ramirez/events{/privacy}",
+        "followers_url": "https://api.github.com/users/jules-ramirez/followers",
+        "following_url": "https://api.github.com/users/jules-ramirez/following{/other_user}",
+        "gists_url": "https://api.github.com/users/jules-ramirez/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/jules-ramirez",
+        "id": 124578901,
+        "login": "jules-ramirez",
+        "node_id": "MDQ6VXNlcjEyNDU3ODkwMQ==",
+        "organizations_url": "https://api.github.com/users/jules-ramirez/orgs",
+        "received_events_url": "https://api.github.com/users/jules-ramirez/received_events",
+        "repos_url": "https://api.github.com/users/jules-ramirez/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/jules-ramirez/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/jules-ramirez/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/jules-ramirez",
+        "user_view_type": "public"
+      }
     },
-    "pull_request": {
-      "html_url": "https://github.com/acme/widgets/pull/101",
-      "number": 101,
-      "title": "Add new endpoint"
+    "issue": {
+      "active_lock_reason": null,
+      "assignee": null,
+      "assignees": [],
+      "author_association": "MEMBER",
+      "body": "This PR renames the game title shown in the UI and updates the page header accordingly.",
+      "closed_at": null,
+      "comments": 3,
+      "comments_url": "https://api.github.com/repos/acme-labs/snaketoy/issues/42/comments",
+      "created_at": "2026-02-25T18:02:11Z",
+      "draft": false,
+      "events_url": "https://api.github.com/repos/acme-labs/snaketoy/issues/42/events",
+      "html_url": "https://github.com/acme-labs/snaketoy/pull/42",
+      "id": 5129048832,
+      "labels": [
+        {
+          "color": "a2eeef",
+          "default": true,
+          "description": "New feature or request",
+          "id": 889120331,
+          "name": "enhancement",
+          "node_id": "LA_kwDOQ7c2jM8AAAABN9qLiw",
+          "url": "https://api.github.com/repos/acme-labs/snaketoy/labels/enhancement"
+        }
+      ],
+      "labels_url": "https://api.github.com/repos/acme-labs/snaketoy/issues/42/labels{/name}",
+      "locked": false,
+      "milestone": null,
+      "node_id": "PR_kwDOQ7c2jM7hY2qB",
+      "number": 42,
+      "performed_via_github_app": null,
+      "pull_request": {
+        "diff_url": "https://github.com/acme-labs/snaketoy/pull/42.diff",
+        "html_url": "https://github.com/acme-labs/snaketoy/pull/42",
+        "merged_at": null,
+        "patch_url": "https://github.com/acme-labs/snaketoy/pull/42.patch",
+        "url": "https://api.github.com/repos/acme-labs/snaketoy/pulls/42"
+      },
+      "reactions": {
+        "+1": 5,
+        "-1": 0,
+        "confused": 0,
+        "eyes": 2,
+        "heart": 1,
+        "hooray": 0,
+        "laugh": 0,
+        "rocket": 1,
+        "total_count": 9,
+        "url": "https://api.github.com/repos/acme-labs/snaketoy/issues/42/reactions"
+      },
+      "repository_url": "https://api.github.com/repos/acme-labs/snaketoy",
+      "state": "open",
+      "state_reason": null,
+      "timeline_url": "https://api.github.com/repos/acme-labs/snaketoy/issues/42/timeline",
+      "title": "Rename title from 'Snake' to 'Snake Toy'",
+      "updated_at": "2026-02-25T18:14:29Z",
+      "url": "https://api.github.com/repos/acme-labs/snaketoy/issues/42",
+      "user": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/90231477?v=4",
+        "events_url": "https://api.github.com/users/renato-dev/events{/privacy}",
+        "followers_url": "https://api.github.com/users/renato-dev/followers",
+        "following_url": "https://api.github.com/users/renato-dev/following{/other_user}",
+        "gists_url": "https://api.github.com/users/renato-dev/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/renato-dev",
+        "id": 90231477,
+        "login": "renato-dev",
+        "node_id": "MDQ6VXNlcjkwMjMxNDc3",
+        "organizations_url": "https://api.github.com/users/renato-dev/orgs",
+        "received_events_url": "https://api.github.com/users/renato-dev/received_events",
+        "repos_url": "https://api.github.com/users/renato-dev/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/renato-dev/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/renato-dev/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/renato-dev",
+        "user_view_type": "public"
+      }
     },
     "repository": {
-      "full_name": "acme/widgets",
-      "html_url": "https://github.com/acme/widgets",
-      "id": 123456
+      "allow_forking": true,
+      "archive_url": "https://api.github.com/repos/acme-labs/snaketoy/{archive_format}{/ref}",
+      "archived": false,
+      "assignees_url": "https://api.github.com/repos/acme-labs/snaketoy/assignees{/user}",
+      "blobs_url": "https://api.github.com/repos/acme-labs/snaketoy/git/blobs{/sha}",
+      "branches_url": "https://api.github.com/repos/acme-labs/snaketoy/branches{/branch}",
+      "clone_url": "https://github.com/acme-labs/snaketoy.git",
+      "collaborators_url": "https://api.github.com/repos/acme-labs/snaketoy/collaborators{/collaborator}",
+      "comments_url": "https://api.github.com/repos/acme-labs/snaketoy/comments{/number}",
+      "commits_url": "https://api.github.com/repos/acme-labs/snaketoy/commits{/sha}",
+      "compare_url": "https://api.github.com/repos/acme-labs/snaketoy/compare/{base}...{head}",
+      "contents_url": "https://api.github.com/repos/acme-labs/snaketoy/contents/{+path}",
+      "contributors_url": "https://api.github.com/repos/acme-labs/snaketoy/contributors",
+      "created_at": "2024-08-11T13:09:40Z",
+      "default_branch": "main",
+      "deployments_url": "https://api.github.com/repos/acme-labs/snaketoy/deployments",
+      "description": "A tiny snake fangame written in JavaScript + HTML5 canvas",
+      "disabled": false,
+      "downloads_url": "https://api.github.com/repos/acme-labs/snaketoy/downloads",
+      "events_url": "https://api.github.com/repos/acme-labs/snaketoy/events",
+      "fork": false,
+      "forks": 7,
+      "forks_count": 7,
+      "forks_url": "https://api.github.com/repos/acme-labs/snaketoy/forks",
+      "full_name": "acme-labs/snaketoy",
+      "git_commits_url": "https://api.github.com/repos/acme-labs/snaketoy/git/commits{/sha}",
+      "git_refs_url": "https://api.github.com/repos/acme-labs/snaketoy/git/refs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/acme-labs/snaketoy/git/tags{/sha}",
+      "git_url": "git://github.com/acme-labs/snaketoy.git",
+      "has_discussions": true,
+      "has_downloads": true,
+      "has_issues": true,
+      "has_pages": false,
+      "has_projects": true,
+      "has_pull_requests": true,
+      "has_wiki": true,
+      "homepage": "https://acme.example/snaketoy",
+      "hooks_url": "https://api.github.com/repos/acme-labs/snaketoy/hooks",
+      "html_url": "https://github.com/acme-labs/snaketoy",
+      "id": 712304981,
+      "is_template": false,
+      "issue_comment_url": "https://api.github.com/repos/acme-labs/snaketoy/issues/comments{/number}",
+      "issue_events_url": "https://api.github.com/repos/acme-labs/snaketoy/issues/events{/number}",
+      "issues_url": "https://api.github.com/repos/acme-labs/snaketoy/issues{/number}",
+      "keys_url": "https://api.github.com/repos/acme-labs/snaketoy/keys{/key_id}",
+      "labels_url": "https://api.github.com/repos/acme-labs/snaketoy/labels{/name}",
+      "language": "JavaScript",
+      "languages_url": "https://api.github.com/repos/acme-labs/snaketoy/languages",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "node_id": "MDc6TGljZW5zZTEz",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+      },
+      "merges_url": "https://api.github.com/repos/acme-labs/snaketoy/merges",
+      "milestones_url": "https://api.github.com/repos/acme-labs/snaketoy/milestones{/number}",
+      "mirror_url": null,
+      "name": "snaketoy",
+      "node_id": "MDEwOlJlcG9zaXRvcnk3MTIzMDQ5ODE=",
+      "notifications_url": "https://api.github.com/repos/acme-labs/snaketoy/notifications{?since,all,participating}",
+      "open_issues": 12,
+      "open_issues_count": 12,
+      "owner": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/55120911?v=4",
+        "events_url": "https://api.github.com/users/acme-labs/events{/privacy}",
+        "followers_url": "https://api.github.com/users/acme-labs/followers",
+        "following_url": "https://api.github.com/users/acme-labs/following{/other_user}",
+        "gists_url": "https://api.github.com/users/acme-labs/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/acme-labs",
+        "id": 55120911,
+        "login": "acme-labs",
+        "node_id": "MDEyOk9yZ2FuaXphdGlvbjU1MTIwOTEx",
+        "organizations_url": "https://api.github.com/users/acme-labs/orgs",
+        "received_events_url": "https://api.github.com/users/acme-labs/received_events",
+        "repos_url": "https://api.github.com/users/acme-labs/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/acme-labs/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/acme-labs/subscriptions",
+        "type": "Organization",
+        "url": "https://api.github.com/users/acme-labs",
+        "user_view_type": "public"
+      },
+      "private": false,
+      "pull_request_creation_policy": "all",
+      "pulls_url": "https://api.github.com/repos/acme-labs/snaketoy/pulls{/number}",
+      "pushed_at": "2026-02-25T18:13:58Z",
+      "releases_url": "https://api.github.com/repos/acme-labs/snaketoy/releases{/id}",
+      "size": 1380,
+      "ssh_url": "git@github.com:acme-labs/snaketoy.git",
+      "stargazers_count": 24,
+      "stargazers_url": "https://api.github.com/repos/acme-labs/snaketoy/stargazers",
+      "statuses_url": "https://api.github.com/repos/acme-labs/snaketoy/statuses/{sha}",
+      "subscribers_url": "https://api.github.com/repos/acme-labs/snaketoy/subscribers",
+      "subscription_url": "https://api.github.com/repos/acme-labs/snaketoy/subscription",
+      "svn_url": "https://github.com/acme-labs/snaketoy",
+      "tags_url": "https://api.github.com/repos/acme-labs/snaketoy/tags",
+      "teams_url": "https://api.github.com/repos/acme-labs/snaketoy/teams",
+      "topics": [
+        "game",
+        "canvas",
+        "javascript"
+      ],
+      "trees_url": "https://api.github.com/repos/acme-labs/snaketoy/git/trees{/sha}",
+      "updated_at": "2026-02-12T09:41:27Z",
+      "url": "https://api.github.com/repos/acme-labs/snaketoy",
+      "visibility": "public",
+      "watchers": 24,
+      "watchers_count": 24,
+      "web_commit_signoff_required": false
     },
     "sender": {
-      "html_url": "https://github.com/octocat",
-      "id": 101,
-      "login": "octocat"
+      "avatar_url": "https://avatars.githubusercontent.com/u/55120911?v=4",
+      "events_url": "https://api.github.com/users/acme-ci/events{/privacy}",
+      "followers_url": "https://api.github.com/users/acme-ci/followers",
+      "following_url": "https://api.github.com/users/acme-ci/following{/other_user}",
+      "gists_url": "https://api.github.com/users/acme-ci/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/acme-ci",
+      "id": 77100412,
+      "login": "acme-ci",
+      "node_id": "MDQ6VXNlcjc3MTAwNDEy",
+      "organizations_url": "https://api.github.com/users/acme-ci/orgs",
+      "received_events_url": "https://api.github.com/users/acme-ci/received_events",
+      "repos_url": "https://api.github.com/users/acme-ci/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/acme-ci/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/acme-ci/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/acme-ci",
+      "user_view_type": "public"
     }
   },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.pullRequestReviewComment"
+  "timestamp": "2026-02-25T18:14:31.384219122Z",
+  "type": "github.prComment"
+}
+```
+
+<a id="on-pr-review-comment"></a>
+
+## On PR Review Comment
+
+The On PR Review Comment trigger starts a workflow execution when review comments are added to pull requests.
+
+### Use Cases
+
+- **Code review automation**: React to line-level review comments
+- **Review workflows**: Trigger follow-up workflows when a review is submitted
+- **Notification systems**: Notify teams when new review comments are posted
+
+### Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **Content Filter**: Optional regex pattern to filter comment/review body (e.g., `/solve`)
+
+### Event Data
+
+This trigger handles two GitHub webhook events:
+- **pull_request_review_comment**: line-level code review comments (`comment` and `pull_request`)
+- **pull_request_review**: submitted review comments (`review` and `pull_request`)
+
+SuperPlane passes through the full GitHub webhook payload under data.
+
+Common expression paths:
+- PR number: `root().data.pull_request.number`
+- Branch name: `root().data.pull_request.head.ref`
+- Head SHA: `root().data.pull_request.head.sha`
+- Review comment body: `root().data.comment.body` (pull_request_review_comment)
+- Review submission body: `root().data.review.body` (pull_request_review)
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "created",
+    "comment": {
+      "_links": {
+        "html": {
+          "href": "https://github.com/acme-labs/snaketoy/pull/42#discussion_r3179045528"
+        },
+        "pull_request": {
+          "href": "https://api.github.com/repos/acme-labs/snaketoy/pulls/42"
+        },
+        "self": {
+          "href": "https://api.github.com/repos/acme-labs/snaketoy/pulls/comments/3179045528"
+        }
+      },
+      "author_association": "CONTRIBUTOR",
+      "body": "Small nit: could we also update the page heading to match the new title?",
+      "commit_id": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+      "created_at": "2026-02-25T18:22:13Z",
+      "diff_hunk": "@@ -3,7 +3,7 @@\n \u003chead\u003e\n     \u003cmeta charset=\"UTF-8\"\u003e\n     \u003cmeta name=\"viewport\" content=\"width=device-width, user-scalable=no, initial-scale=1\"\u003e\n-    \u003ctitle\u003eSnake\u003c/title\u003e\n+    \u003ctitle\u003eSnake Toy\u003c/title\u003e",
+      "html_url": "https://github.com/acme-labs/snaketoy/pull/42#discussion_r3179045528",
+      "id": 3179045528,
+      "line": 6,
+      "node_id": "PRRC_kwDOQ7c2jM6_9s1Y",
+      "original_commit_id": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+      "original_line": 6,
+      "original_position": 5,
+      "original_start_line": null,
+      "path": "index.html",
+      "position": 5,
+      "pull_request_review_id": 4632189077,
+      "pull_request_url": "https://api.github.com/repos/acme-labs/snaketoy/pulls/42",
+      "reactions": {
+        "+1": 1,
+        "-1": 0,
+        "confused": 0,
+        "eyes": 0,
+        "heart": 0,
+        "hooray": 0,
+        "laugh": 0,
+        "rocket": 0,
+        "total_count": 1,
+        "url": "https://api.github.com/repos/acme-labs/snaketoy/pulls/comments/3179045528/reactions"
+      },
+      "side": "RIGHT",
+      "start_line": null,
+      "start_side": null,
+      "subject_type": "line",
+      "updated_at": "2026-02-25T18:22:21Z",
+      "url": "https://api.github.com/repos/acme-labs/snaketoy/pulls/comments/3179045528",
+      "user": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/124578901?v=4",
+        "events_url": "https://api.github.com/users/jules-ramirez/events{/privacy}",
+        "followers_url": "https://api.github.com/users/jules-ramirez/followers",
+        "following_url": "https://api.github.com/users/jules-ramirez/following{/other_user}",
+        "gists_url": "https://api.github.com/users/jules-ramirez/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/jules-ramirez",
+        "id": 124578901,
+        "login": "jules-ramirez",
+        "node_id": "MDQ6VXNlcjEyNDU3ODkwMQ==",
+        "organizations_url": "https://api.github.com/users/jules-ramirez/orgs",
+        "received_events_url": "https://api.github.com/users/jules-ramirez/received_events",
+        "repos_url": "https://api.github.com/users/jules-ramirez/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/jules-ramirez/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/jules-ramirez/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/jules-ramirez",
+        "user_view_type": "public"
+      }
+    },
+    "pull_request": {
+      "_links": {
+        "comments": {
+          "href": "https://api.github.com/repos/acme-labs/snaketoy/issues/42/comments"
+        },
+        "commits": {
+          "href": "https://api.github.com/repos/acme-labs/snaketoy/pulls/42/commits"
+        },
+        "html": {
+          "href": "https://github.com/acme-labs/snaketoy/pull/42"
+        },
+        "issue": {
+          "href": "https://api.github.com/repos/acme-labs/snaketoy/issues/42"
+        },
+        "review_comment": {
+          "href": "https://api.github.com/repos/acme-labs/snaketoy/pulls/comments{/number}"
+        },
+        "review_comments": {
+          "href": "https://api.github.com/repos/acme-labs/snaketoy/pulls/42/comments"
+        },
+        "self": {
+          "href": "https://api.github.com/repos/acme-labs/snaketoy/pulls/42"
+        },
+        "statuses": {
+          "href": "https://api.github.com/repos/acme-labs/snaketoy/statuses/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+        }
+      },
+      "active_lock_reason": null,
+      "assignee": null,
+      "assignees": [],
+      "author_association": "MEMBER",
+      "auto_merge": null,
+      "base": {
+        "label": "acme-labs:main",
+        "ref": "main",
+        "repo": {
+          "allow_auto_merge": false,
+          "allow_forking": true,
+          "allow_merge_commit": true,
+          "allow_rebase_merge": true,
+          "allow_squash_merge": true,
+          "allow_update_branch": false,
+          "archive_url": "https://api.github.com/repos/acme-labs/snaketoy/{archive_format}{/ref}",
+          "archived": false,
+          "assignees_url": "https://api.github.com/repos/acme-labs/snaketoy/assignees{/user}",
+          "blobs_url": "https://api.github.com/repos/acme-labs/snaketoy/git/blobs{/sha}",
+          "branches_url": "https://api.github.com/repos/acme-labs/snaketoy/branches{/branch}",
+          "clone_url": "https://github.com/acme-labs/snaketoy.git",
+          "collaborators_url": "https://api.github.com/repos/acme-labs/snaketoy/collaborators{/collaborator}",
+          "comments_url": "https://api.github.com/repos/acme-labs/snaketoy/comments{/number}",
+          "commits_url": "https://api.github.com/repos/acme-labs/snaketoy/commits{/sha}",
+          "compare_url": "https://api.github.com/repos/acme-labs/snaketoy/compare/{base}...{head}",
+          "contents_url": "https://api.github.com/repos/acme-labs/snaketoy/contents/{+path}",
+          "contributors_url": "https://api.github.com/repos/acme-labs/snaketoy/contributors",
+          "created_at": "2024-08-11T13:09:40Z",
+          "default_branch": "main",
+          "delete_branch_on_merge": false,
+          "deployments_url": "https://api.github.com/repos/acme-labs/snaketoy/deployments",
+          "description": "A tiny snake fangame written in JavaScript + HTML5 canvas",
+          "disabled": false,
+          "downloads_url": "https://api.github.com/repos/acme-labs/snaketoy/downloads",
+          "events_url": "https://api.github.com/repos/acme-labs/snaketoy/events",
+          "fork": false,
+          "forks": 7,
+          "forks_count": 7,
+          "forks_url": "https://api.github.com/repos/acme-labs/snaketoy/forks",
+          "full_name": "acme-labs/snaketoy",
+          "git_commits_url": "https://api.github.com/repos/acme-labs/snaketoy/git/commits{/sha}",
+          "git_refs_url": "https://api.github.com/repos/acme-labs/snaketoy/git/refs{/sha}",
+          "git_tags_url": "https://api.github.com/repos/acme-labs/snaketoy/git/tags{/sha}",
+          "git_url": "git://github.com/acme-labs/snaketoy.git",
+          "has_discussions": true,
+          "has_downloads": true,
+          "has_issues": true,
+          "has_pages": false,
+          "has_projects": true,
+          "has_pull_requests": true,
+          "has_wiki": true,
+          "homepage": "https://acme.example/snaketoy",
+          "hooks_url": "https://api.github.com/repos/acme-labs/snaketoy/hooks",
+          "html_url": "https://github.com/acme-labs/snaketoy",
+          "id": 712304981,
+          "is_template": false,
+          "issue_comment_url": "https://api.github.com/repos/acme-labs/snaketoy/issues/comments{/number}",
+          "issue_events_url": "https://api.github.com/repos/acme-labs/snaketoy/issues/events{/number}",
+          "issues_url": "https://api.github.com/repos/acme-labs/snaketoy/issues{/number}",
+          "keys_url": "https://api.github.com/repos/acme-labs/snaketoy/keys{/key_id}",
+          "labels_url": "https://api.github.com/repos/acme-labs/snaketoy/labels{/name}",
+          "language": "JavaScript",
+          "languages_url": "https://api.github.com/repos/acme-labs/snaketoy/languages",
+          "license": {
+            "key": "mit",
+            "name": "MIT License",
+            "node_id": "MDc6TGljZW5zZTEz",
+            "spdx_id": "MIT",
+            "url": "https://api.github.com/licenses/mit"
+          },
+          "merge_commit_message": "PR_TITLE",
+          "merge_commit_title": "MERGE_MESSAGE",
+          "merges_url": "https://api.github.com/repos/acme-labs/snaketoy/merges",
+          "milestones_url": "https://api.github.com/repos/acme-labs/snaketoy/milestones{/number}",
+          "mirror_url": null,
+          "name": "snaketoy",
+          "node_id": "MDEwOlJlcG9zaXRvcnk3MTIzMDQ5ODE=",
+          "notifications_url": "https://api.github.com/repos/acme-labs/snaketoy/notifications{?since,all,participating}",
+          "open_issues": 12,
+          "open_issues_count": 12,
+          "owner": {
+            "avatar_url": "https://avatars.githubusercontent.com/u/55120911?v=4",
+            "events_url": "https://api.github.com/users/acme-labs/events{/privacy}",
+            "followers_url": "https://api.github.com/users/acme-labs/followers",
+            "following_url": "https://api.github.com/users/acme-labs/following{/other_user}",
+            "gists_url": "https://api.github.com/users/acme-labs/gists{/gist_id}",
+            "gravatar_id": "",
+            "html_url": "https://github.com/acme-labs",
+            "id": 55120911,
+            "login": "acme-labs",
+            "node_id": "MDEyOk9yZ2FuaXphdGlvbjU1MTIwOTEx",
+            "organizations_url": "https://api.github.com/users/acme-labs/orgs",
+            "received_events_url": "https://api.github.com/users/acme-labs/received_events",
+            "repos_url": "https://api.github.com/users/acme-labs/repos",
+            "site_admin": false,
+            "starred_url": "https://api.github.com/users/acme-labs/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/acme-labs/subscriptions",
+            "type": "Organization",
+            "url": "https://api.github.com/users/acme-labs",
+            "user_view_type": "public"
+          },
+          "private": false,
+          "pull_request_creation_policy": "all",
+          "pulls_url": "https://api.github.com/repos/acme-labs/snaketoy/pulls{/number}",
+          "pushed_at": "2026-02-25T18:21:49Z",
+          "releases_url": "https://api.github.com/repos/acme-labs/snaketoy/releases{/id}",
+          "size": 1380,
+          "squash_merge_commit_message": "COMMIT_MESSAGES",
+          "squash_merge_commit_title": "COMMIT_OR_PR_TITLE",
+          "ssh_url": "git@github.com:acme-labs/snaketoy.git",
+          "stargazers_count": 24,
+          "stargazers_url": "https://api.github.com/repos/acme-labs/snaketoy/stargazers",
+          "statuses_url": "https://api.github.com/repos/acme-labs/snaketoy/statuses/{sha}",
+          "subscribers_url": "https://api.github.com/repos/acme-labs/snaketoy/subscribers",
+          "subscription_url": "https://api.github.com/repos/acme-labs/snaketoy/subscription",
+          "svn_url": "https://github.com/acme-labs/snaketoy",
+          "tags_url": "https://api.github.com/repos/acme-labs/snaketoy/tags",
+          "teams_url": "https://api.github.com/repos/acme-labs/snaketoy/teams",
+          "topics": [
+            "game",
+            "javascript",
+            "canvas"
+          ],
+          "trees_url": "https://api.github.com/repos/acme-labs/snaketoy/git/trees{/sha}",
+          "updated_at": "2026-02-12T09:41:27Z",
+          "url": "https://api.github.com/repos/acme-labs/snaketoy",
+          "use_squash_pr_title_as_default": false,
+          "visibility": "public",
+          "watchers": 24,
+          "watchers_count": 24,
+          "web_commit_signoff_required": false
+        },
+        "sha": "2d5a1dfbba9d0a8a7f7b14b08a1b6c7c1e2f3a4b",
+        "user": {
+          "avatar_url": "https://avatars.githubusercontent.com/u/90231477?v=4",
+          "events_url": "https://api.github.com/users/renato-dev/events{/privacy}",
+          "followers_url": "https://api.github.com/users/renato-dev/followers",
+          "following_url": "https://api.github.com/users/renato-dev/following{/other_user}",
+          "gists_url": "https://api.github.com/users/renato-dev/gists{/gist_id}",
+          "gravatar_id": "",
+          "html_url": "https://github.com/renato-dev",
+          "id": 90231477,
+          "login": "renato-dev",
+          "node_id": "MDQ6VXNlcjkwMjMxNDc3",
+          "organizations_url": "https://api.github.com/users/renato-dev/orgs",
+          "received_events_url": "https://api.github.com/users/renato-dev/received_events",
+          "repos_url": "https://api.github.com/users/renato-dev/repos",
+          "site_admin": false,
+          "starred_url": "https://api.github.com/users/renato-dev/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/renato-dev/subscriptions",
+          "type": "User",
+          "url": "https://api.github.com/users/renato-dev",
+          "user_view_type": "public"
+        }
+      },
+      "body": "Renames the UI title and keeps the game logic unchanged.",
+      "closed_at": null,
+      "comments_url": "https://api.github.com/repos/acme-labs/snaketoy/issues/42/comments",
+      "commits_url": "https://api.github.com/repos/acme-labs/snaketoy/pulls/42/commits",
+      "created_at": "2026-02-25T18:02:11Z",
+      "diff_url": "https://github.com/acme-labs/snaketoy/pull/42.diff",
+      "draft": false,
+      "head": {
+        "label": "renato-dev:rename-title",
+        "ref": "rename-title",
+        "repo": {
+          "default_branch": "main",
+          "description": "A tiny snake fangame written in JavaScript + HTML5 canvas",
+          "fork": false,
+          "forks_count": 7,
+          "full_name": "acme-labs/snaketoy",
+          "html_url": "https://github.com/acme-labs/snaketoy",
+          "id": 712304981,
+          "language": "JavaScript",
+          "name": "snaketoy",
+          "node_id": "MDEwOlJlcG9zaXRvcnk3MTIzMDQ5ODE=",
+          "open_issues_count": 12,
+          "owner": {
+            "avatar_url": "https://avatars.githubusercontent.com/u/55120911?v=4",
+            "html_url": "https://github.com/acme-labs",
+            "id": 55120911,
+            "login": "acme-labs",
+            "node_id": "MDEyOk9yZ2FuaXphdGlvbjU1MTIwOTEx",
+            "site_admin": false,
+            "type": "Organization"
+          },
+          "private": false,
+          "stargazers_count": 24,
+          "url": "https://api.github.com/repos/acme-labs/snaketoy",
+          "watchers_count": 24
+        },
+        "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+        "user": {
+          "avatar_url": "https://avatars.githubusercontent.com/u/90231477?v=4",
+          "events_url": "https://api.github.com/users/renato-dev/events{/privacy}",
+          "followers_url": "https://api.github.com/users/renato-dev/followers",
+          "following_url": "https://api.github.com/users/renato-dev/following{/other_user}",
+          "gists_url": "https://api.github.com/users/renato-dev/gists{/gist_id}",
+          "gravatar_id": "",
+          "html_url": "https://github.com/renato-dev",
+          "id": 90231477,
+          "login": "renato-dev",
+          "node_id": "MDQ6VXNlcjkwMjMxNDc3",
+          "organizations_url": "https://api.github.com/users/renato-dev/orgs",
+          "received_events_url": "https://api.github.com/users/renato-dev/received_events",
+          "repos_url": "https://api.github.com/users/renato-dev/repos",
+          "site_admin": false,
+          "starred_url": "https://api.github.com/users/renato-dev/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/renato-dev/subscriptions",
+          "type": "User",
+          "url": "https://api.github.com/users/renato-dev",
+          "user_view_type": "public"
+        }
+      },
+      "html_url": "https://github.com/acme-labs/snaketoy/pull/42",
+      "id": 4982710331,
+      "issue_url": "https://api.github.com/repos/acme-labs/snaketoy/issues/42",
+      "labels": [],
+      "locked": false,
+      "merge_commit_sha": "8b1a4c7d9e0f2a3b4c5d6e7f8a9b0c1d2e3f4a5b",
+      "merged_at": null,
+      "milestone": null,
+      "node_id": "PR_kwDOQ7c2jM7hY2qB",
+      "number": 42,
+      "patch_url": "https://github.com/acme-labs/snaketoy/pull/42.patch",
+      "requested_reviewers": [],
+      "requested_teams": [],
+      "review_comment_url": "https://api.github.com/repos/acme-labs/snaketoy/pulls/comments{/number}",
+      "review_comments_url": "https://api.github.com/repos/acme-labs/snaketoy/pulls/42/comments",
+      "state": "open",
+      "statuses_url": "https://api.github.com/repos/acme-labs/snaketoy/statuses/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+      "title": "Rename title from 'Snake' to 'Snake Toy'",
+      "updated_at": "2026-02-25T18:22:21Z",
+      "url": "https://api.github.com/repos/acme-labs/snaketoy/pulls/42",
+      "user": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/90231477?v=4",
+        "events_url": "https://api.github.com/users/renato-dev/events{/privacy}",
+        "followers_url": "https://api.github.com/users/renato-dev/followers",
+        "following_url": "https://api.github.com/users/renato-dev/following{/other_user}",
+        "gists_url": "https://api.github.com/users/renato-dev/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/renato-dev",
+        "id": 90231477,
+        "login": "renato-dev",
+        "node_id": "MDQ6VXNlcjkwMjMxNDc3",
+        "organizations_url": "https://api.github.com/users/renato-dev/orgs",
+        "received_events_url": "https://api.github.com/users/renato-dev/received_events",
+        "repos_url": "https://api.github.com/users/renato-dev/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/renato-dev/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/renato-dev/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/renato-dev",
+        "user_view_type": "public"
+      }
+    },
+    "repository": {
+      "created_at": "2024-08-11T13:09:40Z",
+      "default_branch": "main",
+      "description": "A tiny snake fangame written in JavaScript + HTML5 canvas",
+      "fork": false,
+      "forks_count": 7,
+      "full_name": "acme-labs/snaketoy",
+      "html_url": "https://github.com/acme-labs/snaketoy",
+      "id": 712304981,
+      "language": "JavaScript",
+      "name": "snaketoy",
+      "node_id": "MDEwOlJlcG9zaXRvcnk3MTIzMDQ5ODE=",
+      "open_issues_count": 12,
+      "owner": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/55120911?v=4",
+        "html_url": "https://github.com/acme-labs",
+        "id": 55120911,
+        "login": "acme-labs",
+        "node_id": "MDEyOk9yZ2FuaXphdGlvbjU1MTIwOTEx",
+        "site_admin": false,
+        "type": "Organization"
+      },
+      "private": false,
+      "pushed_at": "2026-02-25T18:21:49Z",
+      "stargazers_count": 24,
+      "updated_at": "2026-02-12T09:41:27Z",
+      "url": "https://api.github.com/repos/acme-labs/snaketoy",
+      "visibility": "public",
+      "watchers_count": 24
+    },
+    "sender": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/77100412?v=4",
+      "events_url": "https://api.github.com/users/acme-ci/events{/privacy}",
+      "followers_url": "https://api.github.com/users/acme-ci/followers",
+      "following_url": "https://api.github.com/users/acme-ci/following{/other_user}",
+      "gists_url": "https://api.github.com/users/acme-ci/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/acme-ci",
+      "id": 77100412,
+      "login": "acme-ci",
+      "node_id": "MDQ6VXNlcjc3MTAwNDEy",
+      "organizations_url": "https://api.github.com/users/acme-ci/orgs",
+      "received_events_url": "https://api.github.com/users/acme-ci/received_events",
+      "repos_url": "https://api.github.com/users/acme-ci/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/acme-ci/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/acme-ci/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/acme-ci",
+      "user_view_type": "public"
+    }
+  },
+  "timestamp": "2026-02-25T18:22:23.912774300Z",
+  "type": "github.prReviewComment"
 }
 ```
 

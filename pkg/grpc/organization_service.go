@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -16,6 +17,7 @@ import (
 
 type OrganizationService struct {
 	authorizationService authorization.Authorization
+	encryptor            crypto.Encryptor
 	registry             *registry.Registry
 	oidcProvider         oidc.Provider
 	baseURL              string
@@ -24,6 +26,7 @@ type OrganizationService struct {
 
 func NewOrganizationService(
 	authorizationService authorization.Authorization,
+	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
 	baseURL string,
@@ -34,6 +37,7 @@ func NewOrganizationService(
 		oidcProvider:         oidcProvider,
 		baseURL:              baseURL,
 		webhooksBaseURL:      webhooksBaseURL,
+		encryptor:            encryptor,
 		authorizationService: authorizationService,
 	}
 }
@@ -86,6 +90,50 @@ func (s *OrganizationService) UpdateInviteLink(ctx context.Context, req *pb.Upda
 func (s *OrganizationService) ResetInviteLink(ctx context.Context, req *pb.ResetInviteLinkRequest) (*pb.ResetInviteLinkResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.ResetInviteLink(orgID)
+}
+
+func (s *OrganizationService) GetAgentSettings(
+	ctx context.Context,
+	req *pb.GetAgentSettingsRequest,
+) (*pb.GetAgentSettingsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.GetAgentSettings(orgID)
+}
+
+func (s *OrganizationService) UpdateAgentSettings(
+	ctx context.Context,
+	req *pb.UpdateAgentSettingsRequest,
+) (*pb.UpdateAgentSettingsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	userID, err := userIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return organizations.UpdateAgentSettings(orgID, req.AgentModeEnabled, userID)
+}
+
+func (s *OrganizationService) SetAgentOpenAIKey(
+	ctx context.Context,
+	req *pb.SetAgentOpenAIKeyRequest,
+) (*pb.SetAgentOpenAIKeyResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	userID, err := userIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return organizations.SetAgentOpenAIKey(ctx, s.encryptor, orgID, userID, req.ApiKey, req.Validate)
+}
+
+func (s *OrganizationService) DeleteAgentOpenAIKey(
+	ctx context.Context,
+	req *pb.DeleteAgentOpenAIKeyRequest,
+) (*pb.DeleteAgentOpenAIKeyResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	userID, err := userIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return organizations.DeleteAgentOpenAIKey(orgID, userID)
 }
 
 func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.InviteLink) (*structpb.Struct, error) {
@@ -164,4 +212,18 @@ func accountIDFromContext(ctx context.Context) (string, error) {
 	}
 
 	return accountMeta[0], nil
+}
+
+func userIDFromContext(ctx context.Context) (string, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return "", status.Error(codes.Unauthenticated, "user not found")
+	}
+
+	userMeta := md.Get("x-user-id")
+	if len(userMeta) == 0 || userMeta[0] == "" {
+		return "", status.Error(codes.Unauthenticated, "user not found")
+	}
+
+	return userMeta[0], nil
 }

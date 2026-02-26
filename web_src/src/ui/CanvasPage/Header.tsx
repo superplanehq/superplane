@@ -217,8 +217,8 @@ export function Header({
                   setExportAction("");
                 }}
               >
-                <SelectTrigger className="w-fit min-w-32">
-                  <SelectValue placeholder="YAML" />
+                <SelectTrigger className="h-5 w-fit min-w-0 rounded-md border-gray-300 px-1 py-0 text-xs font-mono text-gray-500 data-[placeholder]:text-gray-500 shadow-none [&>svg]:hidden">
+                  <SelectValue placeholder=".yaml" />
                 </SelectTrigger>
                 <SelectContent align="end">
                   <SelectItem value="copy">
