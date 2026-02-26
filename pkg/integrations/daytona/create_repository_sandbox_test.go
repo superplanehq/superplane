@@ -180,6 +180,7 @@ func Test__CreateRepositorySandbox__Execute(t *testing.T) {
 		ExecutionState: execCtx,
 		Metadata:       metadataCtx,
 		Requests:       requestCtx,
+		Logger:         newTestLogger(),
 	})
 
 	require.NoError(t, err)
@@ -555,6 +556,8 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 	})
 
 	t.Run("times out when sandbox startup exceeded timeout", func(t *testing.T) {
+		execCtx := &contexts.ExecutionStateContext{}
+
 		err := component.HandleAction(core.ActionContext{
 			Name: "poll",
 			Metadata: &contexts.MetadataContext{
@@ -565,7 +568,7 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 					Timeout:          int(time.Minute.Seconds()),
 				},
 			},
-			ExecutionState: &contexts.ExecutionStateContext{},
+			ExecutionState: execCtx,
 			Requests:       &contexts.RequestContext{},
 			Logger:         newTestLogger(),
 			Integration: &contexts.IntegrationContext{
@@ -573,7 +576,47 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 			},
 		})
 
-		require.ErrorContains(t, err, "timed out")
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.False(t, execCtx.Passed)
+		assert.Equal(t, "error", execCtx.FailureReason)
+		assert.Contains(t, execCtx.FailureMessage, "sandbox creation failed on stage waitingSandbox after 1m0s")
+	})
+
+	t.Run("times out during clone stage and marks execution as failed", func(t *testing.T) {
+		execCtx := &contexts.ExecutionStateContext{}
+
+		err := component.HandleAction(core.ActionContext{
+			Name: "poll",
+			Metadata: &contexts.MetadataContext{
+				Metadata: CreateRepositorySandboxMetadata{
+					Stage:            repositorySandboxStageCloningRepo,
+					SandboxID:        "sandbox-123",
+					SandboxStartedAt: time.Now().Add(-2 * time.Minute).Format(time.RFC3339),
+					Timeout:          int(time.Minute.Seconds()),
+					SessionID:        "session-1",
+					Clone: &CloneMetadata{
+						CmdID: "cmd-clone",
+					},
+				},
+			},
+			ExecutionState: execCtx,
+			Requests:       &contexts.RequestContext{},
+			Logger:         newTestLogger(),
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiKey": "test-api-key"},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.False(t, execCtx.Passed)
+		assert.Equal(t, "error", execCtx.FailureReason)
+		assert.Contains(
+			t,
+			execCtx.FailureMessage,
+			"sandbox creation failed on stage "+repositorySandboxStageCloningRepo+" after 1m0s",
+		)
 	})
 
 	t.Run("unknown action returns error", func(t *testing.T) {
