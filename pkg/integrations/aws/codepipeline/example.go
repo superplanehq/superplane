@@ -62,3 +62,17 @@ func (c *GetPipelineExecution) ExampleOutput() map[string]any {
 		&exampleOutputGetPipelineExecution,
 	)
 }
+
+//go:embed example_output_retry_stage_execution.json
+var exampleOutputRetryStageExecutionBytes []byte
+
+var exampleOutputRetryStageExecutionOnce sync.Once
+var exampleOutputRetryStageExecution map[string]any
+
+func (c *RetryStageExecution) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputRetryStageExecutionOnce,
+		exampleOutputRetryStageExecutionBytes,
+		&exampleOutputRetryStageExecution,
+	)
+}

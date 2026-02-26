@@ -48,6 +48,12 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	case "codepipeline.pipeline":
 		return codepipeline.ListPipelines(ctx, resourceType)
 
+	case "codepipeline.stage":
+		return codepipeline.ListStages(ctx, resourceType)
+
+	case "codepipeline.pipelineExecution":
+		return codepipeline.ListPipelineExecutions(ctx, resourceType)
+
 	case "sqs.queue":
 		return sqs.ListQueues(ctx, resourceType)
 	case "route53.hostedZone":
