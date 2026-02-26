@@ -1,7 +1,7 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
+import { Predicate, formatPredicate, buildSubtitle } from "../utils";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
 
 const eventLabels: Record<string, string> = {
@@ -24,6 +24,13 @@ const actionLabels: Record<string, string> = {
 
 function formatActionLabel(action: string): string {
   return actionLabels[action] ?? action;
+}
+
+interface OnFeatureFlagChangeConfiguration {
+  projectKey?: string;
+  environments?: Predicate[];
+  flags?: Predicate[];
+  actions?: string[];
 }
 
 interface OnFeatureFlagChangeEventData {
@@ -62,24 +69,39 @@ export const onFeatureFlagChangeTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const configuration = node.configuration as { projectKey?: string; flagKey?: string; actions?: string[] };
+    const configuration = node.configuration as OnFeatureFlagChangeConfiguration;
     const metadataItems: { icon: string; label: string }[] = [];
+
     if (configuration?.projectKey) {
       metadataItems.push({ icon: "folder", label: configuration.projectKey });
     }
-    if (configuration?.flagKey) {
-      metadataItems.push({ icon: "flag", label: configuration.flagKey });
+
+    if (configuration?.environments?.length) {
+      metadataItems.push({
+        icon: "globe",
+        label: configuration.environments.map(formatPredicate).join(", "),
+      });
     }
+
+    if (configuration?.flags?.length) {
+      metadataItems.push({
+        icon: "flag",
+        label: configuration.flags.map(formatPredicate).join(", "),
+      });
+    }
+
     if (configuration?.actions?.length) {
       const formattedActions = configuration.actions.map(formatActionLabel).join(", ");
       metadataItems.push({ icon: "funnel", label: "Actions: " + formattedActions });
     }
+
     const props: TriggerProps = {
       title: node.name!,
       iconSrc: launchdarklyIcon,
       collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
     };
+
     if (lastEvent) {
       const eventData = lastEvent.data as OnFeatureFlagChangeEventData;
       const { title, subtitle } = getEventTitleAndSubtitle(eventData, lastEvent.createdAt);
@@ -91,11 +113,7 @@ export const onFeatureFlagChangeTriggerRenderer: TriggerRenderer = {
         eventId: lastEvent.id,
       };
     }
+
     return props;
   },
 };
-
-function buildSubtitle(content: string, createdAt?: string): string {
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
-  return content && timeAgo ? content + " · " + timeAgo : content || timeAgo;
-}

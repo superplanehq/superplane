@@ -30,9 +30,10 @@ const (
 type OnFeatureFlagChange struct{}
 
 type OnFeatureFlagChangeConfiguration struct {
-	ProjectKey string   `json:"projectKey" mapstructure:"projectKey"`
-	FlagKey    string   `json:"flagKey" mapstructure:"flagKey"`
-	Actions    []string `json:"actions" mapstructure:"actions"`
+	ProjectKey   string                     `json:"projectKey" mapstructure:"projectKey"`
+	Environments []configuration.Predicate  `json:"environments" mapstructure:"environments"`
+	Flags        []configuration.Predicate  `json:"flags" mapstructure:"flags"`
+	Actions      []string                   `json:"actions" mapstructure:"actions"`
 }
 
 func (t *OnFeatureFlagChange) Name() string {
@@ -48,26 +49,27 @@ func (t *OnFeatureFlagChange) Description() string {
 }
 
 func (t *OnFeatureFlagChange) Documentation() string {
-	return `The On Feature Flag Change trigger starts a workflow execution when LaunchDarkly sends webhooks for a specific feature flag.
+	return `The On Feature Flag Change trigger starts a workflow execution when LaunchDarkly sends webhooks for feature flags in a project.
 
 ## Use Cases
 
 - **Deployment automation**: Trigger deployments or rollbacks when a feature flag changes
-- **Audit workflows**: Track and log changes to a specific flag for compliance
+- **Audit workflows**: Track and log changes to flags for compliance
 - **Notification workflows**: Send notifications when a flag is created, updated, or deleted
 - **Integration workflows**: Sync flag changes with external systems
 
 ## Configuration
 
-- **Project**: The LaunchDarkly project containing the flag to monitor
-- **Feature Flag**: The specific flag to monitor
+- **Project**: The LaunchDarkly project to monitor
+- **Environments**: Optionally filter by environment(s). Leave empty to receive events for all environments.
+- **Feature Flags**: Optionally filter by specific flags or patterns. Leave empty to receive events for all flags.
 - **Actions**: Optionally filter by specific actions (e.g. only when a flag is turned on or off). Leave empty to receive all actions.
 
 ## Webhook Setup
 
 The webhook is automatically created in LaunchDarkly when you save the canvas. No manual setup is required.
 
-SuperPlane uses the LaunchDarkly API (via your configured API access token) to create a signed webhook scoped to the selected project, and securely stores the auto-generated signing secret. When LaunchDarkly sends events, SuperPlane verifies the signature and filters to the configured flag automatically.`
+SuperPlane uses the LaunchDarkly API (via your configured API access token) to create a signed webhook scoped to the selected project, and securely stores the auto-generated signing secret. When LaunchDarkly sends events, SuperPlane verifies the signature and filters to the configured environments, flags, and actions automatically.`
 }
 
 func (t *OnFeatureFlagChange) Icon() string {
@@ -85,7 +87,7 @@ func (t *OnFeatureFlagChange) Configuration() []configuration.Field {
 			Label:       "Project",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The LaunchDarkly project containing the flag to monitor",
+			Description: "The LaunchDarkly project to monitor",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "project",
@@ -93,20 +95,26 @@ func (t *OnFeatureFlagChange) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "flagKey",
-			Label:       "Feature Flag",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "The feature flag to monitor",
+			Name:        "environments",
+			Label:       "Environments",
+			Type:        configuration.FieldTypeAnyPredicateList,
+			Required:    false,
+			Description: "Filter by environment. Leave empty to receive events for all environments.",
 			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: "flag",
-					Parameters: []configuration.ParameterRef{
-						{
-							Name:      "projectKey",
-							ValueFrom: &configuration.ParameterValueFrom{Field: "projectKey"},
-						},
-					},
+				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
+					Operators: configuration.AllPredicateOperators,
+				},
+			},
+		},
+		{
+			Name:        "flags",
+			Label:       "Feature Flags",
+			Type:        configuration.FieldTypeAnyPredicateList,
+			Required:    false,
+			Description: "Filter by feature flag. Leave empty to receive events for all flags.",
+			TypeOptions: &configuration.TypeOptions{
+				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
+					Operators: configuration.AllPredicateOperators,
 				},
 			},
 		},
@@ -141,10 +149,6 @@ func (t *OnFeatureFlagChange) Setup(ctx core.TriggerContext) error {
 
 	if strings.TrimSpace(config.ProjectKey) == "" {
 		return fmt.Errorf("project key is required")
-	}
-
-	if strings.TrimSpace(config.FlagKey) == "" {
-		return fmt.Errorf("flag key is required")
 	}
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
@@ -202,23 +206,28 @@ func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int
 		return http.StatusOK, nil
 	}
 
-	// Extract action and flag key from the accesses array.
+	// Extract action, environment key, and flag key from the accesses array.
 	// Resource format: proj/<projKey>:env/<envKey>:flag/<flagKey>
 	action := ""
+	envKey := ""
 	flagKey := ""
 	if accesses, ok := payload["accesses"].([]any); ok && len(accesses) > 0 {
 		if access, ok := accesses[0].(map[string]any); ok {
 			action, _ = access["action"].(string)
 			resource, _ := access["resource"].(string)
-			if parts := strings.Split(resource, ":flag/"); len(parts) == 2 {
-				flagKey = parts[1]
-			}
+			envKey, flagKey = parseResourceEnvAndFlag(resource)
 		}
 	}
 
-	// Filter by configured flag key (skip if flag key could not be extracted from payload)
-	if config.FlagKey != "" && flagKey != "" && flagKey != config.FlagKey {
-		ctx.Logger.Infof("launchdarkly webhook: flag %q does not match configured flag %q, acknowledging without emitting", flagKey, config.FlagKey)
+	// Filter by configured environments (skip if env key could not be extracted)
+	if len(config.Environments) > 0 && envKey != "" && !configuration.MatchesAnyPredicate(config.Environments, envKey) {
+		ctx.Logger.Infof("launchdarkly webhook: environment %q does not match configured environments, acknowledging without emitting", envKey)
+		return http.StatusOK, nil
+	}
+
+	// Filter by configured flags (skip if flag key could not be extracted)
+	if len(config.Flags) > 0 && flagKey != "" && !configuration.MatchesAnyPredicate(config.Flags, flagKey) {
+		ctx.Logger.Infof("launchdarkly webhook: flag %q does not match configured flags, acknowledging without emitting", flagKey)
 		return http.StatusOK, nil
 	}
 
@@ -244,6 +253,22 @@ func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int
 
 func (t *OnFeatureFlagChange) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+// parseResourceEnvAndFlag extracts the environment and flag keys from a LaunchDarkly resource string.
+// Expected format: proj/<projKey>:env/<envKey>:flag/<flagKey>
+func parseResourceEnvAndFlag(resource string) (envKey, flagKey string) {
+	// Split on ":env/" to get the environment and flag parts
+	envParts := strings.SplitN(resource, ":env/", 2)
+	if len(envParts) != 2 {
+		return "", ""
+	}
+	// The remaining part is "<envKey>:flag/<flagKey>"
+	flagParts := strings.SplitN(envParts[1], ":flag/", 2)
+	if len(flagParts) != 2 {
+		return envParts[1], ""
+	}
+	return flagParts[0], flagParts[1]
 }
 
 // resolveSigningSecret returns the webhook signing secret for verification.
