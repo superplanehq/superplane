@@ -190,12 +190,37 @@ export type CanvasesCanvasStatus = {
   lastEvents?: Array<CanvasesCanvasEvent>;
 };
 
+export type CanvasesCanvasVersion = {
+  metadata?: CanvasesCanvasVersionMetadata;
+  spec?: CanvasesCanvasSpec;
+};
+
+export type CanvasesCanvasVersionMetadata = {
+  id?: string;
+  canvasId?: string;
+  revision?: number;
+  owner?: SuperplaneCanvasesUserRef;
+  basedOnVersionId?: string;
+  isPublished?: boolean;
+  publishedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type CanvasesCreateCanvasRequest = {
   canvas?: CanvasesCanvas;
 };
 
 export type CanvasesCreateCanvasResponse = {
   canvas?: CanvasesCanvas;
+};
+
+export type CanvasesCreateCanvasVersionBody = {
+  [key: string]: unknown;
+};
+
+export type CanvasesCreateCanvasVersionResponse = {
+  version?: CanvasesCanvasVersion;
 };
 
 export type CanvasesDeleteCanvasResponse = {
@@ -287,6 +312,15 @@ export type CanvasesListNodeQueueItemsResponse = {
   lastTimestamp?: string;
 };
 
+export type CanvasesPublishCanvasVersionBody = {
+  expectedLiveVersionId?: string;
+};
+
+export type CanvasesPublishCanvasVersionResponse = {
+  canvas?: CanvasesCanvas;
+  version?: CanvasesCanvasVersion;
+};
+
 export type CanvasesResolveExecutionErrorsBody = {
   executionIds?: Array<string>;
 };
@@ -313,6 +347,14 @@ export type CanvasesUpdateCanvasBody = {
 
 export type CanvasesUpdateCanvasResponse = {
   canvas?: CanvasesCanvas;
+};
+
+export type CanvasesUpdateCanvasVersionBody = {
+  canvas?: CanvasesCanvas;
+};
+
+export type CanvasesUpdateCanvasVersionResponse = {
+  version?: CanvasesCanvasVersion;
 };
 
 export type CanvasesUpdateNodePauseBody = {
@@ -1811,6 +1853,95 @@ export type CanvasesInvokeNodeTriggerActionResponses = {
 
 export type CanvasesInvokeNodeTriggerActionResponse2 =
   CanvasesInvokeNodeTriggerActionResponses[keyof CanvasesInvokeNodeTriggerActionResponses];
+
+export type CanvasesCreateCanvasVersionData = {
+  body: CanvasesCreateCanvasVersionBody;
+  path: {
+    canvasId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/versions";
+};
+
+export type CanvasesCreateCanvasVersionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesCreateCanvasVersionError =
+  CanvasesCreateCanvasVersionErrors[keyof CanvasesCreateCanvasVersionErrors];
+
+export type CanvasesCreateCanvasVersionResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesCreateCanvasVersionResponse;
+};
+
+export type CanvasesCreateCanvasVersionResponse2 =
+  CanvasesCreateCanvasVersionResponses[keyof CanvasesCreateCanvasVersionResponses];
+
+export type CanvasesUpdateCanvasVersionData = {
+  body: CanvasesUpdateCanvasVersionBody;
+  path: {
+    canvasId: string;
+    versionId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/versions/{versionId}";
+};
+
+export type CanvasesUpdateCanvasVersionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesUpdateCanvasVersionError =
+  CanvasesUpdateCanvasVersionErrors[keyof CanvasesUpdateCanvasVersionErrors];
+
+export type CanvasesUpdateCanvasVersionResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesUpdateCanvasVersionResponse;
+};
+
+export type CanvasesUpdateCanvasVersionResponse2 =
+  CanvasesUpdateCanvasVersionResponses[keyof CanvasesUpdateCanvasVersionResponses];
+
+export type CanvasesPublishCanvasVersionData = {
+  body: CanvasesPublishCanvasVersionBody;
+  path: {
+    canvasId: string;
+    versionId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/versions/{versionId}/publish";
+};
+
+export type CanvasesPublishCanvasVersionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesPublishCanvasVersionError =
+  CanvasesPublishCanvasVersionErrors[keyof CanvasesPublishCanvasVersionErrors];
+
+export type CanvasesPublishCanvasVersionResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesPublishCanvasVersionResponse;
+};
+
+export type CanvasesPublishCanvasVersionResponse2 =
+  CanvasesPublishCanvasVersionResponses[keyof CanvasesPublishCanvasVersionResponses];
 
 export type CanvasesDeleteCanvasData = {
   body?: never;

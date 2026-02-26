@@ -73,6 +73,42 @@ service Canvases {
     };
   }
 
+  rpc CreateCanvasVersion(CreateCanvasVersionRequest) returns (CreateCanvasVersionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/versions"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create canvas version";
+      description: "Creates a user-owned canvas version from the current live canvas";
+      tags: "CanvasVersion";
+    };
+  }
+
+  rpc UpdateCanvasVersion(UpdateCanvasVersionRequest) returns (UpdateCanvasVersionResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas version";
+      description: "Updates a user-owned canvas version without applying runtime setup";
+      tags: "CanvasVersion";
+    };
+  }
+
+  rpc PublishCanvasVersion(PublishCanvasVersionRequest) returns (PublishCanvasVersionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/versions/{version_id}/publish"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Publish canvas version";
+      description: "Publishes a canvas version to live and applies runtime node setup";
+      tags: "CanvasVersion";
+    };
+  }
+
   rpc DeleteCanvas(DeleteCanvasRequest) returns (DeleteCanvasResponse) {
     option (google.api.http) = {
       delete: "/api/v1/canvases/{id}"
@@ -280,6 +316,35 @@ message UpdateCanvasResponse {
   Canvas canvas = 1;
 }
 
+message CreateCanvasVersionRequest {
+  string canvas_id = 1;
+}
+
+message CreateCanvasVersionResponse {
+  CanvasVersion version = 1;
+}
+
+message UpdateCanvasVersionRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+  Canvas canvas = 3;
+}
+
+message UpdateCanvasVersionResponse {
+  CanvasVersion version = 1;
+}
+
+message PublishCanvasVersionRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+  string expected_live_version_id = 3;
+}
+
+message PublishCanvasVersionResponse {
+  Canvas canvas = 1;
+  CanvasVersion version = 2;
+}
+
 message DeleteCanvasRequest {
   string id = 1;
 }
@@ -317,6 +382,23 @@ message Canvas {
   Metadata metadata = 1;
   Spec spec = 2;
   Status status = 3;
+}
+
+message CanvasVersion {
+  message Metadata {
+    string id = 1;
+    string canvas_id = 2;
+    int32 revision = 3;
+    UserRef owner = 4;
+    string based_on_version_id = 5;
+    bool is_published = 6;
+    google.protobuf.Timestamp published_at = 7;
+    google.protobuf.Timestamp created_at = 8;
+    google.protobuf.Timestamp updated_at = 9;
+  }
+
+  Metadata metadata = 1;
+  Canvas.Spec spec = 2;
 }
 
 message ListNodeEventsRequest {

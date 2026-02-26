@@ -24,6 +24,9 @@ import type {
   CanvasesCreateCanvasData,
   CanvasesCreateCanvasErrors,
   CanvasesCreateCanvasResponses,
+  CanvasesCreateCanvasVersionData,
+  CanvasesCreateCanvasVersionErrors,
+  CanvasesCreateCanvasVersionResponses,
   CanvasesDeleteCanvasData,
   CanvasesDeleteCanvasErrors,
   CanvasesDeleteCanvasResponses,
@@ -63,6 +66,9 @@ import type {
   CanvasesListNodeQueueItemsData,
   CanvasesListNodeQueueItemsErrors,
   CanvasesListNodeQueueItemsResponses,
+  CanvasesPublishCanvasVersionData,
+  CanvasesPublishCanvasVersionErrors,
+  CanvasesPublishCanvasVersionResponses,
   CanvasesResolveExecutionErrorsData,
   CanvasesResolveExecutionErrorsErrors,
   CanvasesResolveExecutionErrorsResponses,
@@ -72,6 +78,9 @@ import type {
   CanvasesUpdateCanvasData,
   CanvasesUpdateCanvasErrors,
   CanvasesUpdateCanvasResponses,
+  CanvasesUpdateCanvasVersionData,
+  CanvasesUpdateCanvasVersionErrors,
+  CanvasesUpdateCanvasVersionResponses,
   CanvasesUpdateNodePauseData,
   CanvasesUpdateNodePauseErrors,
   CanvasesUpdateNodePauseResponses,
@@ -605,6 +614,67 @@ export const canvasesInvokeNodeTriggerAction = <ThrowOnError extends boolean = t
     ThrowOnError
   >({
     url: "/api/v1/canvases/{canvasId}/triggers/{nodeId}/actions/{actionName}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Create canvas version
+ *
+ * Creates a user-owned canvas version from the current live canvas
+ */
+export const canvasesCreateCanvasVersion = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesCreateCanvasVersionData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    CanvasesCreateCanvasVersionResponses,
+    CanvasesCreateCanvasVersionErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/versions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Update canvas version
+ *
+ * Updates a user-owned canvas version without applying runtime setup
+ */
+export const canvasesUpdateCanvasVersion = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesUpdateCanvasVersionData, ThrowOnError>,
+) =>
+  (options.client ?? client).put<CanvasesUpdateCanvasVersionResponses, CanvasesUpdateCanvasVersionErrors, ThrowOnError>(
+    {
+      url: "/api/v1/canvases/{canvasId}/versions/{versionId}",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    },
+  );
+
+/**
+ * Publish canvas version
+ *
+ * Publishes a canvas version to live and applies runtime node setup
+ */
+export const canvasesPublishCanvasVersion = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesPublishCanvasVersionData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    CanvasesPublishCanvasVersionResponses,
+    CanvasesPublishCanvasVersionErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/versions/{versionId}/publish",
     ...options,
     headers: {
       "Content-Type": "application/json",
