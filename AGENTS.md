@@ -9,6 +9,13 @@
 - gRPC API implementation in in pkg/grpc/actions
 - Database models in pkg/models
 
+## AI Canvas Skill Map
+
+- Runtime component skill files are in `templates/skills/*.md` and are loaded by `pkg/grpc/actions/canvases/send_ai_message.go`.
+- Canvas auto-layout contract is defined in `protos/canvases.proto` (`CanvasAutoLayout` in `UpdateCanvasRequest.auto_layout`).
+- Backend auto-layout logic lives in `pkg/grpc/actions/canvases/auto_layout.go` and is applied from `pkg/grpc/actions/canvases/update_canvas.go`.
+- CLI entrypoints for auto-layout are in `pkg/cli/commands/canvases/root.go` and `pkg/cli/commands/canvases/update.go`.
+
 ## Build, Test, and Development Commands
 
 - Setup dev environment: `make dev.setup`

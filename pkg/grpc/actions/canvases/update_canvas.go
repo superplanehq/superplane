@@ -27,6 +27,19 @@ import (
 )
 
 func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, organizationID string, id string, pbCanvas *pb.Canvas, webhookBaseURL string) (*pb.UpdateCanvasResponse, error) {
+	return UpdateCanvasWithAutoLayout(ctx, encryptor, registry, organizationID, id, pbCanvas, nil, webhookBaseURL)
+}
+
+func UpdateCanvasWithAutoLayout(
+	ctx context.Context,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	organizationID string,
+	id string,
+	pbCanvas *pb.Canvas,
+	autoLayout *pb.CanvasAutoLayout,
+	webhookBaseURL string,
+) (*pb.UpdateCanvasResponse, error) {
 	canvasID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
@@ -47,6 +60,11 @@ func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *reg
 	}
 
 	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
+	if err != nil {
+		return nil, actions.ToStatus(err)
+	}
+
+	nodes, edges, err = applyCanvasAutoLayout(nodes, edges, autoLayout)
 	if err != nil {
 		return nil, actions.ToStatus(err)
 	}

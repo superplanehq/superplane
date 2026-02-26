@@ -3538,6 +3538,24 @@
         }
       }
     },
+    "CanvasAutoLayoutAlgorithm": {
+      "type": "string",
+      "enum": [
+        "ALGORITHM_UNSPECIFIED",
+        "ALGORITHM_HORIZONTAL"
+      ],
+      "default": "ALGORITHM_UNSPECIFIED"
+    },
+    "CanvasAutoLayoutScope": {
+      "type": "string",
+      "enum": [
+        "SCOPE_UNSPECIFIED",
+        "SCOPE_FULL_CANVAS",
+        "SCOPE_CONNECTED_COMPONENT",
+        "SCOPE_EXACT_SET"
+      ],
+      "default": "SCOPE_UNSPECIFIED"
+    },
     "CanvasNodeExecutionResult": {
       "type": "string",
       "enum": [
@@ -3634,6 +3652,23 @@
         },
         "type": {
           "type": "string"
+        }
+      }
+    },
+    "CanvasesCanvasAutoLayout": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "$ref": "#/definitions/CanvasAutoLayoutAlgorithm"
+        },
+        "nodeIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "scope": {
+          "$ref": "#/definitions/CanvasAutoLayoutScope"
         }
       }
     },
@@ -4114,6 +4149,9 @@
       "properties": {
         "canvas": {
           "$ref": "#/definitions/CanvasesCanvas"
+        },
+        "autoLayout": {
+          "$ref": "#/definitions/CanvasesCanvasAutoLayout"
         }
       }
     },

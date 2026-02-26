@@ -20,7 +20,8 @@ var _ MappedNullable = &CanvasesUpdateCanvasBody{}
 
 // CanvasesUpdateCanvasBody struct for CanvasesUpdateCanvasBody
 type CanvasesUpdateCanvasBody struct {
-	Canvas *CanvasesCanvas `json:"canvas,omitempty"`
+	Canvas     *CanvasesCanvas           `json:"canvas,omitempty"`
+	AutoLayout *CanvasesCanvasAutoLayout `json:"autoLayout,omitempty"`
 }
 
 // NewCanvasesUpdateCanvasBody instantiates a new CanvasesUpdateCanvasBody object
@@ -72,6 +73,38 @@ func (o *CanvasesUpdateCanvasBody) SetCanvas(v CanvasesCanvas) {
 	o.Canvas = &v
 }
 
+// GetAutoLayout returns the AutoLayout field value if set, zero value otherwise.
+func (o *CanvasesUpdateCanvasBody) GetAutoLayout() CanvasesCanvasAutoLayout {
+	if o == nil || IsNil(o.AutoLayout) {
+		var ret CanvasesCanvasAutoLayout
+		return ret
+	}
+	return *o.AutoLayout
+}
+
+// GetAutoLayoutOk returns a tuple with the AutoLayout field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesUpdateCanvasBody) GetAutoLayoutOk() (*CanvasesCanvasAutoLayout, bool) {
+	if o == nil || IsNil(o.AutoLayout) {
+		return nil, false
+	}
+	return o.AutoLayout, true
+}
+
+// HasAutoLayout returns a boolean if a field has been set.
+func (o *CanvasesUpdateCanvasBody) HasAutoLayout() bool {
+	if o != nil && !IsNil(o.AutoLayout) {
+		return true
+	}
+
+	return false
+}
+
+// SetAutoLayout gets a reference to the given CanvasesCanvasAutoLayout and assigns it to the AutoLayout field.
+func (o *CanvasesUpdateCanvasBody) SetAutoLayout(v CanvasesCanvasAutoLayout) {
+	o.AutoLayout = &v
+}
+
 func (o CanvasesUpdateCanvasBody) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -84,6 +117,9 @@ func (o CanvasesUpdateCanvasBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Canvas) {
 		toSerialize["canvas"] = o.Canvas
+	}
+	if !IsNil(o.AutoLayout) {
+		toSerialize["autoLayout"] = o.AutoLayout
 	}
 	return toSerialize, nil
 }
