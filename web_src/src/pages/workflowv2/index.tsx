@@ -1857,7 +1857,7 @@ export function WorkflowPageV2() {
       }
 
       saveWorkflowSnapshot(latestWorkflow);
-      const updatedWorkflow = applyAiOperationsToWorkflow({
+      const updatedWorkflow = await applyAiOperationsToWorkflow({
         workflow: latestWorkflow,
         operations,
         buildingBlocks,
@@ -1885,6 +1885,44 @@ export function WorkflowPageV2() {
       saveWorkflowSnapshot,
     ],
   );
+
+  const handleAutoLayout = useCallback(async () => {
+    if (!organizationId || !canvasId) {
+      return;
+    }
+
+    const latestWorkflow = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+    if (!latestWorkflow) {
+      throw new Error("Canvas not found.");
+    }
+
+    saveWorkflowSnapshot(latestWorkflow);
+    const updatedWorkflow = await applyAiOperationsToWorkflow({
+      workflow: latestWorkflow,
+      operations: [],
+      buildingBlocks,
+      integrations,
+    });
+
+    queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+    if (canAutoSave) {
+      await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+    } else {
+      markUnsavedChange("structural");
+    }
+  }, [
+    buildingBlocks,
+    canAutoSave,
+    canvas,
+    canvasId,
+    handleSaveWorkflow,
+    integrations,
+    markUnsavedChange,
+    organizationId,
+    queryClient,
+    saveWorkflowSnapshot,
+  ]);
 
   const handlePlaceholderAdd = useCallback(
     async (data: {
@@ -3017,6 +3055,7 @@ export function WorkflowPageV2() {
         showAiBuilderTab={showAiBuilderTab}
         onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
         onApplyAiOperations={!isReadOnly ? handleApplyAiOperations : undefined}
+        onAutoLayout={!isReadOnly ? handleAutoLayout : undefined}
         onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
         onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
         integrations={canReadIntegrations ? integrations : []}

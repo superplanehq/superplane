@@ -11,7 +11,7 @@ import {
   type EdgeChange,
 } from "@xyflow/react";
 
-import { CircleX, Loader2, ScanLine, ScanText, ScrollText, TriangleAlert } from "lucide-react";
+import { CircleX, LayoutGrid, Loader2, ScanLine, ScanText, ScrollText, TriangleAlert } from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
@@ -149,6 +149,7 @@ export interface CanvasPageProps {
   canUpdateIntegrations?: boolean;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
+  onAutoLayout?: () => void;
   // Undo functionality
   onUndo?: () => void;
   canUndo?: boolean;
@@ -902,6 +903,7 @@ function CanvasPage(props: CanvasPageProps) {
                 initialFocusNodeId={props.initialFocusNodeId}
                 onResolveExecutionErrors={props.onResolveExecutionErrors}
                 title={props.title}
+                onAutoLayout={props.onAutoLayout}
               />
             </ReactFlowProvider>
 
@@ -1392,6 +1394,7 @@ function CanvasContent({
   initialFocusNodeId,
   onResolveExecutionErrors,
   title,
+  onAutoLayout,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1448,6 +1451,7 @@ function CanvasContent({
   initialFocusNodeId?: string | null;
   onResolveExecutionErrors?: (executionIds: string[]) => void;
   title?: string;
+  onAutoLayout?: () => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
   const isReadOnly = readOnly ?? false;
@@ -2146,6 +2150,16 @@ function CanvasContent({
                     : "Switch components to Compact view (Ctrl/Cmd + E)"}
                 </TooltipContent>
               </Tooltip>
+              {onAutoLayout && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon-sm" onClick={onAutoLayout}>
+                      <LayoutGrid className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Auto-layout canvas</TooltipContent>
+                </Tooltip>
+              )}
               <NodeSearch
                 onSearch={(searchString) => {
                   const query = searchString.toLowerCase();
@@ -2168,7 +2182,7 @@ function CanvasContent({
             <Panel
               position="bottom-left"
               className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8"
-              style={{ marginLeft: 336 }}
+              style={{ marginLeft: onAutoLayout ? 384 : 336 }}
             >
               <Tooltip>
                 <TooltipTrigger asChild>

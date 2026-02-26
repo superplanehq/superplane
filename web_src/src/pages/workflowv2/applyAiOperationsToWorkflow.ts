@@ -1,6 +1,7 @@
 import type { CanvasesCanvas, ComponentsEdge, ComponentsIntegrationRef, ComponentsNode, OrganizationsIntegration } from "@/api-client";
 import type { AiCanvasOperation, BuildingBlockCategory } from "@/ui/BuildingBlocksSidebar";
 import { filterVisibleConfiguration } from "@/utils/components";
+import ELK from "elkjs/lib/elk.bundled.js";
 import { generateNodeId, generateUniqueNodeName } from "./utils";
 
 type ApplyAiOperationsToWorkflowInput = {
@@ -9,6 +10,66 @@ type ApplyAiOperationsToWorkflowInput = {
   buildingBlocks: BuildingBlockCategory[];
   integrations?: OrganizationsIntegration[];
 };
+
+const elk = new ELK();
+const AI_AUTO_LAYOUT = {
+  direction: "RIGHT",
+  nodeSpacing: 280,
+  layerSpacing: 140,
+  edgeNodeSpacing: 80,
+  estimatedNodeWidth: 420,
+  estimatedNodeHeight: 240,
+} as const;
+
+async function autoLayoutNodes(nodes: ComponentsNode[], edges: ComponentsEdge[]): Promise<ComponentsNode[]> {
+  if (nodes.length <= 1) {
+    return nodes;
+  }
+
+  const graph = {
+    id: "root",
+    layoutOptions: {
+      "elk.algorithm": "layered",
+      "elk.direction": AI_AUTO_LAYOUT.direction,
+      "elk.spacing.nodeNode": String(AI_AUTO_LAYOUT.nodeSpacing),
+      "elk.layered.spacing.nodeNodeBetweenLayers": String(AI_AUTO_LAYOUT.layerSpacing),
+      "elk.spacing.edgeNode": String(AI_AUTO_LAYOUT.edgeNodeSpacing),
+    },
+    children: nodes.map((node) => ({
+      id: node.id || "",
+      width: AI_AUTO_LAYOUT.estimatedNodeWidth,
+      height: AI_AUTO_LAYOUT.estimatedNodeHeight,
+    })),
+    edges: edges
+      .map((edge, index) => {
+        if (!edge.sourceId || !edge.targetId) {
+          return null;
+        }
+        return {
+          id: `${edge.sourceId}-${edge.targetId}-${edge.channel || "default"}-${index}`,
+          sources: [edge.sourceId],
+          targets: [edge.targetId],
+        };
+      })
+      .filter((edge): edge is { id: string; sources: string[]; targets: string[] } => !!edge),
+  };
+
+  const layoutedGraph = await elk.layout(graph);
+
+  return nodes.map((node) => {
+    const layoutedNode = layoutedGraph.children?.find((child) => child.id === node.id);
+    if (!layoutedNode) {
+      return node;
+    }
+    return {
+      ...node,
+      position: {
+        x: Math.round(layoutedNode.x || 0),
+        y: Math.round(layoutedNode.y || 0),
+      },
+    };
+  });
+}
 
 function normalizeIntegrationName(name?: string): string {
   return (name || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
@@ -43,12 +104,12 @@ function resolveIntegrationRefForBlock(
   };
 }
 
-export function applyAiOperationsToWorkflow({
+export async function applyAiOperationsToWorkflow({
   workflow,
   operations,
   buildingBlocks,
   integrations = [],
-}: ApplyAiOperationsToWorkflowInput): CanvasesCanvas {
+}: ApplyAiOperationsToWorkflowInput): Promise<CanvasesCanvas> {
   const blockLookup = new Map(
     buildingBlocks.flatMap((category) => category.blocks.map((block) => [block.name, block])),
   );
@@ -760,11 +821,13 @@ export function applyAiOperationsToWorkflow({
     }
   }
 
+  const layoutedNodes = await autoLayoutNodes(updatedNodes, updatedEdges);
+
   return {
     ...workflow,
     spec: {
       ...workflow.spec,
-      nodes: updatedNodes,
+      nodes: layoutedNodes,
       edges: updatedEdges,
     },
   };
