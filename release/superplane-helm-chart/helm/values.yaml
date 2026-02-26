@@ -38,6 +38,7 @@ domain:
 
 authentication:
   secretName: ""
+  enablePasswordLogin: true
   github:
     enabled: true
     clientId: ""

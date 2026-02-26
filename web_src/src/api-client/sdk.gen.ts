@@ -66,6 +66,9 @@ import type {
   CanvasesResolveExecutionErrorsData,
   CanvasesResolveExecutionErrorsErrors,
   CanvasesResolveExecutionErrorsResponses,
+  CanvasesSendAiMessageData,
+  CanvasesSendAiMessageErrors,
+  CanvasesSendAiMessageResponses,
   CanvasesUpdateCanvasData,
   CanvasesUpdateCanvasErrors,
   CanvasesUpdateCanvasResponses,
@@ -372,6 +375,23 @@ export const canvasesCreateCanvas = <ThrowOnError extends boolean = true>(
 ) =>
   (options.client ?? client).post<CanvasesCreateCanvasResponses, CanvasesCreateCanvasErrors, ThrowOnError>({
     url: "/api/v1/canvases",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Generate AI canvas proposal
+ *
+ * Generates a structured, non-persistent canvas proposal from a natural language prompt
+ */
+export const canvasesSendAiMessage = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesSendAiMessageData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<CanvasesSendAiMessageResponses, CanvasesSendAiMessageErrors, ThrowOnError>({
+    url: "/api/v1/canvases/{canvasId}/ai/messages",
     ...options,
     headers: {
       "Content-Type": "application/json",

@@ -85,6 +85,24 @@ export type CanvasesCanvas = {
   status?: CanvasesCanvasStatus;
 };
 
+export type CanvasesCanvasAiBlockContext = {
+  name?: string;
+  label?: string;
+  type?: string;
+};
+
+export type CanvasesCanvasAiContext = {
+  nodes?: Array<CanvasesCanvasAiNodeContext>;
+  availableBlocks?: Array<CanvasesCanvasAiBlockContext>;
+};
+
+export type CanvasesCanvasAiNodeContext = {
+  id?: string;
+  name?: string;
+  label?: string;
+  type?: string;
+};
+
 export type CanvasesCanvasEvent = {
   id?: string;
   canvasId?: string;
@@ -275,6 +293,18 @@ export type CanvasesResolveExecutionErrorsBody = {
 
 export type CanvasesResolveExecutionErrorsResponse = {
   [key: string]: unknown;
+};
+
+export type CanvasesSendAiMessageBody = {
+  prompt?: string;
+  canvasContext?: CanvasesCanvasAiContext;
+};
+
+export type CanvasesSendAiMessageResponse = {
+  assistantMessage?: string;
+  operations?: Array<{
+    [key: string]: unknown;
+  }>;
 };
 
 export type CanvasesUpdateCanvasBody = {
@@ -1360,6 +1390,33 @@ export type CanvasesCreateCanvasResponses = {
 };
 
 export type CanvasesCreateCanvasResponse2 = CanvasesCreateCanvasResponses[keyof CanvasesCreateCanvasResponses];
+
+export type CanvasesSendAiMessageData = {
+  body: CanvasesSendAiMessageBody;
+  path: {
+    canvasId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/ai/messages";
+};
+
+export type CanvasesSendAiMessageErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesSendAiMessageError = CanvasesSendAiMessageErrors[keyof CanvasesSendAiMessageErrors];
+
+export type CanvasesSendAiMessageResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesSendAiMessageResponse;
+};
+
+export type CanvasesSendAiMessageResponse2 = CanvasesSendAiMessageResponses[keyof CanvasesSendAiMessageResponses];
 
 export type CanvasesListCanvasEventsData = {
   body?: never;

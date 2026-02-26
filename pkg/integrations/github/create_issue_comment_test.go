@@ -60,6 +60,25 @@ func Test__CreateIssueComment__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "repository world is not accessible to app installation")
 	})
 
+	t.Run("repository expression skips setup validation", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Metadata: Metadata{
+				Repositories: []Repository{helloRepo},
+			},
+		}
+		nodeMetadataCtx := contexts.MetadataContext{}
+		require.NoError(t, component.Setup(core.SetupContext{
+			Integration: integrationCtx,
+			Metadata:    &nodeMetadataCtx,
+			Configuration: map[string]any{
+				"issueNumber": "42",
+				"body":        "test",
+				"repository":  `{{$["github.onWorkflowRun failed test"].data.repository.full_name}}`,
+			},
+		}))
+		require.Empty(t, nodeMetadataCtx.Get())
+	})
+
 	t.Run("metadata is set successfully", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Metadata: Metadata{

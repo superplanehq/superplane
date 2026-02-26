@@ -31,7 +31,12 @@ import {
 import { parseDefaultValues } from "@/utils/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { AiSidebar } from "../ai";
-import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
+import {
+  AiCanvasOperation,
+  BuildingBlock,
+  BuildingBlockCategory,
+  BuildingBlocksSidebar,
+} from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
 import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
@@ -125,6 +130,7 @@ export interface CanvasPageProps {
   breadcrumbs?: BreadcrumbItem[];
   headerBanner?: React.ReactNode;
   organizationId?: string;
+  canvasId?: string;
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
@@ -198,7 +204,9 @@ export interface CanvasPageProps {
 
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
+  showAiBuilderTab?: boolean;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
+  onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
     sourceNodeId: string;
@@ -820,6 +828,15 @@ function CanvasPage(props: CanvasPageProps) {
           isOpen={isBuildingBlocksSidebarOpen}
           onToggle={handleSidebarToggle}
           blocks={props.buildingBlocks || []}
+          showAiBuilderTab={props.showAiBuilderTab}
+          canvasId={props.canvasId}
+          canvasNodes={state.nodes.map((node) => ({
+            id: node.id,
+            name: String((node.data as { nodeName?: string })?.nodeName || ""),
+            label: String((node.data as { label?: string })?.label || ""),
+            type: String((node.data as { type?: string })?.type || ""),
+          }))}
+          onApplyAiOperations={props.onApplyAiOperations}
           integrations={props.integrations}
           canvasZoom={canvasZoom}
           disabled={readOnly}

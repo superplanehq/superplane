@@ -65,6 +65,7 @@ export interface PullRequest {
   id?: string;
   number?: number;
   url?: string;
+  html_url?: string;
   head?: {
     sha: string;
     ref: string;

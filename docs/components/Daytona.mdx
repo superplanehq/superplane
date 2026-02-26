@@ -164,11 +164,16 @@ The Execute Command component runs shell commands in an existing Daytona sandbox
 - **Sandbox ID**: The ID of the sandbox (from createSandbox output)
 - **Command**: The shell command to execute
 - **Working Directory**: Optional working directory for the command
+- **Environment Variables**: Optional key-value pairs exported before command execution
 - **Timeout**: Optional execution timeout in seconds
 
 ### Output
 
-Returns the command result including:
+Routes to one of two channels:
+- **success**: Exit code is 0
+- **failed**: Exit code is non-zero
+
+The payload includes:
 - **exitCode**: The process exit code (0 for success)
 - **result**: The stdout/output from the command execution
 

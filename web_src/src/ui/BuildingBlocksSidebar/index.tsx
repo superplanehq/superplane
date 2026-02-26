@@ -3,21 +3,35 @@ import type {
   SuperplaneBlueprintsOutputChannel,
   SuperplaneComponentsOutputChannel,
 } from "@/api-client";
+import { canvasesSendAiMessage } from "@/api-client/sdk.gen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { resolveIcon } from "@/lib/utils";
 import { isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
+import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getComponentSubtype } from "../buildingBlocks";
-import { ChevronRight, GripVerticalIcon, Plug, Plus, Search, Settings2, StickyNote, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ChevronRight,
+  GripVerticalIcon,
+  Plug,
+  Plus,
+  Search,
+  SendHorizontal,
+  Settings2,
+  StickyNote,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
+import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
@@ -58,6 +72,7 @@ import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
+import octopusIcon from "@/assets/icons/integrations/octopus.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 
@@ -86,6 +101,15 @@ export interface BuildingBlocksSidebarProps {
   isOpen: boolean;
   onToggle: (open: boolean) => void;
   blocks: BuildingBlockCategory[];
+  showAiBuilderTab?: boolean;
+  canvasId?: string;
+  canvasNodes?: Array<{
+    id: string;
+    name?: string;
+    label?: string;
+    type?: string;
+  }>;
+  onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
   integrations?: OrganizationsIntegration[];
   canvasZoom?: number;
   disabled?: boolean;
@@ -94,10 +118,105 @@ export interface BuildingBlocksSidebarProps {
   onAddNote?: () => void;
 }
 
+export type AiCanvasOperation =
+  | {
+      type: "add_node";
+      nodeKey?: string;
+      blockName: string;
+      nodeName?: string;
+      configuration?: Record<string, unknown>;
+      position?: { x: number; y: number };
+      source?: {
+        nodeKey?: string;
+        nodeId?: string;
+        nodeName?: string;
+        handleId?: string | null;
+      };
+    }
+  | {
+      type: "connect_nodes";
+      source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null };
+      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
+    }
+  | {
+      type: "update_node_config";
+      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
+      configuration: Record<string, unknown>;
+      nodeName?: string;
+    }
+  | {
+      type: "delete_node";
+      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
+    };
+
+type AiBuilderMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+};
+
+type AiBuilderProposal = {
+  id: string;
+  summary: string;
+  operations: AiCanvasOperation[];
+};
+
+const AI_HISTORY_RECENT_TURNS = 8;
+const AI_HISTORY_OLDER_TURNS = 6;
+const AI_HISTORY_MAX_MESSAGE_CHARS = 320;
+const AI_MAX_STORED_MESSAGES = 50;
+
+function compactMessageContent(content: string): string {
+  const normalized = content.replace(/\s+/g, " ").trim();
+  if (normalized.length <= AI_HISTORY_MAX_MESSAGE_CHARS) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, AI_HISTORY_MAX_MESSAGE_CHARS)}...`;
+}
+
+function formatConversationTurns(messages: AiBuilderMessage[]): string[] {
+  return messages
+    .map((message) => `${message.role}: ${compactMessageContent(message.content)}`)
+    .filter((line) => line.length > 0);
+}
+
+function buildPromptWithConversationContext(messages: AiBuilderMessage[], prompt: string): string {
+  const turns = formatConversationTurns(messages);
+  if (turns.length === 0) {
+    return prompt;
+  }
+
+  const recentTurns = turns.slice(-AI_HISTORY_RECENT_TURNS);
+  const olderTurns = turns.slice(0, -AI_HISTORY_RECENT_TURNS).slice(-AI_HISTORY_OLDER_TURNS);
+  const contextSections = [
+    "Conversation context (use this for continuity and intent resolution):",
+    ...(olderTurns.length > 0 ? [`Earlier turns summary:\n${olderTurns.join("\n")}`] : []),
+    `Recent turns:\n${recentTurns.join("\n")}`,
+    `Current user request:\n${prompt}`,
+  ];
+
+  return contextSections.join("\n\n");
+}
+
+function pushAiMessages(previous: AiBuilderMessage[], next: AiBuilderMessage | AiBuilderMessage[]): AiBuilderMessage[] {
+  const nextMessages = Array.isArray(next) ? next : [next];
+  const merged = [...previous, ...nextMessages];
+  if (merged.length <= AI_MAX_STORED_MESSAGES) {
+    return merged;
+  }
+
+  return merged.slice(-AI_MAX_STORED_MESSAGES);
+}
+
 export function BuildingBlocksSidebar({
   isOpen,
   onToggle,
   blocks,
+  showAiBuilderTab = false,
+  canvasId,
+  canvasNodes = [],
+  onApplyAiOperations,
   integrations = [],
   canvasZoom = 1,
   disabled = false,
@@ -106,6 +225,7 @@ export function BuildingBlocksSidebar({
   onAddNote,
 }: BuildingBlocksSidebarProps) {
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
+  const persistedAiState = loadAiBuilderState<AiCanvasOperation>(canvasId);
 
   if (!isOpen) {
     const addNoteButton = (
@@ -169,6 +289,7 @@ export function BuildingBlocksSidebar({
   const [typeFilter, setTypeFilter] = useState<"all" | "trigger" | "action" | "flow">("all");
   const sidebarRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const aiInputRef = useRef<HTMLInputElement>(null);
   const isDraggingRef = useRef(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -179,13 +300,247 @@ export function BuildingBlocksSidebar({
   const dragPreviewRef = useRef<HTMLDivElement>(null);
   const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(true);
   const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(false);
+  const [activeTab, setActiveTab] = useState<"components" | "ai">(persistedAiState?.activeTab || "components");
+  const [aiInput, setAiInput] = useState("");
+  const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>(persistedAiState?.messages || []);
+  const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
+  const [isApplyingProposal, setIsApplyingProposal] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(
+    persistedAiState?.pendingProposal || null,
+  );
+  const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
 
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const handleSendPrompt = useCallback(
+    async (value?: string) => {
+      const nextPrompt = (value ?? aiInput).trim();
+      if (!nextPrompt || isGeneratingResponse || !canvasId) {
+        return;
+      }
+
+      if (nextPrompt.toLowerCase() === "/clear") {
+        setAiMessages([]);
+        setPendingProposal(null);
+        setAiError(null);
+        setAiInput("");
+        requestAnimationFrame(() => {
+          aiInputRef.current?.focus();
+        });
+        return;
+      }
+
+      const contextualPrompt = buildPromptWithConversationContext(aiMessages, nextPrompt);
+
+      const userMessage: AiBuilderMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: nextPrompt,
+      };
+      setAiMessages((prev) => pushAiMessages(prev, userMessage));
+      setAiInput("");
+      requestAnimationFrame(() => {
+        aiInputRef.current?.focus();
+      });
+      setAiError(null);
+      setIsGeneratingResponse(true);
+
+      try {
+        const availableBlocks = (blocks || []).flatMap((category) =>
+          category.blocks
+            .filter((block) => block.isLive && !block.deprecated)
+            .map((block) => ({
+              name: block.name,
+              label: block.label || block.name,
+              type: block.type,
+            })),
+        );
+
+        const apiResponse = await canvasesSendAiMessage(
+          withOrganizationHeader({
+            path: { canvasId },
+            body: {
+              prompt: contextualPrompt,
+              canvasContext: {
+                nodes: canvasNodes,
+                availableBlocks,
+              },
+            },
+          }),
+        );
+
+        const payload = apiResponse.data as { assistantMessage?: string; operations?: AiCanvasOperation[] } | undefined;
+        const proposal: AiBuilderProposal = {
+          id: `proposal-${Date.now()}`,
+          summary: payload?.assistantMessage || "I prepared a draft change set you can review and apply.",
+          operations: payload?.operations || [],
+        };
+
+        const assistantMessage: AiBuilderMessage = {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: proposal.summary,
+        };
+        setAiMessages((prev) => pushAiMessages(prev, assistantMessage));
+        if (proposal.operations.length > 0) {
+          setPendingProposal(proposal);
+        } else {
+          setPendingProposal(null);
+        }
+      } catch (error) {
+        const fallbackMessage = "I couldn't generate changes right now. Please try again.";
+        setAiError(error instanceof Error ? error.message : fallbackMessage);
+        setAiMessages((prev) =>
+          pushAiMessages(prev, {
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            content: fallbackMessage,
+          }),
+        );
+      } finally {
+        setIsGeneratingResponse(false);
+      }
+    },
+    [aiInput, aiMessages, blocks, canvasId, canvasNodes, isGeneratingResponse],
+  );
+
+  const handleDiscardProposal = useCallback(() => {
+    setPendingProposal(null);
+  }, []);
+
+  const formatOperation = useCallback((operation: AiCanvasOperation, proposal?: AiBuilderProposal) => {
+    const operationNodeLabels = new Map<string, string>();
+    if (proposal) {
+      for (const op of proposal.operations) {
+        if (op.type === "add_node" && op.nodeKey) {
+          operationNodeLabels.set(op.nodeKey, op.nodeName || op.blockName);
+        }
+      }
+    }
+
+    const resolveRefLabel = (ref?: { nodeKey?: string; nodeId?: string; nodeName?: string }) => {
+      if (!ref) return "step";
+      if (ref.nodeName) return ref.nodeName;
+      if (ref.nodeKey && operationNodeLabels.has(ref.nodeKey)) {
+        return operationNodeLabels.get(ref.nodeKey) || "step";
+      }
+      if (ref.nodeId) return ref.nodeId;
+      return "step";
+    };
+
+    switch (operation.type) {
+      case "add_node":
+        return `Add node ${operation.nodeName || operation.blockName} (${operation.blockName})`;
+      case "connect_nodes":
+        return `Connect ${resolveRefLabel(operation.source)} -> ${resolveRefLabel(operation.target)}`;
+      case "update_node_config":
+        return `Update configuration for ${operation.nodeName || operation.target.nodeName || "node"}`;
+      case "delete_node":
+        return `Delete node ${resolveRefLabel(operation.target)}`;
+      default:
+        return "Update canvas";
+    }
+  }, []);
+
+  const extractAssistantOptions = useCallback((content: string): string[] => {
+    const optionSet = new Set<string>();
+
+    const lines = content
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    for (const line of lines) {
+      const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+      const numberedMatch = line.match(/^\d+[.)]\s+(.+)$/);
+      const optionText = bulletMatch?.[1] || numberedMatch?.[1];
+      if (!optionText) continue;
+
+      const normalized = optionText.replace(/\s+/g, " ").trim();
+      if (normalized.length < 2 || normalized.length > 140) continue;
+      optionSet.add(normalized.replace(/[.;,\s]+$/, ""));
+    }
+
+    if (optionSet.size === 0) {
+      const codeMatches = [...content.matchAll(/`([^`]+)`/g)];
+      for (const match of codeMatches) {
+        const value = (match[1] || "").trim();
+        if (!value || value.length > 80) continue;
+        if (value.toLowerCase() === "etc.") continue;
+        optionSet.add(value);
+      }
+    }
+
+    return Array.from(optionSet).slice(0, 8);
+  }, []);
+
+  const handleApplyProposal = useCallback(async () => {
+    if (!pendingProposal) return;
+
+    if (!onApplyAiOperations) {
+      setAiError("Canvas apply handlers are not available.");
+      return;
+    }
+
+    setAiError(null);
+    setIsApplyingProposal(true);
+    try {
+      await onApplyAiOperations(pendingProposal.operations);
+      setAiMessages((prev) =>
+        pushAiMessages(prev, {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: "Applied the proposed changes to the canvas.",
+        }),
+      );
+      setPendingProposal(null);
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : "Failed to apply AI proposal.");
+    } finally {
+      setIsApplyingProposal(false);
+    }
+  }, [onApplyAiOperations, pendingProposal]);
 
   // Save sidebar width to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (!showAiBuilderTab && activeTab === "ai") {
+      setActiveTab("components");
+    }
+  }, [showAiBuilderTab, activeTab]);
+
+  useEffect(() => {
+    const nextPersistedState = loadAiBuilderState<AiCanvasOperation>(canvasId);
+    setActiveTab(nextPersistedState?.activeTab || "components");
+    setAiMessages(nextPersistedState?.messages || []);
+    setPendingProposal(nextPersistedState?.pendingProposal || null);
+    setAiError(null);
+    setAiInput("");
+  }, [canvasId]);
+
+  useEffect(() => {
+    saveAiBuilderState<AiCanvasOperation>(canvasId, {
+      activeTab,
+      messages: aiMessages,
+      pendingProposal,
+    });
+  }, [activeTab, aiMessages, canvasId, pendingProposal]);
+
+  useEffect(() => {
+    if (activeTab !== "ai") {
+      return;
+    }
+
+    const container = aiMessagesContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    container.scrollTop = container.scrollHeight;
+  }, [activeTab, aiMessages, pendingProposal, isGeneratingResponse, aiError]);
 
   // Auto-focus search input when sidebar opens
   useEffect(() => {
@@ -235,53 +590,149 @@ export function BuildingBlocksSidebar({
     }
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
-  const categoryOrder: Record<string, number> = {
-    Core: 0,
-    Bundles: 2,
-  };
+  const sortedCategories = useMemo(() => {
+    const categoryOrder: Record<string, number> = {
+      Core: 0,
+      Bundles: 2,
+    };
 
-  const filteredCategories = (blocks || []).filter((category) => {
-    if (category.name === "Bundles" && !isCustomComponentsEnabled()) {
-      return false;
-    }
-    return true;
-  });
-
-  const sortedCategories = [...filteredCategories].sort((a, b) => {
-    const aOrder = categoryOrder[a.name] ?? Infinity;
-    const bOrder = categoryOrder[b.name] ?? Infinity;
-
-    if (aOrder !== bOrder) {
-      return aOrder - bOrder;
-    }
-
-    if (showConnectedIntegrationsOnTop && aOrder === Infinity && bOrder === Infinity) {
-      const aIntegrationName = a.blocks.find((block) => block.integrationName)?.integrationName;
-      const bIntegrationName = b.blocks.find((block) => block.integrationName)?.integrationName;
-
-      const aHasConnectedIntegration = aIntegrationName
-        ? integrations.some(
-            (integration) =>
-              normalizeIntegrationName(integration.spec?.integrationName) ===
-              normalizeIntegrationName(aIntegrationName),
-          )
-        : false;
-
-      const bHasConnectedIntegration = bIntegrationName
-        ? integrations.some(
-            (integration) =>
-              normalizeIntegrationName(integration.spec?.integrationName) ===
-              normalizeIntegrationName(bIntegrationName),
-          )
-        : false;
-
-      if (aHasConnectedIntegration !== bHasConnectedIntegration) {
-        return aHasConnectedIntegration ? -1 : 1;
+    const filteredCategories = (blocks || []).filter((category) => {
+      if (category.name === "Bundles" && !isCustomComponentsEnabled()) {
+        return false;
       }
-    }
+      return true;
+    });
 
-    return a.name.localeCompare(b.name);
-  });
+    return [...filteredCategories].sort((a, b) => {
+      const aOrder = categoryOrder[a.name] ?? Infinity;
+      const bOrder = categoryOrder[b.name] ?? Infinity;
+
+      if (aOrder !== bOrder) {
+        return aOrder - bOrder;
+      }
+
+      if (showConnectedIntegrationsOnTop && aOrder === Infinity && bOrder === Infinity) {
+        const aIntegrationName = a.blocks.find((block) => block.integrationName)?.integrationName;
+        const bIntegrationName = b.blocks.find((block) => block.integrationName)?.integrationName;
+
+        const aHasConnectedIntegration = aIntegrationName
+          ? integrations.some(
+              (integration) =>
+                normalizeIntegrationName(integration.spec?.integrationName) ===
+                normalizeIntegrationName(aIntegrationName),
+            )
+          : false;
+
+        const bHasConnectedIntegration = bIntegrationName
+          ? integrations.some(
+              (integration) =>
+                normalizeIntegrationName(integration.spec?.integrationName) ===
+                normalizeIntegrationName(bIntegrationName),
+            )
+          : false;
+
+        if (aHasConnectedIntegration !== bHasConnectedIntegration) {
+          return aHasConnectedIntegration ? -1 : 1;
+        }
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [blocks, integrations, showConnectedIntegrationsOnTop]);
+
+  const componentsTabContent = useMemo(
+    () => (
+      <TabsContent value="components" className="mt-0 flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="flex items-center gap-2 px-5">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+            <Input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Filter components..."
+              className="pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as typeof typeFilter)}>
+            <SelectTrigger size="sm" className="w-[120px]">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="trigger">Trigger</SelectItem>
+              <SelectItem value="action">Action</SelectItem>
+              <SelectItem value="flow">Flow</SelectItem>
+            </SelectContent>
+          </Select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon-sm" className="h-8 w-8" aria-label="Sidebar settings">
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuCheckboxItem
+                checked={showIntegrationSetupStatus}
+                onCheckedChange={(checked) => setShowIntegrationSetupStatus(Boolean(checked))}
+              >
+                Show integration setup status
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={showConnectedIntegrationsOnTop}
+                onCheckedChange={(checked) => setShowConnectedIntegrationsOnTop(Boolean(checked))}
+              >
+                Connected integrations on top
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="gap-2 py-6">
+          {sortedCategories.map((category) => (
+            <CategorySection
+              key={category.name}
+              category={category}
+              integrations={integrations}
+              showIntegrationSetupStatus={showIntegrationSetupStatus}
+              canvasZoom={canvasZoom}
+              searchTerm={searchTerm}
+              typeFilter={typeFilter}
+              isDraggingRef={isDraggingRef}
+              setHoveredBlock={setHoveredBlock}
+              dragPreviewRef={dragPreviewRef}
+              onBlockClick={onBlockClick}
+            />
+          ))}
+
+          {/* Disabled overlay - only over items */}
+          {disabled && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 z-30 cursor-not-allowed" />
+              </TooltipTrigger>
+              <TooltipContent side="left" sideOffset={10}>
+                <p>{disabledTooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      </TabsContent>
+    ),
+    [
+      canvasZoom,
+      disabled,
+      disabledTooltip,
+      integrations,
+      onBlockClick,
+      searchTerm,
+      showConnectedIntegrationsOnTop,
+      showIntegrationSetupStatus,
+      sortedCategories,
+      typeFilter,
+    ],
+  );
 
   return (
     <div
@@ -305,99 +756,171 @@ export function BuildingBlocksSidebar({
         />
       </div>
 
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 px-5 py-4 relative">
-        <div className="flex flex-col items-start gap-3 w-full">
-          <div className="flex justify-between gap-3 w-full">
-            <div className="flex flex-col gap-0.5">
-              <h2 className="text-base font-medium">Add Component</h2>
+      {!showAiBuilderTab && (
+        <div className="flex items-center justify-between gap-3 px-5 py-4 relative">
+          <div className="flex flex-col items-start gap-3 w-full">
+            <div className="flex justify-between gap-3 w-full">
+              <div className="flex flex-col gap-0.5">
+                <h2 className="text-base font-medium">Add Component</h2>
+              </div>
+            </div>
+            <div
+              onClick={() => onToggle(false)}
+              className="absolute top-4 right-4 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
+            >
+              <X size={16} />
             </div>
           </div>
-          <div
-            onClick={() => onToggle(false)}
-            className="absolute top-4 right-4 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
-          >
-            <X size={16} />
+        </div>
+      )}
+
+      <Tabs
+        value={showAiBuilderTab ? activeTab : "components"}
+        onValueChange={(value) => setActiveTab(value as "components" | "ai")}
+        className={`flex ${showAiBuilderTab ? "h-full" : "h-[calc(100%-82px)]"} flex-col`}
+      >
+        {showAiBuilderTab && (
+          <div className="px-4 pt-3 pb-3 flex items-center gap-1.5 relative">
+            <TabsList className="grid h-8 w-auto grid-cols-2 gap-0.5 bg-transparent p-0">
+              <TabsTrigger
+                value="components"
+                className="h-7 rounded-sm px-2 text-xs text-muted-foreground shadow-none data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              >
+                Components
+              </TabsTrigger>
+              <TabsTrigger
+                value="ai"
+                className="h-7 gap-1 rounded-sm px-2 text-xs text-muted-foreground shadow-none data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              >
+                <span>AI Builder</span>
+                {pendingProposal ? <span className="h-2 w-2 rounded-full bg-blue-500" /> : null}
+              </TabsTrigger>
+            </TabsList>
+            <div
+              onClick={() => onToggle(false)}
+              className="absolute top-4 right-4 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
+            >
+              <X size={16} />
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* Search and Filter */}
-      <div className="flex items-center gap-2 px-5">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
-          <Input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Filter components..."
-            className="pl-9"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as typeof typeFilter)}>
-          <SelectTrigger size="sm" className="w-[120px]">
-            <SelectValue placeholder="All Types" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="trigger">Trigger</SelectItem>
-            <SelectItem value="action">Action</SelectItem>
-            <SelectItem value="flow">Flow</SelectItem>
-          </SelectContent>
-        </Select>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon-sm" className="h-8 w-8" aria-label="Sidebar settings">
-              <Settings2 className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuCheckboxItem
-              checked={showIntegrationSetupStatus}
-              onCheckedChange={(checked) => setShowIntegrationSetupStatus(Boolean(checked))}
-            >
-              Show integration setup status
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={showConnectedIntegrationsOnTop}
-              onCheckedChange={(checked) => setShowConnectedIntegrationsOnTop(Boolean(checked))}
-            >
-              Connected integrations on top
-            </DropdownMenuCheckboxItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <div className="gap-2 py-6">
-        {sortedCategories.map((category) => (
-          <CategorySection
-            key={category.name}
-            category={category}
-            integrations={integrations}
-            showIntegrationSetupStatus={showIntegrationSetupStatus}
-            canvasZoom={canvasZoom}
-            searchTerm={searchTerm}
-            typeFilter={typeFilter}
-            isDraggingRef={isDraggingRef}
-            setHoveredBlock={setHoveredBlock}
-            dragPreviewRef={dragPreviewRef}
-            onBlockClick={onBlockClick}
-          />
-        ))}
-
-        {/* Disabled overlay - only over items */}
-        {disabled && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 z-30 cursor-not-allowed" />
-            </TooltipTrigger>
-            <TooltipContent side="left" sideOffset={10}>
-              <p>{disabledTooltip}</p>
-            </TooltipContent>
-          </Tooltip>
         )}
-      </div>
+        {(!showAiBuilderTab || activeTab === "components") && componentsTabContent}
+
+        {showAiBuilderTab && (
+          <TabsContent value="ai" className="mt-0 flex-1 overflow-hidden px-5 pb-5">
+            <div className="h-full rounded-md border border-border bg-slate-50/30 flex flex-col">
+              <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+                {aiMessages.length === 0 ? (
+                  <div className="text-sm text-gray-600">
+                    <div className="flex items-start gap-2">
+                      <p>Describe your flow and I will propose changes.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {aiMessages.map((message) => (
+                      <div key={message.id} className={message.role === "user" ? "ml-6" : "mr-6"}>
+                        <div
+                          className={
+                            message.role === "user"
+                              ? "rounded-md bg-blue-600 text-white px-3 py-2 text-sm"
+                              : "rounded-md bg-white border border-border px-3 py-2 text-sm text-gray-800"
+                          }
+                        >
+                          {message.content}
+                        </div>
+                        {message.role === "assistant" && !pendingProposal
+                          ? (() => {
+                              const options = extractAssistantOptions(message.content);
+                              if (options.length === 0) return null;
+                              return (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {options.map((option) => (
+                                    <Button
+                                      key={`${message.id}-${option}`}
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs"
+                                      onClick={() => handleSendPrompt(option)}
+                                      disabled={disabled || isGeneratingResponse || !canvasId}
+                                    >
+                                      {option}
+                                    </Button>
+                                  ))}
+                                </div>
+                              );
+                            })()
+                          : null}
+                      </div>
+                    ))}
+                    {isGeneratingResponse ? (
+                      <div className="sp-ai-thinking text-xs text-gray-500 px-1 py-1 rounded-sm">
+                        Planing next steps...
+                      </div>
+                    ) : null}
+                  </>
+                )}
+
+                {pendingProposal && (
+                  <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-3 space-y-2">
+                    <ul className="text-sm text-blue-900 list-disc pl-5 space-y-1">
+                      {pendingProposal.operations
+                        .filter((operation) => operation.type !== "connect_nodes")
+                        .map((operation) => (
+                          <li key={`${pendingProposal.id}-${JSON.stringify(operation)}`}>
+                            {formatOperation(operation, pendingProposal)}
+                          </li>
+                        ))}
+                    </ul>
+                    <div className="flex items-center gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        onClick={handleApplyProposal}
+                        disabled={disabled || isApplyingProposal || pendingProposal.operations.length === 0}
+                      >
+                        Apply changes
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleDiscardProposal} disabled={isApplyingProposal}>
+                        Discard
+                      </Button>
+                    </div>
+                    {aiError ? <p className="text-xs text-red-700">{aiError}</p> : null}
+                  </div>
+                )}
+
+                {!pendingProposal && aiError ? <p className="text-xs text-red-700">{aiError}</p> : null}
+              </div>
+
+              <div className="border-t border-border px-4 py-3">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSendPrompt();
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Input
+                    ref={aiInputRef}
+                    value={aiInput}
+                    onChange={(e) => setAiInput(e.target.value)}
+                    placeholder="Describe your canvas changes..."
+                    disabled={disabled || !canvasId}
+                  />
+                  <Button
+                    type="submit"
+                    size="icon-sm"
+                    disabled={disabled || isGeneratingResponse || !canvasId || !aiInput.trim()}
+                    aria-label="Send prompt"
+                  >
+                    <SendHorizontal size={14} />
+                  </Button>
+                </form>
+              </div>
+            </div>
+          </TabsContent>
+        )}
+      </Tabs>
 
       {/* Hidden drag preview - pre-rendered and ready for drag */}
       <div
@@ -527,6 +1050,7 @@ function CategorySection({
     render: renderIcon,
     dockerhub: dockerIcon,
     harness: harnessIcon,
+    octopus: octopusIcon,
     servicenow: servicenowIcon,
     statuspage: statuspageIcon,
     aws: {
@@ -654,6 +1178,7 @@ function CategorySection({
             render: renderIcon,
             dockerhub: dockerIcon,
             harness: harnessIcon,
+            octopus: octopusIcon,
             servicenow: servicenowIcon,
             statuspage: statuspageIcon,
             aws: {

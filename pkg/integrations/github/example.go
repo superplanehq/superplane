@@ -49,8 +49,11 @@ var exampleDataOnIssueBytes []byte
 //go:embed example_data_on_pull_request.json
 var exampleDataOnPullRequestBytes []byte
 
-//go:embed example_data_on_pull_request_review_comment.json
-var exampleDataOnPullRequestReviewCommentBytes []byte
+//go:embed example_data_on_pr_comment.json
+var exampleDataOnPRCommentBytes []byte
+
+//go:embed example_data_on_pr_review_comment.json
+var exampleDataOnPRReviewCommentBytes []byte
 
 //go:embed example_data_on_push.json
 var exampleDataOnPushBytes []byte
@@ -124,8 +127,11 @@ var exampleDataOnIssue map[string]any
 var exampleDataOnPullRequestOnce sync.Once
 var exampleDataOnPullRequest map[string]any
 
-var exampleDataOnPullRequestReviewCommentOnce sync.Once
-var exampleDataOnPullRequestReviewComment map[string]any
+var exampleDataOnPRCommentOnce sync.Once
+var exampleDataOnPRComment map[string]any
+
+var exampleDataOnPRReviewCommentOnce sync.Once
+var exampleDataOnPRReviewComment map[string]any
 
 var exampleDataOnPushOnce sync.Once
 var exampleDataOnPush map[string]any
@@ -223,9 +229,17 @@ func (t *OnPullRequest) ExampleData() map[string]any {
 
 func (t *OnPRComment) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
-		&exampleDataOnPullRequestReviewCommentOnce,
-		exampleDataOnPullRequestReviewCommentBytes,
-		&exampleDataOnPullRequestReviewComment,
+		&exampleDataOnPRCommentOnce,
+		exampleDataOnPRCommentBytes,
+		&exampleDataOnPRComment,
+	)
+}
+
+func (t *OnPRReviewComment) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleDataOnPRReviewCommentOnce,
+		exampleDataOnPRReviewCommentBytes,
+		&exampleDataOnPRReviewComment,
 	)
 }
 

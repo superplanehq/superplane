@@ -233,6 +233,18 @@ service Canvases {
       tags: "CanvasEvent";
     };
   }
+
+  rpc SendAiMessage(SendAiMessageRequest) returns (SendAiMessageResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/ai/messages"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Generate AI canvas proposal";
+      description: "Generates a structured, non-persistent canvas proposal from a natural language prompt";
+      tags: "Canvas";
+    };
+  }
 }
 
 message ListCanvasesRequest {
@@ -515,6 +527,35 @@ message ResolveExecutionErrorsRequest {
 }
 
 message ResolveExecutionErrorsResponse {}
+
+message CanvasAiNodeContext {
+  string id = 1;
+  string name = 2;
+  string label = 3;
+  string type = 4;
+}
+
+message CanvasAiBlockContext {
+  string name = 1;
+  string label = 2;
+  string type = 3;
+}
+
+message CanvasAiContext {
+  repeated CanvasAiNodeContext nodes = 1;
+  repeated CanvasAiBlockContext available_blocks = 2;
+}
+
+message SendAiMessageRequest {
+  string canvas_id = 1;
+  string prompt = 2;
+  CanvasAiContext canvas_context = 3;
+}
+
+message SendAiMessageResponse {
+  string assistant_message = 1;
+  repeated google.protobuf.Struct operations = 2;
+}
 
 //
 // Standalone messages
