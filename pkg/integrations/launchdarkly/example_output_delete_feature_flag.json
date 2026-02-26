@@ -1,0 +1,9 @@
+{
+  "data": {
+    "projectKey": "default",
+    "flagKey": "toggle-feature",
+    "deleted": true
+  },
+  "type": "launchdarkly.flag.deleted",
+  "timestamp": "2026-01-19T12:00:00Z"
+}
