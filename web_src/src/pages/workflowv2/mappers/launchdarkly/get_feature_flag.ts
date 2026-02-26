@@ -1,5 +1,12 @@
 import { ComponentBaseProps } from "@/ui/componentBase";
-import { ComponentBaseMapper, ComponentBaseContext, SubtitleContext, ExecutionDetailsContext, OutputPayload, NodeInfo } from "../types";
+import {
+  ComponentBaseMapper,
+  ComponentBaseContext,
+  SubtitleContext,
+  ExecutionDetailsContext,
+  OutputPayload,
+  NodeInfo,
+} from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap } from "..";
