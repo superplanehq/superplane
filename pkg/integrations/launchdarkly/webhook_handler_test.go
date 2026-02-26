@@ -35,10 +35,10 @@ func (w *testHandlerWebhookContext) SetSecret(secret []byte) error {
 func Test__LaunchDarklyWebhookHandler__CompareConfig(t *testing.T) {
 	handler := &LaunchDarklyWebhookHandler{}
 
-	t.Run("same project -> true", func(t *testing.T) {
+	t.Run("same project and URL -> true", func(t *testing.T) {
 		equal, err := handler.CompareConfig(
-			WebhookConfiguration{ProjectKey: "default"},
-			WebhookConfiguration{ProjectKey: "default"},
+			WebhookConfiguration{ProjectKey: "default", WebhooksBaseURL: "https://example.com"},
+			WebhookConfiguration{ProjectKey: "default", WebhooksBaseURL: "https://example.com"},
 		)
 		require.NoError(t, err)
 		assert.True(t, equal)
@@ -46,8 +46,17 @@ func Test__LaunchDarklyWebhookHandler__CompareConfig(t *testing.T) {
 
 	t.Run("different project -> false", func(t *testing.T) {
 		equal, err := handler.CompareConfig(
-			WebhookConfiguration{ProjectKey: "default"},
-			WebhookConfiguration{ProjectKey: "other"},
+			WebhookConfiguration{ProjectKey: "default", WebhooksBaseURL: "https://example.com"},
+			WebhookConfiguration{ProjectKey: "other", WebhooksBaseURL: "https://example.com"},
+		)
+		require.NoError(t, err)
+		assert.False(t, equal)
+	})
+
+	t.Run("different URL -> false", func(t *testing.T) {
+		equal, err := handler.CompareConfig(
+			WebhookConfiguration{ProjectKey: "default", WebhooksBaseURL: "https://old.ngrok-free.app"},
+			WebhookConfiguration{ProjectKey: "default", WebhooksBaseURL: "https://new.ngrok-free.app"},
 		)
 		require.NoError(t, err)
 		assert.False(t, equal)
@@ -87,7 +96,7 @@ func Test__LaunchDarklyWebhookHandler__Setup(t *testing.T) {
 
 		webhookCtx := &testHandlerWebhookContext{
 			url:           "https://example.com/api/v1/webhooks/w1",
-			configuration: WebhookConfiguration{ProjectKey: "default"},
+			configuration: WebhookConfiguration{ProjectKey: "default", WebhooksBaseURL: "https://example.com"},
 		}
 
 		result, err := handler.Setup(core.WebhookHandlerContext{

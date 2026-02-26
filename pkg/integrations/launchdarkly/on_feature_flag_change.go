@@ -30,10 +30,10 @@ const (
 type OnFeatureFlagChange struct{}
 
 type OnFeatureFlagChangeConfiguration struct {
-	ProjectKey   string                     `json:"projectKey" mapstructure:"projectKey"`
-	Environments []configuration.Predicate  `json:"environments" mapstructure:"environments"`
-	Flags        []configuration.Predicate  `json:"flags" mapstructure:"flags"`
-	Actions      []string                   `json:"actions" mapstructure:"actions"`
+	ProjectKey   string                    `json:"projectKey" mapstructure:"projectKey"`
+	Environments []configuration.Predicate `json:"environments" mapstructure:"environments"`
+	Flags        []configuration.Predicate `json:"flags" mapstructure:"flags"`
+	Actions      []string                  `json:"actions" mapstructure:"actions"`
 }
 
 func (t *OnFeatureFlagChange) Name() string {
@@ -152,7 +152,8 @@ func (t *OnFeatureFlagChange) Setup(ctx core.TriggerContext) error {
 	}
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		ProjectKey: config.ProjectKey,
+		ProjectKey:      config.ProjectKey,
+		WebhooksBaseURL: ctx.Webhook.GetBaseURL(),
 	})
 }
 
@@ -219,13 +220,16 @@ func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int
 		}
 	}
 
-	// Filter by configured environments (skip if env key could not be extracted)
-	if len(config.Environments) > 0 && envKey != "" && !configuration.MatchesAnyPredicate(config.Environments, envKey) {
+	// Filter by configured environments.
+	// Skip if: env key could not be extracted (no accesses), or env is "*" (project-scoped
+	// actions like createFlag use proj/<proj>:env/*:flag/<flag> and are not environment-specific).
+	if len(config.Environments) > 0 && envKey != "" && envKey != "*" && !configuration.MatchesAnyPredicate(config.Environments, envKey) {
 		ctx.Logger.Infof("launchdarkly webhook: environment %q does not match configured environments, acknowledging without emitting", envKey)
 		return http.StatusOK, nil
 	}
 
-	// Filter by configured flags (skip if flag key could not be extracted)
+	// Filter by configured flags.
+	// Skip if: flag key could not be extracted (no accesses).
 	if len(config.Flags) > 0 && flagKey != "" && !configuration.MatchesAnyPredicate(config.Flags, flagKey) {
 		ctx.Logger.Infof("launchdarkly webhook: flag %q does not match configured flags, acknowledging without emitting", flagKey)
 		return http.StatusOK, nil

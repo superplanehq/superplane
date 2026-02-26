@@ -144,6 +144,8 @@ func (c *GetFeatureFlag) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to get feature flag: %w", err)
 	}
 
+	flag["projectKey"] = spec.ProjectKey
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"launchdarkly.flag",

@@ -12,6 +12,7 @@ interface GetFeatureFlagConfiguration {
 }
 
 interface FeatureFlagOutput {
+  projectKey?: string;
   key?: string;
   name?: string;
   description?: string;
@@ -80,6 +81,7 @@ export const getFeatureFlagMapper: ComponentBaseMapper = {
     const flag = outputs.default[0].data as FeatureFlagOutput;
     if (!flag) return details;
 
+    if (flag.projectKey) details["Project"] = flag.projectKey;
     if (flag.key) details["Key"] = flag.key;
     if (flag.name) details["Name"] = flag.name;
     if (flag.description) details["Description"] = flag.description;

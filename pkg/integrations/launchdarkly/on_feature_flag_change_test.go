@@ -316,6 +316,63 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 0, eventContext.Count())
 	})
 
+	t.Run("createFlag uses env wildcard and passes env filter -> emit", func(t *testing.T) {
+		// LaunchDarkly uses proj/<proj>:env/*:flag/<flag> for createFlag (project-scoped).
+		// The env wildcard should NOT be filtered out by an environment predicate.
+		body := []byte(`{"kind":"flag","name":"New Flag","accesses":[{"action":"createFlag","resource":"proj/default:env/*:flag/new-flag"}]}`)
+		sig := hmacSignature(validSecret, body)
+		headers := http.Header{}
+		headers.Set("X-LD-Signature", sig)
+
+		wc := &contexts.WebhookContext{}
+		require.NoError(t, wc.SetSecret([]byte(validSecret)))
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"projectKey":   "default",
+				"environments": []map[string]any{{"type": "equals", "value": "production"}},
+				"actions":      []string{ActionCreateFlag},
+			},
+			Webhook: wc,
+			Events:  eventContext,
+			Logger:  testLogger,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Equal(t, 1, eventContext.Count())
+		assert.Equal(t, "launchdarkly.flag.createFlag", eventContext.Payloads[0].Type)
+	})
+
+	t.Run("createFlag with flag predicate -> filters by flag key", func(t *testing.T) {
+		body := []byte(`{"kind":"flag","name":"Other Flag","accesses":[{"action":"createFlag","resource":"proj/default:env/*:flag/other-flag"}]}`)
+		sig := hmacSignature(validSecret, body)
+		headers := http.Header{}
+		headers.Set("X-LD-Signature", sig)
+
+		wc := &contexts.WebhookContext{}
+		require.NoError(t, wc.SetSecret([]byte(validSecret)))
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"projectKey": "default",
+				"flags":      []map[string]any{{"type": "equals", "value": "my-flag"}},
+				"actions":    []string{ActionCreateFlag},
+			},
+			Webhook: wc,
+			Events:  eventContext,
+			Logger:  testLogger,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Equal(t, 0, eventContext.Count())
+	})
+
 	t.Run("action not in configured actions -> no emit", func(t *testing.T) {
 		body := []byte(`{"kind":"flag","name":"My Feature","accesses":[{"action":"updateRules","resource":"proj/default:env/production:flag/my-flag"}]}`)
 		sig := hmacSignature(validSecret, body)
@@ -431,6 +488,7 @@ func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
+			Webhook:       &testWebhookContext{},
 			Configuration: OnFeatureFlagChangeConfiguration{},
 		})
 		require.ErrorContains(t, err, "project key is required")
@@ -441,6 +499,7 @@ func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
+			Webhook:       &testWebhookContext{},
 			Configuration: OnFeatureFlagChangeConfiguration{ProjectKey: "default"},
 		})
 
@@ -449,6 +508,7 @@ func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 		req, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
 		require.True(t, ok, "expected WebhookRequests[0] to be WebhookConfiguration")
 		assert.Equal(t, "default", req.ProjectKey)
+		assert.Equal(t, "https://example.com", req.WebhooksBaseURL)
 	})
 
 	t.Run("project with flags predicate requests webhook", func(t *testing.T) {
@@ -456,6 +516,7 @@ func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Integration: integrationCtx,
 			Metadata:    &contexts.MetadataContext{},
+			Webhook:     &testWebhookContext{},
 			Configuration: OnFeatureFlagChangeConfiguration{
 				ProjectKey: "default",
 				Flags: []configuration.Predicate{
@@ -469,5 +530,6 @@ func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 		req, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
 		require.True(t, ok)
 		assert.Equal(t, "default", req.ProjectKey)
+		assert.Equal(t, "https://example.com", req.WebhooksBaseURL)
 	})
 }
