@@ -293,9 +293,5 @@ func resolveSigningSecret(ctx core.WebhookRequestContext) string {
 	if err != nil || len(b) == 0 {
 		return ""
 	}
-	s := strings.TrimSpace(string(b))
-	if s == "" {
-		return ""
-	}
-	return s
+	return strings.TrimSpace(string(b))
 }

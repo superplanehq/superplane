@@ -90,7 +90,6 @@ import {
   componentMappers as launchdarklyComponentMappers,
   triggerRenderers as launchdarklyTriggerRenderers,
   eventStateRegistry as launchdarklyEventStateRegistry,
-  customFieldRenderers as launchdarklyCustomFieldRenderers,
 } from "./launchdarkly/index";
 import {
   componentMappers as awsComponentMappers,
@@ -351,7 +350,6 @@ const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
   incident: incidentCustomFieldRenderers,
-  launchdarkly: launchdarklyCustomFieldRenderers,
   gcp: gcpCustomFieldRenderers,
   servicenow: servicenowCustomFieldRenderers,
 };

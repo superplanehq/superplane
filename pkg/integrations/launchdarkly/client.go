@@ -40,6 +40,15 @@ type FeatureFlagListResponse struct {
 	Items []FeatureFlag `json:"items"`
 }
 
+type APIError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("request failed with %d: %s", e.StatusCode, e.Body)
+}
+
 type Client struct {
 	Token   string
 	BaseURL string
@@ -87,7 +96,7 @@ func (c *Client) execRequest(method, path string, body io.Reader) ([]byte, error
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("request got %d: %s", res.StatusCode, string(responseBody))
+		return nil, &APIError{StatusCode: res.StatusCode, Body: string(responseBody)}
 	}
 
 	return responseBody, nil

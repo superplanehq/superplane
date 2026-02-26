@@ -2,7 +2,7 @@ package launchdarkly
 
 import (
 	"fmt"
-	"strings"
+	"net/http"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -96,7 +96,7 @@ func (h *LaunchDarklyWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) err
 
 	if err := client.DeleteWebhook(metadata.LDWebhookID); err != nil {
 		// If the webhook is already gone in LaunchDarkly, treat as success.
-		if strings.Contains(err.Error(), "404") {
+		if apiErr, ok := err.(*APIError); ok && apiErr.StatusCode == http.StatusNotFound {
 			return nil
 		}
 		return fmt.Errorf("failed to delete webhook from LaunchDarkly: %w", err)
