@@ -1,6 +1,7 @@
 import { MetadataItem } from "@/ui/metadataList";
 import { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
 import { baseMapper } from "./base";
+import { ComponentBaseSpec } from "@/ui/componentBase";
 
 interface CreateRepositorySandboxConfiguration {
   snapshot?: string;
@@ -39,6 +40,7 @@ export const createRepositorySandboxMapper: ComponentBaseMapper = {
     return {
       ...props,
       metadata: createRepositorySandboxMetadataList(context.node),
+      specs: createRepositorySandboxSpecs(context.node),
     };
   },
 
@@ -84,9 +86,20 @@ function createRepositorySandboxMetadataList(node: ComponentBaseContext["node"])
     items.push({ icon: "terminal", label: `bootstrap: ${config.bootstrap.from}` });
   }
 
-  if (config?.bootstrap?.path) {
+  if (config?.bootstrap?.from === "file" && config?.bootstrap?.path) {
     items.push({ icon: "file-code", label: config.bootstrap.path });
   }
 
   return items;
+}
+
+function createRepositorySandboxSpecs(node: ComponentBaseContext["node"]): ComponentBaseSpec[] {
+  const config = node.configuration as CreateRepositorySandboxConfiguration | undefined;
+  const specs: ComponentBaseSpec[] = [];
+
+  if (config?.bootstrap?.from == "inline" && config?.bootstrap?.script) {
+    specs.push({ title: "Script", value: config.bootstrap.script });
+  }
+
+  return specs;
 }
