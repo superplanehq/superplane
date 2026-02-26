@@ -286,9 +286,6 @@ func parseResourceEnvAndFlag(resource string) (envKey, flagKey string) {
 
 // resolveSigningSecret returns the webhook signing secret for verification.
 func resolveSigningSecret(ctx core.WebhookRequestContext) string {
-	if ctx.Webhook == nil {
-		return ""
-	}
 	b, err := ctx.Webhook.GetSecret()
 	if err != nil || len(b) == 0 {
 		return ""
