@@ -38,6 +38,9 @@ interface OnFeatureFlagChangeEventData {
   name?: string;
   title?: string;
   titleVerb?: string;
+  projectKey?: string;
+  environmentKey?: string;
+  flagKey?: string;
 }
 
 function getEventTitleAndSubtitle(
@@ -61,8 +64,10 @@ export const onFeatureFlagChangeTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnFeatureFlagChangeEventData;
     const details: Record<string, string> = {};
-    if (eventData?.kind) details["Event"] = formatEventLabel(eventData.kind);
-    if (eventData?.name) details["Flag"] = eventData.name;
+    if (eventData?.projectKey) details["Project"] = eventData.projectKey;
+    if (eventData?.environmentKey) details["Environment"] = eventData.environmentKey;
+    if (eventData?.flagKey) details["Flag Key"] = eventData.flagKey;
+    if (eventData?.name) details["Flag Name"] = eventData.name;
     if (eventData?.titleVerb) details["Action"] = eventData.titleVerb;
     return details;
   },

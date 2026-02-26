@@ -241,6 +241,15 @@ func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int
 		return http.StatusOK, nil
 	}
 
+	// Inject extracted keys into the payload so consumers can access them directly.
+	payload["projectKey"] = config.ProjectKey
+	if envKey != "" && envKey != "*" {
+		payload["environmentKey"] = envKey
+	}
+	if flagKey != "" {
+		payload["flagKey"] = flagKey
+	}
+
 	// Determine a more specific payload type from the kind and action
 	payloadType := "launchdarkly." + kind
 	if action != "" {
