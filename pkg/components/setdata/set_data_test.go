@@ -46,6 +46,107 @@ func TestSetData_Execute(t *testing.T) {
 	assert.Equal(t, PayloadType, stateCtx.Type)
 }
 
+func TestSetData_Execute_AppendToList(t *testing.T) {
+	component := &SetData{}
+	stateCtx := &supportcontexts.ExecutionStateContext{}
+	canvasData := &canvasDataContext{
+		values: map[string]any{
+			"environments": []any{
+				map[string]any{
+					"pull_request": 122,
+					"requester":    "other-user",
+				},
+			},
+		},
+	}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"key":       "environments",
+			"operation": "append",
+			"value": map[string]any{
+				"pull_request": 123,
+				"requester":    "shiroyasha",
+				"sandbox_id":   "12asdfasdf-12341asd12341-324",
+			},
+		},
+		CanvasData:     canvasData,
+		ExecutionState: stateCtx,
+	})
+
+	assert.NoError(t, err)
+	list, ok := canvasData.values["environments"].([]any)
+	assert.True(t, ok)
+	assert.Len(t, list, 2)
+}
+
+func TestSetData_Execute_AppendWithUniqueBy(t *testing.T) {
+	component := &SetData{}
+	stateCtx := &supportcontexts.ExecutionStateContext{}
+	canvasData := &canvasDataContext{
+		values: map[string]any{
+			"environments": []any{
+				map[string]any{
+					"pull_request": 123,
+					"requester":    "old-user",
+					"sandbox_id":   "old-sandbox",
+				},
+			},
+		},
+	}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"key":       "environments",
+			"operation": "append",
+			"uniqueBy":  "pull_request",
+			"value": map[string]any{
+				"pull_request": 123,
+				"requester":    "shiroyasha",
+				"sandbox_id":   "12asdfasdf-12341asd12341-324",
+			},
+		},
+		CanvasData:     canvasData,
+		ExecutionState: stateCtx,
+	})
+
+	assert.NoError(t, err)
+	list, ok := canvasData.values["environments"].([]any)
+	assert.True(t, ok)
+	assert.Len(t, list, 1)
+	updated, ok := list[0].(map[string]any)
+	assert.True(t, ok)
+	assert.Equal(t, "shiroyasha", updated["requester"])
+	assert.Equal(t, "12asdfasdf-12341asd12341-324", updated["sandbox_id"])
+}
+
+func TestSetData_Execute_BuildObjectFromValueList(t *testing.T) {
+	component := &SetData{}
+	stateCtx := &supportcontexts.ExecutionStateContext{}
+	canvasData := &canvasDataContext{values: map[string]any{}}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"key":       "environment",
+			"operation": "set",
+			"valueList": []any{
+				map[string]any{"name": "pull_request", "value": 123},
+				map[string]any{"name": "creator", "value": "shiroyasha"},
+				map[string]any{"name": "sandbox_id", "value": "asdfasdf-123asdfasdf-asdfasdf"},
+			},
+		},
+		CanvasData:     canvasData,
+		ExecutionState: stateCtx,
+	})
+
+	assert.NoError(t, err)
+	objectValue, ok := canvasData.values["environment"].(map[string]any)
+	assert.True(t, ok)
+	assert.Equal(t, 123, objectValue["pull_request"])
+	assert.Equal(t, "shiroyasha", objectValue["creator"])
+	assert.Equal(t, "asdfasdf-123asdfasdf-asdfasdf", objectValue["sandbox_id"])
+}
+
 func TestSetData_Execute_WithoutCanvasDataContext(t *testing.T) {
 	component := &SetData{}
 	stateCtx := &supportcontexts.ExecutionStateContext{}

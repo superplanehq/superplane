@@ -22,7 +22,11 @@ func init() {
 type GetData struct{}
 
 type Spec struct {
-	Key string `json:"key"`
+	Key         string  `json:"key"`
+	Mode        string  `json:"mode"`
+	MatchBy     *string `json:"matchBy,omitempty"`
+	MatchValue  any     `json:"matchValue,omitempty"`
+	ReturnField *string `json:"returnField,omitempty"`
 }
 
 func (c *GetData) Name() string {
@@ -49,7 +53,7 @@ func (c *GetData) Documentation() string {
 ## How It Works
 
 1. Reads ` + "`key`" + ` from configuration
-2. Looks up the value in canvas-level storage
+2. Optionally filters list values by a field and value
 3. Emits a ` + "`data.get`" + ` event with ` + "`key`" + `, ` + "`value`" + `, and ` + "`exists`" + ``
 }
 
@@ -74,6 +78,53 @@ func (c *GetData) Configuration() []configuration.Field {
 			Description: "Canvas data key to fetch",
 			Required:    true,
 		},
+		{
+			Name:        "mode",
+			Label:       "Mode",
+			Type:        configuration.FieldTypeSelect,
+			Description: "How to read this key",
+			Required:    true,
+			Default:     "value",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Read whole value", Value: "value"},
+						{Label: "Find item in list", Value: "listLookup"},
+					},
+				},
+			},
+		},
+		{
+			Name:        "matchBy",
+			Label:       "Match By",
+			Type:        configuration.FieldTypeString,
+			Description: "Field to match in list items",
+			Required:    true,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "mode", Values: []string{"listLookup"}},
+			},
+		},
+		{
+			Name:        "matchValue",
+			Label:       "Match Value",
+			Type:        configuration.FieldTypeExpression,
+			Description: "Value to match against selected field",
+			Required:    true,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "mode", Values: []string{"listLookup"}},
+			},
+		},
+		{
+			Name:        "returnField",
+			Label:       "Return Field (optional)",
+			Type:        configuration.FieldTypeString,
+			Description: "Field to return from the matched item (leave empty to return full item)",
+			Required:    false,
+			Togglable:   true,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "mode", Values: []string{"listLookup"}},
+			},
+		},
 	}
 }
 
@@ -91,10 +142,22 @@ func (c *GetData) Execute(ctx core.ExecutionContext) error {
 	if spec.Key == "" {
 		return fmt.Errorf("key is required")
 	}
+	if spec.Mode == "" {
+		spec.Mode = "value"
+	}
 
 	value, exists, err := ctx.CanvasData.Get(spec.Key)
 	if err != nil {
 		return fmt.Errorf("failed to get canvas data: %w", err)
+	}
+
+	selectedValue := value
+	selectedExists := exists
+	if spec.Mode == "listLookup" {
+		selectedValue, selectedExists, err = lookupListValue(spec, value, exists)
+		if err != nil {
+			return err
+		}
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -103,11 +166,63 @@ func (c *GetData) Execute(ctx core.ExecutionContext) error {
 		[]any{
 			map[string]any{
 				"key":    spec.Key,
-				"value":  value,
-				"exists": exists,
+				"value":  selectedValue,
+				"exists": selectedExists,
 			},
 		},
 	)
+}
+
+func lookupListValue(spec Spec, sourceValue any, sourceExists bool) (any, bool, error) {
+	if !sourceExists {
+		return nil, false, nil
+	}
+
+	matchBy := ""
+	if spec.MatchBy != nil {
+		matchBy = strings.TrimSpace(*spec.MatchBy)
+	}
+	if matchBy == "" {
+		return nil, false, fmt.Errorf("matchBy is required for listLookup mode")
+	}
+
+	items, ok := sourceValue.([]any)
+	if !ok {
+		return nil, false, fmt.Errorf("key %s is not a list", spec.Key)
+	}
+
+	for _, item := range items {
+		objectItem, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		candidate, ok := objectItem[matchBy]
+		if !ok {
+			continue
+		}
+
+		if fmt.Sprintf("%v", candidate) != fmt.Sprintf("%v", spec.MatchValue) {
+			continue
+		}
+
+		returnField := ""
+		if spec.ReturnField != nil {
+			returnField = strings.TrimSpace(*spec.ReturnField)
+		}
+		if returnField == "" {
+			return objectItem, true, nil
+		}
+
+		fieldValue, ok := objectItem[returnField]
+		if !ok {
+			return nil, false, nil
+		}
+
+		return fieldValue, true, nil
+	}
+
+	return nil, false, nil
 }
 
 func (c *GetData) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {

@@ -45,6 +45,72 @@ func TestGetData_Execute(t *testing.T) {
 	assert.Len(t, stateCtx.Payloads, 1)
 }
 
+func TestGetData_Execute_ListLookupWithReturnField(t *testing.T) {
+	component := &GetData{}
+	stateCtx := &supportcontexts.ExecutionStateContext{}
+	canvasData := &canvasDataContext{
+		values: map[string]any{
+			"ephemeral_environments": []any{
+				map[string]any{"pull_request": 1, "sandbox_id": "adfasdf"},
+				map[string]any{"pull_request": 2, "sandbox_id": "sfasdfads"},
+			},
+		},
+	}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"key":         "ephemeral_environments",
+			"mode":        "listLookup",
+			"matchBy":     "pull_request",
+			"matchValue":  1,
+			"returnField": "sandbox_id",
+		},
+		CanvasData:     canvasData,
+		ExecutionState: stateCtx,
+	})
+
+	assert.NoError(t, err)
+	assert.Len(t, stateCtx.Payloads, 1)
+	payload, ok := stateCtx.Payloads[0].(map[string]any)
+	assert.True(t, ok)
+	data, ok := payload["data"].(map[string]any)
+	assert.True(t, ok)
+	assert.Equal(t, true, data["exists"])
+	assert.Equal(t, "adfasdf", data["value"])
+}
+
+func TestGetData_Execute_ListLookup_NotFound(t *testing.T) {
+	component := &GetData{}
+	stateCtx := &supportcontexts.ExecutionStateContext{}
+	canvasData := &canvasDataContext{
+		values: map[string]any{
+			"ephemeral_environments": []any{
+				map[string]any{"pull_request": 2, "sandbox_id": "sfasdfads"},
+			},
+		},
+	}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"key":        "ephemeral_environments",
+			"mode":       "listLookup",
+			"matchBy":    "pull_request",
+			"matchValue": 1,
+		},
+		CanvasData:     canvasData,
+		ExecutionState: stateCtx,
+	})
+
+	assert.NoError(t, err)
+	assert.Len(t, stateCtx.Payloads, 1)
+	payload, ok := stateCtx.Payloads[0].(map[string]any)
+	assert.True(t, ok)
+	data, ok := payload["data"].(map[string]any)
+	assert.True(t, ok)
+	assert.Equal(t, false, data["exists"])
+	assert.Nil(t, data["value"])
+}
+
 func TestGetData_Execute_WithoutCanvasDataContext(t *testing.T) {
 	component := &GetData{}
 	stateCtx := &supportcontexts.ExecutionStateContext{}

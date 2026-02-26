@@ -42,6 +42,7 @@ import {
   useUpdateCanvas,
   useCanvas,
   useCanvasDataEntries,
+  useDeleteCanvasDataEntry,
   useCanvasEvents,
   useWidgets,
   canvasKeys,
@@ -147,6 +148,7 @@ export function WorkflowPageV2() {
   const { data: canvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId!, canvasId!);
   const { data: canvasEventsResponse } = useCanvasEvents(canvasId!);
   const { data: canvasDataEntries = [] } = useCanvasDataEntries(canvasId!);
+  const deleteCanvasDataEntry = useDeleteCanvasDataEntry(canvasId!);
   const [topViewMode, setTopViewMode] = useState<"canvas" | "data">("canvas");
   const canReadOrg = canAct("org", "read");
   const { data: agentSettings } = useOrganizationAgentSettings(organizationId || "", !!organizationId && canReadOrg);
@@ -2978,7 +2980,13 @@ export function WorkflowPageV2() {
         headerBanner={headerBanner}
         topViewMode={topViewMode}
         onTopViewModeChange={setTopViewMode}
-        dataViewContent={<CanvasDataView entries={canvasDataEntries} />}
+        dataViewContent={
+          <CanvasDataView
+            entries={canvasDataEntries}
+            onDeleteEntry={canUpdateCanvas ? (key) => deleteCanvasDataEntry.mutate(key) : undefined}
+            deletingKey={deleteCanvasDataEntry.isPending ? deleteCanvasDataEntry.variables : undefined}
+          />
+        }
         nodes={nodes}
         edges={edges}
         organizationId={organizationId}

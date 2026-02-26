@@ -75,6 +75,14 @@ func ListCanvasDataKVsInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]Canvas
 	return records, nil
 }
 
+func DeleteCanvasDataKVInTransaction(tx *gorm.DB, workflowID uuid.UUID, key string) error {
+	return tx.
+		Where("workflow_id = ?", workflowID).
+		Where("key = ?", key).
+		Delete(&CanvasDataKV{}).
+		Error
+}
+
 func UpsertCanvasDataKV(workflowID uuid.UUID, key string, value any) error {
 	return UpsertCanvasDataKVInTransaction(database.Conn(), workflowID, key, value)
 }
@@ -85,4 +93,8 @@ func FindCanvasDataKV(workflowID uuid.UUID, key string) (*CanvasDataKV, error) {
 
 func ListCanvasDataKVs(workflowID uuid.UUID) ([]CanvasDataKV, error) {
 	return ListCanvasDataKVsInTransaction(database.Conn(), workflowID)
+}
+
+func DeleteCanvasDataKV(workflowID uuid.UUID, key string) error {
+	return DeleteCanvasDataKVInTransaction(database.Conn(), workflowID, key)
 }

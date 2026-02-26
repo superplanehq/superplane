@@ -250,6 +250,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		middleware.OrganizationAuthMiddleware(s.jwt).
 			Middleware(http.HandlerFunc(s.listCanvasData)),
 	).Methods("GET")
+	s.Router.Handle(
+		"/api/v1/canvases/{canvasId}/data/{key}",
+		middleware.OrganizationAuthMiddleware(s.jwt).
+			Middleware(http.HandlerFunc(s.deleteCanvasData)),
+	).Methods("DELETE")
 
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
@@ -536,6 +541,44 @@ func (s *Server) listCanvasData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, listCanvasDataResponse{Items: items})
+}
+
+func (s *Server) deleteCanvasData(w http.ResponseWriter, r *http.Request) {
+	user, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	vars := mux.Vars(r)
+	canvasID, err := uuid.Parse(vars["canvasId"])
+	if err != nil {
+		http.Error(w, "invalid canvas id", http.StatusBadRequest)
+		return
+	}
+
+	key, err := url.PathUnescape(vars["key"])
+	if err != nil {
+		http.Error(w, "invalid key", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(key) == "" {
+		http.Error(w, "invalid key", http.StatusBadRequest)
+		return
+	}
+
+	_, err = models.FindCanvas(user.OrganizationID, canvasID)
+	if err != nil {
+		http.Error(w, "canvas not found", http.StatusNotFound)
+		return
+	}
+
+	if err := models.DeleteCanvasDataKV(canvasID, key); err != nil {
+		http.Error(w, "failed to delete canvas data", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request) {

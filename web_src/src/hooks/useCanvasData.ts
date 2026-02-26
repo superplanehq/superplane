@@ -285,6 +285,27 @@ export const useCanvasDataEntries = (canvasId: string) => {
   });
 };
 
+export const useDeleteCanvasDataEntry = (canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (key: string) => {
+      const response = await fetch(
+        `/api/v1/canvases/${canvasId}/data/${encodeURIComponent(key)}`,
+        withOrganizationHeader({
+          method: "DELETE",
+        }),
+      );
+      if (!response.ok) {
+        throw new Error("failed to delete canvas data");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.canvasDataEntries(canvasId) });
+    },
+  });
+};
+
 export const useEventExecutions = (canvasId: string, eventId: string | null) => {
   return useQuery({
     queryKey: canvasKeys.eventExecution(canvasId, eventId!),
