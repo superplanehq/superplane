@@ -122,6 +122,46 @@ func TestGetData_Execute_ListLookup_NotFound(t *testing.T) {
 	assert.Nil(t, data["value"])
 }
 
+func TestGetData_Execute_EmitEachItem(t *testing.T) {
+	component := &GetData{}
+	stateCtx := &supportcontexts.ExecutionStateContext{}
+	canvasData := &canvasDataContext{
+		values: map[string]any{
+			"pr_sandboxes": []any{
+				map[string]any{"pull_request": 1, "sandbox_id": "sb-1"},
+				map[string]any{"pull_request": 2, "sandbox_id": "sb-2"},
+			},
+		},
+	}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"key":          "pr_sandboxes",
+			"mode":         "value",
+			"emitEachItem": true,
+			"itemField":    "sandbox_id",
+		},
+		CanvasData:     canvasData,
+		ExecutionState: stateCtx,
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, "found", stateCtx.Channel)
+	assert.Len(t, stateCtx.Payloads, 2)
+
+	firstPayload, ok := stateCtx.Payloads[0].(map[string]any)
+	assert.True(t, ok)
+	firstData, ok := firstPayload["data"].(map[string]any)
+	assert.True(t, ok)
+	assert.Equal(t, "sb-1", firstData["value"])
+
+	secondPayload, ok := stateCtx.Payloads[1].(map[string]any)
+	assert.True(t, ok)
+	secondData, ok := secondPayload["data"].(map[string]any)
+	assert.True(t, ok)
+	assert.Equal(t, "sb-2", secondData["value"])
+}
+
 func TestGetData_Execute_WithoutCanvasDataContext(t *testing.T) {
 	component := &GetData{}
 	stateCtx := &supportcontexts.ExecutionStateContext{}

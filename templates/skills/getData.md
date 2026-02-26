@@ -23,6 +23,11 @@ For `mode: "listLookup"`, also include:
 - `matchValue` (required expression/string/number)
 - `returnField` (optional string; use when downstream needs one field like `sandbox_id`)
 
+Optional fan-out fields:
+
+- `emitEachItem` (optional bool): when true and selected value is a list, emits one `found` event per list item
+- `itemField` (optional string): when `emitEachItem` is true, return this field from each object item
+
 ## Planning Rules
 
 When generating workflow operations that include `getData`:
@@ -38,6 +43,11 @@ When generating workflow operations that include `getData`:
    - `matchBy: "pull_request"`
    - `matchValue` from PR event expression
    - `returnField: "sandbox_id"`
+9. For "delete every sandbox" list cleanup flows, prefer:
+   - `mode: "value"`
+   - `emitEachItem: true`
+   - `itemField: "sandbox_id"`
+   so downstream `daytona.deleteSandbox` receives one sandbox ID per event.
 
 ## Common Lifecycle Pattern
 
@@ -69,3 +79,4 @@ When generating workflow operations that include `getData`:
 - Returning full objects when downstream node expects a single scalar field.
 - Omitting `mode` (can leave node invalid in generated proposals).
 - Using `mode: "value"` when the key stores a list and lookup by identifier is required.
+- Forgetting `emitEachItem` for list fan-out flows where downstream actions expect a single value per execution.

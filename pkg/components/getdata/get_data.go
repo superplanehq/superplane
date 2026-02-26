@@ -31,6 +31,8 @@ type Spec struct {
 	MatchBy     *string `json:"matchBy,omitempty"`
 	MatchValue  any     `json:"matchValue,omitempty"`
 	ReturnField *string `json:"returnField,omitempty"`
+	EmitEachItem bool    `json:"emitEachItem,omitempty"`
+	ItemField    *string `json:"itemField,omitempty"`
 }
 
 func (c *GetData) Name() string {
@@ -58,7 +60,8 @@ func (c *GetData) Documentation() string {
 
 1. Reads ` + "`key`" + ` from configuration
 2. Optionally filters list values by a field and value
-3. Emits a ` + "`data.get`" + ` event on either ` + "`found`" + ` or ` + "`notFound`" + ` with ` + "`key`" + `, ` + "`value`" + `, and ` + "`exists`" + ``
+3. Optionally emits one found event per list item
+4. Emits a ` + "`data.get`" + ` event on either ` + "`found`" + ` or ` + "`notFound`" + ` with ` + "`key`" + `, ` + "`value`" + `, and ` + "`exists`" + ``
 }
 
 func (c *GetData) Icon() string {
@@ -132,6 +135,25 @@ func (c *GetData) Configuration() []configuration.Field {
 				{Field: "mode", Values: []string{"listLookup"}},
 			},
 		},
+		{
+			Name:        "emitEachItem",
+			Label:       "Emit each list item",
+			Type:        configuration.FieldTypeBool,
+			Description: "When enabled and value is a list, emit one found event per list item",
+			Required:    false,
+			Default:     false,
+		},
+		{
+			Name:        "itemField",
+			Label:       "Item Field (optional)",
+			Type:        configuration.FieldTypeString,
+			Description: "When emitting each list item, return this field from each object item",
+			Required:    false,
+			Togglable:   true,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "emitEachItem", Values: []string{"true"}},
+			},
+		},
 	}
 }
 
@@ -167,6 +189,27 @@ func (c *GetData) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
+	if selectedExists && spec.EmitEachItem {
+		payloads, err := buildPerItemPayloads(spec, selectedValue)
+		if err != nil {
+			return err
+		}
+		if len(payloads) == 0 {
+			return ctx.ExecutionState.Emit(
+				channelNotFound,
+				PayloadType,
+				[]any{
+					map[string]any{
+						"key":    spec.Key,
+						"value":  nil,
+						"exists": false,
+					},
+				},
+			)
+		}
+		return ctx.ExecutionState.Emit(channelFound, PayloadType, payloads)
+	}
+
 	channel := channelNotFound
 	if selectedExists {
 		channel = channelFound
@@ -183,6 +226,42 @@ func (c *GetData) Execute(ctx core.ExecutionContext) error {
 			},
 		},
 	)
+}
+
+func buildPerItemPayloads(spec Spec, value any) ([]any, error) {
+	items, ok := value.([]any)
+	if !ok {
+		return nil, fmt.Errorf("emitEachItem requires value to be a list")
+	}
+
+	itemField := ""
+	if spec.ItemField != nil {
+		itemField = strings.TrimSpace(*spec.ItemField)
+	}
+
+	payloads := make([]any, 0, len(items))
+	for _, item := range items {
+		nextValue := item
+		if itemField != "" {
+			objectItem, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			fieldValue, ok := objectItem[itemField]
+			if !ok {
+				continue
+			}
+			nextValue = fieldValue
+		}
+
+		payloads = append(payloads, map[string]any{
+			"key":    spec.Key,
+			"value":  nextValue,
+			"exists": true,
+		})
+	}
+
+	return payloads, nil
 }
 
 func lookupListValue(spec Spec, sourceValue any, sourceExists bool) (any, bool, error) {

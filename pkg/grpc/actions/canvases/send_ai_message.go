@@ -188,6 +188,7 @@ func generateCanvasAIPlan(
 		"- For PR sandbox lifecycle flows, prefer setData key 'pr_sandboxes' with operation 'append', uniqueBy 'pull_request', and fields including pull_request + sandbox_id.",
 		"- For getData nodes, always include configuration.mode explicitly ('value' or 'listLookup'); do not omit mode.",
 		"- When reading PR sandbox mappings from list storage, prefer getData mode 'listLookup' with matchBy 'pull_request' and returnField 'sandbox_id'.",
+		"- For delete-all list flows where downstream action expects one item per execution (for example deleteSandbox), configure getData with emitEachItem=true and itemField set appropriately (for example 'sandbox_id').",
 		"- getData emits via 'found' and 'notFound' channels; route primary action from 'found' and fallback handling from 'notFound' when relevant.",
 		"- For daytona.deleteSandbox nodes, always set configuration.sandbox explicitly.",
 		"- For cross-run destroy flows, set daytona.deleteSandbox.sandbox from getData output (do not guess or leave empty).",
