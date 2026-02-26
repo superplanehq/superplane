@@ -40,6 +40,7 @@ import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
+import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
 import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
@@ -78,6 +79,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   prometheus: prometheusIcon,
   render: renderIcon,
   dockerhub: dockerIcon,
+  honeycomb: honeycombIcon,
   gcp: gcpIcon,
   harness: harnessIcon,
   servicenow: servicenowIcon,
@@ -131,6 +133,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
     ecs: awsEcsIcon,
     sns: awsSnsIcon,
   },
+  honeycomb: honeycombIcon,
   gcp: gcpIcon,
 };
 
