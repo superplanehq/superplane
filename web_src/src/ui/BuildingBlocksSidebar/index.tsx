@@ -107,6 +107,9 @@ export interface BuildingBlocksSidebarProps {
     name?: string;
     label?: string;
     type?: string;
+    blockName?: string;
+    configuration?: Record<string, unknown>;
+    integrationName?: string;
   }>;
   onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
   integrations?: OrganizationsIntegration[];
@@ -145,6 +148,11 @@ export type AiCanvasOperation =
     }
   | {
       type: "delete_node";
+      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
+    }
+  | {
+      type: "delete_edge";
+      source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null };
       target: { nodeKey?: string; nodeId?: string; nodeName?: string };
     };
 
@@ -436,6 +444,8 @@ export function BuildingBlocksSidebar({
         return `Update configuration for ${operation.nodeName || operation.target.nodeName || "node"}`;
       case "delete_node":
         return `Delete node ${resolveRefLabel(operation.target)}`;
+      case "delete_edge":
+        return `Disconnect ${resolveRefLabel(operation.source)} -> ${resolveRefLabel(operation.target)}`;
       default:
         return "Update canvas";
     }

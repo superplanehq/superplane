@@ -533,6 +533,9 @@ message CanvasAiNodeContext {
   string name = 2;
   string label = 3;
   string type = 4;
+  string block_name = 5;
+  google.protobuf.Struct configuration = 6;
+  string integration_name = 7;
 }
 
 message CanvasAiBlockContext {

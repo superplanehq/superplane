@@ -23,7 +23,10 @@ When generating workflow operations that include `github.onPRComment`:
 4. If a repository is already known in the current flow (from user input or an existing GitHub node), reuse that repository for related GitHub nodes unless the user asks for a different one.
 5. Only set `configuration.contentFilter` when the user asks for filtering behavior.
 6. Treat `contentFilter` as a regex, not a simple substring.
-7. Use downstream branching for complex conditions instead of overloading a single regex.
+7. For simple comment-command matching, prefer `configuration.contentFilter` on the trigger (for example `^create env\b`, `^destroy\b`) instead of adding an `if` node.
+8. Use downstream `if` branching only for logic that cannot be expressed cleanly as a single trigger filter (multi-field checks, combined predicates, non-comment payload logic).
+9. If the user wants to listen to separate commands (for example "give me envs" and "destroy"), create separate `github.onPRComment` trigger nodes with separate `contentFilter` values.
+10. Do not merge distinct command listeners into a single trigger regex just to reduce node count.
 
 ## Event Semantics
 
@@ -53,10 +56,18 @@ For `github.prComment` events:
 2. Optionally filter command comments (for example `^/deploy\b`).
 3. Route to actions like deployment workflows, status updates, or automated replies.
 
+For multiple independent PR comment commands:
+
+1. Add one `github.onPRComment` trigger per command intent.
+2. Set each trigger's `contentFilter` specifically for that command.
+3. Route each trigger to its own path.
+
 ## Mistakes To Avoid
 
 - Omitting `repository`.
 - Guessing or inferring `repository` when the user has not provided it.
 - Asking for `owner/repo` format instead of just the repository name.
 - Assuming `contentFilter` is not regex.
+- Adding an unnecessary `if` node when a trigger `contentFilter` is sufficient.
+- Combining separate command listeners into one overloaded trigger/filter.
 - Using this trigger when the request is explicitly about non-PR issue comments only.

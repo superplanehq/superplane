@@ -22,6 +22,7 @@ When generating workflow operations that include `daytona.executeCommand`:
 3. Only set `cwd` and `timeout` when the user asks for them or they are clearly needed.
 4. If this node is used to "setup and run dev server", ensure the command starts the server in a way that allows the step to finish (for example background process), then follow with `daytona.getPreviewUrl`.
 5. Use a deterministic preview port when the next step generates a preview URL.
+6. If command logic depends on sandbox IDs from previous runs, retrieve those IDs via `getData` (paired with `setData` at creation time) instead of assuming current-run context.
 
 ## GitHub PR-Comment Trigger Notes
 

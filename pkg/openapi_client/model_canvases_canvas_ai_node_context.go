@@ -20,10 +20,13 @@ var _ MappedNullable = &CanvasesCanvasAiNodeContext{}
 
 // CanvasesCanvasAiNodeContext struct for CanvasesCanvasAiNodeContext
 type CanvasesCanvasAiNodeContext struct {
-	Id    *string `json:"id,omitempty"`
-	Name  *string `json:"name,omitempty"`
+	Id *string `json:"id,omitempty"`
+	Name *string `json:"name,omitempty"`
 	Label *string `json:"label,omitempty"`
-	Type  *string `json:"type,omitempty"`
+	Type *string `json:"type,omitempty"`
+	BlockName *string `json:"blockName,omitempty"`
+	Configuration map[string]interface{} `json:"configuration,omitempty"`
+	IntegrationName *string `json:"integrationName,omitempty"`
 }
 
 // NewCanvasesCanvasAiNodeContext instantiates a new CanvasesCanvasAiNodeContext object
@@ -171,8 +174,104 @@ func (o *CanvasesCanvasAiNodeContext) SetType(v string) {
 	o.Type = &v
 }
 
+// GetBlockName returns the BlockName field value if set, zero value otherwise.
+func (o *CanvasesCanvasAiNodeContext) GetBlockName() string {
+	if o == nil || IsNil(o.BlockName) {
+		var ret string
+		return ret
+	}
+	return *o.BlockName
+}
+
+// GetBlockNameOk returns a tuple with the BlockName field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasAiNodeContext) GetBlockNameOk() (*string, bool) {
+	if o == nil || IsNil(o.BlockName) {
+		return nil, false
+	}
+	return o.BlockName, true
+}
+
+// HasBlockName returns a boolean if a field has been set.
+func (o *CanvasesCanvasAiNodeContext) HasBlockName() bool {
+	if o != nil && !IsNil(o.BlockName) {
+		return true
+	}
+
+	return false
+}
+
+// SetBlockName gets a reference to the given string and assigns it to the BlockName field.
+func (o *CanvasesCanvasAiNodeContext) SetBlockName(v string) {
+	o.BlockName = &v
+}
+
+// GetConfiguration returns the Configuration field value if set, zero value otherwise.
+func (o *CanvasesCanvasAiNodeContext) GetConfiguration() map[string]interface{} {
+	if o == nil || IsNil(o.Configuration) {
+		var ret map[string]interface{}
+		return ret
+	}
+	return o.Configuration
+}
+
+// GetConfigurationOk returns a tuple with the Configuration field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasAiNodeContext) GetConfigurationOk() (map[string]interface{}, bool) {
+	if o == nil || IsNil(o.Configuration) {
+		return map[string]interface{}{}, false
+	}
+	return o.Configuration, true
+}
+
+// HasConfiguration returns a boolean if a field has been set.
+func (o *CanvasesCanvasAiNodeContext) HasConfiguration() bool {
+	if o != nil && !IsNil(o.Configuration) {
+		return true
+	}
+
+	return false
+}
+
+// SetConfiguration gets a reference to the given map[string]interface{} and assigns it to the Configuration field.
+func (o *CanvasesCanvasAiNodeContext) SetConfiguration(v map[string]interface{}) {
+	o.Configuration = v
+}
+
+// GetIntegrationName returns the IntegrationName field value if set, zero value otherwise.
+func (o *CanvasesCanvasAiNodeContext) GetIntegrationName() string {
+	if o == nil || IsNil(o.IntegrationName) {
+		var ret string
+		return ret
+	}
+	return *o.IntegrationName
+}
+
+// GetIntegrationNameOk returns a tuple with the IntegrationName field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasAiNodeContext) GetIntegrationNameOk() (*string, bool) {
+	if o == nil || IsNil(o.IntegrationName) {
+		return nil, false
+	}
+	return o.IntegrationName, true
+}
+
+// HasIntegrationName returns a boolean if a field has been set.
+func (o *CanvasesCanvasAiNodeContext) HasIntegrationName() bool {
+	if o != nil && !IsNil(o.IntegrationName) {
+		return true
+	}
+
+	return false
+}
+
+// SetIntegrationName gets a reference to the given string and assigns it to the IntegrationName field.
+func (o *CanvasesCanvasAiNodeContext) SetIntegrationName(v string) {
+	o.IntegrationName = &v
+}
+
 func (o CanvasesCanvasAiNodeContext) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -192,6 +291,15 @@ func (o CanvasesCanvasAiNodeContext) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Type) {
 		toSerialize["type"] = o.Type
+	}
+	if !IsNil(o.BlockName) {
+		toSerialize["blockName"] = o.BlockName
+	}
+	if !IsNil(o.Configuration) {
+		toSerialize["configuration"] = o.Configuration
+	}
+	if !IsNil(o.IntegrationName) {
+		toSerialize["integrationName"] = o.IntegrationName
 	}
 	return toSerialize, nil
 }
@@ -231,3 +339,5 @@ func (v *NullableCanvasesCanvasAiNodeContext) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

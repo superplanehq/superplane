@@ -659,6 +659,27 @@ export async function applyAiOperationsToWorkflow({
       continue;
     }
 
+    if (operation.type === "delete_edge") {
+      const sourceId = resolveNodeId(operation.source);
+      const targetId = resolveNodeId(operation.target);
+      if (!sourceId || !targetId) {
+        continue;
+      }
+
+      const explicitChannel = operation.source.handleId?.trim();
+      for (let edgeIndex = updatedEdges.length - 1; edgeIndex >= 0; edgeIndex -= 1) {
+        const edge = updatedEdges[edgeIndex];
+        if (edge.sourceId !== sourceId || edge.targetId !== targetId) {
+          continue;
+        }
+        if (explicitChannel && edge.channel !== explicitChannel) {
+          continue;
+        }
+        updatedEdges.splice(edgeIndex, 1);
+      }
+      continue;
+    }
+
     if (operation.type === "update_node_config") {
       const targetId = resolveNodeId(operation.target);
       if (!targetId) {

@@ -20,7 +20,7 @@ var _ MappedNullable = &CanvasesSendAiMessageBody{}
 
 // CanvasesSendAiMessageBody struct for CanvasesSendAiMessageBody
 type CanvasesSendAiMessageBody struct {
-	Prompt        *string                  `json:"prompt,omitempty"`
+	Prompt *string `json:"prompt,omitempty"`
 	CanvasContext *CanvasesCanvasAiContext `json:"canvasContext,omitempty"`
 }
 
@@ -106,7 +106,7 @@ func (o *CanvasesSendAiMessageBody) SetCanvasContext(v CanvasesCanvasAiContext) 
 }
 
 func (o CanvasesSendAiMessageBody) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,3 +159,5 @@ func (v *NullableCanvasesSendAiMessageBody) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

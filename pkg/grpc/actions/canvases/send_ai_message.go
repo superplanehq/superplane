@@ -129,17 +129,19 @@ func generateCanvasAIPlan(
 	prompt := strings.Join([]string{
 		"You are an AI planner for a workflow canvas editor.",
 		"Return strict JSON only with this schema:",
-		`{"assistantMessage":"string","operations":[{"type":"add_node","nodeKey":"optional-string","blockName":"required-block-name","nodeName":"optional","configuration":{"optional":"object"},"position":{"x":123,"y":456},"source":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional","handleId":"optional-or-null"}},{"type":"connect_nodes","source":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional","handleId":"optional-or-null"},"target":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional"}},{"type":"update_node_config","target":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional"},"configuration":{"required":"object"},"nodeName":"optional"},{"type":"delete_node","target":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional"}}]}`,
+		`{"assistantMessage":"string","operations":[{"type":"add_node","nodeKey":"optional-string","blockName":"required-block-name","nodeName":"optional","configuration":{"optional":"object"},"position":{"x":123,"y":456},"source":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional","handleId":"optional-or-null"}},{"type":"connect_nodes","source":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional","handleId":"optional-or-null"},"target":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional"}},{"type":"delete_edge","source":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional","handleId":"optional-or-null"},"target":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional"}},{"type":"update_node_config","target":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional"},"configuration":{"required":"object"},"nodeName":"optional"},{"type":"delete_node","target":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional"}}]}`,
 		"Rules:",
 		"- Use only blockName values present in availableBlocks.",
 		"- Prefer add_node with nodeKey so follow-up connect/update operations can reference new nodes.",
 		"- Keep operations minimal and valid.",
 		"- Never invent component names or use components not listed in availableBlocks.",
 		"- First inspect existing nodes and prefer updating/reusing/reconnecting them before asking follow-up questions.",
+		"- Use existing node configuration from canvas context when available (for example repository, filters, and stored config values) instead of asking for values already present.",
 		"- If parts of the request are ambiguous, make reasonable assumptions and still return best-effort operations when there is a safe place to apply them.",
 		"- Ask a clarifying question and return operations as [] only when you cannot safely map the request to availableBlocks or cannot identify any valid target/location in the current canvas.",
 		"- For required GitHub trigger repository fields (for example github.onPRComment.repository and github.onIssueComment.repository), never assume, infer, or use placeholders; ask a clarifying question and return operations as [] until the user provides the value.",
 		"- After a GitHub repository is known in the current flow (from user input or existing node configuration), reuse that same repository for downstream GitHub nodes in that flow unless the user explicitly asks for a different one.",
+		"- For github.onPRComment simple command matching, prefer trigger contentFilter over inserting an extra if node.",
 		"- For schedule trigger operations (blockName 'schedule'), never leave it partially configured.",
 		"- When adding a schedule node, include a concrete configuration object in that same add_node operation.",
 		"- When updating a schedule node, include all required schedule fields for the selected schedule type in update_node_config.configuration.",
@@ -153,6 +155,11 @@ func generateCanvasAIPlan(
 		"- For GitHub trigger repository fields, accept a plain repository name as a valid answer when requested.",
 		"- Prefer a left-to-right horizontal flow.",
 		"- Use delete_node when the user explicitly asks to remove/delete a node.",
+		"- If inserting a new node between two existing connected nodes, first remove the existing direct edge using a delete_edge operation, then add/connect the new node in between.",
+		"- Execution semantics: each incoming edge can independently trigger downstream execution. Avoid creating duplicate trigger paths unless the user explicitly wants fan-out.",
+		"- If adding a new processing step between A and B, rewire to a single chain A -> NewStep -> B and remove/avoid direct A -> B.",
+		"- Do not connect both A -> B and A -> NewStep -> B at the same time unless explicitly requested.",
+		"- For persistence steps like setData that must happen before a downstream action, chain them serially (for example CreateSandbox -> setData -> SetupRunApp) instead of parallel branches into the same downstream node.",
 		"- For add_node, include position when possible.",
 		"- Use at least 420px horizontal spacing between sequential nodes to avoid overlap.",
 		"- Keep nodes in the same path on the same y lane when possible.",
@@ -170,6 +177,11 @@ func generateCanvasAIPlan(
 		"- Never use root() or previous() to configure fields on the root trigger node itself (for example github.onIssueComment.repository); those fields must be set as fixed values.",
 		"- Never use non-SuperPlane syntaxes like {{steps.create_hetzner.ipv4}} or other steps.* references.",
 		"- When configuring fields like SSH host/IP, identify the actual producer node in the run chain and reference that node by name instead of assuming previous().",
+		"- For flows where values must survive across separate runs/trigger paths (for example create sandbox now and destroy later), use canvas data storage components (setData/getData).",
+		"- Prefer setData right after resource creation to persist identifiers, and getData before cleanup/deletion nodes to retrieve identifiers.",
+		"- For multiple resources, use list append/upsert in setData and list lookup in getData by a stable key (for example pull request number).",
+		"- For setData nodes, always include configuration.valueList with at least one {name, value} item; do not leave valueList empty.",
+		"- For PR sandbox lifecycle flows, prefer setData key 'pr_sandboxes' with operation 'append', uniqueBy 'pull_request', and fields including pull_request + sandbox_id.",
 		"",
 		"Current canvas context JSON:",
 		string(canvasContextJSON),
@@ -289,13 +301,21 @@ func buildCanvasContextJSON(ctx *pb.CanvasAiContext) ([]byte, error) {
 		})
 	}
 
-	nodes := make([]map[string]string, 0, len(ctx.GetNodes()))
+	nodes := make([]map[string]interface{}, 0, len(ctx.GetNodes()))
 	for _, node := range ctx.GetNodes() {
-		nodes = append(nodes, map[string]string{
-			"id":    node.GetId(),
-			"name":  node.GetName(),
-			"label": node.GetLabel(),
-			"type":  node.GetType(),
+		configuration := map[string]interface{}{}
+		if configStruct := node.GetConfiguration(); configStruct != nil {
+			configuration = configStruct.AsMap()
+		}
+
+		nodes = append(nodes, map[string]interface{}{
+			"id":              node.GetId(),
+			"name":            node.GetName(),
+			"label":           node.GetLabel(),
+			"type":            node.GetType(),
+			"blockName":       node.GetBlockName(),
+			"integrationName": node.GetIntegrationName(),
+			"configuration":   configuration,
 		})
 	}
 

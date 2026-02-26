@@ -801,6 +801,38 @@ function CanvasPage(props: CanvasPageProps) {
     );
   }, [state, templateNodeId]);
 
+  const workflowNodeById = useMemo(() => {
+    const byID = new Map<string, ComponentsNode>();
+    for (const node of props.workflowNodes || []) {
+      if (node.id) {
+        byID.set(node.id, node);
+      }
+    }
+    return byID;
+  }, [props.workflowNodes]);
+
+  const aiContextNodes = useMemo(() => {
+    return state.nodes.map((node) => {
+      const workflowNode = workflowNodeById.get(node.id);
+      const blockName =
+        workflowNode?.trigger?.name ||
+        workflowNode?.component?.name ||
+        workflowNode?.blueprint?.id ||
+        workflowNode?.widget?.name ||
+        "";
+
+      return {
+        id: node.id,
+        name: String((node.data as { nodeName?: string })?.nodeName || ""),
+        label: String((node.data as { label?: string })?.label || ""),
+        type: String((node.data as { type?: string })?.type || ""),
+        blockName,
+        configuration: (workflowNode?.configuration as Record<string, unknown> | undefined) || {},
+        integrationName: workflowNode?.integration?.name || "",
+      };
+    });
+  }, [state.nodes, workflowNodeById]);
+
   return (
     <div ref={canvasWrapperRef} className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
@@ -839,12 +871,7 @@ function CanvasPage(props: CanvasPageProps) {
             blocks={props.buildingBlocks || []}
             showAiBuilderTab={props.showAiBuilderTab}
             canvasId={props.canvasId}
-            canvasNodes={state.nodes.map((node) => ({
-              id: node.id,
-              name: String((node.data as { nodeName?: string })?.nodeName || ""),
-              label: String((node.data as { label?: string })?.label || ""),
-              type: String((node.data as { type?: string })?.type || ""),
-            }))}
+            canvasNodes={aiContextNodes}
             onApplyAiOperations={props.onApplyAiOperations}
             integrations={props.integrations}
             canvasZoom={canvasZoom}

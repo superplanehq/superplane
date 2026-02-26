@@ -3634,6 +3634,15 @@
         },
         "type": {
           "type": "string"
+        },
+        "blockName": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "object"
+        },
+        "integrationName": {
+          "type": "string"
         }
       }
     },
