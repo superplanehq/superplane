@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -46,6 +47,16 @@ func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *reg
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
+	var versionOwnerID *uuid.UUID
+	if metadataUserID, ok := authentication.GetUserIdFromMetadata(ctx); ok {
+		if parsedUserID, parseErr := uuid.Parse(metadataUserID); parseErr == nil {
+			versionOwnerID = &parsedUserID
+		}
+	}
+	if versionOwnerID == nil {
+		versionOwnerID = existingCanvas.CreatedBy
+	}
+
 	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
 	if err != nil {
 		return nil, actions.ToStatus(err)
@@ -68,6 +79,7 @@ func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *reg
 		return nil, actions.ToStatus(err)
 	}
 
+	baseLiveVersionID := existingCanvas.LiveVersionID
 	now := time.Now()
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -141,7 +153,20 @@ func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *reg
 			return err
 		}
 
-		return deleteNodes(tx, existingNodes, expandedNodes)
+		if err := deleteNodes(tx, existingNodes, expandedNodes); err != nil {
+			return err
+		}
+
+		_, err = models.CreatePublishedCanvasVersionInTransaction(
+			tx,
+			existingCanvas.ID,
+			versionOwnerID,
+			baseLiveVersionID,
+			nodes,
+			edges,
+		)
+
+		return err
 	})
 
 	if err != nil {

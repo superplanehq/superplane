@@ -5,8 +5,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -15,6 +17,89 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
 )
+
+func TestUpdateCanvasCreatesNewLiveVersion(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	createResponse, err := CreateCanvas(
+		ctx,
+		r.Registry,
+		r.Organization.ID.String(),
+		&pb.Canvas{
+			Metadata: &pb.Canvas_Metadata{
+				Name: "Versioned Update Canvas",
+			},
+			Spec: &pb.Canvas_Spec{
+				Nodes: []*componentpb.Node{
+					{
+						Id:   "node-1",
+						Name: "Node 1",
+						Type: componentpb.Node_TYPE_COMPONENT,
+						Component: &componentpb.Node_ComponentRef{
+							Name: "noop",
+						},
+					},
+				},
+				Edges: []*componentpb.Edge{},
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	canvasID := uuid.MustParse(createResponse.Canvas.Metadata.Id)
+	updatePayload := &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{
+			Name:        "Versioned Update Canvas",
+			Description: "updated",
+		},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-1",
+					Name: "Node 1 Updated",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+
+	_, err = UpdateCanvas(
+		ctx,
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		canvasID.String(),
+		updatePayload,
+		"http://localhost:3000/api/v1",
+	)
+	require.NoError(t, err)
+
+	canvas, err := models.FindCanvas(r.Organization.ID, canvasID)
+	require.NoError(t, err)
+	require.NotNil(t, canvas.LiveVersionID)
+
+	var versions []models.CanvasVersion
+	err = database.Conn().
+		Where("workflow_id = ?", canvasID).
+		Order("revision ASC").
+		Find(&versions).
+		Error
+	require.NoError(t, err)
+	require.Len(t, versions, 2)
+	require.Equal(t, 1, versions[0].Revision)
+	require.Equal(t, 2, versions[1].Revision)
+	require.Equal(t, *canvas.LiveVersionID, versions[1].ID)
+	require.True(t, versions[1].IsPublished)
+	require.NotNil(t, versions[1].OwnerID)
+	require.Equal(t, r.User, *versions[1].OwnerID)
+}
 
 func TestUpdateCanvas_NodeRemovalUseSoftDelete(t *testing.T) {
 	r := support.Setup(t)

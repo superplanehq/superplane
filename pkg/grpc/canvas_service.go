@@ -55,6 +55,34 @@ func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRe
 	return canvases.UpdateCanvas(ctx, s.encryptor, s.registry, organizationID, req.Id, req.Canvas, s.webhookBaseURL)
 }
 
+func (s *CanvasService) CreateCanvasVersion(ctx context.Context, req *pb.CreateCanvasVersionRequest) (*pb.CreateCanvasVersionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CreateCanvasVersion(ctx, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) UpdateCanvasVersion(ctx context.Context, req *pb.UpdateCanvasVersionRequest) (*pb.UpdateCanvasVersionResponse, error) {
+	if req.Canvas == nil {
+		return nil, status.Error(codes.InvalidArgument, "canvas is required")
+	}
+
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.UpdateCanvasVersion(ctx, s.registry, organizationID, req.CanvasId, req.VersionId, req.Canvas)
+}
+
+func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.PublishCanvasVersionRequest) (*pb.PublishCanvasVersionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.PublishCanvasVersion(
+		ctx,
+		s.encryptor,
+		s.registry,
+		organizationID,
+		req.CanvasId,
+		req.VersionId,
+		req.ExpectedLiveVersionId,
+		s.webhookBaseURL,
+	)
+}
+
 func (s *CanvasService) DeleteCanvas(ctx context.Context, req *pb.DeleteCanvasRequest) (*pb.DeleteCanvasResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.DeleteCanvas(ctx, s.registry, uuid.MustParse(organizationID), req.Id)
