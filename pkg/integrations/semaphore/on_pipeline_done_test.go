@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -16,10 +17,12 @@ import (
 
 func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 	trigger := &OnPipelineDone{}
+	logger := logrus.NewEntry(logrus.New())
 
 	t.Run("no X-Semaphore-Signature-256 -> 403", func(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: http.Header{},
+			Logger:  logger,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -34,6 +37,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 			Headers: headers,
 			Events:  &contexts.EventContext{},
 			Webhook: &contexts.WebhookContext{},
+			Logger:  logger,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -51,6 +55,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 			Headers: headers,
 			Webhook: &contexts.WebhookContext{Secret: secret},
 			Events:  &contexts.EventContext{},
+			Logger:  logger,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -68,6 +73,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 			Headers: headers,
 			Webhook: &contexts.WebhookContext{Secret: secret},
 			Events:  eventContext,
+			Logger:  logger,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -88,6 +94,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 			Headers: headers,
 			Webhook: &contexts.WebhookContext{Secret: secret},
 			Events:  eventContext,
+			Logger:  logger,
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -110,6 +117,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 			},
 			Webhook: &contexts.WebhookContext{Secret: secret},
 			Events:  eventContext,
+			Logger:  logger,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -133,6 +141,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 			},
 			Webhook: &contexts.WebhookContext{Secret: secret},
 			Events:  eventContext,
+			Logger:  logger,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -154,6 +163,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 			},
 			Webhook: &contexts.WebhookContext{Secret: secret},
 			Events:  eventContext,
+			Logger:  logger,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -161,8 +171,8 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		assert.Zero(t, eventContext.Count())
 	})
 
-	t.Run("pipeline filter match using wrapped payload -> event is emitted", func(t *testing.T) {
-		body := []byte(`{"data":{"revision":{"reference":"refs/heads/main"},"pipeline":{"result":"passed","yaml_file_name":"production.yml"}}}`)
+	t.Run("pipeline filter match -> event is emitted", func(t *testing.T) {
+		body := []byte(`{"revision":{"reference":"refs/heads/main"},"pipeline":{"result":"passed","working_directory":".semaphore","yaml_file_name":"production.yml"}}`)
 		secret := "test-secret"
 		headers := buildSemaphoreHeaders(secret, body)
 
@@ -172,11 +182,12 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 			Headers: headers,
 			Configuration: map[string]any{
 				"pipelines": []configuration.Predicate{
-					{Type: configuration.PredicateTypeEquals, Value: "production.yml"},
+					{Type: configuration.PredicateTypeEquals, Value: ".semaphore/production.yml"},
 				},
 			},
 			Webhook: &contexts.WebhookContext{Secret: secret},
 			Events:  eventContext,
+			Logger:  logger,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -198,6 +209,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 			},
 			Webhook: &contexts.WebhookContext{Secret: secret},
 			Events:  eventContext,
+			Logger:  logger,
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)

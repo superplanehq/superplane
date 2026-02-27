@@ -229,13 +229,11 @@ func (p *OnPipelineDone) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 		return http.StatusForbidden, fmt.Errorf("invalid signature")
 	}
 
-	data := map[string]any{}
-	err = json.Unmarshal(ctx.Body, &data)
+	payload := map[string]any{}
+	err = json.Unmarshal(ctx.Body, &payload)
 	if err != nil {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
-
-	payload := unwrapSemaphoreEventData(data)
 
 	if len(config.Refs) > 0 {
 		ref, ok := getNestedString(payload, "revision", "reference")
@@ -279,7 +277,7 @@ func (p *OnPipelineDone) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 		}
 	}
 
-	err = ctx.Events.Emit("semaphore.pipeline.done", data)
+	err = ctx.Events.Emit("semaphore.pipeline.done", payload)
 
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
@@ -290,15 +288,6 @@ func (p *OnPipelineDone) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 
 func (p *OnPipelineDone) Cleanup(ctx core.TriggerContext) error {
 	return nil
-}
-
-func unwrapSemaphoreEventData(payload map[string]any) map[string]any {
-	innerPayload, ok := payload["data"].(map[string]any)
-	if ok && innerPayload != nil {
-		return innerPayload
-	}
-
-	return payload
 }
 
 func getNestedString(payload map[string]any, keys ...string) (string, bool) {
