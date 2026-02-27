@@ -56,7 +56,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as Record<string, string>;
 
   if (configuration?.query) {
-    const truncated = configuration.query.length > 40 ? configuration.query.substring(0, 40) + "..." : configuration.query;
+    const truncated =
+      configuration.query.length > 40 ? configuration.query.substring(0, 40) + "..." : configuration.query;
     metadata.push({ icon: "search", label: truncated });
   }
 

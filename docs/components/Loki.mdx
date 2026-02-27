@@ -1,0 +1,112 @@
+---
+title: "Loki"
+---
+
+Push and query logs in Grafana Loki
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Push Logs" href="#push-logs" description="Push log entries to Loki" />
+  <LinkCard title="Query Logs" href="#query-logs" description="Query logs from Loki using LogQL" />
+</CardGrid>
+
+## Instructions
+
+To configure Loki to work with SuperPlane:
+
+1. **Get Loki URL**: Obtain the base URL of your Loki instance (e.g., `http://loki:3100`)
+2. **Authentication (optional)**: If your Loki instance requires authentication, provide the appropriate credentials:
+   - **Basic Auth**: Provide a username and password
+   - **Bearer Token**: Provide a bearer token for token-based authentication
+   - **Tenant ID**: If using multi-tenancy, provide the X-Scope-OrgID header value
+3. **Enter Configuration**: Provide the Loki URL and optional authentication details in the integration configuration
+
+<a id="push-logs"></a>
+
+## Push Logs
+
+The Push Logs component sends log entries to a Grafana Loki instance.
+
+### Use Cases
+
+- **Workflow audit logging**: Record workflow execution events as structured logs in Loki
+- **Deployment tracking**: Push deployment logs to Loki for centralized observability
+- **Event forwarding**: Forward events from other systems to Loki for analysis
+
+### Outputs
+
+The component emits an event containing:
+- `labels`: The labels attached to the log stream
+- `message`: The log message that was pushed
+- `timestamp`: The Unix nanosecond timestamp of the log entry
+
+### Example Output
+
+```json
+{
+  "data": {
+    "labels": {
+      "env": "prod",
+      "job": "superplane"
+    },
+    "message": "Deployment v1.2.3 completed successfully",
+    "timestamp": "1706400000000000000"
+  },
+  "timestamp": "2026-01-28T12:00:00Z",
+  "type": "loki.logEntry"
+}
+```
+
+<a id="query-logs"></a>
+
+## Query Logs
+
+The Query Logs component queries logs from a Grafana Loki instance using LogQL.
+
+### Use Cases
+
+- **Log analysis**: Query logs to check for errors or specific patterns in a workflow
+- **Health checks**: Verify system health by querying for recent error logs
+- **Incident investigation**: Retrieve logs related to a specific service or time window
+
+### Outputs
+
+The component emits an event containing:
+- `status`: The query status (e.g., "success")
+- `result_type`: The type of result (e.g., "streams")
+- `result`: Array of stream results, each containing labels and log values
+
+### Example Output
+
+```json
+{
+  "data": {
+    "result": [
+      {
+        "stream": {
+          "env": "prod",
+          "job": "superplane"
+        },
+        "values": [
+          [
+            "1706400000000000000",
+            "Deployment v1.2.3 completed successfully"
+          ],
+          [
+            "1706399900000000000",
+            "Starting deployment v1.2.3"
+          ]
+        ]
+      }
+    ],
+    "result_type": "streams",
+    "status": "success"
+  },
+  "timestamp": "2026-01-28T12:00:00Z",
+  "type": "loki.queryResult"
+}
+```
+
