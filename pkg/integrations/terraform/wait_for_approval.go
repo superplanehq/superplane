@@ -297,10 +297,11 @@ func (c *WaitForApproval) handleApprove(ctx core.ActionContext) error {
 			return err
 		}
 
-		comment, _ := ctx.Parameters["comment"].(string)
-		err = client.TFE.Runs.Apply(context.Background(), config.RunID, tfe.RunApplyOptions{
-			Comment: &comment,
-		})
+		applyOpts := tfe.RunApplyOptions{}
+		if comment, _ := ctx.Parameters["comment"].(string); comment != "" {
+			applyOpts.Comment = &comment
+		}
+		err = client.TFE.Runs.Apply(context.Background(), config.RunID, applyOpts)
 		if err != nil {
 			return fmt.Errorf("failed to apply run in Terraform Cloud: %w", err)
 		}
@@ -351,10 +352,11 @@ func (c *WaitForApproval) handleReject(ctx core.ActionContext) error {
 		return err
 	}
 
-	comment, _ := ctx.Parameters["comment"].(string)
-	err = client.TFE.Runs.Discard(context.Background(), config.RunID, tfe.RunDiscardOptions{
-		Comment: &comment,
-	})
+	discardOpts := tfe.RunDiscardOptions{}
+	if comment, _ := ctx.Parameters["comment"].(string); comment != "" {
+		discardOpts.Comment = &comment
+	}
+	err = client.TFE.Runs.Discard(context.Background(), config.RunID, discardOpts)
 	if err != nil {
 		return fmt.Errorf("failed to discard run in Terraform Cloud: %w", err)
 	}

@@ -183,6 +183,10 @@ func (t *TerraformNeedsAttention) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
+	if config.WorkspaceID == "" {
+		return fmt.Errorf("workspaceId is required")
+	}
+
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		WorkspaceID: config.WorkspaceID,
 	})
@@ -263,9 +267,11 @@ func (t *TerraformNeedsAttention) HandleAction(ctx core.TriggerActionContext) (m
 			return nil, fmt.Errorf("runId is required")
 		}
 
-		err := client.TFE.Runs.Apply(context.Background(), runID, tfe.RunApplyOptions{
-			Comment: &comment,
-		})
+		applyOpts := tfe.RunApplyOptions{}
+		if comment != "" {
+			applyOpts.Comment = &comment
+		}
+		err := client.TFE.Runs.Apply(context.Background(), runID, applyOpts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply run: %w", err)
 		}
@@ -278,9 +284,11 @@ func (t *TerraformNeedsAttention) HandleAction(ctx core.TriggerActionContext) (m
 			return nil, fmt.Errorf("runId is required")
 		}
 
-		err := client.TFE.Runs.Discard(context.Background(), runID, tfe.RunDiscardOptions{
-			Comment: &comment,
-		})
+		discardOpts := tfe.RunDiscardOptions{}
+		if comment != "" {
+			discardOpts.Comment = &comment
+		}
+		err := client.TFE.Runs.Discard(context.Background(), runID, discardOpts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to discard run: %w", err)
 		}
