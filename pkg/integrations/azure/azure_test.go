@@ -45,19 +45,26 @@ func (m *mockIntegrationContext) GetConfig(name string) ([]byte, error) {
 	return nil, fmt.Errorf("config %s not found", name)
 }
 
-func (m *mockIntegrationContext) GetMetadata() any                                 { return nil }
-func (m *mockIntegrationContext) SetMetadata(any)                                  {}
-func (m *mockIntegrationContext) Ready()                                           {}
-func (m *mockIntegrationContext) Error(string)                                     {}
-func (m *mockIntegrationContext) NewBrowserAction(core.BrowserAction)              {}
-func (m *mockIntegrationContext) RemoveBrowserAction()                             {}
-func (m *mockIntegrationContext) SetSecret(string, []byte) error                   { return nil }
-func (m *mockIntegrationContext) GetSecrets() ([]core.IntegrationSecret, error)    { return nil, nil }
-func (m *mockIntegrationContext) RequestWebhook(any) error                         { return nil }
-func (m *mockIntegrationContext) Subscribe(any) (*uuid.UUID, error)                { return nil, nil }
-func (m *mockIntegrationContext) ScheduleResync(time.Duration) error               { return nil }
-func (m *mockIntegrationContext) ScheduleActionCall(string, any, time.Duration) error { return nil }
+func (m *mockIntegrationContext) GetMetadata() any                    { return nil }
+func (m *mockIntegrationContext) SetMetadata(any)                     {}
+func (m *mockIntegrationContext) Ready()                              {}
+func (m *mockIntegrationContext) Error(string)                        {}
+func (m *mockIntegrationContext) NewBrowserAction(core.BrowserAction) {}
+func (m *mockIntegrationContext) RemoveBrowserAction()                {}
+func (m *mockIntegrationContext) SetSecret(string, []byte) error      { return nil }
+func (m *mockIntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
+	return nil, nil
+}
+func (m *mockIntegrationContext) RequestWebhook(any) error           { return nil }
+func (m *mockIntegrationContext) Subscribe(any) (*uuid.UUID, error)  { return nil, nil }
+func (m *mockIntegrationContext) ScheduleResync(time.Duration) error { return nil }
+func (m *mockIntegrationContext) ScheduleActionCall(string, any, time.Duration) error {
+	return nil
+}
 func (m *mockIntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
+	return nil, nil
+}
+func (m *mockIntegrationContext) FindSubscription(func(core.IntegrationSubscriptionContext) bool) (core.IntegrationSubscriptionContext, error) {
 	return nil, nil
 }
 
@@ -251,13 +258,14 @@ func TestAzureIntegration_SetOIDCProvider(t *testing.T) {
 }
 
 func TestAzureIntegration_EnsureProvider_ReturnsCachedProvider(t *testing.T) {
+	testID := "00000000-0000-0000-0000-000000000001"
 	provider := &AzureProvider{}
 	integration := &AzureIntegration{
 		provider:      provider,
-		integrationID: "test-id",
+		integrationID: testID,
 	}
 
-	ctx := &mockIntegrationContext{id: "test-id"}
+	ctx := &mockIntegrationContext{id: testID}
 	result, err := integration.ensureProvider(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, provider, result)
@@ -266,7 +274,7 @@ func TestAzureIntegration_EnsureProvider_ReturnsCachedProvider(t *testing.T) {
 func TestAzureIntegration_EnsureProvider_FailsWithoutOIDC(t *testing.T) {
 	integration := &AzureIntegration{}
 
-	ctx := &mockIntegrationContext{id: "test-id"}
+	ctx := &mockIntegrationContext{id: "00000000-0000-0000-0000-000000000002"}
 	result, err := integration.ensureProvider(ctx)
 	assert.Error(t, err)
 	assert.Nil(t, result)

@@ -4,13 +4,13 @@ title: "Microsoft Azure"
 
 Manage and automate Microsoft Azure resources and services
 
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
 ## Triggers
 
 <CardGrid>
   <LinkCard title="Azure • On VM Created" href="#azure-•-on-vm-created" description="Triggers when a new Virtual Machine is successfully provisioned in Azure" />
 </CardGrid>
-
-import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
 
@@ -30,34 +30,14 @@ To connect SuperPlane to Microsoft Azure using Workload Identity Federation:
 2. Create a new registration or select an existing app
 3. Note the **Application (client) ID** and **Directory (tenant) ID**
 
-### 2. Configure Federated Identity Credential
+### 2. Complete the Connection
 
-1. In your app registration, go to **Certificates & secrets** → **Federated credentials**
-2. Click **Add credential**
-3. Select **Other issuer**
-4. Configure the credential:
-   - **Issuer**: The SuperPlane OIDC issuer URL (provided after creation)
-   - **Subject identifier**: `app-installation:<integration-id>` (provided after creation)
-   - **Audience**: The integration ID (provided after creation)
-   - **Name**: `superplane-integration` (or any descriptive name)
-
-### 3. Grant Required Permissions
-
-Assign appropriate Azure RBAC roles to your app registration:
-
-- **Virtual Machine Contributor** - For VM management
-- **Network Contributor** - For network resource management
-- **Storage Account Contributor** - For storage operations (if needed)
-- **EventGrid Contributor** - For Event Grid subscriptions
-
-You can assign these roles at the subscription or resource group level.
-
-### 4. Complete the Connection
-
-Enter the following information below:
+Enter the following information below and create the integration:
 - **Tenant ID**: Your Azure AD tenant ID
 - **Client ID**: Your app registration's client ID
 - **Subscription ID**: Your Azure subscription ID
+
+After creation, you will be guided through configuring the Federated Identity Credential and granting the required permissions.
 
 SuperPlane will use Workload Identity Federation to authenticate without storing any credentials.
 
@@ -85,6 +65,8 @@ provides detailed information about the new VM.
 
 - **Resource Group** (optional): Filter events to only trigger for VMs created in a specific
   resource group. Leave empty to trigger for all resource groups in the subscription.
+- **VM Name Filter** (optional): A regex pattern to filter VMs by name. Only VMs whose name
+  matches the pattern will trigger the workflow. Leave empty to trigger for all VM names.
 
 ### Event Data
 
@@ -95,30 +77,19 @@ Each VM creation event includes:
 - **resourceGroup**: The resource group containing the VM
 - **subscriptionId**: The Azure subscription ID
 - **location**: The Azure region where the VM was created
-- **provisioningState**: The provisioning state (typically "Succeeded")
+- **status**: The status of the operation (typically "Succeeded")
 - **timestamp**: The timestamp when the event occurred
 
 ### Azure Event Grid Setup
 
-**Important**: This trigger requires manual setup of an Azure Event Grid subscription.
+Event Grid subscriptions are created automatically when the trigger is set up. SuperPlane will:
 
-1. **Create an Event Grid System Topic** (if not already created):
-   - Go to Azure Portal → Event Grid System Topics
-   - Create a new topic for your subscription
-   - Topic Type: "Azure Subscriptions"
-   - Select your subscription
+1. Create an Event Grid subscription at the Azure subscription scope
+2. Configure it to forward `Microsoft.Resources.ResourceWriteSuccess` events to the trigger webhook
+3. Apply subject filters based on the configured resource group and resource type
+4. Handle the Event Grid validation handshake automatically
 
-2. **Create an Event Subscription**:
-   - In your Event Grid System Topic, create a new Event Subscription
-   - **Event Types**: Select "Resource Write Success"
-   - **Filters**: 
-     - Subject begins with: `/subscriptions/<subscription-id>/resourceGroups/`
-     - Subject ends with: `/providers/Microsoft.Compute/virtualMachines/`
-   - **Endpoint Type**: Webhook
-   - **Endpoint**: Use the webhook URL provided by SuperPlane for this trigger node
-
-3. **Validation**: Azure Event Grid will send a validation event to verify the endpoint.
-   SuperPlane will automatically respond to this validation request.
+No manual setup is required.
 
 ### Notes
 
@@ -133,8 +104,8 @@ Each VM creation event includes:
 {
   "location": "eastus",
   "operationName": "Microsoft.Compute/virtualMachines/write",
-  "provisioningState": "Succeeded",
   "resourceGroup": "my-rg",
+  "status": "Succeeded",
   "subscriptionId": "12345678-1234-1234-1234-123456789abc",
   "timestamp": "2026-02-11T10:30:00Z",
   "vmId": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
@@ -170,8 +141,9 @@ The Create Virtual Machine component creates a new Azure VM with full configurat
 - **Size**: The VM size (e.g., "Standard_B1s", "Standard_D2s_v3")
 - **Admin Username**: Administrator username for the VM
 - **Admin Password**: Administrator password for the VM (must meet Azure complexity requirements)
-- **Network Interface ID**: Optional existing NIC. Leave empty to create NIC from selected VNet/Subnet.
-- **Image**: The OS image to use (publisher, offer, SKU, version)
+- **Virtual Network / Subnet**: The network for the VM
+- **Network Interface ID**: Optional existing NIC (overrides VNet/Subnet)
+- **OS Image**: Select from common presets (Ubuntu, Debian, Windows Server)
 
 ### Output
 

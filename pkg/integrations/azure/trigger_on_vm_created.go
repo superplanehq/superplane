@@ -287,9 +287,9 @@ func (t *OnVMCreatedTrigger) handleVMCreationEvent(
 	}
 
 	payload := map[string]any{
-		"vmName":        vmName,
-		"vmId":          event.Subject,
-		"resourceGroup": resourceGroup,
+		"vmName":         vmName,
+		"vmId":           event.Subject,
+		"resourceGroup":  resourceGroup,
 		"subscriptionId": extractSubscriptionID(event.Subject),
 		"location":       "",
 		"timestamp":      event.EventTime,
