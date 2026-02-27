@@ -2,6 +2,8 @@ import { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 
 interface CanvasMemoryViewProps {
   entries: CanvasMemoryEntry[];
+  isLoading?: boolean;
+  errorMessage?: string;
 }
 
 function formatValue(value: unknown): string {
@@ -112,7 +114,7 @@ function renderValueTable(value: unknown) {
   return <div className="px-3 py-2 font-mono text-xs text-gray-700">{formatValue(value)}</div>;
 }
 
-export function CanvasMemoryView({ entries }: CanvasMemoryViewProps) {
+export function CanvasMemoryView({ entries, isLoading, errorMessage }: CanvasMemoryViewProps) {
   return (
     <div className="p-4">
       <div className="rounded-lg border border-slate-200 bg-white">
@@ -120,7 +122,14 @@ export function CanvasMemoryView({ entries }: CanvasMemoryViewProps) {
           <h2 className="text-sm font-semibold text-gray-900">Canvas Memory</h2>
           <p className="text-xs text-gray-500">Shared append-only memory entries for this canvas.</p>
         </div>
-        {entries.length === 0 ? (
+        {isLoading ? (
+          <div className="px-4 py-6 text-sm text-gray-500">Loading memory entries...</div>
+        ) : errorMessage ? (
+          <div className="px-4 py-6 text-sm text-red-600">
+            Failed to load memory entries.
+            <div className="mt-1 text-xs text-red-500">{errorMessage}</div>
+          </div>
+        ) : entries.length === 0 ? (
           <div className="px-4 py-6 text-sm text-gray-500">No memory entries added yet.</div>
         ) : (
           <div className="divide-y divide-slate-200">

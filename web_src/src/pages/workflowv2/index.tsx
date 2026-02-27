@@ -147,7 +147,11 @@ export function WorkflowPageV2() {
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const { data: canvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId!, canvasId!);
   const { data: canvasEventsResponse } = useCanvasEvents(canvasId!);
-  const { data: canvasMemoryEntries = [] } = useCanvasMemoryEntries(canvasId!);
+  const {
+    data: canvasMemoryEntries = [],
+    isLoading: canvasMemoryLoading,
+    error: canvasMemoryError,
+  } = useCanvasMemoryEntries(canvasId!);
   const canReadOrg = canAct("org", "read");
   const { data: agentSettings } = useOrganizationAgentSettings(organizationId || "", !!organizationId && canReadOrg);
   const canUpdateCanvas = canAct("canvases", "update");
@@ -3017,7 +3021,13 @@ export function WorkflowPageV2() {
         headerBanner={headerBanner}
         topViewMode={topViewMode}
         onTopViewModeChange={setTopViewMode}
-        dataViewContent={<CanvasMemoryView entries={canvasMemoryEntries} />}
+        dataViewContent={
+          <CanvasMemoryView
+            entries={canvasMemoryEntries}
+            isLoading={canvasMemoryLoading}
+            errorMessage={canvasMemoryError instanceof Error ? canvasMemoryError.message : undefined}
+          />
+        }
         nodes={nodes}
         edges={edges}
         organizationId={organizationId}
