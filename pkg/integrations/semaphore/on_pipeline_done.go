@@ -99,24 +99,26 @@ func (p *OnPipelineDone) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "refs",
-			Label:    "Refs",
-			Type:     configuration.FieldTypeAnyPredicateList,
-			Required: false,
-			TypeOptions: &configuration.TypeOptions{
-				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
-					Operators: configuration.AllPredicateOperators,
-				},
-			},
-		},
-		{
 			Name:     "results",
 			Label:    "Results",
 			Type:     configuration.FieldTypeMultiSelect,
 			Required: false,
+			Default:  []string{"passed"},
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: AllPipelineDoneResults,
+				},
+			},
+		},
+		{
+			Name:     "refs",
+			Label:    "Refs",
+			Type:     configuration.FieldTypeAnyPredicateList,
+			Required: false,
+			Default:  []map[string]any{{"type": configuration.PredicateTypeEquals, "value": "refs/heads/main"}},
+			TypeOptions: &configuration.TypeOptions{
+				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
+					Operators: configuration.AllPredicateOperators,
 				},
 			},
 		},
@@ -125,6 +127,7 @@ func (p *OnPipelineDone) Configuration() []configuration.Field {
 			Label:    "Pipelines",
 			Type:     configuration.FieldTypeAnyPredicateList,
 			Required: false,
+			Default:  []map[string]any{{"type": configuration.PredicateTypeEquals, "value": ".semaphore/semaphore.yml"}},
 			TypeOptions: &configuration.TypeOptions{
 				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
 					Operators: configuration.AllPredicateOperators,
@@ -241,6 +244,7 @@ func (p *OnPipelineDone) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 		}
 
 		if !configuration.MatchesAnyPredicate(config.Refs, ref) {
+			ctx.Logger.Infof("ref %s does not match the allowed predicates: %v", ref, config.Refs)
 			return http.StatusOK, nil
 		}
 	}
@@ -252,17 +256,25 @@ func (p *OnPipelineDone) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 		}
 
 		if !matchesPipelineResult(config.Results, result) {
+			ctx.Logger.Infof("result %s does not match the allowed predicates: %v", result, config.Results)
 			return http.StatusOK, nil
 		}
 	}
 
 	if len(config.Pipelines) > 0 {
+		workingDirectory, ok := getNestedString(payload, "pipeline", "working_directory")
+		if !ok || strings.TrimSpace(workingDirectory) == "" {
+			return http.StatusBadRequest, fmt.Errorf("missing pipeline.working_directory")
+		}
+
 		pipelineFile, ok := getNestedString(payload, "pipeline", "yaml_file_name")
 		if !ok || strings.TrimSpace(pipelineFile) == "" {
 			return http.StatusBadRequest, fmt.Errorf("missing pipeline.yaml_file_name")
 		}
 
-		if !configuration.MatchesAnyPredicate(config.Pipelines, pipelineFile) {
+		pipelinePath := fmt.Sprintf("%s/%s", workingDirectory, pipelineFile)
+		if !configuration.MatchesAnyPredicate(config.Pipelines, pipelinePath) {
+			ctx.Logger.Infof("pipeline file %s does not match the allowed predicates: %v", pipelinePath, config.Pipelines)
 			return http.StatusOK, nil
 		}
 	}
