@@ -509,11 +509,7 @@ func (c *CreateRepositorySandbox) startClone(ctx core.ActionContext, client *Cli
 		return fmt.Errorf("failed to create session: %v", err)
 	}
 
-	bootstrapCommand, err := c.bootstrapCommand(metadata)
-	if err != nil {
-		return err
-	}
-
+	bootstrapCommand := c.bootstrapCommand(metadata)
 	bootstrapCommand = wrapCommandWithSandboxSecretEnv(bootstrapCommand)
 	response, err := client.ExecuteSessionCommand(metadata.SandboxID, sessionID, bootstrapCommand)
 	if err != nil {
@@ -630,11 +626,9 @@ func (c *CreateRepositorySandbox) pollBootstrapping(ctx core.ActionContext, meta
 			return err
 		}
 
-		return fmt.Errorf(
-			"bootstrap script failed with exit code %d: %s",
-			result.ExitCode,
-			result.ShortResult(),
-		)
+		ctx.Logger.Errorf("bootstrap script failed with exit code %d: %s", result.ExitCode, result.ShortResult())
+		ctx.ExecutionState.Fail("error", fmt.Sprintf("bootstrap script failed with exit code %d: %s", result.ExitCode, result.ShortResult()))
+		return nil
 	}
 
 	return c.finish(ctx, metadata)
@@ -744,27 +738,14 @@ func directoryFromPath(candidate, original string) (string, error) {
 	return name, nil
 }
 
-func (c *CreateRepositorySandbox) bootstrapCommand(metadata *CreateRepositorySandboxMetadata) (string, error) {
-	commands := []string{
-		fmt.Sprintf("cd %s", shellQuote(metadata.Directory)),
-	}
-
-	switch metadata.Bootstrap.From {
-	case SandboxBootstrapFromInline:
-		if metadata.Bootstrap.Path == nil || strings.TrimSpace(*metadata.Bootstrap.Path) == "" {
-			return "", fmt.Errorf("bootstrap.path is required when bootstrap.from is inline")
-		}
-
-		commands = append(commands, fmt.Sprintf("sh %s", shellQuote(*metadata.Bootstrap.Path)))
-		return strings.Join(commands, " && "), nil
-
-	case SandboxBootstrapFromFile:
-		commands = append(commands, fmt.Sprintf("sh %s", shellQuote(*metadata.Bootstrap.Path)))
-		return strings.Join(commands, " && "), nil
-
-	default:
-		return "", fmt.Errorf("invalid bootstrap.from: %s", metadata.Bootstrap.From)
-	}
+func (c *CreateRepositorySandbox) bootstrapCommand(metadata *CreateRepositorySandboxMetadata) string {
+	return strings.Join(
+		[]string{
+			fmt.Sprintf("cd %s", shellQuote(metadata.Directory)),
+			fmt.Sprintf("sh %s", shellQuote(*metadata.Bootstrap.Path)),
+		},
+		" && ",
+	)
 }
 
 func (c *CreateRepositorySandbox) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

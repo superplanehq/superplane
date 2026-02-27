@@ -354,3 +354,16 @@ func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 	c.Responses = c.Responses[1:]
 	return response, nil
 }
+
+type SecretsContext struct {
+	Values map[string][]byte
+}
+
+func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
+	value, ok := c.Values[secretName+"/"+keyName]
+	if !ok {
+		return nil, fmt.Errorf("secret not found: %s/%s", secretName, keyName)
+	}
+
+	return value, nil
+}

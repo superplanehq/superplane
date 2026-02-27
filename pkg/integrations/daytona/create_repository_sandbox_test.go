@@ -2,7 +2,6 @@ package daytona
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -595,66 +595,13 @@ func Test__CreateRepositorySandbox__GetDirectoryName(t *testing.T) {
 	})
 }
 
-func Test__CreateRepositorySandbox__BootstrapCommand(t *testing.T) {
-	component := CreateRepositorySandbox{}
-
-	t.Run("inline mode", func(t *testing.T) {
-		_, err := component.bootstrapCommand(&CreateRepositorySandboxMetadata{
-			Directory: "/home/daytona/repository",
-			Bootstrap: &BootstrapMetadata{
-				From:   SandboxBootstrapFromInline,
-				Script: ptr("npm ci && npm test"),
-			},
-		})
-
-		require.ErrorContains(t, err, "bootstrap.path is required when bootstrap.from is inline")
-	})
-
-	t.Run("inline mode with prepared path", func(t *testing.T) {
-		command, err := component.bootstrapCommand(&CreateRepositorySandboxMetadata{
-			Directory: "/home/daytona/repository",
-			Bootstrap: &BootstrapMetadata{
-				From: SandboxBootstrapFromInline,
-				Path: ptr("/home/daytona/.superplane/bootstrap.inline.sh"),
-			},
-		})
-
-		require.NoError(t, err)
-		assert.Equal(t, "cd '/home/daytona/repository' && sh '/home/daytona/.superplane/bootstrap.inline.sh'", command)
-	})
-
-	t.Run("file mode", func(t *testing.T) {
-		command, err := component.bootstrapCommand(&CreateRepositorySandboxMetadata{
-			Directory: "/home/daytona/repository",
-			Bootstrap: &BootstrapMetadata{
-				From: SandboxBootstrapFromFile,
-				Path: ptr("scripts/bootstrap.sh"),
-			},
-		})
-
-		require.NoError(t, err)
-		assert.Equal(t, "cd '/home/daytona/repository' && sh 'scripts/bootstrap.sh'", command)
-	})
-
-	t.Run("invalid from", func(t *testing.T) {
-		_, err := component.bootstrapCommand(&CreateRepositorySandboxMetadata{
-			Directory: "/home/daytona/repository",
-			Bootstrap: &BootstrapMetadata{
-				From: "url",
-			},
-		})
-
-		require.ErrorContains(t, err, "invalid bootstrap.from")
-	})
-}
-
 func Test__CreateRepositorySandbox__CloneRepositoryRequest(t *testing.T) {
 	component := CreateRepositorySandbox{}
 
 	t.Run("includes github token from secrets", func(t *testing.T) {
 		request, err := component.cloneRepositoryRequest(
-			&testSecretsContext{
-				values: map[string][]byte{
+			&contexts.SecretsContext{
+				Values: map[string][]byte{
 					"credentials/token": []byte("ghp_test_token"),
 				},
 			},
@@ -665,7 +612,7 @@ func Test__CreateRepositorySandbox__CloneRepositoryRequest(t *testing.T) {
 					{
 						Type: SandboxSecretTypeEnvVar,
 						Name: "GITHUB_TOKEN",
-						Value: SecretKeyRef{
+						Value: configuration.SecretKeyRef{
 							Secret: "credentials",
 							Key:    "token",
 						},
@@ -683,7 +630,7 @@ func Test__CreateRepositorySandbox__CloneRepositoryRequest(t *testing.T) {
 
 	t.Run("no github token secret keeps clone request without credentials", func(t *testing.T) {
 		request, err := component.cloneRepositoryRequest(
-			&testSecretsContext{},
+			&contexts.SecretsContext{},
 			&CreateRepositorySandboxMetadata{
 				Repository: "https://github.com/superplanehq/superplane.git",
 				Directory:  "/home/daytona/superplane",
@@ -704,17 +651,4 @@ func newTestLogger() *log.Entry {
 
 func ptr(value string) *string {
 	return &value
-}
-
-type testSecretsContext struct {
-	values map[string][]byte
-}
-
-func (c *testSecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
-	value, ok := c.values[secretName+"/"+keyName]
-	if !ok {
-		return nil, fmt.Errorf("secret not found: %s/%s", secretName, keyName)
-	}
-
-	return value, nil
 }

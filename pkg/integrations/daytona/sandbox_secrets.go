@@ -18,19 +18,10 @@ const (
 )
 
 type SandboxSecret struct {
-	Type  string       `json:"type" mapstructure:"type"`
-	Path  string       `json:"path,omitempty" mapstructure:"path"`
-	Name  string       `json:"name,omitempty" mapstructure:"name"`
-	Value SecretKeyRef `json:"value" mapstructure:"value"`
-}
-
-type SecretKeyRef struct {
-	Secret string `json:"secret" mapstructure:"secret"`
-	Key    string `json:"key" mapstructure:"key"`
-}
-
-func (r SecretKeyRef) IsSet() bool {
-	return strings.TrimSpace(r.Secret) != "" && strings.TrimSpace(r.Key) != ""
+	Type  string                     `json:"type" mapstructure:"type"`
+	Path  string                     `json:"path,omitempty" mapstructure:"path"`
+	Name  string                     `json:"name,omitempty" mapstructure:"name"`
+	Value configuration.SecretKeyRef `json:"value" mapstructure:"value"`
 }
 
 type sandboxEnvBinding struct {

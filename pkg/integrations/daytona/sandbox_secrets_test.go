@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 )
 
 func Test__validateSandboxSecrets(t *testing.T) {
@@ -13,7 +14,7 @@ func Test__validateSandboxSecrets(t *testing.T) {
 			{
 				Type: SandboxSecretTypeFile,
 				Path: "/home/daytona/.ssh/id_rsa",
-				Value: SecretKeyRef{
+				Value: configuration.SecretKeyRef{
 					Secret: "ssh-keys",
 					Key:    "sandbox",
 				},
@@ -28,7 +29,7 @@ func Test__validateSandboxSecrets(t *testing.T) {
 			{
 				Type: SandboxSecretTypeEnvVar,
 				Name: "GITHUB_TOKEN",
-				Value: SecretKeyRef{
+				Value: configuration.SecretKeyRef{
 					Secret: "credentials",
 					Key:    "token",
 				},
@@ -43,7 +44,7 @@ func Test__validateSandboxSecrets(t *testing.T) {
 			{
 				Type:  SandboxSecretTypeFile,
 				Path:  "/tmp/file",
-				Value: SecretKeyRef{},
+				Value: configuration.SecretKeyRef{},
 			},
 		})
 
