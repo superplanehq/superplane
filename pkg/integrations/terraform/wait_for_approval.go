@@ -358,7 +358,10 @@ func (c *WaitForApproval) handleReject(ctx core.ActionContext) error {
 	}
 	err = client.TFE.Runs.Discard(context.Background(), config.RunID, discardOpts)
 	if err != nil {
-		return fmt.Errorf("failed to discard run in Terraform Cloud: %w", err)
+		run, readErr := client.TFE.Runs.Read(context.Background(), config.RunID)
+		if readErr != nil || !isTerminalState(string(run.Status)) {
+			return fmt.Errorf("failed to discard run in Terraform Cloud: %w", err)
+		}
 	}
 
 	if err := ctx.Metadata.Set(metadata); err != nil {
