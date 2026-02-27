@@ -4,7 +4,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -17,36 +16,6 @@ import (
 )
 
 var testLogger = logrus.NewEntry(logrus.New())
-
-type testWebhookContext struct {
-	setupCalled bool
-	secret      []byte
-}
-
-func (w *testWebhookContext) Setup() (string, error) {
-	w.setupCalled = true
-	return "https://example.com/api/v1/webhooks/webhook-123", nil
-}
-
-func (w *testWebhookContext) SetSecret(secret []byte) error {
-	if !w.setupCalled {
-		return fmt.Errorf("set secret called before setup")
-	}
-	w.secret = secret
-	return nil
-}
-
-func (w *testWebhookContext) GetSecret() ([]byte, error) {
-	return w.secret, nil
-}
-
-func (w *testWebhookContext) ResetSecret() ([]byte, []byte, error) {
-	return w.secret, w.secret, nil
-}
-
-func (w *testWebhookContext) GetBaseURL() string {
-	return "https://example.com"
-}
 
 // hmacSignature computes the LaunchDarkly HMAC-SHA256 hex signature for a body.
 func hmacSignature(secret string, body []byte) string {
@@ -466,21 +435,6 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 	})
 }
 
-func Test__OnFeatureFlagChange__HandleAction(t *testing.T) {
-	trigger := &OnFeatureFlagChange{}
-
-	t.Run("unsupported action returns error", func(t *testing.T) {
-		result, err := trigger.HandleAction(core.TriggerActionContext{
-			Name:    "setSecret",
-			Webhook: &testWebhookContext{setupCalled: true},
-		})
-
-		assert.Error(t, err)
-		assert.Nil(t, result)
-		assert.ErrorContains(t, err, "not supported")
-	})
-}
-
 func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 	trigger := &OnFeatureFlagChange{}
 
@@ -488,7 +442,7 @@ func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
-			Webhook:       &testWebhookContext{},
+			Webhook:       &contexts.NodeWebhookContext{},
 			Configuration: OnFeatureFlagChangeConfiguration{},
 		})
 		require.ErrorContains(t, err, "project key is required")
@@ -499,7 +453,7 @@ func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
-			Webhook:       &testWebhookContext{},
+			Webhook:       &contexts.NodeWebhookContext{},
 			Configuration: OnFeatureFlagChangeConfiguration{ProjectKey: "default"},
 		})
 
@@ -515,7 +469,7 @@ func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Integration: integrationCtx,
 			Metadata:    &contexts.MetadataContext{},
-			Webhook:     &testWebhookContext{},
+			Webhook:     &contexts.NodeWebhookContext{},
 			Configuration: OnFeatureFlagChangeConfiguration{
 				ProjectKey: "default",
 				Flags: []configuration.Predicate{

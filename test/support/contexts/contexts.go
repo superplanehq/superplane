@@ -27,7 +27,6 @@ func (e *EventContext) Count() int {
 	return len(e.Payloads)
 }
 
-// NodeWebhookContext implements core.NodeWebhookContext for trigger tests.
 type NodeWebhookContext struct {
 	Secret string
 }
@@ -54,7 +53,6 @@ func (w *NodeWebhookContext) GetBaseURL() string {
 	return "http://localhost:3000/api/v1"
 }
 
-// WebhookContext implements core.WebhookContext for webhook handler tests.
 type WebhookContext struct {
 	ID            string
 	URL           string
