@@ -14,9 +14,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
-type TerraformWebhookHandler struct{}
+type WebhookHandler struct{}
 
-func (h *TerraformWebhookHandler) CompareConfig(a, b any) (bool, error) {
+func (h *WebhookHandler) CompareConfig(a, b any) (bool, error) {
 	configA := WebhookConfiguration{}
 	if err := mapstructure.Decode(a, &configA); err != nil {
 		return false, err
@@ -30,26 +30,14 @@ func (h *TerraformWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	return configA.WorkspaceID == configB.WorkspaceID, nil
 }
 
-func (h *TerraformWebhookHandler) Merge(current, requested any) (any, bool, error) {
+func (h *WebhookHandler) Merge(current, requested any) (any, bool, error) {
 	return requested, false, nil
 }
 
-func (h *TerraformWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
-	configAPI, err := ctx.Integration.GetConfig("apiToken")
+func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
+	client, err := getClientFromIntegration(ctx.Integration)
 	if err != nil {
 		return nil, err
-	}
-	configAddr, err := ctx.Integration.GetConfig("address")
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := NewClient(map[string]any{
-		"apiToken": string(configAPI),
-		"address":  string(configAddr),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to init client: %w", err)
 	}
 
 	config := WebhookConfiguration{}
@@ -60,7 +48,6 @@ func (h *TerraformWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, er
 		}
 	}
 
-	// Resolve workspace ID in case it's an org/workspace path
 	resolvedWsId, err := client.ResolveWorkspaceID(context.Background(), config.WorkspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve workspace: %w", err)
@@ -131,22 +118,10 @@ func (h *TerraformWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, er
 	}, nil
 }
 
-func (h *TerraformWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
-	configAPI, err := ctx.Integration.GetConfig("apiToken")
+func (h *WebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
+	client, err := getClientFromIntegration(ctx.Integration)
 	if err != nil {
 		return err
-	}
-	configAddr, err := ctx.Integration.GetConfig("address")
-	if err != nil {
-		return err
-	}
-
-	client, err := NewClient(map[string]any{
-		"apiToken": string(configAPI),
-		"address":  string(configAddr),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to init client: %w", err)
 	}
 
 	metadata, ok := ctx.Webhook.GetMetadata().(map[string]any)
