@@ -128,8 +128,13 @@ func (c *ApplyRun) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to read run: %w", err)
 	}
 
-	if run.Status != tfe.RunPlanned {
-		return fmt.Errorf("run %s is currently '%s', cannot apply (must be 'planned')", spec.RunID, run.Status)
+	confirmableStates := map[tfe.RunStatus]bool{
+		tfe.RunPlanned:       true,
+		tfe.RunCostEstimated: true,
+		tfe.RunPolicyChecked: true,
+	}
+	if !confirmableStates[run.Status] {
+		return fmt.Errorf("run %s is currently '%s', cannot apply (must be 'planned', 'cost_estimated', or 'policy_checked')", spec.RunID, run.Status)
 	}
 
 	opts := tfe.RunApplyOptions{}
