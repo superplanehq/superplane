@@ -378,7 +378,7 @@ func needsAttention(status string, workspace *tfe.Workspace) bool {
 			return false
 		}
 		return true
-	case tfe.RunPolicyOverride, tfe.RunCostEstimated:
+	case tfe.RunPolicyOverride, tfe.RunCostEstimated, tfe.RunPolicyChecked:
 		return true
 	}
 	return false
