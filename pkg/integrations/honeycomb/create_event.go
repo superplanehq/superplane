@@ -146,7 +146,3 @@ func (c *CreateEvent) Cancel(ctx core.ExecutionContext) error {
 func (c *CreateEvent) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
-
-func (c *CreateEvent) ExampleOutput() map[string]any {
-	return embeddedExampleOutputCreateEvent()
-}

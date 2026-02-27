@@ -223,6 +223,3 @@ func payloadHasTriggerID(payload map[string]any, want string) bool {
 	return false
 }
 
-func (t *OnAlertFired) ExampleData() map[string]any {
-	return embeddedExampleDataOnAlertFired()
-}

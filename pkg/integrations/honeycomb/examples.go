@@ -36,3 +36,11 @@ func embeddedExampleOutputCreateEvent() map[string]any {
 		&exampleOutputCreateEvent,
 	)
 }
+
+func (t *OnAlertFired) ExampleData() map[string]any {
+	return embeddedExampleDataOnAlertFired()
+}
+
+func (c *CreateEvent) ExampleOutput() map[string]any {
+	return embeddedExampleOutputCreateEvent()
+}
