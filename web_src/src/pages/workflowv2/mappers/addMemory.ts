@@ -35,7 +35,7 @@ export const addMemoryMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      eventSections: lastExecution ? getEventSections(context.nodes, context.node, lastExecution) : undefined,
+      eventSections: lastExecution ? getEventSections(context.nodes, lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       metadata: getAddMemoryMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -62,14 +62,12 @@ export const addMemoryMapper: ComponentBaseMapper = {
   },
 };
 
-function getEventSections(nodes: NodeInfo[], node: NodeInfo, execution: ExecutionInfo): EventSection[] {
+function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title: fallbackTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
-
-  const metadata = resolveMetadata(execution, node);
 
   return [
     {
@@ -80,15 +78,6 @@ function getEventSections(nodes: NodeInfo[], node: NodeInfo, execution: Executio
       eventId: execution.rootEvent?.id || "",
     },
   ];
-}
-
-function resolveMetadata(execution: ExecutionInfo, node: NodeInfo): AddMemoryMetadata {
-  const executionMetadata = (execution.metadata || {}) as AddMemoryMetadata;
-  if (executionMetadata.namespace || (executionMetadata.fields && executionMetadata.fields.length > 0)) {
-    return executionMetadata;
-  }
-
-  return (node.metadata || {}) as AddMemoryMetadata;
 }
 
 function getAddMemoryMetadataList(node: NodeInfo): Array<{ icon: string; label: string }> {
