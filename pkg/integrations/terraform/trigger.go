@@ -15,9 +15,9 @@ import (
 type TerraformRunEvent struct{}
 
 type TerraformRunEventConfiguration struct {
-	WorkspaceID             string   `json:"workspaceId"`
-	Events                  []string `json:"events"`
-	IncludeSuperPlaneRuns   bool     `json:"includeSuperPlaneRuns"`
+	WorkspaceID           string   `json:"workspaceId"`
+	Events                []string `json:"events"`
+	IncludeSuperPlaneRuns bool     `json:"includeSuperPlaneRuns"`
 }
 
 func (t *TerraformRunEvent) Name() string  { return "terraform.runEvent" }
@@ -336,14 +336,16 @@ func (t *TerraformNeedsAttention) HandleWebhook(ctx core.WebhookRequestContext) 
 	}
 
 	workspaceID, _ := data["workspaceId"].(string)
-	if workspaceID != config.WorkspaceID {
+	orgName, _ := data["organizationName"].(string)
+	wsName, _ := data["workspaceName"].(string)
+
+	matched := config.WorkspaceID == workspaceID || config.WorkspaceID == fmt.Sprintf("%s/%s", orgName, wsName)
+	if !matched {
 		return http.StatusOK, nil
 	}
 
 	runStatus, _ := data["runStatus"].(string)
 	runURL, _ := data["runUrl"].(string)
-	workspaceName, _ := data["workspaceName"].(string)
-	organizationName, _ := data["organizationName"].(string)
 	runCreatedBy, _ := data["runCreatedBy"].(string)
 	runMessage, _ := data["runMessage"].(string)
 
@@ -354,8 +356,8 @@ func (t *TerraformNeedsAttention) HandleWebhook(ctx core.WebhookRequestContext) 
 		"runStatus":        runStatus,
 		"runUrl":           runURL,
 		"runMessage":       runMessage,
-		"workspaceName":    workspaceName,
-		"organizationName": organizationName,
+		"workspaceName":    wsName,
+		"organizationName": orgName,
 		"runCreatedBy":     runCreatedBy,
 	}); err != nil {
 		return http.StatusInternalServerError, err
