@@ -27,23 +27,22 @@ const (
 type WaitForApproval struct{}
 
 type WaitForApprovalConfiguration struct {
-	RunID         string `json:"runId" mapstructure:"runId"`
-	AutoApply     bool   `json:"autoApply" mapstructure:"autoApply"`
-	Timeout       *int   `json:"timeout,omitempty" mapstructure:"timeout,omitempty"`
-	ApproveLabel  string `json:"approveLabel,omitempty" mapstructure:"approveLabel,omitempty"`
-	RejectLabel   string `json:"rejectLabel,omitempty" mapstructure:"rejectLabel,omitempty"`
-	ApplyOnApprove bool  `json:"applyOnApprove" mapstructure:"applyOnApprove"`
+	RunID          string `json:"runId" mapstructure:"runId"`
+	Timeout        *int   `json:"timeout,omitempty" mapstructure:"timeout,omitempty"`
+	ApproveLabel   string `json:"approveLabel,omitempty" mapstructure:"approveLabel,omitempty"`
+	RejectLabel    string `json:"rejectLabel,omitempty" mapstructure:"rejectLabel,omitempty"`
+	ApplyOnApprove bool   `json:"applyOnApprove" mapstructure:"applyOnApprove"`
 }
 
 type WaitForApprovalMetadata struct {
-	RunID          string  `json:"runId"`
-	RunURL         string  `json:"runUrl,omitempty"`
-	RunStatus      string  `json:"runStatus,omitempty"`
-	WorkspaceName  string  `json:"workspaceName,omitempty"`
-	Decision       *string `json:"decision,omitempty"`
-	DecidedAt      *string `json:"decidedAt,omitempty"`
-	DecidedBy      *string `json:"decidedBy,omitempty"`
-	AppliedToTFC   bool    `json:"appliedToTFC"`
+	RunID         string  `json:"runId"`
+	RunURL        string  `json:"runUrl,omitempty"`
+	RunStatus     string  `json:"runStatus,omitempty"`
+	WorkspaceName string  `json:"workspaceName,omitempty"`
+	Decision      *string `json:"decision,omitempty"`
+	DecidedAt     *string `json:"decidedAt,omitempty"`
+	DecidedBy     *string `json:"decidedBy,omitempty"`
+	AppliedToTFC  bool    `json:"appliedToTFC"`
 }
 
 func (c *WaitForApproval) Name() string {
@@ -70,9 +69,9 @@ func (c *WaitForApproval) Documentation() string {
 ## Configuration
 
 - **Run ID**: The Terraform run ID to approve (required, usually from trigger data)
-- **Auto Apply**: If enabled, automatically applies the run when approved in SuperPlane
+- **Apply on Approve**: If enabled, automatically applies the run in Terraform Cloud when approved
 - **Timeout**: Maximum time to wait in seconds (optional, leave empty to wait indefinitely)
-- **Approve Label**: Custom label for the approve button (default: "Approve")
+- **Approve Label**: Custom label for the approve button (default: "Approve & Apply")
 - **Reject Label**: Custom label for the reject button (default: "Reject")
 
 ## Output Channels
@@ -84,7 +83,7 @@ func (c *WaitForApproval) Documentation() string {
 ## Behavior
 
 - The workflow pauses until a decision is made or timeout occurs
-- If Auto Apply is enabled, clicking Approve will also apply the run in Terraform Cloud
+- If Apply on Approve is enabled, clicking Approve will also apply the run in Terraform Cloud
 - Only the first decision is processed; subsequent clicks are ignored`
 }
 
@@ -110,9 +109,9 @@ func (c *WaitForApproval) DefaultOutputChannel() core.OutputChannel {
 
 func (c *WaitForApproval) ExampleOutput() map[string]any {
 	return map[string]any{
-		"runId":       "run-xxxxx",
-		"decision":    "approved",
-		"decidedAt":   "2024-01-01T12:00:00Z",
+		"runId":        "run-xxxxx",
+		"decision":     "approved",
+		"decidedAt":    "2024-01-01T12:00:00Z",
 		"appliedToTFC": true,
 	}
 }
@@ -342,9 +341,9 @@ func (c *WaitForApproval) handleApprove(ctx core.ActionContext) error {
 	}
 
 	payload := map[string]any{
-		"runId":      config.RunID,
-		"decision":   "approved",
-		"decidedAt":  now,
+		"runId":        config.RunID,
+		"decision":     "approved",
+		"decidedAt":    now,
 		"appliedToTFC": metadata.AppliedToTFC,
 	}
 
