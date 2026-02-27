@@ -73,3 +73,24 @@
       is compatible with Apache 2.0
     :versions: []
     :when: 2025-12-23 15:02:58.461300000 Z
+- - :approve
+  - github.com/hashicorp/go-tfe
+  - :who: SuperPlane
+    :why: go-tfe is published under MPL-2.0 based on https://github.com/hashicorp/go-tfe/blob/main/LICENSE
+      which is compatible with Apache 2.0
+    :versions: []
+    :when: 2026-02-27 00:00:00.000000000 Z
+- - :approve
+  - github.com/hashicorp/go-retryablehttp
+  - :who: SuperPlane
+    :why: go-retryablehttp is published under MPL-2.0 based on https://github.com/hashicorp/go-retryablehttp/blob/main/LICENSE
+      which is compatible with Apache 2.0
+    :versions: []
+    :when: 2026-02-27 00:00:00.000000000 Z
+- - :approve
+  - github.com/hashicorp/go-version
+  - :who: SuperPlane
+    :why: go-version is published under MPL-2.0 based on https://github.com/hashicorp/go-version/blob/main/LICENSE
+      which is compatible with Apache 2.0
+    :versions: []
+    :when: 2026-02-27 00:00:00.000000000 Z
