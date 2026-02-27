@@ -48,6 +48,7 @@ export const canvasKeys = {
     [...canvasKeys.nodeExecutions(), "infinite", canvasId, nodeId] as const,
   nodeQueueItemHistory: (canvasId: string, nodeId: string) =>
     [...canvasKeys.nodeQueueItems(), "infinite", canvasId, nodeId] as const,
+  canvasMemoryEntries: (canvasId: string) => [...canvasKeys.all, "memoryEntries", canvasId] as const,
 };
 
 export const triggerKeys = {
@@ -250,6 +251,34 @@ export const useCanvasEvents = (canvasId: string) => {
       return response.data;
     },
     refetchOnWindowFocus: false,
+    enabled: !!canvasId,
+  });
+};
+
+export interface CanvasMemoryEntry {
+  namespace: string;
+  values: unknown;
+}
+
+export const useCanvasMemoryEntries = (canvasId: string) => {
+  return useQuery({
+    queryKey: canvasKeys.canvasMemoryEntries(canvasId),
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/v1/canvases/${canvasId}/memory`,
+        withOrganizationHeader({
+          method: "GET",
+        }),
+      );
+      if (!response.ok) {
+        throw new Error("failed to fetch canvas memory");
+      }
+
+      const data = (await response.json()) as { items?: CanvasMemoryEntry[] };
+      return data.items || [];
+    },
+    refetchOnWindowFocus: false,
+    refetchInterval: 3000,
     enabled: !!canvasId,
   });
 };

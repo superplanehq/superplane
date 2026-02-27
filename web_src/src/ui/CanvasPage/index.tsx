@@ -140,6 +140,9 @@ export interface CanvasPageProps {
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
+  topViewMode?: "canvas" | "memory";
+  onTopViewModeChange?: (mode: "canvas" | "memory") => void;
+  dataViewContent?: React.ReactNode;
   readOnly?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
@@ -817,149 +820,155 @@ function CanvasPage(props: CanvasPageProps) {
           onToggleAutoSave={props.onToggleAutoSave}
           autoSaveDisabled={props.autoSaveDisabled}
           autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
+          topViewMode={props.topViewMode}
+          onTopViewModeChange={props.onTopViewModeChange}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
 
-      {/* Main content area with sidebar and canvas */}
-      <div className="flex-1 flex relative overflow-hidden">
-        <BuildingBlocksSidebar
-          isOpen={isBuildingBlocksSidebarOpen}
-          onToggle={handleSidebarToggle}
-          blocks={props.buildingBlocks || []}
-          showAiBuilderTab={props.showAiBuilderTab}
-          canvasId={props.canvasId}
-          canvasNodes={state.nodes.map((node) => ({
-            id: node.id,
-            name: String((node.data as { nodeName?: string })?.nodeName || ""),
-            label: String((node.data as { label?: string })?.label || ""),
-            type: String((node.data as { type?: string })?.type || ""),
-          }))}
-          onApplyAiOperations={props.onApplyAiOperations}
-          integrations={props.integrations}
-          canvasZoom={canvasZoom}
-          disabled={readOnly}
-          disabledMessage="You don't have permission to edit this canvas."
-          onBlockClick={handleBuildingBlockClick}
-          onAddNote={handleAddNote}
-        />
+      {/* Main content area with sidebar and canvas/memory */}
+      {props.topViewMode === "memory" ? (
+        <div className="flex-1 overflow-auto bg-slate-50">{props.dataViewContent}</div>
+      ) : (
+        <div className="flex-1 flex relative overflow-hidden">
+          <BuildingBlocksSidebar
+            isOpen={isBuildingBlocksSidebarOpen}
+            onToggle={handleSidebarToggle}
+            blocks={props.buildingBlocks || []}
+            showAiBuilderTab={props.showAiBuilderTab}
+            canvasId={props.canvasId}
+            canvasNodes={state.nodes.map((node) => ({
+              id: node.id,
+              name: String((node.data as { nodeName?: string })?.nodeName || ""),
+              label: String((node.data as { label?: string })?.label || ""),
+              type: String((node.data as { type?: string })?.type || ""),
+            }))}
+            onApplyAiOperations={props.onApplyAiOperations}
+            integrations={props.integrations}
+            canvasZoom={canvasZoom}
+            disabled={readOnly}
+            disabledMessage="You don't have permission to edit this canvas."
+            onBlockClick={handleBuildingBlockClick}
+            onAddNote={handleAddNote}
+          />
 
-        <div className="flex-1 relative">
-          <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
-            <CanvasContent
+          <div className="flex-1 relative">
+            <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
+              <CanvasContent
+                state={state}
+                onSave={props.onSave}
+                onNodeEdit={handleNodeEdit}
+                onNodeDelete={handleNodeDelete}
+                onEdgeCreate={props.onEdgeCreate}
+                hideHeader={true}
+                onToggleView={handleToggleView}
+                onToggleCollapse={props.onToggleCollapse}
+                onAutoLayout={props.onAutoLayout}
+                onRun={(nodeId) => handleNodeRun(nodeId)}
+                onDuplicate={props.onDuplicate}
+                onConfigure={props.onConfigure}
+                onDeactivate={props.onDeactivate}
+                onAnnotationUpdate={props.onAnnotationUpdate}
+                onAnnotationBlur={props.onAnnotationBlur}
+                onTogglePause={props.onTogglePause}
+                runDisabled={props.runDisabled}
+                runDisabledTooltip={props.runDisabledTooltip}
+                onBuildingBlockDrop={handleBuildingBlockDrop}
+                onBuildingBlocksSidebarToggle={handleSidebarToggle}
+                onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
+                onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
+                onZoomChange={setCanvasZoom}
+                hasFitToViewRef={hasFitToViewRef}
+                viewportRefProp={props.viewportRef}
+                highlightedNodeIds={highlightedNodeIds}
+                workflowNodes={props.workflowNodes}
+                setCurrentTab={setCurrentTab}
+                onUndo={props.onUndo}
+                canUndo={props.canUndo}
+                organizationId={props.organizationId}
+                unsavedMessage={props.unsavedMessage}
+                saveIsPrimary={props.saveIsPrimary}
+                saveButtonHidden={props.saveButtonHidden}
+                saveDisabled={props.saveDisabled}
+                saveDisabledTooltip={props.saveDisabledTooltip}
+                isAutoSaveEnabled={props.isAutoSaveEnabled}
+                onToggleAutoSave={props.onToggleAutoSave}
+                autoSaveDisabled={props.autoSaveDisabled}
+                autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
+                readOnly={props.readOnly}
+                logEntries={props.logEntries}
+                focusRequest={props.focusRequest}
+                onExecutionChainHandled={props.onExecutionChainHandled}
+                initialFocusNodeId={props.initialFocusNodeId}
+                onResolveExecutionErrors={props.onResolveExecutionErrors}
+                title={props.title}
+              />
+            </ReactFlowProvider>
+
+            <AiSidebar
+              enabled={state.ai.enabled}
+              isOpen={state.ai.sidebarOpen}
+              setIsOpen={state.ai.setSidebarOpen}
+              showNotifications={state.ai.showNotifications}
+              notificationMessage={state.ai.notificationMessage}
+            />
+
+            <Sidebar
               state={state}
-              onSave={props.onSave}
-              onNodeEdit={handleNodeEdit}
-              onNodeDelete={handleNodeDelete}
-              onEdgeCreate={props.onEdgeCreate}
-              hideHeader={true}
-              onToggleView={handleToggleView}
-              onToggleCollapse={props.onToggleCollapse}
-              onAutoLayout={props.onAutoLayout}
-              onRun={(nodeId) => handleNodeRun(nodeId)}
+              getSidebarData={props.getSidebarData}
+              loadSidebarData={props.loadSidebarData}
+              getTabData={props.getTabData}
+              getAutocompleteExampleObj={props.getAutocompleteExampleObj}
+              onCancelQueueItem={handleCancelQueueItem}
+              onPushThrough={handlePushThrough}
+              onCancelExecution={handleCancelExecution}
+              supportsPushThrough={props.supportsPushThrough}
+              onRun={handleNodeRun}
               onDuplicate={props.onDuplicate}
+              onDocs={props.onDocs}
               onConfigure={props.onConfigure}
               onDeactivate={props.onDeactivate}
-              onAnnotationUpdate={props.onAnnotationUpdate}
-              onAnnotationBlur={props.onAnnotationBlur}
-              onTogglePause={props.onTogglePause}
+              onToggleView={handleToggleView}
+              onDelete={handleNodeDelete}
               runDisabled={props.runDisabled}
               runDisabledTooltip={props.runDisabledTooltip}
-              onBuildingBlockDrop={handleBuildingBlockDrop}
-              onBuildingBlocksSidebarToggle={handleSidebarToggle}
-              onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
-              onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
-              onZoomChange={setCanvasZoom}
-              hasFitToViewRef={hasFitToViewRef}
-              viewportRefProp={props.viewportRef}
-              highlightedNodeIds={highlightedNodeIds}
-              workflowNodes={props.workflowNodes}
-              setCurrentTab={setCurrentTab}
-              onUndo={props.onUndo}
-              canUndo={props.canUndo}
+              getAllHistoryEvents={props.getAllHistoryEvents}
+              onLoadMoreHistory={props.onLoadMoreHistory}
+              getHasMoreHistory={props.getHasMoreHistory}
+              getLoadingMoreHistory={props.getLoadingMoreHistory}
+              onLoadMoreQueue={props.onLoadMoreQueue}
+              getAllQueueEvents={props.getAllQueueEvents}
+              getHasMoreQueue={props.getHasMoreQueue}
+              getLoadingMoreQueue={props.getLoadingMoreQueue}
+              onReEmit={props.onReEmit}
+              loadExecutionChain={props.loadExecutionChain}
+              getExecutionState={props.getExecutionState}
+              onSidebarClose={handleSidebarClose}
+              editingNodeData={editingNodeData}
+              onSaveConfiguration={handleSaveConfiguration}
+              onEdit={handleNodeEdit}
+              currentTab={currentTab}
+              onTabChange={setCurrentTab}
               organizationId={props.organizationId}
-              unsavedMessage={props.unsavedMessage}
-              saveIsPrimary={props.saveIsPrimary}
-              saveButtonHidden={props.saveButtonHidden}
-              saveDisabled={props.saveDisabled}
-              saveDisabledTooltip={props.saveDisabledTooltip}
-              isAutoSaveEnabled={props.isAutoSaveEnabled}
-              onToggleAutoSave={props.onToggleAutoSave}
-              autoSaveDisabled={props.autoSaveDisabled}
-              autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
-              readOnly={props.readOnly}
-              logEntries={props.logEntries}
+              getCustomField={props.getCustomField}
+              integrations={props.integrations}
+              workflowNodes={props.workflowNodes}
+              components={props.components}
+              triggers={props.triggers}
+              blueprints={props.blueprints}
+              onHighlightedNodesChange={setHighlightedNodeIds}
               focusRequest={props.focusRequest}
               onExecutionChainHandled={props.onExecutionChainHandled}
-              initialFocusNodeId={props.initialFocusNodeId}
-              onResolveExecutionErrors={props.onResolveExecutionErrors}
-              title={props.title}
+              readOnly={readOnly}
+              canReadIntegrations={props.canReadIntegrations}
+              canCreateIntegrations={props.canCreateIntegrations}
+              canUpdateIntegrations={props.canUpdateIntegrations}
             />
-          </ReactFlowProvider>
-
-          <AiSidebar
-            enabled={state.ai.enabled}
-            isOpen={state.ai.sidebarOpen}
-            setIsOpen={state.ai.setSidebarOpen}
-            showNotifications={state.ai.showNotifications}
-            notificationMessage={state.ai.notificationMessage}
-          />
-
-          <Sidebar
-            state={state}
-            getSidebarData={props.getSidebarData}
-            loadSidebarData={props.loadSidebarData}
-            getTabData={props.getTabData}
-            getAutocompleteExampleObj={props.getAutocompleteExampleObj}
-            onCancelQueueItem={handleCancelQueueItem}
-            onPushThrough={handlePushThrough}
-            onCancelExecution={handleCancelExecution}
-            supportsPushThrough={props.supportsPushThrough}
-            onRun={handleNodeRun}
-            onDuplicate={props.onDuplicate}
-            onDocs={props.onDocs}
-            onConfigure={props.onConfigure}
-            onDeactivate={props.onDeactivate}
-            onToggleView={handleToggleView}
-            onDelete={handleNodeDelete}
-            runDisabled={props.runDisabled}
-            runDisabledTooltip={props.runDisabledTooltip}
-            getAllHistoryEvents={props.getAllHistoryEvents}
-            onLoadMoreHistory={props.onLoadMoreHistory}
-            getHasMoreHistory={props.getHasMoreHistory}
-            getLoadingMoreHistory={props.getLoadingMoreHistory}
-            onLoadMoreQueue={props.onLoadMoreQueue}
-            getAllQueueEvents={props.getAllQueueEvents}
-            getHasMoreQueue={props.getHasMoreQueue}
-            getLoadingMoreQueue={props.getLoadingMoreQueue}
-            onReEmit={props.onReEmit}
-            loadExecutionChain={props.loadExecutionChain}
-            getExecutionState={props.getExecutionState}
-            onSidebarClose={handleSidebarClose}
-            editingNodeData={editingNodeData}
-            onSaveConfiguration={handleSaveConfiguration}
-            onEdit={handleNodeEdit}
-            currentTab={currentTab}
-            onTabChange={setCurrentTab}
-            organizationId={props.organizationId}
-            getCustomField={props.getCustomField}
-            integrations={props.integrations}
-            workflowNodes={props.workflowNodes}
-            components={props.components}
-            triggers={props.triggers}
-            blueprints={props.blueprints}
-            onHighlightedNodesChange={setHighlightedNodeIds}
-            focusRequest={props.focusRequest}
-            onExecutionChainHandled={props.onExecutionChainHandled}
-            readOnly={readOnly}
-            canReadIntegrations={props.canReadIntegrations}
-            canCreateIntegrations={props.canCreateIntegrations}
-            canUpdateIntegrations={props.canUpdateIntegrations}
-          />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Edit existing node modal - now handled by settings sidebar */}
 
@@ -1261,6 +1270,8 @@ function CanvasContentHeader({
   onToggleAutoSave,
   autoSaveDisabled,
   autoSaveDisabledTooltip,
+  topViewMode,
+  onTopViewModeChange,
   onExportYamlCopy,
   onExportYamlDownload,
 }: {
@@ -1278,6 +1289,8 @@ function CanvasContentHeader({
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
+  topViewMode?: "canvas" | "memory";
+  onTopViewModeChange?: (mode: "canvas" | "memory") => void;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
 }) {
@@ -1325,6 +1338,8 @@ function CanvasContentHeader({
       onToggleAutoSave={onToggleAutoSave}
       autoSaveDisabled={autoSaveDisabled}
       autoSaveDisabledTooltip={autoSaveDisabledTooltip}
+      topViewMode={topViewMode}
+      onTopViewModeChange={onTopViewModeChange}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
     />

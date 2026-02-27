@@ -30,3 +30,17 @@ func AddCanvasMemoryInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace str
 func AddCanvasMemory(canvasID uuid.UUID, namespace string, values any) error {
 	return AddCanvasMemoryInTransaction(database.Conn(), canvasID, namespace, values)
 }
+
+func ListCanvasMemoriesInTransaction(tx *gorm.DB, canvasID uuid.UUID) ([]CanvasMemory, error) {
+	memories := []CanvasMemory{}
+	err := tx.
+		Where("canvas_id = ?", canvasID).
+		Order("namespace ASC").
+		Find(&memories).
+		Error
+	return memories, err
+}
+
+func ListCanvasMemories(canvasID uuid.UUID) ([]CanvasMemory, error) {
+	return ListCanvasMemoriesInTransaction(database.Conn(), canvasID)
+}
