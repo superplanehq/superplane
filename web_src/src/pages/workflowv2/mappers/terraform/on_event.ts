@@ -19,11 +19,11 @@ export const onRunEventTriggerRenderer: TriggerRenderer = {
 
     return {
       "Run ID": eventData?.runId || "",
-      "Workspace": eventData?.workspaceName || "",
-      "Action": eventData?.action || "",
-      "Status": eventData?.runStatus || "",
+      Workspace: eventData?.workspaceName || "",
+      Action: eventData?.action || "",
+      Status: eventData?.runStatus || "",
       "Created By": eventData?.runCreatedBy || "",
-      "URL": eventData?.runUrl || "",
+      URL: eventData?.runUrl || "",
     };
   },
 
@@ -67,11 +67,11 @@ export const onNeedsAttentionTriggerRenderer: TriggerRenderer = {
 
     return {
       "Run ID": eventData?.runId || "",
-      "Workspace": eventData?.workspaceName || "",
-      "Action": eventData?.action || "",
-      "Status": eventData?.runStatus || "",
+      Workspace: eventData?.workspaceName || "",
+      Action: eventData?.action || "",
+      Status: eventData?.runStatus || "",
       "Created By": eventData?.runCreatedBy || "",
-      "URL": eventData?.runUrl || "",
+      URL: eventData?.runUrl || "",
     };
   },
 
