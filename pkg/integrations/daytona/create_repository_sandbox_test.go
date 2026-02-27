@@ -460,7 +460,7 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 		assert.Equal(t, 0, payload.Bootstrap.ExitCode)
 	})
 
-	t.Run("bootstrap stage failure returns error", func(t *testing.T) {
+	t.Run("bootstrap stage failure fails execution", func(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: CreateRepositorySandboxMetadata{
 				Stage:            repositorySandboxStageBootstrapping,
@@ -484,11 +484,12 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 			},
 		}
 
+		execCtx := &contexts.ExecutionStateContext{}
 		err := component.HandleAction(core.ActionContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Metadata:       metadataCtx,
-			ExecutionState: &contexts.ExecutionStateContext{},
+			ExecutionState: execCtx,
 			Requests:       &contexts.RequestContext{},
 			Logger:         newTestLogger(),
 			Integration: &contexts.IntegrationContext{
@@ -496,12 +497,11 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 			},
 		})
 
-		require.ErrorContains(t, err, "bootstrap script failed")
-
-		updated := metadataCtx.Metadata.(CreateRepositorySandboxMetadata)
-		require.NotNil(t, updated.Bootstrap)
-		assert.Equal(t, 2, updated.Bootstrap.ExitCode)
-		assert.Equal(t, "npm ERR!", updated.Bootstrap.Result)
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.False(t, execCtx.Passed)
+		assert.Equal(t, "error", execCtx.FailureReason)
+		assert.Contains(t, execCtx.FailureMessage, "bootstrap script failed with exit code 2: npm ERR!")
 	})
 
 	t.Run("times out when sandbox startup exceeded timeout", func(t *testing.T) {
