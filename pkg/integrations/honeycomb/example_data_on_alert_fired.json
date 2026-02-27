@@ -1,34 +1,26 @@
 {
-  "version": "v1",
-  "id": "01HQXYZ123ABC",
-  "name": "High Error Rate - Production API",
-  "status": "firing",
-  "summary": "Error rate is 8.5% (threshold: 5%)",
-  "description": "API error rate has exceeded the acceptable threshold",
-  "trigger_url": "https://ui.honeycomb.io/myteam/triggers/abc123",
-  "dataset": {
-    "slug": "api-production",
-    "name": "Production API"
+  "data": {
+    "alert_type": "on_true",
+    "description": "production environment:\nCurrent value greater than threshold value (5)",
+    "id": "kQjkatCVK6M",
+    "is_test": false,
+    "name": "High Error Rate",
+    "operator": "greater than",
+    "result_groups": [
+      {
+        "Group": {},
+        "Result": 8.5
+      }
+    ],
+    "result_groups_triggered": [],
+    "result_url": "https://ui.honeycomb.io/myteam/environments/production/datasets/api-production/result/p3o2dvAhYxx/a/z5rYVCoNUZz?utm_content=view_graph&utm_medium=Trigger&utm_source=webhook",
+    "status": "TRIGGERED",
+    "summary": "Triggered: High Error Rate",
+    "threshold": 5,
+    "trigger_description": "API error rate has exceeded the acceptable threshold",
+    "trigger_url": "https://ui.honeycomb.io/myteam/environments/production/datasets/api-production/triggers/kQjkatCVK6M?utm_content=edit_trigger&utm_medium=Trigger&utm_source=webhook",
+    "version": "v0.1.0"
   },
-  "query": {
-    "query_url": "https://ui.honeycomb.io/myteam/datasets/api-production/query/xyz789",
-    "time_range": 900
-  },
-  "threshold": {
-    "op": "above",
-    "value": 5
-  },
-  "result_value": 8.5,
-  "result_groups": [
-    {
-      "group": {"endpoint": "/api/users"},
-      "result_value": 12.3
-    },
-    {
-      "group": {"endpoint": "/api/orders"},
-      "result_value": 6.8
-    }
-  ],
-  "triggered_at": "2026-02-15T10:30:00Z",
-  "severity": "critical"
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "honeycomb.alert.fired"
 }
