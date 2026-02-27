@@ -34,7 +34,11 @@ function collectColumns(items: Record<string, unknown>[]): string[] {
   return Array.from(set);
 }
 
-function renderNamespaceTable(values: CanvasMemoryEntry[], onDeleteEntry?: (memoryId: string) => void, deletingId?: string) {
+function renderNamespaceTable(
+  values: CanvasMemoryEntry[],
+  onDeleteEntry?: (memoryId: string) => void,
+  deletingId?: string,
+) {
   if (values.length === 0) {
     return <div className="px-3 py-2 text-xs text-gray-500">No items</div>;
   }
@@ -60,27 +64,27 @@ function renderNamespaceTable(values: CanvasMemoryEntry[], onDeleteEntry?: (memo
               const item = objectValues[index];
               return (
                 <tr key={entry.id || index} className="border-b border-slate-100">
-                {columns.map((column) => (
-                  <td key={`${index}-${column}`} className="px-3 py-2 font-mono text-xs text-gray-700 align-top">
-                    {formatValue(item[column])}
+                  {columns.map((column) => (
+                    <td key={`${index}-${column}`} className="px-3 py-2 font-mono text-xs text-gray-700 align-top">
+                      {formatValue(item[column])}
+                    </td>
+                  ))}
+                  <td className="px-3 py-2 text-right">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={!onDeleteEntry || !entry.id || deletingId === entry.id}
+                      onClick={() => {
+                        if (entry.id) onDeleteEntry?.(entry.id);
+                      }}
+                      className="text-gray-500 hover:text-red-600"
+                      title="Delete entry"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </td>
-                ))}
-                <td className="px-3 py-2 text-right">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    disabled={!onDeleteEntry || !entry.id || deletingId === entry.id}
-                    onClick={() => {
-                      if (entry.id) onDeleteEntry?.(entry.id);
-                    }}
-                    className="text-gray-500 hover:text-red-600"
-                    title="Delete entry"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </td>
-              </tr>
+                </tr>
               );
             })}
           </tbody>

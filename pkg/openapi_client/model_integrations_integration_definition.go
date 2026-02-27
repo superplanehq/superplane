@@ -20,14 +20,14 @@ var _ MappedNullable = &IntegrationsIntegrationDefinition{}
 
 // IntegrationsIntegrationDefinition struct for IntegrationsIntegrationDefinition
 type IntegrationsIntegrationDefinition struct {
-	Name *string `json:"name,omitempty"`
-	Label *string `json:"label,omitempty"`
-	Icon *string `json:"icon,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Configuration []ConfigurationField `json:"configuration,omitempty"`
-	Components []ComponentsComponent `json:"components,omitempty"`
-	Triggers []TriggersTrigger `json:"triggers,omitempty"`
-	Instructions *string `json:"instructions,omitempty"`
+	Name          *string               `json:"name,omitempty"`
+	Label         *string               `json:"label,omitempty"`
+	Icon          *string               `json:"icon,omitempty"`
+	Description   *string               `json:"description,omitempty"`
+	Configuration []ConfigurationField  `json:"configuration,omitempty"`
+	Components    []ComponentsComponent `json:"components,omitempty"`
+	Triggers      []TriggersTrigger     `json:"triggers,omitempty"`
+	Instructions  *string               `json:"instructions,omitempty"`
 }
 
 // NewIntegrationsIntegrationDefinition instantiates a new IntegrationsIntegrationDefinition object
@@ -304,7 +304,7 @@ func (o *IntegrationsIntegrationDefinition) SetInstructions(v string) {
 }
 
 func (o IntegrationsIntegrationDefinition) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -375,5 +375,3 @@ func (v *NullableIntegrationsIntegrationDefinition) UnmarshalJSON(src []byte) er
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

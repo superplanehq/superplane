@@ -21,11 +21,11 @@ var _ MappedNullable = &GroupsGroupMetadata{}
 
 // GroupsGroupMetadata struct for GroupsGroupMetadata
 type GroupsGroupMetadata struct {
-	Name *string `json:"name,omitempty"`
+	Name       *string                  `json:"name,omitempty"`
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
-	DomainId *string `json:"domainId,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	DomainId   *string                  `json:"domainId,omitempty"`
+	CreatedAt  *time.Time               `json:"createdAt,omitempty"`
+	UpdatedAt  *time.Time               `json:"updatedAt,omitempty"`
 }
 
 // NewGroupsGroupMetadata instantiates a new GroupsGroupMetadata object
@@ -210,7 +210,7 @@ func (o *GroupsGroupMetadata) SetUpdatedAt(v time.Time) {
 }
 
 func (o GroupsGroupMetadata) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -272,5 +272,3 @@ func (v *NullableGroupsGroupMetadata) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

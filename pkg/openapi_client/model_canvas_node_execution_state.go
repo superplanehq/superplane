@@ -21,9 +21,9 @@ type CanvasNodeExecutionState string
 
 // List of CanvasNodeExecutionState
 const (
-	CANVASNODEEXECUTIONSTATE_STATE_UNKNOWN CanvasNodeExecutionState = "STATE_UNKNOWN"
-	CANVASNODEEXECUTIONSTATE_STATE_PENDING CanvasNodeExecutionState = "STATE_PENDING"
-	CANVASNODEEXECUTIONSTATE_STATE_STARTED CanvasNodeExecutionState = "STATE_STARTED"
+	CANVASNODEEXECUTIONSTATE_STATE_UNKNOWN  CanvasNodeExecutionState = "STATE_UNKNOWN"
+	CANVASNODEEXECUTIONSTATE_STATE_PENDING  CanvasNodeExecutionState = "STATE_PENDING"
+	CANVASNODEEXECUTIONSTATE_STATE_STARTED  CanvasNodeExecutionState = "STATE_STARTED"
 	CANVASNODEEXECUTIONSTATE_STATE_FINISHED CanvasNodeExecutionState = "STATE_FINISHED"
 )
 
@@ -113,4 +113,3 @@ func (v *NullableCanvasNodeExecutionState) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
