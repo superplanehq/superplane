@@ -344,9 +344,10 @@ func (t *TerraformNeedsAttention) HandleWebhook(ctx core.WebhookRequestContext) 
 	runURL, _ := data["runUrl"].(string)
 	runCreatedBy, _ := data["runCreatedBy"].(string)
 	runMessage, _ := data["runMessage"].(string)
+	runID, _ := data["runId"].(string)
 
 	if err := ctx.Events.Emit("terraform.needsAttention", map[string]any{
-		"runId":            data["runId"],
+		"runId":            runID,
 		"workspaceId":      workspaceID,
 		"action":           action,
 		"runStatus":        runStatus,
