@@ -1,13 +1,15 @@
 package terraform
 
 import (
+	"fmt"
+
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 func init() {
-	registry.RegisterIntegrationWithWebhookHandler("terraform", &TerraformIntegration{}, &TerraformWebhookHandler{})
+	registry.RegisterIntegrationWithWebhookHandler("terraform", &TerraformIntegration{}, &WebhookHandler{})
 }
 
 type TerraformIntegration struct{}
@@ -37,19 +39,7 @@ func (i *TerraformIntegration) Configuration() []configuration.Field {
 }
 
 func (i *TerraformIntegration) Sync(ctx core.SyncContext) error {
-	configAPI, err := ctx.Integration.GetConfig("apiToken")
-	if err != nil {
-		return err
-	}
-	configAddr, err := ctx.Integration.GetConfig("address")
-	if err != nil {
-		return err
-	}
-
-	client, err := NewClient(map[string]any{
-		"apiToken": string(configAPI),
-		"address":  string(configAddr),
-	})
+	client, err := getClientFromIntegration(ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -60,6 +50,22 @@ func (i *TerraformIntegration) Sync(ctx core.SyncContext) error {
 
 	ctx.Integration.Ready()
 	return nil
+}
+
+func getClientFromIntegration(integration core.IntegrationContext) (*Client, error) {
+	configAPI, err := integration.GetConfig("apiToken")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get API token: %w", err)
+	}
+	configAddr, err := integration.GetConfig("address")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get address: %w", err)
+	}
+
+	return NewClient(map[string]any{
+		"apiToken": string(configAPI),
+		"address":  string(configAddr),
+	})
 }
 
 func (i *TerraformIntegration) Cleanup(ctx core.IntegrationCleanupContext) error     { return nil }
@@ -73,7 +79,7 @@ func (i *TerraformIntegration) HandleRequest(ctx core.HTTPRequestContext) {}
 
 func (i *TerraformIntegration) Triggers() []core.Trigger {
 	return []core.Trigger{
-		&TerraformRunEvent{},
+		&RunEvent{},
 		&TerraformNeedsAttention{},
 	}
 }
