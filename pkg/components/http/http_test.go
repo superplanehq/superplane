@@ -105,11 +105,11 @@ func TestHTTP__Setup__ValidConfigurations(t *testing.T) {
 			},
 		},
 		{
-			name: "with bearer authentication",
+			name: "with bearer authorization",
 			config: map[string]any{
 				"method": "GET",
 				"url":    "https://api.example.com",
-				"authentication": map[string]any{
+				"authorization": map[string]any{
 					"authMethod": "bearer",
 					"token": map[string]any{
 						"secret": "api",
@@ -196,7 +196,7 @@ func TestHTTP__Setup__ValidationErrors(t *testing.T) {
 			config: map[string]any{
 				"method": "GET",
 				"url":    "https://api.example.com",
-				"authentication": map[string]any{
+				"authorization": map[string]any{
 					"authMethod": "basic",
 					"password": map[string]any{
 						"secret": "api",
@@ -204,14 +204,14 @@ func TestHTTP__Setup__ValidationErrors(t *testing.T) {
 					},
 				},
 			},
-			expectErr: "authentication.username is required for basic auth",
+			expectErr: "authorization.username is required for basic auth",
 		},
 		{
 			name: "invalid api key location",
 			config: map[string]any{
 				"method": "GET",
 				"url":    "https://api.example.com",
-				"authentication": map[string]any{
+				"authorization": map[string]any{
 					"authMethod": "api_key",
 					"apiKey": map[string]any{
 						"secret": "api",
@@ -221,7 +221,7 @@ func TestHTTP__Setup__ValidationErrors(t *testing.T) {
 					"name":     "X-API-Key",
 				},
 			},
-			expectErr: "authentication.location must be header or query for api key auth",
+			expectErr: "authorization.location must be header or query for api key auth",
 		},
 	}
 
@@ -531,7 +531,7 @@ func TestHTTP__Execute__BasicAuthFromSecret(t *testing.T) {
 	ctx, stateCtx, _ := createExecutionContext(map[string]any{
 		"method": "GET",
 		"url":    server.URL,
-		"authentication": map[string]any{
+		"authorization": map[string]any{
 			"authMethod": "basic",
 			"username":   "user",
 			"password": map[string]any{
@@ -563,7 +563,7 @@ func TestHTTP__Execute__BearerAuthDefaultPrefix(t *testing.T) {
 	ctx, stateCtx, _ := createExecutionContext(map[string]any{
 		"method": "GET",
 		"url":    server.URL,
-		"authentication": map[string]any{
+		"authorization": map[string]any{
 			"authMethod": "bearer",
 			"token": map[string]any{
 				"secret": "api",
@@ -594,7 +594,7 @@ func TestHTTP__Execute__APIKeyInQueryWithManualOverride(t *testing.T) {
 	ctx, stateCtx, _ := createExecutionContext(map[string]any{
 		"method": "GET",
 		"url":    server.URL,
-		"authentication": map[string]any{
+		"authorization": map[string]any{
 			"authMethod": "api_key",
 			"apiKey": map[string]any{
 				"secret": "api",
@@ -630,7 +630,7 @@ func TestHTTP__Execute__ManualAuthorizationHeaderOverridesAuthConfig(t *testing.
 	ctx, stateCtx, _ := createExecutionContext(map[string]any{
 		"method": "GET",
 		"url":    server.URL,
-		"authentication": map[string]any{
+		"authorization": map[string]any{
 			"authMethod": "bearer",
 			"token": map[string]any{
 				"secret": "api",
@@ -658,7 +658,7 @@ func TestHTTP__Execute__AuthRequiresSecretsContext(t *testing.T) {
 	ctx, stateCtx, _ := createExecutionContext(map[string]any{
 		"method": "GET",
 		"url":    "https://api.example.com",
-		"authentication": map[string]any{
+		"authorization": map[string]any{
 			"authMethod": "bearer",
 			"token": map[string]any{
 				"secret": "api",

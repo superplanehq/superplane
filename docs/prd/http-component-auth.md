@@ -1,8 +1,8 @@
-# HTTP Component Authentication Schemes
+# HTTP Component Authorization Schemes
 
 ## Overview
 
-This PRD defines an authentication configuration model for the HTTP component so users can choose
+This PRD defines an authorization configuration model for the HTTP component so users can choose
 an auth scheme and securely source credentials from organization secrets.
 
 The goal is to remove manual auth header construction for common patterns (for example,
@@ -24,7 +24,7 @@ This creates several issues:
 
 ## Goals
 
-1. Add a first-class `authentication` configuration section to the HTTP component.
+1. Add a first-class authorization configuration section to the HTTP component.
 2. Support multiple auth schemes in v1 with clear UX and validation.
 3. Source all sensitive auth values from organization secrets (secret + key references), not raw plaintext fields.
 4. Keep compatibility with existing HTTP component flows that already use manual headers.
@@ -53,15 +53,14 @@ This creates several issues:
 
 ## Functional Requirements
 
-### Authentication Section
+### Authorization Section
 
-- Add an optional top-level `authentication` object in HTTP component configuration.
+- Add an optional top-level authorization object in HTTP component configuration.
 - Add an `authMethod` select field with:
-  - `none` (default)
   - `basic`
   - `bearer`
   - `api_key`
-- When `none` is selected, no auth credentials are required and no auth header/query params are auto-generated.
+- When authorization is not configured, no auth header/query params are auto-generated.
 - Existing `headers` and `queryParams` fields remain available for advanced/manual use cases.
 
 ### Scheme: Basic Auth
@@ -128,7 +127,7 @@ This creates several issues:
 {
   "method": "GET",
   "url": "https://api.example.com/items",
-  "authentication": {
+  "authorization": {
     "authMethod": "bearer",
     "token": {
       "secret": "third-party-api",
@@ -141,7 +140,7 @@ This creates several issues:
 
 ```json
 {
-  "authentication": {
+  "authorization": {
     "authMethod": "api_key",
     "apiKey": {
       "secret": "stripe",
@@ -155,7 +154,7 @@ This creates several issues:
 
 ## UX Requirements
 
-- Add a new **Authentication** object section in the HTTP component form.
+- Add a new **Authorization** object section in the HTTP component form.
 - `authMethod` appears first and controls conditional visibility of child fields.
 - Secret-backed fields use the existing `secret-key` selector UX (`secret` + `key`).
 - Helper text explains that credentials come from secrets and are resolved at runtime.
@@ -164,12 +163,12 @@ This creates several issues:
 ## Backend and Component Requirements
 
 - Update `pkg/components/http/http.go`:
-  - Extend `Spec` with `Authentication`.
-  - Extend `Configuration()` schema with `authentication` object and conditional fields.
+  - Extend `Spec` with `Authorization`.
+  - Extend `Configuration()` schema with `authorization` object and conditional fields.
   - Extend `Setup()` validation for auth scheme requirements.
   - Extend request preparation logic in `executeRequest()` to apply auth.
 - Reuse the `SecretKeyRef` pattern used by other components (for consistency and type safety).
-- Ensure no behavior changes when `authMethod=none` or `authentication` is absent.
+- Ensure no behavior changes when authorization is absent.
 
 ## Security Requirements
 
@@ -181,18 +180,18 @@ This creates several issues:
 ## Backward Compatibility
 
 - Existing HTTP nodes with manual auth headers must continue to execute unchanged.
-- New authentication section is additive and optional.
-- Default behavior for existing nodes is equivalent to `authMethod=none`.
+- New authorization section is additive and optional.
+- Default behavior for existing nodes is equivalent to authorization being absent.
 
 ## Acceptance Criteria
 
-1. Builder can select one of `none`, `basic`, `bearer`, `api_key` in HTTP component configuration.
+1. Builder can select one of `basic`, `bearer`, `api_key` in HTTP component configuration.
 2. Required fields are enforced per selected auth scheme at setup time.
 3. Basic auth sends valid `Authorization: Basic ...` header with password from secret key.
 4. Bearer auth sends valid `Authorization` header with token from secret key.
 5. API key auth can inject key in either header or query param based on configuration.
 6. Missing/invalid secret references fail execution with non-sensitive errors.
-7. Existing HTTP nodes without authentication config continue to work unchanged.
+7. Existing HTTP nodes without authorization config continue to work unchanged.
 8. Resolved credential values never appear in execution outputs, metadata, or logs.
 
 ## Success Metrics
@@ -210,7 +209,7 @@ This creates several issues:
   **Mitigation:** Clear setup-time requirements and actionable runtime errors.
 
 - **Risk:** Future auth schemes require incompatible model changes.  
-  **Mitigation:** Keep `authentication` as an extensible object with method-specific fields.
+  **Mitigation:** Keep authorization settings extensible with method-specific fields.
 
 ## Rollout Plan
 

@@ -57,7 +57,7 @@ const (
 	authLocationQuery  = "query"
 )
 
-type AuthenticationSpec struct {
+type AuthorizationSpec struct {
 	AuthMethod string       `json:"authMethod" mapstructure:"authMethod"`
 	Username   string       `json:"username" mapstructure:"username"`
 	Password   SecretKeyRef `json:"password" mapstructure:"password"`
@@ -73,7 +73,7 @@ type Spec struct {
 	URL             string              `json:"url"`
 	QueryParams     *[]KeyValue         `json:"queryParams,omitempty"`
 	Headers         *[]Header           `json:"headers,omitempty"`
-	Authentication  *AuthenticationSpec `json:"authentication,omitempty" mapstructure:"authentication"`
+	Authorization   *AuthorizationSpec `json:"authorization,omitempty" mapstructure:"authorization"`
 	ContentType     *string             `json:"contentType,omitempty"`
 	JSON            *any                `json:"json,omitempty"`
 	XML             *string             `json:"xml,omitempty"`
@@ -181,7 +181,7 @@ func (e *HTTP) Setup(ctx core.SetupContext) error {
 	}
 
 	if spec.ContentType == nil {
-		return e.validateAuthentication(spec.Authentication)
+		return e.validateAuthorization(spec.Authorization)
 	}
 
 	switch *spec.ContentType {
@@ -206,7 +206,7 @@ func (e *HTTP) Setup(ctx core.SetupContext) error {
 		}
 	}
 
-	return e.validateAuthentication(spec.Authentication)
+	return e.validateAuthorization(spec.Authorization)
 }
 
 func (e *HTTP) OutputChannels(configuration any) []core.OutputChannel {
@@ -241,7 +241,7 @@ func (e *HTTP) Configuration() []configuration.Field {
 			Placeholder: "https://api.example.com/endpoint",
 		},
 		{
-			Name:        "authentication",
+			Name:        "authorization",
 			Label:       "Authorization",
 			Type:        configuration.FieldTypeObject,
 			Required:    false,
@@ -601,7 +601,7 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	if err := e.validateAuthentication(spec.Authentication); err != nil {
+	if err := e.validateAuthorization(spec.Authorization); err != nil {
 		return err
 	}
 
@@ -752,7 +752,7 @@ func (e *HTTP) executeRequest(httpCtx core.HTTPContext, secretsCtx core.SecretsC
 
 	reqCtx, cancel := context.WithTimeout(context.Background(), timeout)
 
-	authValues, err := e.resolveAuthentication(spec.Authentication, secretsCtx)
+	authValues, err := e.resolveAuthorization(spec.Authorization, secretsCtx)
 	if err != nil {
 		cancel()
 		return nil, nil, err
@@ -811,7 +811,7 @@ func (e *HTTP) executeRequest(httpCtx core.HTTPContext, secretsCtx core.SecretsC
 	return resp, cancel, nil
 }
 
-func (e *HTTP) validateAuthentication(auth *AuthenticationSpec) error {
+func (e *HTTP) validateAuthorization(auth *AuthorizationSpec) error {
 	if auth == nil || auth.AuthMethod == "" || auth.AuthMethod == authMethodNone {
 		return nil
 	}
@@ -819,21 +819,21 @@ func (e *HTTP) validateAuthentication(auth *AuthenticationSpec) error {
 	switch auth.AuthMethod {
 	case authMethodBasic:
 		if strings.TrimSpace(auth.Username) == "" {
-			return fmt.Errorf("authentication.username is required for basic auth")
+			return fmt.Errorf("authorization.username is required for basic auth")
 		}
 		if !auth.Password.IsSet() {
-			return fmt.Errorf("authentication.password secret and key are required for basic auth")
+			return fmt.Errorf("authorization.password secret and key are required for basic auth")
 		}
 	case authMethodBearer:
 		if !auth.Token.IsSet() {
-			return fmt.Errorf("authentication.token secret and key are required for bearer auth")
+			return fmt.Errorf("authorization.token secret and key are required for bearer auth")
 		}
 	case authMethodAPIKey:
 		if !auth.APIKey.IsSet() {
-			return fmt.Errorf("authentication.apiKey secret and key are required for api key auth")
+			return fmt.Errorf("authorization.apiKey secret and key are required for api key auth")
 		}
 		if strings.TrimSpace(auth.Name) == "" {
-			return fmt.Errorf("authentication.name is required for api key auth")
+			return fmt.Errorf("authorization.name is required for api key auth")
 		}
 
 		location := auth.Location
@@ -841,7 +841,7 @@ func (e *HTTP) validateAuthentication(auth *AuthenticationSpec) error {
 			location = authLocationHeader
 		}
 		if location != authLocationHeader && location != authLocationQuery {
-			return fmt.Errorf("authentication.location must be header or query for api key auth")
+			return fmt.Errorf("authorization.location must be header or query for api key auth")
 		}
 	default:
 		return fmt.Errorf("unsupported authorization method: %s", auth.AuthMethod)
@@ -850,7 +850,7 @@ func (e *HTTP) validateAuthentication(auth *AuthenticationSpec) error {
 	return nil
 }
 
-func (e *HTTP) resolveAuthentication(auth *AuthenticationSpec, secretsCtx core.SecretsContext) (requestAuthValues, error) {
+func (e *HTTP) resolveAuthorization(auth *AuthorizationSpec, secretsCtx core.SecretsContext) (requestAuthValues, error) {
 	values := requestAuthValues{}
 
 	if auth == nil || auth.AuthMethod == "" || auth.AuthMethod == authMethodNone {
