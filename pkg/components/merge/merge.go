@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/expr-lang/expr"
@@ -244,8 +243,7 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 			return nil, err
 		}
 
-		normalizedExpression := normalizeMemoryExpression(spec.StopIfExpression)
-		vm, err := expr.Compile(normalizedExpression, expressionOptions(env)...)
+		vm, err := expr.Compile(spec.StopIfExpression, expressionOptions(env)...)
 		if err != nil {
 			return nil, fmt.Errorf("stopIfExpression compilation failed: %w", err)
 		}
@@ -367,43 +365,7 @@ func expressionOptions(env map[string]any) []expr.Option {
 
 			return nil, nil
 		}),
-		expr.Function("memory_find", func(params ...any) (any, error) {
-			return callMemoryNamespaceFunc(env, "find", params...)
-		}),
-		expr.Function("memory_find_first", func(params ...any) (any, error) {
-			return callMemoryNamespaceFunc(env, "findFirst", params...)
-		}),
 	}
-}
-
-func normalizeMemoryExpression(expression string) string {
-	normalized := strings.ReplaceAll(expression, "memory.findFirst(", "memory_find_first(")
-	normalized = strings.ReplaceAll(normalized, "memory.find(", "memory_find(")
-	return normalized
-}
-
-func callMemoryNamespaceFunc(env map[string]any, functionName string, params ...any) (any, error) {
-	namespaceRaw, ok := env["memory"]
-	if !ok {
-		return nil, fmt.Errorf("memory namespace is not available")
-	}
-
-	namespace, ok := namespaceRaw.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("memory namespace is invalid")
-	}
-
-	rawFunc, ok := namespace[functionName]
-	if !ok {
-		return nil, fmt.Errorf("memory.%s is not available", functionName)
-	}
-
-	callable, ok := rawFunc.(func(params ...any) (any, error))
-	if !ok {
-		return nil, fmt.Errorf("memory.%s is invalid", functionName)
-	}
-
-	return callable(params...)
 }
 
 func parseDepthValue(param any) (int, error) {

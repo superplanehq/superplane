@@ -294,8 +294,6 @@ func (b *NodeConfigurationBuilder) BuildExpressionEnv(expression string) (map[st
 }
 
 func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, error) {
-	normalizedExpression := normalizeMemoryExpression(expression)
-
 	referencedNodes, err := parseReferencedNodes(expression)
 	if err != nil {
 		return "", err
@@ -310,7 +308,6 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 		"$":      messageChain,
 		"memory": b.buildMemoryExpressionNamespace(),
 	}
-	memoryNamespace := env["memory"]
 
 	if b.parentBlueprintNode != nil {
 		env["config"] = b.parentBlueprintNode.Configuration.Data()
@@ -343,15 +340,9 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 
 			return b.resolvePreviousPayload(depth)
 		}),
-		expr.Function("memory_find", func(params ...any) (any, error) {
-			return callMemoryNamespaceFunc(memoryNamespace, "find", params...)
-		}),
-		expr.Function("memory_find_first", func(params ...any) (any, error) {
-			return callMemoryNamespaceFunc(memoryNamespace, "findFirst", params...)
-		}),
 	}
 
-	vm, err := expr.Compile(normalizedExpression, exprOptions...)
+	vm, err := expr.Compile(expression, exprOptions...)
 	if err != nil {
 		return "", err
 	}
@@ -362,12 +353,6 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 	}
 
 	return output, nil
-}
-
-func normalizeMemoryExpression(expression string) string {
-	normalized := strings.ReplaceAll(expression, "memory.findFirst(", "memory_find_first(")
-	normalized = strings.ReplaceAll(normalized, "memory.find(", "memory_find(")
-	return normalized
 }
 
 func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (map[string]any, error) {
@@ -862,25 +847,6 @@ func parseMemoryFindParams(params []any) (string, map[string]any, error) {
 	}
 
 	return namespace, matches, nil
-}
-
-func callMemoryNamespaceFunc(namespaceRaw any, functionName string, params ...any) (any, error) {
-	namespace, ok := namespaceRaw.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("memory namespace is invalid")
-	}
-
-	callableRaw, ok := namespace[functionName]
-	if !ok {
-		return nil, fmt.Errorf("memory.%s is not available", functionName)
-	}
-
-	callable, ok := callableRaw.(func(params ...any) (any, error))
-	if !ok {
-		return nil, fmt.Errorf("memory.%s is invalid", functionName)
-	}
-
-	return callable(params...)
 }
 
 func memoryValueMatches(value any, matches map[string]any) bool {
