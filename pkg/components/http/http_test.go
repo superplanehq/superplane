@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -25,6 +26,24 @@ func createExecutionContext(config map[string]any) (core.ExecutionContext, *cont
 		Metadata:       metadataCtx,
 		HTTP:           &http.Client{},
 	}, stateCtx, metadataCtx
+}
+
+type secretsContext struct {
+	values map[string]map[string][]byte
+}
+
+func (s *secretsContext) GetKey(secretName, keyName string) ([]byte, error) {
+	secret, ok := s.values[secretName]
+	if !ok {
+		return nil, fmt.Errorf("secret not found")
+	}
+
+	value, ok := secret[keyName]
+	if !ok {
+		return nil, fmt.Errorf("secret key not found")
+	}
+
+	return value, nil
 }
 
 func TestHTTP__Setup__ValidConfigurations(t *testing.T) {
@@ -83,6 +102,20 @@ func TestHTTP__Setup__ValidConfigurations(t *testing.T) {
 				"method":  "POST",
 				"url":     "https://api.example.com",
 				"headers": []map[string]any{{"name": "Authorization", "value": "Bearer token"}},
+			},
+		},
+		{
+			name: "with bearer authentication",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authentication": map[string]any{
+					"authMethod": "bearer",
+					"token": map[string]any{
+						"secret": "api",
+						"key":    "token",
+					},
+				},
 			},
 		},
 	}
@@ -157,6 +190,38 @@ func TestHTTP__Setup__ValidationErrors(t *testing.T) {
 				"contentType": "application/x-www-form-urlencoded",
 			},
 			expectErr: "form data is required",
+		},
+		{
+			name: "basic auth missing username",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authentication": map[string]any{
+					"authMethod": "basic",
+					"password": map[string]any{
+						"secret": "api",
+						"key":    "password",
+					},
+				},
+			},
+			expectErr: "authentication.username is required for basic auth",
+		},
+		{
+			name: "invalid api key location",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authentication": map[string]any{
+					"authMethod": "api_key",
+					"apiKey": map[string]any{
+						"secret": "api",
+						"key":    "api_key",
+					},
+					"location": "cookie",
+					"name":     "X-API-Key",
+				},
+			},
+			expectErr: "authentication.location must be header or query for api key auth",
 		},
 	}
 
@@ -454,6 +519,159 @@ func TestHTTP__Execute__WithCustomHeaders(t *testing.T) {
 	assert.True(t, stateCtx.Passed)
 }
 
+func TestHTTP__Execute__BasicAuthFromSecret(t *testing.T) {
+	h := &HTTP{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Basic dXNlcjpzM2NyM3Q=", r.Header.Get("Authorization"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+		"authentication": map[string]any{
+			"authMethod": "basic",
+			"username":   "user",
+			"password": map[string]any{
+				"secret": "api",
+				"key":    "password",
+			},
+		},
+	})
+	ctx.Secrets = &secretsContext{
+		values: map[string]map[string][]byte{
+			"api": {"password": []byte("s3cr3t")},
+		},
+	}
+
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+}
+
+func TestHTTP__Execute__BearerAuthDefaultPrefix(t *testing.T) {
+	h := &HTTP{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer token-123", r.Header.Get("Authorization"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+		"authentication": map[string]any{
+			"authMethod": "bearer",
+			"token": map[string]any{
+				"secret": "api",
+				"key":    "token",
+			},
+		},
+	})
+	ctx.Secrets = &secretsContext{
+		values: map[string]map[string][]byte{
+			"api": {"token": []byte("token-123")},
+		},
+	}
+
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+}
+
+func TestHTTP__Execute__APIKeyInQueryWithManualOverride(t *testing.T) {
+	h := &HTTP{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "manual", r.URL.Query().Get("api_key"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+		"authentication": map[string]any{
+			"authMethod": "api_key",
+			"apiKey": map[string]any{
+				"secret": "api",
+				"key":    "api_key",
+			},
+			"location": "query",
+			"name":     "api_key",
+		},
+		"queryParams": []map[string]any{
+			{"key": "api_key", "value": "manual"},
+		},
+	})
+	ctx.Secrets = &secretsContext{
+		values: map[string]map[string][]byte{
+			"api": {"api_key": []byte("from-secret")},
+		},
+	}
+
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+}
+
+func TestHTTP__Execute__ManualAuthorizationHeaderOverridesAuthConfig(t *testing.T) {
+	h := &HTTP{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer manual", r.Header.Get("Authorization"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+		"authentication": map[string]any{
+			"authMethod": "bearer",
+			"token": map[string]any{
+				"secret": "api",
+				"key":    "token",
+			},
+		},
+		"headers": []map[string]any{
+			{"name": "Authorization", "value": "Bearer manual"},
+		},
+	})
+	ctx.Secrets = &secretsContext{
+		values: map[string]map[string][]byte{
+			"api": {"token": []byte("token-123")},
+		},
+	}
+
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+}
+
+func TestHTTP__Execute__AuthRequiresSecretsContext(t *testing.T) {
+	h := &HTTP{}
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    "https://api.example.com",
+		"authentication": map[string]any{
+			"authMethod": "bearer",
+			"token": map[string]any{
+				"secret": "api",
+				"key":    "token",
+			},
+		},
+	})
+
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+	assert.False(t, stateCtx.Passed)
+}
+
 func TestHTTP__Execute__HeadersOverrideContentType(t *testing.T) {
 	//
 	// Create test server
@@ -518,6 +736,29 @@ func TestHTTP__Execute__NonJSONResponse(t *testing.T) {
 	response := payload["data"].(map[string]any)
 	body := response["body"].(string)
 	assert.Equal(t, "Plain text response", body)
+}
+
+func TestHTTP__Execute__DelayedResponseBodyDoesNotFailWithContextCanceled(t *testing.T) {
+	h := &HTTP{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		time.Sleep(100 * time.Millisecond)
+		_, _ = w.Write([]byte("delayed body"))
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method":          "GET",
+		"url":             server.URL,
+		"timeoutStrategy": "fixed",
+		"timeoutSeconds":  2,
+	})
+
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, "http.request.finished", stateCtx.Type)
 }
 
 func TestHTTP__Execute__EmptyResponse(t *testing.T) {

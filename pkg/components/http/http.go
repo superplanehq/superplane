@@ -3,7 +3,9 @@ package http
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -35,20 +37,52 @@ type KeyValue struct {
 	Value string `json:"value"`
 }
 
+type SecretKeyRef struct {
+	Secret string `json:"secret" mapstructure:"secret"`
+	Key    string `json:"key" mapstructure:"key"`
+}
+
+func (r SecretKeyRef) IsSet() bool {
+	return r.Secret != "" && r.Key != ""
+}
+
+const (
+	// Kept for backward compatibility with previously saved node configurations.
+	authMethodNone   = "none"
+	authMethodBasic  = "basic"
+	authMethodBearer = "bearer"
+	authMethodAPIKey = "api_key"
+
+	authLocationHeader = "header"
+	authLocationQuery  = "query"
+)
+
+type AuthenticationSpec struct {
+	AuthMethod string       `json:"authMethod" mapstructure:"authMethod"`
+	Username   string       `json:"username" mapstructure:"username"`
+	Password   SecretKeyRef `json:"password" mapstructure:"password"`
+	Token      SecretKeyRef `json:"token" mapstructure:"token"`
+	Prefix     string       `json:"prefix" mapstructure:"prefix"`
+	APIKey     SecretKeyRef `json:"apiKey" mapstructure:"apiKey"`
+	Location   string       `json:"location" mapstructure:"location"`
+	Name       string       `json:"name" mapstructure:"name"`
+}
+
 type Spec struct {
-	Method          string      `json:"method"`
-	URL             string      `json:"url"`
-	QueryParams     *[]KeyValue `json:"queryParams,omitempty"`
-	Headers         *[]Header   `json:"headers,omitempty"`
-	ContentType     *string     `json:"contentType,omitempty"`
-	JSON            *any        `json:"json,omitempty"`
-	XML             *string     `json:"xml,omitempty"`
-	Text            *string     `json:"text,omitempty"`
-	FormData        *[]KeyValue `json:"formData,omitempty"`
-	SuccessCodes    *string     `json:"successCodes,omitempty"`
-	TimeoutStrategy *string     `json:"timeoutStrategy,omitempty"`
-	TimeoutSeconds  *int        `json:"timeoutSeconds,omitempty"`
-	Retries         *int        `json:"retries,omitempty"`
+	Method          string              `json:"method"`
+	URL             string              `json:"url"`
+	QueryParams     *[]KeyValue         `json:"queryParams,omitempty"`
+	Headers         *[]Header           `json:"headers,omitempty"`
+	Authentication  *AuthenticationSpec `json:"authentication,omitempty" mapstructure:"authentication"`
+	ContentType     *string             `json:"contentType,omitempty"`
+	JSON            *any                `json:"json,omitempty"`
+	XML             *string             `json:"xml,omitempty"`
+	Text            *string             `json:"text,omitempty"`
+	FormData        *[]KeyValue         `json:"formData,omitempty"`
+	SuccessCodes    *string             `json:"successCodes,omitempty"`
+	TimeoutStrategy *string             `json:"timeoutStrategy,omitempty"`
+	TimeoutSeconds  *int                `json:"timeoutSeconds,omitempty"`
+	Retries         *int                `json:"retries,omitempty"`
 }
 
 type RetryMetadata struct {
@@ -147,7 +181,7 @@ func (e *HTTP) Setup(ctx core.SetupContext) error {
 	}
 
 	if spec.ContentType == nil {
-		return nil
+		return e.validateAuthentication(spec.Authentication)
 	}
 
 	switch *spec.ContentType {
@@ -172,7 +206,7 @@ func (e *HTTP) Setup(ctx core.SetupContext) error {
 		}
 	}
 
-	return nil
+	return e.validateAuthentication(spec.Authentication)
 }
 
 func (e *HTTP) OutputChannels(configuration any) []core.OutputChannel {
@@ -205,6 +239,112 @@ func (e *HTTP) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Placeholder: "https://api.example.com/endpoint",
+		},
+		{
+			Name:        "authentication",
+			Label:       "Authorization",
+			Type:        configuration.FieldTypeObject,
+			Required:    false,
+			Togglable:   true,
+			Description: "Configure request authorization using organization secrets",
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
+						{
+							Name:        "authMethod",
+							Label:       "Method",
+							Type:        configuration.FieldTypeSelect,
+							Description: "Authorization scheme to apply",
+							Required:    true,
+							Default:     authMethodBearer,
+							TypeOptions: &configuration.TypeOptions{
+								Select: &configuration.SelectTypeOptions{
+									Options: []configuration.FieldOption{
+										{Label: "Basic Auth", Value: authMethodBasic},
+										{Label: "Bearer Token", Value: authMethodBearer},
+										{Label: "API Key", Value: authMethodAPIKey},
+									},
+								},
+							},
+						},
+						{
+							Name:                 "username",
+							Type:                 configuration.FieldTypeString,
+							Label:                "Username",
+							Required:             false,
+							Description:          "Username used in Basic authorization",
+							Placeholder:          "e.g. api-user",
+							RequiredConditions:   []configuration.RequiredCondition{{Field: "authMethod", Values: []string{authMethodBasic}}},
+							VisibilityConditions: []configuration.VisibilityCondition{{Field: "authMethod", Values: []string{authMethodBasic}}},
+						},
+						{
+							Name:                 "password",
+							Type:                 configuration.FieldTypeSecretKey,
+							Label:                "Password",
+							Required:             false,
+							Description:          "Secret key for Basic authorization password",
+							RequiredConditions:   []configuration.RequiredCondition{{Field: "authMethod", Values: []string{authMethodBasic}}},
+							VisibilityConditions: []configuration.VisibilityCondition{{Field: "authMethod", Values: []string{authMethodBasic}}},
+						},
+						{
+							Name:                 "token",
+							Type:                 configuration.FieldTypeSecretKey,
+							Label:                "Token",
+							Required:             false,
+							Description:          "Secret key for bearer token",
+							RequiredConditions:   []configuration.RequiredCondition{{Field: "authMethod", Values: []string{authMethodBearer}}},
+							VisibilityConditions: []configuration.VisibilityCondition{{Field: "authMethod", Values: []string{authMethodBearer}}},
+						},
+						{
+							Name:                 "prefix",
+							Type:                 configuration.FieldTypeString,
+							Label:                "Prefix",
+							Required:             false,
+							Default:              "Bearer",
+							Description:          "Token prefix used in Authorization header",
+							Placeholder:          "Bearer",
+							VisibilityConditions: []configuration.VisibilityCondition{{Field: "authMethod", Values: []string{authMethodBearer}}},
+						},
+						{
+							Name:                 "apiKey",
+							Type:                 configuration.FieldTypeSecretKey,
+							Label:                "API Key",
+							Required:             false,
+							Description:          "Secret key for API key authorization",
+							RequiredConditions:   []configuration.RequiredCondition{{Field: "authMethod", Values: []string{authMethodAPIKey}}},
+							VisibilityConditions: []configuration.VisibilityCondition{{Field: "authMethod", Values: []string{authMethodAPIKey}}},
+						},
+						{
+							Name:                 "location",
+							Type:                 configuration.FieldTypeSelect,
+							Label:                "Location",
+							Required:             false,
+							Default:              authLocationHeader,
+							Description:          "Where to place the API key",
+							RequiredConditions:   []configuration.RequiredCondition{{Field: "authMethod", Values: []string{authMethodAPIKey}}},
+							VisibilityConditions: []configuration.VisibilityCondition{{Field: "authMethod", Values: []string{authMethodAPIKey}}},
+							TypeOptions: &configuration.TypeOptions{
+								Select: &configuration.SelectTypeOptions{
+									Options: []configuration.FieldOption{
+										{Label: "Header", Value: authLocationHeader},
+										{Label: "Query Parameter", Value: authLocationQuery},
+									},
+								},
+							},
+						},
+						{
+							Name:                 "name",
+							Type:                 configuration.FieldTypeString,
+							Label:                "Name",
+							Required:             false,
+							Description:          "Header or query parameter name",
+							Placeholder:          "e.g. X-API-Key",
+							RequiredConditions:   []configuration.RequiredCondition{{Field: "authMethod", Values: []string{authMethodAPIKey}}},
+							VisibilityConditions: []configuration.VisibilityCondition{{Field: "authMethod", Values: []string{authMethodAPIKey}}},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "queryParams",
@@ -461,6 +601,9 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
+	if err := e.validateAuthentication(spec.Authentication); err != nil {
+		return err
+	}
 
 	retryMetadata := RetryMetadata{
 		Attempt:         0,
@@ -494,7 +637,7 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 func (e *HTTP) executeHTTPRequest(ctx core.ExecutionContext, spec Spec, retryMetadata RetryMetadata) error {
 	currentTimeout := e.calculateTimeoutForAttempt(retryMetadata.TimeoutStrategy, retryMetadata.TimeoutSeconds, retryMetadata.Attempt)
 
-	resp, err := e.executeRequest(ctx.HTTP, spec, currentTimeout)
+	resp, cancel, err := e.executeRequest(ctx.HTTP, ctx.Secrets, spec, currentTimeout)
 	if err != nil {
 		if retryMetadata.Attempt < retryMetadata.MaxRetries {
 			return e.scheduleRetry(ctx, err.Error(), retryMetadata)
@@ -502,6 +645,7 @@ func (e *HTTP) executeHTTPRequest(ctx core.ExecutionContext, spec Spec, retryMet
 
 		return e.handleRequestError(ctx, err, retryMetadata.Attempt+1)
 	}
+	defer cancel()
 
 	var isSuccess bool
 	if spec.SuccessCodes != nil && *spec.SuccessCodes != "" {
@@ -515,7 +659,16 @@ func (e *HTTP) executeHTTPRequest(ctx core.ExecutionContext, spec Spec, retryMet
 		return e.scheduleRetry(ctx, fmt.Sprintf("HTTP status %d", resp.StatusCode), retryMetadata)
 	}
 
-	return e.processResponse(ctx, resp, spec)
+	err = e.processResponse(ctx, resp, spec, currentTimeout)
+	if err != nil {
+		if retryMetadata.Attempt < retryMetadata.MaxRetries {
+			return e.scheduleRetry(ctx, err.Error(), retryMetadata)
+		}
+
+		return e.handleRequestError(ctx, err, retryMetadata.Attempt+1)
+	}
+
+	return nil
 }
 
 func (e *HTTP) scheduleRetry(ctx core.ExecutionContext, lastError string, retryMetadata RetryMetadata) error {
@@ -556,6 +709,7 @@ func (e *HTTP) handleRetryRequest(ctx core.ActionContext) error {
 		Metadata:       ctx.Metadata,
 		Requests:       ctx.Requests,
 		Auth:           ctx.Auth,
+		Secrets:        ctx.Secrets,
 		HTTP:           ctx.HTTP,
 	}
 
@@ -578,43 +732,61 @@ func (e *HTTP) calculateTimeoutForAttempt(strategy string, timeoutSeconds int, a
 	return baseTimeout
 }
 
-func (e *HTTP) executeRequest(httpCtx core.HTTPContext, spec Spec, timeout time.Duration) (*http.Response, error) {
+type requestAuthValues struct {
+	HeaderName  string
+	HeaderValue string
+	QueryName   string
+	QueryValue  string
+}
+
+func (e *HTTP) executeRequest(httpCtx core.HTTPContext, secretsCtx core.SecretsContext, spec Spec, timeout time.Duration) (*http.Response, context.CancelFunc, error) {
 	var body io.Reader
 	var contentType string
 	var err error
 	if spec.ContentType != nil && (spec.Method == "POST" || spec.Method == "PUT" || spec.Method == "PATCH") {
 		body, contentType, err = e.serializePayload(spec)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	reqCtx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
 
-	requestURL := spec.URL
+	authValues, err := e.resolveAuthentication(spec.Authentication, secretsCtx)
+	if err != nil {
+		cancel()
+		return nil, nil, err
+	}
+
+	parsedURL, parseErr := url.Parse(spec.URL)
+	if parseErr != nil {
+		cancel()
+		return nil, nil, fmt.Errorf("failed to parse url: %w", parseErr)
+	}
+
+	query := parsedURL.Query()
+	if authValues.QueryName != "" {
+		query.Set(authValues.QueryName, authValues.QueryValue)
+	}
 	if spec.QueryParams != nil && len(*spec.QueryParams) > 0 {
-		parsedURL, parseErr := url.Parse(spec.URL)
-		if parseErr != nil {
-			return nil, fmt.Errorf("failed to parse url: %w", parseErr)
-		}
-
-		query := parsedURL.Query()
 		for _, param := range *spec.QueryParams {
 			query.Set(param.Key, param.Value)
 		}
-
-		parsedURL.RawQuery = query.Encode()
-		requestURL = parsedURL.String()
 	}
+	parsedURL.RawQuery = query.Encode()
+	requestURL := parsedURL.String()
 
 	req, err := http.NewRequestWithContext(reqCtx, spec.Method, requestURL, body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		cancel()
+		return nil, nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
+	}
+	if authValues.HeaderName != "" {
+		req.Header.Set(authValues.HeaderName, authValues.HeaderValue)
 	}
 
 	if spec.Headers != nil {
@@ -625,14 +797,113 @@ func (e *HTTP) executeRequest(httpCtx core.HTTPContext, spec Spec, timeout time.
 
 	resp, err := httpCtx.Do(req)
 	if err != nil {
+		cancel()
 		if reqCtx.Err() == context.DeadlineExceeded {
-			return nil, fmt.Errorf("request timed out after %s", timeout)
+			return nil, nil, fmt.Errorf("request timed out after %s", timeout)
+		}
+		if reqCtx.Err() == context.Canceled {
+			return nil, nil, fmt.Errorf("request was canceled")
 		}
 
-		return nil, err
+		return nil, nil, err
 	}
 
-	return resp, nil
+	return resp, cancel, nil
+}
+
+func (e *HTTP) validateAuthentication(auth *AuthenticationSpec) error {
+	if auth == nil || auth.AuthMethod == "" || auth.AuthMethod == authMethodNone {
+		return nil
+	}
+
+	switch auth.AuthMethod {
+	case authMethodBasic:
+		if strings.TrimSpace(auth.Username) == "" {
+			return fmt.Errorf("authentication.username is required for basic auth")
+		}
+		if !auth.Password.IsSet() {
+			return fmt.Errorf("authentication.password secret and key are required for basic auth")
+		}
+	case authMethodBearer:
+		if !auth.Token.IsSet() {
+			return fmt.Errorf("authentication.token secret and key are required for bearer auth")
+		}
+	case authMethodAPIKey:
+		if !auth.APIKey.IsSet() {
+			return fmt.Errorf("authentication.apiKey secret and key are required for api key auth")
+		}
+		if strings.TrimSpace(auth.Name) == "" {
+			return fmt.Errorf("authentication.name is required for api key auth")
+		}
+
+		location := auth.Location
+		if location == "" {
+			location = authLocationHeader
+		}
+		if location != authLocationHeader && location != authLocationQuery {
+			return fmt.Errorf("authentication.location must be header or query for api key auth")
+		}
+	default:
+		return fmt.Errorf("unsupported authorization method: %s", auth.AuthMethod)
+	}
+
+	return nil
+}
+
+func (e *HTTP) resolveAuthentication(auth *AuthenticationSpec, secretsCtx core.SecretsContext) (requestAuthValues, error) {
+	values := requestAuthValues{}
+
+	if auth == nil || auth.AuthMethod == "" || auth.AuthMethod == authMethodNone {
+		return values, nil
+	}
+	if secretsCtx == nil {
+		return values, fmt.Errorf("secrets context is required for authorization")
+	}
+
+	switch auth.AuthMethod {
+	case authMethodBasic:
+		password, err := secretsCtx.GetKey(auth.Password.Secret, auth.Password.Key)
+		if err != nil {
+			return values, fmt.Errorf("failed to resolve basic auth password from secret")
+		}
+
+		token := base64.StdEncoding.EncodeToString([]byte(auth.Username + ":" + string(password)))
+		values.HeaderName = "Authorization"
+		values.HeaderValue = "Basic " + token
+	case authMethodBearer:
+		token, err := secretsCtx.GetKey(auth.Token.Secret, auth.Token.Key)
+		if err != nil {
+			return values, fmt.Errorf("failed to resolve bearer token from secret")
+		}
+
+		prefix := strings.TrimSpace(auth.Prefix)
+		if prefix == "" {
+			prefix = "Bearer"
+		}
+		values.HeaderName = "Authorization"
+		values.HeaderValue = prefix + " " + string(token)
+	case authMethodAPIKey:
+		apiKey, err := secretsCtx.GetKey(auth.APIKey.Secret, auth.APIKey.Key)
+		if err != nil {
+			return values, fmt.Errorf("failed to resolve api key from secret")
+		}
+
+		location := auth.Location
+		if location == "" {
+			location = authLocationHeader
+		}
+		if location == authLocationHeader {
+			values.HeaderName = auth.Name
+			values.HeaderValue = string(apiKey)
+		} else {
+			values.QueryName = auth.Name
+			values.QueryValue = string(apiKey)
+		}
+	default:
+		return values, fmt.Errorf("unsupported authorization method: %s", auth.AuthMethod)
+	}
+
+	return values, nil
 }
 
 func (e *HTTP) handleRequestError(ctx core.ExecutionContext, err error, totalAttempts int) error {
@@ -669,37 +940,18 @@ func (e *HTTP) handleRequestError(ctx core.ExecutionContext, err error, totalAtt
 	return nil
 }
 
-func (e *HTTP) processResponse(ctx core.ExecutionContext, resp *http.Response, spec Spec) error {
+func (e *HTTP) processResponse(ctx core.ExecutionContext, resp *http.Response, spec Spec, timeout time.Duration) error {
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		// Get current metadata and update with final result
-		metadata := ctx.Metadata.Get()
-		var retryMetadata RetryMetadata
-		mapstructure.Decode(metadata, &retryMetadata)
-
-		retryMetadata.Result = "error"
-		retryMetadata.FinalStatus = resp.StatusCode
-		retryMetadata.LastError = fmt.Sprintf("failed to read response body: %v", err)
-
-		if ctx.Metadata != nil {
-			ctx.Metadata.Set(retryMetadata)
+		if errors.Is(err, context.DeadlineExceeded) {
+			return fmt.Errorf("request timed out after %s", timeout)
 		}
-
-		errorResponse := map[string]any{
-			"status": resp.StatusCode,
-			"error":  fmt.Sprintf("failed to read response body: %v", err),
+		if errors.Is(err, context.Canceled) || strings.Contains(err.Error(), "context canceled") {
+			return fmt.Errorf("request was canceled while reading response")
 		}
-		emitErr := ctx.ExecutionState.Emit(
-			core.DefaultOutputChannel.Name,
-			"http.request.error",
-			[]any{errorResponse},
-		)
-		if emitErr != nil {
-			return fmt.Errorf("failed to read response: %w (and failed to emit event: %v)", err, emitErr)
-		}
-		return fmt.Errorf("failed to read response: %w", err)
+		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	var bodyData any
