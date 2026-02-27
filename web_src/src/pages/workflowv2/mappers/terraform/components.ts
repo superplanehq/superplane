@@ -50,14 +50,22 @@ export const terraformComponentMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    const CHANNELS = ["completed", "failed", "needsAttention", "approved", "rejected", "timeout", "default"];
+    const outputs = context.execution.outputs as Record<string, OutputPayload[]> | undefined;
     const details: Record<string, string> = {};
 
-    if (!outputs || !outputs.default || outputs.default.length === 0) {
-      return details;
+    if (!outputs) return details;
+
+    let outputData: Record<string, any> | undefined;
+    for (const channel of CHANNELS) {
+      const channelOutputs = outputs[channel];
+      if (channelOutputs && channelOutputs.length > 0) {
+        outputData = channelOutputs[0].data as Record<string, any>;
+        break;
+      }
     }
 
-    const outputData = outputs.default[0].data as Record<string, any>;
+    if (!outputData) return details;
 
     if (outputData?.runId) details["Run ID"] = outputData.runId;
     if (outputData?.status) details["Status"] = outputData.status;
@@ -65,7 +73,8 @@ export const terraformComponentMapper: ComponentBaseMapper = {
     if (outputData?.message) details["Message"] = outputData.message;
     if (outputData?.decision) details["Decision"] = outputData.decision;
     if (outputData?.decidedAt) details["Decided At"] = outputData.decidedAt;
-    if (outputData?.appliedToTFC) details["Applied to TFC"] = outputData.appliedToTFC ? "Yes" : "No";
+    if (outputData?.appliedToTFC !== undefined) details["Applied to TFC"] = outputData.appliedToTFC ? "Yes" : "No";
+    if (outputData?.timeoutAt) details["Timed Out At"] = outputData.timeoutAt;
 
     return details;
   },
