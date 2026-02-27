@@ -116,10 +116,6 @@ func (c *AddMemory) Configuration() []configuration.Field {
 }
 
 func (c *AddMemory) Execute(ctx core.ExecutionContext) error {
-	if ctx.CanvasMemory == nil {
-		return fmt.Errorf("canvas memory context is not available")
-	}
-
 	var spec Spec
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
@@ -136,16 +132,12 @@ func (c *AddMemory) Execute(ctx core.ExecutionContext) error {
 		"fields":    buildFieldNames(spec, values),
 	}
 
-	if ctx.Metadata != nil {
-		if err := ctx.Metadata.Set(metadata); err != nil {
-			return fmt.Errorf("failed to set execution metadata: %w", err)
-		}
+	if err := ctx.Metadata.Set(metadata); err != nil {
+		return fmt.Errorf("failed to set execution metadata: %w", err)
 	}
 
-	if ctx.NodeMetadata != nil {
-		if err := ctx.NodeMetadata.Set(metadata); err != nil {
-			return fmt.Errorf("failed to set node metadata: %w", err)
-		}
+	if err := ctx.NodeMetadata.Set(metadata); err != nil {
+		return fmt.Errorf("failed to set node metadata: %w", err)
 	}
 
 	if err := ctx.CanvasMemory.Add(spec.Namespace, values); err != nil {
@@ -157,8 +149,10 @@ func (c *AddMemory) Execute(ctx core.ExecutionContext) error {
 		PayloadType,
 		[]any{
 			map[string]any{
-				"namespace": spec.Namespace,
-				"values":    values,
+				"data": map[string]any{
+					"namespace": spec.Namespace,
+					"values":    values,
+				},
 			},
 		},
 	)
@@ -239,4 +233,3 @@ func (c *AddMemory) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 func (c *AddMemory) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
-

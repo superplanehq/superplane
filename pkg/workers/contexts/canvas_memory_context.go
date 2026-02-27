@@ -26,4 +26,3 @@ func (c *CanvasMemoryContext) Add(namespace string, values any) error {
 
 	return models.AddCanvasMemoryInTransaction(c.tx, c.canvasID, namespace, values)
 }
-

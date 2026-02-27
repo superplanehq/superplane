@@ -62,6 +62,19 @@ func TestAddMemoryExecute(t *testing.T) {
 		assert.True(t, execState.Passed)
 		assert.Equal(t, "default", execState.Channel)
 		assert.Equal(t, PayloadType, execState.Type)
+		assert.Len(t, execState.Payloads, 1)
+		emittedPayload, ok := execState.Payloads[0].(map[string]any)
+		assert.True(t, ok)
+		outerData, ok := emittedPayload["data"].(map[string]any)
+		assert.True(t, ok)
+		innerData, ok := outerData["data"].(map[string]any)
+		assert.True(t, ok)
+		assert.Equal(t, "machines", innerData["namespace"])
+		assert.Equal(
+			t,
+			map[string]any{"id": "1", "pull_request": "123", "creator": "alex"},
+			innerData["values"],
+		)
 	})
 
 	t.Run("fails when canvas memory context is missing", func(t *testing.T) {
@@ -79,4 +92,3 @@ func TestAddMemoryExecute(t *testing.T) {
 		assert.Contains(t, err.Error(), "canvas memory context is not available")
 	})
 }
-

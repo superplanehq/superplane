@@ -110,9 +110,7 @@ function getAddMemoryMetadataList(node: NodeInfo): Array<{ icon: string; label: 
 
 function extractConfiguredFields(config: AddMemoryConfiguration, metadata: AddMemoryMetadata): string[] {
   const configFields = Array.isArray(config.valueList)
-    ? config.valueList
-        .map((item) => (item?.name || "").trim())
-        .filter((name): name is string => name.length > 0)
+    ? config.valueList.map((item) => (item?.name || "").trim()).filter((name): name is string => name.length > 0)
     : [];
 
   if (configFields.length > 0) {
@@ -121,4 +119,3 @@ function extractConfiguredFields(config: AddMemoryConfiguration, metadata: AddMe
 
   return Array.isArray(metadata.fields) ? metadata.fields.filter(Boolean) : [];
 }
-

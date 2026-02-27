@@ -30,4 +30,3 @@ func AddCanvasMemoryInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace str
 func AddCanvasMemory(canvasID uuid.UUID, namespace string, values any) error {
 	return AddCanvasMemoryInTransaction(database.Conn(), canvasID, namespace, values)
 }
-

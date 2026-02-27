@@ -16,4 +16,3 @@ var exampleOutput map[string]any
 func (c *AddMemory) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputOnce, exampleOutputBytes, &exampleOutput)
 }
-
