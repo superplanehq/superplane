@@ -92,8 +92,8 @@ func (c *TrackRun) DefaultOutputChannel() core.OutputChannel {
 
 func (c *TrackRun) ExampleOutput() map[string]any {
 	return map[string]any{
-		"runId":        "run-xxxxx",
-		"finalStatus":  "applied",
+		"runId":       "run-xxxxx",
+		"finalStatus": "applied",
 		"stateHistory": []map[string]string{
 			{"status": "pending", "timestamp": "2024-01-01T12:00:00Z"},
 			{"status": "planning", "timestamp": "2024-01-01T12:00:05Z"},
@@ -142,12 +142,10 @@ func (c *TrackRun) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("runId is required but got empty string")
 	}
 
-	// Validate run ID format (should start with "run-")
 	if len(config.RunID) < 4 || config.RunID[:4] != "run-" {
 		return fmt.Errorf("invalid run ID format: %q (expected format: run-xxxxxxxx)", config.RunID)
 	}
 
-	// Get run details from Terraform Cloud
 	client, err := c.getClient(ctx.Integration)
 	if err != nil {
 		return err
@@ -162,13 +160,11 @@ func (c *TrackRun) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to read run %s: %w", config.RunID, err)
 	}
 
-	// Build metadata
 	var workspaceName string
 	if run.Workspace != nil {
 		workspaceName = run.Workspace.Name
 	}
 
-	// Resolve poll interval
 	pollInterval := 10
 	if config.PollInterval != nil && *config.PollInterval > 0 {
 		pollInterval = *config.PollInterval
@@ -190,15 +186,12 @@ func (c *TrackRun) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to set metadata: %w", err)
 	}
 
-	// Log the initial state
 	ctx.Logger.Infof("Tracking run %s - current status: %s", config.RunID, run.Status)
 
-	// Check if already in a terminal state
 	if isTerminalState(string(run.Status)) {
 		return c.emitFinalState(ctx, config.RunID, string(run.Status), metadata)
 	}
 
-	// Schedule polling for status updates
 	if err := ctx.Requests.ScheduleActionCall("poll", map[string]any{}, time.Duration(pollInterval)*time.Second); err != nil {
 		return fmt.Errorf("failed to schedule poll: %w", err)
 	}
@@ -238,7 +231,6 @@ func (c *TrackRun) poll(ctx core.ActionContext) error {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	// Use RunID from metadata (resolved during initial execution)
 	runID := metadata.RunID
 	if runID == "" {
 		return fmt.Errorf("runId not found in metadata - initial execution may have failed")
@@ -249,7 +241,9 @@ func (c *TrackRun) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	run, err := client.TFE.Runs.Read(context.Background(), runID)
+	run, err := client.TFE.Runs.ReadWithOptions(context.Background(), runID, &tfe.RunReadOptions{
+		Include: []tfe.RunIncludeOpt{tfe.RunWorkspace},
+	})
 	if err != nil {
 		return fmt.Errorf("failed to read run %s: %w", runID, err)
 	}
@@ -257,7 +251,6 @@ func (c *TrackRun) poll(ctx core.ActionContext) error {
 	currentStatus := string(run.Status)
 	now := time.Now().Format(time.RFC3339)
 
-	// Check if status changed
 	if currentStatus != metadata.CurrentStatus {
 		ctx.Logger.Infof("Run %s status changed: %s → %s", runID, metadata.CurrentStatus, currentStatus)
 
@@ -272,7 +265,6 @@ func (c *TrackRun) poll(ctx core.ActionContext) error {
 		}
 	}
 
-	// Check if terminal state
 	if isTerminalState(currentStatus) {
 		ctx.Logger.Infof("Run %s reached terminal state: %s", runID, currentStatus)
 		metadata.FinishedAt = now
@@ -282,15 +274,13 @@ func (c *TrackRun) poll(ctx core.ActionContext) error {
 		return c.emitFinalStateFromAction(ctx, runID, currentStatus, metadata)
 	}
 
-	// Check if needs attention
-	if needsAttention(currentStatus) {
+	if needsAttention(currentStatus, run.Workspace) {
 		ctx.Logger.Infof("Run %s needs attention: %s", runID, currentStatus)
 		return c.emitNeedsAttention(ctx, runID, currentStatus, metadata)
 	}
 
 	ctx.Logger.Infof("Run %s still in progress: %s, scheduling next poll", runID, currentStatus)
 
-	// Schedule next poll using interval from metadata
 	pollInterval := metadata.PollInterval
 	if pollInterval <= 0 {
 		pollInterval = 10
@@ -395,9 +385,14 @@ func isFailedState(status string) bool {
 	return false
 }
 
-func needsAttention(status string) bool {
+func needsAttention(status string, workspace *tfe.Workspace) bool {
 	switch tfe.RunStatus(status) {
-	case tfe.RunPlanned, tfe.RunPolicyOverride, tfe.RunCostEstimated:
+	case tfe.RunPlanned:
+		if workspace != nil && workspace.AutoApply {
+			return false
+		}
+		return true
+	case tfe.RunPolicyOverride, tfe.RunCostEstimated:
 		return true
 	}
 	return false
