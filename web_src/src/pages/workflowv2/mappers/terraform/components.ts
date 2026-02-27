@@ -58,12 +58,14 @@ export const terraformComponentMapper: ComponentBaseMapper = {
     }
 
     const outputData = outputs.default[0].data as Record<string, any>;
-    
-    // Map standard terraform run outputs
-    if (outputData?.id) details["Run ID"] = outputData.id;
+
+    if (outputData?.runId) details["Run ID"] = outputData.runId;
     if (outputData?.status) details["Status"] = outputData.status;
+    if (outputData?.finalStatus) details["Final Status"] = outputData.finalStatus;
     if (outputData?.message) details["Message"] = outputData.message;
-    if (outputData?.createdAt) details["Created At"] = outputData.createdAt;
+    if (outputData?.decision) details["Decision"] = outputData.decision;
+    if (outputData?.decidedAt) details["Decided At"] = outputData.decidedAt;
+    if (outputData?.appliedToTFC) details["Applied to TFC"] = outputData.appliedToTFC ? "Yes" : "No";
     
     return details;
   },
