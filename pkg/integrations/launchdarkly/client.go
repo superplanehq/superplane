@@ -21,7 +21,8 @@ type Project struct {
 
 // ProjectListResponse is the API response for listing projects.
 type ProjectListResponse struct {
-	Items []Project `json:"items"`
+	Items      []Project `json:"items"`
+	TotalCount int       `json:"totalCount"`
 }
 
 // FeatureFlag represents a LaunchDarkly feature flag.
@@ -37,7 +38,8 @@ type FeatureFlag struct {
 
 // FeatureFlagListResponse is the API response for listing feature flags.
 type FeatureFlagListResponse struct {
-	Items []FeatureFlag `json:"items"`
+	Items      []FeatureFlag `json:"items"`
+	TotalCount int           `json:"totalCount"`
 }
 
 // Environment represents a LaunchDarkly environment within a project.
@@ -48,7 +50,8 @@ type Environment struct {
 
 // EnvironmentListResponse is the API response for listing environments.
 type EnvironmentListResponse struct {
-	Items []Environment `json:"items"`
+	Items      []Environment `json:"items"`
+	TotalCount int           `json:"totalCount"`
 }
 
 type APIError struct {
@@ -115,17 +118,27 @@ func (c *Client) execRequest(method, path string, body io.Reader) ([]byte, error
 
 // ListProjects returns all projects in the LaunchDarkly account.
 func (c *Client) ListProjects() ([]Project, error) {
-	responseBody, err := c.execRequest(http.MethodGet, "/api/v2/projects", nil)
-	if err != nil {
-		return nil, err
+	const limit = 200
+	var all []Project
+	for offset := 0; ; offset += limit {
+		path := fmt.Sprintf("/api/v2/projects?limit=%d&offset=%d", limit, offset)
+		responseBody, err := c.execRequest(http.MethodGet, path, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var response ProjectListResponse
+		if err := json.Unmarshal(responseBody, &response); err != nil {
+			return nil, fmt.Errorf("error parsing projects response: %w", err)
+		}
+
+		all = append(all, response.Items...)
+		if len(all) >= response.TotalCount {
+			break
+		}
 	}
 
-	var response ProjectListResponse
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error parsing projects response: %w", err)
-	}
-
-	return response.Items, nil
+	return all, nil
 }
 
 // GetFeatureFlag returns a feature flag by project key and flag key.
@@ -146,34 +159,52 @@ func (c *Client) GetFeatureFlag(projectKey, flagKey string) (map[string]any, err
 
 // ListFeatureFlags returns all feature flags in a LaunchDarkly project.
 func (c *Client) ListFeatureFlags(projectKey string) ([]FeatureFlag, error) {
-	path := fmt.Sprintf("/api/v2/flags/%s", projectKey)
-	responseBody, err := c.execRequest(http.MethodGet, path, nil)
-	if err != nil {
-		return nil, err
+	const limit = 200
+	var all []FeatureFlag
+	for offset := 0; ; offset += limit {
+		path := fmt.Sprintf("/api/v2/flags/%s?limit=%d&offset=%d", projectKey, limit, offset)
+		responseBody, err := c.execRequest(http.MethodGet, path, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var response FeatureFlagListResponse
+		if err := json.Unmarshal(responseBody, &response); err != nil {
+			return nil, fmt.Errorf("error parsing feature flags response: %w", err)
+		}
+
+		all = append(all, response.Items...)
+		if len(all) >= response.TotalCount {
+			break
+		}
 	}
 
-	var response FeatureFlagListResponse
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error parsing feature flags response: %w", err)
-	}
-
-	return response.Items, nil
+	return all, nil
 }
 
 // ListEnvironments returns all environments in a LaunchDarkly project.
 func (c *Client) ListEnvironments(projectKey string) ([]Environment, error) {
-	path := fmt.Sprintf("/api/v2/projects/%s/environments", projectKey)
-	responseBody, err := c.execRequest(http.MethodGet, path, nil)
-	if err != nil {
-		return nil, err
+	const limit = 200
+	var all []Environment
+	for offset := 0; ; offset += limit {
+		path := fmt.Sprintf("/api/v2/projects/%s/environments?limit=%d&offset=%d", projectKey, limit, offset)
+		responseBody, err := c.execRequest(http.MethodGet, path, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var response EnvironmentListResponse
+		if err := json.Unmarshal(responseBody, &response); err != nil {
+			return nil, fmt.Errorf("error parsing environments response: %w", err)
+		}
+
+		all = append(all, response.Items...)
+		if len(all) >= response.TotalCount {
+			break
+		}
 	}
 
-	var response EnvironmentListResponse
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error parsing environments response: %w", err)
-	}
-
-	return response.Items, nil
+	return all, nil
 }
 
 // DeleteFeatureFlag deletes a feature flag by project key and flag key.
