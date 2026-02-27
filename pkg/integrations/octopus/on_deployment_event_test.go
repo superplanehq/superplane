@@ -124,7 +124,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       http.Header{"Content-Type": []string{"application/json"}},
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventCtx,
 		})
 
@@ -144,7 +144,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventCtx,
 		})
 
@@ -164,7 +164,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventCtx,
 		})
 
@@ -196,7 +196,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			Body:          emptyBody,
 			Headers:       headers,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventCtx,
 		})
 
@@ -228,7 +228,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			Body:          nonDeployBody,
 			Headers:       headers,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventCtx,
 		})
 
@@ -250,7 +250,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"eventCategories": []string{"DeploymentFailed"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventCtx,
 		})
 
@@ -273,7 +273,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 				"eventCategories": []string{"DeploymentSucceeded"},
 				"project":         "Projects-999",
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventCtx,
 		})
 
@@ -296,7 +296,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 				"eventCategories": []string{"DeploymentSucceeded"},
 				"environment":     "Environments-999",
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventCtx,
 		})
 
@@ -320,7 +320,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 				"project":         "Projects-1",
 				"environment":     "Environments-2",
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventCtx,
 		})
 
@@ -353,7 +353,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventCtx,
 		})
 
@@ -389,7 +389,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"eventCategories": []string{"DeploymentQueued"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventCtx,
 		})
 
@@ -410,7 +410,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			Body:          []byte("not json"),
 			Headers:       headers,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventCtx,
 		})
 

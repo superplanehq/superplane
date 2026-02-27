@@ -19,7 +19,7 @@ func Test__OnRelease__HandleWebhook__ActionMatch(t *testing.T) {
 		Headers:       gitlabHeaders("Release Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "actions": []string{"create"}},
-		Webhook:       &contexts.WebhookContext{Secret: "token"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
 		Events:        events,
 		Logger:        log.NewEntry(log.New()),
 	})
@@ -39,7 +39,7 @@ func Test__OnRelease__HandleWebhook__ActionMismatch(t *testing.T) {
 		Headers:       gitlabHeaders("Release Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "actions": []string{"create"}},
-		Webhook:       &contexts.WebhookContext{Secret: "token"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
 		Events:        events,
 		Logger:        log.NewEntry(log.New()),
 	})

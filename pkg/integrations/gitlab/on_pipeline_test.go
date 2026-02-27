@@ -19,7 +19,7 @@ func Test__OnPipeline__HandleWebhook__StatusMatch(t *testing.T) {
 		Headers:       gitlabHeaders("Pipeline Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "statuses": []string{"success"}},
-		Webhook:       &contexts.WebhookContext{Secret: "token"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
 		Events:        events,
 		Logger:        log.NewEntry(log.New()),
 	})
@@ -39,7 +39,7 @@ func Test__OnPipeline__HandleWebhook__StatusMismatch(t *testing.T) {
 		Headers:       gitlabHeaders("Pipeline Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "statuses": []string{"success"}},
-		Webhook:       &contexts.WebhookContext{Secret: "token"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
 		Events:        events,
 		Logger:        log.NewEntry(log.New()),
 	})
@@ -58,7 +58,7 @@ func Test__OnPipeline__HandleWebhook__MissingStatus(t *testing.T) {
 		Headers:       gitlabHeaders("Pipeline Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "statuses": []string{"success"}},
-		Webhook:       &contexts.WebhookContext{Secret: "token"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
 		Events:        events,
 		Logger:        log.NewEntry(log.New()),
 	})

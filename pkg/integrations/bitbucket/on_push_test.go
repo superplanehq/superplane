@@ -172,7 +172,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    []byte(`{}`),
 			Headers: headers,
-			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -190,7 +190,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Configuration: map[string]any{
 				"repository": "hello",
 				"refs": []configuration.Predicate{
@@ -216,7 +216,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Configuration: map[string]any{
 				"repository": "hello",
 				"refs": []configuration.Predicate{
@@ -243,7 +243,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Configuration: map[string]any{
 				"repository": "hello",
 				"refs": []configuration.Predicate{

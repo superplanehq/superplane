@@ -136,7 +136,7 @@ func Test__Render_OnBuild__HandleWebhook(t *testing.T) {
 		HTTP:          httpCtx,
 		Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
 		Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
-		Webhook:       &contexts.WebhookContext{Secret: secret},
+		Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 		Events:        eventCtx,
 	})
 
@@ -181,7 +181,7 @@ func Test__Render_OnBuild__HandleWebhook__WithoutEventResolution(t *testing.T) {
 		Body:          body,
 		Headers:       headers,
 		Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
-		Webhook:       &contexts.WebhookContext{Secret: secret},
+		Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 		Events:        eventCtx,
 	})
 
