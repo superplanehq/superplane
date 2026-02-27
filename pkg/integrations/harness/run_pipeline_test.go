@@ -526,7 +526,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 		code, err := component.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-1","pipelineIdentifier":"deploy","nodeStatus":"FAILED"}}`),
-			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -542,7 +542,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 		code, err := component.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"StageEnd","eventData":{"planExecutionId":"exec-1","nodeStatus":"FAILED"}}`),
-			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
 					Metadata:       metadata,
@@ -563,7 +563,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 		code, err := component.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-unknown","nodeStatus":"FAILED"}}`),
-			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return nil, fmt.Errorf("not found")
 			},
@@ -588,7 +588,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 			Body: []byte(
 				`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-1","pipelineIdentifier":"deploy-prod","nodeStatus":"COMPLETED","executionUrl":"https://app.harness.io/executions/exec-1","startTs":"1771083861471","endTs":"1771083876397"}}`,
 			),
-			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
 					Metadata:       metadata,
@@ -632,7 +632,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 			Body: []byte(
 				`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-2","pipelineIdentifier":"deploy-prod","nodeStatus":"ABORTED"}}`,
 			),
-			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
 					Metadata:       metadata,

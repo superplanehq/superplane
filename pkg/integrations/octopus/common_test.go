@@ -17,7 +17,7 @@ func Test__Octopus__verifyWebhookHeader(t *testing.T) {
 
 		err := verifyWebhookHeader(core.WebhookRequestContext{
 			Headers: headers,
-			Webhook: &contexts.WebhookContext{Secret: "my-secret"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "my-secret"},
 		})
 
 		require.NoError(t, err)
@@ -34,7 +34,7 @@ func Test__Octopus__verifyWebhookHeader(t *testing.T) {
 	t.Run("missing header -> error", func(t *testing.T) {
 		err := verifyWebhookHeader(core.WebhookRequestContext{
 			Headers: http.Header{},
-			Webhook: &contexts.WebhookContext{Secret: "my-secret"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "my-secret"},
 		})
 
 		assert.ErrorContains(t, err, "missing X-SuperPlane-Webhook-Secret header")
@@ -46,7 +46,7 @@ func Test__Octopus__verifyWebhookHeader(t *testing.T) {
 
 		err := verifyWebhookHeader(core.WebhookRequestContext{
 			Headers: headers,
-			Webhook: &contexts.WebhookContext{Secret: "my-secret"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "my-secret"},
 		})
 
 		assert.ErrorContains(t, err, "invalid webhook secret")
@@ -58,7 +58,7 @@ func Test__Octopus__verifyWebhookHeader(t *testing.T) {
 
 		err := verifyWebhookHeader(core.WebhookRequestContext{
 			Headers: headers,
-			Webhook: &contexts.WebhookContext{Secret: ""},
+			Webhook: &contexts.NodeWebhookContext{Secret: ""},
 		})
 
 		assert.ErrorContains(t, err, "missing webhook secret")

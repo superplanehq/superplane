@@ -49,7 +49,7 @@ func Test__OnMergeRequest__HandleWebhook__InvalidToken(t *testing.T) {
 		Headers:       gitlabHeaders("Merge Request Hook", "wrong"),
 		Body:          []byte(`{}`),
 		Configuration: map[string]any{"project": "123", "actions": []string{"open"}},
-		Webhook:       &contexts.WebhookContext{Secret: "token"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
 		Logger:        log.NewEntry(log.New()),
 	})
 
@@ -75,7 +75,7 @@ func Test__OnMergeRequest__HandleWebhook__ActionMatch(t *testing.T) {
 			"project": "123",
 			"actions": []string{"open"},
 		},
-		Webhook: &contexts.WebhookContext{Secret: "token"},
+		Webhook: &contexts.NodeWebhookContext{Secret: "token"},
 		Events:  events,
 		Logger:  log.NewEntry(log.New()),
 	})
@@ -100,7 +100,7 @@ func Test__OnMergeRequest__HandleWebhook__ActionMismatch(t *testing.T) {
 		Headers:       gitlabHeaders("Merge Request Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "actions": []string{"open"}},
-		Webhook:       &contexts.WebhookContext{Secret: "token"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
 		Events:        events,
 		Logger:        log.NewEntry(log.New()),
 	})

@@ -40,7 +40,7 @@ func Test__LaunchAgent__HandleWebhook__SignatureVerification(t *testing.T) {
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
 			Headers: http.Header{}, // No signature header
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 		}
 
 		status, err := c.HandleWebhook(webhookCtx)
@@ -60,7 +60,7 @@ func Test__LaunchAgent__HandleWebhook__SignatureVerification(t *testing.T) {
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
 			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{"invalid-signature"}},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 		}
 
 		status, err := c.HandleWebhook(webhookCtx)
@@ -89,7 +89,7 @@ func Test__LaunchAgent__HandleWebhook__SignatureVerification(t *testing.T) {
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
 			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
 					Metadata:       metadataCtx,
@@ -127,7 +127,7 @@ func Test__LaunchAgent__HandleWebhook__IdempotencyCheck(t *testing.T) {
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
 			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
 					Metadata:       metadataCtx,
@@ -160,7 +160,7 @@ func Test__LaunchAgent__HandleWebhook__ExecutionNotFound(t *testing.T) {
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
 			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return nil, errors.New("execution not found")
 			},

@@ -35,7 +35,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Events:  &contexts.EventContext{},
-			Webhook: &contexts.WebhookContext{},
+			Webhook: &contexts.NodeWebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -62,7 +62,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 				"repository": "test",
 				"refs":       []configuration.Predicate{},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -87,7 +87,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  &contexts.EventContext{},
 		})
 
@@ -117,7 +117,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -148,7 +148,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -179,7 +179,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeNotEquals, Value: "refs/heads/main"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -210,7 +210,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeMatches, Value: "refs/heads/feat/*"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -241,7 +241,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
