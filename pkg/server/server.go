@@ -55,6 +55,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/incident"
 	_ "github.com/superplanehq/superplane/pkg/integrations/jfrog_artifactory"
 	_ "github.com/superplanehq/superplane/pkg/integrations/jira"
+	_ "github.com/superplanehq/superplane/pkg/integrations/launchdarkly"
 	_ "github.com/superplanehq/superplane/pkg/integrations/octopus"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
 	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"

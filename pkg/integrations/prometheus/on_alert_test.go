@@ -17,7 +17,7 @@ func Test__OnAlert__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Configuration: map[string]any{"statuses": []string{}},
 			Integration:   &contexts.IntegrationContext{},
-			Webhook:       &contexts.WebhookContext{},
+			Webhook:       &contexts.NodeWebhookContext{},
 		})
 
 		require.ErrorContains(t, err, "at least one status")

@@ -36,7 +36,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Events:  &contexts.EventContext{},
-			Webhook: &contexts.WebhookContext{},
+			Webhook: &contexts.NodeWebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -59,7 +59,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "feature-branch"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  &contexts.EventContext{},
 		})
 
@@ -89,7 +89,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeMatches, Value: ".*"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -120,7 +120,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "feature-branch"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -151,7 +151,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeNotEquals, Value: "main"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -182,7 +182,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeMatches, Value: "feature/.*"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -213,7 +213,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "feature-branch"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -244,7 +244,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeMatches, Value: ".*"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
