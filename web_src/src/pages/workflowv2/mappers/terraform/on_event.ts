@@ -41,7 +41,7 @@ export const onRunEventTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as TerraformEventData;
       props.lastEventData = {
         title: eventData?.runMessage || "Terraform Run",
-        subtitle: `Action: ${eventData?.action} | Workspace: ${eventData?.workspaceName}`,
+        subtitle: `Action: ${eventData?.action || "Unknown"} | Workspace: ${eventData?.workspaceName || "Unknown"}`,
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id!,
@@ -90,7 +90,7 @@ export const onNeedsAttentionTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as TerraformEventData;
       props.lastEventData = {
         title: eventData?.runMessage || "Run Needs Attention",
-        subtitle: `Workspace: ${eventData?.workspaceName}`,
+        subtitle: `Workspace: ${eventData?.workspaceName || "Unknown"}`,
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id!,
