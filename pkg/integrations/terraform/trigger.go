@@ -12,23 +12,23 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-type TerraformRunEvent struct{}
+type RunEvent struct{}
 
-type TerraformRunEventConfiguration struct {
+type RunEventConfiguration struct {
 	WorkspaceID           string   `json:"workspaceId"`
 	Events                []string `json:"events"`
 	IncludeSuperPlaneRuns bool     `json:"includeSuperPlaneRuns"`
 }
 
-func (t *TerraformRunEvent) Name() string  { return "terraform.runEvent" }
-func (t *TerraformRunEvent) Label() string { return "On Run Event" }
-func (t *TerraformRunEvent) Description() string {
+func (t *RunEvent) Name() string  { return "terraform.runEvent" }
+func (t *RunEvent) Label() string { return "On Run Event" }
+func (t *RunEvent) Description() string {
 	return "Trigger a workflow when a Terraform Run transitions to selected states."
 }
-func (t *TerraformRunEvent) Icon() string  { return "terraform" }
-func (t *TerraformRunEvent) Color() string { return "purple" }
+func (t *RunEvent) Icon() string  { return "terraform" }
+func (t *RunEvent) Color() string { return "purple" }
 
-func (t *TerraformRunEvent) Configuration() []configuration.Field {
+func (t *RunEvent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "workspaceId",
@@ -69,11 +69,11 @@ func (t *TerraformRunEvent) Configuration() []configuration.Field {
 	}
 }
 
-func (t *TerraformRunEvent) Cancel(ctx core.ExecutionContext) error { return nil }
-func (t *TerraformRunEvent) Cleanup(ctx core.TriggerContext) error  { return nil }
+func (t *RunEvent) Cancel(ctx core.ExecutionContext) error { return nil }
+func (t *RunEvent) Cleanup(ctx core.TriggerContext) error  { return nil }
 
-func (t *TerraformRunEvent) Setup(ctx core.TriggerContext) error {
-	config := TerraformRunEventConfiguration{}
+func (t *RunEvent) Setup(ctx core.TriggerContext) error {
+	config := RunEventConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -87,22 +87,22 @@ func (t *TerraformRunEvent) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *TerraformRunEvent) Actions() []core.Action { return []core.Action{} }
-func (t *TerraformRunEvent) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *RunEvent) Actions() []core.Action { return []core.Action{} }
+func (t *RunEvent) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
 	return nil, nil
 }
-func (t *TerraformRunEvent) ExampleOutput() map[string]any { return nil }
-func (t *TerraformRunEvent) ExampleData() map[string]any   { return nil }
-func (t *TerraformRunEvent) Documentation() string         { return "" }
-func (t *TerraformRunEvent) Triggers() []string            { return []string{} }
+func (t *RunEvent) ExampleOutput() map[string]any { return nil }
+func (t *RunEvent) ExampleData() map[string]any   { return nil }
+func (t *RunEvent) Documentation() string         { return "" }
+func (t *RunEvent) Triggers() []string            { return []string{} }
 
-func (t *TerraformRunEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *RunEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	data, code, err := ParseAndValidateWebhook(ctx)
 	if err != nil {
 		return code, err
 	}
 
-	config := TerraformRunEventConfiguration{}
+	config := RunEventConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return http.StatusInternalServerError, err
 	}
@@ -250,21 +250,9 @@ func (t *TerraformNeedsAttention) Actions() []core.Action {
 }
 
 func (t *TerraformNeedsAttention) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	configAPI, err := ctx.Integration.GetConfig("apiToken")
+	client, err := getClientFromIntegration(ctx.Integration)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get API token: %w", err)
-	}
-	configAddr, err := ctx.Integration.GetConfig("address")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get address: %w", err)
-	}
-
-	client, err := NewClient(map[string]any{
-		"apiToken": string(configAPI),
-		"address":  string(configAddr),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %w", err)
+		return nil, err
 	}
 
 	switch ctx.Name {

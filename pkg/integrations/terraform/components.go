@@ -40,19 +40,7 @@ func (c *QueueRun) Configuration() []configuration.Field {
 }
 func (c *QueueRun) Setup(ctx core.SetupContext) error { return nil }
 func (c *QueueRun) Execute(ctx core.ExecutionContext) error {
-	configAPI, err := ctx.Integration.GetConfig("apiToken")
-	if err != nil {
-		return err
-	}
-	configAddr, err := ctx.Integration.GetConfig("address")
-	if err != nil {
-		return err
-	}
-
-	client, err := NewClient(map[string]any{
-		"apiToken": string(configAPI),
-		"address":  string(configAddr),
-	})
+	client, err := getClientFromIntegration(ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -125,19 +113,7 @@ func (c *ApplyRun) Configuration() []configuration.Field {
 }
 func (c *ApplyRun) Setup(ctx core.SetupContext) error { return nil }
 func (c *ApplyRun) Execute(ctx core.ExecutionContext) error {
-	configAPI, err := ctx.Integration.GetConfig("apiToken")
-	if err != nil {
-		return err
-	}
-	configAddr, err := ctx.Integration.GetConfig("address")
-	if err != nil {
-		return err
-	}
-
-	client, err := NewClient(map[string]any{
-		"apiToken": string(configAPI),
-		"address":  string(configAddr),
-	})
+	client, err := getClientFromIntegration(ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -208,22 +184,11 @@ func (c *DiscardRun) Configuration() []configuration.Field {
 	}
 }
 func (c *DiscardRun) Execute(ctx core.ExecutionContext) error {
-	configAPI, err := ctx.Integration.GetConfig("apiToken")
-	if err != nil {
-		return err
-	}
-	configAddr, err := ctx.Integration.GetConfig("address")
+	client, err := getClientFromIntegration(ctx.Integration)
 	if err != nil {
 		return err
 	}
 
-	client, err := NewClient(map[string]any{
-		"apiToken": string(configAPI),
-		"address":  string(configAddr),
-	})
-	if err != nil {
-		return err
-	}
 	spec := DiscardRunSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return err
@@ -280,22 +245,11 @@ func (c *OverridePolicy) Configuration() []configuration.Field {
 	}
 }
 func (c *OverridePolicy) Execute(ctx core.ExecutionContext) error {
-	configAPI, err := ctx.Integration.GetConfig("apiToken")
-	if err != nil {
-		return err
-	}
-	configAddr, err := ctx.Integration.GetConfig("address")
+	client, err := getClientFromIntegration(ctx.Integration)
 	if err != nil {
 		return err
 	}
 
-	client, err := NewClient(map[string]any{
-		"apiToken": string(configAPI),
-		"address":  string(configAddr),
-	})
-	if err != nil {
-		return err
-	}
 	spec := OverridePolicySpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return err
@@ -307,7 +261,7 @@ func (c *OverridePolicy) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if run.Status != tfe.RunPolicyOverride {
-		return fmt.Errorf("State Altered Externally: Run %s is currently '%s', not pending a policy override", spec.RunID, run.Status)
+		return fmt.Errorf("state Altered Externally: Run %s is currently '%s', not pending a policy override", spec.RunID, run.Status)
 	}
 
 	policyChecks, err := client.TFE.PolicyChecks.List(context.Background(), spec.RunID, nil)
@@ -368,22 +322,11 @@ func (c *ReadRun) Configuration() []configuration.Field {
 	}
 }
 func (c *ReadRun) Execute(ctx core.ExecutionContext) error {
-	configAPI, err := ctx.Integration.GetConfig("apiToken")
-	if err != nil {
-		return err
-	}
-	configAddr, err := ctx.Integration.GetConfig("address")
+	client, err := getClientFromIntegration(ctx.Integration)
 	if err != nil {
 		return err
 	}
 
-	client, err := NewClient(map[string]any{
-		"apiToken": string(configAPI),
-		"address":  string(configAddr),
-	})
-	if err != nil {
-		return err
-	}
 	spec := ReadRunSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return err
