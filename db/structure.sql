@@ -172,6 +172,17 @@ CREATE TABLE public.blueprints (
 
 
 --
+-- Name: canvas_memories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.canvas_memories (
+    canvas_id uuid NOT NULL,
+    namespace text NOT NULL,
+    "values" jsonb NOT NULL
+);
+
+
+--
 -- Name: casbin_rule; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1003,6 +1014,13 @@ CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (or
 
 
 --
+-- Name: idx_canvas_memories_canvas_namespace; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_canvas_memories_canvas_namespace ON public.canvas_memories USING btree (canvas_id, namespace);
+
+
+--
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1313,6 +1331,14 @@ ALTER TABLE ONLY public.app_installations
 
 
 --
+-- Name: canvas_memories canvas_memories_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_memories
+    ADD CONSTRAINT canvas_memories_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
 -- Name: workflow_node_execution_kvs fk_wnek_workflow; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1592,7 +1618,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260225082807	f
+20260227123636	f
 \.
 
 

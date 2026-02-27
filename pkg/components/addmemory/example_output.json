@@ -1,0 +1,9 @@
+{
+  "namespace": "machines",
+  "values": {
+    "id": "1",
+    "pull_request": "123",
+    "creator": "alex"
+  }
+}
+
