@@ -56,10 +56,10 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	targetURL := ctx.Webhook.GetURL()
 
 	webhookSecretBytes, err := ctx.Integration.GetConfig("webhookSecret")
-	var webhookSecret string
-	if err == nil {
-		webhookSecret = strings.TrimSpace(string(webhookSecretBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get webhook secret: %w", err)
 	}
+	webhookSecret := strings.TrimSpace(string(webhookSecretBytes))
 
 	// Check if webhook already exists and update it if needed
 	listOpts := &tfe.NotificationConfigurationListOptions{}
