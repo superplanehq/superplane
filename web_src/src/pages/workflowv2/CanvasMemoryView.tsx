@@ -65,11 +65,11 @@ function renderNamespaceTable(
               return (
                 <tr key={entry.id || index} className="border-b border-slate-100">
                   {columns.map((column) => (
-                    <td key={`${index}-${column}`} className="px-3 py-2 font-mono text-xs text-gray-700 align-top">
+                    <td key={`${index}-${column}`} className="px-3 py-2 font-mono text-xs text-gray-700 align-middle">
                       {formatValue(item[column])}
                     </td>
                   ))}
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-3 py-2 text-right align-middle">
                     <Button
                       type="button"
                       variant="ghost"
@@ -105,8 +105,8 @@ function renderNamespaceTable(
         <tbody>
           {values.map((entry, index) => (
             <tr key={entry.id || index} className="border-b border-slate-100">
-              <td className="px-3 py-2 font-mono text-xs text-gray-700">{formatValue(entry.values)}</td>
-              <td className="px-3 py-2 text-right">
+              <td className="px-3 py-2 font-mono text-xs text-gray-700 align-middle">{formatValue(entry.values)}</td>
+              <td className="px-3 py-2 text-right align-middle">
                 <Button
                   type="button"
                   variant="ghost"

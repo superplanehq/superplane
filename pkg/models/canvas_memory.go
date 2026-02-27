@@ -35,3 +35,31 @@ func AddCanvasMemoryInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace str
 func AddCanvasMemory(canvasID uuid.UUID, namespace string, values any) error {
 	return AddCanvasMemoryInTransaction(database.Conn(), canvasID, namespace, values)
 }
+
+func ListCanvasMemoriesInTransaction(tx *gorm.DB, canvasID uuid.UUID) ([]CanvasMemory, error) {
+	var records []CanvasMemory
+	err := tx.
+		Where("canvas_id = ?", canvasID).
+		Order("created_at DESC").
+		Find(&records).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return records, nil
+}
+
+func ListCanvasMemories(canvasID uuid.UUID) ([]CanvasMemory, error) {
+	return ListCanvasMemoriesInTransaction(database.Conn(), canvasID)
+}
+
+func DeleteCanvasMemory(canvasID, memoryID uuid.UUID) error {
+	return DeleteCanvasMemoryInTransaction(database.Conn(), canvasID, memoryID)
+}
+
+func DeleteCanvasMemoryInTransaction(tx *gorm.DB, canvasID, memoryID uuid.UUID) error {
+	return tx.
+		Where("canvas_id = ? AND id = ?", canvasID, memoryID).
+		Delete(&CanvasMemory{}).
+		Error
+}

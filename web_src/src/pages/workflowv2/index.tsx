@@ -85,7 +85,7 @@ import {
   getStateMap,
 } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
-import { CanvasMemoryView } from "./CanvasMemoryBanner";
+import { CanvasMemoryView } from "./CanvasMemoryView";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
