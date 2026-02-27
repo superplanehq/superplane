@@ -1,0 +1,12 @@
+{
+    "type": "loki.logEntry",
+    "data": {
+        "labels": {
+            "job": "superplane",
+            "env": "prod"
+        },
+        "message": "Deployment v1.2.3 completed successfully",
+        "timestamp": "1706400000000000000"
+    },
+    "timestamp": "2026-01-28T12:00:00Z"
+}

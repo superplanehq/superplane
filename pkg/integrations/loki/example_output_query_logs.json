@@ -1,0 +1,20 @@
+{
+    "type": "loki.queryResult",
+    "data": {
+        "status": "success",
+        "result_type": "streams",
+        "result": [
+            {
+                "stream": {
+                    "job": "superplane",
+                    "env": "prod"
+                },
+                "values": [
+                    ["1706400000000000000", "Deployment v1.2.3 completed successfully"],
+                    ["1706399900000000000", "Starting deployment v1.2.3"]
+                ]
+            }
+        ]
+    },
+    "timestamp": "2026-01-28T12:00:00Z"
+}

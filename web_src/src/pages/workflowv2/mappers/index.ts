@@ -174,6 +174,11 @@ import {
   eventStateRegistry as gcpEventStateRegistry,
 } from "./gcp";
 import {
+  componentMappers as lokiComponentMappers,
+  triggerRenderers as lokiTriggerRenderers,
+  eventStateRegistry as lokiEventStateRegistry,
+} from "./loki/index";
+import {
   componentMappers as servicenowComponentMappers,
   customFieldRenderers as servicenowCustomFieldRenderers,
   triggerRenderers as servicenowTriggerRenderers,
@@ -240,6 +245,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cursor: cursorComponentMappers,
   hetzner: hetznerComponentMappers,
   jfrogArtifactory: jfrogArtifactoryComponentMappers,
+  loki: lokiComponentMappers,
   statuspage: statuspageComponentMappers,
   dockerhub: dockerhubComponentMappers,
   harness: harnessComponentMappers,
@@ -275,6 +281,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
   jfrogArtifactory: jfrogArtifactoryTriggerRenderers,
+  loki: lokiTriggerRenderers,
   statuspage: statuspageTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
   harness: harnessTriggerRenderers,
@@ -310,6 +317,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
+  loki: lokiEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
   harness: harnessEventStateRegistry,
   servicenow: servicenowEventStateRegistry,
