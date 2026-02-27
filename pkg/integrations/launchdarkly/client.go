@@ -133,7 +133,7 @@ func (c *Client) ListProjects() ([]Project, error) {
 		}
 
 		all = append(all, response.Items...)
-		if len(all) >= response.TotalCount {
+		if len(response.Items) == 0 || len(all) >= response.TotalCount {
 			break
 		}
 	}
@@ -174,7 +174,7 @@ func (c *Client) ListFeatureFlags(projectKey string) ([]FeatureFlag, error) {
 		}
 
 		all = append(all, response.Items...)
-		if len(all) >= response.TotalCount {
+		if len(response.Items) == 0 || len(all) >= response.TotalCount {
 			break
 		}
 	}
@@ -199,7 +199,7 @@ func (c *Client) ListEnvironments(projectKey string) ([]Environment, error) {
 		}
 
 		all = append(all, response.Items...)
-		if len(all) >= response.TotalCount {
+		if len(response.Items) == 0 || len(all) >= response.TotalCount {
 			break
 		}
 	}

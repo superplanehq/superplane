@@ -51,7 +51,7 @@ func Test__LaunchDarkly__Sync(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "ready", integrationCtx.State)
 		require.Len(t, httpContext.Requests, 1)
-		assert.Equal(t, "https://app.launchdarkly.com/api/v2/projects", httpContext.Requests[0].URL.String())
+		assert.Equal(t, "https://app.launchdarkly.com/api/v2/projects?limit=200&offset=0", httpContext.Requests[0].URL.String())
 	})
 }
 
