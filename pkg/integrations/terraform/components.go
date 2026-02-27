@@ -152,10 +152,8 @@ func (c *ApplyRun) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to read run: %w", err)
 	}
 
-	switch run.Status {
-	case tfe.RunPlannedAndFinished, tfe.RunPlanned:
-	default:
-		return fmt.Errorf("State Altered Externally: Run %s is currently '%s', cannot apply", spec.RunID, run.Status)
+	if run.Status != tfe.RunPlanned {
+		return fmt.Errorf("run %s is currently '%s', cannot apply (must be 'planned')", spec.RunID, run.Status)
 	}
 
 	opts := tfe.RunApplyOptions{}
