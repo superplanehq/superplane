@@ -192,6 +192,11 @@ func (c *TrackRun) Execute(ctx core.ExecutionContext) error {
 		return c.emitFinalState(ctx, config.RunID, string(run.Status), metadata)
 	}
 
+	if needsAttention(string(run.Status), run.Workspace) {
+		ctx.Logger.Infof("Run %s needs attention: %s", config.RunID, run.Status)
+		return c.emitNeedsAttentionFromExecution(ctx, config.RunID, string(run.Status), metadata)
+	}
+
 	if err := ctx.Requests.ScheduleActionCall("poll", map[string]any{}, time.Duration(pollInterval)*time.Second); err != nil {
 		return fmt.Errorf("failed to schedule poll: %w", err)
 	}
@@ -294,25 +299,22 @@ func (c *TrackRun) poll(ctx core.ActionContext) error {
 }
 
 func (c *TrackRun) emitFinalState(ctx core.ExecutionContext, runID, status string, metadata TrackRunMetadata) error {
-	payload := map[string]any{
-		"runId":        runID,
-		"finalStatus":  status,
-		"stateHistory": metadata.StateHistory,
-		"runUrl":       metadata.RunURL,
-	}
-
-	channel := "completed"
-	eventType := "terraform.run.completed"
-
-	if isFailedState(status) {
-		channel = "failed"
-		eventType = "terraform.run.failed"
-	}
-
-	return ctx.ExecutionState.Emit(channel, eventType, []any{payload})
+	return emitFinalStateToChannel(ctx.ExecutionState, runID, status, metadata)
 }
 
 func (c *TrackRun) emitFinalStateFromAction(ctx core.ActionContext, runID, status string, metadata TrackRunMetadata) error {
+	return emitFinalStateToChannel(ctx.ExecutionState, runID, status, metadata)
+}
+
+func (c *TrackRun) emitNeedsAttention(ctx core.ActionContext, runID, status string, metadata TrackRunMetadata) error {
+	return emitNeedsAttentionToChannel(ctx.ExecutionState, runID, status, metadata)
+}
+
+func (c *TrackRun) emitNeedsAttentionFromExecution(ctx core.ExecutionContext, runID, status string, metadata TrackRunMetadata) error {
+	return emitNeedsAttentionToChannel(ctx.ExecutionState, runID, status, metadata)
+}
+
+func emitFinalStateToChannel(state core.ExecutionStateContext, runID, status string, metadata TrackRunMetadata) error {
 	payload := map[string]any{
 		"runId":        runID,
 		"finalStatus":  status,
@@ -328,10 +330,10 @@ func (c *TrackRun) emitFinalStateFromAction(ctx core.ActionContext, runID, statu
 		eventType = "terraform.run.failed"
 	}
 
-	return ctx.ExecutionState.Emit(channel, eventType, []any{payload})
+	return state.Emit(channel, eventType, []any{payload})
 }
 
-func (c *TrackRun) emitNeedsAttention(ctx core.ActionContext, runID, status string, metadata TrackRunMetadata) error {
+func emitNeedsAttentionToChannel(state core.ExecutionStateContext, runID, status string, metadata TrackRunMetadata) error {
 	payload := map[string]any{
 		"runId":        runID,
 		"status":       status,
@@ -340,7 +342,7 @@ func (c *TrackRun) emitNeedsAttention(ctx core.ActionContext, runID, status stri
 		"message":      getAttentionMessage(status),
 	}
 
-	return ctx.ExecutionState.Emit("needsAttention", "terraform.run.needsAttention", []any{payload})
+	return state.Emit("needsAttention", "terraform.run.needsAttention", []any{payload})
 }
 
 func (c *TrackRun) Cancel(ctx core.ExecutionContext) error {
