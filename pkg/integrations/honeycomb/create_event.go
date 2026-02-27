@@ -1,7 +1,6 @@
 package honeycomb
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -16,8 +15,8 @@ import (
 type CreateEvent struct{}
 
 type CreateEventConfiguration struct {
-	Dataset string `json:"dataset" mapstructure:"dataset"`
-	Fields  string `json:"fields" mapstructure:"fields"`
+	Dataset string         `json:"dataset" mapstructure:"dataset"`
+	Fields  map[string]any `json:"fields" mapstructure:"fields"`
 }
 
 func (c *CreateEvent) Name() string {
@@ -69,7 +68,7 @@ func (c *CreateEvent) Configuration() []configuration.Field {
 		{
 			Name:     "fields",
 			Label:    "Fields JSON",
-			Type:     configuration.FieldTypeText,
+			Type:     configuration.FieldTypeObject,
 			Required: true,
 			Description: `JSON object to send as event.
 							Example:
@@ -79,7 +78,6 @@ func (c *CreateEvent) Configuration() []configuration.Field {
 }
 
 func (c *CreateEvent) Setup(ctx core.SetupContext) error {
-
 	var cfg CreateEventConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &cfg); err != nil {
 		return fmt.Errorf("invalid configuration: %w", err)
@@ -90,13 +88,8 @@ func (c *CreateEvent) Setup(ctx core.SetupContext) error {
 		return errors.New("dataset is required")
 	}
 
-	if strings.TrimSpace(cfg.Fields) == "" {
+	if len(cfg.Fields) == 0 {
 		return errors.New("fields json is required")
-	}
-
-	var tmp map[string]any
-	if err := json.Unmarshal([]byte(cfg.Fields), &tmp); err != nil {
-		return fmt.Errorf("invalid fields json: %w", err)
 	}
 
 	return nil
@@ -107,15 +100,9 @@ func (c *CreateEvent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 }
 
 func (c *CreateEvent) Execute(ctx core.ExecutionContext) error {
-
 	var cfg CreateEventConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &cfg); err != nil {
 		return err
-	}
-
-	var fields map[string]any
-	if err := json.Unmarshal([]byte(cfg.Fields), &fields); err != nil {
-		return fmt.Errorf("invalid fields json: %w", err)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -123,14 +110,14 @@ func (c *CreateEvent) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	if err := client.CreateEvent(cfg.Dataset, fields); err != nil {
+	if err := client.CreateEvent(cfg.Dataset, cfg.Fields); err != nil {
 		return err
 	}
 
 	output := map[string]any{
 		"status":  "sent",
 		"dataset": cfg.Dataset,
-		"fields":  fields,
+		"fields":  cfg.Fields,
 	}
 
 	return ctx.ExecutionState.Emit(

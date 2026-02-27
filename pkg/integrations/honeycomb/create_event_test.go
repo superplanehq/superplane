@@ -19,7 +19,7 @@ func Test__CreateEvent__Setup(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"dataset": "",
-				"fields":  `{"key":"value"}`,
+				"fields":  map[string]any{"key": "value"},
 			},
 		})
 		require.ErrorContains(t, err, "dataset is required")
@@ -29,27 +29,17 @@ func Test__CreateEvent__Setup(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"dataset": "test-dataset",
-				"fields":  "",
+				"fields": map[string]any{},
 			},
 		})
 		require.ErrorContains(t, err, "fields json is required")
-	})
-
-	t.Run("invalid JSON fields -> error", func(t *testing.T) {
-		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{
-				"dataset": "test-dataset",
-				"fields":  `{invalid json}`,
-			},
-		})
-		require.ErrorContains(t, err, "invalid fields json")
 	})
 
 	t.Run("valid configuration -> success", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"dataset": "test-dataset",
-				"fields":  `{"message":"hello","severity":"info"}`,
+				"fields": map[string]any{"message": "hello", "severity": "info"},
 			},
 		})
 		require.NoError(t, err)
@@ -70,7 +60,7 @@ func Test__CreateEvent__Execute(t *testing.T) {
 			Integration: integrationCtx,
 			Configuration: map[string]any{
 				"dataset": "test-dataset",
-				"fields":  `{"key":"value"}`,
+				"fields": map[string]any{"key": "value"},
 			},
 			HTTP: &contexts.HTTPContext{},
 		})
@@ -92,7 +82,7 @@ func Test__CreateEvent__Execute(t *testing.T) {
 			HTTP:        &contexts.HTTPContext{},
 			Configuration: map[string]any{
 				"dataset": "test-dataset",
-				"fields":  `{"key":"value"}`,
+				"fields": map[string]any{"key": "value"},
 			},
 		})
 
@@ -124,7 +114,7 @@ func Test__CreateEvent__Execute(t *testing.T) {
 			HTTP:        httpCtx,
 			Configuration: map[string]any{
 				"dataset": "test-dataset",
-				"fields":  `{"key":"value"}`,
+				"fields": map[string]any{"key": "value"},
 			},
 		})
 
@@ -159,7 +149,7 @@ func Test__CreateEvent__Execute(t *testing.T) {
 			HTTP:           httpCtx,
 			Configuration: map[string]any{
 				"dataset": "test-dataset",
-				"fields":  `{"message":"deployment","version":"1.2.3"}`,
+				"fields": map[string]any{"message": "deployment", "version": "1.2.3"},
 			},
 		})
 
@@ -211,7 +201,7 @@ func Test__CreateEvent__Execute(t *testing.T) {
 			HTTP:           httpCtx,
 			Configuration: map[string]any{
 				"dataset": "test-dataset",
-				"fields":  `{"message":"deployment","version":"1.2.3","time":"2024-01-15T10:30:00Z"}`,
+				"fields": map[string]any{"message": "deployment", "version": "1.2.3", "time": "2024-01-15T10:30:00Z"},
 			},
 		})
 
