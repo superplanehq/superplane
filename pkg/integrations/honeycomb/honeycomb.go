@@ -163,10 +163,6 @@ func (h *Honeycomb) Sync(ctx core.SyncContext) error {
 	return nil
 }
 
-func (h *Honeycomb) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	return []core.IntegrationResource{}, nil
-}
-
 func (h *Honeycomb) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Response.WriteHeader(404)
 	_, _ = ctx.Response.Write([]byte("not found"))

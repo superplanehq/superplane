@@ -813,3 +813,30 @@ func parseCreatedEnvKeyValue(respBody []byte) (string, error) {
 
 	return secret, nil
 }
+
+type Dataset struct {
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+func (c *Client) ListDatasets() ([]Dataset, error) {
+	req, err := c.newReqV1(http.MethodGet, "/1/datasets", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	body, code, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	if code < 200 || code >= 300 {
+		return nil, fmt.Errorf("list datasets failed (http %d): %s", code, string(body))
+	}
+
+	var datasets []Dataset
+	if err := json.Unmarshal(body, &datasets); err != nil {
+		return nil, fmt.Errorf("failed to parse datasets: %w", err)
+	}
+
+	return datasets, nil
+}

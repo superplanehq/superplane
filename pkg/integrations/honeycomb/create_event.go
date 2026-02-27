@@ -59,11 +59,16 @@ func (c *CreateEvent) OutputChannels(configuration any) []core.OutputChannel {
 func (c *CreateEvent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "dataset",
-			Label:       "Dataset",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Dataset slug",
+			Name:     "dataset",
+			Label:    "Dataset",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "dataset",
+					UseNameAsValue: false,
+				},
+			},
 		},
 		{
 			Name:     "fields",

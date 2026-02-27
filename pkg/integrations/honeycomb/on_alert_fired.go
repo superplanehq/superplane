@@ -63,16 +63,36 @@ func (t *OnAlertFired) Configuration() []configuration.Field {
 		{
 			Name:        "datasetSlug",
 			Label:       "Dataset Slug",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The dataset slug containing your Honeycomb trigger.",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "dataset",
+					UseNameAsValue: false,
+				},
+			},
 		},
 		{
 			Name:        "alertName",
 			Label:       "Alert Name",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The name of the Honeycomb trigger to listen to (case-insensitive).",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "trigger",
+					UseNameAsValue: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "datasetSlug",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "datasetSlug",
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -222,4 +242,3 @@ func payloadHasTriggerID(payload map[string]any, want string) bool {
 
 	return false
 }
-
