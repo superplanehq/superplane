@@ -55,22 +55,37 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 
 	targetURL := ctx.Webhook.GetURL()
 
+	webhookSecretBytes, err := ctx.Integration.GetConfig("webhookSecret")
+	var webhookSecret string
+	if err == nil {
+		webhookSecret = string(webhookSecretBytes)
+	}
+
+	// Check if webhook already exists and update it if needed
 	listOpts := &tfe.NotificationConfigurationListOptions{}
 	existingHooks, err := client.TFE.NotificationConfigurations.List(context.Background(), resolvedWsId, listOpts)
 	if err == nil && existingHooks != nil {
 		for _, hook := range existingHooks.Items {
 			if hook.URL == targetURL {
+				// Update the existing webhook to ensure HMAC token is current
+				updateOpts := tfe.NotificationConfigurationUpdateOptions{
+					Enabled: tfe.Bool(true),
+					Name:    tfe.String("SuperPlane"),
+				}
+				if webhookSecret != "" {
+					updateOpts.Token = tfe.String(webhookSecret)
+				}
+
+				_, err := client.TFE.NotificationConfigurations.Update(context.Background(), hook.ID, updateOpts)
+				if err != nil {
+					return nil, fmt.Errorf("failed to update existing webhook: %w", err)
+				}
+
 				return map[string]string{
 					"notification_configuration_id": hook.ID,
 				}, nil
 			}
 		}
-	}
-
-	webhookSecretBytes, err := ctx.Integration.GetConfig("webhookSecret")
-	var webhookSecret string
-	if err == nil {
-		webhookSecret = string(webhookSecretBytes)
 	}
 
 	dType := tfe.NotificationDestinationType("generic")
@@ -134,7 +149,10 @@ func (h *WebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 		return nil
 	}
 
-	id := idVal.(string)
+	id, ok := idVal.(string)
+	if !ok {
+		return fmt.Errorf("notification_configuration_id is not a string")
+	}
 	err = client.TFE.NotificationConfigurations.Delete(context.Background(), id)
 	if err != nil {
 		return fmt.Errorf("failed to delete terraform webhook %s: %w", id, err)
@@ -185,7 +203,8 @@ func ParseAndValidateWebhook(ctx core.WebhookRequestContext) (map[string]any, in
 
 	var eventData RunEventData
 
-	if versionFloat == 1 {
+	switch int(versionFloat) {
+	case 1:
 		var p1 PayloadVersion1
 		if err := json.Unmarshal(ctx.Body, &p1); err != nil {
 			return nil, http.StatusBadRequest, err
@@ -203,8 +222,7 @@ func ParseAndValidateWebhook(ctx core.WebhookRequestContext) (map[string]any, in
 				RunCreatedBy:     p1.RunCreatedBy,
 			}
 		}
-
-	} else if versionFloat == 2 {
+	case 2:
 		var p2 PayloadVersion2
 		if err := json.Unmarshal(ctx.Body, &p2); err != nil {
 			return nil, http.StatusBadRequest, err
@@ -218,6 +236,8 @@ func ParseAndValidateWebhook(ctx core.WebhookRequestContext) (map[string]any, in
 				RunStatus:        p2.Notifications[0].RunStatus,
 			}
 		}
+	default:
+		return nil, http.StatusBadRequest, fmt.Errorf("unsupported payload_version: %.0f", versionFloat)
 	}
 
 	var out map[string]any
