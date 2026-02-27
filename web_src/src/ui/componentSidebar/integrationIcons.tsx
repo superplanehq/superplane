@@ -13,6 +13,7 @@ import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
+import azureIcon from "@/assets/icons/integrations/azure.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
@@ -50,6 +51,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   aws: awsIcon,
   bitbucket: bitbucketIcon,
   circleci: circleciIcon,
+  azure: azureIcon,
   cloudflare: cloudflareIcon,
   dash0: dash0Icon,
   datadog: datadogIcon,
@@ -119,6 +121,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   harness: harnessIcon,
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
+  azure: azureIcon,
   aws: {
     cloudwatch: awsCloudwatchIcon,
     codeArtifact: awsCodeArtifactIcon,

@@ -61,6 +61,7 @@ import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.sv
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.svg";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
+import azureIcon from "@/assets/icons/integrations/azure.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
@@ -1053,6 +1054,7 @@ function CategorySection({
     octopus: octopusIcon,
     servicenow: servicenowIcon,
     statuspage: statuspageIcon,
+    azure: azureIcon,
     aws: {
       ec2: awsEc2Icon,
       codeArtifact: awsIcon,
@@ -1181,6 +1183,7 @@ function CategorySection({
             octopus: octopusIcon,
             servicenow: servicenowIcon,
             statuspage: statuspageIcon,
+            azure: azureIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
               codepipeline: awsCodePipelineIcon,
