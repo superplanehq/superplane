@@ -178,22 +178,9 @@ func (c *WaitForApproval) Execute(ctx core.ExecutionContext) error {
 		return errors.New("runId is required")
 	}
 
-	// Get run details from Terraform Cloud
-	configAPI, err := ctx.Integration.GetConfig("apiToken")
+	client, err := getClientFromIntegration(ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("failed to get API token: %w", err)
-	}
-	configAddr, err := ctx.Integration.GetConfig("address")
-	if err != nil {
-		return fmt.Errorf("failed to get address: %w", err)
-	}
-
-	client, err := NewClient(map[string]any{
-		"apiToken": string(configAPI),
-		"address":  string(configAddr),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
+		return err
 	}
 
 	run, err := client.TFE.Runs.ReadWithOptions(context.Background(), config.RunID, &tfe.RunReadOptions{
@@ -203,13 +190,11 @@ func (c *WaitForApproval) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to read run: %w", err)
 	}
 
-	// Build metadata
 	var workspaceName string
 	if run.Workspace != nil {
 		workspaceName = run.Workspace.Name
 	}
 
-	// Store run info in metadata
 	metadata := WaitForApprovalMetadata{
 		RunID:         config.RunID,
 		RunStatus:     string(run.Status),
@@ -220,7 +205,6 @@ func (c *WaitForApproval) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to set metadata: %w", err)
 	}
 
-	// Schedule timeout if configured
 	if config.Timeout != nil && *config.Timeout > 0 {
 		timeout := time.Duration(*config.Timeout) * time.Second
 		if err := ctx.Requests.ScheduleActionCall(ActionTimeout, map[string]any{}, timeout); err != nil {
@@ -228,7 +212,6 @@ func (c *WaitForApproval) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	// The execution will wait for user action (approve/reject buttons shown in UI)
 	return nil
 }
 
@@ -309,21 +292,9 @@ func (c *WaitForApproval) handleApprove(ctx core.ActionContext) error {
 
 	// Apply the run in Terraform Cloud if configured
 	if config.ApplyOnApprove {
-		configAPI, err := ctx.Integration.GetConfig("apiToken")
+		client, err := getClientFromIntegration(ctx.Integration)
 		if err != nil {
-			return fmt.Errorf("failed to get API token: %w", err)
-		}
-		configAddr, err := ctx.Integration.GetConfig("address")
-		if err != nil {
-			return fmt.Errorf("failed to get address: %w", err)
-		}
-
-		client, err := NewClient(map[string]any{
-			"apiToken": string(configAPI),
-			"address":  string(configAddr),
-		})
-		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return err
 		}
 
 		comment, _ := ctx.Parameters["comment"].(string)
@@ -375,21 +346,9 @@ func (c *WaitForApproval) handleReject(ctx core.ActionContext) error {
 	metadata.DecidedAt = &now
 
 	// Discard the run in Terraform Cloud
-	configAPI, err := ctx.Integration.GetConfig("apiToken")
+	client, err := getClientFromIntegration(ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("failed to get API token: %w", err)
-	}
-	configAddr, err := ctx.Integration.GetConfig("address")
-	if err != nil {
-		return fmt.Errorf("failed to get address: %w", err)
-	}
-
-	client, err := NewClient(map[string]any{
-		"apiToken": string(configAPI),
-		"address":  string(configAddr),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
+		return err
 	}
 
 	comment, _ := ctx.Parameters["comment"].(string)

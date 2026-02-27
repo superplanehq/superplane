@@ -146,7 +146,7 @@ func (c *TrackRun) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invalid run ID format: %q (expected format: run-xxxxxxxx)", config.RunID)
 	}
 
-	client, err := c.getClient(ctx.Integration)
+	client, err := getClientFromIntegration(ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -236,7 +236,7 @@ func (c *TrackRun) poll(ctx core.ActionContext) error {
 		return fmt.Errorf("runId not found in metadata - initial execution may have failed")
 	}
 
-	client, err := c.getClient(ctx.Integration)
+	client, err := getClientFromIntegration(ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -341,22 +341,6 @@ func (c *TrackRun) emitNeedsAttention(ctx core.ActionContext, runID, status stri
 	}
 
 	return ctx.ExecutionState.Emit("needsAttention", "terraform.run.needsAttention", []any{payload})
-}
-
-func (c *TrackRun) getClient(integration core.IntegrationContext) (*Client, error) {
-	configAPI, err := integration.GetConfig("apiToken")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get API token: %w", err)
-	}
-	configAddr, err := integration.GetConfig("address")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get address: %w", err)
-	}
-
-	return NewClient(map[string]any{
-		"apiToken": string(configAPI),
-		"address":  string(configAddr),
-	})
 }
 
 func (c *TrackRun) Cancel(ctx core.ExecutionContext) error {
