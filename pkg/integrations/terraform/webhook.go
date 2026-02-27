@@ -70,6 +70,16 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 				updateOpts := tfe.NotificationConfigurationUpdateOptions{
 					Enabled: tfe.Bool(true),
 					Name:    tfe.String("SuperPlane"),
+					Triggers: []tfe.NotificationTriggerType{
+						tfe.NotificationTriggerCreated,
+						tfe.NotificationTriggerPlanning,
+						tfe.NotificationTriggerNeedsAttention,
+						tfe.NotificationTriggerApplying,
+						tfe.NotificationTriggerCompleted,
+						tfe.NotificationTriggerErrored,
+						tfe.NotificationTriggerAssessmentDrifted,
+						tfe.NotificationTriggerAssessmentFailed,
+					},
 				}
 				if webhookSecret != "" {
 					updateOpts.Token = tfe.String(webhookSecret)
