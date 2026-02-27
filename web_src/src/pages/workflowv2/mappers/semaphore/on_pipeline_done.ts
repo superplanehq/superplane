@@ -3,6 +3,8 @@ import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "..
 import { TriggerProps } from "@/ui/trigger";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { formatTimeAgo } from "@/utils/date";
+import { MetadataItem } from "@/ui/metadataList";
+import { formatPredicate, Predicate } from "../utils";
 
 interface OnPipelineDoneMetadata {
   project?: {
@@ -10,6 +12,12 @@ interface OnPipelineDoneMetadata {
     name: string;
     url: string;
   };
+}
+
+interface OnPipelineDoneConfiguration {
+  refs?: Predicate[];
+  results?: string[];
+  pipelines?: Predicate[];
 }
 
 interface OnPipelineDoneEventData {
@@ -68,12 +76,34 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as OnPipelineDoneMetadata;
-    const metadataItems = [];
+    const configuration = node.configuration as unknown as OnPipelineDoneConfiguration;
+    const metadataItems: MetadataItem[] = [];
 
     if (metadata?.project?.name) {
       metadataItems.push({
         icon: "book",
         label: metadata.project.name,
+      });
+    }
+
+    if (configuration?.refs?.length) {
+      metadataItems.push({
+        icon: "funnel",
+        label: configuration.refs.map(formatPredicate).join(", "),
+      });
+    }
+
+    if (configuration?.results?.length) {
+      metadataItems.push({
+        icon: "circle-check",
+        label: configuration.results.join(", "),
+      });
+    }
+
+    if (configuration?.pipelines?.length) {
+      metadataItems.push({
+        icon: "file-code",
+        label: configuration.pipelines.map(formatPredicate).join(", "),
       });
     }
 
