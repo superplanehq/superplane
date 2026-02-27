@@ -26,6 +26,9 @@ import type {
   CanvasesCreateCanvasResponses,
   CanvasesDeleteCanvasData,
   CanvasesDeleteCanvasErrors,
+  CanvasesDeleteCanvasMemoryData,
+  CanvasesDeleteCanvasMemoryErrors,
+  CanvasesDeleteCanvasMemoryResponses,
   CanvasesDeleteCanvasResponses,
   CanvasesDeleteNodeQueueItemData,
   CanvasesDeleteNodeQueueItemErrors,
@@ -48,6 +51,9 @@ import type {
   CanvasesListCanvasEventsData,
   CanvasesListCanvasEventsErrors,
   CanvasesListCanvasEventsResponses,
+  CanvasesListCanvasMemoriesData,
+  CanvasesListCanvasMemoriesErrors,
+  CanvasesListCanvasMemoriesResponses,
   CanvasesListChildExecutionsData,
   CanvasesListChildExecutionsErrors,
   CanvasesListChildExecutionsResponses,
@@ -503,6 +509,33 @@ export const canvasesListChildExecutions = <ThrowOnError extends boolean = true>
       ...options.headers,
     },
   });
+
+/**
+ * List canvas memories
+ *
+ * Returns append-only memory records for a canvas
+ */
+export const canvasesListCanvasMemories = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesListCanvasMemoriesData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<CanvasesListCanvasMemoriesResponses, CanvasesListCanvasMemoriesErrors, ThrowOnError>({
+    url: "/api/v1/canvases/{canvasId}/memory",
+    ...options,
+  });
+
+/**
+ * Delete canvas memory entry
+ *
+ * Deletes one memory record by ID from a canvas
+ */
+export const canvasesDeleteCanvasMemory = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesDeleteCanvasMemoryData, ThrowOnError>,
+) =>
+  (options.client ?? client).delete<
+    CanvasesDeleteCanvasMemoryResponses,
+    CanvasesDeleteCanvasMemoryErrors,
+    ThrowOnError
+  >({ url: "/api/v1/canvases/{canvasId}/memory/{memoryId}", ...options });
 
 /**
  * List node events

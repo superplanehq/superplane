@@ -134,7 +134,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventCtx,
 		})
 
@@ -155,7 +155,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       expiredHeaders,
 			Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventCtx,
 		})
 
@@ -173,7 +173,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       invalidHeaders,
 			Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventCtx,
 		})
 
@@ -197,7 +197,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 			Body:          buildBody,
 			Headers:       buildHeaders,
 			Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventCtx,
 		})
 
@@ -212,7 +212,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{"service": "srv-other"},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventCtx,
 		})
 
@@ -230,7 +230,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 				"service":    "srv-cukouhrtq21c73e9scng",
 				"eventTypes": []string{"deploy_started"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventCtx,
 		})
 
@@ -257,7 +257,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 			HTTP:          httpCtx,
 			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
 			Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventCtx,
 		})
 
@@ -303,7 +303,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 			HTTP:          httpCtx,
 			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
 			Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventCtx,
 		})
 
@@ -342,7 +342,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 			HTTP:          httpCtx,
 			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
 			Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
-			Webhook:       &contexts.WebhookContext{Secret: webhookSecret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: webhookSecret},
 			Events:        eventCtx,
 		})
 
@@ -385,7 +385,7 @@ func Test__Render_OnDeploy__HandleWebhook__WithoutEventResolution(t *testing.T) 
 		Body:          body,
 		Headers:       headers,
 		Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
-		Webhook:       &contexts.WebhookContext{Secret: secret},
+		Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 		Events:        eventCtx,
 	})
 

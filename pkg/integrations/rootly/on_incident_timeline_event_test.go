@@ -28,7 +28,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
 			Configuration: baseConfig,
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:        &contexts.EventContext{},
 		})
 
@@ -48,7 +48,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: baseConfig,
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        &contexts.EventContext{},
 		})
 
@@ -69,7 +69,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: baseConfig,
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventContext,
 			Metadata:      &contexts.MetadataContext{},
 		})
@@ -93,7 +93,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: baseConfig,
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventContext,
 			Metadata:      metadata,
 		})
@@ -117,7 +117,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: baseConfig,
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventContext,
 			Metadata:      metadata,
 		})
@@ -141,7 +141,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{"visibility": "internal"},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventContext,
 			Metadata:      metadata,
 		})
@@ -165,7 +165,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: baseConfig,
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventContext,
 			Metadata:      metadata,
 		})
@@ -188,7 +188,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: baseConfig,
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventContext,
 			Metadata:      &contexts.MetadataContext{},
 		})
@@ -222,7 +222,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: baseConfig,
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventContext,
 			Metadata:      &contexts.MetadataContext{},
 		})
@@ -275,7 +275,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{"incidentStatus": []string{"resolved"}, "severity": []string{"sev2"}, "service": []string{"API"}, "team": []string{"Platform"}},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventContext,
 			Metadata:      &contexts.MetadataContext{},
 			HTTP:          httpCtx,

@@ -223,6 +223,28 @@ service Canvases {
     };
   }
 
+  rpc ListCanvasMemories(ListCanvasMemoriesRequest) returns (ListCanvasMemoriesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/memory"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List canvas memories";
+      description: "Returns append-only memory records for a canvas";
+      tags: "Canvas";
+    };
+  }
+
+  rpc DeleteCanvasMemory(DeleteCanvasMemoryRequest) returns (DeleteCanvasMemoryResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/canvases/{canvas_id}/memory/{memory_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete canvas memory entry";
+      description: "Deletes one memory record by ID from a canvas";
+      tags: "Canvas";
+    };
+  }
+
   rpc ListEventExecutions(ListEventExecutionsRequest) returns (ListEventExecutionsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/events/{event_id}/executions"
@@ -502,6 +524,27 @@ message ListCanvasEventsResponse {
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
 }
+
+message CanvasMemory {
+  string id = 1;
+  string namespace = 2;
+  google.protobuf.Value values = 3;
+}
+
+message ListCanvasMemoriesRequest {
+  string canvas_id = 1;
+}
+
+message ListCanvasMemoriesResponse {
+  repeated CanvasMemory items = 1;
+}
+
+message DeleteCanvasMemoryRequest {
+  string canvas_id = 1;
+  string memory_id = 2;
+}
+
+message DeleteCanvasMemoryResponse {}
 
 message CanvasEvent {
   string id = 1;

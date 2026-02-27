@@ -35,7 +35,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Events:  &contexts.EventContext{},
-			Webhook: &contexts.WebhookContext{},
+			Webhook: &contexts.NodeWebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -55,7 +55,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"repository": "test",
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  &contexts.EventContext{},
 		})
 
@@ -83,7 +83,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 				"repository":  "test",
 				"conclusions": []string{"success"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -112,7 +112,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 				"repository":  "test",
 				"conclusions": []string{"success"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -141,7 +141,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 				"repository":    "test",
 				"workflowFiles": []string{".github/workflows/ci.yml"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -170,7 +170,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 				"repository":    "test",
 				"workflowFiles": []string{".github/workflows/ci.yml"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -198,7 +198,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"repository": "test",
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -226,7 +226,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"repository": "test",
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 

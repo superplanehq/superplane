@@ -47,6 +47,7 @@ docs/CanvasesCanvasAiNodeContext.md
 docs/CanvasesCanvasAutoLayout.md
 docs/CanvasesCanvasEvent.md
 docs/CanvasesCanvasEventWithExecutions.md
+docs/CanvasesCanvasMemory.md
 docs/CanvasesCanvasMetadata.md
 docs/CanvasesCanvasNodeExecution.md
 docs/CanvasesCanvasNodeQueueItem.md
@@ -61,6 +62,7 @@ docs/CanvasesInvokeNodeExecutionActionBody.md
 docs/CanvasesInvokeNodeTriggerActionBody.md
 docs/CanvasesInvokeNodeTriggerActionResponse.md
 docs/CanvasesListCanvasEventsResponse.md
+docs/CanvasesListCanvasMemoriesResponse.md
 docs/CanvasesListCanvasesResponse.md
 docs/CanvasesListChildExecutionsResponse.md
 docs/CanvasesListEventExecutionsResponse.md
@@ -252,6 +254,7 @@ model_canvases_canvas_ai_node_context.go
 model_canvases_canvas_auto_layout.go
 model_canvases_canvas_event.go
 model_canvases_canvas_event_with_executions.go
+model_canvases_canvas_memory.go
 model_canvases_canvas_metadata.go
 model_canvases_canvas_node_execution.go
 model_canvases_canvas_node_queue_item.go
@@ -266,6 +269,7 @@ model_canvases_invoke_node_execution_action_body.go
 model_canvases_invoke_node_trigger_action_body.go
 model_canvases_invoke_node_trigger_action_response.go
 model_canvases_list_canvas_events_response.go
+model_canvases_list_canvas_memories_response.go
 model_canvases_list_canvases_response.go
 model_canvases_list_child_executions_response.go
 model_canvases_list_event_executions_response.go

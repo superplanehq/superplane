@@ -142,6 +142,12 @@ export type CanvasesCanvasEventWithExecutions = {
   customName?: string;
 };
 
+export type CanvasesCanvasMemory = {
+  id?: string;
+  namespace?: string;
+  values?: unknown;
+};
+
 export type CanvasesCanvasMetadata = {
   id?: string;
   organizationId?: string;
@@ -212,6 +218,10 @@ export type CanvasesCreateCanvasResponse = {
   canvas?: CanvasesCanvas;
 };
 
+export type CanvasesDeleteCanvasMemoryResponse = {
+  [key: string]: unknown;
+};
+
 export type CanvasesDeleteCanvasResponse = {
   [key: string]: unknown;
 };
@@ -262,6 +272,10 @@ export type CanvasesListCanvasEventsResponse = {
   totalCount?: number;
   hasNextPage?: boolean;
   lastTimestamp?: string;
+};
+
+export type CanvasesListCanvasMemoriesResponse = {
+  items?: Array<CanvasesCanvasMemory>;
 };
 
 export type CanvasesListCanvasesResponse = {
@@ -1611,6 +1625,63 @@ export type CanvasesListChildExecutionsResponses = {
 
 export type CanvasesListChildExecutionsResponse2 =
   CanvasesListChildExecutionsResponses[keyof CanvasesListChildExecutionsResponses];
+
+export type CanvasesListCanvasMemoriesData = {
+  body?: never;
+  path: {
+    canvasId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/memory";
+};
+
+export type CanvasesListCanvasMemoriesErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesListCanvasMemoriesError = CanvasesListCanvasMemoriesErrors[keyof CanvasesListCanvasMemoriesErrors];
+
+export type CanvasesListCanvasMemoriesResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesListCanvasMemoriesResponse;
+};
+
+export type CanvasesListCanvasMemoriesResponse2 =
+  CanvasesListCanvasMemoriesResponses[keyof CanvasesListCanvasMemoriesResponses];
+
+export type CanvasesDeleteCanvasMemoryData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    memoryId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/memory/{memoryId}";
+};
+
+export type CanvasesDeleteCanvasMemoryErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesDeleteCanvasMemoryError = CanvasesDeleteCanvasMemoryErrors[keyof CanvasesDeleteCanvasMemoryErrors];
+
+export type CanvasesDeleteCanvasMemoryResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesDeleteCanvasMemoryResponse;
+};
+
+export type CanvasesDeleteCanvasMemoryResponse2 =
+  CanvasesDeleteCanvasMemoryResponses[keyof CanvasesDeleteCanvasMemoryResponses];
 
 export type CanvasesListNodeEventsData = {
   body?: never;
