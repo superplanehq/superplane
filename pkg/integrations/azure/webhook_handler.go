@@ -81,7 +81,7 @@ func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error)
 			"destination": map[string]any{
 				"endpointType": "WebHook",
 				"properties": map[string]any{
-					"endpointUrl":              webhookURL,
+					"endpointUrl":               webhookURL,
 					"deliveryAttributeMappings": deliveryAttributes,
 				},
 			},

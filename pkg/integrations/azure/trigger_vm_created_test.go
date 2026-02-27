@@ -50,7 +50,7 @@ func TestOnVMCreatedTrigger_ExampleData(t *testing.T) {
 	assert.Contains(t, example, "vmId")
 	assert.Contains(t, example, "resourceGroup")
 	assert.Contains(t, example, "subscriptionId")
-	assert.Contains(t, example, "provisioningState")
+	assert.Contains(t, example, "status")
 }
 
 // TestOnVMCreatedTrigger_Setup verifies the trigger setup method
@@ -605,8 +605,8 @@ func TestOnVMCreatedTrigger_HandleWebhook_MultipleEvents(t *testing.T) {
 			EventType: EventTypeResourceWriteSuccess,
 			EventTime: time.Now(),
 			Data: map[string]any{
-				"status": ProvisioningStateSucceeded,
-				"subscriptionId":    "test-sub",
+				"status":         ProvisioningStateSucceeded,
+				"subscriptionId": "test-sub",
 			},
 			DataVersion:     "1.0",
 			MetadataVersion: "1",
@@ -618,8 +618,8 @@ func TestOnVMCreatedTrigger_HandleWebhook_MultipleEvents(t *testing.T) {
 			EventType: EventTypeResourceWriteSuccess,
 			EventTime: time.Now(),
 			Data: map[string]any{
-				"status": ProvisioningStateSucceeded,
-				"subscriptionId":    "test-sub",
+				"status":         ProvisioningStateSucceeded,
+				"subscriptionId": "test-sub",
 			},
 			DataVersion:     "1.0",
 			MetadataVersion: "1",
@@ -631,8 +631,8 @@ func TestOnVMCreatedTrigger_HandleWebhook_MultipleEvents(t *testing.T) {
 			EventType: EventTypeResourceWriteSuccess,
 			EventTime: time.Now(),
 			Data: map[string]any{
-				"status": ProvisioningStateSucceeded,
-				"subscriptionId":    "test-sub",
+				"status":         ProvisioningStateSucceeded,
+				"subscriptionId": "test-sub",
 			},
 			DataVersion:     "1.0",
 			MetadataVersion: "1",
