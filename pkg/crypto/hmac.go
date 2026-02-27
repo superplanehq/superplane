@@ -6,6 +6,7 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
+	"hash"
 )
 
 func VerifySignature(key []byte, data []byte, signature string) error {
