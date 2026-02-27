@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/go-tfe"
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 )
@@ -208,6 +209,9 @@ func ParseAndValidateWebhook(ctx core.WebhookRequestContext) (map[string]any, in
 			return nil, http.StatusBadRequest, err
 		}
 		if len(p1.Notifications) > 0 {
+			if len(p1.Notifications) > 1 {
+				log.Warnf("terraform webhook payload v1 contains %d notifications, only the first will be processed; all: %+v", len(p1.Notifications), p1.Notifications)
+			}
 			eventData = RunEventData{
 				RunID:            p1.RunID,
 				RunURL:           p1.RunURL,
@@ -226,6 +230,9 @@ func ParseAndValidateWebhook(ctx core.WebhookRequestContext) (map[string]any, in
 			return nil, http.StatusBadRequest, err
 		}
 		if len(p2.Notifications) > 0 {
+			if len(p2.Notifications) > 1 {
+				log.Warnf("terraform webhook payload v2 contains %d notifications, only the first will be processed; all: %+v", len(p2.Notifications), p2.Notifications)
+			}
 			eventData = RunEventData{
 				WorkspaceID:      p2.WorkspaceID,
 				WorkspaceName:    p2.WorkspaceName,
@@ -239,8 +246,13 @@ func ParseAndValidateWebhook(ctx core.WebhookRequestContext) (map[string]any, in
 	}
 
 	var out map[string]any
-	evBytes, _ := json.Marshal(eventData)
-	json.Unmarshal(evBytes, &out)
+	evBytes, err := json.Marshal(eventData)
+	if err != nil {
+		return nil, http.StatusInternalServerError, fmt.Errorf("failed to marshal event data: %w", err)
+	}
+	if err := json.Unmarshal(evBytes, &out); err != nil {
+		return nil, http.StatusInternalServerError, fmt.Errorf("failed to unmarshal event data: %w", err)
+	}
 
 	return out, http.StatusOK, nil
 }
