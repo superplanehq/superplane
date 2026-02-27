@@ -178,8 +178,7 @@ CREATE TABLE public.blueprints (
 CREATE TABLE public.canvas_memories (
     canvas_id uuid NOT NULL,
     namespace text NOT NULL,
-    "values" jsonb NOT NULL,
-    id uuid DEFAULT gen_random_uuid() NOT NULL
+    "values" jsonb NOT NULL
 );
 
 
@@ -189,7 +188,7 @@ CREATE TABLE public.canvas_memories (
 
 CREATE TABLE public.casbin_rule (
     id integer NOT NULL,
-    ptype character varying(100),
+    ptype character varying(100) NOT NULL,
     v0 character varying(100),
     v1 character varying(100),
     v2 character varying(100),
@@ -677,14 +676,6 @@ ALTER TABLE ONLY public.blueprints
 
 
 --
--- Name: canvas_memories canvas_memories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvas_memories
-    ADD CONSTRAINT canvas_memories_pkey PRIMARY KEY (id);
-
-
---
 -- Name: casbin_rule casbin_rule_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1027,13 +1018,6 @@ CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (or
 --
 
 CREATE INDEX idx_canvas_memories_canvas_namespace ON public.canvas_memories USING btree (canvas_id, namespace);
-
-
---
--- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --
@@ -1634,7 +1618,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260227134915	f
+20260227123636	f
 \.
 
 

@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
@@ -8,7 +10,9 @@ import (
 )
 
 type CanvasMemory struct {
-	ID        uuid.UUID
+	ID        uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 	CanvasID  uuid.UUID
 	Namespace string
 	Values    datatypes.JSONType[any]
@@ -30,29 +34,4 @@ func AddCanvasMemoryInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace str
 
 func AddCanvasMemory(canvasID uuid.UUID, namespace string, values any) error {
 	return AddCanvasMemoryInTransaction(database.Conn(), canvasID, namespace, values)
-}
-
-func ListCanvasMemoriesInTransaction(tx *gorm.DB, canvasID uuid.UUID) ([]CanvasMemory, error) {
-	memories := []CanvasMemory{}
-	err := tx.
-		Where("canvas_id = ?", canvasID).
-		Order("namespace ASC").
-		Find(&memories).
-		Error
-	return memories, err
-}
-
-func ListCanvasMemories(canvasID uuid.UUID) ([]CanvasMemory, error) {
-	return ListCanvasMemoriesInTransaction(database.Conn(), canvasID)
-}
-
-func DeleteCanvasMemoryInTransaction(tx *gorm.DB, canvasID uuid.UUID, memoryID uuid.UUID) error {
-	return tx.
-		Where("id = ? AND canvas_id = ?", memoryID, canvasID).
-		Delete(&CanvasMemory{}).
-		Error
-}
-
-func DeleteCanvasMemory(canvasID uuid.UUID, memoryID uuid.UUID) error {
-	return DeleteCanvasMemoryInTransaction(database.Conn(), canvasID, memoryID)
 }
