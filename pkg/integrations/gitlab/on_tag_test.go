@@ -25,7 +25,7 @@ func Test__OnTag__HandleWebhook__FullRefMatch(t *testing.T) {
 				{Type: configuration.PredicateTypeEquals, Value: "refs/tags/v1.0.0"},
 			},
 		},
-		Webhook: &contexts.WebhookContext{Secret: "token"},
+		Webhook: &contexts.NodeWebhookContext{Secret: "token"},
 		Events:  events,
 		Logger:  log.NewEntry(log.New()),
 	})
@@ -50,7 +50,7 @@ func Test__OnTag__HandleWebhook__TagNameMatch(t *testing.T) {
 				{Type: configuration.PredicateTypeEquals, Value: "v1.0.0"},
 			},
 		},
-		Webhook: &contexts.WebhookContext{Secret: "token"},
+		Webhook: &contexts.NodeWebhookContext{Secret: "token"},
 		Events:  events,
 		Logger:  log.NewEntry(log.New()),
 	})
@@ -75,7 +75,7 @@ func Test__OnTag__HandleWebhook__TagMismatch(t *testing.T) {
 				{Type: configuration.PredicateTypeEquals, Value: "v1.0.0"},
 			},
 		},
-		Webhook: &contexts.WebhookContext{Secret: "token"},
+		Webhook: &contexts.NodeWebhookContext{Secret: "token"},
 		Events:  events,
 		Logger:  log.NewEntry(log.New()),
 	})

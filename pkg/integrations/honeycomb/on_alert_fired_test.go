@@ -63,7 +63,7 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 			Headers:       http.Header{},
 			Body:          body,
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:        &contexts.EventContext{},
 			Metadata:      &contexts.MetadataContext{},
 		})
@@ -79,7 +79,7 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 			Headers:       h,
 			Body:          body,
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:        &contexts.EventContext{},
 			Metadata:      &contexts.MetadataContext{},
 		})
@@ -96,7 +96,7 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 			Headers:       h,
 			Body:          []byte(`not valid json`),
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:        events,
 			Metadata:      &contexts.MetadataContext{},
 		})
@@ -117,7 +117,7 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 			Headers:       h,
 			Body:          body,
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:        events,
 			Metadata:      meta,
 		})
@@ -139,7 +139,7 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 			Headers:       h,
 			Body:          body,
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:        events,
 			Metadata:      meta,
 		})
@@ -157,7 +157,7 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 			Headers:       h,
 			Body:          body,
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:        events,
 			Metadata:      &contexts.MetadataContext{},
 		})
@@ -178,7 +178,7 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 			Headers:       h,
 			Body:          body,
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:        events,
 			Metadata:      meta,
 		})

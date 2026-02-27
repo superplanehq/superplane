@@ -278,7 +278,7 @@ func Test__Octopus_DeployRelease__HandleWebhook(t *testing.T) {
 					"apiKey":    "API-TEST",
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				if key == "deployment_id" && value == "Deployments-100" {
 					return &core.ExecutionContext{
@@ -361,7 +361,7 @@ func Test__Octopus_DeployRelease__HandleWebhook(t *testing.T) {
 					"apiKey":    "API-TEST",
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				if key == "deployment_id" && value == "Deployments-200" {
 					return &core.ExecutionContext{
@@ -405,7 +405,7 @@ func Test__Octopus_DeployRelease__HandleWebhook(t *testing.T) {
 		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 		})
 
 		assert.Equal(t, http.StatusOK, status)
@@ -434,7 +434,7 @@ func Test__Octopus_DeployRelease__HandleWebhook(t *testing.T) {
 		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 		})
 
 		assert.Equal(t, http.StatusOK, status)
@@ -463,7 +463,7 @@ func Test__Octopus_DeployRelease__HandleWebhook(t *testing.T) {
 		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return nil, assert.AnError
 			},
@@ -533,7 +533,7 @@ func Test__Octopus_DeployRelease__HandleWebhook(t *testing.T) {
 					"apiKey":    "API-TEST",
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				if key == "deployment_id" && value == "Deployments-100" {
 					return &core.ExecutionContext{
@@ -584,7 +584,7 @@ func Test__Octopus_DeployRelease__HandleWebhook(t *testing.T) {
 		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				if key == "deployment_id" && value == "Deployments-100" {
 					return &core.ExecutionContext{

@@ -35,7 +35,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Events:  &contexts.EventContext{},
-			Webhook: &contexts.WebhookContext{},
+			Webhook: &contexts.NodeWebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -56,7 +56,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 				"repository": "test",
 				"actions":    []string{"opened"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  &contexts.EventContext{},
 		})
 
@@ -84,7 +84,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 				"repository": "test",
 				"actions":    []string{"opened"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -113,7 +113,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 				"repository": "test",
 				"actions":    []string{"opened"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
