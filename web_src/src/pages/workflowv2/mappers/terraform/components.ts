@@ -66,7 +66,7 @@ export const terraformComponentMapper: ComponentBaseMapper = {
     if (outputData?.decision) details["Decision"] = outputData.decision;
     if (outputData?.decidedAt) details["Decided At"] = outputData.decidedAt;
     if (outputData?.appliedToTFC) details["Applied to TFC"] = outputData.appliedToTFC ? "Yes" : "No";
-    
+
     return details;
   },
 };
