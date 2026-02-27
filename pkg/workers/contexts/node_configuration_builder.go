@@ -2,7 +2,9 @@ package contexts
 
 import (
 	"fmt"
+	"math"
 	"regexp"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -259,7 +261,10 @@ func (b *NodeConfigurationBuilder) BuildExpressionEnv(expression string) (map[st
 		return nil, err
 	}
 
-	env := map[string]any{"$": messageChain}
+	env := map[string]any{
+		"$":      messageChain,
+		"memory": b.buildMemoryExpressionNamespace(),
+	}
 
 	if strings.Contains(expression, "root(") {
 		rootPayload, err := b.resolveRootPayload()
@@ -289,6 +294,8 @@ func (b *NodeConfigurationBuilder) BuildExpressionEnv(expression string) (map[st
 }
 
 func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, error) {
+	normalizedExpression := normalizeMemoryExpression(expression)
+
 	referencedNodes, err := parseReferencedNodes(expression)
 	if err != nil {
 		return "", err
@@ -299,7 +306,11 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 		return "", err
 	}
 
-	env := map[string]any{"$": messageChain}
+	env := map[string]any{
+		"$":      messageChain,
+		"memory": b.buildMemoryExpressionNamespace(),
+	}
+	memoryNamespace := env["memory"]
 
 	if b.parentBlueprintNode != nil {
 		env["config"] = b.parentBlueprintNode.Configuration.Data()
@@ -332,9 +343,15 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 
 			return b.resolvePreviousPayload(depth)
 		}),
+		expr.Function("memory_find", func(params ...any) (any, error) {
+			return callMemoryNamespaceFunc(memoryNamespace, "find", params...)
+		}),
+		expr.Function("memory_find_first", func(params ...any) (any, error) {
+			return callMemoryNamespaceFunc(memoryNamespace, "findFirst", params...)
+		}),
 	}
 
-	vm, err := expr.Compile(expression, exprOptions...)
+	vm, err := expr.Compile(normalizedExpression, exprOptions...)
 	if err != nil {
 		return "", err
 	}
@@ -345,6 +362,12 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 	}
 
 	return output, nil
+}
+
+func normalizeMemoryExpression(expression string) string {
+	normalized := strings.ReplaceAll(expression, "memory.findFirst(", "memory_find_first(")
+	normalized = strings.ReplaceAll(normalized, "memory.find(", "memory_find(")
+	return normalized
 }
 
 func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (map[string]any, error) {
@@ -751,6 +774,181 @@ func (b *NodeConfigurationBuilder) resolveFromRoot(depth int, step int) (any, er
 	}
 
 	return nil, nil
+}
+
+func (b *NodeConfigurationBuilder) buildMemoryExpressionNamespace() map[string]any {
+	cache := make(map[string][]models.CanvasMemory)
+
+	loadByNamespace := func(namespace string) ([]models.CanvasMemory, error) {
+		if cached, ok := cache[namespace]; ok {
+			return cached, nil
+		}
+
+		records, err := models.ListCanvasMemoriesByNamespaceInTransaction(b.tx, b.workflowID, namespace)
+		if err != nil {
+			return nil, err
+		}
+
+		cache[namespace] = records
+		return records, nil
+	}
+
+	return map[string]any{
+		"find": func(params ...any) (any, error) {
+			namespace, matches, err := parseMemoryFindParams(params)
+			if err != nil {
+				return nil, err
+			}
+
+			records, err := loadByNamespace(namespace)
+			if err != nil {
+				return nil, err
+			}
+
+			values := make([]any, 0, len(records))
+			for _, record := range records {
+				if !memoryValueMatches(record.Values.Data(), matches) {
+					continue
+				}
+				values = append(values, record.Values.Data())
+			}
+
+			return values, nil
+		},
+		"findFirst": func(params ...any) (any, error) {
+			namespace, matches, err := parseMemoryFindParams(params)
+			if err != nil {
+				return nil, err
+			}
+
+			records, err := loadByNamespace(namespace)
+			if err != nil {
+				return nil, err
+			}
+			for _, record := range records {
+				if !memoryValueMatches(record.Values.Data(), matches) {
+					continue
+				}
+				return record.Values.Data(), nil
+			}
+
+			return nil, nil
+		},
+	}
+}
+
+func parseMemoryFindParams(params []any) (string, map[string]any, error) {
+	if len(params) == 0 || len(params) > 2 {
+		return "", nil, fmt.Errorf("memory.find() and memory.findFirst() require a namespace and optionally a matches object")
+	}
+
+	namespace, ok := params[0].(string)
+	if !ok {
+		return "", nil, fmt.Errorf("memory namespace must be a string")
+	}
+
+	namespace = strings.TrimSpace(namespace)
+	if namespace == "" {
+		return "", nil, fmt.Errorf("memory namespace is required")
+	}
+
+	if len(params) == 1 || params[1] == nil {
+		return namespace, nil, nil
+	}
+
+	matches, ok := params[1].(map[string]any)
+	if !ok {
+		return "", nil, fmt.Errorf("memory matches must be an object")
+	}
+
+	return namespace, matches, nil
+}
+
+func callMemoryNamespaceFunc(namespaceRaw any, functionName string, params ...any) (any, error) {
+	namespace, ok := namespaceRaw.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("memory namespace is invalid")
+	}
+
+	callableRaw, ok := namespace[functionName]
+	if !ok {
+		return nil, fmt.Errorf("memory.%s is not available", functionName)
+	}
+
+	callable, ok := callableRaw.(func(params ...any) (any, error))
+	if !ok {
+		return nil, fmt.Errorf("memory.%s is invalid", functionName)
+	}
+
+	return callable(params...)
+}
+
+func memoryValueMatches(value any, matches map[string]any) bool {
+	if len(matches) == 0 {
+		return true
+	}
+
+	valueMap, ok := value.(map[string]any)
+	if !ok {
+		return false
+	}
+
+	for key, expected := range matches {
+		actual, exists := valueMap[key]
+		if !exists {
+			return false
+		}
+
+		if !memoryValuesEqual(actual, expected) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func memoryValuesEqual(actual, expected any) bool {
+	if actualNumber, ok := toComparableFloat(actual); ok {
+		expectedNumber, expectedOk := toComparableFloat(expected)
+		if !expectedOk {
+			return false
+		}
+
+		return math.Abs(actualNumber-expectedNumber) < 1e-9
+	}
+
+	return reflect.DeepEqual(actual, expected)
+}
+
+func toComparableFloat(value any) (float64, bool) {
+	switch typed := value.(type) {
+	case int:
+		return float64(typed), true
+	case int8:
+		return float64(typed), true
+	case int16:
+		return float64(typed), true
+	case int32:
+		return float64(typed), true
+	case int64:
+		return float64(typed), true
+	case uint:
+		return float64(typed), true
+	case uint8:
+		return float64(typed), true
+	case uint16:
+		return float64(typed), true
+	case uint32:
+		return float64(typed), true
+	case uint64:
+		return float64(typed), true
+	case float32:
+		return float64(typed), true
+	case float64:
+		return typed, true
+	default:
+		return 0, false
+	}
 }
 
 func (b *NodeConfigurationBuilder) singleInputPayload() (any, bool, error) {

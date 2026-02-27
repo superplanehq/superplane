@@ -194,6 +194,8 @@ type MetadataContext interface {
 
 type CanvasMemoryContext interface {
 	Add(namespace string, values any) error
+	Find(namespace string, matches map[string]any) ([]any, error)
+	FindFirst(namespace string, matches map[string]any) (any, error)
 }
 
 /*

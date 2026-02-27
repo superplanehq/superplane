@@ -22,6 +22,14 @@ func (c *canvasMemoryContext) Add(namespace string, values any) error {
 	return c.err
 }
 
+func (c *canvasMemoryContext) Find(namespace string, matches map[string]any) ([]any, error) {
+	return []any{}, c.err
+}
+
+func (c *canvasMemoryContext) FindFirst(namespace string, matches map[string]any) (any, error) {
+	return nil, c.err
+}
+
 func TestAddMemoryExecute(t *testing.T) {
 	t.Run("adds memory and emits payload", func(t *testing.T) {
 		component := &AddMemory{}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/expr-lang/expr"
@@ -123,7 +124,8 @@ func (f *If) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	vm, err := expr.Compile(spec.Expression, expressionOptions(env)...)
+	normalizedExpression := normalizeMemoryExpression(spec.Expression)
+	vm, err := expr.Compile(normalizedExpression, expressionOptions(env)...)
 
 	if err != nil {
 		return err
@@ -159,7 +161,11 @@ func expressionEnv(ctx core.ExecutionContext, expression string) (map[string]any
 		return ctx.ExpressionEnv(expression)
 	}
 
-	return buildExpressionEnv(ctx.Data, ctx.SourceNodeID), nil
+	env := buildExpressionEnv(ctx.Data, ctx.SourceNodeID)
+	if ctx.CanvasMemory != nil {
+		env["memory"] = buildMemoryExpressionNamespace(ctx.CanvasMemory)
+	}
+	return env, nil
 }
 
 func buildExpressionEnv(input any, sourceNodeID string) map[string]any {
@@ -235,7 +241,43 @@ func expressionOptions(env map[string]any) []expr.Option {
 
 			return nil, nil
 		}),
+		expr.Function("memory_find", func(params ...any) (any, error) {
+			return callMemoryNamespaceFunc(env, "find", params...)
+		}),
+		expr.Function("memory_find_first", func(params ...any) (any, error) {
+			return callMemoryNamespaceFunc(env, "findFirst", params...)
+		}),
 	}
+}
+
+func normalizeMemoryExpression(expression string) string {
+	normalized := strings.ReplaceAll(expression, "memory.findFirst(", "memory_find_first(")
+	normalized = strings.ReplaceAll(normalized, "memory.find(", "memory_find(")
+	return normalized
+}
+
+func callMemoryNamespaceFunc(env map[string]any, functionName string, params ...any) (any, error) {
+	namespaceRaw, ok := env["memory"]
+	if !ok {
+		return nil, fmt.Errorf("memory namespace is not available")
+	}
+
+	namespace, ok := namespaceRaw.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("memory namespace is invalid")
+	}
+
+	rawFunc, ok := namespace[functionName]
+	if !ok {
+		return nil, fmt.Errorf("memory.%s is not available", functionName)
+	}
+
+	callable, ok := rawFunc.(func(params ...any) (any, error))
+	if !ok {
+		return nil, fmt.Errorf("memory.%s is invalid", functionName)
+	}
+
+	return callable(params...)
 }
 
 func parseDepthValue(param any) (int, error) {
@@ -262,6 +304,47 @@ func parseDepthValue(param any) (int, error) {
 	default:
 		return 0, fmt.Errorf("depth must be an integer")
 	}
+}
+
+func buildMemoryExpressionNamespace(memoryCtx core.CanvasMemoryContext) map[string]any {
+	return map[string]any{
+		"find": func(params ...any) (any, error) {
+			namespace, matches, err := parseMemoryParams(params)
+			if err != nil {
+				return nil, err
+			}
+			return memoryCtx.Find(namespace, matches)
+		},
+		"findFirst": func(params ...any) (any, error) {
+			namespace, matches, err := parseMemoryParams(params)
+			if err != nil {
+				return nil, err
+			}
+			return memoryCtx.FindFirst(namespace, matches)
+		},
+	}
+}
+
+func parseMemoryParams(params []any) (string, map[string]any, error) {
+	if len(params) == 0 || len(params) > 2 {
+		return "", nil, fmt.Errorf("memory.find() and memory.findFirst() require a namespace and optionally a matches object")
+	}
+
+	namespace, ok := params[0].(string)
+	if !ok || namespace == "" {
+		return "", nil, fmt.Errorf("memory namespace must be a non-empty string")
+	}
+
+	if len(params) == 1 || params[1] == nil {
+		return namespace, nil, nil
+	}
+
+	matches, ok := params[1].(map[string]any)
+	if !ok {
+		return "", nil, fmt.Errorf("memory matches must be an object")
+	}
+
+	return namespace, matches, nil
 }
 
 func (f *If) Actions() []core.Action {

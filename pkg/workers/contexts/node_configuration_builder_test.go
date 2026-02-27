@@ -1251,3 +1251,77 @@ func Test_NodeConfigurationBuilder_DisallowExpression_ListItems(t *testing.T) {
 	assert.Equal(t, "resolved", item["allowed"])
 	assert.Equal(t, "{{ $[\"node-1\"].disallowed }}", item["disallowed"])
 }
+
+func Test_NodeConfigurationBuilder_MemoryFind(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	err := models.AddCanvasMemory(canvas.ID, "machines", map[string]any{"sandbox_id": "12121"})
+	require.NoError(t, err)
+	err = models.AddCanvasMemory(canvas.ID, "machines", map[string]any{"sandbox_id": "34343"})
+	require.NoError(t, err)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithInput(map[string]any{})
+
+	result, err := builder.resolveExpression(`len(memory.find("machines"))`)
+	require.NoError(t, err)
+	assert.Equal(t, 2, result)
+
+	filtered, err := builder.resolveExpression(`len(memory.find("machines", {"sandbox_id": "12121"}))`)
+	require.NoError(t, err)
+	assert.Equal(t, 1, filtered)
+}
+
+func Test_NodeConfigurationBuilder_MemoryFindFirst(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	err := models.AddCanvasMemory(canvas.ID, "machines", map[string]any{"sandbox_id": "12121", "creator": "igor", "attempt": 1})
+	require.NoError(t, err)
+	err = models.AddCanvasMemory(canvas.ID, "machines", map[string]any{"sandbox_id": "34343", "creator": "dani", "attempt": 2})
+	require.NoError(t, err)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithInput(map[string]any{})
+
+	result, err := builder.resolveExpression(`memory.findFirst("machines").sandbox_id`)
+	require.NoError(t, err)
+	assert.Equal(t, "34343", result)
+
+	matched, err := builder.resolveExpression(`memory.findFirst("machines", {"creator": "igor"}).sandbox_id`)
+	require.NoError(t, err)
+	assert.Equal(t, "12121", matched)
+
+	numericMatch, err := builder.resolveExpression(`memory.findFirst("machines", {"attempt": 1}).creator`)
+	require.NoError(t, err)
+	assert.Equal(t, "igor", numericMatch)
+
+	missing, err := builder.resolveExpression(`memory.findFirst("missing")`)
+	require.NoError(t, err)
+	assert.Nil(t, missing)
+
+	missingMatch, err := builder.resolveExpression(`memory.findFirst("machines", {"creator": "nobody"})`)
+	require.NoError(t, err)
+	assert.Nil(t, missingMatch)
+}

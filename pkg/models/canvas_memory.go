@@ -53,6 +53,23 @@ func ListCanvasMemories(canvasID uuid.UUID) ([]CanvasMemory, error) {
 	return ListCanvasMemoriesInTransaction(database.Conn(), canvasID)
 }
 
+func ListCanvasMemoriesByNamespaceInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string) ([]CanvasMemory, error) {
+	var records []CanvasMemory
+	err := tx.
+		Where("canvas_id = ? AND namespace = ?", canvasID, namespace).
+		Order("created_at DESC").
+		Find(&records).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return records, nil
+}
+
+func ListCanvasMemoriesByNamespace(canvasID uuid.UUID, namespace string) ([]CanvasMemory, error) {
+	return ListCanvasMemoriesByNamespaceInTransaction(database.Conn(), canvasID, namespace)
+}
+
 func DeleteCanvasMemory(canvasID, memoryID uuid.UUID) error {
 	return DeleteCanvasMemoryInTransaction(database.Conn(), canvasID, memoryID)
 }

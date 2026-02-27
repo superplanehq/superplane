@@ -22,6 +22,8 @@ Expressions can reference:
 - `$` for run context data
 - `root()` for root event data
 - `previous()` or `previous(<depth>)` for prior node outputs by depth
+- `memory.find(namespace[, matches])` for canvas memory list lookup
+- `memory.findFirst(namespace[, matches])` for first matching canvas memory item
 
 ## Planning Rules
 
@@ -39,6 +41,8 @@ When generating workflow operations that include `if`:
 - `$["Approval"].status == "approved"`
 - `$["RiskScore"].value >= 80`
 - `previous().status == "success"`
+- `memory.findFirst("machines", {"sandbox_id": root().data.sandbox_id}) != nil`
+- `len(memory.find("machines", {"creator": "igor"})) > 0`
 
 ## Common Mistakes To Avoid
 
