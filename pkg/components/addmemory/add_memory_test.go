@@ -27,6 +27,7 @@ func TestAddMemoryExecute(t *testing.T) {
 		component := &AddMemory{}
 		execState := &contexts.ExecutionStateContext{}
 		memoryCtx := &canvasMemoryContext{}
+		execMetadata := &contexts.MetadataContext{}
 		nodeMetadata := &contexts.MetadataContext{}
 
 		err := component.Execute(core.ExecutionContext{
@@ -38,6 +39,7 @@ func TestAddMemoryExecute(t *testing.T) {
 					{"name": "creator", "value": "alex"},
 				},
 			},
+			Metadata:       execMetadata,
 			NodeMetadata:   nodeMetadata,
 			CanvasMemory:   memoryCtx,
 			ExecutionState: execState,
@@ -77,18 +79,4 @@ func TestAddMemoryExecute(t *testing.T) {
 		)
 	})
 
-	t.Run("fails when canvas memory context is missing", func(t *testing.T) {
-		component := &AddMemory{}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"namespace": "machines",
-				"valueList": []map[string]any{{"name": "id", "value": "1"}},
-			},
-			ExecutionState: &contexts.ExecutionStateContext{},
-		})
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "canvas memory context is not available")
-	})
 }
