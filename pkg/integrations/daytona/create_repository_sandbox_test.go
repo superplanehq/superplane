@@ -2,6 +2,7 @@ package daytona
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -210,7 +211,7 @@ func Test__CreateRepositorySandbox__Execute(t *testing.T) {
 
 	metadata, ok := metadataCtx.Metadata.(CreateRepositorySandboxMetadata)
 	require.True(t, ok)
-	assert.Equal(t, repositorySandboxStageWaitingSandbox, metadata.Stage)
+	assert.Equal(t, repositorySandboxStagePreparingSandbox, metadata.Stage)
 	assert.Equal(t, "sandbox-123", metadata.SandboxID)
 	assert.Equal(t, "https://github.com/superplanehq/superplane.git", metadata.Repository)
 	assert.Equal(t, "/home/daytona/superplane", metadata.Directory)
@@ -228,7 +229,7 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 	t.Run("waits while sandbox is creating", func(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: CreateRepositorySandboxMetadata{
-				Stage:            repositorySandboxStageWaitingSandbox,
+				Stage:            repositorySandboxStagePreparingSandbox,
 				SandboxID:        "sandbox-123",
 				SandboxStartedAt: time.Now().Format(time.RFC3339),
 				Timeout:          int(5 * time.Minute.Seconds()),
@@ -261,7 +262,7 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 	t.Run("starts clone when sandbox is ready", func(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: CreateRepositorySandboxMetadata{
-				Stage:            repositorySandboxStageWaitingSandbox,
+				Stage:            repositorySandboxStagePreparingSandbox,
 				SandboxID:        "sandbox-123",
 				SandboxStartedAt: time.Now().Format(time.RFC3339),
 				Timeout:          int(5 * time.Minute.Seconds()),
@@ -278,14 +279,26 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 			Responses: []*http.Response{
 				// GetSandbox
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sandbox-123","state":"started"}`))},
+				// FetchConfig for CloneRepository
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				// CloneRepository
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				// FetchConfig for bootstrap folder creation
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				// CreateFolder /home/daytona/.superplane
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				// FetchConfig for inline bootstrap upload
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				// Upload inline bootstrap script
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 				// FetchConfig for CreateSession
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
 				// CreateSession
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 				// FetchConfig for ExecuteSessionCommand
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
-				// ExecuteSessionCommand clone
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"cmdId":"cmd-clone"}`))},
+				// ExecuteSessionCommand bootstrap
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"cmdId":"cmd-bootstrap"}`))},
 			},
 		}
 
@@ -307,89 +320,64 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 
 		updated, ok := metadataCtx.Metadata.(CreateRepositorySandboxMetadata)
 		require.True(t, ok)
-		assert.Equal(t, repositorySandboxStageCloningRepo, updated.Stage)
+		assert.Equal(t, repositorySandboxStageBootstrapping, updated.Stage)
 		assert.NotEmpty(t, updated.SessionID)
 		require.NotNil(t, updated.Clone)
-		assert.Equal(t, "cmd-clone", updated.Clone.CmdID)
+		assert.Nil(t, updated.Clone.Error)
 		assert.NotEmpty(t, updated.Clone.StartedAt)
+		assert.NotEmpty(t, updated.Clone.FinishedAt)
+		require.NotNil(t, updated.Bootstrap)
+		assert.Equal(t, "cmd-bootstrap", updated.Bootstrap.CmdID)
+		assert.NotEmpty(t, updated.Bootstrap.StartedAt)
 
-		require.Len(t, httpContext.Requests, 5)
-		body, err := io.ReadAll(httpContext.Requests[4].Body)
+		require.Len(t, httpContext.Requests, 11)
+		cloneBody, err := io.ReadAll(httpContext.Requests[2].Body)
 		require.NoError(t, err)
+		cloneReq := CloneRepositoryRequest{}
+		require.NoError(t, json.Unmarshal(cloneBody, &cloneReq))
+		assert.Equal(t, "https://github.com/superplanehq/superplane.git", cloneReq.URL)
+		assert.Equal(t, "/home/daytona/superplane", cloneReq.Path)
 
+		uploadedScriptBody, err := io.ReadAll(httpContext.Requests[6].Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(uploadedScriptBody), "npm ci")
+
+		body, err := io.ReadAll(httpContext.Requests[10].Body)
+		require.NoError(t, err)
 		req := SessionExecuteRequest{}
 		require.NoError(t, json.Unmarshal(body, &req))
-		assert.Contains(t, req.Command, "git clone --depth 1")
-		assert.Contains(t, req.Command, "'https://github.com/superplanehq/superplane.git'")
-		assert.Contains(t, req.Command, "'/home/daytona/superplane'")
+		assert.Contains(t, req.Command, "cd '/home/daytona/superplane' && sh '/home/daytona/.superplane/bootstrap.sh'")
 	})
 
-	t.Run("clone stage with command not finished reschedules", func(t *testing.T) {
+	t.Run("clone failure marks execution as failed", func(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: CreateRepositorySandboxMetadata{
-				Stage:            repositorySandboxStageCloningRepo,
+				Stage:            repositorySandboxStagePreparingSandbox,
 				SandboxID:        "sandbox-123",
 				SandboxStartedAt: time.Now().Format(time.RFC3339),
 				Timeout:          int(5 * time.Minute.Seconds()),
-				SessionID:        "session-1",
-				Clone: &CloneMetadata{
-					CmdID: "cmd-clone",
-				},
+				Repository:       "https://github.com/superplanehq/private-repo.git",
+				Directory:        "/home/daytona/private-repo",
 			},
 		}
 
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				// GetSandbox
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sandbox-123","state":"started"}`))},
+				// FetchConfig for CloneRepository
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-1","commands":[{"id":"cmd-clone"}]}`))},
+				// CloneRepository error
+				{StatusCode: http.StatusUnauthorized, Body: io.NopCloser(strings.NewReader(`{"message":"authentication failed"}`))},
 			},
 		}
 
-		requestCtx := &contexts.RequestContext{}
+		execCtx := &contexts.ExecutionStateContext{}
 		err := component.HandleAction(core.ActionContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Metadata:       metadataCtx,
-			ExecutionState: &contexts.ExecutionStateContext{},
-			Requests:       requestCtx,
-			Logger:         newTestLogger(),
-			Integration: &contexts.IntegrationContext{
-				Configuration: map[string]any{"apiKey": "test-api-key"},
-			},
-		})
-
-		require.NoError(t, err)
-		assert.Equal(t, "poll", requestCtx.Action)
-	})
-
-	t.Run("clone stage failure returns error", func(t *testing.T) {
-		metadataCtx := &contexts.MetadataContext{
-			Metadata: CreateRepositorySandboxMetadata{
-				Stage:            repositorySandboxStageCloningRepo,
-				SandboxID:        "sandbox-123",
-				SandboxStartedAt: time.Now().Format(time.RFC3339),
-				Timeout:          int(5 * time.Minute.Seconds()),
-				SessionID:        "session-1",
-				Clone: &CloneMetadata{
-					CmdID: "cmd-clone",
-				},
-			},
-		}
-
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-1","commands":[{"id":"cmd-clone","exitCode":1}]}`))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`fatal: repository not found`))},
-			},
-		}
-
-		err := component.HandleAction(core.ActionContext{
-			Name:           "poll",
-			HTTP:           httpContext,
-			Metadata:       metadataCtx,
-			ExecutionState: &contexts.ExecutionStateContext{},
+			ExecutionState: execCtx,
 			Requests:       &contexts.RequestContext{},
 			Logger:         newTestLogger(),
 			Integration: &contexts.IntegrationContext{
@@ -397,76 +385,18 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 			},
 		})
 
-		require.ErrorContains(t, err, "repository clone failed")
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.False(t, execCtx.Passed)
+		assert.Equal(t, "error", execCtx.FailureReason)
+		assert.Contains(t, execCtx.FailureMessage, "repository clone failed")
 
 		updated := metadataCtx.Metadata.(CreateRepositorySandboxMetadata)
 		require.NotNil(t, updated.Clone)
-		assert.Equal(t, 1, updated.Clone.ExitCode)
-		assert.Equal(t, "fatal: repository not found", updated.Clone.Result)
+		assert.NotNil(t, updated.Clone.Error)
+		assert.Contains(t, *updated.Clone.Error, "authentication failed")
+		assert.NotEmpty(t, updated.Clone.StartedAt)
 		assert.NotEmpty(t, updated.Clone.FinishedAt)
-	})
-
-	t.Run("clone stage success starts bootstrap", func(t *testing.T) {
-		metadataCtx := &contexts.MetadataContext{
-			Metadata: CreateRepositorySandboxMetadata{
-				Stage:            repositorySandboxStageCloningRepo,
-				SandboxID:        "sandbox-123",
-				SandboxStartedAt: time.Now().Format(time.RFC3339),
-				Timeout:          int(5 * time.Minute.Seconds()),
-				SessionID:        "session-1",
-				Repository:       "https://github.com/superplanehq/superplane.git",
-				Directory:        "/home/daytona/superplane",
-				Clone: &CloneMetadata{
-					CmdID: "cmd-clone",
-				},
-				Bootstrap: &BootstrapMetadata{
-					From:   SandboxBootstrapFromInline,
-					Script: ptr("npm ci && npm test"),
-				},
-			},
-		}
-
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-1","commands":[{"id":"cmd-clone","exitCode":0}]}`))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`clone logs`))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"cmdId":"cmd-bootstrap"}`))},
-			},
-		}
-
-		requestCtx := &contexts.RequestContext{}
-		err := component.HandleAction(core.ActionContext{
-			Name:           "poll",
-			HTTP:           httpContext,
-			Metadata:       metadataCtx,
-			ExecutionState: &contexts.ExecutionStateContext{},
-			Requests:       requestCtx,
-			Logger:         newTestLogger(),
-			Integration: &contexts.IntegrationContext{
-				Configuration: map[string]any{"apiKey": "test-api-key"},
-			},
-		})
-
-		require.NoError(t, err)
-		assert.Equal(t, "poll", requestCtx.Action)
-
-		updated := metadataCtx.Metadata.(CreateRepositorySandboxMetadata)
-		assert.Equal(t, repositorySandboxStageBootstrapping, updated.Stage)
-		require.NotNil(t, updated.Clone)
-		assert.Equal(t, "clone logs", updated.Clone.Result)
-		require.NotNil(t, updated.Bootstrap)
-		assert.Equal(t, "cmd-bootstrap", updated.Bootstrap.CmdID)
-		assert.NotEmpty(t, updated.Bootstrap.StartedAt)
-
-		require.Len(t, httpContext.Requests, 6)
-		body, err := io.ReadAll(httpContext.Requests[5].Body)
-		require.NoError(t, err)
-		req := SessionExecuteRequest{}
-		require.NoError(t, json.Unmarshal(body, &req))
-		assert.Contains(t, req.Command, "cd '/home/daytona/superplane' && npm ci && npm test")
 	})
 
 	t.Run("bootstrap stage success emits payload", func(t *testing.T) {
@@ -480,10 +410,8 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 				Repository:       "https://github.com/superplanehq/superplane.git",
 				Directory:        "/home/daytona/superplane",
 				Clone: &CloneMetadata{
-					CmdID:     "cmd-clone",
-					ExitCode:  0,
-					Result:    "clone logs",
-					StartedAt: time.Now().Format(time.RFC3339),
+					StartedAt:  time.Now().Format(time.RFC3339),
+					FinishedAt: time.Now().Format(time.RFC3339),
 				},
 				Bootstrap: &BootstrapMetadata{
 					CmdID: "cmd-bootstrap",
@@ -526,7 +454,8 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "sandbox-123", payload.SandboxID)
 		assert.Equal(t, "/home/daytona/superplane", payload.Directory)
-		assert.Equal(t, "clone logs", payload.Clone.Result)
+		require.NotNil(t, payload.Clone)
+		assert.Nil(t, payload.Clone.Error)
 		assert.Equal(t, "bootstrap logs", payload.Bootstrap.Result)
 		assert.Equal(t, 0, payload.Bootstrap.ExitCode)
 	})
@@ -582,7 +511,7 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 			Name: "poll",
 			Metadata: &contexts.MetadataContext{
 				Metadata: CreateRepositorySandboxMetadata{
-					Stage:            repositorySandboxStageWaitingSandbox,
+					Stage:            repositorySandboxStagePreparingSandbox,
 					SandboxID:        "sandbox-123",
 					SandboxStartedAt: time.Now().Add(-2 * time.Minute).Format(time.RFC3339),
 					Timeout:          int(time.Minute.Seconds()),
@@ -600,23 +529,23 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 		assert.True(t, execCtx.Finished)
 		assert.False(t, execCtx.Passed)
 		assert.Equal(t, "error", execCtx.FailureReason)
-		assert.Contains(t, execCtx.FailureMessage, "sandbox creation failed on stage waitingSandbox after 1m0s")
+		assert.Contains(t, execCtx.FailureMessage, "sandbox creation failed on stage preparingSandbox after 1m0s")
 	})
 
-	t.Run("times out during clone stage and marks execution as failed", func(t *testing.T) {
+	t.Run("times out during bootstrap stage and marks execution as failed", func(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 
 		err := component.HandleAction(core.ActionContext{
 			Name: "poll",
 			Metadata: &contexts.MetadataContext{
 				Metadata: CreateRepositorySandboxMetadata{
-					Stage:            repositorySandboxStageCloningRepo,
+					Stage:            repositorySandboxStageBootstrapping,
 					SandboxID:        "sandbox-123",
 					SandboxStartedAt: time.Now().Add(-2 * time.Minute).Format(time.RFC3339),
 					Timeout:          int(time.Minute.Seconds()),
 					SessionID:        "session-1",
-					Clone: &CloneMetadata{
-						CmdID: "cmd-clone",
+					Bootstrap: &BootstrapMetadata{
+						CmdID: "cmd-bootstrap",
 					},
 				},
 			},
@@ -635,7 +564,7 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 		assert.Contains(
 			t,
 			execCtx.FailureMessage,
-			"sandbox creation failed on stage "+repositorySandboxStageCloningRepo+" after 1m0s",
+			"sandbox creation failed on stage "+repositorySandboxStageBootstrapping+" after 1m0s",
 		)
 	})
 
@@ -670,7 +599,7 @@ func Test__CreateRepositorySandbox__BootstrapCommand(t *testing.T) {
 	component := CreateRepositorySandbox{}
 
 	t.Run("inline mode", func(t *testing.T) {
-		command, err := component.bootstrapCommand(&CreateRepositorySandboxMetadata{
+		_, err := component.bootstrapCommand(&CreateRepositorySandboxMetadata{
 			Directory: "/home/daytona/repository",
 			Bootstrap: &BootstrapMetadata{
 				From:   SandboxBootstrapFromInline,
@@ -678,8 +607,20 @@ func Test__CreateRepositorySandbox__BootstrapCommand(t *testing.T) {
 			},
 		})
 
+		require.ErrorContains(t, err, "bootstrap.path is required when bootstrap.from is inline")
+	})
+
+	t.Run("inline mode with prepared path", func(t *testing.T) {
+		command, err := component.bootstrapCommand(&CreateRepositorySandboxMetadata{
+			Directory: "/home/daytona/repository",
+			Bootstrap: &BootstrapMetadata{
+				From: SandboxBootstrapFromInline,
+				Path: ptr("/home/daytona/.superplane/bootstrap.inline.sh"),
+			},
+		})
+
 		require.NoError(t, err)
-		assert.Equal(t, "cd '/home/daytona/repository' && npm ci && npm test", command)
+		assert.Equal(t, "cd '/home/daytona/repository' && sh '/home/daytona/.superplane/bootstrap.inline.sh'", command)
 	})
 
 	t.Run("file mode", func(t *testing.T) {
@@ -707,10 +648,73 @@ func Test__CreateRepositorySandbox__BootstrapCommand(t *testing.T) {
 	})
 }
 
+func Test__CreateRepositorySandbox__CloneRepositoryRequest(t *testing.T) {
+	component := CreateRepositorySandbox{}
+
+	t.Run("includes github token from secrets", func(t *testing.T) {
+		request, err := component.cloneRepositoryRequest(
+			&testSecretsContext{
+				values: map[string][]byte{
+					"credentials/token": []byte("ghp_test_token"),
+				},
+			},
+			&CreateRepositorySandboxMetadata{
+				Repository: "https://github.com/superplanehq/superplane.git",
+				Directory:  "/home/daytona/superplane",
+				Secrets: []SandboxSecret{
+					{
+						Type: SandboxSecretTypeEnvVar,
+						Name: "GITHUB_TOKEN",
+						Value: SecretKeyRef{
+							Secret: "credentials",
+							Key:    "token",
+						},
+					},
+				},
+			},
+		)
+
+		require.NoError(t, err)
+		assert.Equal(t, "https://github.com/superplanehq/superplane.git", request.URL)
+		assert.Equal(t, "/home/daytona/superplane", request.Path)
+		assert.Equal(t, "x-access-token", request.Username)
+		assert.Equal(t, "ghp_test_token", request.Password)
+	})
+
+	t.Run("no github token secret keeps clone request without credentials", func(t *testing.T) {
+		request, err := component.cloneRepositoryRequest(
+			&testSecretsContext{},
+			&CreateRepositorySandboxMetadata{
+				Repository: "https://github.com/superplanehq/superplane.git",
+				Directory:  "/home/daytona/superplane",
+			},
+		)
+
+		require.NoError(t, err)
+		assert.Equal(t, "https://github.com/superplanehq/superplane.git", request.URL)
+		assert.Equal(t, "/home/daytona/superplane", request.Path)
+		assert.Empty(t, request.Username)
+		assert.Empty(t, request.Password)
+	})
+}
+
 func newTestLogger() *log.Entry {
 	return log.NewEntry(log.New())
 }
 
 func ptr(value string) *string {
 	return &value
+}
+
+type testSecretsContext struct {
+	values map[string][]byte
+}
+
+func (c *testSecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
+	value, ok := c.values[secretName+"/"+keyName]
+	if !ok {
+		return nil, fmt.Errorf("secret not found: %s/%s", secretName, keyName)
+	}
+
+	return value, nil
 }

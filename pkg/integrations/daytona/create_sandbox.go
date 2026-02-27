@@ -174,11 +174,7 @@ func (c *CreateSandbox) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("autoStopInterval cannot be negative")
 	}
 
-	if err := validateSandboxSecrets(spec.Secrets); err != nil {
-		return err
-	}
-
-	return nil
+	return validateSandboxSecrets(spec.Secrets)
 }
 
 func (c *CreateSandbox) Execute(ctx core.ExecutionContext) error {

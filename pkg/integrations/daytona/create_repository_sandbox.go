@@ -18,19 +18,15 @@ const (
 	CreateRepositorySandboxPayloadType    = "daytona.repository.sandbox"
 	CreateRepositorySandboxPollInterval   = 5 * time.Second
 	CreateRepositorySandboxDefaultTimeout = 5 * time.Minute
-	CreateRepositorySandboxCloneBasePath  = "/home/daytona"
-)
 
-const (
 	SandboxBootstrapFromInline = "inline"
 	SandboxBootstrapFromFile   = "file"
-)
 
-const (
-	repositorySandboxStageWaitingSandbox = "waitingSandbox"
-	repositorySandboxStageCloningRepo    = "cloningRepository"
-	repositorySandboxStageBootstrapping  = "bootstrapping"
-	repositorySandboxStageDone           = "done"
+	repositorySandboxStagePreparingSandbox = "preparingSandbox"
+	repositorySandboxStageBootstrapping    = "bootstrapping"
+	repositorySandboxStageDone             = "done"
+
+	repositorySandboxInlineBootstrapPath = SandboxBaseDir + "/bootstrap.sh"
 )
 
 type CreateRepositorySandbox struct{}
@@ -66,11 +62,9 @@ type CreateRepositorySandboxMetadata struct {
 }
 
 type CloneMetadata struct {
-	CmdID      string `json:"cmdId" mapstructure:"cmdId"`
-	StartedAt  string `json:"startedAt" mapstructure:"startedAt"`
-	FinishedAt string `json:"finishedAt" mapstructure:"finishedAt"`
-	ExitCode   int    `json:"exitCode" mapstructure:"exitCode"`
-	Result     string `json:"result" mapstructure:"result"`
+	StartedAt  string  `json:"startedAt" mapstructure:"startedAt"`
+	FinishedAt string  `json:"finishedAt" mapstructure:"finishedAt"`
+	Error      *string `json:"error,omitempty" mapstructure:"error,omitempty"`
 }
 
 type BootstrapMetadata struct {
@@ -159,6 +153,14 @@ func (c *CreateRepositorySandbox) Configuration() []configuration.Field {
 			Default:     15,
 		},
 		{
+			Name:        "repository",
+			Label:       "Repository",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Description: "Repository URL to clone",
+			Placeholder: "https://github.com/owner/repository.git",
+		},
+		{
 			Name:  "env",
 			Label: "Environment Variables",
 			Type:  configuration.FieldTypeList,
@@ -188,14 +190,6 @@ func (c *CreateRepositorySandbox) Configuration() []configuration.Field {
 			Description: "Environment variables to set in the sandbox",
 		},
 		sandboxSecretsConfigurationField(),
-		{
-			Name:        "repository",
-			Label:       "Repository",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Repository URL to clone",
-			Placeholder: "https://github.com/owner/repository.git",
-		},
 		{
 			Name:        "bootstrap",
 			Label:       "Bootstrap",
@@ -371,12 +365,12 @@ func (c *CreateRepositorySandbox) Execute(ctx core.ExecutionContext) error {
 	ctx.Logger.Infof("Created sandbox %s", sandbox.ID)
 
 	metadata := CreateRepositorySandboxMetadata{
-		Stage:            repositorySandboxStageWaitingSandbox,
+		Stage:            repositorySandboxStagePreparingSandbox,
 		SandboxID:        sandbox.ID,
 		SandboxStartedAt: time.Now().Format(time.RFC3339),
 		Timeout:          int(CreateRepositorySandboxDefaultTimeout.Seconds()),
 		Repository:       strings.TrimSpace(spec.Repository),
-		Directory:        path.Join(CreateRepositorySandboxCloneBasePath, repositoryDirectory),
+		Directory:        path.Join(SandboxHomeDir, repositoryDirectory),
 		Secrets:          spec.Secrets,
 		Bootstrap:        bootstrapMetadata,
 	}
@@ -433,11 +427,8 @@ func (c *CreateRepositorySandbox) poll(ctx core.ActionContext) error {
 	}
 
 	switch metadata.Stage {
-	case repositorySandboxStageWaitingSandbox:
+	case repositorySandboxStagePreparingSandbox:
 		return c.pollWaitingSandbox(ctx, &metadata)
-
-	case repositorySandboxStageCloningRepo:
-		return c.pollCloningRepository(ctx, &metadata)
 
 	case repositorySandboxStageBootstrapping:
 		return c.pollBootstrapping(ctx, &metadata)
@@ -474,29 +465,65 @@ func (c *CreateRepositorySandbox) pollWaitingSandbox(ctx core.ActionContext, met
 }
 
 func (c *CreateRepositorySandbox) startClone(ctx core.ActionContext, client *Client, metadata *CreateRepositorySandboxMetadata) error {
+	cloneRequest, err := c.cloneRepositoryRequest(ctx.Secrets, metadata)
+	if err != nil {
+		return err
+	}
+
+	cloneStartedAt := time.Now().Format(time.RFC3339)
+	if err := client.CloneRepository(metadata.SandboxID, cloneRequest); err != nil {
+		errorMessage := err.Error()
+		metadata.Clone = &CloneMetadata{
+			StartedAt:  cloneStartedAt,
+			FinishedAt: time.Now().Format(time.RFC3339),
+			Error:      &errorMessage,
+		}
+
+		if err := ctx.Metadata.Set(*metadata); err != nil {
+			return err
+		}
+
+		ctx.Logger.Errorf("repository clone failed: %v", err)
+		ctx.ExecutionState.Fail("error", fmt.Sprintf("repository clone failed: %v", err))
+		return nil
+	}
+
+	metadata.Clone = &CloneMetadata{
+		StartedAt:  cloneStartedAt,
+		FinishedAt: time.Now().Format(time.RFC3339),
+	}
+
+	//
+	// If no bootstrap is required, we can finish after cloning.
+	//
+	if metadata.Bootstrap == nil {
+		return c.finish(ctx, metadata)
+	}
+
+	if err := c.prepareInlineBootstrapScript(client, metadata); err != nil {
+		return err
+	}
+
 	sessionID := uuid.New().String()
 	if err := client.CreateSession(metadata.SandboxID, sessionID); err != nil {
 		return fmt.Errorf("failed to create session: %v", err)
 	}
 
-	command := fmt.Sprintf(
-		"git clone --depth 1 %s %s",
-		shellQuote(metadata.Repository),
-		shellQuote(metadata.Directory),
-	)
-	command = wrapCommandWithSandboxSecretEnv(command)
-
-	response, err := client.ExecuteSessionCommand(metadata.SandboxID, sessionID, command)
+	bootstrapCommand, err := c.bootstrapCommand(metadata)
 	if err != nil {
-		return fmt.Errorf("failed to clone repository: %v", err)
+		return err
 	}
 
-	metadata.Stage = repositorySandboxStageCloningRepo
-	metadata.SessionID = sessionID
-	metadata.Clone = &CloneMetadata{
-		CmdID:     response.CmdID,
-		StartedAt: time.Now().Format(time.RFC3339),
+	bootstrapCommand = wrapCommandWithSandboxSecretEnv(bootstrapCommand)
+	response, err := client.ExecuteSessionCommand(metadata.SandboxID, sessionID, bootstrapCommand)
+	if err != nil {
+		return fmt.Errorf("failed to execute bootstrap script: %v", err)
 	}
+
+	metadata.Stage = repositorySandboxStageBootstrapping
+	metadata.SessionID = sessionID
+	metadata.Bootstrap.CmdID = response.CmdID
+	metadata.Bootstrap.StartedAt = time.Now().Format(time.RFC3339)
 
 	if err := ctx.Metadata.Set(*metadata); err != nil {
 		return err
@@ -505,63 +532,86 @@ func (c *CreateRepositorySandbox) startClone(ctx core.ActionContext, client *Cli
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateRepositorySandboxPollInterval)
 }
 
-func (c *CreateRepositorySandbox) pollCloningRepository(ctx core.ActionContext, metadata *CreateRepositorySandboxMetadata) error {
-	result, err := c.getCommandResult(ctx, metadata, metadata.Clone.CmdID)
-	if err != nil {
-		ctx.Logger.Errorf("failed to get clone command result for %s: %v", metadata.Clone.CmdID, err)
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateRepositorySandboxPollInterval)
+func (c *CreateRepositorySandbox) cloneRepositoryRequest(secretsContext core.SecretsContext, metadata *CreateRepositorySandboxMetadata) (*CloneRepositoryRequest, error) {
+	request := &CloneRepositoryRequest{
+		URL:  metadata.Repository,
+		Path: metadata.Directory,
 	}
 
-	metadata.Clone.Result = result.Result
-	metadata.Clone.FinishedAt = time.Now().Format(time.RFC3339)
-	metadata.Clone.ExitCode = result.ExitCode
+	token, err := c.findCloneToken(secretsContext, metadata)
+	if err != nil {
+		return nil, err
+	}
 
-	if result.ExitCode != 0 {
-		if err := ctx.Metadata.Set(*metadata); err != nil {
-			return err
+	if token != "" {
+		request.Username = "x-access-token"
+		request.Password = token
+	}
+
+	return request, nil
+}
+
+/*
+ * If a "GITHUB_TOKEN" secret is found in the spec,
+ * we use it to clone the repository with the toolbox Git API.
+ */
+func (c *CreateRepositorySandbox) findCloneToken(secretsContext core.SecretsContext, metadata *CreateRepositorySandboxMetadata) (string, error) {
+	for _, secret := range metadata.Secrets {
+		if strings.TrimSpace(secret.Type) != SandboxSecretTypeEnvVar {
+			continue
 		}
 
-		return fmt.Errorf(
-			"repository clone failed with exit code %d: %s",
-			result.ExitCode,
-			result.ShortResult(),
-		)
+		if strings.TrimSpace(secret.Name) != "GITHUB_TOKEN" {
+			continue
+		}
+
+		if !secret.Value.IsSet() {
+			continue
+		}
+
+		value, err := secretsContext.GetKey(secret.Value.Secret, secret.Value.Key)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve secret %s/%s: %w", secret.Value.Secret, secret.Value.Key, err)
+		}
+
+		token := string(value)
+		if token != "" {
+			return token, nil
+		}
 	}
 
-	//
-	// If no bootstrap is required, we can skip the bootstrap step.
-	//
-	if metadata.Bootstrap == nil {
-		return c.finish(ctx, metadata)
+	return "", nil
+}
+
+/*
+ * If an inline bootstrap script is provided,
+ * we upload it to the sandbox base directory.
+ */
+func (c *CreateRepositorySandbox) prepareInlineBootstrapScript(client *Client, metadata *CreateRepositorySandboxMetadata) error {
+	if metadata.Bootstrap == nil || metadata.Bootstrap.From != SandboxBootstrapFromInline {
+		return nil
 	}
 
-	//
-	// Otherwise, we need to execute the bootstrap script.
-	//
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
+	if metadata.Bootstrap.Script == nil {
+		return fmt.Errorf("bootstrap.script is required when bootstrap.from is inline")
+	}
+
+	if err := ensureFolderExists(client, metadata.SandboxID, SandboxBaseDir); err != nil {
 		return err
 	}
 
-	bootstrapCommand, err := c.bootstrapCommand(metadata)
-	if err != nil {
-		return err
-	}
-	bootstrapCommand = wrapCommandWithSandboxSecretEnv(bootstrapCommand)
-
-	response, err := client.ExecuteSessionCommand(metadata.SandboxID, metadata.SessionID, bootstrapCommand)
-	if err != nil {
-		return fmt.Errorf("failed to execute bootstrap script: %v", err)
+	inlineScriptPath := repositorySandboxInlineBootstrapPath
+	script := *metadata.Bootstrap.Script
+	if !strings.HasSuffix(script, "\n") {
+		script += "\n"
 	}
 
-	metadata.Stage = repositorySandboxStageBootstrapping
-	metadata.Bootstrap.CmdID = response.CmdID
-	metadata.Bootstrap.StartedAt = time.Now().Format(time.RFC3339)
-	if err := ctx.Metadata.Set(*metadata); err != nil {
-		return err
+	if err := client.UploadFile(metadata.SandboxID, inlineScriptPath, []byte(script)); err != nil {
+		return fmt.Errorf("failed to upload inline bootstrap script: %v", err)
 	}
 
-	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateRepositorySandboxPollInterval)
+	metadata.Bootstrap.Path = &inlineScriptPath
+	return nil
 }
 
 func (c *CreateRepositorySandbox) pollBootstrapping(ctx core.ActionContext, metadata *CreateRepositorySandboxMetadata) error {
@@ -695,13 +745,23 @@ func directoryFromPath(candidate, original string) (string, error) {
 }
 
 func (c *CreateRepositorySandbox) bootstrapCommand(metadata *CreateRepositorySandboxMetadata) (string, error) {
-	base := fmt.Sprintf("cd %s && ", shellQuote(metadata.Directory))
+	commands := []string{
+		fmt.Sprintf("cd %s", shellQuote(metadata.Directory)),
+	}
 
 	switch metadata.Bootstrap.From {
 	case SandboxBootstrapFromInline:
-		return base + *metadata.Bootstrap.Script, nil
+		if metadata.Bootstrap.Path == nil || strings.TrimSpace(*metadata.Bootstrap.Path) == "" {
+			return "", fmt.Errorf("bootstrap.path is required when bootstrap.from is inline")
+		}
+
+		commands = append(commands, fmt.Sprintf("sh %s", shellQuote(*metadata.Bootstrap.Path)))
+		return strings.Join(commands, " && "), nil
+
 	case SandboxBootstrapFromFile:
-		return fmt.Sprintf("%ssh %s", base, shellQuote(*metadata.Bootstrap.Path)), nil
+		commands = append(commands, fmt.Sprintf("sh %s", shellQuote(*metadata.Bootstrap.Path)))
+		return strings.Join(commands, " && "), nil
+
 	default:
 		return "", fmt.Errorf("invalid bootstrap.from: %s", metadata.Bootstrap.From)
 	}

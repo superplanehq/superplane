@@ -553,6 +553,47 @@ func Test__Client__ExecuteSessionCommand(t *testing.T) {
 	})
 }
 
+func Test__Client__CloneRepository(t *testing.T) {
+	t.Run("clones repository using toolbox git endpoint", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		err = client.CloneRepository("sandbox-123", &CloneRepositoryRequest{
+			URL:  "https://github.com/superplanehq/superplane.git",
+			Path: "/home/daytona/superplane",
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Equal(t, http.MethodPost, httpContext.Requests[1].Method)
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/toolbox/sandbox-123/git/clone")
+
+		body, readErr := io.ReadAll(httpContext.Requests[1].Body)
+		require.NoError(t, readErr)
+		assert.Contains(t, string(body), `"url":"https://github.com/superplanehq/superplane.git"`)
+		assert.Contains(t, string(body), `"path":"/home/daytona/superplane"`)
+	})
+}
+
 func Test__Client__GetSession(t *testing.T) {
 	t.Run("session with running command", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{

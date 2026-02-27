@@ -292,6 +292,14 @@ type SessionExecuteRequest struct {
 	RunAsync bool   `json:"runAsync"`
 }
 
+// CloneRepositoryRequest is the request body for cloning a repository with the toolbox Git API.
+type CloneRepositoryRequest struct {
+	URL      string `json:"url"`
+	Path     string `json:"path"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+}
+
 // SessionExecuteResponse is the response from executing a command in a session
 type SessionExecuteResponse struct {
 	CmdID string `json:"cmdId"`
@@ -364,6 +372,22 @@ func (c *Client) ExecuteSessionCommand(sandboxID, sessionID, command string) (*S
 	}
 
 	return &response, nil
+}
+
+// CloneRepository clones a repository into the sandbox using the toolbox Git API.
+func (c *Client) CloneRepository(sandboxID string, req *CloneRepositoryRequest) error {
+	baseURL, err := c.toolboxBaseURL(sandboxID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve toolbox URL: %v", err)
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	_, err = c.execRequest(http.MethodPost, baseURL+"/git/clone", bytes.NewReader(body))
+	return err
 }
 
 // GetSession retrieves the session state including command statuses
