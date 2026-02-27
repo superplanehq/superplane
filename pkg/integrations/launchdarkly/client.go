@@ -40,6 +40,17 @@ type FeatureFlagListResponse struct {
 	Items []FeatureFlag `json:"items"`
 }
 
+// Environment represents a LaunchDarkly environment within a project.
+type Environment struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+}
+
+// EnvironmentListResponse is the API response for listing environments.
+type EnvironmentListResponse struct {
+	Items []Environment `json:"items"`
+}
+
 type APIError struct {
 	StatusCode int
 	Body       string
@@ -144,6 +155,22 @@ func (c *Client) ListFeatureFlags(projectKey string) ([]FeatureFlag, error) {
 	var response FeatureFlagListResponse
 	if err := json.Unmarshal(responseBody, &response); err != nil {
 		return nil, fmt.Errorf("error parsing feature flags response: %w", err)
+	}
+
+	return response.Items, nil
+}
+
+// ListEnvironments returns all environments in a LaunchDarkly project.
+func (c *Client) ListEnvironments(projectKey string) ([]Environment, error) {
+	path := fmt.Sprintf("/api/v2/projects/%s/environments", projectKey)
+	responseBody, err := c.execRequest(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response EnvironmentListResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing environments response: %w", err)
 	}
 
 	return response.Items, nil

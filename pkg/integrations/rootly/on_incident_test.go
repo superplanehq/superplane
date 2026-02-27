@@ -27,7 +27,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:        &contexts.EventContext{},
 		})
 
@@ -42,7 +42,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       headers,
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:        &contexts.EventContext{},
 		})
 
@@ -59,7 +59,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:        &contexts.EventContext{},
 		})
 
@@ -79,7 +79,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        &contexts.EventContext{},
 		})
 
@@ -100,7 +100,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig, // Only "incident.created" is configured
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventContext,
 		})
 
@@ -122,7 +122,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventContext,
 		})
 
@@ -154,7 +154,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: multiEventConfig,
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventContext,
 		})
 

@@ -1,17 +1,19 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
+import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import {
   ComponentBaseMapper,
   ComponentBaseContext,
   SubtitleContext,
   ExecutionDetailsContext,
+  ExecutionInfo,
   OutputPayload,
   NodeInfo,
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { getState, getStateMap } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "..";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
 import { buildSubtitle } from "../utils";
+import { formatTimeAgo } from "@/utils/date";
 
 interface GetFeatureFlagConfiguration {
   projectKey?: string;
@@ -27,6 +29,23 @@ interface FeatureFlagOutput {
   archived?: boolean;
   temporary?: boolean;
   creationDate?: number;
+}
+
+function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+  const subtitleTimestamp = execution.updatedAt || execution.createdAt;
+  const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
+  return [
+    {
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+      eventSubtitle,
+      eventState: getState(componentName)(execution),
+      eventId: execution.rootEvent!.id!,
+    },
+  ];
 }
 
 function getFeatureFlagMetadata(node: NodeInfo): MetadataItem[] {
@@ -59,17 +78,7 @@ export const getFeatureFlagMapper: ComponentBaseMapper = {
       metadata: getFeatureFlagMetadata(node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
-      eventSections: lastExecution
-        ? [
-            {
-              receivedAt: new Date(lastExecution.createdAt!),
-              eventState: getState(componentName)(lastExecution),
-              eventTitle: "Flag retrieved",
-              eventSubtitle: buildSubtitle("", lastExecution.updatedAt || lastExecution.createdAt),
-              eventId: lastExecution.rootEvent?.id || "",
-            },
-          ]
-        : undefined,
+      eventSections: lastExecution ? getEventSections(context.nodes, lastExecution, componentName) : undefined,
     };
   },
 
@@ -96,6 +105,9 @@ export const getFeatureFlagMapper: ComponentBaseMapper = {
     if (flag.archived !== undefined) details["Archived"] = flag.archived ? "Yes" : "No";
     if (flag.temporary !== undefined) details["Temporary"] = flag.temporary ? "Yes" : "No";
     if (flag.creationDate) details["Created At"] = new Date(flag.creationDate).toLocaleString();
+    if (flag.projectKey && flag.key) {
+      details["URL"] = `https://app.launchdarkly.com/projects/${flag.projectKey}/flags/${flag.key}`;
+    }
 
     return details;
   },

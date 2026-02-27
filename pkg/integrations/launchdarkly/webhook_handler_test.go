@@ -13,32 +13,13 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-// testHandlerWebhookContext implements core.WebhookContext for webhook handler tests.
-type testHandlerWebhookContext struct {
-	id            string
-	url           string
-	secret        []byte
-	metadata      any
-	configuration any
-}
-
-func (w *testHandlerWebhookContext) GetID() string              { return w.id }
-func (w *testHandlerWebhookContext) GetURL() string             { return w.url }
-func (w *testHandlerWebhookContext) GetSecret() ([]byte, error) { return w.secret, nil }
-func (w *testHandlerWebhookContext) GetMetadata() any           { return w.metadata }
-func (w *testHandlerWebhookContext) GetConfiguration() any      { return w.configuration }
-func (w *testHandlerWebhookContext) SetSecret(secret []byte) error {
-	w.secret = secret
-	return nil
-}
-
 func Test__LaunchDarklyWebhookHandler__CompareConfig(t *testing.T) {
 	handler := &LaunchDarklyWebhookHandler{}
 
-	t.Run("same project and URL -> true", func(t *testing.T) {
+	t.Run("same project -> true", func(t *testing.T) {
 		equal, err := handler.CompareConfig(
-			WebhookConfiguration{ProjectKey: "default", WebhooksBaseURL: "https://example.com"},
-			WebhookConfiguration{ProjectKey: "default", WebhooksBaseURL: "https://example.com"},
+			WebhookConfiguration{ProjectKey: "default"},
+			WebhookConfiguration{ProjectKey: "default"},
 		)
 		require.NoError(t, err)
 		assert.True(t, equal)
@@ -46,17 +27,8 @@ func Test__LaunchDarklyWebhookHandler__CompareConfig(t *testing.T) {
 
 	t.Run("different project -> false", func(t *testing.T) {
 		equal, err := handler.CompareConfig(
-			WebhookConfiguration{ProjectKey: "default", WebhooksBaseURL: "https://example.com"},
-			WebhookConfiguration{ProjectKey: "other", WebhooksBaseURL: "https://example.com"},
-		)
-		require.NoError(t, err)
-		assert.False(t, equal)
-	})
-
-	t.Run("different URL -> false", func(t *testing.T) {
-		equal, err := handler.CompareConfig(
-			WebhookConfiguration{ProjectKey: "default", WebhooksBaseURL: "https://old.ngrok-free.app"},
-			WebhookConfiguration{ProjectKey: "default", WebhooksBaseURL: "https://new.ngrok-free.app"},
+			WebhookConfiguration{ProjectKey: "default"},
+			WebhookConfiguration{ProjectKey: "other"},
 		)
 		require.NoError(t, err)
 		assert.False(t, equal)
@@ -94,9 +66,9 @@ func Test__LaunchDarklyWebhookHandler__Setup(t *testing.T) {
 			Configuration: map[string]any{"apiKey": "test-api-key"},
 		}
 
-		webhookCtx := &testHandlerWebhookContext{
-			url:           "https://example.com/api/v1/webhooks/w1",
-			configuration: WebhookConfiguration{ProjectKey: "default", WebhooksBaseURL: "https://example.com"},
+		webhookCtx := &contexts.WebhookContext{
+			URL:           "https://example.com/api/v1/webhooks/w1",
+			Configuration: WebhookConfiguration{ProjectKey: "default"},
 		}
 
 		result, err := handler.Setup(core.WebhookHandlerContext{
@@ -110,7 +82,7 @@ func Test__LaunchDarklyWebhookHandler__Setup(t *testing.T) {
 		req := httpContext.Requests[0]
 		assert.Equal(t, http.MethodPost, req.Method)
 		assert.Equal(t, "https://app.launchdarkly.com/api/v2/webhooks", req.URL.String())
-		assert.Equal(t, "auto-generated-secret", string(webhookCtx.secret))
+		assert.Equal(t, "auto-generated-secret", string(webhookCtx.Secret))
 
 		// Verify statement scopes to the selected project (all flags)
 		bodyBytes, err := io.ReadAll(httpContext.Requests[0].Body)
@@ -147,8 +119,8 @@ func Test__LaunchDarklyWebhookHandler__Cleanup(t *testing.T) {
 			Configuration: map[string]any{"apiKey": "test-api-key"},
 		}
 
-		webhookCtx := &testHandlerWebhookContext{
-			metadata: WebhookMetadata{LDWebhookID: "ld-webhook-abc123"},
+		webhookCtx := &contexts.WebhookContext{
+			Metadata: WebhookMetadata{LDWebhookID: "ld-webhook-abc123"},
 		}
 
 		err := handler.Cleanup(core.WebhookHandlerContext{
@@ -167,8 +139,8 @@ func Test__LaunchDarklyWebhookHandler__Cleanup(t *testing.T) {
 	t.Run("no-op when LDWebhookID is empty", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{}
 
-		webhookCtx := &testHandlerWebhookContext{
-			metadata: WebhookMetadata{LDWebhookID: ""},
+		webhookCtx := &contexts.WebhookContext{
+			Metadata: WebhookMetadata{LDWebhookID: ""},
 		}
 
 		err := handler.Cleanup(core.WebhookHandlerContext{
@@ -194,8 +166,8 @@ func Test__LaunchDarklyWebhookHandler__Cleanup(t *testing.T) {
 			Configuration: map[string]any{"apiKey": "test-api-key"},
 		}
 
-		webhookCtx := &testHandlerWebhookContext{
-			metadata: WebhookMetadata{LDWebhookID: "ld-webhook-gone"},
+		webhookCtx := &contexts.WebhookContext{
+			Metadata: WebhookMetadata{LDWebhookID: "ld-webhook-gone"},
 		}
 
 		err := handler.Cleanup(core.WebhookHandlerContext{

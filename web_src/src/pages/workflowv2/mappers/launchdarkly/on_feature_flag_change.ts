@@ -28,7 +28,7 @@ function formatActionLabel(action: string): string {
 
 interface OnFeatureFlagChangeConfiguration {
   projectKey?: string;
-  environments?: Predicate[];
+  environments?: string[];
   flags?: Predicate[];
   actions?: string[];
 }
@@ -47,7 +47,7 @@ function getEventTitleAndSubtitle(
   eventData: OnFeatureFlagChangeEventData | undefined,
   createdAt?: string,
 ): { title: string; subtitle: string } {
-  const title = eventData?.title || eventData?.name || "Feature Flag";
+  const title = eventData?.name || eventData?.flagKey || "Feature Flag";
   const verb = eventData?.titleVerb;
   const kind = eventData?.kind ? formatEventLabel(eventData.kind) : "";
   const contentParts = [verb || kind].filter(Boolean).join(" · ");
@@ -69,6 +69,9 @@ export const onFeatureFlagChangeTriggerRenderer: TriggerRenderer = {
     if (eventData?.flagKey) details["Flag Key"] = eventData.flagKey;
     if (eventData?.name) details["Flag Name"] = eventData.name;
     if (eventData?.titleVerb) details["Action"] = eventData.titleVerb;
+    if (eventData?.projectKey && eventData?.flagKey) {
+      details["URL"] = `https://app.launchdarkly.com/projects/${eventData.projectKey}/flags/${eventData.flagKey}`;
+    }
     return details;
   },
 
@@ -84,7 +87,7 @@ export const onFeatureFlagChangeTriggerRenderer: TriggerRenderer = {
     if (configuration?.environments?.length) {
       metadataItems.push({
         icon: "globe",
-        label: configuration.environments.map(formatPredicate).join(", "),
+        label: configuration.environments.join(", "),
       });
     }
 

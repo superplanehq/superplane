@@ -66,7 +66,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
 			Configuration: defaultConfig,
-			Webhook:       &contexts.WebhookContext{},
+			Webhook:       &contexts.NodeWebhookContext{},
 			Events:        &contexts.EventContext{},
 			Logger:        testLogger,
 		})
@@ -76,7 +76,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("missing X-LD-Signature header -> 403", func(t *testing.T) {
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
@@ -96,7 +96,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", "invalidsignature")
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
@@ -117,7 +117,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -140,7 +140,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -168,7 +168,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -192,7 +192,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -218,7 +218,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -244,7 +244,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -270,7 +270,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -278,7 +278,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 			Headers: headers,
 			Configuration: map[string]any{
 				"projectKey":   "default",
-				"environments": []map[string]any{{"type": "equals", "value": "production"}},
+				"environments": []string{"production"},
 			},
 			Webhook: wc,
 			Events:  eventContext,
@@ -296,7 +296,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -304,7 +304,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 			Headers: headers,
 			Configuration: map[string]any{
 				"projectKey":   "default",
-				"environments": []map[string]any{{"type": "equals", "value": "production"}},
+				"environments": []string{"production"},
 			},
 			Webhook: wc,
 			Events:  eventContext,
@@ -324,7 +324,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -332,7 +332,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 			Headers: headers,
 			Configuration: map[string]any{
 				"projectKey":   "default",
-				"environments": []map[string]any{{"type": "equals", "value": "production"}},
+				"environments": []string{"production"},
 				"actions":      []string{ActionCreateFlag},
 			},
 			Webhook: wc,
@@ -352,7 +352,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -379,7 +379,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -402,7 +402,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -426,7 +426,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -450,7 +450,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-LD-Signature", sig)
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
@@ -508,7 +508,6 @@ func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 		req, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
 		require.True(t, ok, "expected WebhookRequests[0] to be WebhookConfiguration")
 		assert.Equal(t, "default", req.ProjectKey)
-		assert.Equal(t, "https://example.com", req.WebhooksBaseURL)
 	})
 
 	t.Run("project with flags predicate requests webhook", func(t *testing.T) {
@@ -530,6 +529,5 @@ func Test__OnFeatureFlagChange__Setup(t *testing.T) {
 		req, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
 		require.True(t, ok)
 		assert.Equal(t, "default", req.ProjectKey)
-		assert.Equal(t, "https://example.com", req.WebhooksBaseURL)
 	})
 }

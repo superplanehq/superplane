@@ -31,7 +31,7 @@ type OnFeatureFlagChange struct{}
 
 type OnFeatureFlagChangeConfiguration struct {
 	ProjectKey   string                    `json:"projectKey" mapstructure:"projectKey"`
-	Environments []configuration.Predicate `json:"environments" mapstructure:"environments"`
+	Environments []string                  `json:"environments" mapstructure:"environments"`
 	Flags        []configuration.Predicate `json:"flags" mapstructure:"flags"`
 	Actions      []string                  `json:"actions" mapstructure:"actions"`
 }
@@ -97,12 +97,19 @@ func (t *OnFeatureFlagChange) Configuration() []configuration.Field {
 		{
 			Name:        "environments",
 			Label:       "Environments",
-			Type:        configuration.FieldTypeAnyPredicateList,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Description: "Filter by environment. Leave empty to receive events for all environments.",
 			TypeOptions: &configuration.TypeOptions{
-				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
-					Operators: configuration.AllPredicateOperators,
+				Resource: &configuration.ResourceTypeOptions{
+					Type:  "environment",
+					Multi: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "projectKey",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "projectKey"},
+						},
+					},
 				},
 			},
 		},
@@ -152,8 +159,7 @@ func (t *OnFeatureFlagChange) Setup(ctx core.TriggerContext) error {
 	}
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		ProjectKey:      config.ProjectKey,
-		WebhooksBaseURL: ctx.Webhook.GetBaseURL(),
+		ProjectKey: config.ProjectKey,
 	})
 }
 
@@ -223,7 +229,7 @@ func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int
 	// Filter by configured environments.
 	// Skip if: env key could not be extracted (no accesses), or env is "*" (project-scoped
 	// actions like createFlag use proj/<proj>:env/*:flag/<flag> and are not environment-specific).
-	if len(config.Environments) > 0 && envKey != "" && envKey != "*" && !configuration.MatchesAnyPredicate(config.Environments, envKey) {
+	if len(config.Environments) > 0 && envKey != "" && envKey != "*" && !slices.Contains(config.Environments, envKey) {
 		ctx.Logger.Infof("launchdarkly webhook: environment %q does not match configured environments, acknowledging without emitting", envKey)
 		return http.StatusOK, nil
 	}

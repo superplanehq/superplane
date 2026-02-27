@@ -10,8 +10,7 @@ import (
 
 // WebhookConfiguration is the config stored with the webhook.
 type WebhookConfiguration struct {
-	ProjectKey      string `json:"projectKey" mapstructure:"projectKey"`
-	WebhooksBaseURL string `json:"webhooksBaseURL" mapstructure:"webhooksBaseURL"`
+	ProjectKey string `json:"projectKey" mapstructure:"projectKey"`
 }
 
 // WebhookMetadata is stored after Setup. It holds the LaunchDarkly webhook ID
@@ -33,7 +32,7 @@ func (h *LaunchDarklyWebhookHandler) CompareConfig(a, b any) (bool, error) {
 		return false, err
 	}
 
-	return configA.ProjectKey == configB.ProjectKey && configA.WebhooksBaseURL == configB.WebhooksBaseURL, nil
+	return configA.ProjectKey == configB.ProjectKey, nil
 }
 
 func (h *LaunchDarklyWebhookHandler) Merge(current, requested any) (any, bool, error) {

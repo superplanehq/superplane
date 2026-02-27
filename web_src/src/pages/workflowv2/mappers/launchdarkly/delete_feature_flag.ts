@@ -1,17 +1,19 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
+import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import {
   ComponentBaseMapper,
   ComponentBaseContext,
   SubtitleContext,
   ExecutionDetailsContext,
+  ExecutionInfo,
   OutputPayload,
   NodeInfo,
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { getState, getStateMap } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "..";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
 import { buildSubtitle } from "../utils";
+import { formatTimeAgo } from "@/utils/date";
 
 interface DeleteFeatureFlagConfiguration {
   projectKey?: string;
@@ -22,6 +24,23 @@ interface DeleteFeatureFlagOutput {
   projectKey?: string;
   flagKey?: string;
   deleted?: boolean;
+}
+
+function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+  const subtitleTimestamp = execution.updatedAt || execution.createdAt;
+  const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
+  return [
+    {
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+      eventSubtitle,
+      eventState: getState(componentName)(execution),
+      eventId: execution.rootEvent!.id!,
+    },
+  ];
 }
 
 function deleteFeatureFlagMetadata(node: NodeInfo): MetadataItem[] {
@@ -54,17 +73,7 @@ export const deleteFeatureFlagMapper: ComponentBaseMapper = {
       metadata: deleteFeatureFlagMetadata(node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
-      eventSections: lastExecution
-        ? [
-            {
-              receivedAt: new Date(lastExecution.createdAt!),
-              eventState: getState(componentName)(lastExecution),
-              eventTitle: "Flag deleted",
-              eventSubtitle: buildSubtitle("", lastExecution.updatedAt || lastExecution.createdAt),
-              eventId: lastExecution.rootEvent?.id || "",
-            },
-          ]
-        : undefined,
+      eventSections: lastExecution ? getEventSections(context.nodes, lastExecution, componentName) : undefined,
     };
   },
 

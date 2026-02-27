@@ -134,6 +134,32 @@ func (l *LaunchDarkly) ListResources(resourceType string, ctx core.ListResources
 		}
 		return resources, nil
 
+	case "environment":
+		projectKey := ctx.Parameters["projectKey"]
+		if projectKey == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		environments, err := client.ListEnvironments(projectKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list environments: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(environments))
+		for _, e := range environments {
+			resources = append(resources, core.IntegrationResource{
+				Type: "environment",
+				Name: e.Name,
+				ID:   e.Key,
+			})
+		}
+		return resources, nil
+
 	case "flag":
 		projectKey := ctx.Parameters["projectKey"]
 		if projectKey == "" {
