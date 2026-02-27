@@ -178,7 +178,10 @@ CREATE TABLE public.blueprints (
 CREATE TABLE public.canvas_memories (
     canvas_id uuid NOT NULL,
     namespace text NOT NULL,
-    "values" jsonb NOT NULL
+    "values" jsonb NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -673,6 +676,14 @@ ALTER TABLE ONLY public.blueprints
 
 ALTER TABLE ONLY public.blueprints
     ADD CONSTRAINT blueprints_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: canvas_memories canvas_memories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_memories
+    ADD CONSTRAINT canvas_memories_pkey PRIMARY KEY (id);
 
 
 --
@@ -1618,7 +1629,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260227123636	f
+20260227135919	f
 \.
 
 
