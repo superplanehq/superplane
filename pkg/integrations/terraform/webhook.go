@@ -58,7 +58,7 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	webhookSecretBytes, err := ctx.Integration.GetConfig("webhookSecret")
 	var webhookSecret string
 	if err == nil {
-		webhookSecret = string(webhookSecretBytes)
+		webhookSecret = strings.TrimSpace(string(webhookSecretBytes))
 	}
 
 	// Check if webhook already exists and update it if needed
