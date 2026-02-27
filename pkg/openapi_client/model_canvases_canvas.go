@@ -21,8 +21,8 @@ var _ MappedNullable = &CanvasesCanvas{}
 // CanvasesCanvas struct for CanvasesCanvas
 type CanvasesCanvas struct {
 	Metadata *CanvasesCanvasMetadata `json:"metadata,omitempty"`
-	Spec     *CanvasesCanvasSpec     `json:"spec,omitempty"`
-	Status   *CanvasesCanvasStatus   `json:"status,omitempty"`
+	Spec *CanvasesCanvasSpec `json:"spec,omitempty"`
+	Status *CanvasesCanvasStatus `json:"status,omitempty"`
 }
 
 // NewCanvasesCanvas instantiates a new CanvasesCanvas object
@@ -139,7 +139,7 @@ func (o *CanvasesCanvas) SetStatus(v CanvasesCanvasStatus) {
 }
 
 func (o CanvasesCanvas) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,3 +195,5 @@ func (v *NullableCanvasesCanvas) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

@@ -244,13 +244,6 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
-	// Canvas memory endpoint.
-	s.Router.Handle(
-		"/api/v1/canvases/{canvasId}/memory",
-		middleware.OrganizationAuthMiddleware(s.jwt).
-			Middleware(http.HandlerFunc(s.listCanvasMemory)),
-	).Methods("GET")
-
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
@@ -485,52 +478,6 @@ func respondJSON(w http.ResponseWriter, payload any) {
 	if err := encoder.Encode(payload); err != nil {
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 	}
-}
-
-type canvasMemoryItem struct {
-	Namespace string `json:"namespace"`
-	Values    any    `json:"values"`
-}
-
-type listCanvasMemoryResponse struct {
-	Items []canvasMemoryItem `json:"items"`
-}
-
-func (s *Server) listCanvasMemory(w http.ResponseWriter, r *http.Request) {
-	user, ok := middleware.GetUserFromContext(r.Context())
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	vars := mux.Vars(r)
-	canvasID, err := uuid.Parse(vars["canvasId"])
-	if err != nil {
-		http.Error(w, "invalid canvas id", http.StatusBadRequest)
-		return
-	}
-
-	_, err = models.FindCanvas(user.OrganizationID, canvasID)
-	if err != nil {
-		http.Error(w, "canvas not found", http.StatusNotFound)
-		return
-	}
-
-	records, err := models.ListCanvasMemories(canvasID)
-	if err != nil {
-		http.Error(w, "failed to list canvas memory", http.StatusInternalServerError)
-		return
-	}
-
-	items := make([]canvasMemoryItem, 0, len(records))
-	for _, record := range records {
-		items = append(items, canvasMemoryItem{
-			Namespace: record.Namespace,
-			Values:    record.Values.Data(),
-		})
-	}
-
-	respondJSON(w, listCanvasMemoryResponse{Items: items})
 }
 
 func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request) {

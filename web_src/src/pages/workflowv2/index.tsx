@@ -43,6 +43,7 @@ import {
   useCanvas,
   useCanvasEvents,
   useCanvasMemoryEntries,
+  useDeleteCanvasMemoryEntry,
   useWidgets,
   canvasKeys,
 } from "@/hooks/useCanvasData";
@@ -152,6 +153,7 @@ export function WorkflowPageV2() {
     isLoading: canvasMemoryLoading,
     error: canvasMemoryError,
   } = useCanvasMemoryEntries(canvasId!);
+  const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
   const canReadOrg = canAct("org", "read");
   const { data: agentSettings } = useOrganizationAgentSettings(organizationId || "", !!organizationId && canReadOrg);
   const canUpdateCanvas = canAct("canvases", "update");
@@ -3026,6 +3028,8 @@ export function WorkflowPageV2() {
             entries={canvasMemoryEntries}
             isLoading={canvasMemoryLoading}
             errorMessage={canvasMemoryError instanceof Error ? canvasMemoryError.message : undefined}
+            onDeleteEntry={canUpdateCanvas ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined}
+            deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
           />
         }
         nodes={nodes}

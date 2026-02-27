@@ -589,6 +589,76 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasId}/memory": {
+      "get": {
+        "summary": "List canvas memories",
+        "description": "Returns append-only memory records for a canvas",
+        "operationId": "Canvases_ListCanvasMemories",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesListCanvasMemoriesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/memory/{memoryId}": {
+      "delete": {
+        "summary": "Delete canvas memory entry",
+        "description": "Deletes one memory record by ID from a canvas",
+        "operationId": "Canvases_DeleteCanvasMemory",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesDeleteCanvasMemoryResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "memoryId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events": {
       "get": {
         "summary": "List node events",
@@ -3733,6 +3803,18 @@
         }
       }
     },
+    "CanvasesCanvasMemory": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "values": {}
+      }
+    },
     "CanvasesCanvasMetadata": {
       "type": "object",
       "properties": {
@@ -3914,6 +3996,9 @@
         }
       }
     },
+    "CanvasesDeleteCanvasMemoryResponse": {
+      "type": "object"
+    },
     "CanvasesDeleteCanvasResponse": {
       "type": "object"
     },
@@ -3994,6 +4079,18 @@
         "lastTimestamp": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "CanvasesListCanvasMemoriesResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasMemory"
+          }
         }
       }
     },

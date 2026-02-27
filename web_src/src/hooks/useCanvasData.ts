@@ -7,6 +7,8 @@ import {
   canvasesDeleteCanvas,
   canvasesListNodeExecutions,
   canvasesListCanvasEvents,
+  canvasesListCanvasMemories,
+  canvasesDeleteCanvasMemory,
   canvasesListEventExecutions,
   canvasesListChildExecutions,
   canvasesListNodeQueueItems,
@@ -256,6 +258,7 @@ export const useCanvasEvents = (canvasId: string) => {
 };
 
 export interface CanvasMemoryEntry {
+  id: string;
   namespace: string;
   values: unknown;
 }
@@ -264,22 +267,41 @@ export const useCanvasMemoryEntries = (canvasId: string) => {
   return useQuery({
     queryKey: canvasKeys.canvasMemoryEntries(canvasId),
     queryFn: async () => {
-      const response = await fetch(
-        `/api/v1/canvases/${canvasId}/memory`,
+      const response = await canvasesListCanvasMemories(
         withOrganizationHeader({
-          method: "GET",
+          path: { canvasId },
         }),
       );
-      if (!response.ok) {
-        throw new Error("failed to fetch canvas memory");
-      }
-
-      const data = (await response.json()) as { items?: CanvasMemoryEntry[] };
-      return data.items || [];
+      const items = response.data?.items || [];
+      return items.map((item) => ({
+        id: item.id || "",
+        namespace: item.namespace || "",
+        values: item.values,
+      }));
     },
     refetchOnWindowFocus: false,
     refetchInterval: 3000,
     enabled: !!canvasId,
+  });
+};
+
+export const useDeleteCanvasMemoryEntry = (canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (memoryId: string) => {
+      await canvasesDeleteCanvasMemory(
+        withOrganizationHeader({
+          path: {
+            canvasId,
+            memoryId,
+          },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.canvasMemoryEntries(canvasId) });
+    },
   });
 };
 

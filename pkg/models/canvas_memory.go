@@ -8,6 +8,7 @@ import (
 )
 
 type CanvasMemory struct {
+	ID        uuid.UUID
 	CanvasID  uuid.UUID
 	Namespace string
 	Values    datatypes.JSONType[any]
@@ -43,4 +44,15 @@ func ListCanvasMemoriesInTransaction(tx *gorm.DB, canvasID uuid.UUID) ([]CanvasM
 
 func ListCanvasMemories(canvasID uuid.UUID) ([]CanvasMemory, error) {
 	return ListCanvasMemoriesInTransaction(database.Conn(), canvasID)
+}
+
+func DeleteCanvasMemoryInTransaction(tx *gorm.DB, canvasID uuid.UUID, memoryID uuid.UUID) error {
+	return tx.
+		Where("id = ? AND canvas_id = ?", memoryID, canvasID).
+		Delete(&CanvasMemory{}).
+		Error
+}
+
+func DeleteCanvasMemory(canvasID uuid.UUID, memoryID uuid.UUID) error {
+	return DeleteCanvasMemoryInTransaction(database.Conn(), canvasID, memoryID)
 }

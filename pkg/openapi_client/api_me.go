@@ -19,11 +19,12 @@ import (
 	"net/url"
 )
 
+
 // MeAPIService MeAPI service
 type MeAPIService service
 
 type ApiMeMeRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *MeAPIService
 }
 
@@ -36,25 +37,24 @@ MeMe Get current user
 
 Returns the currently authenticated user
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiMeMeRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiMeMeRequest
 */
 func (a *MeAPIService) MeMe(ctx context.Context) ApiMeMeRequest {
 	return ApiMeMeRequest{
 		ApiService: a,
-		ctx:        ctx,
+		ctx: ctx,
 	}
 }
 
 // Execute executes the request
-//
-//	@return SuperplaneMeUser
+//  @return SuperplaneMeUser
 func (a *MeAPIService) MeMeExecute(r ApiMeMeRequest) (*SuperplaneMeUser, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *SuperplaneMeUser
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *SuperplaneMeUser
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "MeAPIService.MeMe")
@@ -107,14 +107,14 @@ func (a *MeAPIService) MeMeExecute(r ApiMeMeRequest) (*SuperplaneMeUser, *http.R
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -131,7 +131,7 @@ func (a *MeAPIService) MeMeExecute(r ApiMeMeRequest) (*SuperplaneMeUser, *http.R
 }
 
 type ApiMeRegenerateTokenRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *MeAPIService
 }
 
@@ -144,25 +144,24 @@ MeRegenerateToken Regenerate API token
 
 Regenerates the currently authencated user's API token
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiMeRegenerateTokenRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiMeRegenerateTokenRequest
 */
 func (a *MeAPIService) MeRegenerateToken(ctx context.Context) ApiMeRegenerateTokenRequest {
 	return ApiMeRegenerateTokenRequest{
 		ApiService: a,
-		ctx:        ctx,
+		ctx: ctx,
 	}
 }
 
 // Execute executes the request
-//
-//	@return MeRegenerateTokenResponse
+//  @return MeRegenerateTokenResponse
 func (a *MeAPIService) MeRegenerateTokenExecute(r ApiMeRegenerateTokenRequest) (*MeRegenerateTokenResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPost
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *MeRegenerateTokenResponse
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *MeRegenerateTokenResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "MeAPIService.MeRegenerateToken")
@@ -215,14 +214,14 @@ func (a *MeAPIService) MeRegenerateTokenExecute(r ApiMeRegenerateTokenRequest) (
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
