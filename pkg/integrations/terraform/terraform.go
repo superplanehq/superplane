@@ -50,6 +50,10 @@ func (i *TerraformIntegration) Sync(ctx core.SyncContext) error {
 		"apiToken": string(configAPI),
 		"address":  string(configAddr),
 	})
+	if err != nil {
+		return err
+	}
+
 	if err := client.Validate(); err != nil {
 		return err
 	}
