@@ -19,6 +19,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Add Memory" href="#add-memory" description="Add a namespaced JSON value to canvas memory" />
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
   <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
@@ -182,6 +183,39 @@ Send a POST request to the webhook URL with your payload. The workflow will rece
     "X-Event": [
       "push"
     ]
+  }
+}
+```
+
+<a id="add-memory"></a>
+
+## Add Memory
+
+The Add Memory component appends a new item to canvas-level memory storage.
+
+### Use Cases
+
+- Persist identifiers for later cleanup paths
+- Store cross-run mappings (for example pull request to resource ID)
+- Keep structured operational context per canvas
+
+### How It Works
+
+1. Reads `namespace` and value fields from configuration
+2. Appends a new memory row for the current canvas
+3. Emits `memory.added` with the saved payload
+
+### Example Output
+
+```json
+{
+  "data": {
+    "namespace": "machines",
+    "values": {
+      "creator": "alex",
+      "id": "1",
+      "pull_request": "123"
+    }
   }
 }
 ```
