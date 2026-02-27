@@ -169,22 +169,23 @@ func (h *TerraformWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error 
 }
 
 func ParseAndValidateWebhook(ctx core.WebhookRequestContext) (map[string]any, int, error) {
-
 	webhookSecretBytes, err := ctx.Integration.GetConfig("webhookSecret")
-	var webhookSecret string
-	if err == nil {
-		webhookSecret = strings.TrimSpace(string(webhookSecretBytes))
+	if err != nil {
+		return nil, http.StatusInternalServerError, fmt.Errorf("failed to get webhook secret: %w", err)
 	}
 
-	if webhookSecret != "" {
-		signature := ctx.Headers.Get("X-TFE-Notification-Signature")
-		if signature == "" {
-			return nil, http.StatusUnauthorized, fmt.Errorf("missing signature header")
-		}
+	webhookSecret := strings.TrimSpace(string(webhookSecretBytes))
+	if webhookSecret == "" {
+		return nil, http.StatusInternalServerError, fmt.Errorf("webhook secret is not configured")
+	}
 
-		if err := crypto.VerifySignatureSHA512([]byte(webhookSecret), ctx.Body, signature); err != nil {
-			return nil, http.StatusUnauthorized, fmt.Errorf("invalid HMAC-SHA512 signature: %w", err)
-		}
+	signature := ctx.Headers.Get("X-TFE-Notification-Signature")
+	if signature == "" {
+		return nil, http.StatusUnauthorized, fmt.Errorf("missing signature header")
+	}
+
+	if err := crypto.VerifySignatureSHA512([]byte(webhookSecret), ctx.Body, signature); err != nil {
+		return nil, http.StatusUnauthorized, fmt.Errorf("invalid HMAC-SHA512 signature: %w", err)
 	}
 
 	var base map[string]any
