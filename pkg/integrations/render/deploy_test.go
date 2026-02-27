@@ -173,7 +173,7 @@ func Test__Render_Deploy__HandleWebhook(t *testing.T) {
 			Headers:     headers,
 			HTTP:        httpCtx,
 			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
-			Webhook:     &contexts.WebhookContext{Secret: secret},
+			Webhook:     &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 				lookupOrder = append(lookupOrder, key+":"+value)
 				if key == "deploy_id" && value == "dep-cukouhrtq21c73e9scng" {
@@ -231,7 +231,7 @@ func Test__Render_Deploy__HandleWebhook(t *testing.T) {
 			Headers:     headers,
 			HTTP:        httpCtx,
 			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
-			Webhook:     &contexts.WebhookContext{Secret: secret},
+			Webhook:     &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 				if key == "deploy_id" {
 					return &core.ExecutionContext{
@@ -287,7 +287,7 @@ func Test__Render_Deploy__HandleWebhook(t *testing.T) {
 			Headers:     headers,
 			HTTP:        httpCtx,
 			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
-			Webhook:     &contexts.WebhookContext{Secret: secret},
+			Webhook:     &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 				if key == "deploy_id" && value == "dep-cukouhrtq21c73e9scng" {
 					return &core.ExecutionContext{
@@ -333,7 +333,7 @@ func Test__Render_Deploy__HandleWebhook(t *testing.T) {
 			Headers:     headers,
 			HTTP:        httpCtx,
 			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
-			Webhook:     &contexts.WebhookContext{Secret: secret},
+			Webhook:     &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 				if key == "deploy_id" && value == "dep-cukouhrtq21c73e9scng" {
 					return &core.ExecutionContext{
@@ -379,7 +379,7 @@ func Test__Render_Deploy__HandleWebhook(t *testing.T) {
 			Headers:     headers,
 			HTTP:        httpCtx,
 			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
-			Webhook:     &contexts.WebhookContext{Secret: secret},
+			Webhook:     &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 				if key == "deploy_id" && value == "dep-cukouhrtq21c73e9scng" {
 					return &core.ExecutionContext{

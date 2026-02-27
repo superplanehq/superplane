@@ -199,7 +199,7 @@ func Test__OnAlertFiring__Setup(t *testing.T) {
 	t.Run("requests webhook through integration and stores webhook url metadata", func(t *testing.T) {
 		integrationContext := &contexts.IntegrationContext{}
 		metadataContext := &contexts.MetadataContext{}
-		webhookContext := &contexts.WebhookContext{}
+		webhookContext := &contexts.NodeWebhookContext{}
 
 		err := trigger.Setup(core.TriggerContext{
 			Configuration: map[string]any{"sharedSecret": "secret"},
@@ -229,7 +229,7 @@ func Test__OnAlertFiring__Setup(t *testing.T) {
 				"webhookBindingKey": "node-1-key",
 			},
 		}
-		webhookContext := &contexts.WebhookContext{}
+		webhookContext := &contexts.NodeWebhookContext{}
 
 		err := trigger.Setup(core.TriggerContext{
 			Configuration: map[string]any{"sharedSecret": "secret"},

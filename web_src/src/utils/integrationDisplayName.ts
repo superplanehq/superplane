@@ -26,6 +26,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   sendgrid: "SendGrid",
   dockerhub: "DockerHub",
   harness: "Harness",
+  launchdarkly: "LaunchDarkly",
 };
 
 /**
