@@ -10,8 +10,6 @@ type Configuration struct {
 	WebhookSecret string `json:"webhookSecret"`
 }
 
-type IntegrationMetadata struct{}
-
 func getConfigurationFields() []configuration.Field {
 	return []configuration.Field{
 		{
