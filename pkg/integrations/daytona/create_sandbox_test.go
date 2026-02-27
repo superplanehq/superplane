@@ -54,6 +54,28 @@ func Test__CreateSandbox__Setup(t *testing.T) {
 
 		require.ErrorContains(t, err, "autoStopInterval cannot be negative")
 	})
+
+	t.Run("invalid secret env-var name -> error", func(t *testing.T) {
+		appCtx := &contexts.IntegrationContext{}
+		err := component.Setup(core.SetupContext{
+			Integration: appCtx,
+			Metadata:    &contexts.MetadataContext{},
+			Configuration: map[string]any{
+				"secrets": []map[string]any{
+					{
+						"type": "env-var",
+						"name": "INVALID-NAME",
+						"value": map[string]any{
+							"secret": "credentials",
+							"key":    "token",
+						},
+					},
+				},
+			},
+		})
+
+		require.ErrorContains(t, err, "invalid env variable name")
+	})
 }
 
 func Test__CreateSandbox__Execute(t *testing.T) {
@@ -373,7 +395,7 @@ func Test__CreateSandbox__Configuration(t *testing.T) {
 	component := CreateSandbox{}
 
 	config := component.Configuration()
-	assert.Len(t, config, 4)
+	assert.Len(t, config, 5)
 
 	fieldNames := make([]string, len(config))
 	for i, f := range config {
@@ -384,6 +406,7 @@ func Test__CreateSandbox__Configuration(t *testing.T) {
 	assert.Contains(t, fieldNames, "target")
 	assert.Contains(t, fieldNames, "autoStopInterval")
 	assert.Contains(t, fieldNames, "env")
+	assert.Contains(t, fieldNames, "secrets")
 
 	for _, f := range config {
 		assert.False(t, f.Required, "all fields should be optional")

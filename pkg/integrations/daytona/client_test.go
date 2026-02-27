@@ -175,6 +175,75 @@ func Test__Client__CreateSandbox(t *testing.T) {
 	})
 }
 
+func Test__Client__CreateFolder(t *testing.T) {
+	t.Run("creates folder using toolbox filesystem endpoint", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		err = client.CreateFolder("sandbox-123", "/home/daytona/.ssh")
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Equal(t, http.MethodPost, httpContext.Requests[1].Method)
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/files/folder?path=%2Fhome%2Fdaytona%2F.ssh")
+	})
+}
+
+func Test__Client__UploadFile(t *testing.T) {
+	t.Run("uploads file using toolbox filesystem endpoint", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		err = client.UploadFile("sandbox-123", "/home/daytona/.ssh/id_rsa", []byte("private-key"))
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Equal(t, http.MethodPost, httpContext.Requests[1].Method)
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/files/upload?path=%2Fhome%2Fdaytona%2F.ssh%2Fid_rsa")
+		assert.Contains(t, httpContext.Requests[1].Header.Get("Content-Type"), "multipart/form-data")
+
+		body, err := io.ReadAll(httpContext.Requests[1].Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(body), "private-key")
+	})
+}
+
 func Test__Client__ListSandboxes(t *testing.T) {
 	t.Run("successful list sandboxes with array response", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{

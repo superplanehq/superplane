@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/url"
+	"path"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -400,6 +403,51 @@ func (c *Client) GetSessionCommandLogs(sandboxID, sessionID, commandID string) (
 	return string(responseBody), nil
 }
 
+// CreateFolder creates a folder in the sandbox filesystem.
+func (c *Client) CreateFolder(sandboxID, folderPath string) error {
+	baseURL, err := c.toolboxBaseURL(sandboxID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve toolbox URL: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/files/folder?path=%s", baseURL, url.QueryEscape(folderPath))
+	_, err = c.execRequest(http.MethodPost, url, nil)
+	return err
+}
+
+// UploadFile uploads a file to the sandbox filesystem.
+func (c *Client) UploadFile(sandboxID, filePath string, content []byte) error {
+	baseURL, err := c.toolboxBaseURL(sandboxID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve toolbox URL: %v", err)
+	}
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	name := path.Base(filePath)
+	if name == "" || name == "." || name == "/" {
+		name = "file"
+	}
+
+	part, err := writer.CreateFormFile("file", name)
+	if err != nil {
+		return fmt.Errorf("failed to build multipart file part: %v", err)
+	}
+
+	if _, err := part.Write(content); err != nil {
+		return fmt.Errorf("failed to write multipart file content: %v", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("failed to close multipart writer: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/files/upload?path=%s", baseURL, url.QueryEscape(filePath))
+	_, err = c.execRequestWithContentType(http.MethodPost, url, body, writer.FormDataContentType())
+	return err
+}
+
 // GetSandbox retrieves the current state of a sandbox
 func (c *Client) GetSandbox(sandboxID string) (*Sandbox, error) {
 	url := fmt.Sprintf("%s/sandbox/%s", c.BaseURL, sandboxID)
@@ -468,12 +516,18 @@ type APIError struct {
 }
 
 func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error) {
+	return c.execRequestWithContentType(method, url, body, "application/json")
+}
+
+func (c *Client) execRequestWithContentType(method, url string, body io.Reader, contentType string) ([]byte, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %v", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
 	res, err := c.http.Do(req)

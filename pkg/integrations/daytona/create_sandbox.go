@@ -21,15 +21,17 @@ const (
 type CreateSandbox struct{}
 
 type CreateSandboxSpec struct {
-	Snapshot         string        `json:"snapshot,omitempty"`
-	Target           string        `json:"target,omitempty"`
-	AutoStopInterval int           `json:"autoStopInterval,omitempty"`
-	Env              []EnvVariable `json:"env,omitempty"`
+	Snapshot         string          `json:"snapshot,omitempty"`
+	Target           string          `json:"target,omitempty"`
+	AutoStopInterval int             `json:"autoStopInterval,omitempty"`
+	Env              []EnvVariable   `json:"env,omitempty"`
+	Secrets          []SandboxSecret `json:"secrets,omitempty"`
 }
 
 type CreateSandboxMetadata struct {
-	SandboxID string `json:"sandboxId" mapstructure:"sandboxId"`
-	StartedAt int64  `json:"startedAt" mapstructure:"startedAt"`
+	SandboxID string          `json:"sandboxId" mapstructure:"sandboxId"`
+	StartedAt int64           `json:"startedAt" mapstructure:"startedAt"`
+	Secrets   []SandboxSecret `json:"secrets,omitempty" mapstructure:"secrets,omitempty"`
 }
 
 type EnvVariable struct {
@@ -151,6 +153,7 @@ func (c *CreateSandbox) Configuration() []configuration.Field {
 			Required:    false,
 			Description: "Environment variables to set in the sandbox",
 		},
+		sandboxSecretsConfigurationField(),
 	}
 }
 
@@ -169,6 +172,10 @@ func (c *CreateSandbox) Setup(ctx core.SetupContext) error {
 
 	if spec.AutoStopInterval < 0 {
 		return fmt.Errorf("autoStopInterval cannot be negative")
+	}
+
+	if err := validateSandboxSecrets(spec.Secrets); err != nil {
+		return err
 	}
 
 	return nil
@@ -208,6 +215,7 @@ func (c *CreateSandbox) Execute(ctx core.ExecutionContext) error {
 	metadata := CreateSandboxMetadata{
 		SandboxID: sandbox.ID,
 		StartedAt: time.Now().UnixNano(),
+		Secrets:   spec.Secrets,
 	}
 
 	if err := ctx.Metadata.Set(metadata); err != nil {
@@ -264,6 +272,10 @@ func (c *CreateSandbox) poll(ctx core.ActionContext) error {
 
 	switch sandbox.State {
 	case "started":
+		if err := injectSandboxSecrets(client, metadata.SandboxID, ctx.Secrets, metadata.Secrets); err != nil {
+			return fmt.Errorf("failed to inject sandbox secrets: %v", err)
+		}
+
 		return ctx.ExecutionState.Emit(
 			core.DefaultOutputChannel.Name,
 			SandboxPayloadType,

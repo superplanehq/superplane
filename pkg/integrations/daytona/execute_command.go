@@ -238,6 +238,8 @@ func (e *ExecuteCommand) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
+	command = wrapCommandWithSandboxSecretEnv(command)
+
 	response, err := client.ExecuteSessionCommand(spec.Sandbox, sessionID, command)
 	if err != nil {
 		return fmt.Errorf("failed to execute command: %v", err)

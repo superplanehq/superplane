@@ -115,6 +115,26 @@ func Test__CreateRepositorySandbox__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "invalid env variable name")
 	})
 
+	t.Run("invalid secret type", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Metadata: &contexts.MetadataContext{},
+			Configuration: map[string]any{
+				"repository": "https://github.com/superplanehq/superplane.git",
+				"secrets": []map[string]any{
+					{
+						"type": "invalid",
+						"value": map[string]any{
+							"secret": "credentials",
+							"key":    "token",
+						},
+					},
+				},
+			},
+		})
+
+		require.ErrorContains(t, err, "invalid secret type")
+	})
+
 	t.Run("valid inline bootstrap setup", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Metadata: &contexts.MetadataContext{},

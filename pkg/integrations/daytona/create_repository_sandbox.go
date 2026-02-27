@@ -40,6 +40,7 @@ type CreateRepositorySandboxSpec struct {
 	Target           string                                `json:"target,omitempty"`
 	AutoStopInterval int                                   `json:"autoStopInterval,omitempty"`
 	Env              []EnvVariable                         `json:"env,omitempty"`
+	Secrets          []SandboxSecret                       `json:"secrets,omitempty"`
 	Repository       string                                `json:"repository"`
 	Bootstrap        *CreateRepositorySandboxBootstrapSpec `json:"bootstrap"`
 }
@@ -59,6 +60,7 @@ type CreateRepositorySandboxMetadata struct {
 	Timeout          int                `json:"timeout" mapstructure:"timeout"`
 	Repository       string             `json:"repository" mapstructure:"repository"`
 	Directory        string             `json:"directory" mapstructure:"directory"`
+	Secrets          []SandboxSecret    `json:"secrets,omitempty" mapstructure:"secrets,omitempty"`
 	Clone            *CloneMetadata     `json:"clone,omitempty" mapstructure:"clone,omitempty"`
 	Bootstrap        *BootstrapMetadata `json:"bootstrap,omitempty" mapstructure:"bootstrap,omitempty"`
 }
@@ -185,6 +187,7 @@ func (c *CreateRepositorySandbox) Configuration() []configuration.Field {
 			Required:    false,
 			Description: "Environment variables to set in the sandbox",
 		},
+		sandboxSecretsConfigurationField(),
 		{
 			Name:        "repository",
 			Label:       "Repository",
@@ -272,6 +275,10 @@ func (c *CreateRepositorySandbox) Setup(ctx core.SetupContext) error {
 		if !envVariableNamePattern.MatchString(name) {
 			return fmt.Errorf("invalid env variable name: %s", env.Name)
 		}
+	}
+
+	if err := validateSandboxSecrets(spec.Secrets); err != nil {
+		return err
 	}
 
 	_, err := c.bootstrapMetadataFromSpec(spec)
@@ -370,6 +377,7 @@ func (c *CreateRepositorySandbox) Execute(ctx core.ExecutionContext) error {
 		Timeout:          int(CreateRepositorySandboxDefaultTimeout.Seconds()),
 		Repository:       strings.TrimSpace(spec.Repository),
 		Directory:        path.Join(CreateRepositorySandboxCloneBasePath, repositoryDirectory),
+		Secrets:          spec.Secrets,
 		Bootstrap:        bootstrapMetadata,
 	}
 
@@ -453,6 +461,10 @@ func (c *CreateRepositorySandbox) pollWaitingSandbox(ctx core.ActionContext, met
 
 	switch sandbox.State {
 	case "started":
+		if err := injectSandboxSecrets(client, metadata.SandboxID, ctx.Secrets, metadata.Secrets); err != nil {
+			return fmt.Errorf("failed to inject sandbox secrets: %v", err)
+		}
+
 		return c.startClone(ctx, client, metadata)
 	case "error":
 		return fmt.Errorf("sandbox %s failed to start", metadata.SandboxID)
@@ -472,6 +484,7 @@ func (c *CreateRepositorySandbox) startClone(ctx core.ActionContext, client *Cli
 		shellQuote(metadata.Repository),
 		shellQuote(metadata.Directory),
 	)
+	command = wrapCommandWithSandboxSecretEnv(command)
 
 	response, err := client.ExecuteSessionCommand(metadata.SandboxID, sessionID, command)
 	if err != nil {
@@ -534,6 +547,7 @@ func (c *CreateRepositorySandbox) pollCloningRepository(ctx core.ActionContext, 
 	if err != nil {
 		return err
 	}
+	bootstrapCommand = wrapCommandWithSandboxSecretEnv(bootstrapCommand)
 
 	response, err := client.ExecuteSessionCommand(metadata.SandboxID, metadata.SessionID, bootstrapCommand)
 	if err != nil {
