@@ -32,6 +32,8 @@ docs/BlueprintsListBlueprintsResponse.md
 docs/BlueprintsUpdateBlueprintBody.md
 docs/BlueprintsUpdateBlueprintResponse.md
 docs/CanvasAPI.md
+docs/CanvasAutoLayoutAlgorithm.md
+docs/CanvasAutoLayoutScope.md
 docs/CanvasEventAPI.md
 docs/CanvasNodeAPI.md
 docs/CanvasNodeExecutionAPI.md
@@ -42,6 +44,7 @@ docs/CanvasesCanvas.md
 docs/CanvasesCanvasAiBlockContext.md
 docs/CanvasesCanvasAiContext.md
 docs/CanvasesCanvasAiNodeContext.md
+docs/CanvasesCanvasAutoLayout.md
 docs/CanvasesCanvasEvent.md
 docs/CanvasesCanvasEventWithExecutions.md
 docs/CanvasesCanvasMetadata.md
@@ -237,6 +240,8 @@ model_blueprints_describe_blueprint_response.go
 model_blueprints_list_blueprints_response.go
 model_blueprints_update_blueprint_body.go
 model_blueprints_update_blueprint_response.go
+model_canvas_auto_layout_algorithm.go
+model_canvas_auto_layout_scope.go
 model_canvas_node_execution_result.go
 model_canvas_node_execution_result_reason.go
 model_canvas_node_execution_state.go
@@ -244,6 +249,7 @@ model_canvases_canvas.go
 model_canvases_canvas_ai_block_context.go
 model_canvases_canvas_ai_context.go
 model_canvases_canvas_ai_node_context.go
+model_canvases_canvas_auto_layout.go
 model_canvases_canvas_event.go
 model_canvases_canvas_event_with_executions.go
 model_canvases_canvas_metadata.go

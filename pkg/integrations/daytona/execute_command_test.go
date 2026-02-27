@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -17,18 +18,18 @@ import (
 func Test__ExecuteCommand__Setup(t *testing.T) {
 	component := ExecuteCommand{}
 
-	t.Run("sandboxId is required", func(t *testing.T) {
+	t.Run("sandbox is required", func(t *testing.T) {
 		appCtx := &contexts.IntegrationContext{}
 		err := component.Setup(core.SetupContext{
 			Integration: appCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"sandboxId": "",
-				"command":   "echo hello",
+				"sandbox": "",
+				"command": "echo hello",
 			},
 		})
 
-		require.ErrorContains(t, err, "sandboxId is required")
+		require.ErrorContains(t, err, "sandbox is required")
 	})
 
 	t.Run("command is required", func(t *testing.T) {
@@ -37,8 +38,8 @@ func Test__ExecuteCommand__Setup(t *testing.T) {
 			Integration: appCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"command":   "",
+				"sandbox": "sandbox-123",
+				"command": "",
 			},
 		})
 
@@ -51,8 +52,8 @@ func Test__ExecuteCommand__Setup(t *testing.T) {
 			Integration: appCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"command":   "echo hello",
+				"sandbox": "sandbox-123",
+				"command": "echo hello",
 			},
 		})
 
@@ -65,9 +66,9 @@ func Test__ExecuteCommand__Setup(t *testing.T) {
 			Integration: appCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"command":   "pip install requests",
-				"cwd":       "/home/daytona",
+				"sandbox": "sandbox-123",
+				"command": "pip install requests",
+				"cwd":     "/home/daytona",
 				"env": []map[string]any{
 					{
 						"name":  "API_KEY",
@@ -87,8 +88,8 @@ func Test__ExecuteCommand__Setup(t *testing.T) {
 			Integration: appCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"command":   "echo hello",
+				"sandbox": "sandbox-123",
+				"command": "echo hello",
 				"env": []map[string]any{
 					{
 						"name":  "INVALID-NAME",
@@ -130,9 +131,9 @@ func Test__ExecuteCommand__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"command":   "echo hello world",
-				"timeout":   120,
+				"sandbox": "sandbox-123",
+				"command": "echo hello world",
+				"timeout": 120,
 			},
 			HTTP:           httpContext,
 			Integration:    appCtx,
@@ -175,9 +176,9 @@ func Test__ExecuteCommand__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"command":   "pwd",
-				"cwd":       "/home/daytona",
+				"sandbox": "sandbox-123",
+				"command": "pwd",
+				"cwd":     "/home/daytona",
 			},
 			HTTP:           httpContext,
 			Integration:    appCtx,
@@ -216,8 +217,8 @@ func Test__ExecuteCommand__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"sandboxId": "invalid-sandbox",
-				"command":   "echo hello",
+				"sandbox": "invalid-sandbox",
+				"command": "echo hello",
 			},
 			HTTP:           httpContext,
 			Integration:    appCtx,
@@ -248,8 +249,8 @@ func Test__ExecuteCommand__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"command":   "env | grep API_KEY",
+				"sandbox": "sandbox-123",
+				"command": "env | grep API_KEY",
 				"env": []map[string]any{
 					{
 						"name":  "API_KEY",
@@ -360,6 +361,13 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 		assert.Equal(t, ExecuteCommandOutputChannelSuccess, execCtx.Channel)
 		assert.Equal(t, ExecuteCommandPayloadType, execCtx.Type)
 		require.Len(t, execCtx.Payloads, 1)
+		wrappedPayload, ok := execCtx.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		data, ok := wrappedPayload["data"].(*ExecuteCommandResponse)
+		require.True(t, ok)
+		assert.Equal(t, 0, data.ExitCode)
+		assert.False(t, data.Timeout)
+		assert.Equal(t, "hello world", data.Result)
 	})
 
 	t.Run("poll emits failed channel when command exits non-zero", func(t *testing.T) {
@@ -402,6 +410,13 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 		assert.Equal(t, ExecuteCommandOutputChannelFailed, execCtx.Channel)
 		assert.Equal(t, ExecuteCommandPayloadType, execCtx.Type)
 		require.Len(t, execCtx.Payloads, 1)
+		wrappedPayload, ok := execCtx.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		data, ok := wrappedPayload["data"].(*ExecuteCommandResponse)
+		require.True(t, ok)
+		assert.Equal(t, 1, data.ExitCode)
+		assert.False(t, data.Timeout)
+		assert.Equal(t, "command failed", data.Result)
 	})
 
 	t.Run("poll times out", func(t *testing.T) {
@@ -411,6 +426,7 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 			},
 		}
 
+		execCtx := &contexts.ExecutionStateContext{}
 		err := component.HandleAction(core.ActionContext{
 			Name: "poll",
 			HTTP: &contexts.HTTPContext{},
@@ -423,13 +439,24 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 					"timeout":   60,
 				},
 			},
-			ExecutionState: &contexts.ExecutionStateContext{},
+			ExecutionState: execCtx,
 			Requests:       &contexts.RequestContext{},
 			Integration:    appCtx,
 		})
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "timed out")
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+		assert.Equal(t, ExecuteCommandOutputChannelFailed, execCtx.Channel)
+		assert.Equal(t, ExecuteCommandPayloadType, execCtx.Type)
+		require.Len(t, execCtx.Payloads, 1)
+		wrappedPayload, ok := execCtx.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		data, ok := wrappedPayload["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Nil(t, data["exitCode"])
+		assert.Equal(t, true, data["timeout"])
+		assert.Equal(t, "command timed out after 60 seconds", data["result"])
 	})
 
 	t.Run("poll reschedules on GetSession API error", func(t *testing.T) {
@@ -509,20 +536,29 @@ func Test__ExecuteCommand__Configuration(t *testing.T) {
 		fieldNames[i] = f.Name
 	}
 
-	assert.Contains(t, fieldNames, "sandboxId")
+	assert.Contains(t, fieldNames, "sandbox")
 	assert.Contains(t, fieldNames, "command")
 	assert.Contains(t, fieldNames, "cwd")
 	assert.Contains(t, fieldNames, "env")
 	assert.Contains(t, fieldNames, "timeout")
 
 	for _, f := range config {
-		if f.Name == "sandboxId" || f.Name == "command" {
+		if f.Name == "sandbox" || f.Name == "command" {
 			assert.True(t, f.Required, "%s should be required", f.Name)
 		}
 		if f.Name == "cwd" || f.Name == "env" || f.Name == "timeout" {
 			assert.False(t, f.Required, "%s should be optional", f.Name)
 		}
 	}
+
+	var sandboxFieldType string
+	for _, field := range config {
+		if field.Name == "sandbox" {
+			sandboxFieldType = field.Type
+			break
+		}
+	}
+	assert.Equal(t, configuration.FieldTypeIntegrationResource, sandboxFieldType)
 }
 
 func Test__ExecuteCommand__OutputChannels(t *testing.T) {

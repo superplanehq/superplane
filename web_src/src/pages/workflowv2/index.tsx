@@ -88,6 +88,7 @@ import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
+import { applyHorizontalAutoLayout } from "./autoLayout";
 import { useAccount } from "@/contexts/AccountContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
@@ -2313,6 +2314,45 @@ export function WorkflowPageV2() {
     ],
   );
 
+  const handleAutoLayout = useCallback(
+    async (selectedNodeIDs: string[] = []) => {
+      if (!canvas || !organizationId || !canvasId) return;
+
+      const latestWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+
+      try {
+        if (!canAutoSave) {
+          saveWorkflowSnapshot(latestWorkflow);
+        }
+
+        const updatedWorkflow = await applyHorizontalAutoLayout(latestWorkflow, {
+          nodeIds: selectedNodeIDs,
+        });
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+        if (canAutoSave) {
+          await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+        } else {
+          markUnsavedChange("position");
+        }
+      } catch (error) {
+        console.error("Failed to auto layout canvas", error);
+        showErrorToast("Failed to auto layout canvas");
+      }
+    },
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      canAutoSave,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      markUnsavedChange,
+    ],
+  );
+
   const handleNodeCollapseChange = useCallback(
     async (nodeId: string) => {
       if (!canvas || !organizationId || !canvasId) return;
@@ -2989,6 +3029,7 @@ export function WorkflowPageV2() {
         onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
         onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
         onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
+        onAutoLayout={!isReadOnly ? handleAutoLayout : undefined}
         onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
         onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
         onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}

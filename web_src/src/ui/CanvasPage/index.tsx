@@ -11,7 +11,7 @@ import {
   type EdgeChange,
 } from "@xyflow/react";
 
-import { CircleX, Loader2, ScanLine, ScanText, ScrollText, TriangleAlert } from "lucide-react";
+import { CircleX, Loader2, ScanLine, ScanText, ScrollText, TriangleAlert, Workflow } from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
@@ -198,6 +198,7 @@ export interface CanvasPageProps {
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
+  onAutoLayout?: (selectedNodeIDs: string[]) => void | Promise<void>;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
 
   ai?: AiProps;
@@ -856,6 +857,7 @@ function CanvasPage(props: CanvasPageProps) {
               hideHeader={true}
               onToggleView={handleToggleView}
               onToggleCollapse={props.onToggleCollapse}
+              onAutoLayout={props.onAutoLayout}
               onRun={(nodeId) => handleNodeRun(nodeId)}
               onDuplicate={props.onDuplicate}
               onConfigure={props.onConfigure}
@@ -1343,6 +1345,7 @@ function CanvasContent({
   onTogglePause,
   onToggleView,
   onToggleCollapse,
+  onAutoLayout,
   onAnnotationUpdate,
   onAnnotationBlur,
   onBuildingBlockDrop,
@@ -1391,6 +1394,7 @@ function CanvasContent({
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
+  onAutoLayout?: (selectedNodeIDs: string[]) => void | Promise<void>;
   onDelete?: (nodeId: string) => void;
   onAnnotationUpdate?: (
     nodeId: string,
@@ -1468,6 +1472,7 @@ function CanvasContent({
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set());
   const [logSidebarHeight, setLogSidebarHeight] = useState(320);
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
+  const [isAutoLayouting, setIsAutoLayouting] = useState(false);
 
   useEffect(() => {
     const activeNoteId = getActiveNoteId();
@@ -1678,6 +1683,30 @@ function CanvasContent({
     state.toggleCollapse();
     onToggleCollapse?.();
   }, [state.toggleCollapse, onToggleCollapse]);
+
+  const selectedNodeIDs = useMemo(
+    () => state.nodes.filter((node) => node.selected).map((node) => node.id),
+    [state.nodes],
+  );
+
+  const handleAutoLayout = useCallback(async () => {
+    if (!onAutoLayout || isReadOnly || isAutoLayouting || selectedNodeIDs.length === 0) {
+      return;
+    }
+
+    try {
+      setIsAutoLayouting(true);
+      await onAutoLayout(selectedNodeIDs);
+    } finally {
+      setIsAutoLayouting(false);
+    }
+  }, [onAutoLayout, isReadOnly, isAutoLayouting, selectedNodeIDs]);
+
+  const isAutoLayoutDisabled = isReadOnly || !onAutoLayout || isAutoLayouting || selectedNodeIDs.length === 0;
+  const autoLayoutTooltipMessage =
+    selectedNodeIDs.length === 0
+      ? "Select one or more nodes to auto arrange"
+      : "Auto arrange selected components left-to-right";
 
   useEffect(() => {
     if (!focusRequest) {
@@ -2131,6 +2160,26 @@ function CanvasContent({
                     : "Switch components to Compact view (Ctrl/Cmd + E)"}
                 </TooltipContent>
               </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs font-medium"
+                      onClick={handleAutoLayout}
+                      disabled={isAutoLayoutDisabled}
+                    >
+                      {isAutoLayouting ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Workflow className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
+              </Tooltip>
               <NodeSearch
                 onSearch={(searchString) => {
                   const query = searchString.toLowerCase();
@@ -2153,7 +2202,7 @@ function CanvasContent({
             <Panel
               position="bottom-left"
               className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8"
-              style={{ marginLeft: 336 }}
+              style={{ marginLeft: 370 }}
             >
               <Tooltip>
                 <TooltipTrigger asChild>

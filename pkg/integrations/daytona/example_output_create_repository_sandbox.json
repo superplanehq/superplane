@@ -1,0 +1,20 @@
+{
+  "data": {
+    "sandbox": {
+      "id": "sandbox-abc123def456",
+      "state": "started"
+    },
+    "repository": "https://github.com/superplanehq/example-app.git",
+    "directory": "/home/daytona/example-app",
+    "clone": {
+      "exitCode": 0,
+      "result": "Cloning into 'example-app'...\n"
+    },
+    "bootstrap": {
+      "exitCode": 0,
+      "result": "Dependencies installed successfully\n"
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "daytona.repository.sandbox"
+}

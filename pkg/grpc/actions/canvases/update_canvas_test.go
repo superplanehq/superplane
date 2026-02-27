@@ -1121,3 +1121,293 @@ func TestUpdateCanvas_WidgetTextLengthValidation(t *testing.T) {
 	database.Conn().Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, "annotation-2").Count(&annotationNodeCount)
 	assert.Equal(t, int64(0), annotationNodeCount, "widget nodes should not be persisted in workflow_nodes table")
 }
+
+func TestUpdateCanvasWithAutoLayout_Horizontal(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{},
+		[]models.Edge{},
+	)
+
+	canvasPB := &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{
+			Name:        canvas.Name,
+			Description: canvas.Description,
+		},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-1",
+					Name: "Node 1",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+					Position: &componentpb.Position{X: 900, Y: 300},
+				},
+				{
+					Id:   "node-2",
+					Name: "Node 2",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+					Position: &componentpb.Position{X: 200, Y: 700},
+				},
+				{
+					Id:   "node-3",
+					Name: "Node 3",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+					Position: &componentpb.Position{X: 600, Y: 100},
+				},
+			},
+			Edges: []*componentpb.Edge{
+				{
+					SourceId: "node-1",
+					TargetId: "node-2",
+					Channel:  "default",
+				},
+				{
+					SourceId: "node-2",
+					TargetId: "node-3",
+					Channel:  "default",
+				},
+			},
+		},
+	}
+
+	response, err := UpdateCanvasWithAutoLayout(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		canvasPB,
+		&pb.CanvasAutoLayout{
+			Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
+		},
+		"http://localhost:3000/api/v1",
+	)
+	require.NoError(t, err)
+	require.NotNil(t, response.Canvas)
+	require.NotNil(t, response.Canvas.Spec)
+
+	nodesByID := make(map[string]*componentpb.Node, len(response.Canvas.Spec.Nodes))
+	for _, node := range response.Canvas.Spec.Nodes {
+		nodesByID[node.GetId()] = node
+	}
+
+	require.Contains(t, nodesByID, "node-1")
+	require.Contains(t, nodesByID, "node-2")
+	require.Contains(t, nodesByID, "node-3")
+
+	node1 := nodesByID["node-1"].GetPosition()
+	node2 := nodesByID["node-2"].GetPosition()
+	node3 := nodesByID["node-3"].GetPosition()
+
+	assert.Less(t, node1.GetX(), node2.GetX())
+	assert.Less(t, node2.GetX(), node3.GetX())
+	assert.Equal(t, node1.GetY(), node2.GetY())
+	assert.Equal(t, node2.GetY(), node3.GetY())
+}
+
+func TestUpdateCanvasWithAutoLayout_RequiresAlgorithm(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{},
+		[]models.Edge{},
+	)
+
+	canvasPB := &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{
+			Name:        canvas.Name,
+			Description: canvas.Description,
+		},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-1",
+					Name: "Node 1",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+					Position: &componentpb.Position{X: 100, Y: 100},
+				},
+			},
+		},
+	}
+
+	_, err := UpdateCanvasWithAutoLayout(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		canvasPB,
+		&pb.CanvasAutoLayout{
+			Algorithm: pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED,
+		},
+		"http://localhost:3000/api/v1",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "auto_layout.algorithm is required")
+}
+
+func TestUpdateCanvasWithAutoLayout_ScopedConnectedComponentPreservesAnchor(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{},
+		[]models.Edge{},
+	)
+
+	canvasPB := &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{
+			Name:        canvas.Name,
+			Description: canvas.Description,
+		},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-a",
+					Name: "Node A",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+					Position: &componentpb.Position{X: 1000, Y: 600},
+				},
+				{
+					Id:   "node-b",
+					Name: "Node B",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+					Position: &componentpb.Position{X: 1400, Y: 900},
+				},
+				{
+					Id:   "node-c",
+					Name: "Node C",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+					Position: &componentpb.Position{X: 120, Y: 80},
+				},
+			},
+			Edges: []*componentpb.Edge{
+				{
+					SourceId: "node-a",
+					TargetId: "node-b",
+					Channel:  "default",
+				},
+			},
+		},
+	}
+
+	response, err := UpdateCanvasWithAutoLayout(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		canvasPB,
+		&pb.CanvasAutoLayout{
+			Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
+			NodeIds:   []string{"node-a"},
+			Scope:     pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT,
+		},
+		"http://localhost:3000/api/v1",
+	)
+	require.NoError(t, err)
+	require.NotNil(t, response.Canvas)
+	require.NotNil(t, response.Canvas.Spec)
+
+	nodesByID := make(map[string]*componentpb.Node, len(response.Canvas.Spec.Nodes))
+	for _, node := range response.Canvas.Spec.Nodes {
+		nodesByID[node.GetId()] = node
+	}
+
+	require.Contains(t, nodesByID, "node-a")
+	require.Contains(t, nodesByID, "node-b")
+	require.Contains(t, nodesByID, "node-c")
+
+	nodeA := nodesByID["node-a"].GetPosition()
+	nodeB := nodesByID["node-b"].GetPosition()
+	nodeC := nodesByID["node-c"].GetPosition()
+
+	assert.Equal(t, int32(1000), nodeA.GetX(), "selected component should preserve top-left anchor X")
+	assert.Equal(t, int32(600), nodeA.GetY(), "selected component should preserve top-left anchor Y")
+	assert.Less(t, nodeA.GetX(), nodeB.GetX(), "selected edge direction should become left-to-right")
+	assert.Equal(t, nodeA.GetY(), nodeB.GetY(), "selected nodes should be aligned by layer in horizontal layout")
+	assert.Equal(t, int32(120), nodeC.GetX(), "detached node should keep original X")
+	assert.Equal(t, int32(80), nodeC.GetY(), "detached node should keep original Y")
+}
+
+func TestUpdateCanvasWithAutoLayout_UnknownSeedNode(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{},
+		[]models.Edge{},
+	)
+
+	canvasPB := &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{
+			Name:        canvas.Name,
+			Description: canvas.Description,
+		},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-1",
+					Name: "Node 1",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+					Position: &componentpb.Position{X: 100, Y: 100},
+				},
+			},
+		},
+	}
+
+	_, err := UpdateCanvasWithAutoLayout(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		canvasPB,
+		&pb.CanvasAutoLayout{
+			Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
+			NodeIds:   []string{"missing-node"},
+		},
+		"http://localhost:3000/api/v1",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "auto_layout.node_ids contains unknown node")
+}

@@ -271,9 +271,28 @@ message CreateCanvasResponse {
   Canvas canvas = 1;
 }
 
+message CanvasAutoLayout {
+  enum Algorithm {
+    ALGORITHM_UNSPECIFIED = 0;
+    ALGORITHM_HORIZONTAL = 1;
+  }
+
+  enum Scope {
+    SCOPE_UNSPECIFIED = 0;
+    SCOPE_FULL_CANVAS = 1;
+    SCOPE_CONNECTED_COMPONENT = 2;
+    SCOPE_EXACT_SET = 3;
+  }
+
+  Algorithm algorithm = 1;
+  repeated string node_ids = 2;
+  Scope scope = 3;
+}
+
 message UpdateCanvasRequest {
   string id = 1;
   Canvas canvas = 2;
+  CanvasAutoLayout auto_layout = 3;
 }
 
 message UpdateCanvasResponse {
