@@ -103,7 +103,7 @@ func (h *HoneycombWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, er
 		}
 		secretBytes = []byte(token)
 	}
-	secret := strings.TrimSpace(string(secretBytes))
+	secret := string(secretBytes)
 
 	webhookURL := strings.TrimSpace(ctx.Webhook.GetURL())
 	if webhookURL == "" {

@@ -162,7 +162,7 @@ func (t *OnAlertFired) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
-	secret := strings.TrimSpace(string(secretBytes))
+	secret := string(secretBytes)
 
 	provided := strings.TrimSpace(ctx.Headers.Get("X-Honeycomb-Webhook-Token"))
 	if provided == "" {
