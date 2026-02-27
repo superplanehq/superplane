@@ -55,7 +55,7 @@ func Test__OnIssue__HandleWebhook__InvalidToken(t *testing.T) {
 	headers.Set("X-Gitlab-Event", "Issue Hook")
 	headers.Set("X-Gitlab-Token", "wrong-token")
 
-	webhookCtx := &contexts.WebhookContext{Secret: "correct-token"}
+	webhookCtx := &contexts.NodeWebhookContext{Secret: "correct-token"}
 
 	ctx := core.WebhookRequestContext{
 		Headers:       headers,
@@ -78,7 +78,7 @@ func Test__OnIssue__HandleWebhook__StateNotOpened(t *testing.T) {
 	headers.Set("X-Gitlab-Event", "Issue Hook")
 	headers.Set("X-Gitlab-Token", "token")
 
-	webhookCtx := &contexts.WebhookContext{Secret: "token"}
+	webhookCtx := &contexts.NodeWebhookContext{Secret: "token"}
 	eventsCtx := &contexts.EventContext{}
 
 	data := map[string]any{
@@ -113,7 +113,7 @@ func Test__OnIssue__HandleWebhook__Success(t *testing.T) {
 	headers.Set("X-Gitlab-Event", "Issue Hook")
 	headers.Set("X-Gitlab-Token", "token")
 
-	webhookCtx := &contexts.WebhookContext{Secret: "token"}
+	webhookCtx := &contexts.NodeWebhookContext{Secret: "token"}
 	eventsCtx := &contexts.EventContext{}
 
 	data := map[string]any{
@@ -149,7 +149,7 @@ func Test__OnIssue__HandleWebhook__Filters(t *testing.T) {
 	headers.Set("X-Gitlab-Event", "Issue Hook")
 	headers.Set("X-Gitlab-Token", "token")
 
-	webhookCtx := &contexts.WebhookContext{Secret: "token"}
+	webhookCtx := &contexts.NodeWebhookContext{Secret: "token"}
 
 	baseAttributes := map[string]any{
 		"state":  "opened",
@@ -254,7 +254,7 @@ func Test__OnIssue__HandleWebhook__UpdateOnClosed(t *testing.T) {
 	headers.Set("X-Gitlab-Event", "Issue Hook")
 	headers.Set("X-Gitlab-Token", "token")
 
-	webhookCtx := &contexts.WebhookContext{Secret: "token"}
+	webhookCtx := &contexts.NodeWebhookContext{Secret: "token"}
 	eventsCtx := &contexts.EventContext{}
 
 	data := map[string]any{

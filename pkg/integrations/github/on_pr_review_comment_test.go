@@ -30,7 +30,7 @@ func Test__OnPRReviewComment__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Events:  &contexts.EventContext{},
-			Webhook: &contexts.WebhookContext{},
+			Webhook: &contexts.NodeWebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -48,7 +48,7 @@ func Test__OnPRReviewComment__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"repository": "test",
 			},
-			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:  events,
 		})
 
@@ -68,7 +68,7 @@ func Test__OnPRReviewComment__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"repository": "test",
 			},
-			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:  events,
 		})
 
@@ -88,7 +88,7 @@ func Test__OnPRReviewComment__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"repository": "test",
 			},
-			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:  events,
 		})
 
@@ -108,7 +108,7 @@ func Test__OnPRReviewComment__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"repository": "test",
 			},
-			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:  events,
 		})
 
@@ -129,7 +129,7 @@ func Test__OnPRReviewComment__HandleWebhook(t *testing.T) {
 				"repository":    "test",
 				"contentFilter": "/deploy",
 			},
-			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:  events,
 		})
 
@@ -150,7 +150,7 @@ func Test__OnPRReviewComment__HandleWebhook(t *testing.T) {
 				"repository":    "test",
 				"contentFilter": "/deploy",
 			},
-			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:  events,
 		})
 
@@ -170,7 +170,7 @@ func Test__OnPRReviewComment__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"repository": "test",
 			},
-			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:  events,
 		})
 

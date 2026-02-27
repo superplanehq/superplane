@@ -82,7 +82,7 @@ func Test__OnPipelineCompleted__Setup(t *testing.T) {
 			},
 			HTTP:        httpCtx,
 			Metadata:    metadataCtx,
-			Webhook:     &contexts.WebhookContext{},
+			Webhook:     &contexts.NodeWebhookContext{},
 			Integration: integrationCtx,
 			Requests:    requestCtx,
 		})
@@ -139,7 +139,7 @@ func Test__OnPipelineCompleted__Setup(t *testing.T) {
 			},
 			HTTP:        httpCtx,
 			Metadata:    metadataCtx,
-			Webhook:     &contexts.WebhookContext{},
+			Webhook:     &contexts.NodeWebhookContext{},
 			Integration: integrationCtx,
 			Requests:    requestCtx,
 		})
@@ -195,7 +195,7 @@ func Test__OnPipelineCompleted__Setup(t *testing.T) {
 			},
 			HTTP:        httpCtx,
 			Metadata:    metadataCtx,
-			Webhook:     &contexts.WebhookContext{},
+			Webhook:     &contexts.NodeWebhookContext{},
 			Integration: integrationCtx,
 			Requests:    requestCtx,
 		})
@@ -213,7 +213,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: http.Header{},
 			Body:    []byte(`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-auth","pipelineIdentifier":"deploy","nodeStatus":"FAILED"}}`),
-			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
 			// Intentionally invalid/missing config.
 			Configuration: map[string]any{},
 			Events:        &contexts.EventContext{},
@@ -230,7 +230,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PIPELINE_END","data":{"planExecutionId":"exec-1","pipelineIdentifier":"deploy","status":"FAILED"}}`),
-			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:              "default",
 				ProjectID:          "default_project",
@@ -253,7 +253,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PIPELINE_END","data":{"planExecutionId":"exec-1","pipelineIdentifier":"deploy","status":"FAILED"}}`),
-			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:              "default",
 				ProjectID:          "default_project",
@@ -284,7 +284,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PIPELINE_END","data":{"planExecutionId":"exec-errored","pipelineIdentifier":"deploy","status":"ERRORED"}}`),
-			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:              "default",
 				ProjectID:          "default_project",
@@ -309,7 +309,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: http.Header{},
 			Body:    []byte(`{"eventType":"PIPELINE_END","data":{"planExecutionId":"exec-2","pipelineIdentifier":"deploy","status":"FAILED"}}`),
-			Webhook: &contexts.WebhookContext{Secret: ""},
+			Webhook: &contexts.NodeWebhookContext{Secret: ""},
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:              "default",
 				ProjectID:          "default_project",
@@ -370,7 +370,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"STAGE_END","data":{"planExecutionId":"exec-3","pipelineIdentifier":"deploy","status":"FAILED"}}`),
-			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:              "default",
 				ProjectID:          "default_project",
@@ -397,7 +397,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-no-end","pipelineIdentifier":"deploy","nodeStatus":"FAILED"}}`),
-			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:              "default",
 				ProjectID:          "default_project",
@@ -426,7 +426,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		webhookCode, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-no-end","pipelineIdentifier":"deploy","nodeStatus":"FAILED"}}`),
-			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:              "default",
 				ProjectID:          "default_project",
@@ -499,7 +499,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 				`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-filtered","pipelineIdentifier":"deploy","nodeStatus":"SUCCESS","endTs":"%d"}}`,
 				endTimestamp,
 			)),
-			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:              "default",
 				ProjectID:          "default_project",
@@ -536,7 +536,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 				`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-4","pipelineIdentifier":"deploy","nodeStatus":"FAILED","endTs":%d}}`,
 				now/1000,
 			)),
-			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:              "default",
 				ProjectID:          "default_project",
