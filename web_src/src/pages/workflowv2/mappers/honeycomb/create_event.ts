@@ -16,8 +16,7 @@ import { formatTimeAgo } from "@/utils/date";
 
 interface CreateEventConfiguration {
   dataset?: string;
-  /** Stored as raw JSON string from backend; may be object when from execution output */
-  fields?: string | Record<string, unknown>;
+  fields?: Record<string, unknown>;
 }
 
 type HoneycombCreateEventPayload = {
@@ -59,7 +58,7 @@ export const createEventMapper: ComponentBaseMapper = {
       "Created At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
       Status: data?.status ?? "-",
       Dataset: data?.dataset ?? "-",
-      "Sent Fields": formatFieldsForDisplay(data?.fields as string | Record<string, unknown> | undefined),
+      "Sent Fields": formatFieldsForDisplay(data?.fields),
     };
   },
 
@@ -123,16 +122,7 @@ function safeJSONStringify(value: unknown): string {
   }
 }
 
-/** Formats fields for display. Backend stores config.fields as raw JSON string, so we parse first to avoid double-encoding. */
-function formatFieldsForDisplay(fields: string | Record<string, unknown> | undefined): string {
+function formatFieldsForDisplay(fields: Record<string, unknown> | undefined): string {
   if (fields == null) return "-";
-  if (typeof fields === "string") {
-    try {
-      const parsed = JSON.parse(fields) as unknown;
-      return safeJSONStringify(parsed);
-    } catch {
-      return fields;
-    }
-  }
   return safeJSONStringify(fields);
 }
