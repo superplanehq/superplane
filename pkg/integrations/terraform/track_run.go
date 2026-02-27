@@ -372,13 +372,12 @@ func isFailedState(status string) bool {
 }
 
 func needsAttention(status string, workspace *tfe.Workspace) bool {
+	autoApply := workspace != nil && workspace.AutoApply
+
 	switch tfe.RunStatus(status) {
-	case tfe.RunPlanned:
-		if workspace != nil && workspace.AutoApply {
-			return false
-		}
-		return true
-	case tfe.RunPolicyOverride, tfe.RunCostEstimated, tfe.RunPolicyChecked:
+	case tfe.RunPlanned, tfe.RunCostEstimated, tfe.RunPolicyChecked:
+		return !autoApply
+	case tfe.RunPolicyOverride:
 		return true
 	}
 	return false
