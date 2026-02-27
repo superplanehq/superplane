@@ -61,13 +61,11 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	}
 	webhookSecret := strings.TrimSpace(string(webhookSecretBytes))
 
-	// Check if webhook already exists and update it if needed
 	listOpts := &tfe.NotificationConfigurationListOptions{}
 	existingHooks, err := client.TFE.NotificationConfigurations.List(context.Background(), resolvedWsId, listOpts)
 	if err == nil && existingHooks != nil {
 		for _, hook := range existingHooks.Items {
 			if hook.URL == targetURL {
-				// Update the existing webhook to ensure HMAC token is current
 				updateOpts := tfe.NotificationConfigurationUpdateOptions{
 					Enabled: tfe.Bool(true),
 					Name:    tfe.String("SuperPlane"),
