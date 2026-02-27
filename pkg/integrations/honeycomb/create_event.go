@@ -75,6 +75,7 @@ func (c *CreateEvent) Configuration() []configuration.Field {
 			Label:    "Fields JSON",
 			Type:     configuration.FieldTypeObject,
 			Required: true,
+			Default:  "{\"message\":\"deploy\",\"status\":\"ok\"}",
 			Description: `JSON object to send as event.
 							Example:
 							{"message":"deploy","status":"ok"}`,

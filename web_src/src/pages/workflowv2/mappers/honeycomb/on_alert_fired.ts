@@ -2,14 +2,16 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
 import { TriggerProps } from "@/ui/trigger";
+import { formatTimeAgo } from "@/utils/date";
 
 interface OnAlertFiredConfiguration {
   datasetSlug?: string;
-  alertName?: string;
+  trigger?: string;
 }
 
 interface OnAlertFiredEventData {
   name?: string;
+  alert_type?: string;
   status?: string;
   summary?: string;
   trigger_url?: string;
@@ -23,8 +25,8 @@ export const onAlertFiredTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as OnAlertFiredEventData;
 
     return {
-      title: eventData?.name ?? "Alert Fired",
-      subtitle: eventData?.status ?? "",
+      title: buildEventTitle(eventData),
+      subtitle: context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "",
     };
   },
 
@@ -32,13 +34,14 @@ export const onAlertFiredTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as OnAlertFiredEventData;
 
     return {
-      Name: eventData?.name ?? "",
-      Status: eventData?.status ?? "",
-      Summary: eventData?.summary ?? "",
-      Severity: eventData?.severity ?? "",
-      "Result Value": eventData?.result_value?.toString() ?? "",
-      "Triggered At": eventData?.triggered_at ?? "",
-      "Trigger URL": eventData?.trigger_url ?? "",
+      Name: eventData?.name ?? "-",
+      "Alert Type": eventData?.alert_type ?? "-",
+      Status: eventData?.status ?? "-",
+      Summary: eventData?.summary ?? "-",
+      Severity: eventData?.severity ?? "-",
+      "Result Value": eventData?.result_value?.toString() ?? "-",
+      "Triggered At": eventData?.triggered_at ?? "-",
+      "Trigger URL": eventData?.trigger_url ?? "-",
     };
   },
 
@@ -54,10 +57,10 @@ export const onAlertFiredTriggerRenderer: TriggerRenderer = {
       });
     }
 
-    if (configuration?.alertName) {
+    if (configuration?.trigger) {
       metadataItems.push({
         icon: "bell",
-        label: configuration.alertName,
+        label: configuration.trigger,
       });
     }
 
@@ -73,8 +76,8 @@ export const onAlertFiredTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnAlertFiredEventData;
 
       props.lastEventData = {
-        title: eventData?.name ?? "Alert Fired",
-        subtitle: eventData?.status ?? "",
+        title: buildEventTitle(eventData),
+        subtitle: lastEvent.createdAt ? formatTimeAgo(new Date(lastEvent.createdAt)) : "",
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
         eventId: lastEvent.id,
@@ -84,3 +87,14 @@ export const onAlertFiredTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function buildEventTitle(eventData?: OnAlertFiredEventData): string {
+  const name = eventData?.name?.trim() || "Alert Fired";
+  const alertType = eventData?.alert_type?.trim();
+
+  if (!alertType) {
+    return name;
+  }
+
+  return `${name} · ${alertType}`;
+}

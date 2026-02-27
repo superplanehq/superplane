@@ -2,6 +2,8 @@ package honeycomb
 
 import "github.com/superplanehq/superplane/pkg/core"
 
+const allDatasetsInEnvironmentScopeSlug = "__all__"
+
 func (h *Honeycomb) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
@@ -29,7 +31,7 @@ func (h *Honeycomb) ListResources(resourceType string, ctx core.ListResourcesCon
 		if datasetSlug == "" {
 			return []core.IntegrationResource{}, nil
 		}
-		triggers, err := client.ListTriggers(datasetSlug)
+		triggers, err := listDatasetAndEnvironmentTriggers(client, datasetSlug)
 		if err != nil {
 			return nil, err
 		}
@@ -46,4 +48,46 @@ func (h *Honeycomb) ListResources(resourceType string, ctx core.ListResourcesCon
 	default:
 		return []core.IntegrationResource{}, nil
 	}
+}
+
+func listDatasetAndEnvironmentTriggers(client *Client, datasetSlug string) ([]HoneycombTrigger, error) {
+	triggers, err := client.ListTriggers(datasetSlug)
+	if err != nil {
+		return nil, err
+	}
+
+	if datasetSlug == allDatasetsInEnvironmentScopeSlug {
+		return triggers, nil
+	}
+
+	environmentTriggers, err := client.ListTriggers(allDatasetsInEnvironmentScopeSlug)
+	if err != nil {
+		return triggers, nil
+	}
+
+	seen := map[string]struct{}{}
+	merged := make([]HoneycombTrigger, 0, len(triggers)+len(environmentTriggers))
+
+	for _, trigger := range triggers {
+		key := trigger.ID
+		if key == "" {
+			key = trigger.Name
+		}
+		seen[key] = struct{}{}
+		merged = append(merged, trigger)
+	}
+
+	for _, trigger := range environmentTriggers {
+		key := trigger.ID
+		if key == "" {
+			key = trigger.Name
+		}
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		merged = append(merged, trigger)
+	}
+
+	return merged, nil
 }

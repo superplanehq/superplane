@@ -16,7 +16,7 @@ type OnAlertFired struct{}
 
 type OnAlertFiredConfiguration struct {
 	DatasetSlug string `json:"datasetSlug" mapstructure:"datasetSlug"`
-	AlertName   string `json:"alertName" mapstructure:"alertName"`
+	Trigger     string `json:"trigger" mapstructure:"trigger"`
 }
 
 type OnAlertFiredNodeMetadata struct {
@@ -49,7 +49,7 @@ Starts a workflow execution when a Honeycomb Trigger fires.
 
 **Configuration:**
 - **Dataset Slug**: The slug of the dataset that contains your Honeycomb trigger. Found in the dataset URL: honeycomb.io/<team>/datasets/<dataset-slug>.
-- **Alert Name**: The exact name of the Honeycomb trigger to listen to (case-insensitive). Found in your dataset under Triggers.
+- **Trigger**: The exact name of the Honeycomb trigger to listen to (case-insensitive). Found in your dataset under Triggers.
 
 **How it works:**
 SuperPlane automatically creates a webhook recipient in Honeycomb and attaches it to the selected trigger. No manual webhook setup is required.
@@ -74,8 +74,8 @@ func (t *OnAlertFired) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "alertName",
-			Label:       "Alert Name",
+			Name:        "trigger",
+			Label:       "Trigger",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The name of the Honeycomb trigger to listen to (case-insensitive).",
@@ -104,13 +104,14 @@ func (t *OnAlertFired) Setup(ctx core.TriggerContext) error {
 	}
 
 	cfg.DatasetSlug = strings.TrimSpace(cfg.DatasetSlug)
-	cfg.AlertName = strings.TrimSpace(cfg.AlertName)
+	cfg.Trigger = strings.TrimSpace(cfg.Trigger)
+	triggerName := cfg.Trigger
 
 	if cfg.DatasetSlug == "" {
 		return fmt.Errorf("datasetSlug is required")
 	}
-	if cfg.AlertName == "" {
-		return fmt.Errorf("alertName is required")
+	if triggerName == "" {
+		return fmt.Errorf("trigger is required")
 	}
 
 	if ctx.Integration == nil {
@@ -129,21 +130,25 @@ func (t *OnAlertFired) Setup(ctx core.TriggerContext) error {
 		}
 	}
 
-	triggers, err := client.ListTriggers(cfg.DatasetSlug)
+	triggers, err := listDatasetAndEnvironmentTriggers(client, cfg.DatasetSlug)
 	if err != nil {
 		return fmt.Errorf("failed to list triggers: %w", err)
 	}
 
 	var triggerID string
+	triggerDatasetSlug := cfg.DatasetSlug
 	for _, tr := range triggers {
-		if strings.EqualFold(strings.TrimSpace(tr.Name), cfg.AlertName) {
+		if strings.EqualFold(strings.TrimSpace(tr.Name), triggerName) {
 			triggerID = tr.ID
+			if datasetFromTrigger, ok := tr.Raw["dataset_slug"].(string); ok && strings.TrimSpace(datasetFromTrigger) != "" {
+				triggerDatasetSlug = strings.TrimSpace(datasetFromTrigger)
+			}
 			break
 		}
 	}
 
 	if triggerID == "" {
-		return fmt.Errorf("trigger with name %q not found in dataset %q", cfg.AlertName, cfg.DatasetSlug)
+		return fmt.Errorf("trigger with name %q not found in dataset %q", triggerName, cfg.DatasetSlug)
 	}
 
 	if err := ctx.Metadata.Set(OnAlertFiredNodeMetadata{TriggerID: triggerID}); err != nil {
@@ -151,7 +156,7 @@ func (t *OnAlertFired) Setup(ctx core.TriggerContext) error {
 	}
 
 	if err := ctx.Integration.RequestWebhook(map[string]any{
-		"datasetSlug": cfg.DatasetSlug,
+		"datasetSlug": triggerDatasetSlug,
 		"triggerIds":  []string{triggerID},
 	}); err != nil {
 		return fmt.Errorf("failed to request webhook: %w", err)

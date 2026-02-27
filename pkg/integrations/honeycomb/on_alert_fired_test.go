@@ -18,13 +18,13 @@ func Test__OnAlertFired__Setup(t *testing.T) {
 			Integration: &contexts.IntegrationContext{},
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"alertName": "High Error Rate",
+				"trigger": "High Error Rate",
 			},
 		})
 		require.ErrorContains(t, err, "datasetSlug is required")
 	})
 
-	t.Run("missing alertName -> error", func(t *testing.T) {
+	t.Run("missing trigger -> error", func(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Integration: &contexts.IntegrationContext{},
 			Metadata:    &contexts.MetadataContext{},
@@ -32,7 +32,7 @@ func Test__OnAlertFired__Setup(t *testing.T) {
 				"datasetSlug": "production",
 			},
 		})
-		require.ErrorContains(t, err, "alertName is required")
+		require.ErrorContains(t, err, "trigger is required")
 	})
 
 	t.Run("no integration -> returns nil without requesting webhook", func(t *testing.T) {
@@ -41,7 +41,7 @@ func Test__OnAlertFired__Setup(t *testing.T) {
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"datasetSlug": "production",
-				"alertName":   "High Error Rate",
+				"trigger":     "High Error Rate",
 			},
 		})
 		assert.NoError(t, err)
@@ -53,7 +53,7 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 
 	validConfig := map[string]any{
 		"datasetSlug": "production",
-		"alertName":   "High Error Rate",
+		"trigger":     "High Error Rate",
 	}
 
 	body := []byte(`{"id":"trigger-abc","name":"High Error Rate","status":"TRIGGERED"}`)
