@@ -71,6 +71,7 @@ import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
+import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
 import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import octopusIcon from "@/assets/icons/integrations/octopus.svg";
@@ -1066,6 +1067,7 @@ function CategorySection({
       ecs: awsEcsIcon,
       sns: awsSnsIcon,
     },
+    honeycomb: honeycombIcon,
     gcp: gcpIcon,
   };
 
@@ -1196,6 +1198,7 @@ function CategorySection({
               ecs: awsEcsIcon,
               sns: awsSnsIcon,
             },
+            honeycomb: honeycombIcon,
             gcp: gcpIcon,
           };
           const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;

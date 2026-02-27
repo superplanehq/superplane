@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -154,4 +155,25 @@ func Test__DeleteSandbox__Execute(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to delete sandbox")
 	})
+}
+
+func Test__DeleteSandbox__Configuration(t *testing.T) {
+	component := DeleteSandbox{}
+
+	config := component.Configuration()
+	require.Len(t, config, 2)
+
+	var sandboxField *configuration.Field
+	for i := range config {
+		if config[i].Name == "sandbox" {
+			sandboxField = &config[i]
+			break
+		}
+	}
+
+	require.NotNil(t, sandboxField)
+	assert.Equal(t, configuration.FieldTypeIntegrationResource, sandboxField.Type)
+	require.NotNil(t, sandboxField.TypeOptions)
+	require.NotNil(t, sandboxField.TypeOptions.Resource)
+	assert.Equal(t, "sandbox", sandboxField.TypeOptions.Resource.Type)
 }

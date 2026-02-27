@@ -1,0 +1,12 @@
+{
+  "data": {
+    "id": "fda08377-fe7e-46b1-8992-3a7aaecac9c3",
+    "name": "build-test-deploy",
+    "status": "success",
+    "createdAt": "2021-09-01T22:49:03.544Z",
+    "stoppedAt": "2021-09-01T22:55:34.317Z",
+    "pipelineId": "1285fe1d-d3a6-44fc-8886-8979558254c4"
+  },
+  "timestamp": "2021-09-01T22:55:34.317Z",
+  "type": "circleci.workflow"
+}

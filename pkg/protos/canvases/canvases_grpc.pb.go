@@ -36,6 +36,8 @@ const (
 	Canvases_CancelExecution_FullMethodName           = "/Superplane.Canvases.Canvases/CancelExecution"
 	Canvases_ResolveExecutionErrors_FullMethodName    = "/Superplane.Canvases.Canvases/ResolveExecutionErrors"
 	Canvases_ListCanvasEvents_FullMethodName          = "/Superplane.Canvases.Canvases/ListCanvasEvents"
+	Canvases_ListCanvasMemories_FullMethodName        = "/Superplane.Canvases.Canvases/ListCanvasMemories"
+	Canvases_DeleteCanvasMemory_FullMethodName        = "/Superplane.Canvases.Canvases/DeleteCanvasMemory"
 	Canvases_ListEventExecutions_FullMethodName       = "/Superplane.Canvases.Canvases/ListEventExecutions"
 	Canvases_SendAiMessage_FullMethodName             = "/Superplane.Canvases.Canvases/SendAiMessage"
 )
@@ -61,6 +63,8 @@ type CanvasesClient interface {
 	CancelExecution(ctx context.Context, in *CancelExecutionRequest, opts ...grpc.CallOption) (*CancelExecutionResponse, error)
 	ResolveExecutionErrors(ctx context.Context, in *ResolveExecutionErrorsRequest, opts ...grpc.CallOption) (*ResolveExecutionErrorsResponse, error)
 	ListCanvasEvents(ctx context.Context, in *ListCanvasEventsRequest, opts ...grpc.CallOption) (*ListCanvasEventsResponse, error)
+	ListCanvasMemories(ctx context.Context, in *ListCanvasMemoriesRequest, opts ...grpc.CallOption) (*ListCanvasMemoriesResponse, error)
+	DeleteCanvasMemory(ctx context.Context, in *DeleteCanvasMemoryRequest, opts ...grpc.CallOption) (*DeleteCanvasMemoryResponse, error)
 	ListEventExecutions(ctx context.Context, in *ListEventExecutionsRequest, opts ...grpc.CallOption) (*ListEventExecutionsResponse, error)
 	SendAiMessage(ctx context.Context, in *SendAiMessageRequest, opts ...grpc.CallOption) (*SendAiMessageResponse, error)
 }
@@ -243,6 +247,26 @@ func (c *canvasesClient) ListCanvasEvents(ctx context.Context, in *ListCanvasEve
 	return out, nil
 }
 
+func (c *canvasesClient) ListCanvasMemories(ctx context.Context, in *ListCanvasMemoriesRequest, opts ...grpc.CallOption) (*ListCanvasMemoriesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCanvasMemoriesResponse)
+	err := c.cc.Invoke(ctx, Canvases_ListCanvasMemories_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) DeleteCanvasMemory(ctx context.Context, in *DeleteCanvasMemoryRequest, opts ...grpc.CallOption) (*DeleteCanvasMemoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteCanvasMemoryResponse)
+	err := c.cc.Invoke(ctx, Canvases_DeleteCanvasMemory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *canvasesClient) ListEventExecutions(ctx context.Context, in *ListEventExecutionsRequest, opts ...grpc.CallOption) (*ListEventExecutionsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListEventExecutionsResponse)
@@ -284,6 +308,8 @@ type CanvasesServer interface {
 	CancelExecution(context.Context, *CancelExecutionRequest) (*CancelExecutionResponse, error)
 	ResolveExecutionErrors(context.Context, *ResolveExecutionErrorsRequest) (*ResolveExecutionErrorsResponse, error)
 	ListCanvasEvents(context.Context, *ListCanvasEventsRequest) (*ListCanvasEventsResponse, error)
+	ListCanvasMemories(context.Context, *ListCanvasMemoriesRequest) (*ListCanvasMemoriesResponse, error)
+	DeleteCanvasMemory(context.Context, *DeleteCanvasMemoryRequest) (*DeleteCanvasMemoryResponse, error)
 	ListEventExecutions(context.Context, *ListEventExecutionsRequest) (*ListEventExecutionsResponse, error)
 	SendAiMessage(context.Context, *SendAiMessageRequest) (*SendAiMessageResponse, error)
 }
@@ -345,6 +371,12 @@ func (UnimplementedCanvasesServer) ResolveExecutionErrors(context.Context, *Reso
 }
 func (UnimplementedCanvasesServer) ListCanvasEvents(context.Context, *ListCanvasEventsRequest) (*ListCanvasEventsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListCanvasEvents not implemented")
+}
+func (UnimplementedCanvasesServer) ListCanvasMemories(context.Context, *ListCanvasMemoriesRequest) (*ListCanvasMemoriesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCanvasMemories not implemented")
+}
+func (UnimplementedCanvasesServer) DeleteCanvasMemory(context.Context, *DeleteCanvasMemoryRequest) (*DeleteCanvasMemoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteCanvasMemory not implemented")
 }
 func (UnimplementedCanvasesServer) ListEventExecutions(context.Context, *ListEventExecutionsRequest) (*ListEventExecutionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListEventExecutions not implemented")
@@ -678,6 +710,42 @@ func _Canvases_ListCanvasEvents_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Canvases_ListCanvasMemories_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCanvasMemoriesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).ListCanvasMemories(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_ListCanvasMemories_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).ListCanvasMemories(ctx, req.(*ListCanvasMemoriesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_DeleteCanvasMemory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteCanvasMemoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).DeleteCanvasMemory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_DeleteCanvasMemory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).DeleteCanvasMemory(ctx, req.(*DeleteCanvasMemoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Canvases_ListEventExecutions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListEventExecutionsRequest)
 	if err := dec(in); err != nil {
@@ -788,6 +856,14 @@ var Canvases_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListCanvasEvents",
 			Handler:    _Canvases_ListCanvasEvents_Handler,
+		},
+		{
+			MethodName: "ListCanvasMemories",
+			Handler:    _Canvases_ListCanvasMemories_Handler,
+		},
+		{
+			MethodName: "DeleteCanvasMemory",
+			Handler:    _Canvases_DeleteCanvasMemory_Handler,
 		},
 		{
 			MethodName: "ListEventExecutions",

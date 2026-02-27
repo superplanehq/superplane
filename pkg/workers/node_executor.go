@@ -292,6 +292,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
 		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
+		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
 		Webhook:        contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
 	}
 	ctx.ExpressionEnv = func(expression string) (map[string]any, error) {

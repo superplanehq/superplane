@@ -988,7 +988,11 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             }
           }}
         >
-          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <DialogContent
+            size="large"
+            className="w-[80vw] max-w-[80vw] h-[80vh] max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between">
               <DialogTitle>Payload</DialogTitle>
               <DialogDescription className="sr-only">Expanded payload viewer.</DialogDescription>

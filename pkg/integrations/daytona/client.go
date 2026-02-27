@@ -78,7 +78,16 @@ type ExecuteCommandRequest struct {
 // ExecuteCommandResponse represents the response from command execution
 type ExecuteCommandResponse struct {
 	ExitCode int    `json:"exitCode"`
+	Timeout  bool   `json:"timeout"`
 	Result   string `json:"result"`
+}
+
+func (e *ExecuteCommandResponse) ShortResult() string {
+	if len(e.Result) <= 1024 {
+		return e.Result
+	}
+
+	return e.Result[:1024] + "..."
 }
 
 // Snapshot represents a Daytona snapshot

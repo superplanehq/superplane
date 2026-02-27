@@ -1,0 +1,29 @@
+{
+  "data": {
+    "flakyTests": [
+      {
+        "testName": "TestUserAuthentication",
+        "classname": "auth_test.go",
+        "pipelineName": "build-pipeline",
+        "workflowName": "build-test-deploy",
+        "jobName": "test",
+        "timesFlaky": 8,
+        "source": "go",
+        "file": "pkg/auth/auth_test.go"
+      },
+      {
+        "testName": "TestCacheInvalidation",
+        "classname": "cache_test.go",
+        "pipelineName": "build-pipeline",
+        "workflowName": "build-test-deploy",
+        "jobName": "test",
+        "timesFlaky": 3,
+        "source": "go",
+        "file": "pkg/cache/cache_test.go"
+      }
+    ],
+    "totalFlakyTests": 2
+  },
+  "timestamp": "2021-09-01T22:55:34.317Z",
+  "type": "circleci.flakyTests"
+}

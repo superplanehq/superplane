@@ -70,11 +70,42 @@ func (c *triggersCommand) getTriggerByName(ctx core.CommandContext, name string)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		_, _ = fmt.Fprintf(stdout, "Name: %s\n", trigger.GetName())
-		_, _ = fmt.Fprintf(stdout, "Label: %s\n", trigger.GetLabel())
-		_, err := fmt.Fprintf(stdout, "Description: %s\n", trigger.GetDescription())
-		return err
+		return renderTriggerText(stdout, trigger)
 	})
+}
+
+func renderTriggerText(stdout io.Writer, trigger openapi_client.TriggersTrigger) error {
+	_, err := fmt.Fprintf(stdout, "Name: %s\n", trigger.GetName())
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintf(stdout, "Label: %s\n", trigger.GetLabel())
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintf(stdout, "Description: %s\n", trigger.GetDescription())
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintln(stdout)
+	if err != nil {
+		return err
+	}
+
+	err = renderConfigurationText(stdout, trigger.GetConfiguration())
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintln(stdout)
+	if err != nil {
+		return err
+	}
+
+	return renderExamplePayloadText(stdout, trigger.GetExampleData())
 }
 
 func (c *triggersCommand) listTriggers(ctx core.CommandContext, from string) ([]openapi_client.TriggersTrigger, error) {
