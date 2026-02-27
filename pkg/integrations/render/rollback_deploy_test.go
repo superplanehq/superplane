@@ -135,7 +135,7 @@ func Test__Render_RollbackDeploy__HandleWebhook(t *testing.T) {
 			Headers:     headers,
 			HTTP:        httpCtx,
 			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
-			Webhook:     &contexts.WebhookContext{Secret: secret},
+			Webhook:     &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 				if key == "deploy_id" && value == "dep-new" {
 					return &core.ExecutionContext{
@@ -209,7 +209,7 @@ func Test__Render_RollbackDeploy__HandleWebhook(t *testing.T) {
 			Headers:     failedHeaders,
 			HTTP:        httpCtx,
 			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
-			Webhook:     &contexts.WebhookContext{Secret: secret},
+			Webhook:     &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 				if key == "deploy_id" && value == "dep-new" {
 					return &core.ExecutionContext{

@@ -38,7 +38,7 @@ func Test__OnIncidentStatusUpdate__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Events:  &contexts.EventContext{},
-			Webhook: &contexts.WebhookContext{},
+			Webhook: &contexts.NodeWebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -54,7 +54,7 @@ func Test__OnIncidentStatusUpdate__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:        &contexts.EventContext{},
 		})
 
@@ -73,7 +73,7 @@ func Test__OnIncidentStatusUpdate__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        &contexts.EventContext{},
 		})
 
@@ -93,7 +93,7 @@ func Test__OnIncidentStatusUpdate__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventContext,
 		})
 
@@ -114,7 +114,7 @@ func Test__OnIncidentStatusUpdate__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventContext,
 		})
 
