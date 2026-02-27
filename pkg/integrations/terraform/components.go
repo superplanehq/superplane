@@ -266,8 +266,7 @@ func (c *DiscardRun) Documentation() string { return "" }
 
 type OverridePolicy struct{}
 type OverridePolicySpec struct {
-	RunID     string `json:"runId"`
-	Rationale string `json:"rationale"`
+	RunID string `json:"runId"`
 }
 
 func (c *OverridePolicy) Name() string        { return "terraform.overridePolicy" }
@@ -278,7 +277,6 @@ func (c *OverridePolicy) Description() string { return "Overrides a failed Senti
 func (c *OverridePolicy) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{Name: "runId", Label: "Run ID", Type: configuration.FieldTypeString, Required: true},
-		{Name: "rationale", Label: "Override Rationale", Type: configuration.FieldTypeString, Required: true},
 	}
 }
 func (c *OverridePolicy) Execute(ctx core.ExecutionContext) error {
