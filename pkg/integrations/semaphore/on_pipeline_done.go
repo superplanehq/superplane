@@ -60,7 +60,7 @@ func (p *OnPipelineDone) Documentation() string {
 - **Project**: Select the Semaphore project to monitor
 - **Refs**: Optional ref filters (for example ` + "`refs/heads/main`" + `)
 - **Results**: Optional pipeline result filters (for example ` + "`passed`" + `, ` + "`failed`" + `)
-- **Pipelines**: Optional pipeline file filters (for example ` + "`semaphore.yml`" + `, ` + "`production.yml`" + `)
+- **Pipelines**: Optional pipeline file filters (for example ` + "`.semaphore/semaphore.yml`" + `, ` + "`.semaphore/production/deploy.yml`" + `)
 
 ## Event Data
 

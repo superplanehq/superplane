@@ -49,8 +49,8 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as OnPipelineDoneEventData;
     const result = eventData?.pipeline?.result || "";
     const timeAgo = context.event?.createdAt ? formatTimeAgo(new Date(context.event?.createdAt)) : "";
-    const pipelineFile = `${eventData?.pipeline?.working_directory || ""}/${eventData?.pipeline?.yaml_file_name}`
-    const title = `${pipelineFile} (${eventData?.pipeline?.name || ""})`
+    const pipelineFile = `${eventData?.pipeline?.working_directory || ""}/${eventData?.pipeline?.yaml_file_name}`;
+    const title = `${pipelineFile} (${eventData?.pipeline?.name || ""})`;
     const subtitle = result && timeAgo ? `${result} · ${timeAgo}` : result || timeAgo;
 
     return {
@@ -63,7 +63,7 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as OnPipelineDoneEventData;
     const doneAt = eventData?.pipeline?.done_at ? new Date(eventData.pipeline.done_at).toLocaleString() : "";
     const repositoryUrl = eventData?.repository?.url || "";
-    const pipelineFile = `${eventData?.pipeline?.working_directory || ""}/${eventData?.pipeline?.yaml_file_name}`
+    const pipelineFile = `${eventData?.pipeline?.working_directory || ""}/${eventData?.pipeline?.yaml_file_name}`;
     const commitSha = eventData?.revision?.commit_sha || "";
     const commitUrl = repositoryUrl && commitSha ? `${repositoryUrl}/commit/${commitSha}` : "";
 
@@ -124,7 +124,7 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       const eventData = lastEvent.data as OnPipelineDoneEventData;
       const result = eventData?.pipeline?.result || "";
-      const pipelineFile = `${eventData?.pipeline?.working_directory || ""}/${eventData?.pipeline?.yaml_file_name}`
+      const pipelineFile = `${eventData?.pipeline?.working_directory || ""}/${eventData?.pipeline?.yaml_file_name}`;
       const timeAgo = lastEvent.createdAt ? formatTimeAgo(new Date(lastEvent.createdAt)) : "";
       const subtitle = result && timeAgo ? `${result} · ${timeAgo}` : result || timeAgo;
 
