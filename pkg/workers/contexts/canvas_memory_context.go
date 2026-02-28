@@ -81,3 +81,22 @@ func (c *CanvasMemoryContext) Delete(namespace string, matches map[string]any) (
 
 	return deletedValues, nil
 }
+
+func (c *CanvasMemoryContext) Update(namespace string, matches map[string]any, values map[string]any) ([]any, error) {
+	namespace = strings.TrimSpace(namespace)
+	if namespace == "" {
+		return nil, fmt.Errorf("namespace is required")
+	}
+
+	records, err := models.UpdateCanvasMemoriesByNamespaceAndMatchesInTransaction(c.tx, c.canvasID, namespace, matches, values)
+	if err != nil {
+		return nil, err
+	}
+
+	updatedValues := make([]any, 0, len(records))
+	for _, record := range records {
+		updatedValues = append(updatedValues, record.Values.Data())
+	}
+
+	return updatedValues, nil
+}

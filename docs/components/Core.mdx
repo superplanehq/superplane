@@ -30,6 +30,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run a command on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
+  <LinkCard title="Update Memory" href="#update-memory" description="Update values in canvas memory by namespace and field matches" />
   <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
 </CardGrid>
 
@@ -700,6 +701,59 @@ The Time Gate component delays event processing until the next valid day and tim
   "data": {},
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "timegate.finished"
+}
+```
+
+<a id="update-memory"></a>
+
+## Update Memory
+
+The Update Memory component updates matching rows in canvas-level memory storage.
+
+### Use Cases
+
+- Patch stored records after external state changes
+- Enrich existing memory rows with additional fields
+- Keep identifiers and status data in sync
+
+### How It Works
+
+1. Reads `namespace`, `matchList`, and `valueList` from configuration
+2. Updates all matching memory rows in a single SQL operation
+3. Emits `memory.updated` to the `found` or `notFound` channel
+
+### Output Channels
+
+- **Found**: At least one matching memory row was updated
+- **Not Found**: No matching memory rows were updated
+
+### Example Output
+
+```json
+{
+  "data": {
+    "count": 1,
+    "matches": {
+      "creator": "igor",
+      "pull_request": 123
+    },
+    "namespace": "machines",
+    "updated": [
+      {
+        "creator": "igor",
+        "pull_request": 123,
+        "sandbox_id": "sbx-001",
+        "status": "running",
+        "updated_by": "workflow"
+      }
+    ],
+    "values": {
+      "status": "running",
+      "updated_by": "workflow"
+    }
+  },
+  "timestamp": "2026-02-28T00:00:00Z",
+  "type": "memory.updated"
 }
 ```
 
