@@ -26,6 +26,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="If" href="#if" description="Route events based on expression" />
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
+  <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run a command on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
   <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
@@ -528,6 +529,48 @@ When executed, the No Operation component immediately emits the incoming event d
   "data": {},
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "noop.finished"
+}
+```
+
+<a id="read-memory"></a>
+
+## Read Memory
+
+The Read Memory component looks up values from canvas-level memory storage.
+
+### Use Cases
+
+- Retrieve previously stored IDs before cleanup actions
+- Check whether related data already exists
+- Rehydrate context from prior runs
+
+### How It Works
+
+1. Reads `namespace` and `matchList` from configuration
+2. Finds memory rows matching all configured key/value pairs
+3. Emits `memory.read` with matching values
+
+### Example Output
+
+```json
+{
+  "data": {
+    "count": 1,
+    "matches": {
+      "creator": "igor",
+      "pull_request": 123
+    },
+    "namespace": "machines",
+    "values": [
+      {
+        "creator": "igor",
+        "pull_request": 123,
+        "sandbox_id": "sbx-001"
+      }
+    ]
+  },
+  "timestamp": "2026-02-28T00:00:00Z",
+  "type": "memory.read"
 }
 ```
 
