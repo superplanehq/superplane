@@ -7,7 +7,13 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "./types";
-import { ComponentBaseProps, DEFAULT_EVENT_STATE_MAP, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import {
+  ComponentBaseProps,
+  DEFAULT_EVENT_STATE_MAP,
+  EventSection,
+  EventState,
+  EventStateMap,
+} from "@/ui/componentBase";
 import { getTriggerRenderer } from ".";
 import { formatTimeAgo } from "@/utils/date";
 import { defaultStateFunction } from "./stateRegistry";

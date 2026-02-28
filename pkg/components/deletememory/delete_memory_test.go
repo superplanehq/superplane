@@ -10,13 +10,13 @@ import (
 )
 
 type canvasMemoryContext struct {
-	namespace       string
-	matches         map[string]any
-	deletedValues   []any
-	deletedFirst    any
-	deleteCalls     int
+	namespace        string
+	matches          map[string]any
+	deletedValues    []any
+	deletedFirst     any
+	deleteCalls      int
 	deleteFirstCalls int
-	err             error
+	err              error
 }
 
 func (c *canvasMemoryContext) Add(namespace string, values any) error {
