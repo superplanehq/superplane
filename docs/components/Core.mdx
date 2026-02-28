@@ -21,6 +21,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Add Memory" href="#add-memory" description="Add a namespaced JSON value to canvas memory" />
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
+  <LinkCard title="Delete Memory" href="#delete-memory" description="Delete values from canvas memory by namespace and field matches" />
   <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
   <LinkCard title="If" href="#if" description="Route events based on expression" />
@@ -286,6 +287,53 @@ The Approval component pauses workflow execution and waits for manual approval f
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "approval.finished"
+}
+```
+
+<a id="delete-memory"></a>
+
+## Delete Memory
+
+The Delete Memory component removes memory rows from canvas-level memory storage.
+
+### Use Cases
+
+- Remove stale IDs after cleanup is complete
+- Keep memory stores bounded over time
+
+### How It Works
+
+1. Reads `namespace` and `matchList` from configuration
+2. Deletes memory rows matching all configured key/value pairs
+3. Emits `memory.deleted` to the `deleted` or `notFound` channel
+
+### Output Channels
+
+- **Deleted**: At least one matching memory row was removed
+- **Not Found**: No matching memory rows were removed
+
+### Example Output
+
+```json
+{
+  "data": {
+    "count": 1,
+    "deleteMode": "allMatches",
+    "deleted": [
+      {
+        "creator": "igor",
+        "pull_request": 123,
+        "sandbox_id": "sbx-001"
+      }
+    ],
+    "matches": {
+      "creator": "igor",
+      "pull_request": 123
+    },
+    "namespace": "machines"
+  },
+  "timestamp": "2026-02-28T00:00:00Z",
+  "type": "memory.deleted"
 }
 ```
 

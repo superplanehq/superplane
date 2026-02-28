@@ -13,6 +13,7 @@ import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
 import { noopMapper } from "./noop";
 import { addMemoryMapper } from "./addMemory";
+import { deleteMemoryMapper } from "./deleteMemory";
 import { readMemoryMapper } from "./readMemory";
 import { ifMapper, IF_STATE_REGISTRY } from "./if";
 import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
@@ -215,6 +216,7 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   noop: noopMapper,
   addMemory: addMemoryMapper,
+  deleteMemory: deleteMemoryMapper,
   readMemory: readMemoryMapper,
   if: ifMapper,
   http: httpMapper,
