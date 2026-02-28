@@ -14,8 +14,6 @@ import (
 
 const ComponentName = "deleteMemory"
 const PayloadType = "memory.deleted"
-const DeleteModeAllMatches = "allMatches"
-const DeleteModeLatestMatch = "latestMatch"
 const ChannelNameDeleted = "deleted"
 const ChannelNameNotFound = "notFound"
 
@@ -26,9 +24,8 @@ func init() {
 type DeleteMemory struct{}
 
 type Spec struct {
-	Namespace  string      `json:"namespace"`
-	DeleteMode string      `json:"deleteMode,omitempty"`
-	MatchList  []MatchPair `json:"matchList"`
+	Namespace string      `json:"namespace"`
+	MatchList []MatchPair `json:"matchList"`
 }
 
 type MatchPair struct {
@@ -38,7 +35,6 @@ type MatchPair struct {
 
 type canvasMemoryDeleteContext interface {
 	Delete(namespace string, matches map[string]any) ([]any, error)
-	DeleteFirst(namespace string, matches map[string]any) (any, error)
 }
 
 func (c *DeleteMemory) Name() string {
@@ -160,29 +156,16 @@ func (c *DeleteMemory) Execute(ctx core.ExecutionContext) error {
 	}
 
 	matches := buildMatches(spec.MatchList)
-	deletedValues := []any{}
-	if spec.DeleteMode == DeleteModeLatestMatch {
-		deleted, deleteErr := deleteCtx.DeleteFirst(spec.Namespace, matches)
-		if deleteErr != nil {
-			return fmt.Errorf("failed to delete canvas memory: %w", deleteErr)
-		}
-		if deleted != nil {
-			deletedValues = append(deletedValues, deleted)
-		}
-	} else {
-		var deleteErr error
-		deletedValues, deleteErr = deleteCtx.Delete(spec.Namespace, matches)
-		if deleteErr != nil {
-			return fmt.Errorf("failed to delete canvas memory: %w", deleteErr)
-		}
+	deletedValues, deleteErr := deleteCtx.Delete(spec.Namespace, matches)
+	if deleteErr != nil {
+		return fmt.Errorf("failed to delete canvas memory: %w", deleteErr)
 	}
 
 	metadata := map[string]any{
-		"namespace":  spec.Namespace,
-		"fields":     extractFieldNames(spec.MatchList),
-		"matches":    matches,
-		"deleteMode": spec.DeleteMode,
-		"count":      len(deletedValues),
+		"namespace": spec.Namespace,
+		"fields":    extractFieldNames(spec.MatchList),
+		"matches":   matches,
+		"count":     len(deletedValues),
 	}
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return fmt.Errorf("failed to set execution metadata: %w", err)
@@ -202,11 +185,10 @@ func (c *DeleteMemory) Execute(ctx core.ExecutionContext) error {
 		[]any{
 			map[string]any{
 				"data": map[string]any{
-					"namespace":  spec.Namespace,
-					"matches":    matches,
-					"deleteMode": spec.DeleteMode,
-					"deleted":    deletedValues,
-					"count":      len(deletedValues),
+					"namespace": spec.Namespace,
+					"matches":   matches,
+					"deleted":   deletedValues,
+					"count":     len(deletedValues),
 				},
 			},
 		},
@@ -223,19 +205,12 @@ func decodeSpec(raw any) (Spec, error) {
 
 func normalizeSpec(spec Spec) Spec {
 	spec.Namespace = strings.TrimSpace(spec.Namespace)
-	spec.DeleteMode = strings.TrimSpace(spec.DeleteMode)
-	if spec.DeleteMode == "" {
-		spec.DeleteMode = DeleteModeAllMatches
-	}
 	return spec
 }
 
 func validateSpec(spec Spec) error {
 	if spec.Namespace == "" {
 		return fmt.Errorf("namespace is required")
-	}
-	if spec.DeleteMode != DeleteModeAllMatches && spec.DeleteMode != DeleteModeLatestMatch {
-		return fmt.Errorf("deleteMode must be either %q or %q", DeleteModeAllMatches, DeleteModeLatestMatch)
 	}
 
 	matches := buildMatches(spec.MatchList)

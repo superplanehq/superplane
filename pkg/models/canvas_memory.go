@@ -143,3 +143,41 @@ func DeleteCanvasMemoryInTransaction(tx *gorm.DB, canvasID, memoryID uuid.UUID) 
 		Delete(&CanvasMemory{}).
 		Error
 }
+
+func DeleteCanvasMemoriesByNamespaceAndMatchesInTransaction(
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	namespace string,
+	matches map[string]any,
+) ([]CanvasMemory, error) {
+	if len(matches) == 0 {
+		return []CanvasMemory{}, fmt.Errorf("at least one match expression is required")
+	}
+
+	matchesJSON, err := json.Marshal(matches)
+	if err != nil {
+		return nil, err
+	}
+
+	var deletedRecords []CanvasMemory
+	err = tx.Raw(
+		`WITH deleted AS (
+			DELETE FROM canvas_memories
+			WHERE canvas_id = ? AND namespace = ? AND values @> ?::jsonb
+			RETURNING *
+		)
+		SELECT * FROM deleted ORDER BY created_at DESC`,
+		canvasID,
+		namespace,
+		matchesJSON,
+	).Scan(&deletedRecords).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return deletedRecords, nil
+}
+
+func DeleteCanvasMemoriesByNamespaceAndMatches(canvasID uuid.UUID, namespace string, matches map[string]any) ([]CanvasMemory, error) {
+	return DeleteCanvasMemoriesByNamespaceAndMatchesInTransaction(database.Conn(), canvasID, namespace, matches)
+}

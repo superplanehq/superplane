@@ -22,12 +22,10 @@ type DeleteMemoryMetadata = {
   namespace?: string;
   fields?: string[];
   matches?: Record<string, unknown>;
-  deleteMode?: string;
 };
 
 type DeleteMemoryConfiguration = {
   namespace?: string;
-  deleteMode?: string;
   matchList?: Array<{ name?: string; value?: unknown }>;
 };
 

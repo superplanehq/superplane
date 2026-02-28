@@ -1,7 +1,6 @@
 {
   "data": {
     "namespace": "machines",
-    "deleteMode": "allMatches",
     "matches": {
       "creator": "igor",
       "pull_request": 123

@@ -69,39 +69,16 @@ func (c *CanvasMemoryContext) Delete(namespace string, matches map[string]any) (
 		return nil, fmt.Errorf("namespace is required")
 	}
 
-	records, err := models.ListCanvasMemoriesByNamespaceAndMatchesInTransaction(c.tx, c.canvasID, namespace, matches)
+	records, err := models.DeleteCanvasMemoriesByNamespaceAndMatchesInTransaction(c.tx, c.canvasID, namespace, matches)
 	if err != nil {
 		return nil, err
 	}
 
 	deletedValues := make([]any, 0, len(records))
 	for _, record := range records {
-		if err := models.DeleteCanvasMemoryInTransaction(c.tx, c.canvasID, record.ID); err != nil {
-			return nil, err
-		}
 		deletedValues = append(deletedValues, record.Values.Data())
 	}
 
 	return deletedValues, nil
 }
 
-func (c *CanvasMemoryContext) DeleteFirst(namespace string, matches map[string]any) (any, error) {
-	namespace = strings.TrimSpace(namespace)
-	if namespace == "" {
-		return nil, fmt.Errorf("namespace is required")
-	}
-
-	record, err := models.FindFirstCanvasMemoryByNamespaceAndMatchesInTransaction(c.tx, c.canvasID, namespace, matches)
-	if err != nil {
-		return nil, err
-	}
-	if record == nil {
-		return nil, nil
-	}
-
-	if err := models.DeleteCanvasMemoryInTransaction(c.tx, c.canvasID, record.ID); err != nil {
-		return nil, err
-	}
-
-	return record.Values.Data(), nil
-}
