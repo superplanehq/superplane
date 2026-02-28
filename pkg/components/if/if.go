@@ -159,11 +159,7 @@ func expressionEnv(ctx core.ExecutionContext, expression string) (map[string]any
 		return ctx.ExpressionEnv(expression)
 	}
 
-	env := buildExpressionEnv(ctx.Data, ctx.SourceNodeID)
-	if ctx.CanvasMemory != nil {
-		env["memory"] = buildMemoryExpressionNamespace(ctx.CanvasMemory)
-	}
-	return env, nil
+	return buildExpressionEnv(ctx.Data, ctx.SourceNodeID), nil
 }
 
 func buildExpressionEnv(input any, sourceNodeID string) map[string]any {
@@ -266,47 +262,6 @@ func parseDepthValue(param any) (int, error) {
 	default:
 		return 0, fmt.Errorf("depth must be an integer")
 	}
-}
-
-func buildMemoryExpressionNamespace(memoryCtx core.CanvasMemoryContext) map[string]any {
-	return map[string]any{
-		"find": func(params ...any) (any, error) {
-			namespace, matches, err := parseMemoryParams(params)
-			if err != nil {
-				return nil, err
-			}
-			return memoryCtx.Find(namespace, matches)
-		},
-		"findFirst": func(params ...any) (any, error) {
-			namespace, matches, err := parseMemoryParams(params)
-			if err != nil {
-				return nil, err
-			}
-			return memoryCtx.FindFirst(namespace, matches)
-		},
-	}
-}
-
-func parseMemoryParams(params []any) (string, map[string]any, error) {
-	if len(params) == 0 || len(params) > 2 {
-		return "", nil, fmt.Errorf("memory.find() and memory.findFirst() require a namespace and optionally a matches object")
-	}
-
-	namespace, ok := params[0].(string)
-	if !ok || namespace == "" {
-		return "", nil, fmt.Errorf("memory namespace must be a non-empty string")
-	}
-
-	if len(params) == 1 || params[1] == nil {
-		return namespace, nil, nil
-	}
-
-	matches, ok := params[1].(map[string]any)
-	if !ok {
-		return "", nil, fmt.Errorf("memory matches must be an object")
-	}
-
-	return namespace, matches, nil
 }
 
 func (f *If) Actions() []core.Action {

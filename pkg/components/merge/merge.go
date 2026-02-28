@@ -288,8 +288,7 @@ func expressionEnv(ctx core.ProcessQueueContext, expression string) (map[string]
 		return ctx.ExpressionEnv(expression)
 	}
 
-	env := buildExpressionEnv(ctx.Input, ctx.SourceNodeID)
-	return env, nil
+	return buildExpressionEnv(ctx.Input, ctx.SourceNodeID), nil
 }
 
 func buildExpressionEnv(input any, sourceNodeID string) map[string]any {

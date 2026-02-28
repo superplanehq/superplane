@@ -3,8 +3,8 @@ package contexts
 import (
 	"fmt"
 	"math"
-	"regexp"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -762,20 +762,8 @@ func (b *NodeConfigurationBuilder) resolveFromRoot(depth int, step int) (any, er
 }
 
 func (b *NodeConfigurationBuilder) buildMemoryExpressionNamespace() map[string]any {
-	cache := make(map[string][]models.CanvasMemory)
-
 	loadByNamespace := func(namespace string) ([]models.CanvasMemory, error) {
-		if cached, ok := cache[namespace]; ok {
-			return cached, nil
-		}
-
-		records, err := models.ListCanvasMemoriesByNamespaceInTransaction(b.tx, b.workflowID, namespace)
-		if err != nil {
-			return nil, err
-		}
-
-		cache[namespace] = records
-		return records, nil
+		return models.ListCanvasMemoriesByNamespaceInTransaction(b.tx, b.workflowID, namespace)
 	}
 
 	return map[string]any{
