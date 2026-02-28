@@ -546,9 +546,14 @@ The Read Memory component looks up values from canvas-level memory storage.
 
 ### How It Works
 
-1. Reads `namespace` and `matchList` from configuration
+1. Reads `namespace`, `resultMode`, `emitMode`, and `matchList` from configuration
 2. Finds memory rows matching all configured key/value pairs
-3. Emits `memory.read` with matching values
+3. Emits `memory.read` to the `found` or `notFound` channel
+
+### Output Channels
+
+- **Found**: At least one matching memory row was found
+- **Not Found**: No matching memory rows were found
 
 ### Example Output
 
@@ -556,11 +561,13 @@ The Read Memory component looks up values from canvas-level memory storage.
 {
   "data": {
     "count": 1,
+    "emitMode": "allAtOnce",
     "matches": {
       "creator": "igor",
       "pull_request": 123
     },
     "namespace": "machines",
+    "resultMode": "latest",
     "values": [
       {
         "creator": "igor",

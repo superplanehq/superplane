@@ -14,6 +14,12 @@ import (
 
 const ComponentName = "readMemory"
 const PayloadType = "memory.read"
+const ResultModeAll = "all"
+const ResultModeLatest = "latest"
+const EmitModeAllAtOnce = "allAtOnce"
+const EmitModeOneByOne = "oneByOne"
+const ChannelNameFound = "found"
+const ChannelNameNotFound = "notFound"
 
 func init() {
 	registry.RegisterComponent(ComponentName, &ReadMemory{})
@@ -22,8 +28,10 @@ func init() {
 type ReadMemory struct{}
 
 type Spec struct {
-	Namespace string      `json:"namespace"`
-	MatchList []MatchPair `json:"matchList"`
+	Namespace  string      `json:"namespace"`
+	ResultMode string      `json:"resultMode,omitempty"`
+	EmitMode   string      `json:"emitMode,omitempty"`
+	MatchList  []MatchPair `json:"matchList"`
 }
 
 type MatchPair struct {
@@ -54,9 +62,15 @@ func (c *ReadMemory) Documentation() string {
 
 ## How It Works
 
-1. Reads ` + "`namespace`" + ` and ` + "`matchList`" + ` from configuration
+1. Reads ` + "`namespace`" + `, ` + "`resultMode`" + `, ` + "`emitMode`" + `, and ` + "`matchList`" + ` from configuration
 2. Finds memory rows matching all configured key/value pairs
-3. Emits ` + "`memory.read`" + ` with matching values`
+3. Emits ` + "`memory.read`" + ` to the ` + "`found`" + ` or ` + "`notFound`" + ` channel
+
+## Output Channels
+
+- **Found**: At least one matching memory row was found
+- **Not Found**: No matching memory rows were found`
+
 }
 
 func (c *ReadMemory) Icon() string {
@@ -72,7 +86,10 @@ func (c *ReadMemory) ExampleOutput() map[string]any {
 }
 
 func (c *ReadMemory) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{core.DefaultOutputChannel}
+	return []core.OutputChannel{
+		{Name: ChannelNameFound, Label: "Found"},
+		{Name: ChannelNameNotFound, Label: "Not Found"},
+	}
 }
 
 func (c *ReadMemory) Configuration() []configuration.Field {
@@ -83,6 +100,22 @@ func (c *ReadMemory) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Description: "Memory namespace to search in",
 			Required:    true,
+		},
+		{
+			Name:        "resultMode",
+			Label:       "Result Mode",
+			Type:        configuration.FieldTypeSelect,
+			Description: "Choose whether to return all matches or only the latest match",
+			Required:    true,
+			Default:     ResultModeAll,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "All Matches", Value: ResultModeAll},
+						{Label: "Latest Match", Value: ResultModeLatest},
+					},
+				},
+			},
 		},
 		{
 			Name:        "matchList",
@@ -115,6 +148,25 @@ func (c *ReadMemory) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "emitMode",
+			Label:       "Emit Mode",
+			Type:        configuration.FieldTypeSelect,
+			Description: "Choose whether list results are emitted as a single event or one event per record",
+			Required:    false,
+			Default:     EmitModeAllAtOnce,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "All At Once", Value: EmitModeAllAtOnce},
+						{Label: "One By One", Value: EmitModeOneByOne},
+					},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "resultMode", Values: []string{ResultModeAll}},
+			},
+		},
 	}
 }
 
@@ -123,7 +175,7 @@ func (c *ReadMemory) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return err
 	}
-	spec.Namespace = strings.TrimSpace(spec.Namespace)
+	spec = normalizeSpec(spec)
 
 	return validateSpec(spec)
 }
@@ -133,20 +185,35 @@ func (c *ReadMemory) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	spec.Namespace = strings.TrimSpace(spec.Namespace)
+	spec = normalizeSpec(spec)
 	if err := validateSpec(spec); err != nil {
 		return err
 	}
 
 	matches := buildMatches(spec.MatchList)
-	values, err := ctx.CanvasMemory.Find(spec.Namespace, matches)
-	if err != nil {
-		return fmt.Errorf("failed to read canvas memory: %w", err)
+	values := []any{}
+	if spec.ResultMode == ResultModeLatest {
+		value, findErr := ctx.CanvasMemory.FindFirst(spec.Namespace, matches)
+		if findErr != nil {
+			return fmt.Errorf("failed to read canvas memory: %w", findErr)
+		}
+		if value != nil {
+			values = append(values, value)
+		}
+	} else {
+		var findErr error
+		values, findErr = ctx.CanvasMemory.Find(spec.Namespace, matches)
+		if findErr != nil {
+			return fmt.Errorf("failed to read canvas memory: %w", findErr)
+		}
 	}
 
 	metadata := map[string]any{
 		"namespace": spec.Namespace,
+		"fields":    extractFieldNames(spec.MatchList),
 		"matches":   matches,
+		"resultMode": spec.ResultMode,
+		"emitMode":  spec.EmitMode,
 		"count":     len(values),
 	}
 
@@ -158,19 +225,17 @@ func (c *ReadMemory) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to set node metadata: %w", err)
 	}
 
+	channel := ChannelNameNotFound
+	if len(values) > 0 {
+		channel = ChannelNameFound
+	}
+
+	payloads := buildPayloads(spec, matches, values)
+
 	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
+		channel,
 		PayloadType,
-		[]any{
-			map[string]any{
-				"data": map[string]any{
-					"namespace": spec.Namespace,
-					"matches":   matches,
-					"values":    values,
-					"count":     len(values),
-				},
-			},
-		},
+		payloads,
 	)
 }
 
@@ -182,9 +247,28 @@ func decodeSpec(raw any) (Spec, error) {
 	return spec, nil
 }
 
+func normalizeSpec(spec Spec) Spec {
+	spec.Namespace = strings.TrimSpace(spec.Namespace)
+	spec.ResultMode = strings.TrimSpace(spec.ResultMode)
+	if spec.ResultMode == "" {
+		spec.ResultMode = ResultModeAll
+	}
+	spec.EmitMode = strings.TrimSpace(spec.EmitMode)
+	if spec.EmitMode == "" || spec.ResultMode == ResultModeLatest {
+		spec.EmitMode = EmitModeAllAtOnce
+	}
+	return spec
+}
+
 func validateSpec(spec Spec) error {
 	if spec.Namespace == "" {
 		return fmt.Errorf("namespace is required")
+	}
+	if spec.ResultMode != ResultModeAll && spec.ResultMode != ResultModeLatest {
+		return fmt.Errorf("resultMode must be either %q or %q", ResultModeAll, ResultModeLatest)
+	}
+	if spec.EmitMode != EmitModeAllAtOnce && spec.EmitMode != EmitModeOneByOne {
+		return fmt.Errorf("emitMode must be either %q or %q", EmitModeAllAtOnce, EmitModeOneByOne)
 	}
 
 	matches := buildMatches(spec.MatchList)
@@ -206,6 +290,58 @@ func buildMatches(matchList []MatchPair) map[string]any {
 	}
 
 	return matches
+}
+
+func extractFieldNames(matchList []MatchPair) []string {
+	fields := make([]string, 0, len(matchList))
+	seen := map[string]struct{}{}
+	for _, pair := range matchList {
+		name := strings.TrimSpace(pair.Name)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		fields = append(fields, name)
+	}
+
+	return fields
+}
+
+func buildPayloads(spec Spec, matches map[string]any, values []any) []any {
+	if spec.ResultMode == ResultModeAll && spec.EmitMode == EmitModeOneByOne && len(values) > 0 {
+		payloads := make([]any, 0, len(values))
+		for i, value := range values {
+			payloads = append(payloads, map[string]any{
+				"data": map[string]any{
+					"namespace": spec.Namespace,
+					"matches":   matches,
+					"resultMode": spec.ResultMode,
+					"emitMode":  spec.EmitMode,
+					"values":    []any{value},
+					"count":     1,
+					"index":     i,
+					"totalCount": len(values),
+				},
+			})
+		}
+		return payloads
+	}
+
+	return []any{
+		map[string]any{
+			"data": map[string]any{
+				"namespace": spec.Namespace,
+				"matches":   matches,
+				"resultMode": spec.ResultMode,
+				"emitMode":  spec.EmitMode,
+				"values":    values,
+				"count":     len(values),
+			},
+		},
+	}
 }
 
 func (c *ReadMemory) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {

@@ -15,10 +15,14 @@ type ReadMemoryMetadata = {
   namespace?: string;
   fields?: string[];
   matches?: Record<string, unknown>;
+  resultMode?: string;
+  emitMode?: string;
 };
 
 type ReadMemoryConfiguration = {
   namespace?: string;
+  resultMode?: string;
+  emitMode?: string;
   matchList?: Array<{ name?: string; value?: unknown }>;
 };
 
@@ -50,10 +54,18 @@ export const readMemoryMapper: ComponentBaseMapper = {
     const details: Record<string, string> = {};
     const metadata = (context.node.metadata || {}) as ReadMemoryMetadata;
     const namespace = (metadata.namespace || "").trim();
+    const resultMode = extractResultMode((context.node.configuration || {}) as ReadMemoryConfiguration, metadata);
+    const emitMode = extractEmitMode((context.node.configuration || {}) as ReadMemoryConfiguration, metadata);
     const fields = extractConfiguredFields((context.node.configuration || {}) as ReadMemoryConfiguration, metadata);
 
     if (namespace) {
       details["Namespace"] = namespace;
+    }
+    if (resultMode) {
+      details["Result Mode"] = resultMode === "latest" ? "Latest Match" : "All Matches";
+    }
+    if (emitMode) {
+      details["Emit Mode"] = emitMode === "oneByOne" ? "One By One" : "All At Once";
     }
     if (fields.length > 0) {
       details["Fields"] = fields.join(", ");
@@ -112,4 +124,24 @@ function extractConfiguredFields(config: ReadMemoryConfiguration, metadata: Read
   }
 
   return metadata.matches ? Object.keys(metadata.matches).filter((key) => key.trim().length > 0) : [];
+}
+
+function extractResultMode(config: ReadMemoryConfiguration, metadata: ReadMemoryMetadata): string {
+  const value = ((config.resultMode as string) || metadata.resultMode || "").trim().toLowerCase();
+  if (value === "latest") {
+    return "latest";
+  }
+  return value === "all" ? "all" : "";
+}
+
+function extractEmitMode(config: ReadMemoryConfiguration, metadata: ReadMemoryMetadata): string {
+  const resultMode = extractResultMode(config, metadata);
+  if (resultMode !== "all") {
+    return "";
+  }
+  const value = ((config.emitMode as string) || metadata.emitMode || "").trim();
+  if (value === "oneByOne") {
+    return "oneByOne";
+  }
+  return value === "allAtOnce" ? "allAtOnce" : "";
 }

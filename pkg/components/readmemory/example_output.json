@@ -1,6 +1,8 @@
 {
   "data": {
     "namespace": "machines",
+    "resultMode": "latest",
+    "emitMode": "allAtOnce",
     "matches": {
       "creator": "igor",
       "pull_request": 123

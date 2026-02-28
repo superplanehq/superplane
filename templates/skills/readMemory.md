@@ -11,7 +11,9 @@ Use it to retrieve previously stored values when later steps need deterministic 
 ## Required Configuration
 
 - `namespace` (required): memory namespace string.
+- `resultMode` (required): `all` (all matches) or `latest` (only the newest match).
 - `matchList` (required): list of key/value pairs used as exact matches.
+- `emitMode` (optional, only when `resultMode = "all"`): `allAtOnce` (default) or `oneByOne`.
 
 `readMemory` requires at least one match entry and will not run with an empty match set.
 
@@ -31,8 +33,15 @@ The component emits `memory.read` with:
 
 - `data.namespace`
 - `data.matches`
+- `data.resultMode`
+- `data.emitMode`
 - `data.values` (array of matched memory objects)
 - `data.count`
+
+Channel behavior:
+
+- `found`: emitted when `data.count > 0`
+- `notFound`: emitted when `data.count == 0`
 
 Common follow-up patterns:
 
@@ -44,6 +53,8 @@ Common follow-up patterns:
 ## Example Configuration
 
 - `namespace: "machines"`
+- `resultMode: "latest"`
+- `emitMode: "allAtOnce"`
 - `matchList:`
   - `{ "name": "pull_request", "value": "{{ root().data.issue.number }}" }`
   - `{ "name": "creator", "value": "{{ root().data.sender.login }}" }`
@@ -51,6 +62,7 @@ Common follow-up patterns:
 ## Mistakes To Avoid
 
 - Empty namespace.
+- Invalid `resultMode` (must be `all` or `latest`).
 - Empty `matchList`.
 - Mismatched key names between write and read components.
 - Assuming all reads return exactly one row; always account for zero or multiple matches.
