@@ -800,7 +800,7 @@ func (b *NodeConfigurationBuilder) buildMemoryExpressionNamespace() map[string]a
 
 func parseMemoryFindParams(params []any) (string, map[string]any, error) {
 	if len(params) == 0 || len(params) > 2 {
-		return "", nil, fmt.Errorf("memory.find() and memory.findFirst() require a namespace and optionally a matches object")
+		return "", nil, fmt.Errorf("memory.find() and memory.findFirst() require a namespace and matches")
 	}
 
 	namespace, ok := params[0].(string)
@@ -813,13 +813,13 @@ func parseMemoryFindParams(params []any) (string, map[string]any, error) {
 		return "", nil, fmt.Errorf("memory namespace is required")
 	}
 
-	if len(params) == 1 || params[1] == nil {
-		return namespace, nil, nil
+	if len(params) == 1 {
+		return namespace, nil, fmt.Errorf("at least one match expression is required")
 	}
 
 	matches, ok := params[1].(map[string]any)
 	if !ok {
-		return "", nil, fmt.Errorf("memory matches must be an object")
+		return "", nil, fmt.Errorf("match expression must be an object")
 	}
 
 	return namespace, matches, nil
