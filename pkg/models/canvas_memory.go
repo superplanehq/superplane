@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -68,6 +69,67 @@ func ListCanvasMemoriesByNamespaceInTransaction(tx *gorm.DB, canvasID uuid.UUID,
 
 func ListCanvasMemoriesByNamespace(canvasID uuid.UUID, namespace string) ([]CanvasMemory, error) {
 	return ListCanvasMemoriesByNamespaceInTransaction(database.Conn(), canvasID, namespace)
+}
+
+func ListCanvasMemoriesByNamespaceAndMatchesInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, matches map[string]any) ([]CanvasMemory, error) {
+	if len(matches) == 0 {
+		return []CanvasMemory{}, nil
+	}
+
+	matchesJSON, err := json.Marshal(matches)
+	if err != nil {
+		return nil, err
+	}
+
+	var records []CanvasMemory
+
+	err = tx.
+		Where("canvas_id = ? AND namespace = ?", canvasID, namespace).
+		Where("values @> ?::jsonb", matchesJSON).
+		Order("created_at DESC").
+		Find(&records).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return records, nil
+}
+
+func ListCanvasMemoriesByNamespaceAndMatches(canvasID uuid.UUID, namespace string, matches map[string]any) ([]CanvasMemory, error) {
+	return ListCanvasMemoriesByNamespaceAndMatchesInTransaction(database.Conn(), canvasID, namespace, matches)
+}
+
+func FindFirstCanvasMemoryByNamespaceAndMatchesInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, matches map[string]any) (*CanvasMemory, error) {
+	if len(matches) == 0 {
+		return nil, nil
+	}
+
+	matchesJSON, err := json.Marshal(matches)
+	if err != nil {
+		return nil, err
+	}
+
+	var record CanvasMemory
+
+	err = tx.
+		Where("canvas_id = ? AND namespace = ?", canvasID, namespace).
+		Where("values @> ?::jsonb", matchesJSON).
+		Order("created_at DESC").
+		Limit(1).
+		First(&record).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &record, nil
+}
+
+func FindFirstCanvasMemoryByNamespaceAndMatches(canvasID uuid.UUID, namespace string, matches map[string]any) (*CanvasMemory, error) {
+	return FindFirstCanvasMemoryByNamespaceAndMatchesInTransaction(database.Conn(), canvasID, namespace, matches)
 }
 
 func DeleteCanvasMemory(canvasID, memoryID uuid.UUID) error {

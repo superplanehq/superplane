@@ -2,8 +2,6 @@ package contexts
 
 import (
 	"fmt"
-	"math"
-	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -762,10 +760,6 @@ func (b *NodeConfigurationBuilder) resolveFromRoot(depth int, step int) (any, er
 }
 
 func (b *NodeConfigurationBuilder) buildMemoryExpressionNamespace() map[string]any {
-	loadByNamespace := func(namespace string) ([]models.CanvasMemory, error) {
-		return models.ListCanvasMemoriesByNamespaceInTransaction(b.tx, b.workflowID, namespace)
-	}
-
 	return map[string]any{
 		"find": func(params ...any) (any, error) {
 			namespace, matches, err := parseMemoryFindParams(params)
@@ -773,16 +767,13 @@ func (b *NodeConfigurationBuilder) buildMemoryExpressionNamespace() map[string]a
 				return nil, err
 			}
 
-			records, err := loadByNamespace(namespace)
+			records, err := models.ListCanvasMemoriesByNamespaceAndMatchesInTransaction(b.tx, b.workflowID, namespace, matches)
 			if err != nil {
 				return nil, err
 			}
 
 			values := make([]any, 0, len(records))
 			for _, record := range records {
-				if !memoryValueMatches(record.Values.Data(), matches) {
-					continue
-				}
 				values = append(values, record.Values.Data())
 			}
 
@@ -794,14 +785,11 @@ func (b *NodeConfigurationBuilder) buildMemoryExpressionNamespace() map[string]a
 				return nil, err
 			}
 
-			records, err := loadByNamespace(namespace)
+			record, err := models.FindFirstCanvasMemoryByNamespaceAndMatchesInTransaction(b.tx, b.workflowID, namespace, matches)
 			if err != nil {
 				return nil, err
 			}
-			for _, record := range records {
-				if !memoryValueMatches(record.Values.Data(), matches) {
-					continue
-				}
+			if record != nil {
 				return record.Values.Data(), nil
 			}
 
@@ -835,74 +823,6 @@ func parseMemoryFindParams(params []any) (string, map[string]any, error) {
 	}
 
 	return namespace, matches, nil
-}
-
-func memoryValueMatches(value any, matches map[string]any) bool {
-	if len(matches) == 0 {
-		return true
-	}
-
-	valueMap, ok := value.(map[string]any)
-	if !ok {
-		return false
-	}
-
-	for key, expected := range matches {
-		actual, exists := valueMap[key]
-		if !exists {
-			return false
-		}
-
-		if !memoryValuesEqual(actual, expected) {
-			return false
-		}
-	}
-
-	return true
-}
-
-func memoryValuesEqual(actual, expected any) bool {
-	if actualNumber, ok := toComparableFloat(actual); ok {
-		expectedNumber, expectedOk := toComparableFloat(expected)
-		if !expectedOk {
-			return false
-		}
-
-		return math.Abs(actualNumber-expectedNumber) < 1e-9
-	}
-
-	return reflect.DeepEqual(actual, expected)
-}
-
-func toComparableFloat(value any) (float64, bool) {
-	switch typed := value.(type) {
-	case int:
-		return float64(typed), true
-	case int8:
-		return float64(typed), true
-	case int16:
-		return float64(typed), true
-	case int32:
-		return float64(typed), true
-	case int64:
-		return float64(typed), true
-	case uint:
-		return float64(typed), true
-	case uint8:
-		return float64(typed), true
-	case uint16:
-		return float64(typed), true
-	case uint32:
-		return float64(typed), true
-	case uint64:
-		return float64(typed), true
-	case float32:
-		return float64(typed), true
-	case float64:
-		return typed, true
-	default:
-		return 0, false
-	}
 }
 
 func (b *NodeConfigurationBuilder) singleInputPayload() (any, bool, error) {
