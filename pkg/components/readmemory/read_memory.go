@@ -209,12 +209,12 @@ func (c *ReadMemory) Execute(ctx core.ExecutionContext) error {
 	}
 
 	metadata := map[string]any{
-		"namespace": spec.Namespace,
-		"fields":    extractFieldNames(spec.MatchList),
-		"matches":   matches,
+		"namespace":  spec.Namespace,
+		"fields":     extractFieldNames(spec.MatchList),
+		"matches":    matches,
 		"resultMode": spec.ResultMode,
-		"emitMode":  spec.EmitMode,
-		"count":     len(values),
+		"emitMode":   spec.EmitMode,
+		"count":      len(values),
 	}
 
 	if err := ctx.Metadata.Set(metadata); err != nil {
@@ -316,13 +316,13 @@ func buildPayloads(spec Spec, matches map[string]any, values []any) []any {
 		for i, value := range values {
 			payloads = append(payloads, map[string]any{
 				"data": map[string]any{
-					"namespace": spec.Namespace,
-					"matches":   matches,
+					"namespace":  spec.Namespace,
+					"matches":    matches,
 					"resultMode": spec.ResultMode,
-					"emitMode":  spec.EmitMode,
-					"values":    []any{value},
-					"count":     1,
-					"index":     i,
+					"emitMode":   spec.EmitMode,
+					"values":     []any{value},
+					"count":      1,
+					"index":      i,
 					"totalCount": len(values),
 				},
 			})
@@ -333,12 +333,12 @@ func buildPayloads(spec Spec, matches map[string]any, values []any) []any {
 	return []any{
 		map[string]any{
 			"data": map[string]any{
-				"namespace": spec.Namespace,
-				"matches":   matches,
+				"namespace":  spec.Namespace,
+				"matches":    matches,
 				"resultMode": spec.ResultMode,
-				"emitMode":  spec.EmitMode,
-				"values":    values,
-				"count":     len(values),
+				"emitMode":   spec.EmitMode,
+				"values":     values,
+				"count":      len(values),
 			},
 		},
 	}

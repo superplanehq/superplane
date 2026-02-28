@@ -10,13 +10,13 @@ import (
 )
 
 type canvasMemoryContext struct {
-	namespace string
-	matches   map[string]any
-	values    []any
-	first     any
-	findCalls int
+	namespace      string
+	matches        map[string]any
+	values         []any
+	first          any
+	findCalls      int
 	findFirstCalls int
-	err       error
+	err            error
 }
 
 func (c *canvasMemoryContext) Add(namespace string, values any) error {
@@ -83,12 +83,12 @@ func TestReadMemoryExecute(t *testing.T) {
 		assert.Equal(
 			t,
 			map[string]any{
-				"namespace": "machines",
-				"fields":    []string{"creator", "pull_request"},
-				"matches":   map[string]any{"creator": "igor", "pull_request": 123},
+				"namespace":  "machines",
+				"fields":     []string{"creator", "pull_request"},
+				"matches":    map[string]any{"creator": "igor", "pull_request": 123},
 				"resultMode": ResultModeAll,
-				"emitMode":  EmitModeAllAtOnce,
-				"count":     1,
+				"emitMode":   EmitModeAllAtOnce,
+				"count":      1,
 			},
 			nodeMetadata.Get(),
 		)
@@ -135,9 +135,9 @@ func TestReadMemoryExecute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"namespace": "machines",
+				"namespace":  "machines",
 				"resultMode": ResultModeAll,
-				"emitMode":  EmitModeOneByOne,
+				"emitMode":   EmitModeOneByOne,
 				"matchList": []map[string]any{
 					{"name": "creator", "value": "igor"},
 				},
@@ -318,7 +318,7 @@ func TestReadMemorySetup(t *testing.T) {
 			Configuration: map[string]any{
 				"namespace":  "machines",
 				"resultMode": ResultModeAll,
-				"emitMode":  "stream",
+				"emitMode":   "stream",
 				"matchList": []map[string]any{
 					{"name": "creator", "value": "igor"},
 				},
