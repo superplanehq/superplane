@@ -1,0 +1,12 @@
+{
+  "data": {
+    "sourceBucket": "source-bucket",
+    "sourceKey": "documents/report.pdf",
+    "bucket": "destination-bucket",
+    "key": "archive/report.pdf",
+    "etag": "d41d8cd98f00b204e9800998ecf8427e",
+    "lastModified": "2026-02-28T10:00:00.000Z"
+  },
+  "timestamp": "2026-02-28T10:00:00.000000000Z",
+  "type": "aws.s3.object.copied"
+}

@@ -1,0 +1,9 @@
+{
+  "data": {
+    "bucket": "my-example-bucket",
+    "key": "documents/report.pdf",
+    "deleted": true
+  },
+  "timestamp": "2026-02-28T10:00:00.000000000Z",
+  "type": "aws.s3.object.deleted"
+}

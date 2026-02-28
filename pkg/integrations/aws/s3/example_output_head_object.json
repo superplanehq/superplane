@@ -1,0 +1,13 @@
+{
+  "data": {
+    "key": "documents/report.pdf",
+    "bucket": "my-example-bucket",
+    "contentLength": 1048576,
+    "contentType": "application/pdf",
+    "etag": "d41d8cd98f00b204e9800998ecf8427e",
+    "lastModified": "Fri, 28 Feb 2026 10:00:00 GMT",
+    "storageClass": "STANDARD"
+  },
+  "timestamp": "2026-02-28T10:00:00.000000000Z",
+  "type": "aws.s3.object"
+}

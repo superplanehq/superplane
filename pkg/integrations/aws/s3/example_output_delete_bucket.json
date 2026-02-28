@@ -1,0 +1,8 @@
+{
+  "data": {
+    "bucket": "my-example-bucket",
+    "deleted": true
+  },
+  "timestamp": "2026-02-28T10:00:00.000000000Z",
+  "type": "aws.s3.bucket.deleted"
+}

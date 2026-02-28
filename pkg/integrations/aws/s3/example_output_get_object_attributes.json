@@ -1,0 +1,11 @@
+{
+  "data": {
+    "bucket": "my-example-bucket",
+    "key": "documents/report.pdf",
+    "etag": "d41d8cd98f00b204e9800998ecf8427e",
+    "storageClass": "STANDARD",
+    "objectSize": 1048576
+  },
+  "timestamp": "2026-02-28T10:00:00.000000000Z",
+  "type": "aws.s3.object.attributes"
+}
