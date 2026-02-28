@@ -8,9 +8,7 @@ The `addMemory` component appends a JSON object into canvas-scoped memory under 
 
 Use it to persist values that later nodes can read in expressions with:
 
-- `memory.find("<namespace>")`
 - `memory.find("<namespace>", { ...matches })`
-- `memory.findFirst("<namespace>")`
 - `memory.findFirst("<namespace>", { ...matches })`
 
 ## Required Configuration
@@ -40,6 +38,8 @@ Common follow-up patterns in later components:
   - `len(memory.find("machines", {"creator": "igor"})) > 0`
 - Use first matching record:
   - `memory.findFirst("machines", {"pull_request": root().data.issue.number}).sandbox_id`
+
+Note: memory reads now require match criteria. Avoid unfiltered `memory.find("<namespace>")` and `memory.findFirst("<namespace>")`.
 
 ## Example Configuration
 
