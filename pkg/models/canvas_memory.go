@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -73,7 +74,7 @@ func ListCanvasMemoriesByNamespace(canvasID uuid.UUID, namespace string) ([]Canv
 
 func ListCanvasMemoriesByNamespaceAndMatchesInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, matches map[string]any) ([]CanvasMemory, error) {
 	if len(matches) == 0 {
-		return []CanvasMemory{}, nil
+		return []CanvasMemory{}, fmt.Errorf("at least one match expression is required")
 	}
 
 	matchesJSON, err := json.Marshal(matches)
@@ -103,7 +104,7 @@ func ListCanvasMemoriesByNamespaceAndMatches(canvasID uuid.UUID, namespace strin
 
 func FindFirstCanvasMemoryByNamespaceAndMatchesInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, matches map[string]any) (*CanvasMemory, error) {
 	if len(matches) == 0 {
-		return nil, nil
+		return nil, fmt.Errorf("at least one match expression is required")
 	}
 
 	matchesJSON, err := json.Marshal(matches)
@@ -122,7 +123,7 @@ func FindFirstCanvasMemoryByNamespaceAndMatchesInTransaction(tx *gorm.DB, canvas
 		Error
 
 	if err != nil {
-		return nil, err
+		return nil, nil
 	}
 
 	return &record, nil
