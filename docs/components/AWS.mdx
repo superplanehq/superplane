@@ -53,6 +53,15 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Route 53 • Create DNS Record" href="#route-53-•-create-dns-record" description="Create a DNS record in an AWS Route 53 hosted zone" />
   <LinkCard title="Route 53 • Delete DNS Record" href="#route-53-•-delete-dns-record" description="Delete a DNS record from an AWS Route 53 hosted zone" />
   <LinkCard title="Route 53 • Upsert DNS Record" href="#route-53-•-upsert-dns-record" description="Create or update a DNS record in an AWS Route 53 hosted zone" />
+  <LinkCard title="S3 • Create Bucket" href="#s3-•-create-bucket" description="Create an AWS S3 bucket" />
+  <LinkCard title="S3 • Copy Object" href="#s3-•-copy-object" description="Copy an object within AWS S3" />
+  <LinkCard title="S3 • Delete Object" href="#s3-•-delete-object" description="Delete an object from an AWS S3 bucket" />
+  <LinkCard title="S3 • Head Object" href="#s3-•-head-object" description="Retrieve metadata for an S3 object without downloading it" />
+  <LinkCard title="S3 • Head Bucket" href="#s3-•-head-bucket" description="Check whether an S3 bucket exists and is accessible" />
+  <LinkCard title="S3 • Get Object Attributes" href="#s3-•-get-object-attributes" description="Retrieve attributes for an S3 object" />
+  <LinkCard title="S3 • Put Object" href="#s3-•-put-object" description="Upload an object to an AWS S3 bucket" />
+  <LinkCard title="S3 • Delete Bucket" href="#s3-•-delete-bucket" description="Delete an empty AWS S3 bucket" />
+  <LinkCard title="S3 • Empty Bucket" href="#s3-•-empty-bucket" description="Delete all objects in an AWS S3 bucket" />
   <LinkCard title="SNS • Create Topic" href="#sns-•-create-topic" description="Create an AWS SNS topic" />
   <LinkCard title="SNS • Delete Topic" href="#sns-•-delete-topic" description="Delete an AWS SNS topic" />
   <LinkCard title="SNS • Get Subscription" href="#sns-•-get-subscription" description="Get an AWS SNS subscription by ARN" />
@@ -1855,6 +1864,246 @@ The Upsert DNS Record component creates or updates a DNS record in an AWS Route 
   },
   "timestamp": "2026-01-28T10:30:00.000Z",
   "type": "aws.route53.change"
+}
+```
+
+<a id="s3-•-create-bucket"></a>
+
+## S3 • Create Bucket
+
+The Create Bucket component creates an AWS S3 bucket in the specified region.
+
+### Use Cases
+
+- **Environment provisioning**: Create buckets as part of environment setup workflows
+- **Data pipeline bootstrap**: Provision storage buckets before running data processing jobs
+- **Self-service operations**: Allow teams to create storage resources on demand
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "my-example-bucket",
+    "location": "/my-example-bucket"
+  },
+  "timestamp": "2026-02-28T10:00:00.000000000Z",
+  "type": "aws.s3.bucket"
+}
+```
+
+<a id="s3-•-copy-object"></a>
+
+## S3 • Copy Object
+
+The Copy Object component copies an S3 object from one location to another within S3.
+
+### Use Cases
+
+- **Cross-bucket replication**: Copy objects between buckets for backup or distribution
+- **Object versioning**: Create copies of objects before modifications
+- **Data pipeline staging**: Move objects between staging and production buckets
+
+### Example Output
+
+```json
+{
+  "data": {
+    "sourceBucket": "source-bucket",
+    "sourceKey": "documents/report.pdf",
+    "bucket": "destination-bucket",
+    "key": "archive/report.pdf",
+    "etag": "d41d8cd98f00b204e9800998ecf8427e",
+    "lastModified": "2026-02-28T10:00:00.000Z"
+  },
+  "timestamp": "2026-02-28T10:00:00.000000000Z",
+  "type": "aws.s3.object.copied"
+}
+```
+
+<a id="s3-•-delete-object"></a>
+
+## S3 • Delete Object
+
+The Delete Object component deletes an object from an AWS S3 bucket.
+
+### Use Cases
+
+- **Cleanup workflows**: Remove temporary files after processing
+- **Data lifecycle management**: Delete expired or obsolete objects
+- **Rollback automation**: Remove artifacts from failed deployments
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-example-bucket",
+    "key": "documents/report.pdf",
+    "deleted": true
+  },
+  "timestamp": "2026-02-28T10:00:00.000000000Z",
+  "type": "aws.s3.object.deleted"
+}
+```
+
+<a id="s3-•-head-object"></a>
+
+## S3 • Head Object
+
+The Head Object component retrieves metadata for an S3 object without downloading the object data.
+
+### Use Cases
+
+- **Existence checks**: Verify an object exists before processing
+- **Metadata inspection**: Check content type, size, or last modified date
+- **Conditional workflows**: Branch workflows based on object properties
+
+### Example Output
+
+```json
+{
+  "data": {
+    "key": "documents/report.pdf",
+    "bucket": "my-example-bucket",
+    "contentLength": 1048576,
+    "contentType": "application/pdf",
+    "etag": "d41d8cd98f00b204e9800998ecf8427e",
+    "lastModified": "Fri, 28 Feb 2026 10:00:00 GMT",
+    "storageClass": "STANDARD"
+  },
+  "timestamp": "2026-02-28T10:00:00.000000000Z",
+  "type": "aws.s3.object"
+}
+```
+
+<a id="s3-•-head-bucket"></a>
+
+## S3 • Head Bucket
+
+The Head Bucket component checks whether an S3 bucket exists and is accessible.
+
+### Use Cases
+
+- **Existence checks**: Verify a bucket exists before uploading objects
+- **Pre-flight validation**: Confirm bucket availability in provisioning workflows
+- **Access verification**: Check whether credentials have access to the bucket
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "my-example-bucket",
+    "region": "us-east-1",
+    "exists": true
+  },
+  "timestamp": "2026-02-28T10:00:00.000000000Z",
+  "type": "aws.s3.bucket.info"
+}
+```
+
+<a id="s3-•-get-object-attributes"></a>
+
+## S3 • Get Object Attributes
+
+The Get Object Attributes component retrieves attributes such as ETag, storage class, and size for an S3 object.
+
+### Use Cases
+
+- **Integrity checks**: Verify object ETag after uploads or copies
+- **Storage audits**: Inspect object storage class and size
+- **Workflow enrichment**: Load object attributes before downstream processing
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-example-bucket",
+    "key": "documents/report.pdf",
+    "etag": "d41d8cd98f00b204e9800998ecf8427e",
+    "storageClass": "STANDARD",
+    "objectSize": 1048576
+  },
+  "timestamp": "2026-02-28T10:00:00.000000000Z",
+  "type": "aws.s3.object.attributes"
+}
+```
+
+<a id="s3-•-put-object"></a>
+
+## S3 • Put Object
+
+The Put Object component uploads content to an S3 object.
+
+### Use Cases
+
+- **Artifact publishing**: Upload build artifacts, reports, or configurations
+- **Data pipeline output**: Write processed data to S3
+- **Configuration management**: Store configuration files in S3
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-example-bucket",
+    "key": "documents/report.json",
+    "etag": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "timestamp": "2026-02-28T10:00:00.000000000Z",
+  "type": "aws.s3.object"
+}
+```
+
+<a id="s3-•-delete-bucket"></a>
+
+## S3 • Delete Bucket
+
+The Delete Bucket component deletes an AWS S3 bucket. The bucket must be empty before it can be deleted.
+
+### Use Cases
+
+- **Cleanup workflows**: Remove temporary buckets after processing
+- **Environment teardown**: Delete buckets during environment decommissioning
+- **Rollback automation**: Remove buckets created in failed provisioning runs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-example-bucket",
+    "deleted": true
+  },
+  "timestamp": "2026-02-28T10:00:00.000000000Z",
+  "type": "aws.s3.bucket.deleted"
+}
+```
+
+<a id="s3-•-empty-bucket"></a>
+
+## S3 • Empty Bucket
+
+The Empty Bucket component deletes all objects in an S3 bucket. This is useful as a prerequisite before deleting the bucket itself.
+
+### Use Cases
+
+- **Bucket cleanup**: Remove all objects before deleting a bucket
+- **Environment reset**: Clear bucket contents for fresh test runs
+- **Data purge**: Remove all data from a bucket as part of compliance workflows
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-example-bucket",
+    "deletedCount": 42
+  },
+  "timestamp": "2026-02-28T10:00:00.000000000Z",
+  "type": "aws.s3.bucket.emptied"
 }
 ```
 
