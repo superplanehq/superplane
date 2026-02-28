@@ -81,4 +81,3 @@ func (c *CanvasMemoryContext) Delete(namespace string, matches map[string]any) (
 
 	return deletedValues, nil
 }
-
