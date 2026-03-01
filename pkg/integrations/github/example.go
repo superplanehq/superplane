@@ -16,6 +16,9 @@ var exampleOutputCreateIssueCommentBytes []byte
 //go:embed example_output_get_issue.json
 var exampleOutputGetIssueBytes []byte
 
+//go:embed example_output_get_repository_permission.json
+var exampleOutputGetRepositoryPermissionBytes []byte
+
 //go:embed example_output_update_issue.json
 var exampleOutputUpdateIssueBytes []byte
 
@@ -93,6 +96,9 @@ var exampleOutputCreateIssueComment map[string]any
 
 var exampleOutputGetIssueOnce sync.Once
 var exampleOutputGetIssue map[string]any
+
+var exampleOutputGetRepositoryPermissionOnce sync.Once
+var exampleOutputGetRepositoryPermission map[string]any
 
 var exampleOutputUpdateIssueOnce sync.Once
 var exampleOutputUpdateIssue map[string]any
@@ -173,6 +179,14 @@ func (c *CreateIssueComment) ExampleOutput() map[string]any {
 
 func (c *GetIssue) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetIssueOnce, exampleOutputGetIssueBytes, &exampleOutputGetIssue)
+}
+
+func (c *GetRepositoryPermission) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetRepositoryPermissionOnce,
+		exampleOutputGetRepositoryPermissionBytes,
+		&exampleOutputGetRepositoryPermission,
+	)
 }
 
 func (c *UpdateIssue) ExampleOutput() map[string]any {

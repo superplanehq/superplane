@@ -30,6 +30,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CodeArtifact • Update Package Versions Status" href="#code-artifact-•-update-package-versions-status" description="Update the status of one or more package versions (Archived, Published, Unlisted)" />
   <LinkCard title="CodePipeline • Get Pipeline" href="#code-pipeline-•-get-pipeline" description="Retrieve the definition of an AWS CodePipeline pipeline" />
   <LinkCard title="CodePipeline • Get Pipeline Execution" href="#code-pipeline-•-get-pipeline-execution" description="Retrieve the status and details of an AWS CodePipeline execution" />
+  <LinkCard title="CodePipeline • Retry Stage Execution" href="#code-pipeline-•-retry-stage-execution" description="Retry a failed stage in an existing AWS CodePipeline execution" />
   <LinkCard title="CodePipeline • Run Pipeline" href="#code-pipeline-•-run-pipeline" description="Start an AWS CodePipeline execution and wait for it to complete" />
   <LinkCard title="EC2 • Copy Image" href="#ec2-•-copy-image" description="Copy an EC2 AMI image to another region" />
   <LinkCard title="EC2 • Create Image" href="#ec2-•-create-image" description="Create a new AMI image from an EC2 instance" />
@@ -806,6 +807,52 @@ Emits the full pipeline execution details including:
   },
   "timestamp": "2026-02-23T10:00:00.000000000Z",
   "type": "aws.codepipeline.pipeline.execution"
+}
+```
+
+<a id="code-pipeline-•-retry-stage-execution"></a>
+
+## CodePipeline • Retry Stage Execution
+
+The Retry Stage Execution component retries a stage within an existing AWS CodePipeline execution.
+
+### Use Cases
+
+- **Recover failed deployments**: Retry only failed actions in a failed stage
+- **Re-run full stage**: Retry all actions for a stage when needed
+- **Workflow recovery**: Continue orchestration after a transient failure
+
+### Configuration
+
+- **Region**: AWS region where the pipeline exists
+- **Pipeline**: Pipeline name
+- **Stage**: Stage name to retry
+- **Pipeline Execution**: Source execution to retry from
+- **Retry Mode**: Choose between failed actions only or all actions
+
+### Output
+
+Emits retry result metadata including:
+- Pipeline name and stage
+- Selected retry mode
+- Source execution ID
+- New execution ID created by the retry
+
+### Example Output
+
+```json
+{
+  "data": {
+    "pipeline": {
+      "name": "my-pipeline",
+      "newExecutionId": "4444-5555-6666",
+      "retryMode": "FAILED_ACTIONS",
+      "sourceExecutionId": "1111-2222-3333",
+      "stage": "Deploy"
+    }
+  },
+  "timestamp": "2026-02-23T10:00:00.000000000Z",
+  "type": "aws.codepipeline.stage.retry"
 }
 ```
 

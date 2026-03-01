@@ -19,14 +19,18 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Add Memory" href="#add-memory" description="Add a namespaced JSON value to canvas memory" />
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
+  <LinkCard title="Delete Memory" href="#delete-memory" description="Delete values from canvas memory by namespace and field matches" />
   <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
   <LinkCard title="If" href="#if" description="Route events based on expression" />
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
+  <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run a command on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
+  <LinkCard title="Update Memory" href="#update-memory" description="Update values in canvas memory by namespace and field matches" />
   <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
 </CardGrid>
 
@@ -186,6 +190,39 @@ Send a POST request to the webhook URL with your payload. The workflow will rece
 }
 ```
 
+<a id="add-memory"></a>
+
+## Add Memory
+
+The Add Memory component appends a new item to canvas-level memory storage.
+
+### Use Cases
+
+- Persist identifiers for later cleanup paths
+- Store cross-run mappings (for example pull request to resource ID)
+- Keep structured operational context per canvas
+
+### How It Works
+
+1. Reads `namespace` and value fields from configuration
+2. Appends a new memory row for the current canvas
+3. Emits `memory.added` with the saved payload
+
+### Example Output
+
+```json
+{
+  "data": {
+    "namespace": "machines",
+    "values": {
+      "creator": "alex",
+      "id": "1",
+      "pull_request": "123"
+    }
+  }
+}
+```
+
 <a id="approval"></a>
 
 ## Approval
@@ -251,6 +288,52 @@ The Approval component pauses workflow execution and waits for manual approval f
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "approval.finished"
+}
+```
+
+<a id="delete-memory"></a>
+
+## Delete Memory
+
+The Delete Memory component removes memory rows from canvas-level memory storage.
+
+### Use Cases
+
+- Remove stale IDs after cleanup is complete
+- Keep memory stores bounded over time
+
+### How It Works
+
+1. Reads `namespace` and `matchList` from configuration
+2. Deletes memory rows matching all configured key/value pairs
+3. Emits `memory.deleted` to the `deleted` or `notFound` channel
+
+### Output Channels
+
+- **Deleted**: At least one matching memory row was removed
+- **Not Found**: No matching memory rows were removed
+
+### Example Output
+
+```json
+{
+  "data": {
+    "count": 1,
+    "deleted": [
+      {
+        "creator": "igor",
+        "pull_request": 123,
+        "sandbox_id": "sbx-001"
+      }
+    ],
+    "matches": {
+      "creator": "igor",
+      "pull_request": 123
+    },
+    "namespace": "machines"
+  },
+  "timestamp": "2026-02-28T00:00:00Z",
+  "type": "memory.deleted"
 }
 ```
 
@@ -497,6 +580,55 @@ When executed, the No Operation component immediately emits the incoming event d
 }
 ```
 
+<a id="read-memory"></a>
+
+## Read Memory
+
+The Read Memory component looks up values from canvas-level memory storage.
+
+### Use Cases
+
+- Retrieve previously stored IDs before cleanup actions
+- Check whether related data already exists
+- Rehydrate context from prior runs
+
+### How It Works
+
+1. Reads `namespace`, `resultMode`, `emitMode`, and `matchList` from configuration
+2. Finds memory rows matching all configured key/value pairs
+3. Emits `memory.read` to the `found` or `notFound` channel
+
+### Output Channels
+
+- **Found**: At least one matching memory row was found
+- **Not Found**: No matching memory rows were found
+
+### Example Output
+
+```json
+{
+  "data": {
+    "count": 1,
+    "emitMode": "allAtOnce",
+    "matches": {
+      "creator": "igor",
+      "pull_request": 123
+    },
+    "namespace": "machines",
+    "resultMode": "latest",
+    "values": [
+      {
+        "creator": "igor",
+        "pull_request": 123,
+        "sandbox_id": "sbx-001"
+      }
+    ]
+  },
+  "timestamp": "2026-02-28T00:00:00Z",
+  "type": "memory.read"
+}
+```
+
 <a id="ssh-command"></a>
 
 ## SSH Command
@@ -569,6 +701,59 @@ The Time Gate component delays event processing until the next valid day and tim
   "data": {},
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "timegate.finished"
+}
+```
+
+<a id="update-memory"></a>
+
+## Update Memory
+
+The Update Memory component updates matching rows in canvas-level memory storage.
+
+### Use Cases
+
+- Patch stored records after external state changes
+- Enrich existing memory rows with additional fields
+- Keep identifiers and status data in sync
+
+### How It Works
+
+1. Reads `namespace`, `matchList`, and `valueList` from configuration
+2. Updates all matching memory rows in a single SQL operation
+3. Emits `memory.updated` to the `found` or `notFound` channel
+
+### Output Channels
+
+- **Found**: At least one matching memory row was updated
+- **Not Found**: No matching memory rows were updated
+
+### Example Output
+
+```json
+{
+  "data": {
+    "count": 1,
+    "matches": {
+      "creator": "igor",
+      "pull_request": 123
+    },
+    "namespace": "machines",
+    "updated": [
+      {
+        "creator": "igor",
+        "pull_request": 123,
+        "sandbox_id": "sbx-001",
+        "status": "running",
+        "updated_by": "workflow"
+      }
+    ],
+    "values": {
+      "status": "running",
+      "updated_by": "workflow"
+    }
+  },
+  "timestamp": "2026-02-28T00:00:00Z",
+  "type": "memory.updated"
 }
 ```
 

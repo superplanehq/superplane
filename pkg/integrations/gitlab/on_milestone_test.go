@@ -19,7 +19,7 @@ func Test__OnMilestone__HandleWebhook__TopLevelAction(t *testing.T) {
 		Headers:       gitlabHeaders("Milestone Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "actions": []string{"create"}},
-		Webhook:       &contexts.WebhookContext{Secret: "token"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
 		Events:        events,
 		Logger:        log.NewEntry(log.New()),
 	})
@@ -39,7 +39,7 @@ func Test__OnMilestone__HandleWebhook__ObjectAttributesAction(t *testing.T) {
 		Headers:       gitlabHeaders("Milestone Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "actions": []string{"reopen"}},
-		Webhook:       &contexts.WebhookContext{Secret: "token"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
 		Events:        events,
 		Logger:        log.NewEntry(log.New()),
 	})
@@ -59,7 +59,7 @@ func Test__OnMilestone__HandleWebhook__NonWhitelistedAction(t *testing.T) {
 		Headers:       gitlabHeaders("Milestone Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "actions": []string{"create"}},
-		Webhook:       &contexts.WebhookContext{Secret: "token"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
 		Events:        events,
 		Logger:        log.NewEntry(log.New()),
 	})

@@ -7,18 +7,22 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 	trigger := &OnPipelineDone{}
+	logger := logrus.NewEntry(logrus.New())
 
 	t.Run("no X-Semaphore-Signature-256 -> 403", func(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: http.Header{},
+			Logger:  logger,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -32,7 +36,8 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Events:  &contexts.EventContext{},
-			Webhook: &contexts.WebhookContext{},
+			Webhook: &contexts.NodeWebhookContext{},
+			Logger:  logger,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -48,8 +53,9 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    []byte(`{"pipeline":{"state":"done"}}`),
 			Headers: headers,
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  &contexts.EventContext{},
+			Logger:  logger,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -57,22 +63,17 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("valid signature -> event is emitted", func(t *testing.T) {
-		body := []byte(`{"pipeline":{"state":"done","result":"passed"}}`)
-
 		secret := "test-secret"
-		h := hmac.New(sha256.New, []byte(secret))
-		h.Write(body)
-		signature := fmt.Sprintf("%x", h.Sum(nil))
-
-		headers := http.Header{}
-		headers.Set("X-Semaphore-Signature-256", "sha256="+signature)
+		body := []byte(`{"revision":{"reference":"refs/heads/main"},"pipeline":{"state":"done","result":"passed","yaml_file_name":"semaphore.yml"}}`)
+		headers := buildSemaphoreHeaders(secret, body)
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
+			Logger:  logger,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -85,23 +86,135 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		body := []byte(`invalid json`)
 
 		secret := "test-secret"
-		h := hmac.New(sha256.New, []byte(secret))
-		h.Write(body)
-		signature := fmt.Sprintf("%x", h.Sum(nil))
-
-		headers := http.Header{}
-		headers.Set("X-Semaphore-Signature-256", "sha256="+signature)
+		headers := buildSemaphoreHeaders(secret, body)
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
+			Logger:  logger,
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
 		assert.ErrorContains(t, err, "error parsing request body")
+	})
+
+	t.Run("ref filter match -> event is emitted", func(t *testing.T) {
+		body := []byte(`{"revision":{"reference":"refs/heads/main"},"pipeline":{"result":"passed","yaml_file_name":"semaphore.yml"}}`)
+		secret := "test-secret"
+		headers := buildSemaphoreHeaders(secret, body)
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"refs": []configuration.Predicate{
+					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
+				},
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
+			Events:  eventContext,
+			Logger:  logger,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, eventContext.Count())
+	})
+
+	t.Run("ref filter mismatch -> event is ignored", func(t *testing.T) {
+		body := []byte(`{"revision":{"reference":"refs/heads/feature"},"pipeline":{"result":"passed","yaml_file_name":"semaphore.yml"}}`)
+		secret := "test-secret"
+		headers := buildSemaphoreHeaders(secret, body)
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"refs": []configuration.Predicate{
+					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
+				},
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
+			Events:  eventContext,
+			Logger:  logger,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Zero(t, eventContext.Count())
+	})
+
+	t.Run("results filter mismatch -> event is ignored", func(t *testing.T) {
+		body := []byte(`{"revision":{"reference":"refs/heads/main"},"pipeline":{"result":"failed","yaml_file_name":"semaphore.yml"}}`)
+		secret := "test-secret"
+		headers := buildSemaphoreHeaders(secret, body)
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"results": []string{"passed"},
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
+			Events:  eventContext,
+			Logger:  logger,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Zero(t, eventContext.Count())
+	})
+
+	t.Run("pipeline filter match -> event is emitted", func(t *testing.T) {
+		body := []byte(`{"revision":{"reference":"refs/heads/main"},"pipeline":{"result":"passed","working_directory":".semaphore","yaml_file_name":"production.yml"}}`)
+		secret := "test-secret"
+		headers := buildSemaphoreHeaders(secret, body)
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"pipelines": []configuration.Predicate{
+					{Type: configuration.PredicateTypeEquals, Value: ".semaphore/production.yml"},
+				},
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
+			Events:  eventContext,
+			Logger:  logger,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, eventContext.Count())
+	})
+
+	t.Run("missing pipeline result with results filter -> 400", func(t *testing.T) {
+		body := []byte(`{"pipeline":{"yaml_file_name":"semaphore.yml"}}`)
+		secret := "test-secret"
+		headers := buildSemaphoreHeaders(secret, body)
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"results": []string{"passed"},
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
+			Events:  eventContext,
+			Logger:  logger,
+		})
+
+		assert.Equal(t, http.StatusBadRequest, code)
+		assert.ErrorContains(t, err, "missing pipeline.result")
+		assert.Zero(t, eventContext.Count())
 	})
 }
 
@@ -149,4 +262,15 @@ func Test__OnPipelineDone__Setup(t *testing.T) {
 
 		require.ErrorContains(t, err, "failed to decode configuration")
 	})
+}
+
+func buildSemaphoreHeaders(secret string, body []byte) http.Header {
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write(body)
+	signature := fmt.Sprintf("%x", h.Sum(nil))
+
+	headers := http.Header{}
+	headers.Set("X-Semaphore-Signature-256", "sha256="+signature)
+
+	return headers
 }

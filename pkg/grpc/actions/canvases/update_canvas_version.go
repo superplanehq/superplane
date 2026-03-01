@@ -25,6 +25,7 @@ func UpdateCanvasVersion(
 	canvasID string,
 	versionID string,
 	pbCanvas *pb.Canvas,
+	autoLayout *pb.CanvasAutoLayout,
 ) (*pb.UpdateCanvasVersionResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
@@ -51,6 +52,11 @@ func UpdateCanvasVersion(
 	}
 
 	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
+	if err != nil {
+		return nil, err
+	}
+
+	nodes, edges, err = applyCanvasAutoLayout(nodes, edges, autoLayout)
 	if err != nil {
 		return nil, err
 	}

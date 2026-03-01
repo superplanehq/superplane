@@ -16,6 +16,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Send Message" href="#send-message" description="Send a text message to a Telegram chat" />
+  <LinkCard title="Wait for Button Click" href="#wait-for-button-click" description="Send a message with buttons and wait for the user to click one" />
 </CardGrid>
 
 ## Instructions
@@ -131,6 +132,59 @@ Returns metadata about the sent message including message ID, chat ID, text, and
   },
   "timestamp": "2026-01-16T12:00:00.000Z",
   "type": "telegram.message.sent"
+}
+```
+
+<a id="wait-for-button-click"></a>
+
+## Wait for Button Click
+
+The Wait for Button Click component sends a message to a Telegram chat with inline keyboard buttons and waits for the user to click one of the configured buttons.
+
+### Use Cases
+
+- **Request approval or input**: Get structured input from a user in Telegram before applying or deploying (e.g., Approve / Reject buttons)
+- **Pause a workflow**: Wait until a human selects an option (e.g., Confirm / Cancel)
+- **Implement interactive flows**: Create interactive flows that need a structured reply via buttons
+
+### Configuration
+
+- **Chat ID**: Telegram chat ID (user, group, or channel) to post to (required)
+- **Message**: Message text (required)
+- **Timeout**: Maximum time to wait in seconds (optional)
+- **Buttons**: Set of 1–4 items, each with name (label) and value (required)
+
+### Output Channels
+
+- **Received**: Emits when the user clicks a button; payload includes the selected value and clicker info (when available)
+- **Timeout**: Emits when no button click is received within the configured timeout
+
+### Behavior
+
+- The message is posted with inline keyboard buttons
+- The workflow pauses until a button is clicked or timeout occurs
+- Only the first button click is processed; subsequent clicks are ignored
+- If timeout is not configured, the component waits indefinitely
+
+### Notes
+
+- The Telegram bot must be added to the chat and have permission to post messages
+- Button clicks are processed through Telegram's callback query API
+
+### Example Output
+
+```json
+{
+  "data": {
+    "clicked_at": "2026-02-10T21:00:00Z",
+    "clicked_by": {
+      "id": 123456789,
+      "username": "john"
+    },
+    "value": "approve"
+  },
+  "timestamp": "2026-02-10T21:00:00Z",
+  "type": "telegram.button.clicked"
 }
 ```
 

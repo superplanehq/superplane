@@ -62,6 +62,14 @@ export type BlueprintsUpdateBlueprintResponse = {
   blueprint?: BlueprintsBlueprint;
 };
 
+export type CanvasAutoLayoutAlgorithm = "ALGORITHM_UNSPECIFIED" | "ALGORITHM_HORIZONTAL";
+
+export type CanvasAutoLayoutScope =
+  | "SCOPE_UNSPECIFIED"
+  | "SCOPE_FULL_CANVAS"
+  | "SCOPE_CONNECTED_COMPONENT"
+  | "SCOPE_EXACT_SET";
+
 export type CanvasNodeExecutionResult = "RESULT_UNKNOWN" | "RESULT_PASSED" | "RESULT_FAILED" | "RESULT_CANCELLED";
 
 export type CanvasNodeExecutionResultReason =
@@ -103,6 +111,12 @@ export type CanvasesCanvasAiNodeContext = {
   type?: string;
 };
 
+export type CanvasesCanvasAutoLayout = {
+  algorithm?: CanvasAutoLayoutAlgorithm;
+  nodeIds?: Array<string>;
+  scope?: CanvasAutoLayoutScope;
+};
+
 export type CanvasesCanvasEvent = {
   id?: string;
   canvasId?: string;
@@ -126,6 +140,12 @@ export type CanvasesCanvasEventWithExecutions = {
   createdAt?: string;
   executions?: Array<CanvasesCanvasNodeExecution>;
   customName?: string;
+};
+
+export type CanvasesCanvasMemory = {
+  id?: string;
+  namespace?: string;
+  values?: unknown;
 };
 
 export type CanvasesCanvasMetadata = {
@@ -223,6 +243,10 @@ export type CanvasesCreateCanvasVersionResponse = {
   version?: CanvasesCanvasVersion;
 };
 
+export type CanvasesDeleteCanvasMemoryResponse = {
+  [key: string]: unknown;
+};
+
 export type CanvasesDeleteCanvasResponse = {
   [key: string]: unknown;
 };
@@ -273,6 +297,10 @@ export type CanvasesListCanvasEventsResponse = {
   totalCount?: number;
   hasNextPage?: boolean;
   lastTimestamp?: string;
+};
+
+export type CanvasesListCanvasMemoriesResponse = {
+  items?: Array<CanvasesCanvasMemory>;
 };
 
 export type CanvasesListCanvasesResponse = {
@@ -343,6 +371,7 @@ export type CanvasesSendAiMessageResponse = {
 
 export type CanvasesUpdateCanvasBody = {
   canvas?: CanvasesCanvas;
+  autoLayout?: CanvasesCanvasAutoLayout;
 };
 
 export type CanvasesUpdateCanvasResponse = {
@@ -351,6 +380,7 @@ export type CanvasesUpdateCanvasResponse = {
 
 export type CanvasesUpdateCanvasVersionBody = {
   canvas?: CanvasesCanvas;
+  autoLayout?: CanvasesCanvasAutoLayout;
 };
 
 export type CanvasesUpdateCanvasVersionResponse = {
@@ -1638,6 +1668,63 @@ export type CanvasesListChildExecutionsResponses = {
 
 export type CanvasesListChildExecutionsResponse2 =
   CanvasesListChildExecutionsResponses[keyof CanvasesListChildExecutionsResponses];
+
+export type CanvasesListCanvasMemoriesData = {
+  body?: never;
+  path: {
+    canvasId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/memory";
+};
+
+export type CanvasesListCanvasMemoriesErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesListCanvasMemoriesError = CanvasesListCanvasMemoriesErrors[keyof CanvasesListCanvasMemoriesErrors];
+
+export type CanvasesListCanvasMemoriesResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesListCanvasMemoriesResponse;
+};
+
+export type CanvasesListCanvasMemoriesResponse2 =
+  CanvasesListCanvasMemoriesResponses[keyof CanvasesListCanvasMemoriesResponses];
+
+export type CanvasesDeleteCanvasMemoryData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    memoryId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/memory/{memoryId}";
+};
+
+export type CanvasesDeleteCanvasMemoryErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesDeleteCanvasMemoryError = CanvasesDeleteCanvasMemoryErrors[keyof CanvasesDeleteCanvasMemoryErrors];
+
+export type CanvasesDeleteCanvasMemoryResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesDeleteCanvasMemoryResponse;
+};
+
+export type CanvasesDeleteCanvasMemoryResponse2 =
+  CanvasesDeleteCanvasMemoryResponses[keyof CanvasesDeleteCanvasMemoryResponses];
 
 export type CanvasesListNodeEventsData = {
   body?: never;

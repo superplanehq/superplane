@@ -153,6 +153,8 @@ func generateCanvasAIPlan(
 		"- For embedded string interpolation, use literal text plus handlebars (example: root@{{ $[\"Create Hetzner Machine\"].data.ipv4 }}).",
 		"- previous() means immediate upstream only; use previous(<depth>) only when depth-based access is explicitly intended.",
 		"- root() refers to the root trigger event payload.",
+		"- Use memory.find(\"namespace\", {\"field\": value}) to filter memory rows by exact key/value matches.",
+		"- Use memory.findFirst(\"namespace\", {\"field\": value}) to get the first matching memory row (or nil).",
 		"- Never use non-SuperPlane syntaxes like {{steps.create_hetzner.ipv4}} or other steps.* references.",
 		"- When configuring fields like SSH host/IP, identify the actual producer node in the run chain and reference that node by name instead of assuming previous().",
 		"",

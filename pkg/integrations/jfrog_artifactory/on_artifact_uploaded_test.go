@@ -100,7 +100,7 @@ func Test__OnArtifactUploaded__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{}`),
-			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Logger:  log.NewEntry(log.New()),
 		})
 
@@ -124,7 +124,7 @@ func Test__OnArtifactUploaded__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: jfrogHeaders(secret, body),
 			Body:    body,
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  events,
 			Logger:  log.NewEntry(log.New()),
 		})
@@ -153,7 +153,7 @@ func Test__OnArtifactUploaded__HandleWebhook(t *testing.T) {
 			Headers:       jfrogHeaders(secret, body),
 			Body:          body,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        events,
 			Logger:        log.NewEntry(log.New()),
 		})
@@ -190,7 +190,7 @@ func Test__OnArtifactUploaded__HandleWebhook(t *testing.T) {
 			Headers:       jfrogHeaders(secret, body),
 			Body:          body,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        events,
 			Logger:        log.NewEntry(log.New()),
 		})
@@ -219,7 +219,7 @@ func Test__OnArtifactUploaded__HandleWebhook(t *testing.T) {
 			Headers:       jfrogHeaders(secret, body),
 			Body:          body,
 			Configuration: map[string]any{"repository": "libs-release-local"},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        events,
 			Logger:        log.NewEntry(log.New()),
 		})
@@ -248,7 +248,7 @@ func Test__OnArtifactUploaded__HandleWebhook(t *testing.T) {
 			Headers:       jfrogHeaders(secret, body),
 			Body:          body,
 			Configuration: map[string]any{"repository": "libs-release-local"},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        events,
 			Logger:        log.NewEntry(log.New()),
 		})

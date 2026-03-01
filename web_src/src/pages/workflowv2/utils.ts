@@ -1,12 +1,12 @@
 import {
-  ComponentsEdge,
-  ComponentsNode,
   CanvasesCanvas,
   CanvasesCanvasEvent,
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   ComponentsComponent,
+  ComponentsEdge,
+  ComponentsNode,
 } from "@/api-client";
 import { flattenObject } from "@/lib/utils";
 import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";

@@ -118,6 +118,7 @@ func TestUpdateCanvasVersionOnlyUpdatesDraft(t *testing.T) {
 				Edges: []*componentpb.Edge{},
 			},
 		},
+		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, updateVersionResponse.Version)
@@ -195,6 +196,7 @@ func TestPublishCanvasVersionAppliesRuntimeChanges(t *testing.T) {
 				Edges: []*componentpb.Edge{},
 			},
 		},
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -237,4 +239,117 @@ func TestPublishCanvasVersionAppliesRuntimeChanges(t *testing.T) {
 		Error
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), draftCount)
+}
+
+func TestUpdateCanvasVersionAppliesAutoLayout(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	createCanvasResponse, err := CreateCanvas(ctx, r.Registry, r.Organization.ID.String(), &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{Name: "canvas-for-version-auto-layout"},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-a",
+					Name: "Node A",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+				{
+					Id:   "node-b",
+					Name: "Node B",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{
+				{
+					SourceId: "node-a",
+					TargetId: "node-b",
+					Channel:  "default",
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	canvasID := createCanvasResponse.Canvas.Metadata.Id
+	createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
+	require.NoError(t, err)
+	versionID := createVersionResponse.Version.Metadata.Id
+
+	updateVersionResponse, err := UpdateCanvasVersion(
+		ctx,
+		r.Registry,
+		r.Organization.ID.String(),
+		canvasID,
+		versionID,
+		&pb.Canvas{
+			Metadata: &pb.Canvas_Metadata{Name: "canvas-for-version-auto-layout"},
+			Spec: &pb.Canvas_Spec{
+				Nodes: []*componentpb.Node{
+					{
+						Id:   "node-a",
+						Name: "Node A",
+						Type: componentpb.Node_TYPE_COMPONENT,
+						Position: &componentpb.Position{
+							X: 100,
+							Y: 100,
+						},
+						Component: &componentpb.Node_ComponentRef{
+							Name: "noop",
+						},
+					},
+					{
+						Id:   "node-b",
+						Name: "Node B",
+						Type: componentpb.Node_TYPE_COMPONENT,
+						Position: &componentpb.Position{
+							X: 900,
+							Y: 900,
+						},
+						Component: &componentpb.Node_ComponentRef{
+							Name: "noop",
+						},
+					},
+				},
+				Edges: []*componentpb.Edge{
+					{
+						SourceId: "node-a",
+						TargetId: "node-b",
+						Channel:  "default",
+					},
+				},
+			},
+		},
+		&pb.CanvasAutoLayout{
+			Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
+		},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, updateVersionResponse.Version)
+	require.NotNil(t, updateVersionResponse.Version.Spec)
+	require.Len(t, updateVersionResponse.Version.Spec.Nodes, 2)
+
+	var nodeA *componentpb.Node
+	var nodeB *componentpb.Node
+	for _, node := range updateVersionResponse.Version.Spec.Nodes {
+		if node.GetId() == "node-a" {
+			nodeA = node
+		}
+		if node.GetId() == "node-b" {
+			nodeB = node
+		}
+	}
+
+	require.NotNil(t, nodeA)
+	require.NotNil(t, nodeB)
+	require.NotNil(t, nodeA.GetPosition())
+	require.NotNil(t, nodeB.GetPosition())
+	assert.Equal(t, nodeA.GetPosition().GetY(), nodeB.GetPosition().GetY(), "horizontal layout should align nodes by Y")
+	assert.Greater(t, nodeB.GetPosition().GetX(), nodeA.GetPosition().GetX(), "downstream node should be placed to the right")
 }

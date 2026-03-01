@@ -66,7 +66,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
 			Configuration: map[string]any{"events": []string{EventIncidentCreatedV2}},
-			Webhook:       &contexts.WebhookContext{}, // no SetSecret called
+			Webhook:       &contexts.NodeWebhookContext{}, // no SetSecret called
 			Events:        &contexts.EventContext{},
 		})
 
@@ -75,7 +75,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("missing webhook headers -> 403", func(t *testing.T) {
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
@@ -96,7 +96,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers.Set("webhook-timestamp", ts)
 		headers.Set("webhook-signature", "v1,invalid")
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
@@ -119,7 +119,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers.Set("webhook-timestamp", ts)
 		headers.Set("webhook-signature", svixSignatureFor(validSecret, id, ts, body))
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -144,7 +144,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers.Set("webhook-timestamp", ts)
 		headers.Set("webhook-signature", svixSignatureFor(validSecret, id, ts, body))
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -177,7 +177,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers.Set("webhook-timestamp", ts)
 		headers.Set("webhook-signature", svixSignatureFor(validSecret, id, ts, body))
 
-		wc := &contexts.WebhookContext{}
+		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
