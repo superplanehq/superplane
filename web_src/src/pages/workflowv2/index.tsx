@@ -1876,9 +1876,7 @@ export function WorkflowPageV2() {
 
       let finalWorkflow = updatedWorkflow;
       if (aiAddedNodeIds.length > 0) {
-        finalWorkflow = await applyHorizontalAutoLayout(updatedWorkflow, {
-          nodeIds: aiAddedNodeIds,
-        });
+        finalWorkflow = await applyHorizontalAutoLayout(updatedWorkflow);
       }
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
