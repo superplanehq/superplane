@@ -1,0 +1,17 @@
+{
+  "data": {
+    "dataset": "example",
+    "fields": {
+      "deployed_by": "github-actions",
+      "duration_seconds": 42,
+      "environment": "production",
+      "event_type": "deployment",
+      "service": "billing-api",
+      "success": true,
+      "version": "2.4.1"
+    },
+    "status": "sent"
+  },
+  "timestamp": "2026-02-27T11:34:29.510313029Z",
+  "type": "honeycomb.event.created"
+}

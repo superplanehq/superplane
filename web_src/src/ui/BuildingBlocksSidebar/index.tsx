@@ -63,6 +63,7 @@ import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.sv
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
+import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
@@ -70,8 +71,10 @@ import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
+import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
 import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
+import octopusIcon from "@/assets/icons/integrations/octopus.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 
@@ -1041,6 +1044,7 @@ function CategorySection({
     pagerduty: pagerDutyIcon,
     rootly: rootlyIcon,
     incident: incidentIcon,
+    launchdarkly: launchdarklyIcon,
     semaphore: SemaphoreLogo,
     slack: slackIcon,
     telegram: telegramIcon,
@@ -1049,6 +1053,7 @@ function CategorySection({
     render: renderIcon,
     dockerhub: dockerIcon,
     harness: harnessIcon,
+    octopus: octopusIcon,
     servicenow: servicenowIcon,
     statuspage: statuspageIcon,
     aws: {
@@ -1062,6 +1067,7 @@ function CategorySection({
       ecs: awsEcsIcon,
       sns: awsSnsIcon,
     },
+    honeycomb: honeycombIcon,
     gcp: gcpIcon,
   };
 
@@ -1168,6 +1174,7 @@ function CategorySection({
             pagerduty: pagerDutyIcon,
             rootly: rootlyIcon,
             incident: incidentIcon,
+            launchdarkly: launchdarklyIcon,
             semaphore: SemaphoreLogo,
             slack: slackIcon,
             telegram: telegramIcon,
@@ -1176,6 +1183,7 @@ function CategorySection({
             render: renderIcon,
             dockerhub: dockerIcon,
             harness: harnessIcon,
+            octopus: octopusIcon,
             servicenow: servicenowIcon,
             statuspage: statuspageIcon,
             aws: {
@@ -1190,6 +1198,7 @@ function CategorySection({
               ecs: awsEcsIcon,
               sns: awsSnsIcon,
             },
+            honeycomb: honeycombIcon,
             gcp: gcpIcon,
           };
           const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;

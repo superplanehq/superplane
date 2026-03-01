@@ -16,16 +16,36 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
+	organizationLabel := response.GetOrganizationId()
+	if response.HasOrganizationId() && response.GetOrganizationId() != "" {
+		orgResponse, _, err := ctx.API.OrganizationAPI.
+			OrganizationsDescribeOrganization(ctx.Context, response.GetOrganizationId()).
+			Execute()
+
+		if err == nil &&
+			orgResponse.Organization.Metadata != nil &&
+			orgResponse.Organization.Metadata.Name != nil &&
+			*orgResponse.Organization.Metadata.Name != "" {
+			organizationLabel = *orgResponse.Organization.Metadata.Name
+		}
+	}
+
 	if ctx.Renderer.IsText() {
 		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 			_, _ = fmt.Fprintf(stdout, "ID: %s\n", response.GetId())
 			_, _ = fmt.Fprintf(stdout, "Email: %s\n", response.GetEmail())
-			_, _ = fmt.Fprintf(stdout, "Organization: %s\n", response.GetOrganizationId())
+			_, _ = fmt.Fprintf(stdout, "Organization ID: %s\n", response.GetOrganizationId())
+			_, _ = fmt.Fprintf(stdout, "Organization: %s\n", organizationLabel)
 			return nil
 		})
 	}
 
-	return ctx.Renderer.Render(response)
+	return ctx.Renderer.Render(map[string]any{
+		"id":               response.GetId(),
+		"email":            response.GetEmail(),
+		"organizationId":   response.GetOrganizationId(),
+		"organizationName": organizationLabel,
+	})
 }
 
 var whoamiCmd = &cobra.Command{

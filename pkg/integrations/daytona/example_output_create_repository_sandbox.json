@@ -1,0 +1,25 @@
+{
+  "data": {
+    "sandboxId": "sandbox-abc123def456",
+    "sandboxStartedAt": "2026-01-19T12:00:00Z",
+    "timeout": 300,
+    "repository": "https://github.com/superplanehq/example-app.git",
+    "directory": "/home/daytona/example-app",
+    "secrets": [
+      {
+        "type": "env",
+        "name": "API_KEY",
+        "value": {
+          "secret": "api-key-secret",
+          "key": "API_KEY"
+        }
+      }
+    ],
+    "bootstrap": {
+      "from": "file",
+      "path": "scripts/bootstrap.sh"
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "daytona.repository.sandbox.created"
+}

@@ -16,6 +16,9 @@ var exampleOutputCreateIssueCommentBytes []byte
 //go:embed example_output_get_issue.json
 var exampleOutputGetIssueBytes []byte
 
+//go:embed example_output_get_repository_permission.json
+var exampleOutputGetRepositoryPermissionBytes []byte
+
 //go:embed example_output_update_issue.json
 var exampleOutputUpdateIssueBytes []byte
 
@@ -49,8 +52,11 @@ var exampleDataOnIssueBytes []byte
 //go:embed example_data_on_pull_request.json
 var exampleDataOnPullRequestBytes []byte
 
-//go:embed example_data_on_pull_request_review_comment.json
-var exampleDataOnPullRequestReviewCommentBytes []byte
+//go:embed example_data_on_pr_comment.json
+var exampleDataOnPRCommentBytes []byte
+
+//go:embed example_data_on_pr_review_comment.json
+var exampleDataOnPRReviewCommentBytes []byte
 
 //go:embed example_data_on_push.json
 var exampleDataOnPushBytes []byte
@@ -91,6 +97,9 @@ var exampleOutputCreateIssueComment map[string]any
 var exampleOutputGetIssueOnce sync.Once
 var exampleOutputGetIssue map[string]any
 
+var exampleOutputGetRepositoryPermissionOnce sync.Once
+var exampleOutputGetRepositoryPermission map[string]any
+
 var exampleOutputUpdateIssueOnce sync.Once
 var exampleOutputUpdateIssue map[string]any
 
@@ -124,8 +133,11 @@ var exampleDataOnIssue map[string]any
 var exampleDataOnPullRequestOnce sync.Once
 var exampleDataOnPullRequest map[string]any
 
-var exampleDataOnPullRequestReviewCommentOnce sync.Once
-var exampleDataOnPullRequestReviewComment map[string]any
+var exampleDataOnPRCommentOnce sync.Once
+var exampleDataOnPRComment map[string]any
+
+var exampleDataOnPRReviewCommentOnce sync.Once
+var exampleDataOnPRReviewComment map[string]any
 
 var exampleDataOnPushOnce sync.Once
 var exampleDataOnPush map[string]any
@@ -167,6 +179,14 @@ func (c *CreateIssueComment) ExampleOutput() map[string]any {
 
 func (c *GetIssue) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetIssueOnce, exampleOutputGetIssueBytes, &exampleOutputGetIssue)
+}
+
+func (c *GetRepositoryPermission) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetRepositoryPermissionOnce,
+		exampleOutputGetRepositoryPermissionBytes,
+		&exampleOutputGetRepositoryPermission,
+	)
 }
 
 func (c *UpdateIssue) ExampleOutput() map[string]any {
@@ -223,9 +243,17 @@ func (t *OnPullRequest) ExampleData() map[string]any {
 
 func (t *OnPRComment) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
-		&exampleDataOnPullRequestReviewCommentOnce,
-		exampleDataOnPullRequestReviewCommentBytes,
-		&exampleDataOnPullRequestReviewComment,
+		&exampleDataOnPRCommentOnce,
+		exampleDataOnPRCommentBytes,
+		&exampleDataOnPRComment,
+	)
+}
+
+func (t *OnPRReviewComment) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleDataOnPRReviewCommentOnce,
+		exampleDataOnPRReviewCommentBytes,
+		&exampleDataOnPRReviewComment,
 	)
 }
 

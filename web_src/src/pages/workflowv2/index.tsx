@@ -42,6 +42,8 @@ import {
   useUpdateCanvas,
   useCanvas,
   useCanvasEvents,
+  useCanvasMemoryEntries,
+  useDeleteCanvasMemoryEntry,
   useWidgets,
   canvasKeys,
 } from "@/hooks/useCanvasData";
@@ -83,11 +85,13 @@ import {
   getStateMap,
 } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
+import { CanvasMemoryView } from "./CanvasMemoryView";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
+import { applyHorizontalAutoLayout } from "./autoLayout";
 import { useAccount } from "@/contexts/AccountContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
@@ -144,6 +148,12 @@ export function WorkflowPageV2() {
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const { data: canvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId!, canvasId!);
   const { data: canvasEventsResponse } = useCanvasEvents(canvasId!);
+  const {
+    data: canvasMemoryEntries = [],
+    isLoading: canvasMemoryLoading,
+    error: canvasMemoryError,
+  } = useCanvasMemoryEntries(canvasId!);
+  const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
   const canReadOrg = canAct("org", "read");
   const { data: agentSettings } = useOrganizationAgentSettings(organizationId || "", !!organizationId && canReadOrg);
   const canUpdateCanvas = canAct("canvases", "update");
@@ -156,6 +166,7 @@ export function WorkflowPageV2() {
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely;
   const isDev = import.meta.env.DEV;
+  const [topViewMode, setTopViewMode] = useState<"canvas" | "memory">("canvas");
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const createWorkflowMutation = useCreateCanvas(organizationId!);
 
@@ -2323,6 +2334,45 @@ export function WorkflowPageV2() {
     ],
   );
 
+  const handleAutoLayout = useCallback(
+    async (selectedNodeIDs: string[] = []) => {
+      if (!canvas || !organizationId || !canvasId) return;
+
+      const latestWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+
+      try {
+        if (!canAutoSave) {
+          saveWorkflowSnapshot(latestWorkflow);
+        }
+
+        const updatedWorkflow = await applyHorizontalAutoLayout(latestWorkflow, {
+          nodeIds: selectedNodeIDs,
+        });
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+        if (canAutoSave) {
+          await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+        } else {
+          markUnsavedChange("position");
+        }
+      } catch (error) {
+        console.error("Failed to auto layout canvas", error);
+        showErrorToast("Failed to auto layout canvas");
+      }
+    },
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      canAutoSave,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      markUnsavedChange,
+    ],
+  );
+
   const handleNodeCollapseChange = useCallback(
     async (nodeId: string) => {
       if (!canvas || !organizationId || !canvasId) return;
@@ -2839,8 +2889,17 @@ export function WorkflowPageV2() {
       } = onRun ? { onRun } : {};
       if (integration) context.integration = integration;
 
-      return () => {
-        return renderer.render(buildNodeInfo(node), Object.keys(context).length > 0 ? context : undefined);
+      // Return a function that takes the current configuration
+      return (configuration?: Record<string, unknown>) => {
+        const nodeWithConfiguration = {
+          ...node,
+          configuration: configuration ?? node.configuration,
+        };
+
+        return renderer.render(
+          buildNodeInfo(nodeWithConfiguration),
+          Object.keys(context).length > 0 ? context : undefined,
+        );
       };
     },
     [canvas],
@@ -2972,6 +3031,17 @@ export function WorkflowPageV2() {
         }}
         title={canvas?.metadata?.name || "Canvas"}
         headerBanner={headerBanner}
+        topViewMode={topViewMode}
+        onTopViewModeChange={setTopViewMode}
+        dataViewContent={
+          <CanvasMemoryView
+            entries={canvasMemoryEntries}
+            isLoading={canvasMemoryLoading}
+            errorMessage={canvasMemoryError instanceof Error ? canvasMemoryError.message : undefined}
+            onDeleteEntry={canUpdateCanvas ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined}
+            deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
+          />
+        }
         nodes={nodes}
         edges={edges}
         organizationId={organizationId}
@@ -2990,6 +3060,7 @@ export function WorkflowPageV2() {
         onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
         onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
         onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
+        onAutoLayout={!isReadOnly ? handleAutoLayout : undefined}
         onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
         onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
         onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}

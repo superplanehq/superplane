@@ -153,6 +153,7 @@ type ExecutionContext struct {
 	Integration    IntegrationContext
 	Notifications  NotificationContext
 	Secrets        SecretsContext
+	CanvasMemory   CanvasMemoryContext
 	Webhook        NodeWebhookContext
 }
 
@@ -189,6 +190,12 @@ type SetupContext struct {
 type MetadataContext interface {
 	Get() any
 	Set(any) error
+}
+
+type CanvasMemoryContext interface {
+	Add(namespace string, values any) error
+	Find(namespace string, matches map[string]any) ([]any, error)
+	FindFirst(namespace string, matches map[string]any) (any, error)
 }
 
 /*

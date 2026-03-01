@@ -4,7 +4,7 @@ Use this guidance when planning or configuring the `github.onPRComment` trigger.
 
 ## Purpose
 
-`github.onPRComment` starts a workflow when comments are posted on pull requests.
+`github.onPRComment` starts a workflow when comments are posted on the pull request conversation (GitHub `issue_comment` on PRs).
 
 It is suitable for PR command handling, review automation, and comment-driven delivery flows.
 
@@ -46,6 +46,16 @@ For `github.prComment` events:
 - Comment URL: `root().data.comment.html_url`
 - PR URL: `root().data.issue.pull_request.html_url`
 - For PR workflow context values, use the `issue` and `repository` paths above.
+- This trigger handles only PR conversation comments (`issue_comment` where `issue.pull_request` exists).
+- Do not use this trigger for line-level review comments or review submission comments.
+- SuperPlane passes through the full GitHub webhook payload in `data`.
+
+## Common Expression Paths
+
+- PR number: `root().data.issue.number`
+- PR title: `root().data.issue.title`
+- PR URL: `root().data.issue.pull_request.html_url` (or `root().data.issue.pull_request.url`)
+- Comment text: `root().data.comment.body`
 
 ## Common Pattern
 

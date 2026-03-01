@@ -2,6 +2,7 @@
     "type": "daytona.command.response",
     "data": {
         "exitCode": 0,
+        "timeout": false,
         "result": "Successfully installed requests-2.31.0\n"
     },
     "timestamp": "2026-01-19T12:00:00Z"

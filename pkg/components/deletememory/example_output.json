@@ -1,0 +1,19 @@
+{
+  "data": {
+    "namespace": "machines",
+    "matches": {
+      "creator": "igor",
+      "pull_request": 123
+    },
+    "deleted": [
+      {
+        "creator": "igor",
+        "pull_request": 123,
+        "sandbox_id": "sbx-001"
+      }
+    ],
+    "count": 1
+  },
+  "timestamp": "2026-02-28T00:00:00Z",
+  "type": "memory.deleted"
+}

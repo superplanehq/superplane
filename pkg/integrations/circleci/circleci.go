@@ -104,10 +104,19 @@ func (c *CircleCI) HandleAction(ctx core.IntegrationActionContext) error {
 const ResourceTypePipelineDefinition = "pipeline-definition"
 
 func (c *CircleCI) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != ResourceTypePipelineDefinition {
+	switch resourceType {
+	case ResourceTypeProject:
+		return ListProjectSlugs(ctx)
+	case ResourceTypeWorkflow:
+		return ListWorkflowNames(ctx)
+	case ResourceTypePipelineDefinition:
+		return c.listPipelineDefinitions(ctx)
+	default:
 		return []core.IntegrationResource{}, nil
 	}
+}
 
+func (c *CircleCI) listPipelineDefinitions(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	projectID := ctx.Parameters["project_id"]
 	if projectID == "" {
 		// Try to get project_id from projectSlug if provided
@@ -159,6 +168,11 @@ func (c *CircleCI) ListResources(resourceType string, ctx core.ListResourcesCont
 func (c *CircleCI) Components() []core.Component {
 	return []core.Component{
 		&RunPipeline{},
+		&GetWorkflow{},
+		&GetLastWorkflow{},
+		&GetRecentWorkflowRuns{},
+		&GetTestMetrics{},
+		&GetFlakyTests{},
 	}
 }
 

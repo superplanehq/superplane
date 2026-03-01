@@ -94,6 +94,7 @@ func (g *GitHub) Configuration() []configuration.Field {
 func (g *GitHub) Components() []core.Component {
 	return []core.Component{
 		&GetIssue{},
+		&GetRepositoryPermission{},
 		&CreateIssue{},
 		&CreateIssueComment{},
 		&UpdateIssue{},
@@ -117,6 +118,7 @@ func (g *GitHub) Triggers() []core.Trigger {
 		&OnPush{},
 		&OnPullRequest{},
 		&OnPRComment{},
+		&OnPRReviewComment{},
 		&OnIssue{},
 		&OnIssueComment{},
 		&OnRelease{},

@@ -106,6 +106,8 @@ spec:
 {{- else }}
               value: "no"
 {{- end }}
+            - name: ENABLE_PASSWORD_LOGIN
+              value: {{ ternary "yes" "no" .Values.authentication.enablePasswordLogin | quote }}
             - name: OWNER_SETUP_ENABLED
 {{- if .Values.api.ownerSetupEnabled }}
               value: "yes"

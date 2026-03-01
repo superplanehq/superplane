@@ -97,7 +97,7 @@ func Test__RunPipeline__HandleWebhook__FinishedPipeline(t *testing.T) {
 				"url": "https://gitlab.com/group/project/-/pipelines/1001"
 			}
 		}`),
-		Webhook: &contexts.WebhookContext{
+		Webhook: &contexts.NodeWebhookContext{
 			Secret: "token",
 		},
 		Logger: log.NewEntry(log.New()),

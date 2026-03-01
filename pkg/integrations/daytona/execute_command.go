@@ -3,6 +3,8 @@ package daytona
 import (
 	"fmt"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,17 +14,22 @@ import (
 )
 
 const (
-	ExecuteCommandPayloadType  = "daytona.command.response"
-	ExecuteCommandPollInterval = 5 * time.Second
+	ExecuteCommandPayloadType          = "daytona.command.response"
+	ExecuteCommandPollInterval         = 5 * time.Second
+	ExecuteCommandOutputChannelSuccess = "success"
+	ExecuteCommandOutputChannelFailed  = "failed"
 )
+
+var envVariableNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 type ExecuteCommand struct{}
 
 type ExecuteCommandSpec struct {
-	SandboxID string `json:"sandboxId"`
-	Command   string `json:"command"`
-	Cwd       string `json:"cwd,omitempty"`
-	Timeout   int    `json:"timeout,omitempty"`
+	Sandbox string        `json:"sandbox"`
+	Command string        `json:"command"`
+	Cwd     string        `json:"cwd,omitempty"`
+	Env     []EnvVariable `json:"env,omitempty"`
+	Timeout int           `json:"timeout,omitempty"`
 }
 
 type ExecuteCommandMetadata struct {
@@ -57,15 +64,21 @@ func (e *ExecuteCommand) Documentation() string {
 
 ## Configuration
 
-- **Sandbox ID**: The ID of the sandbox (from createSandbox output)
+- **Sandbox**: The sandbox ID to run commands in (from createSandbox output). Supports expressions, e.g. ` + "`" + `{{ $["daytona.createSandbox"].data.id }}` + "`" + `
 - **Command**: The shell command to execute
 - **Working Directory**: Optional working directory for the command
+- **Environment Variables**: Optional key-value pairs exported before command execution
 - **Timeout**: Optional execution timeout in seconds
 
 ## Output
 
-Returns the command result including:
+Routes to one of two channels:
+- **success**: Exit code is 0
+- **failed**: Exit code is non-zero
+
+The payload includes:
 - **exitCode**: The process exit code (0 for success)
+- **timeout**: Whether the command timed out
 - **result**: The stdout/output from the command execution
 
 ## Notes
@@ -84,18 +97,25 @@ func (e *ExecuteCommand) Color() string {
 }
 
 func (e *ExecuteCommand) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{core.DefaultOutputChannel}
+	return []core.OutputChannel{
+		{Name: ExecuteCommandOutputChannelSuccess, Label: "Success"},
+		{Name: ExecuteCommandOutputChannelFailed, Label: "Failed"},
+	}
 }
 
 func (e *ExecuteCommand) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "sandboxId",
-			Label:       "Sandbox ID",
-			Type:        configuration.FieldTypeExpression,
+			Name:        "sandbox",
+			Label:       "Sandbox",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The ID of the sandbox to run the command in",
-			Placeholder: `{{ $["daytona.createSandbox"].data.id }}`,
+			Description: "Sandbox to run the command in",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "sandbox",
+				},
+			},
 		},
 		{
 			Name:        "command",
@@ -114,6 +134,35 @@ func (e *ExecuteCommand) Configuration() []configuration.Field {
 			Placeholder: "/home/daytona",
 		},
 		{
+			Name:  "env",
+			Label: "Environment Variables",
+			Type:  configuration.FieldTypeList,
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Variable",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:     "name",
+								Label:    "Name",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+							{
+								Name:     "value",
+								Label:    "Value",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+						},
+					},
+				},
+			},
+			Required:    false,
+			Description: "Environment variables to export before running the command",
+		},
+		{
 			Name:        "timeout",
 			Label:       "Timeout",
 			Type:        configuration.FieldTypeNumber,
@@ -130,12 +179,23 @@ func (e *ExecuteCommand) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
-	if spec.SandboxID == "" {
-		return fmt.Errorf("sandboxId is required")
+	if spec.Sandbox == "" {
+		return fmt.Errorf("sandbox is required")
 	}
 
 	if spec.Command == "" {
 		return fmt.Errorf("command is required")
+	}
+
+	for _, env := range spec.Env {
+		name := strings.TrimSpace(env.Name)
+		if name == "" {
+			return fmt.Errorf("env variable name is required")
+		}
+
+		if !envVariableNamePattern.MatchString(name) {
+			return fmt.Errorf("invalid env variable name: %s", env.Name)
+		}
 	}
 
 	return nil
@@ -153,7 +213,7 @@ func (e *ExecuteCommand) Execute(ctx core.ExecutionContext) error {
 	}
 
 	sessionID := uuid.New().String()
-	if err := client.CreateSession(spec.SandboxID, sessionID); err != nil {
+	if err := client.CreateSession(spec.Sandbox, sessionID); err != nil {
 		return fmt.Errorf("failed to create session: %v", err)
 	}
 
@@ -162,7 +222,25 @@ func (e *ExecuteCommand) Execute(ctx core.ExecutionContext) error {
 		command = fmt.Sprintf("cd %s && %s", spec.Cwd, spec.Command)
 	}
 
-	response, err := client.ExecuteSessionCommand(spec.SandboxID, sessionID, command)
+	if len(spec.Env) > 0 {
+		envExports := make([]string, 0, len(spec.Env))
+		for _, env := range spec.Env {
+			name := strings.TrimSpace(env.Name)
+			if name == "" {
+				continue
+			}
+
+			envExports = append(envExports, fmt.Sprintf("%s=%s", name, shellQuote(env.Value)))
+		}
+
+		if len(envExports) > 0 {
+			command = fmt.Sprintf("export %s && %s", strings.Join(envExports, " "), command)
+		}
+	}
+
+	command = wrapCommandWithSandboxSecretEnv(command)
+
+	response, err := client.ExecuteSessionCommand(spec.Sandbox, sessionID, command)
 	if err != nil {
 		return fmt.Errorf("failed to execute command: %v", err)
 	}
@@ -173,7 +251,7 @@ func (e *ExecuteCommand) Execute(ctx core.ExecutionContext) error {
 	}
 
 	metadata := ExecuteCommandMetadata{
-		SandboxID: spec.SandboxID,
+		SandboxID: spec.Sandbox,
 		SessionID: sessionID,
 		CmdID:     response.CmdID,
 		StartedAt: time.Now().Unix(),
@@ -219,7 +297,11 @@ func (e *ExecuteCommand) poll(ctx core.ActionContext) error {
 	}
 
 	if time.Now().Unix()-metadata.StartedAt > int64(metadata.Timeout) {
-		return fmt.Errorf("command timed out after %d seconds", metadata.Timeout)
+		return ctx.ExecutionState.Emit(ExecuteCommandOutputChannelFailed, ExecuteCommandPayloadType, []any{map[string]any{
+			"exitCode": nil,
+			"timeout":  true,
+			"result":   fmt.Sprintf("command timed out after %d seconds", metadata.Timeout),
+		}})
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -244,11 +326,17 @@ func (e *ExecuteCommand) poll(ctx core.ActionContext) error {
 
 	result := &ExecuteCommandResponse{
 		ExitCode: *cmd.ExitCode,
+		Timeout:  false,
 		Result:   logs,
 	}
 
+	channel := ExecuteCommandOutputChannelFailed
+	if *cmd.ExitCode == 0 {
+		channel = ExecuteCommandOutputChannelSuccess
+	}
+
 	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
+		channel,
 		ExecuteCommandPayloadType,
 		[]any{result},
 	)
@@ -256,6 +344,14 @@ func (e *ExecuteCommand) poll(ctx core.ActionContext) error {
 
 func (e *ExecuteCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
+}
+
+func shellQuote(value string) string {
+	if value == "" {
+		return "''"
+	}
+
+	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
 }
 
 func (e *ExecuteCommand) Cleanup(ctx core.SetupContext) error {
