@@ -1,10 +1,12 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -25,6 +27,38 @@ func createExecutionContext(config map[string]any) (core.ExecutionContext, *cont
 		Metadata:       metadataCtx,
 		HTTP:           &http.Client{},
 	}, stateCtx, metadataCtx
+}
+
+type contextBoundReadCloser struct {
+	ctx    context.Context
+	reader io.Reader
+}
+
+func (r *contextBoundReadCloser) Read(p []byte) (int, error) {
+	select {
+	case <-r.ctx.Done():
+		return 0, r.ctx.Err()
+	default:
+	}
+
+	return r.reader.Read(p)
+}
+
+func (r *contextBoundReadCloser) Close() error {
+	return nil
+}
+
+type contextBoundHTTPClient struct{}
+
+func (c *contextBoundHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{},
+		Body: &contextBoundReadCloser{
+			ctx:    req.Context(),
+			reader: strings.NewReader(`{"hello":"world"}`),
+		},
+	}, nil
 }
 
 func TestHTTP__Setup__ValidConfigurations(t *testing.T) {
@@ -213,6 +247,34 @@ func TestHTTP__Execute__GET(t *testing.T) {
 	//
 	// Verify body was parsed as JSON
 	//
+	body := response["body"].(map[string]any)
+	assert.Equal(t, "world", body["hello"])
+}
+
+func TestHTTP__Execute__ReadsResponseBodyBeforeContextCancellation(t *testing.T) {
+	h := &HTTP{}
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+
+	ctx := core.ExecutionContext{
+		Configuration: map[string]any{
+			"method": "GET",
+			"url":    "https://api.example.com/test",
+		},
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		HTTP:           &contextBoundHTTPClient{},
+	}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, "http.request.finished", stateCtx.Type)
+
+	payload := stateCtx.Payloads[0].(map[string]any)
+	response := payload["data"].(map[string]any)
+	assert.Equal(t, 200, response["status"])
+
 	body := response["body"].(map[string]any)
 	assert.Equal(t, "world", body["hello"])
 }
