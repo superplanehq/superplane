@@ -59,7 +59,7 @@ func Test__OnPackageEvent__Setup(t *testing.T) {
 			HTTP:        httpCtx,
 			Integration: integrationCtx,
 			Metadata:    metadata,
-			Webhook:     &contexts.WebhookContext{},
+			Webhook:     &contexts.NodeWebhookContext{},
 			Configuration: map[string]any{
 				"repository": "my-org/my-repo",
 				"events":     []string{"package.synced"},
@@ -111,7 +111,7 @@ func Test__OnPackageEvent__Setup(t *testing.T) {
 			HTTP:        httpCtx,
 			Integration: integrationCtx,
 			Metadata:    metadata,
-			Webhook:     &contexts.WebhookContext{},
+			Webhook:     &contexts.NodeWebhookContext{},
 			Configuration: map[string]any{
 				"repository": "my-org/my-repo",
 				"events":     []string{"package.synced"},
