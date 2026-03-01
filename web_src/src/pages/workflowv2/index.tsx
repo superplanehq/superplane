@@ -1869,12 +1869,25 @@ export function WorkflowPageV2() {
         integrations,
       });
 
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+      const previousNodeIds = new Set((latestWorkflow.spec?.nodes || []).map((node) => node.id));
+      const aiAddedNodeIds = (updatedWorkflow.spec?.nodes || [])
+        .map((node) => node.id)
+        .filter((nodeId): nodeId is string => typeof nodeId === "string" && !previousNodeIds.has(nodeId));
+
+      let finalWorkflow = updatedWorkflow;
+      if (aiAddedNodeIds.length > 0) {
+        finalWorkflow = await applyHorizontalAutoLayout(updatedWorkflow, {
+          nodeIds: aiAddedNodeIds,
+        });
+      }
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
 
       if (canAutoSave) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+        await handleSaveWorkflow(finalWorkflow, { showToast: false });
       } else {
-        markUnsavedChange("structural");
+        const changeKind = aiAddedNodeIds.length > 0 ? "position" : "structural";
+        markUnsavedChange(changeKind);
       }
     },
     [
