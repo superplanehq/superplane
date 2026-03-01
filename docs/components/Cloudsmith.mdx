@@ -1,0 +1,109 @@
+---
+title: "Cloudsmith"
+---
+
+Manage and react to Cloudsmith package repositories
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Package Event" href="#on-package-event" description="Triggers when a package event occurs in a Cloudsmith repository" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Get Package" href="#get-package" description="Fetch details of a Cloudsmith package" />
+</CardGrid>
+
+## Instructions
+
+To generate a Cloudsmith API token:
+- Go to **Cloudsmith** → **Account Settings** → **API Key**
+- Copy the API key and enter it below, along with your organization or user workspace (slug)
+
+<a id="on-package-event"></a>
+
+## On Package Event
+
+The On Package Event trigger starts a workflow execution when a package event occurs in a Cloudsmith repository.
+
+### Use Cases
+
+- **Build pipelines**: Trigger downstream workflows when a new package is synchronized
+- **Release workflows**: Automate promotion or notification on package publish
+- **Security automation**: React to quarantined or failed packages
+
+### Configuration
+
+- **Repository**: Cloudsmith repository in the format `namespace/repo`
+- **Events**: Package events to listen for (e.g. `package.synced`, `package.deleted`)
+
+### Webhook Setup
+
+This trigger creates a webhook in Cloudsmith automatically when the canvas is saved.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event": "package.synced",
+    "package": {
+      "cdn_url": "https://dl.cloudsmith.io/basic/my-org/my-repo/python/simple/my-library/",
+      "checksum_sha256": "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
+      "format": "python",
+      "name": "my-library",
+      "size": 45678,
+      "slug_perm": "Wcpkg1234abcd",
+      "status_str": "Synchronised",
+      "version": "1.2.3"
+    },
+    "repository": {
+      "name": "my-repo",
+      "namespace": "my-org",
+      "slug": "my-repo"
+    }
+  },
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "cloudsmith.package.event"
+}
+```
+
+<a id="get-package"></a>
+
+## Get Package
+
+The Get Package component retrieves metadata for a Cloudsmith package.
+
+### Use Cases
+
+- **Release automation**: Fetch package details for downstream deployments
+- **Audit trails**: Resolve package metadata for traceability
+- **Insights**: Inspect package sizes, checksums, and status
+
+### Configuration
+
+- **Repository**: Cloudsmith repository in the format `namespace/repo`
+- **Identifier**: Package identifier or slug (for example: `Wklm1a2b`)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "cdn_url": "https://dl.cloudsmith.io/basic/my-org/my-repo/python/simple/my-library/",
+    "checksum_sha256": "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
+    "format": "python",
+    "name": "my-library",
+    "size": 45678,
+    "status_str": "Synchronised",
+    "version": "1.2.3"
+  },
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "cloudsmith.package"
+}
+```
+

@@ -8,6 +8,7 @@ import { ConfigurationField } from "../../api-client";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { toTestId } from "@/utils/testID";
 import { type RefObject, useEffect, useMemo, useState } from "react";
+import { RefreshCw } from "lucide-react";
 
 interface IntegrationResourceFieldRendererProps {
   field: ConfigurationField;
@@ -107,7 +108,9 @@ export const IntegrationResourceFieldRenderer = ({
   const {
     data: resources,
     isLoading: isLoadingResources,
+    isFetching,
     error: resourcesError,
+    refetch,
   } = useIntegrationResources(organizationId ?? "", integrationId ?? "", resourceType ?? "", additionalQueryParameters);
 
   // All hooks must be called before any early returns
@@ -256,14 +259,43 @@ export const IntegrationResourceFieldRenderer = ({
         <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)} className="space-y-2">
           <Tabs value={useExpressionMode ? "expression" : "fixed"} onValueChange={handleTabChange}>
             {tabsInLabelRow ?? <div className="flex justify-end">{tabsList}</div>}
-            <TabsContent value="fixed">{picker}</TabsContent>
+            <TabsContent value="fixed">
+              <div className="flex gap-1.5 items-center">
+                <div className="flex-1">{picker}</div>
+                <button
+                  type="button"
+                  onClick={() => refetch()}
+                  disabled={isFetching}
+                  className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50"
+                  title="Refresh list"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+                </button>
+              </div>
+            </TabsContent>
             <TabsContent value="expression">{expressionInput}</TabsContent>
           </Tabs>
         </div>
       );
     }
 
-    return <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>{picker}</div>;
+    return (
+      <div
+        data-testid={toTestId(`app-installation-resource-field-${field.name}`)}
+        className="flex gap-1.5 items-center"
+      >
+        <div className="flex-1">{picker}</div>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50"
+          title="Refresh list"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+        </button>
+      </div>
+    );
   }
 
   // Multi-select mode
@@ -291,17 +323,28 @@ export const IntegrationResourceFieldRenderer = ({
   };
 
   return (
-    <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>
-      <MultiCombobox<SelectOption>
-        options={multiSelectOptions}
-        displayValue={(option) => option.label}
-        placeholder={`Select ${resourceType}...`}
-        value={selectedOptions}
-        onChange={handleChange}
-        showButton={false}
+    <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)} className="flex gap-1.5 items-start">
+      <div className="flex-1">
+        <MultiCombobox<SelectOption>
+          options={multiSelectOptions}
+          displayValue={(option) => option.label}
+          placeholder={`Select ${resourceType}...`}
+          value={selectedOptions}
+          onChange={handleChange}
+          showButton={false}
+        >
+          {(option) => <MultiComboboxLabel>{option.label}</MultiComboboxLabel>}
+        </MultiCombobox>
+      </div>
+      <button
+        type="button"
+        onClick={() => refetch()}
+        disabled={isFetching}
+        className="mt-1 shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50"
+        title="Refresh list"
       >
-        {(option) => <MultiComboboxLabel>{option.label}</MultiComboboxLabel>}
-      </MultiCombobox>
+        <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+      </button>
     </div>
   );
 };
