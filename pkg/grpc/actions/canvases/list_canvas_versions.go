@@ -36,7 +36,14 @@ func ListCanvasVersions(ctx context.Context, organizationID string, canvasID str
 	protoVersions := make([]*pb.CanvasVersion, 0, len(versions))
 	for i := range versions {
 		version := versions[i]
-		if !version.IsPublished && (version.OwnerID == nil || *version.OwnerID != userUUID) {
+		isLiveVersion := canvas.LiveVersionID != nil && *canvas.LiveVersionID == version.ID
+		isOwnedByUser := version.OwnerID != nil && *version.OwnerID == userUUID
+
+		if version.IsPublished {
+			if !isLiveVersion && !isOwnedByUser {
+				continue
+			}
+		} else if !isOwnedByUser {
 			continue
 		}
 

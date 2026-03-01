@@ -43,7 +43,14 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 	}
 
 	userUUID := uuid.MustParse(userID)
-	if !version.IsPublished && (version.OwnerID == nil || *version.OwnerID != userUUID) {
+	isOwnedByUser := version.OwnerID != nil && *version.OwnerID == userUUID
+	isLiveVersion := canvas.LiveVersionID != nil && *canvas.LiveVersionID == version.ID
+
+	if version.IsPublished {
+		if !isLiveVersion && !isOwnedByUser {
+			return nil, status.Error(codes.PermissionDenied, "version owner mismatch")
+		}
+	} else if !isOwnedByUser {
 		return nil, status.Error(codes.PermissionDenied, "version owner mismatch")
 	}
 

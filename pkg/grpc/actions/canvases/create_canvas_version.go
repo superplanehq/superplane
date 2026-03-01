@@ -2,7 +2,6 @@ package canvases
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -39,16 +38,6 @@ func CreateCanvasVersion(ctx context.Context, organizationID string, canvasID st
 	var version *models.CanvasVersion
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		draft, draftErr := models.FindCanvasDraftInTransaction(tx, canvasUUID, userUUID)
-		if draftErr == nil {
-			version, err = models.FindCanvasVersionInTransaction(tx, canvasUUID, draft.VersionID)
-			return err
-		}
-
-		if !errors.Is(draftErr, gorm.ErrRecordNotFound) {
-			return draftErr
-		}
-
 		version, err = models.SaveCanvasDraftInTransaction(
 			tx,
 			canvas.ID,

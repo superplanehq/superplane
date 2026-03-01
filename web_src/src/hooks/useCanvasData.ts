@@ -215,7 +215,7 @@ export const useCreateCanvasVersion = (organizationId: string, canvasId: string)
   });
 };
 
-export const useUpdateCanvasVersion = (_organizationId: string, canvasId: string) => {
+export const useUpdateCanvasVersion = (organizationId: string, canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -246,8 +246,47 @@ export const useUpdateCanvasVersion = (_organizationId: string, canvasId: string
         }),
       );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+    onSuccess: (response, variables) => {
+      const version = response?.data?.version;
+      if (!version) {
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+        return;
+      }
+
+      queryClient.setQueryData(canvasKeys.versionDetail(canvasId, variables.versionId), version);
+
+      queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: any[] | undefined) => {
+        if (!current) {
+          return current;
+        }
+
+        let found = false;
+        const next = current.map((item) => {
+          if (item?.metadata?.id === version.metadata?.id) {
+            found = true;
+            return version;
+          }
+          return item;
+        });
+
+        if (!found) {
+          next.unshift(version);
+        }
+
+        next.sort((left, right) => (right?.metadata?.revision || 0) - (left?.metadata?.revision || 0));
+        return next;
+      });
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: any | undefined) => {
+        if (!current) {
+          return current;
+        }
+
+        return {
+          ...current,
+          spec: version.spec,
+        };
+      });
     },
   });
 };

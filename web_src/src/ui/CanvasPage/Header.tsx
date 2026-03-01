@@ -52,25 +52,15 @@ interface HeaderProps {
 export function Header({
   breadcrumbs,
   onSave,
-  onCreateVersion,
-  onPublishVersion,
-  onDiscardVersion,
   onUndo,
   canUndo,
   onLogoClick,
   organizationId,
-  versionLabel,
   unsavedMessage,
   saveIsPrimary,
   saveButtonHidden,
   saveDisabled,
   saveDisabledTooltip,
-  createVersionDisabled,
-  createVersionDisabledTooltip,
-  publishVersionDisabled,
-  publishVersionDisabledTooltip,
-  discardVersionDisabled,
-  discardVersionDisabledTooltip,
   isAutoSaveEnabled,
   onToggleAutoSave,
   autoSaveDisabled,
@@ -290,41 +280,6 @@ export function Header({
                 {unsavedMessage}
               </span>
             )}
-            {versionLabel && (
-              <span className="hidden sm:inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-800">
-                {versionLabel}
-              </span>
-            )}
-            {onCreateVersion &&
-              wrapWithTooltip(
-                createVersionDisabled,
-                createVersionDisabledTooltip,
-                <Button onClick={onCreateVersion} size="sm" variant="outline" disabled={createVersionDisabled}>
-                  Create version
-                </Button>,
-              )}
-            {onPublishVersion &&
-              wrapWithTooltip(
-                publishVersionDisabled,
-                publishVersionDisabledTooltip,
-                <Button onClick={onPublishVersion} size="sm" variant="default" disabled={publishVersionDisabled}>
-                  Publish version
-                </Button>,
-              )}
-            {onDiscardVersion &&
-              wrapWithTooltip(
-                discardVersionDisabled,
-                discardVersionDisabledTooltip,
-                <Button
-                  onClick={onDiscardVersion}
-                  size="sm"
-                  variant="outline"
-                  disabled={discardVersionDisabled}
-                  className="text-red-700 border-red-200 hover:text-red-800 hover:border-red-300"
-                >
-                  Discard version
-                </Button>,
-              )}
             {onToggleAutoSave &&
               wrapWithTooltip(
                 autoSaveDisabled,

@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Background,
-  Panel,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -11,7 +10,7 @@ import {
   type EdgeChange,
 } from "@xyflow/react";
 
-import { CircleX, Loader2, ScanLine, ScanText, ScrollText, TriangleAlert, Workflow } from "lucide-react";
+import { CircleX, GitBranch, Loader2, ScanLine, ScanText, ScrollText, TriangleAlert, Workflow } from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
@@ -153,6 +152,11 @@ export interface CanvasPageProps {
   topViewMode?: "canvas" | "memory";
   onTopViewModeChange?: (mode: "canvas" | "memory") => void;
   dataViewContent?: React.ReactNode;
+  versionControlSidebar?: React.ReactNode;
+  isVersionControlOpen?: boolean;
+  onOpenVersionControl?: () => void;
+  versionControlButtonLabel?: string;
+  versionControlButtonTooltip?: string;
   readOnly?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
@@ -390,6 +394,16 @@ function CanvasPage(props: CanvasPageProps) {
     channels: string[];
     initialData?: string;
   } | null>(null);
+  const canvasNodesForAiContext = useMemo(
+    () =>
+      (props.workflowNodes || []).map((node) => ({
+        id: node.id || "",
+        name: node.name || "",
+        label: node.name || "",
+        type: node.type || "",
+      })),
+    [props.workflowNodes],
+  );
 
   useEffect(() => {
     if (!props.focusRequest?.tab || props.focusRequest.tab === "execution-chain") {
@@ -850,21 +864,20 @@ function CanvasPage(props: CanvasPageProps) {
 
       {/* Main content area with sidebar and canvas/memory */}
       {props.topViewMode === "memory" ? (
-        <div className="flex-1 overflow-auto bg-slate-50">{props.dataViewContent}</div>
+        <div className="flex-1 flex relative overflow-hidden">
+          {props.versionControlSidebar}
+          <div className="flex-1 overflow-auto bg-slate-50">{props.dataViewContent}</div>
+        </div>
       ) : (
         <div className="flex-1 flex relative overflow-hidden">
+          {props.versionControlSidebar}
           <BuildingBlocksSidebar
             isOpen={isBuildingBlocksSidebarOpen}
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
             showAiBuilderTab={props.showAiBuilderTab}
             canvasId={props.canvasId}
-            canvasNodes={state.nodes.map((node) => ({
-              id: node.id,
-              name: String((node.data as { nodeName?: string })?.nodeName || ""),
-              label: String((node.data as { label?: string })?.label || ""),
-              type: String((node.data as { type?: string })?.type || ""),
-            }))}
+            canvasNodes={canvasNodesForAiContext}
             onApplyAiOperations={props.onApplyAiOperations}
             integrations={props.integrations}
             canvasZoom={canvasZoom}
@@ -927,6 +940,10 @@ function CanvasPage(props: CanvasPageProps) {
                 onToggleAutoSave={props.onToggleAutoSave}
                 autoSaveDisabled={props.autoSaveDisabled}
                 autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
+                isVersionControlOpen={props.isVersionControlOpen}
+                onOpenVersionControl={props.onOpenVersionControl}
+                versionControlButtonLabel={props.versionControlButtonLabel}
+                versionControlButtonTooltip={props.versionControlButtonTooltip}
                 readOnly={props.readOnly}
                 logEntries={props.logEntries}
                 focusRequest={props.focusRequest}
@@ -1459,6 +1476,9 @@ function CanvasContent({
   onToggleAutoSave,
   autoSaveDisabled,
   autoSaveDisabledTooltip,
+  isVersionControlOpen,
+  onOpenVersionControl,
+  versionControlButtonTooltip,
   readOnly,
   logEntries = [],
   focusRequest,
@@ -1525,6 +1545,10 @@ function CanvasContent({
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
+  isVersionControlOpen?: boolean;
+  onOpenVersionControl?: () => void;
+  versionControlButtonLabel?: string;
+  versionControlButtonTooltip?: string;
   readOnly?: boolean;
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
@@ -1557,6 +1581,22 @@ function CanvasContent({
 
   // Use viewport from ref as the state value
   const viewport = viewportRef.current;
+  const lastReportedZoomRef = useRef<number | null>(null);
+  const reportZoom = useCallback(
+    (zoom: number) => {
+      if (!onZoomChange) {
+        return;
+      }
+
+      if (lastReportedZoomRef.current === zoom) {
+        return;
+      }
+
+      lastReportedZoomRef.current = zoom;
+      onZoomChange(zoom);
+    },
+    [onZoomChange],
+  );
 
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
@@ -1766,12 +1806,9 @@ function CanvasContent({
     (_event: any, newViewport: { x: number; y: number; zoom: number }) => {
       // Store the viewport in the ref (which persists across re-renders)
       viewportRef.current = newViewport;
-
-      if (onZoomChange) {
-        onZoomChange(newViewport.zoom);
-      }
+      reportZoom(newViewport.zoom);
     },
-    [onZoomChange, viewportRef],
+    [reportZoom, viewportRef],
   );
 
   const handleToggleCollapse = useCallback(() => {
@@ -1877,18 +1914,12 @@ function CanvasContent({
           // Store the initial viewport after fit
           const initialViewport = getViewport();
           viewportRef.current = initialViewport;
-
-          if (onZoomChange) {
-            onZoomChange(initialViewport.zoom);
-          }
+          reportZoom(initialViewport.zoom);
         } else {
           const defaultViewport = viewportRef.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
           viewportRef.current = defaultViewport;
           reactFlowInstance.setViewport(defaultViewport);
-
-          if (onZoomChange) {
-            onZoomChange(defaultViewport.zoom);
-          }
+          reportZoom(defaultViewport.zoom);
         }
 
         hasFitToViewRef.current = true;
@@ -1901,7 +1932,7 @@ function CanvasContent({
         setIsInitialized(true);
       }
     },
-    [fitView, getViewport, onZoomChange, hasFitToViewRef, viewportRef, initialFocusNodeId],
+    [fitView, getViewport, reportZoom, hasFitToViewRef, viewportRef, initialFocusNodeId],
   );
 
   const showHeader = !isReadOnly;
@@ -2172,6 +2203,8 @@ function CanvasContent({
     });
   }, []);
 
+  const showVersionControlTrigger = !!onOpenVersionControl && !isVersionControlOpen;
+
   return (
     <div className="h-full w-full relative">
       {/* Header */}
@@ -2246,119 +2279,138 @@ function CanvasContent({
             className="h-full w-full"
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
-            <ZoomSlider
-              position="bottom-left"
-              orientation="horizontal"
-              screenshotName={title}
-              isSnapToGridEnabled={isSnapToGridEnabled}
-              onSnapToGridToggle={() => setIsSnapToGridEnabled((prev) => !prev)}
-            >
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" onClick={handleToggleCollapse}>
-                    {state.isCollapsed ? <ScanText className="h-3 w-3" /> : <ScanLine className="h-3 w-3" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {state.isCollapsed
-                    ? "Switch components to Detailed view (Ctrl/Cmd + E)"
-                    : "Switch components to Compact view (Ctrl/Cmd + E)"}
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex">
+            <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2">
+              <ZoomSlider
+                usePanel={false}
+                orientation="horizontal"
+                screenshotName={title}
+                isSnapToGridEnabled={isSnapToGridEnabled}
+                onSnapToGridToggle={() => setIsSnapToGridEnabled((prev) => !prev)}
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon-sm" onClick={handleToggleCollapse}>
+                      {state.isCollapsed ? <ScanText className="h-3 w-3" /> : <ScanLine className="h-3 w-3" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {state.isCollapsed
+                      ? "Switch components to Detailed view (Ctrl/Cmd + E)"
+                      : "Switch components to Compact view (Ctrl/Cmd + E)"}
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs font-medium"
+                        onClick={handleAutoLayout}
+                        disabled={isAutoLayoutDisabled}
+                      >
+                        {isAutoLayouting ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Workflow className="h-3 w-3" />
+                        )}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
+                </Tooltip>
+                <NodeSearch
+                  onSearch={(searchString) => {
+                    const query = searchString.toLowerCase();
+                    return state.nodes.filter((node) => {
+                      const label = ((node.data?.label as string) || "").toLowerCase();
+                      const nodeName = ((node.data as any)?.nodeName || "").toLowerCase();
+                      const id = (node.id || "").toLowerCase();
+                      return label.includes(query) || nodeName.includes(query) || id.includes(query);
+                    });
+                  }}
+                  onSelectNode={(node) => {
+                    const isAnnotationNode = (node.data as any)?.type === "annotation";
+                    if (isAnnotationNode) {
+                      return;
+                    }
+                    state.componentSidebar.open(node.id);
+                  }}
+                />
+              </ZoomSlider>
+              {showVersionControlTrigger ? (
+                <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center rounded-md p-0.5 h-8">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 items-center text-xs font-medium gap-1.5"
+                        onClick={onOpenVersionControl}
+                      >
+                        <GitBranch className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{versionControlButtonTooltip || "Open version control"}</TooltipContent>
+                  </Tooltip>
+                </div>
+              ) : null}
+              <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
+                <Tooltip>
+                  <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 px-2 text-xs font-medium"
-                      onClick={handleAutoLayout}
-                      disabled={isAutoLayoutDisabled}
+                      className="h-8 items-center text-xs font-medium"
+                      onClick={() => handleLogButtonClick("all")}
                     >
-                      {isAutoLayouting ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Workflow className="h-3 w-3" />
-                      )}
+                      <ScrollText className="h-3 w-3" />
                     </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
-              </Tooltip>
-              <NodeSearch
-                onSearch={(searchString) => {
-                  const query = searchString.toLowerCase();
-                  return state.nodes.filter((node) => {
-                    const label = ((node.data?.label as string) || "").toLowerCase();
-                    const nodeName = ((node.data as any)?.nodeName || "").toLowerCase();
-                    const id = (node.id || "").toLowerCase();
-                    return label.includes(query) || nodeName.includes(query) || id.includes(query);
-                  });
-                }}
-                onSelectNode={(node) => {
-                  const isAnnotationNode = (node.data as any)?.type === "annotation";
-                  if (isAnnotationNode) {
-                    return;
-                  }
-                  state.componentSidebar.open(node.id);
-                }}
-              />
-            </ZoomSlider>
-            <Panel
-              position="bottom-left"
-              className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8"
-              style={{ marginLeft: 370 }}
-            >
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 items-center text-xs font-medium"
-                    onClick={() => handleLogButtonClick("all")}
-                  >
-                    <ScrollText className="h-3 w-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>All Logs</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 items-center text-xs font-medium"
-                    onClick={() => handleLogButtonClick("error")}
-                  >
-                    <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
-                    <span className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}>
-                      {logCounts.error}
-                    </span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Errors</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 items-center text-xs font-medium"
-                    onClick={() => handleLogButtonClick("warning")}
-                  >
-                    <TriangleAlert
-                      className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
-                    />
-                    <span
-                      className={logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"}
+                  </TooltipTrigger>
+                  <TooltipContent>All Logs</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 items-center text-xs font-medium"
+                      onClick={() => handleLogButtonClick("error")}
                     >
-                      {logCounts.warning}
-                    </span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Warnings</TooltipContent>
-              </Tooltip>
-            </Panel>
+                      <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
+                      <span
+                        className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}
+                      >
+                        {logCounts.error}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Errors</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 items-center text-xs font-medium"
+                      onClick={() => handleLogButtonClick("warning")}
+                    >
+                      <TriangleAlert
+                        className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
+                      />
+                      <span
+                        className={
+                          logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"
+                        }
+                      >
+                        {logCounts.warning}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Warnings</TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
           </ReactFlow>
         </div>
       </div>

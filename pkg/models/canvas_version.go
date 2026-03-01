@@ -193,43 +193,12 @@ func SaveCanvasDraftInTransaction(
 		basedOnVersionID = canvas.LiveVersionID
 	}
 
-	now := time.Now()
-	draft, err := FindCanvasDraftInTransaction(tx, workflowID, userID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-
-	if err == nil {
-		version, findVersionErr := FindCanvasVersionInTransaction(tx, workflowID, draft.VersionID)
-		if findVersionErr != nil {
-			return nil, findVersionErr
-		}
-
-		version.OwnerID = &userID
-		version.BasedOnVersionID = basedOnVersionID
-		version.IsPublished = false
-		version.PublishedAt = nil
-		version.Nodes = datatypes.NewJSONSlice(nodes)
-		version.Edges = datatypes.NewJSONSlice(edges)
-		version.UpdatedAt = &now
-
-		if saveErr := tx.Save(version).Error; saveErr != nil {
-			return nil, saveErr
-		}
-
-		draft.UpdatedAt = &now
-		if saveErr := tx.Save(draft).Error; saveErr != nil {
-			return nil, saveErr
-		}
-
-		return version, nil
-	}
-
 	nextRevision, err := nextCanvasRevisionInTransaction(tx, workflowID)
 	if err != nil {
 		return nil, err
 	}
 
+	now := time.Now()
 	version := CanvasVersion{
 		ID:               uuid.New(),
 		WorkflowID:       workflowID,
@@ -247,7 +216,7 @@ func SaveCanvasDraftInTransaction(
 		return nil, err
 	}
 
-	draft = &CanvasUserDraft{
+	draft := &CanvasUserDraft{
 		WorkflowID: workflowID,
 		UserID:     userID,
 		VersionID:  version.ID,
