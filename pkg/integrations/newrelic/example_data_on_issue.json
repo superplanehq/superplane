@@ -1,0 +1,17 @@
+{
+    "data": {
+        "issueId": "MXxBSXxJU1NVRXwxMjM0NTY3ODk",
+        "issueUrl": "https://one.newrelic.com/alerts-ai/issues/MXxBSXxJU1NVRXwxMjM0NTY3ODk",
+        "title": "High CPU usage on production server",
+        "priority": "CRITICAL",
+        "state": "ACTIVATED",
+        "policyName": "Production Infrastructure",
+        "conditionName": "CPU usage > 90%",
+        "accountId": 1234567,
+        "createdAt": 1704067200000,
+        "updatedAt": 1704067260000,
+        "sources": ["newrelic"]
+    },
+    "timestamp": "2026-01-19T12:00:00Z",
+    "type": "newrelic.issue"
+}

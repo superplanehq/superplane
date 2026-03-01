@@ -87,6 +87,12 @@ import {
   customFieldRenderers as incidentCustomFieldRenderers,
 } from "./incident/index";
 import {
+  componentMappers as newrelicComponentMappers,
+  customFieldRenderers as newrelicCustomFieldRenderers,
+  triggerRenderers as newrelicTriggerRenderers,
+  eventStateRegistry as newrelicEventStateRegistry,
+} from "./newrelic/index";
+import {
   componentMappers as awsComponentMappers,
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
@@ -223,6 +229,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   render: renderComponentMappers,
   rootly: rootlyComponentMappers,
   incident: incidentComponentMappers,
+  newrelic: newrelicComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
   telegram: telegramComponentMappers,
@@ -256,6 +263,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   render: renderTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   incident: incidentTriggerRenderers,
+  newrelic: newrelicTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
   telegram: telegramTriggerRenderers,
@@ -291,6 +299,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   telegram: telegramEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   incident: incidentEventStateRegistry,
+  newrelic: newrelicEventStateRegistry,
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
@@ -331,6 +340,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
   grafana: grafanaCustomFieldRenderers,
+  newrelic: newrelicCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
   incident: incidentCustomFieldRenderers,

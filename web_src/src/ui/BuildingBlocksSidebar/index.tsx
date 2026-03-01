@@ -72,6 +72,7 @@ import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
+import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 
@@ -1049,6 +1050,7 @@ function CategorySection({
     render: renderIcon,
     dockerhub: dockerIcon,
     harness: harnessIcon,
+    newrelic: newrelicIcon,
     servicenow: servicenowIcon,
     statuspage: statuspageIcon,
     aws: {
@@ -1176,6 +1178,7 @@ function CategorySection({
             render: renderIcon,
             dockerhub: dockerIcon,
             harness: harnessIcon,
+            newrelic: newrelicIcon,
             servicenow: servicenowIcon,
             statuspage: statuspageIcon,
             aws: {
