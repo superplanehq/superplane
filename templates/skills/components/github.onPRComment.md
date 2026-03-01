@@ -24,6 +24,12 @@ When generating workflow operations that include `github.onPRComment`:
 5. If the user specifies a command phrase or quoted trigger text (for example `"create env"`), always set `configuration.contentFilter` to a regex that matches that phrase.
 6. Treat `contentFilter` as a regex, not a simple substring.
 7. Use downstream branching for complex conditions instead of overloading a single regex.
+8. Before adding any downstream `filter` after this trigger, inspect this trigger's existing `configuration.contentFilter` first.
+9. Do not add a downstream `filter` that contradicts or duplicates this trigger's `contentFilter` in the same linear path.
+10. If the user asks for a different command phrase than the existing trigger filter (for example existing `"create env"` but request is `"destroy"`), prefer one of:
+   - update this trigger's `contentFilter` to the new phrase when replacing behavior is intended, or
+   - create a separate trigger/path for the new phrase when both behaviors should coexist.
+11. Never produce an unreachable path where a downstream filter can never match because the trigger already excluded those events.
 
 When the user asks to react to a specific comment command, prefer a case-insensitive boundary-safe regex, for example:
 
@@ -75,3 +81,4 @@ For `github.prComment` events:
 - Assuming `contentFilter` is not regex.
 - Leaving `contentFilter` empty when the request includes a specific command phrase.
 - Using this trigger when the request is explicitly about non-PR issue comments only.
+- Adding a downstream `filter` for `"destroy"` when this trigger is already filtered to `"create env"` (or vice versa).

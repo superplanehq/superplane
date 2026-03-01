@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,15 +12,18 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
+	"gorm.io/gorm"
 )
 
 const (
@@ -30,6 +34,11 @@ const (
 	componentSkillMaxCharsPerBlock       = 3000
 	componentSkillMaxCharsTotal          = 14000
 	componentSkillMissingPreviewLimit    = 10
+	canvasContextRequestLimit            = 8
+	canvasContextRequestNodeEventsLimit  = 5
+	canvasContextRequestNodeEventsTotal  = 20
+	canvasContextEnrichmentRounds        = 1
+	implicitRepoNodeConfigRequestLimit   = 12
 )
 
 type openAIResponsesRequest struct {
@@ -54,6 +63,15 @@ type openAIResponsesOutputText struct {
 type openAICanvasPlan struct {
 	AssistantMessage string                   `json:"assistantMessage"`
 	Operations       []map[string]interface{} `json:"operations"`
+	ContextRequests  []openAICanvasContextReq `json:"contextRequests,omitempty"`
+}
+
+type openAICanvasContextReq struct {
+	Type      string `json:"type"`
+	NodeID    string `json:"nodeId,omitempty"`
+	BlockName string `json:"blockName,omitempty"`
+	BlockType string `json:"blockType,omitempty"`
+	MaxItems  int    `json:"maxItems,omitempty"`
 }
 
 type canvasSkillPromptContext struct {
@@ -132,18 +150,139 @@ func generateCanvasAIPlan(
 		return nil, err
 	}
 
-	prompt := strings.Join([]string{
+	firstPrompt := buildCanvasPlannerPrompt(
+		systemPrompt,
+		string(canvasContextJSON),
+		skillContext.PromptSection,
+		"",
+		req.GetPrompt(),
+		true,
+	)
+
+	parsedPlan, err := requestCanvasAIPlan(ctx, registry, apiKey, firstPrompt)
+	if err != nil {
+		return nil, err
+	}
+	if parsedPlan == nil {
+		return &openAICanvasPlan{
+			AssistantMessage: "I couldn't produce executable operations for that request. Please rephrase with specific component names or desired flow.",
+			Operations:       []map[string]interface{}{},
+		}, nil
+	}
+
+	rounds := 0
+	for rounds < canvasContextEnrichmentRounds {
+		contextRequests := sanitizeCanvasContextRequests(parsedPlan.ContextRequests, req.GetCanvasContext())
+		if len(contextRequests) == 0 {
+			contextRequests = deriveImplicitContextRequests(parsedPlan, req.GetCanvasContext())
+		}
+		if len(contextRequests) == 0 {
+			break
+		}
+
+		additionalContext, contextErr := buildRequestedCanvasContextData(
+			registry,
+			req.GetCanvasId(),
+			req.GetCanvasContext(),
+			contextRequests,
+		)
+		if contextErr != nil || strings.TrimSpace(additionalContext) == "" {
+			break
+		}
+
+		rounds += 1
+		nextPrompt := buildCanvasPlannerPrompt(
+			systemPrompt,
+			string(canvasContextJSON),
+			skillContext.PromptSection,
+			additionalContext,
+			req.GetPrompt(),
+			false,
+		)
+
+		nextPlan, nextErr := requestCanvasAIPlan(ctx, registry, apiKey, nextPrompt)
+		if nextErr != nil || nextPlan == nil {
+			break
+		}
+
+		parsedPlan = nextPlan
+	}
+
+	if parsedPlan.AssistantMessage == "" {
+		parsedPlan.AssistantMessage = "I prepared a draft change set you can review and apply."
+	}
+	parsedPlan.AssistantMessage = sanitizeAssistantMessage(parsedPlan.AssistantMessage)
+	if parsedPlan.Operations == nil {
+		parsedPlan.Operations = []map[string]interface{}{}
+	}
+
+	var hasFilteredInvalidAddNode bool
+	parsedPlan.Operations, hasFilteredInvalidAddNode = sanitizeCanvasOperations(parsedPlan.Operations, req.GetCanvasContext())
+	if hasFilteredInvalidAddNode && len(parsedPlan.Operations) == 0 {
+		parsedPlan.AssistantMessage = "I couldn't find one or more requested components in this workspace. Please tell me which existing component should be used instead."
+	}
+
+	return parsedPlan, nil
+}
+
+func buildCanvasPlannerPrompt(
+	systemPrompt string,
+	canvasContextJSON string,
+	skillPromptSection string,
+	additionalContextJSON string,
+	userPrompt string,
+	allowContextRequests bool,
+) string {
+	sections := []string{
 		systemPrompt,
 		"",
 		"Current canvas context JSON:",
-		string(canvasContextJSON),
+		canvasContextJSON,
 		"",
-		skillContext.PromptSection,
+		skillPromptSection,
+	}
+
+	if allowContextRequests {
+		sections = append(sections,
+			"",
+			"If required context is missing, you may ask for additional context by returning strict JSON with:",
+			`{"assistantMessage":"short reason","operations":[],"contextRequests":[{"type":"node_recent_outputs","nodeId":"existing-node-id","maxItems":3},{"type":"node_configuration","nodeId":"existing-node-id"},{"type":"block_schema","blockName":"component.or.trigger.name","blockType":"component|trigger"},{"type":"block_example_output","blockName":"component.or.trigger.name","blockType":"component|trigger"},{"type":"component_skill","blockName":"component.or.trigger.name","blockType":"component|trigger"}]}`,
+			"Always inspect both relevant existing node configuration and block schema before proposing operations that depend on node behavior, channels, or outputs.",
+			"If output field names are needed and recent node outputs are unavailable, request block_example_output before asking the user.",
+			"Never ask the user to provide schema or output-channel details that can be fetched through contextRequests; fetch them first.",
+			"If required configuration/schema/example output is missing, request the needed context first and return operations as [].",
+			"Only request context when necessary. Use existing node IDs from canvas context. Keep requests minimal.",
+		)
+	} else {
+		sections = append(sections,
+			"",
+			"Additional context has already been provided. Return final operations now and do not return contextRequests.",
+		)
+	}
+
+	if strings.TrimSpace(additionalContextJSON) != "" {
+		sections = append(sections,
+			"",
+			"Additional retrieved context JSON:",
+			additionalContextJSON,
+		)
+	}
+
+	sections = append(sections,
 		"",
 		"User request:",
-		req.GetPrompt(),
-	}, "\n")
+		userPrompt,
+	)
 
+	return strings.Join(sections, "\n")
+}
+
+func requestCanvasAIPlan(
+	ctx context.Context,
+	registry *registry.Registry,
+	apiKey string,
+	prompt string,
+) (*openAICanvasPlan, error) {
 	body, err := json.Marshal(openAIResponsesRequest{
 		Model: canvasAIOpenAIModel,
 		Input: prompt,
@@ -185,27 +324,625 @@ func generateCanvasAIPlan(
 
 	parsedPlan, parseErr := parseOpenAICanvasPlan(rawPlanText)
 	if parseErr != nil {
-		return &openAICanvasPlan{
-			AssistantMessage: "I couldn't produce executable operations for that request. Please rephrase with specific component names or desired flow.",
-			Operations:       []map[string]interface{}{},
-		}, nil
-	}
-
-	if parsedPlan.AssistantMessage == "" {
-		parsedPlan.AssistantMessage = "I prepared a draft change set you can review and apply."
-	}
-	parsedPlan.AssistantMessage = sanitizeAssistantMessage(parsedPlan.AssistantMessage)
-	if parsedPlan.Operations == nil {
-		parsedPlan.Operations = []map[string]interface{}{}
-	}
-
-	var hasFilteredInvalidAddNode bool
-	parsedPlan.Operations, hasFilteredInvalidAddNode = sanitizeCanvasOperations(parsedPlan.Operations, req.GetCanvasContext())
-	if hasFilteredInvalidAddNode && len(parsedPlan.Operations) == 0 {
-		parsedPlan.AssistantMessage = "I couldn't find one or more requested components in this workspace. Please tell me which existing component should be used instead."
+		return nil, nil
 	}
 
 	return parsedPlan, nil
+}
+
+func sanitizeCanvasContextRequests(
+	requests []openAICanvasContextReq,
+	canvasContext *pb.CanvasAiContext,
+) []openAICanvasContextReq {
+	if len(requests) == 0 {
+		return []openAICanvasContextReq{}
+	}
+
+	allowedNodeIDs := map[string]struct{}{}
+	if canvasContext != nil {
+		for _, node := range canvasContext.GetNodes() {
+			id := strings.TrimSpace(node.GetId())
+			if id == "" {
+				continue
+			}
+			allowedNodeIDs[id] = struct{}{}
+		}
+	}
+
+	result := make([]openAICanvasContextReq, 0, len(requests))
+	seen := map[string]struct{}{}
+	for _, req := range requests {
+		if len(result) >= canvasContextRequestLimit {
+			break
+		}
+
+		reqType := strings.TrimSpace(strings.ToLower(req.Type))
+		switch reqType {
+		case "node_recent_outputs", "node_configuration":
+			nodeID := strings.TrimSpace(req.NodeID)
+			if nodeID == "" {
+				continue
+			}
+			if _, ok := allowedNodeIDs[nodeID]; !ok {
+				continue
+			}
+
+			maxItems := req.MaxItems
+			if maxItems <= 0 {
+				maxItems = 3
+			}
+			if maxItems > canvasContextRequestNodeEventsLimit {
+				maxItems = canvasContextRequestNodeEventsLimit
+			}
+
+			key := reqType + ":" + nodeID
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			result = append(result, openAICanvasContextReq{
+				Type:     reqType,
+				NodeID:   nodeID,
+				MaxItems: maxItems,
+			})
+		case "component_skill":
+			blockName := strings.TrimSpace(req.BlockName)
+			if blockName == "" {
+				continue
+			}
+			blockType := strings.TrimSpace(strings.ToLower(req.BlockType))
+			if blockType != "component" && blockType != "trigger" {
+				blockType = ""
+			}
+
+			key := reqType + ":" + blockType + ":" + blockName
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			result = append(result, openAICanvasContextReq{
+				Type:      reqType,
+				BlockName: blockName,
+				BlockType: blockType,
+			})
+		case "block_schema":
+			blockName := strings.TrimSpace(req.BlockName)
+			if blockName == "" {
+				continue
+			}
+			blockType := strings.TrimSpace(strings.ToLower(req.BlockType))
+			if blockType != "component" && blockType != "trigger" {
+				blockType = ""
+			}
+
+			key := reqType + ":" + blockType + ":" + blockName
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			result = append(result, openAICanvasContextReq{
+				Type:      reqType,
+				BlockName: blockName,
+				BlockType: blockType,
+			})
+		case "block_example_output":
+			blockName := strings.TrimSpace(req.BlockName)
+			if blockName == "" {
+				continue
+			}
+			blockType := strings.TrimSpace(strings.ToLower(req.BlockType))
+			if blockType != "component" && blockType != "trigger" {
+				blockType = ""
+			}
+
+			key := reqType + ":" + blockType + ":" + blockName
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			result = append(result, openAICanvasContextReq{
+				Type:      reqType,
+				BlockName: blockName,
+				BlockType: blockType,
+			})
+		}
+	}
+
+	return result
+}
+
+func deriveImplicitContextRequests(
+	plan *openAICanvasPlan,
+	canvasContext *pb.CanvasAiContext,
+) []openAICanvasContextReq {
+	if plan == nil {
+		return []openAICanvasContextReq{}
+	}
+	if len(plan.ContextRequests) > 0 || len(plan.Operations) > 0 {
+		return []openAICanvasContextReq{}
+	}
+
+	message := strings.TrimSpace(plan.AssistantMessage)
+	if message == "" {
+		return []openAICanvasContextReq{}
+	}
+
+	lower := strings.ToLower(message)
+	needsSchema := strings.Contains(lower, "schema") ||
+		strings.Contains(lower, "output channel") ||
+		strings.Contains(lower, "output-channel") ||
+		strings.Contains(lower, "outputchannel") ||
+		strings.Contains(lower, "channel metadata")
+	if !needsSchema {
+		return []openAICanvasContextReq{}
+	}
+
+	type blockRef struct {
+		name    string
+		kind    string
+		aliases []string
+	}
+	allowedBlocks := make([]blockRef, 0)
+	seenBlockNames := map[string]struct{}{}
+	if canvasContext != nil {
+		for _, block := range canvasContext.GetAvailableBlocks() {
+			name := strings.TrimSpace(block.GetName())
+			if name == "" {
+				continue
+			}
+			if _, exists := seenBlockNames[name]; exists {
+				continue
+			}
+			seenBlockNames[name] = struct{}{}
+
+			kind := strings.TrimSpace(strings.ToLower(block.GetType()))
+			aliases := []string{name}
+			label := strings.TrimSpace(block.GetLabel())
+			if label != "" && label != name {
+				aliases = append(aliases, label)
+			}
+			allowedBlocks = append(allowedBlocks, blockRef{
+				name:    name,
+				kind:    kind,
+				aliases: aliases,
+			})
+		}
+	}
+	if len(allowedBlocks) == 0 {
+		return []openAICanvasContextReq{}
+	}
+
+	normalizedMessage := normalizeSchemaMessageForBlockMatching(message)
+
+	reqs := make([]openAICanvasContextReq, 0)
+	seen := map[string]struct{}{}
+	for _, block := range allowedBlocks {
+		if !messageMentionsAnyBlockAlias(normalizedMessage, block.aliases) {
+			continue
+		}
+
+		key := block.kind + ":" + block.name
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+
+		reqs = append(reqs,
+			openAICanvasContextReq{
+				Type:      "block_schema",
+				BlockName: block.name,
+				BlockType: block.kind,
+			},
+			openAICanvasContextReq{
+				Type:      "block_example_output",
+				BlockName: block.name,
+				BlockType: block.kind,
+			},
+		)
+	}
+
+	// If assistant asks user for repository while canvas likely already has it, auto-fetch node configurations.
+	if asksForRepositoryInMessage(lower) && canvasContext != nil {
+		for _, node := range canvasContext.GetNodes() {
+			if len(reqs) >= implicitRepoNodeConfigRequestLimit {
+				break
+			}
+			nodeID := strings.TrimSpace(node.GetId())
+			if nodeID == "" {
+				continue
+			}
+			key := "node_configuration:" + nodeID
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			reqs = append(reqs, openAICanvasContextReq{
+				Type:   "node_configuration",
+				NodeID: nodeID,
+			})
+		}
+	}
+
+	return sanitizeCanvasContextRequests(reqs, canvasContext)
+}
+
+func asksForRepositoryInMessage(lowerMessage string) bool {
+	message := strings.ToLower(strings.TrimSpace(lowerMessage))
+	if message == "" {
+		return false
+	}
+
+	if !strings.Contains(message, "repository") {
+		return false
+	}
+
+	if strings.Contains(message, "github repository") && (strings.Contains(message, "which") || strings.Contains(message, "what")) {
+		return true
+	}
+
+	if strings.Contains(message, "which repository") || strings.Contains(message, "what repository") {
+		return true
+	}
+
+	return false
+}
+
+func normalizeSchemaMessageForBlockMatching(message string) string {
+	normalized := strings.ToLower(message)
+	normalized = strings.ReplaceAll(normalized, "`", "")
+	normalized = strings.ReplaceAll(normalized, " ", "")
+	normalized = strings.ReplaceAll(normalized, "\n", "")
+	normalized = strings.ReplaceAll(normalized, "\t", "")
+	normalized = strings.ReplaceAll(normalized, "-", "")
+	return normalized
+}
+
+func messageMentionsAnyBlockAlias(normalizedMessage string, aliases []string) bool {
+	for _, alias := range aliases {
+		canonical := strings.ToLower(strings.TrimSpace(alias))
+		if canonical == "" {
+			continue
+		}
+		canonical = strings.ReplaceAll(canonical, " ", "")
+		canonical = strings.ReplaceAll(canonical, "-", "")
+		if strings.Contains(normalizedMessage, canonical) {
+			return true
+		}
+
+		withoutDots := strings.ReplaceAll(canonical, ".", "")
+		if withoutDots != canonical && strings.Contains(normalizedMessage, withoutDots) {
+			return true
+		}
+	}
+	return false
+}
+
+func buildRequestedCanvasContextData(
+	registry *registry.Registry,
+	canvasID string,
+	canvasContext *pb.CanvasAiContext,
+	requests []openAICanvasContextReq,
+) (string, error) {
+	if len(requests) == 0 {
+		return "", nil
+	}
+
+	canvasUUID, err := uuid.Parse(canvasID)
+	if err != nil {
+		return "", fmt.Errorf("invalid canvas id")
+	}
+
+	allowedNodeIDs := map[string]struct{}{}
+	if canvasContext != nil {
+		for _, node := range canvasContext.GetNodes() {
+			id := strings.TrimSpace(node.GetId())
+			if id == "" {
+				continue
+			}
+			allowedNodeIDs[id] = struct{}{}
+		}
+	}
+
+	nodeRecentOutputs := map[string][]map[string]any{}
+	nodeConfigurations := map[string]map[string]any{}
+	blockSchemas := map[string]map[string]any{}
+	blockExampleOutputs := map[string]map[string]any{}
+	componentSkills := map[string]map[string]string{}
+	errorMessages := []string{}
+	totalNodeEvents := 0
+
+	for _, req := range requests {
+		switch req.Type {
+		case "node_recent_outputs":
+			nodeID := strings.TrimSpace(req.NodeID)
+			if nodeID == "" {
+				continue
+			}
+			if _, ok := allowedNodeIDs[nodeID]; !ok {
+				continue
+			}
+
+			if totalNodeEvents >= canvasContextRequestNodeEventsTotal {
+				continue
+			}
+
+			remaining := canvasContextRequestNodeEventsTotal - totalNodeEvents
+			limit := req.MaxItems
+			if limit <= 0 {
+				limit = 3
+			}
+			if limit > canvasContextRequestNodeEventsLimit {
+				limit = canvasContextRequestNodeEventsLimit
+			}
+			if limit > remaining {
+				limit = remaining
+			}
+			if limit <= 0 {
+				continue
+			}
+
+			events, eventsErr := models.ListCanvasEvents(canvasUUID, nodeID, limit, nil)
+			if eventsErr != nil {
+				errorMessages = append(errorMessages, fmt.Sprintf("node_recent_outputs(%s): %s", nodeID, eventsErr.Error()))
+				continue
+			}
+
+			samples := make([]map[string]any, 0, len(events))
+			for _, event := range events {
+				row := map[string]any{
+					"channel": event.Channel,
+					"data":    event.Data.Data(),
+				}
+				if event.CreatedAt != nil {
+					row["createdAt"] = event.CreatedAt.UTC().Format(time.RFC3339)
+				}
+				samples = append(samples, row)
+			}
+			totalNodeEvents += len(samples)
+			nodeRecentOutputs[nodeID] = samples
+		case "node_configuration":
+			nodeID := strings.TrimSpace(req.NodeID)
+			if nodeID == "" {
+				continue
+			}
+			if _, ok := allowedNodeIDs[nodeID]; !ok {
+				continue
+			}
+
+			node, nodeErr := models.FindCanvasNode(database.Conn(), canvasUUID, nodeID)
+			if nodeErr != nil {
+				if !errors.Is(nodeErr, gorm.ErrRecordNotFound) {
+					errorMessages = append(errorMessages, fmt.Sprintf("node_configuration(%s): %s", nodeID, nodeErr.Error()))
+				}
+				continue
+			}
+
+			blockName := ""
+			ref := node.Ref.Data()
+			switch node.Type {
+			case models.NodeTypeComponent:
+				if ref.Component != nil {
+					blockName = ref.Component.Name
+				}
+			case models.NodeTypeTrigger:
+				if ref.Trigger != nil {
+					blockName = ref.Trigger.Name
+				}
+			}
+
+			nodeConfigurations[nodeID] = map[string]any{
+				"name":          node.Name,
+				"type":          node.Type,
+				"blockName":     blockName,
+				"configuration": node.Configuration.Data(),
+				"metadata":      node.Metadata.Data(),
+			}
+			if blockName != "" {
+				if _, exists := blockSchemas[blockName]; !exists {
+					schemaType := ""
+					if node.Type == models.NodeTypeComponent {
+						schemaType = "component"
+					} else if node.Type == models.NodeTypeTrigger {
+						schemaType = "trigger"
+					}
+					schemaData, schemaErr := loadBlockSchemaFromRegistry(registry, blockName, schemaType)
+					if schemaErr != nil {
+						errorMessages = append(errorMessages, fmt.Sprintf("block_schema(%s): %s", blockName, schemaErr.Error()))
+					} else if schemaData != nil {
+						blockSchemas[blockName] = schemaData
+					}
+				}
+				if _, exists := blockExampleOutputs[blockName]; !exists {
+					exampleOutput, exampleErr := loadBlockExampleOutputFromRegistry(registry, blockName, "")
+					if exampleErr != nil {
+						errorMessages = append(errorMessages, fmt.Sprintf("block_example_output(%s): %s", blockName, exampleErr.Error()))
+					} else if exampleOutput != nil {
+						blockExampleOutputs[blockName] = exampleOutput
+					}
+				}
+			}
+		case "block_schema":
+			blockName := strings.TrimSpace(req.BlockName)
+			if blockName == "" {
+				continue
+			}
+			if _, exists := blockSchemas[blockName]; exists {
+				continue
+			}
+
+			schemaData, schemaErr := loadBlockSchemaFromRegistry(registry, blockName, strings.TrimSpace(req.BlockType))
+			if schemaErr != nil {
+				errorMessages = append(errorMessages, fmt.Sprintf("block_schema(%s): %s", blockName, schemaErr.Error()))
+				continue
+			}
+			if schemaData != nil {
+				blockSchemas[blockName] = schemaData
+			}
+		case "block_example_output":
+			blockName := strings.TrimSpace(req.BlockName)
+			if blockName == "" {
+				continue
+			}
+			if _, exists := blockExampleOutputs[blockName]; exists {
+				continue
+			}
+
+			exampleOutput, exampleErr := loadBlockExampleOutputFromRegistry(registry, blockName, strings.TrimSpace(req.BlockType))
+			if exampleErr != nil {
+				errorMessages = append(errorMessages, fmt.Sprintf("block_example_output(%s): %s", blockName, exampleErr.Error()))
+				continue
+			}
+			if exampleOutput != nil {
+				blockExampleOutputs[blockName] = exampleOutput
+			}
+		case "component_skill":
+			blockName := strings.TrimSpace(req.BlockName)
+			if blockName == "" {
+				continue
+			}
+
+			skillContent, sourcePath, ok := loadComponentSkillContent(blockName, strings.TrimSpace(req.BlockType))
+			if !ok {
+				errorMessages = append(errorMessages, fmt.Sprintf("component_skill(%s): not found", blockName))
+				continue
+			}
+
+			componentSkills[blockName] = map[string]string{
+				"sourcePath": sourcePath,
+				"content":    skillContent,
+			}
+		}
+	}
+
+	payload := map[string]any{
+		"nodeRecentOutputs": nodeRecentOutputs,
+		"nodeConfigurations": nodeConfigurations,
+		"blockSchemas":      blockSchemas,
+		"blockExampleOutputs": blockExampleOutputs,
+		"componentSkills":   componentSkills,
+	}
+	if len(errorMessages) > 0 {
+		payload["errors"] = errorMessages
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
+}
+
+func loadBlockSchemaFromRegistry(
+	registry *registry.Registry,
+	blockName string,
+	blockType string,
+) (map[string]any, error) {
+	name := strings.TrimSpace(blockName)
+	if name == "" {
+		return nil, fmt.Errorf("block name is required")
+	}
+
+	kind := strings.TrimSpace(strings.ToLower(blockType))
+	switch kind {
+	case "component":
+		component, err := registry.GetComponent(name)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{
+			"type":          "component",
+			"name":          component.Name(),
+			"configuration": component.Configuration(),
+			"outputChannels": component.OutputChannels(nil),
+		}, nil
+	case "trigger":
+		trigger, err := registry.GetTrigger(name)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{
+			"type":          "trigger",
+			"name":          trigger.Name(),
+			"configuration": trigger.Configuration(),
+		}, nil
+	default:
+		component, componentErr := registry.GetComponent(name)
+		if componentErr == nil {
+			return map[string]any{
+				"type":          "component",
+				"name":          component.Name(),
+				"configuration": component.Configuration(),
+				"outputChannels": component.OutputChannels(nil),
+			}, nil
+		}
+
+		trigger, triggerErr := registry.GetTrigger(name)
+		if triggerErr == nil {
+			return map[string]any{
+				"type":          "trigger",
+				"name":          trigger.Name(),
+				"configuration": trigger.Configuration(),
+			}, nil
+		}
+
+		return nil, fmt.Errorf("block %s not found as component or trigger", name)
+	}
+}
+
+func loadBlockExampleOutputFromRegistry(
+	registry *registry.Registry,
+	blockName string,
+	blockType string,
+) (map[string]any, error) {
+	name := strings.TrimSpace(blockName)
+	if name == "" {
+		return nil, fmt.Errorf("block name is required")
+	}
+
+	kind := strings.TrimSpace(strings.ToLower(blockType))
+	switch kind {
+	case "component":
+		component, err := registry.GetComponent(name)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{
+			"type":         "component",
+			"name":         component.Name(),
+			"exampleOutput": component.ExampleOutput(),
+		}, nil
+	case "trigger":
+		trigger, err := registry.GetTrigger(name)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{
+			"type":         "trigger",
+			"name":         trigger.Name(),
+			"exampleOutput": trigger.ExampleData(),
+		}, nil
+	default:
+		component, componentErr := registry.GetComponent(name)
+		if componentErr == nil {
+			return map[string]any{
+				"type":         "component",
+				"name":         component.Name(),
+				"exampleOutput": component.ExampleOutput(),
+			}, nil
+		}
+
+		trigger, triggerErr := registry.GetTrigger(name)
+		if triggerErr == nil {
+			return map[string]any{
+				"type":         "trigger",
+				"name":         trigger.Name(),
+				"exampleOutput": trigger.ExampleData(),
+			}, nil
+		}
+
+		return nil, fmt.Errorf("block %s not found as component or trigger", name)
+	}
 }
 
 func loadCanvasSystemPrompt() (string, error) {
