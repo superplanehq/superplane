@@ -259,6 +259,14 @@ export type CanvasesDescribeCanvasResponse = {
   canvas?: CanvasesCanvas;
 };
 
+export type CanvasesDescribeCanvasVersionResponse = {
+  version?: CanvasesCanvasVersion;
+};
+
+export type CanvasesDiscardCanvasVersionResponse = {
+  [key: string]: unknown;
+};
+
 export type CanvasesEmitNodeEventBody = {
   channel?: string;
   data?: {
@@ -301,6 +309,10 @@ export type CanvasesListCanvasEventsResponse = {
 
 export type CanvasesListCanvasMemoriesResponse = {
   items?: Array<CanvasesCanvasMemory>;
+};
+
+export type CanvasesListCanvasVersionsResponse = {
+  versions?: Array<CanvasesCanvasVersion>;
 };
 
 export type CanvasesListCanvasesResponse = {
@@ -367,15 +379,6 @@ export type CanvasesSendAiMessageResponse = {
   operations?: Array<{
     [key: string]: unknown;
   }>;
-};
-
-export type CanvasesUpdateCanvasBody = {
-  canvas?: CanvasesCanvas;
-  autoLayout?: CanvasesCanvasAutoLayout;
-};
-
-export type CanvasesUpdateCanvasResponse = {
-  canvas?: CanvasesCanvas;
 };
 
 export type CanvasesUpdateCanvasVersionBody = {
@@ -1941,6 +1944,34 @@ export type CanvasesInvokeNodeTriggerActionResponses = {
 export type CanvasesInvokeNodeTriggerActionResponse2 =
   CanvasesInvokeNodeTriggerActionResponses[keyof CanvasesInvokeNodeTriggerActionResponses];
 
+export type CanvasesListCanvasVersionsData = {
+  body?: never;
+  path: {
+    canvasId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/versions";
+};
+
+export type CanvasesListCanvasVersionsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesListCanvasVersionsError = CanvasesListCanvasVersionsErrors[keyof CanvasesListCanvasVersionsErrors];
+
+export type CanvasesListCanvasVersionsResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesListCanvasVersionsResponse;
+};
+
+export type CanvasesListCanvasVersionsResponse2 =
+  CanvasesListCanvasVersionsResponses[keyof CanvasesListCanvasVersionsResponses];
+
 export type CanvasesCreateCanvasVersionData = {
   body: CanvasesCreateCanvasVersionBody;
   path: {
@@ -1969,6 +2000,66 @@ export type CanvasesCreateCanvasVersionResponses = {
 
 export type CanvasesCreateCanvasVersionResponse2 =
   CanvasesCreateCanvasVersionResponses[keyof CanvasesCreateCanvasVersionResponses];
+
+export type CanvasesDiscardCanvasVersion2Data = {
+  body?: never;
+  path: {
+    canvasId: string;
+    versionId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/versions/{versionId}";
+};
+
+export type CanvasesDiscardCanvasVersion2Errors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesDiscardCanvasVersion2Error =
+  CanvasesDiscardCanvasVersion2Errors[keyof CanvasesDiscardCanvasVersion2Errors];
+
+export type CanvasesDiscardCanvasVersion2Responses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesDiscardCanvasVersionResponse;
+};
+
+export type CanvasesDiscardCanvasVersion2Response =
+  CanvasesDiscardCanvasVersion2Responses[keyof CanvasesDiscardCanvasVersion2Responses];
+
+export type CanvasesDescribeCanvasVersionData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    versionId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/versions/{versionId}";
+};
+
+export type CanvasesDescribeCanvasVersionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesDescribeCanvasVersionError =
+  CanvasesDescribeCanvasVersionErrors[keyof CanvasesDescribeCanvasVersionErrors];
+
+export type CanvasesDescribeCanvasVersionResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesDescribeCanvasVersionResponse;
+};
+
+export type CanvasesDescribeCanvasVersionResponse2 =
+  CanvasesDescribeCanvasVersionResponses[keyof CanvasesDescribeCanvasVersionResponses];
 
 export type CanvasesUpdateCanvasVersionData = {
   body: CanvasesUpdateCanvasVersionBody;
@@ -1999,6 +2090,36 @@ export type CanvasesUpdateCanvasVersionResponses = {
 
 export type CanvasesUpdateCanvasVersionResponse2 =
   CanvasesUpdateCanvasVersionResponses[keyof CanvasesUpdateCanvasVersionResponses];
+
+export type CanvasesDiscardCanvasVersionData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    versionId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/versions/{versionId}/discard";
+};
+
+export type CanvasesDiscardCanvasVersionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesDiscardCanvasVersionError =
+  CanvasesDiscardCanvasVersionErrors[keyof CanvasesDiscardCanvasVersionErrors];
+
+export type CanvasesDiscardCanvasVersionResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesDiscardCanvasVersionResponse;
+};
+
+export type CanvasesDiscardCanvasVersionResponse2 =
+  CanvasesDiscardCanvasVersionResponses[keyof CanvasesDiscardCanvasVersionResponses];
 
 export type CanvasesPublishCanvasVersionData = {
   body: CanvasesPublishCanvasVersionBody;
@@ -2083,33 +2204,6 @@ export type CanvasesDescribeCanvasResponses = {
 };
 
 export type CanvasesDescribeCanvasResponse2 = CanvasesDescribeCanvasResponses[keyof CanvasesDescribeCanvasResponses];
-
-export type CanvasesUpdateCanvasData = {
-  body: CanvasesUpdateCanvasBody;
-  path: {
-    id: string;
-  };
-  query?: never;
-  url: "/api/v1/canvases/{id}";
-};
-
-export type CanvasesUpdateCanvasErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type CanvasesUpdateCanvasError = CanvasesUpdateCanvasErrors[keyof CanvasesUpdateCanvasErrors];
-
-export type CanvasesUpdateCanvasResponses = {
-  /**
-   * A successful response.
-   */
-  200: CanvasesUpdateCanvasResponse;
-};
-
-export type CanvasesUpdateCanvasResponse2 = CanvasesUpdateCanvasResponses[keyof CanvasesUpdateCanvasResponses];
 
 export type ComponentsListComponentsData = {
   body?: never;

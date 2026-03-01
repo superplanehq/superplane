@@ -61,18 +61,6 @@ service Canvases {
     };
   }
 
-  rpc UpdateCanvas(UpdateCanvasRequest) returns (UpdateCanvasResponse) {
-    option (google.api.http) = {
-      put: "/api/v1/canvases/{id}"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update canvas";
-      description: "Updates an existing canvas";
-      tags: "Canvas";
-    };
-  }
-
   rpc CreateCanvasVersion(CreateCanvasVersionRequest) returns (CreateCanvasVersionResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id}/versions"
@@ -81,6 +69,28 @@ service Canvases {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create canvas version";
       description: "Creates a user-owned canvas version from the current live canvas";
+      tags: "CanvasVersion";
+    };
+  }
+
+  rpc ListCanvasVersions(ListCanvasVersionsRequest) returns (ListCanvasVersionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/versions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List canvas versions";
+      description: "Lists all versions for a canvas";
+      tags: "CanvasVersion";
+    };
+  }
+
+  rpc DescribeCanvasVersion(DescribeCanvasVersionRequest) returns (DescribeCanvasVersionResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe canvas version";
+      description: "Returns one canvas version by ID";
       tags: "CanvasVersion";
     };
   }
@@ -105,6 +115,20 @@ service Canvases {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Publish canvas version";
       description: "Publishes a canvas version to live and applies runtime node setup";
+      tags: "CanvasVersion";
+    };
+  }
+
+  rpc DiscardCanvasVersion(DiscardCanvasVersionRequest) returns (DiscardCanvasVersionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/versions/{version_id}/discard"
+      additional_bindings {
+        delete: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
+      }
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Discard canvas version";
+      description: "Discards a user-owned draft canvas version";
       tags: "CanvasVersion";
     };
   }
@@ -347,21 +371,28 @@ message CanvasAutoLayout {
   Scope scope = 3;
 }
 
-message UpdateCanvasRequest {
-  string id = 1;
-  Canvas canvas = 2;
-  CanvasAutoLayout auto_layout = 3;
-}
-
-message UpdateCanvasResponse {
-  Canvas canvas = 1;
-}
-
 message CreateCanvasVersionRequest {
   string canvas_id = 1;
 }
 
 message CreateCanvasVersionResponse {
+  CanvasVersion version = 1;
+}
+
+message ListCanvasVersionsRequest {
+  string canvas_id = 1;
+}
+
+message ListCanvasVersionsResponse {
+  repeated CanvasVersion versions = 1;
+}
+
+message DescribeCanvasVersionRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+}
+
+message DescribeCanvasVersionResponse {
   CanvasVersion version = 1;
 }
 
@@ -386,6 +417,13 @@ message PublishCanvasVersionResponse {
   Canvas canvas = 1;
   CanvasVersion version = 2;
 }
+
+message DiscardCanvasVersionRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+}
+
+message DiscardCanvasVersionResponse {}
 
 message DeleteCanvasRequest {
   string id = 1;

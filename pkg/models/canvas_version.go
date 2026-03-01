@@ -63,6 +63,24 @@ func FindCanvasVersion(workflowID, versionID uuid.UUID) (*CanvasVersion, error) 
 	return FindCanvasVersionInTransaction(database.Conn(), workflowID, versionID)
 }
 
+func ListCanvasVersionsInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]CanvasVersion, error) {
+	var versions []CanvasVersion
+	err := tx.
+		Where("workflow_id = ?", workflowID).
+		Order("revision DESC").
+		Find(&versions).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return versions, nil
+}
+
+func ListCanvasVersions(workflowID uuid.UUID) ([]CanvasVersion, error) {
+	return ListCanvasVersionsInTransaction(database.Conn(), workflowID)
+}
+
 func FindCanvasDraftInTransaction(tx *gorm.DB, workflowID, userID uuid.UUID) (*CanvasUserDraft, error) {
 	var draft CanvasUserDraft
 	err := tx.

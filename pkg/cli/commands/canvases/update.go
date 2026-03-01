@@ -54,7 +54,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		}
 	}
 
-	body := openapi_client.CanvasesUpdateCanvasBody{}
+	body := openapi_client.CanvasesUpdateCanvasVersionBody{}
 	body.SetCanvas(canvas)
 
 	if autoLayoutValue == "" && (autoLayoutScopeValue != "" || len(autoLayoutNodeIDs) > 0) {
@@ -69,9 +69,29 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		body.SetAutoLayout(*autoLayout)
 	}
 
-	_, _, err = ctx.API.CanvasAPI.
-		CanvasesUpdateCanvas(ctx.Context, canvasID).
+	createVersionResponse, _, err := ctx.API.CanvasVersionAPI.
+		CanvasesCreateCanvasVersion(ctx.Context, canvasID).
+		Execute()
+	if err != nil {
+		return err
+	}
+	if createVersionResponse.Version == nil || createVersionResponse.Version.Metadata == nil || createVersionResponse.Version.Metadata.Id == nil {
+		return fmt.Errorf("failed to create canvas version")
+	}
+
+	versionID := createVersionResponse.Version.Metadata.GetId()
+
+	_, _, err = ctx.API.CanvasVersionAPI.
+		CanvasesUpdateCanvasVersion(ctx.Context, canvasID, versionID).
 		Body(body).
+		Execute()
+	if err != nil {
+		return err
+	}
+
+	_, _, err = ctx.API.CanvasVersionAPI.
+		CanvasesPublishCanvasVersion(ctx.Context, canvasID, versionID).
+		Body(openapi_client.CanvasesPublishCanvasVersionBody{}).
 		Execute()
 	return err
 }

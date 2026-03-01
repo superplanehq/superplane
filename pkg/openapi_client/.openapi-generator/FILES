@@ -61,6 +61,7 @@ docs/CanvasesCreateCanvasRequest.md
 docs/CanvasesCreateCanvasResponse.md
 docs/CanvasesCreateCanvasVersionResponse.md
 docs/CanvasesDescribeCanvasResponse.md
+docs/CanvasesDescribeCanvasVersionResponse.md
 docs/CanvasesEmitNodeEventBody.md
 docs/CanvasesEmitNodeEventResponse.md
 docs/CanvasesInvokeNodeExecutionActionBody.md
@@ -68,6 +69,7 @@ docs/CanvasesInvokeNodeTriggerActionBody.md
 docs/CanvasesInvokeNodeTriggerActionResponse.md
 docs/CanvasesListCanvasEventsResponse.md
 docs/CanvasesListCanvasMemoriesResponse.md
+docs/CanvasesListCanvasVersionsResponse.md
 docs/CanvasesListCanvasesResponse.md
 docs/CanvasesListChildExecutionsResponse.md
 docs/CanvasesListEventExecutionsResponse.md
@@ -79,8 +81,6 @@ docs/CanvasesPublishCanvasVersionResponse.md
 docs/CanvasesResolveExecutionErrorsBody.md
 docs/CanvasesSendAiMessageBody.md
 docs/CanvasesSendAiMessageResponse.md
-docs/CanvasesUpdateCanvasBody.md
-docs/CanvasesUpdateCanvasResponse.md
 docs/CanvasesUpdateCanvasVersionBody.md
 docs/CanvasesUpdateCanvasVersionResponse.md
 docs/CanvasesUpdateNodePauseBody.md
@@ -275,6 +275,7 @@ model_canvases_create_canvas_request.go
 model_canvases_create_canvas_response.go
 model_canvases_create_canvas_version_response.go
 model_canvases_describe_canvas_response.go
+model_canvases_describe_canvas_version_response.go
 model_canvases_emit_node_event_body.go
 model_canvases_emit_node_event_response.go
 model_canvases_invoke_node_execution_action_body.go
@@ -282,6 +283,7 @@ model_canvases_invoke_node_trigger_action_body.go
 model_canvases_invoke_node_trigger_action_response.go
 model_canvases_list_canvas_events_response.go
 model_canvases_list_canvas_memories_response.go
+model_canvases_list_canvas_versions_response.go
 model_canvases_list_canvases_response.go
 model_canvases_list_child_executions_response.go
 model_canvases_list_event_executions_response.go
@@ -293,8 +295,6 @@ model_canvases_publish_canvas_version_response.go
 model_canvases_resolve_execution_errors_body.go
 model_canvases_send_ai_message_body.go
 model_canvases_send_ai_message_response.go
-model_canvases_update_canvas_body.go
-model_canvases_update_canvas_response.go
 model_canvases_update_canvas_version_body.go
 model_canvases_update_canvas_version_response.go
 model_canvases_update_node_pause_body.go

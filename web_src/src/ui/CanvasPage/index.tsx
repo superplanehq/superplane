@@ -136,6 +136,16 @@ export interface CanvasPageProps {
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
   saveDisabledTooltip?: string;
+  versionLabel?: string;
+  onCreateVersion?: () => void;
+  onPublishVersion?: () => void;
+  onDiscardVersion?: () => void;
+  createVersionDisabled?: boolean;
+  createVersionDisabledTooltip?: string;
+  publishVersionDisabled?: boolean;
+  publishVersionDisabledTooltip?: string;
+  discardVersionDisabled?: boolean;
+  discardVersionDisabledTooltip?: string;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
@@ -816,6 +826,16 @@ function CanvasPage(props: CanvasPageProps) {
           saveButtonHidden={props.saveButtonHidden}
           saveDisabled={props.saveDisabled}
           saveDisabledTooltip={props.saveDisabledTooltip}
+          versionLabel={props.versionLabel}
+          onCreateVersion={props.onCreateVersion}
+          onPublishVersion={props.onPublishVersion}
+          onDiscardVersion={props.onDiscardVersion}
+          createVersionDisabled={props.createVersionDisabled}
+          createVersionDisabledTooltip={props.createVersionDisabledTooltip}
+          publishVersionDisabled={props.publishVersionDisabled}
+          publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
+          discardVersionDisabled={props.discardVersionDisabled}
+          discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
           isAutoSaveEnabled={props.isAutoSaveEnabled}
           onToggleAutoSave={props.onToggleAutoSave}
           autoSaveDisabled={props.autoSaveDisabled}
@@ -893,6 +913,16 @@ function CanvasPage(props: CanvasPageProps) {
                 saveButtonHidden={props.saveButtonHidden}
                 saveDisabled={props.saveDisabled}
                 saveDisabledTooltip={props.saveDisabledTooltip}
+                versionLabel={props.versionLabel}
+                onCreateVersion={props.onCreateVersion}
+                onPublishVersion={props.onPublishVersion}
+                onDiscardVersion={props.onDiscardVersion}
+                createVersionDisabled={props.createVersionDisabled}
+                createVersionDisabledTooltip={props.createVersionDisabledTooltip}
+                publishVersionDisabled={props.publishVersionDisabled}
+                publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
+                discardVersionDisabled={props.discardVersionDisabled}
+                discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
                 isAutoSaveEnabled={props.isAutoSaveEnabled}
                 onToggleAutoSave={props.onToggleAutoSave}
                 autoSaveDisabled={props.autoSaveDisabled}
@@ -1266,6 +1296,16 @@ function CanvasContentHeader({
   saveButtonHidden,
   saveDisabled,
   saveDisabledTooltip,
+  versionLabel,
+  onCreateVersion,
+  onPublishVersion,
+  onDiscardVersion,
+  createVersionDisabled,
+  createVersionDisabledTooltip,
+  publishVersionDisabled,
+  publishVersionDisabledTooltip,
+  discardVersionDisabled,
+  discardVersionDisabledTooltip,
   isAutoSaveEnabled,
   onToggleAutoSave,
   autoSaveDisabled,
@@ -1285,6 +1325,16 @@ function CanvasContentHeader({
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
   saveDisabledTooltip?: string;
+  versionLabel?: string;
+  onCreateVersion?: () => void;
+  onPublishVersion?: () => void;
+  onDiscardVersion?: () => void;
+  createVersionDisabled?: boolean;
+  createVersionDisabledTooltip?: string;
+  publishVersionDisabled?: boolean;
+  publishVersionDisabledTooltip?: string;
+  discardVersionDisabled?: boolean;
+  discardVersionDisabledTooltip?: string;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
@@ -1334,6 +1384,16 @@ function CanvasContentHeader({
       saveButtonHidden={saveButtonHidden}
       saveDisabled={saveDisabled}
       saveDisabledTooltip={saveDisabledTooltip}
+      versionLabel={versionLabel}
+      onCreateVersion={onCreateVersion}
+      onPublishVersion={onPublishVersion}
+      onDiscardVersion={onDiscardVersion}
+      createVersionDisabled={createVersionDisabled}
+      createVersionDisabledTooltip={createVersionDisabledTooltip}
+      publishVersionDisabled={publishVersionDisabled}
+      publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+      discardVersionDisabled={discardVersionDisabled}
+      discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       isAutoSaveEnabled={isAutoSaveEnabled}
       onToggleAutoSave={onToggleAutoSave}
       autoSaveDisabled={autoSaveDisabled}
@@ -1385,6 +1445,16 @@ function CanvasContent({
   saveButtonHidden,
   saveDisabled,
   saveDisabledTooltip,
+  versionLabel,
+  onCreateVersion,
+  onPublishVersion,
+  onDiscardVersion,
+  createVersionDisabled,
+  createVersionDisabledTooltip,
+  publishVersionDisabled,
+  publishVersionDisabledTooltip,
+  discardVersionDisabled,
+  discardVersionDisabledTooltip,
   isAutoSaveEnabled,
   onToggleAutoSave,
   autoSaveDisabled,
@@ -1441,6 +1511,16 @@ function CanvasContent({
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
   saveDisabledTooltip?: string;
+  versionLabel?: string;
+  onCreateVersion?: () => void;
+  onPublishVersion?: () => void;
+  onDiscardVersion?: () => void;
+  createVersionDisabled?: boolean;
+  createVersionDisabledTooltip?: string;
+  publishVersionDisabled?: boolean;
+  publishVersionDisabledTooltip?: string;
+  discardVersionDisabled?: boolean;
+  discardVersionDisabledTooltip?: string;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
@@ -2107,6 +2187,16 @@ function CanvasContent({
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}
           saveDisabledTooltip={saveDisabledTooltip}
+          versionLabel={versionLabel}
+          onCreateVersion={onCreateVersion}
+          onPublishVersion={onPublishVersion}
+          onDiscardVersion={onDiscardVersion}
+          createVersionDisabled={createVersionDisabled}
+          createVersionDisabledTooltip={createVersionDisabledTooltip}
+          publishVersionDisabled={publishVersionDisabled}
+          publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+          discardVersionDisabled={discardVersionDisabled}
+          discardVersionDisabledTooltip={discardVersionDisabledTooltip}
           isAutoSaveEnabled={isAutoSaveEnabled}
           onToggleAutoSave={onToggleAutoSave}
           autoSaveDisabled={autoSaveDisabled}

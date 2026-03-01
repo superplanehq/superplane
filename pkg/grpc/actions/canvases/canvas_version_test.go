@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -13,6 +14,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 func TestCreateCanvasVersionCreatesUserDraft(t *testing.T) {
@@ -58,6 +60,287 @@ func TestCreateCanvasVersionCreatesUserDraft(t *testing.T) {
 	err = database.Conn().Where("workflow_id = ? AND user_id = ?", canvasID, r.User).First(&draft).Error
 	require.NoError(t, err)
 	assert.Equal(t, metadata.Id, draft.VersionID.String())
+}
+
+func TestListCanvasVersionsReturnsVersionsSortedByRevision(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	createCanvasResponse, err := CreateCanvas(ctx, r.Registry, r.Organization.ID.String(), &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{Name: "canvas-for-list-versions"},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-1",
+					Name: "Node 1",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	})
+	require.NoError(t, err)
+
+	canvasID := createCanvasResponse.Canvas.Metadata.Id
+	_, err = CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
+	require.NoError(t, err)
+
+	response, err := ListCanvasVersions(ctx, r.Organization.ID.String(), canvasID)
+	require.NoError(t, err)
+	require.Len(t, response.Versions, 2)
+
+	assert.Equal(t, int32(2), response.Versions[0].Metadata.Revision)
+	assert.Equal(t, int32(1), response.Versions[1].Metadata.Revision)
+	assert.False(t, response.Versions[0].Metadata.IsPublished)
+	assert.True(t, response.Versions[1].Metadata.IsPublished)
+}
+
+func TestListCanvasVersionsHidesDraftsFromOtherUsers(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	createCanvasResponse, err := CreateCanvas(ctx, r.Registry, r.Organization.ID.String(), &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{Name: "canvas-for-version-visibility"},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-1",
+					Name: "Node 1",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	})
+	require.NoError(t, err)
+
+	canvasID := createCanvasResponse.Canvas.Metadata.Id
+	_, err = CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
+	require.NoError(t, err)
+
+	otherUser := support.CreateUser(t, r, r.Organization.ID)
+	otherUserCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
+	_, err = CreateCanvasVersion(otherUserCtx, r.Organization.ID.String(), canvasID)
+	require.NoError(t, err)
+
+	response, err := ListCanvasVersions(ctx, r.Organization.ID.String(), canvasID)
+	require.NoError(t, err)
+	require.Len(t, response.Versions, 2)
+
+	for _, version := range response.Versions {
+		if version.Metadata.IsPublished {
+			continue
+		}
+		assert.Equal(t, r.User.String(), version.Metadata.Owner.Id)
+	}
+}
+
+func TestDescribeCanvasVersionReturnsPublishedVersionForAnyUser(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	createCanvasResponse, err := CreateCanvas(ctx, r.Registry, r.Organization.ID.String(), &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{Name: "canvas-describe-version"},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-1",
+					Name: "Node 1",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	})
+	require.NoError(t, err)
+
+	canvasID := createCanvasResponse.Canvas.Metadata.Id
+	versionsResponse, err := ListCanvasVersions(ctx, r.Organization.ID.String(), canvasID)
+	require.NoError(t, err)
+	require.NotEmpty(t, versionsResponse.Versions)
+
+	var publishedVersionID string
+	for _, version := range versionsResponse.Versions {
+		if version.Metadata.IsPublished {
+			publishedVersionID = version.Metadata.Id
+			break
+		}
+	}
+	require.NotEmpty(t, publishedVersionID)
+
+	otherUser := support.CreateUser(t, r, r.Organization.ID)
+	otherUserCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
+	describeResponse, err := DescribeCanvasVersion(otherUserCtx, r.Organization.ID.String(), canvasID, publishedVersionID)
+	require.NoError(t, err)
+	require.NotNil(t, describeResponse.Version)
+	assert.Equal(t, publishedVersionID, describeResponse.Version.Metadata.Id)
+	assert.True(t, describeResponse.Version.Metadata.IsPublished)
+}
+
+func TestDescribeCanvasVersionBlocksDraftFromOtherUsers(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	createCanvasResponse, err := CreateCanvas(ctx, r.Registry, r.Organization.ID.String(), &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{Name: "canvas-describe-draft-visibility"},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-1",
+					Name: "Node 1",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	})
+	require.NoError(t, err)
+
+	canvasID := createCanvasResponse.Canvas.Metadata.Id
+	draftResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
+	require.NoError(t, err)
+	draftVersionID := draftResponse.Version.Metadata.Id
+
+	otherUser := support.CreateUser(t, r, r.Organization.ID)
+	otherUserCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
+	_, err = DescribeCanvasVersion(otherUserCtx, r.Organization.ID.String(), canvasID, draftVersionID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "version owner mismatch")
+}
+
+func TestDiscardCanvasVersionDeletesOwnDraft(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	createCanvasResponse, err := CreateCanvas(ctx, r.Registry, r.Organization.ID.String(), &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{Name: "canvas-discard-version"},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-1",
+					Name: "Node 1",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	})
+	require.NoError(t, err)
+
+	canvasID := createCanvasResponse.Canvas.Metadata.Id
+	createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
+	require.NoError(t, err)
+	draftVersionID := createVersionResponse.Version.Metadata.Id
+
+	_, err = DiscardCanvasVersion(ctx, r.Organization.ID.String(), canvasID, draftVersionID)
+	require.NoError(t, err)
+
+	versionsResponse, err := ListCanvasVersions(ctx, r.Organization.ID.String(), canvasID)
+	require.NoError(t, err)
+	require.Len(t, versionsResponse.Versions, 1)
+	assert.True(t, versionsResponse.Versions[0].Metadata.IsPublished)
+
+	_, err = models.FindCanvasVersion(uuid.MustParse(canvasID), uuid.MustParse(draftVersionID))
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, gorm.ErrRecordNotFound))
+
+	var draftCount int64
+	err = database.Conn().
+		Model(&models.CanvasUserDraft{}).
+		Where("workflow_id = ? AND user_id = ?", canvasID, r.User).
+		Count(&draftCount).
+		Error
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), draftCount)
+}
+
+func TestDiscardCanvasVersionRejectsPublished(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	createCanvasResponse, err := CreateCanvas(ctx, r.Registry, r.Organization.ID.String(), &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{Name: "canvas-discard-published"},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-1",
+					Name: "Node 1",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	})
+	require.NoError(t, err)
+
+	canvasID := createCanvasResponse.Canvas.Metadata.Id
+	versionsResponse, err := ListCanvasVersions(ctx, r.Organization.ID.String(), canvasID)
+	require.NoError(t, err)
+
+	var publishedVersionID string
+	for _, version := range versionsResponse.Versions {
+		if version.Metadata.IsPublished {
+			publishedVersionID = version.Metadata.Id
+			break
+		}
+	}
+	require.NotEmpty(t, publishedVersionID)
+
+	_, err = DiscardCanvasVersion(ctx, r.Organization.ID.String(), canvasID, publishedVersionID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "published versions are immutable")
+}
+
+func TestDiscardCanvasVersionRejectsDraftFromOtherUsers(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	createCanvasResponse, err := CreateCanvas(ctx, r.Registry, r.Organization.ID.String(), &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{Name: "canvas-discard-owner-check"},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-1",
+					Name: "Node 1",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	})
+	require.NoError(t, err)
+
+	canvasID := createCanvasResponse.Canvas.Metadata.Id
+	createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
+	require.NoError(t, err)
+	draftVersionID := createVersionResponse.Version.Metadata.Id
+
+	otherUser := support.CreateUser(t, r, r.Organization.ID)
+	otherUserCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
+	_, err = DiscardCanvasVersion(otherUserCtx, r.Organization.ID.String(), canvasID, draftVersionID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "version owner mismatch")
 }
 
 func TestUpdateCanvasVersionOnlyUpdatesDraft(t *testing.T) {

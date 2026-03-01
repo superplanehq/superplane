@@ -36,6 +36,7 @@ export function useCanvasWebsocket(
   onExecutionEvent?: (execution: CanvasesCanvasNodeExecution, eventName: string) => void,
   onCanvasLifecycleEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasLifecycleEventName) => void,
   shouldApplyCanvasUpdate?: () => boolean,
+  enabled = true,
 ): void {
   const nodeExecutionStore = useNodeExecutionStore();
   const queryClient = useQueryClient();
@@ -224,15 +225,19 @@ export function useCanvasWebsocket(
     };
   }, []);
 
-  useWebSocket(`${SOCKET_SERVER_URL}${canvasId}?organization_id=${organizationId}`, {
-    shouldReconnect: () => true,
-    reconnectAttempts: Number.POSITIVE_INFINITY,
-    heartbeat: false,
-    reconnectInterval: 3000,
-    onOpen: () => {},
-    onError: () => {},
-    onClose: () => {},
-    share: false,
-    onMessage: onMessage,
-  });
+  useWebSocket(
+    `${SOCKET_SERVER_URL}${canvasId}?organization_id=${organizationId}`,
+    {
+      shouldReconnect: () => true,
+      reconnectAttempts: Number.POSITIVE_INFINITY,
+      heartbeat: false,
+      reconnectInterval: 3000,
+      onOpen: () => {},
+      onError: () => {},
+      onClose: () => {},
+      share: false,
+      onMessage: onMessage,
+    },
+    enabled,
+  );
 }

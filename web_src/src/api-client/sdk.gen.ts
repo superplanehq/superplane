@@ -39,6 +39,15 @@ import type {
   CanvasesDescribeCanvasData,
   CanvasesDescribeCanvasErrors,
   CanvasesDescribeCanvasResponses,
+  CanvasesDescribeCanvasVersionData,
+  CanvasesDescribeCanvasVersionErrors,
+  CanvasesDescribeCanvasVersionResponses,
+  CanvasesDiscardCanvasVersion2Data,
+  CanvasesDiscardCanvasVersion2Errors,
+  CanvasesDiscardCanvasVersion2Responses,
+  CanvasesDiscardCanvasVersionData,
+  CanvasesDiscardCanvasVersionErrors,
+  CanvasesDiscardCanvasVersionResponses,
   CanvasesEmitNodeEventData,
   CanvasesEmitNodeEventErrors,
   CanvasesEmitNodeEventResponses,
@@ -57,6 +66,9 @@ import type {
   CanvasesListCanvasMemoriesData,
   CanvasesListCanvasMemoriesErrors,
   CanvasesListCanvasMemoriesResponses,
+  CanvasesListCanvasVersionsData,
+  CanvasesListCanvasVersionsErrors,
+  CanvasesListCanvasVersionsResponses,
   CanvasesListChildExecutionsData,
   CanvasesListChildExecutionsErrors,
   CanvasesListChildExecutionsResponses,
@@ -81,9 +93,6 @@ import type {
   CanvasesSendAiMessageData,
   CanvasesSendAiMessageErrors,
   CanvasesSendAiMessageResponses,
-  CanvasesUpdateCanvasData,
-  CanvasesUpdateCanvasErrors,
-  CanvasesUpdateCanvasResponses,
   CanvasesUpdateCanvasVersionData,
   CanvasesUpdateCanvasVersionErrors,
   CanvasesUpdateCanvasVersionResponses,
@@ -655,6 +664,19 @@ export const canvasesInvokeNodeTriggerAction = <ThrowOnError extends boolean = t
   });
 
 /**
+ * List canvas versions
+ *
+ * Lists all versions for a canvas
+ */
+export const canvasesListCanvasVersions = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesListCanvasVersionsData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<CanvasesListCanvasVersionsResponses, CanvasesListCanvasVersionsErrors, ThrowOnError>({
+    url: "/api/v1/canvases/{canvasId}/versions",
+    ...options,
+  });
+
+/**
  * Create canvas version
  *
  * Creates a user-owned canvas version from the current live canvas
@@ -676,6 +698,34 @@ export const canvasesCreateCanvasVersion = <ThrowOnError extends boolean = true>
   });
 
 /**
+ * Discard canvas version
+ *
+ * Discards a user-owned draft canvas version
+ */
+export const canvasesDiscardCanvasVersion2 = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesDiscardCanvasVersion2Data, ThrowOnError>,
+) =>
+  (options.client ?? client).delete<
+    CanvasesDiscardCanvasVersion2Responses,
+    CanvasesDiscardCanvasVersion2Errors,
+    ThrowOnError
+  >({ url: "/api/v1/canvases/{canvasId}/versions/{versionId}", ...options });
+
+/**
+ * Describe canvas version
+ *
+ * Returns one canvas version by ID
+ */
+export const canvasesDescribeCanvasVersion = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesDescribeCanvasVersionData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<
+    CanvasesDescribeCanvasVersionResponses,
+    CanvasesDescribeCanvasVersionErrors,
+    ThrowOnError
+  >({ url: "/api/v1/canvases/{canvasId}/versions/{versionId}", ...options });
+
+/**
  * Update canvas version
  *
  * Updates a user-owned canvas version without applying runtime setup
@@ -693,6 +743,20 @@ export const canvasesUpdateCanvasVersion = <ThrowOnError extends boolean = true>
       },
     },
   );
+
+/**
+ * Discard canvas version
+ *
+ * Discards a user-owned draft canvas version
+ */
+export const canvasesDiscardCanvasVersion = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesDiscardCanvasVersionData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    CanvasesDiscardCanvasVersionResponses,
+    CanvasesDiscardCanvasVersionErrors,
+    ThrowOnError
+  >({ url: "/api/v1/canvases/{canvasId}/versions/{versionId}/discard", ...options });
 
 /**
  * Publish canvas version
@@ -739,23 +803,6 @@ export const canvasesDescribeCanvas = <ThrowOnError extends boolean = true>(
   (options.client ?? client).get<CanvasesDescribeCanvasResponses, CanvasesDescribeCanvasErrors, ThrowOnError>({
     url: "/api/v1/canvases/{id}",
     ...options,
-  });
-
-/**
- * Update canvas
- *
- * Updates an existing canvas
- */
-export const canvasesUpdateCanvas = <ThrowOnError extends boolean = true>(
-  options: Options<CanvasesUpdateCanvasData, ThrowOnError>,
-) =>
-  (options.client ?? client).put<CanvasesUpdateCanvasResponses, CanvasesUpdateCanvasErrors, ThrowOnError>({
-    url: "/api/v1/canvases/{id}",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
   });
 
 /**
