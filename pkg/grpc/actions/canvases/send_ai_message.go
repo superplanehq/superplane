@@ -25,6 +25,8 @@ import (
 const (
 	canvasAIOpenAIModel                  = "gpt-5.3-codex"
 	canvasAIAssociatedEncryptionDataName = "agent_mode_openai_api_key"
+	canvasSystemSkillPath                = "templates/skills/system.md"
+	canvasComponentSkillsDir             = "templates/skills/components"
 	componentSkillMaxCharsPerBlock       = 3000
 	componentSkillMaxCharsTotal          = 14000
 	componentSkillMissingPreviewLimit    = 10
@@ -125,45 +127,13 @@ func generateCanvasAIPlan(
 		return nil, err
 	}
 	skillContext := buildCanvasSkillPromptContext(req.GetCanvasContext())
+	systemPrompt, err := loadCanvasSystemPrompt()
+	if err != nil {
+		return nil, err
+	}
 
 	prompt := strings.Join([]string{
-		"You are an AI planner for a workflow canvas editor.",
-		"Return strict JSON only with this schema:",
-		`{"assistantMessage":"string","operations":[{"type":"add_node","nodeKey":"optional-string","blockName":"required-block-name","nodeName":"optional","configuration":{"optional":"object"},"position":{"x":123,"y":456},"source":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional","handleId":"optional-or-null"}},{"type":"connect_nodes","source":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional","handleId":"optional-or-null"},"target":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional"}},{"type":"update_node_config","target":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional"},"configuration":{"required":"object"},"nodeName":"optional"},{"type":"delete_node","target":{"nodeKey":"optional","nodeId":"optional","nodeName":"optional"}}]}`,
-		"Rules:",
-		"- Use only blockName values present in availableBlocks.",
-		"- Prefer add_node with nodeKey so follow-up connect/update operations can reference new nodes.",
-		"- Keep operations minimal and valid.",
-		"- Never invent component names or use components not listed in availableBlocks.",
-		"- First inspect existing nodes and prefer updating/reusing/reconnecting them before asking follow-up questions.",
-		"- If parts of the request are ambiguous, make reasonable assumptions and still return best-effort operations when there is a safe place to apply them.",
-		"- Ask a clarifying question and return operations as [] only when you cannot safely map the request to availableBlocks or cannot identify any valid target/location in the current canvas.",
-		"- For required GitHub trigger repository fields (for example github.onPRComment.repository and github.onIssueComment.repository), never assume, infer, or use placeholders; ask a clarifying question and return operations as [] until the user provides the value.",
-		"- After a GitHub repository is known in the current flow (from user input or existing node configuration), reuse that same repository for downstream GitHub nodes in that flow unless the user explicitly asks for a different one.",
-		"- Keep clarifying questions short and direct (one brief sentence).",
-		"- If the user reply provides the previously requested required value (even as a short value), treat it as provided and proceed; do not ask the same question again.",
-		"- For GitHub trigger repository fields, accept a plain repository name as a valid answer when requested.",
-		"- Prefer a left-to-right horizontal flow.",
-		"- Use delete_node when the user explicitly asks to remove/delete a node.",
-		"- For add_node, include position when possible.",
-		"- Use at least 420px horizontal spacing between sequential nodes to avoid overlap.",
-		"- Keep nodes in the same path on the same y lane when possible.",
-		"- For branches, use vertical lane offsets of at least 220px.",
-		"- If you used assumptions, mention them briefly in assistantMessage while still returning operations.",
-		"- If component skill guidance is provided below, treat it as the source of truth for those blocks.",
-		"- Never mention skills, skill files, or internal guidance sources in assistantMessage.",
-		"- Data-flow expression rules (SuperPlane message chain):",
-		"- Access upstream node payloads with explicit node-name lookups such as $[\"Node Name\"].data.field.",
-		"- For expression-capable string fields, wrap expressions with handlebars: {{ ... }}.",
-		"- Respect configuration field types from availableBlocks: numbers must be JSON numbers, booleans must be JSON booleans, and objects/lists must be proper JSON structures (never quoted as strings).",
-		"- For embedded string interpolation, use literal text plus handlebars (example: root@{{ $[\"Create Hetzner Machine\"].data.ipv4 }}).",
-		"- previous() means immediate upstream only; use previous(<depth>) only when depth-based access is explicitly intended.",
-		"- root() refers to the root trigger event payload.",
-		"- Never use root() or previous() to configure fields on the root trigger node itself (for example github.onIssueComment.repository); those fields must be set as fixed values.",
-		"- Use memory.find(\"namespace\", {\"field\": value}) to filter memory rows by exact key/value matches.",
-		"- Use memory.findFirst(\"namespace\", {\"field\": value}) to get the first matching memory row (or nil).",
-		"- Never use non-SuperPlane syntaxes like {{steps.create_hetzner.ipv4}} or other steps.* references.",
-		"- When configuring fields like SSH host/IP, identify the actual producer node in the run chain and reference that node by name instead of assuming previous().",
+		systemPrompt,
 		"",
 		"Current canvas context JSON:",
 		string(canvasContextJSON),
@@ -236,6 +206,20 @@ func generateCanvasAIPlan(
 	}
 
 	return parsedPlan, nil
+}
+
+func loadCanvasSystemPrompt() (string, error) {
+	content, err := os.ReadFile(canvasSystemSkillPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read canvas system prompt from %s: %w", canvasSystemSkillPath, err)
+	}
+
+	trimmed := strings.TrimSpace(string(content))
+	if trimmed == "" {
+		return "", fmt.Errorf("canvas system prompt file %s is empty", canvasSystemSkillPath)
+	}
+
+	return trimmed, nil
 }
 
 func sanitizeCanvasOperations(
@@ -473,18 +457,18 @@ func candidateSkillPaths(blockName, blockType string) []string {
 	}
 
 	nameSlash := strings.ReplaceAll(name, ".", string(filepath.Separator))
-	baseDir := filepath.Join("templates", "skills")
 	blockTypeDir := strings.TrimSpace(blockType)
+	componentSkillsDir := canvasComponentSkillsDir
 
 	paths := []string{
-		filepath.Join(baseDir, name+".md"),
-		filepath.Join(baseDir, nameSlash+".md"),
+		filepath.Join(componentSkillsDir, name+".md"),
+		filepath.Join(componentSkillsDir, nameSlash+".md"),
 	}
 
 	if blockTypeDir != "" {
 		paths = append(paths,
-			filepath.Join(baseDir, blockTypeDir, name+".md"),
-			filepath.Join(baseDir, blockTypeDir, nameSlash+".md"),
+			filepath.Join(componentSkillsDir, blockTypeDir, name+".md"),
+			filepath.Join(componentSkillsDir, blockTypeDir, nameSlash+".md"),
 		)
 	}
 

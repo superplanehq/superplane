@@ -8,7 +8,7 @@ Use this guidance when planning or configuring `daytona.executeCommand`.
 
 ## Required Configuration
 
-- `sandboxId` (required): sandbox identifier from an upstream sandbox node.
+- `sandbox` (required): sandbox identifier from an upstream sandbox node.
 - `command` (required): shell command to run.
 - `cwd` (optional): working directory.
 - `timeout` (optional): execution timeout in seconds.
@@ -17,11 +17,14 @@ Use this guidance when planning or configuring `daytona.executeCommand`.
 
 When generating workflow operations that include `daytona.executeCommand`:
 
-1. Always set `configuration.sandboxId` from the sandbox-producing node (for example `daytona.createSandbox` output).
+1. Always set `configuration.sandbox` from the sandbox-producing node (for example `daytona.createSandbox` output).
 2. Always set `configuration.command` to a concrete command string.
 3. Only set `cwd` and `timeout` when the user asks for them or they are clearly needed.
 4. If this node is used to "setup and run dev server", ensure the command starts the server in a way that allows the step to finish (for example background process), then follow with `daytona.getPreviewUrl`.
 5. Use a deterministic preview port when the next step generates a preview URL.
+6. Never leave `configuration.sandbox` empty.
+7. Do not use `sandboxId` as a configuration key; the correct key is `sandbox`.
+8. If there is no upstream sandbox-producing node, add one first (typically `daytona.createSandbox`) and wire `configuration.sandbox` from it.
 
 ## GitHub PR-Comment Trigger Notes
 
@@ -36,12 +39,19 @@ When the upstream trigger is `github.onPRComment`:
 ## Common Dev-Server Pattern
 
 1. `daytona.createSandbox`
-2. `daytona.executeCommand` with install + start command (server bound to host/port)
+2. `daytona.executeCommand` with `configuration.sandbox` set from step 1 and install + start command (server bound to host/port)
 3. `daytona.getPreviewUrl` with matching `sandbox` and `port`
+
+## Configuration Example (Important)
+
+- `sandbox: "{{ $[\"Create Sandbox\"].data.id }}"`
+- `command: "npm install && npm run dev -- --host 0.0.0.0 --port 3000"`
+
+If using an existing sandbox node, reference that node's output ID in `sandbox`.
 
 ## Mistakes To Avoid
 
-- Missing `sandboxId`.
+- Missing `sandbox`.
 - Missing `command`.
 - Running a long-lived foreground dev server command that never returns and blocks the flow.
 - Using a preview URL step without ensuring a server is started on the requested port.

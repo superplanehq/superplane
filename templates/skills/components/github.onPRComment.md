@@ -19,11 +19,15 @@ When generating workflow operations that include `github.onPRComment`:
 
 1. Always set `configuration.repository`.
 2. If the user did not specify a repository, ask one short clarifying question for the repository name only (not `owner/repo`) before proposing operations.
-3. If the user then replies with a short repository value (for example `front`), treat it as the answer and proceed without asking again.
+3. If the user then replies with a short repository value (for example `front`), treat it as the answer and proceed without asking again; never ask to convert it to `owner/repo`.
 4. If a repository is already known in the current flow (from user input or an existing GitHub node), reuse that repository for related GitHub nodes unless the user asks for a different one.
-5. Only set `configuration.contentFilter` when the user asks for filtering behavior.
+5. If the user specifies a command phrase or quoted trigger text (for example `"create env"`), always set `configuration.contentFilter` to a regex that matches that phrase.
 6. Treat `contentFilter` as a regex, not a simple substring.
 7. Use downstream branching for complex conditions instead of overloading a single regex.
+
+When the user asks to react to a specific comment command, prefer a case-insensitive boundary-safe regex, for example:
+
+- command phrase `create env` -> `(?i)\bcreate env\b`
 
 ## Event Semantics
 
@@ -60,7 +64,7 @@ For `github.prComment` events:
 ## Common Pattern
 
 1. Add `github.onPRComment` trigger.
-2. Optionally filter command comments (for example `^/deploy\b`).
+2. If a specific comment command/phrase is given, set `contentFilter` (for example `(?i)\bcreate env\b` or `^/deploy\b`).
 3. Route to actions like deployment workflows, status updates, or automated replies.
 
 ## Mistakes To Avoid
@@ -69,4 +73,5 @@ For `github.prComment` events:
 - Guessing or inferring `repository` when the user has not provided it.
 - Asking for `owner/repo` format instead of just the repository name.
 - Assuming `contentFilter` is not regex.
+- Leaving `contentFilter` empty when the request includes a specific command phrase.
 - Using this trigger when the request is explicitly about non-PR issue comments only.
