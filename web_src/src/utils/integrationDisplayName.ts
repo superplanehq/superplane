@@ -27,6 +27,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   dockerhub: "DockerHub",
   harness: "Harness",
   launchdarkly: "LaunchDarkly",
+  splitio: "Split",
 };
 
 /**

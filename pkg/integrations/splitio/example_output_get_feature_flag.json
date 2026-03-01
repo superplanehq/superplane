@@ -1,0 +1,38 @@
+{
+  "data": {
+    "name": "my_feature_flag",
+    "environment": {
+      "id": "env-abc123",
+      "name": "production"
+    },
+    "trafficType": {
+      "id": "tt-abc123",
+      "name": "user"
+    },
+    "killed": false,
+    "treatments": [
+      {
+        "name": "on",
+        "configurations": "{\"color\":\"blue\"}"
+      },
+      {
+        "name": "off",
+        "configurations": ""
+      }
+    ],
+    "defaultTreatment": "off",
+    "trafficAllocation": 100,
+    "rules": [],
+    "defaultRule": [
+      {
+        "treatment": "off",
+        "size": 100
+      }
+    ],
+    "creationTime": 1704067200000,
+    "lastUpdateTime": 1709308800000,
+    "changeNumber": 12345
+  },
+  "type": "splitio.flag",
+  "timestamp": "2026-02-24T12:00:00Z"
+}

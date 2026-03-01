@@ -70,6 +70,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/servicenow"
 	_ "github.com/superplanehq/superplane/pkg/integrations/slack"
 	_ "github.com/superplanehq/superplane/pkg/integrations/smtp"
+	_ "github.com/superplanehq/superplane/pkg/integrations/splitio"
 	_ "github.com/superplanehq/superplane/pkg/integrations/statuspage"
 	_ "github.com/superplanehq/superplane/pkg/integrations/telegram"
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"

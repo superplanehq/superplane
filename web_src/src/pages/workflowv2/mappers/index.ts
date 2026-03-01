@@ -96,6 +96,11 @@ import {
   eventStateRegistry as launchdarklyEventStateRegistry,
 } from "./launchdarkly/index";
 import {
+  componentMappers as splitioComponentMappers,
+  triggerRenderers as splitioTriggerRenderers,
+  eventStateRegistry as splitioEventStateRegistry,
+} from "./splitio/index";
+import {
   componentMappers as awsComponentMappers,
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
@@ -248,6 +253,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   rootly: rootlyComponentMappers,
   incident: incidentComponentMappers,
   launchdarkly: launchdarklyComponentMappers,
+  splitio: splitioComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
   telegram: telegramComponentMappers,
@@ -284,6 +290,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   rootly: rootlyTriggerRenderers,
   incident: incidentTriggerRenderers,
   launchdarkly: launchdarklyTriggerRenderers,
+  splitio: splitioTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
   telegram: telegramTriggerRenderers,
@@ -323,6 +330,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   incident: incidentEventStateRegistry,
   octopus: octopusEventStateRegistry,
   launchdarkly: launchdarklyEventStateRegistry,
+  splitio: splitioEventStateRegistry,
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,

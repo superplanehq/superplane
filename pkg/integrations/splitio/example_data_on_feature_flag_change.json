@@ -1,0 +1,17 @@
+{
+  "type": "splitio.flag.updated",
+  "data": {
+    "name": "my_feature_flag",
+    "type": "split",
+    "changeNumber": 12345,
+    "time": 1709308800000,
+    "definition": "{\"treatments\":[{\"name\":\"on\"},{\"name\":\"off\"}],\"rules\":[],\"defaultRule\":[{\"treatment\":\"off\",\"size\":100}]}",
+    "description": "User updated targeting rules for feature flag",
+    "link": "https://app.split.io/org/ws/default/splits/my_feature_flag",
+    "environmentName": "production",
+    "editor": "user@example.com",
+    "schemaVersion": 1,
+    "previous": {}
+  },
+  "timestamp": "2026-02-24T12:00:00Z"
+}

@@ -64,6 +64,7 @@ import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
+import splitioIcon from "@/assets/icons/integrations/splitio.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
@@ -1045,6 +1046,7 @@ function CategorySection({
     rootly: rootlyIcon,
     incident: incidentIcon,
     launchdarkly: launchdarklyIcon,
+    splitio: splitioIcon,
     semaphore: SemaphoreLogo,
     slack: slackIcon,
     telegram: telegramIcon,
