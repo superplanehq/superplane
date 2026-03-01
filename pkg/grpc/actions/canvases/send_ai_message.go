@@ -190,7 +190,7 @@ func generateCanvasAIPlan(
 			break
 		}
 
-		rounds += 1
+		rounds++
 		nextPrompt := buildCanvasPlannerPrompt(
 			systemPrompt,
 			string(canvasContextJSON),
@@ -815,11 +815,11 @@ func buildRequestedCanvasContextData(
 	}
 
 	payload := map[string]any{
-		"nodeRecentOutputs": nodeRecentOutputs,
-		"nodeConfigurations": nodeConfigurations,
-		"blockSchemas":      blockSchemas,
+		"nodeRecentOutputs":   nodeRecentOutputs,
+		"nodeConfigurations":  nodeConfigurations,
+		"blockSchemas":        blockSchemas,
 		"blockExampleOutputs": blockExampleOutputs,
-		"componentSkills":   componentSkills,
+		"componentSkills":     componentSkills,
 	}
 	if len(errorMessages) > 0 {
 		payload["errors"] = errorMessages
@@ -851,9 +851,9 @@ func loadBlockSchemaFromRegistry(
 			return nil, err
 		}
 		return map[string]any{
-			"type":          "component",
-			"name":          component.Name(),
-			"configuration": component.Configuration(),
+			"type":           "component",
+			"name":           component.Name(),
+			"configuration":  component.Configuration(),
 			"outputChannels": component.OutputChannels(nil),
 		}, nil
 	case "trigger":
@@ -870,9 +870,9 @@ func loadBlockSchemaFromRegistry(
 		component, componentErr := registry.GetComponent(name)
 		if componentErr == nil {
 			return map[string]any{
-				"type":          "component",
-				"name":          component.Name(),
-				"configuration": component.Configuration(),
+				"type":           "component",
+				"name":           component.Name(),
+				"configuration":  component.Configuration(),
 				"outputChannels": component.OutputChannels(nil),
 			}, nil
 		}
@@ -908,8 +908,8 @@ func loadBlockExampleOutputFromRegistry(
 			return nil, err
 		}
 		return map[string]any{
-			"type":         "component",
-			"name":         component.Name(),
+			"type":          "component",
+			"name":          component.Name(),
 			"exampleOutput": component.ExampleOutput(),
 		}, nil
 	case "trigger":
@@ -918,16 +918,16 @@ func loadBlockExampleOutputFromRegistry(
 			return nil, err
 		}
 		return map[string]any{
-			"type":         "trigger",
-			"name":         trigger.Name(),
+			"type":          "trigger",
+			"name":          trigger.Name(),
 			"exampleOutput": trigger.ExampleData(),
 		}, nil
 	default:
 		component, componentErr := registry.GetComponent(name)
 		if componentErr == nil {
 			return map[string]any{
-				"type":         "component",
-				"name":         component.Name(),
+				"type":          "component",
+				"name":          component.Name(),
 				"exampleOutput": component.ExampleOutput(),
 			}, nil
 		}
@@ -935,8 +935,8 @@ func loadBlockExampleOutputFromRegistry(
 		trigger, triggerErr := registry.GetTrigger(name)
 		if triggerErr == nil {
 			return map[string]any{
-				"type":         "trigger",
-				"name":         trigger.Name(),
+				"type":          "trigger",
+				"name":          trigger.Name(),
 				"exampleOutput": trigger.ExampleData(),
 			}, nil
 		}
