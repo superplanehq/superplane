@@ -97,6 +97,7 @@ func (g *GitHub) Components() []core.Component {
 		&GetRepositoryPermission{},
 		&CreateIssue{},
 		&CreateIssueComment{},
+		&AddReaction{},
 		&UpdateIssue{},
 		&AddIssueLabel{},
 		&RemoveIssueLabel{},
