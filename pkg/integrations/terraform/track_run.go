@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hashicorp/go-tfe"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -153,16 +152,14 @@ func (c *TrackRun) Execute(ctx core.ExecutionContext) error {
 
 	ctx.Logger.Infof("Reading run details for: %s", config.RunID)
 
-	run, err := client.TFE.Runs.ReadWithOptions(context.Background(), config.RunID, &tfe.RunReadOptions{
-		Include: []tfe.RunIncludeOpt{tfe.RunWorkspace},
-	})
+	run, err := client.ReadRun(context.Background(), config.RunID)
 	if err != nil {
 		return fmt.Errorf("failed to read run %s: %w", config.RunID, err)
 	}
 
 	var workspaceName string
 	if run.Workspace != nil {
-		workspaceName = run.Workspace.Name
+		workspaceName = run.Workspace.Attributes.Name
 	}
 
 	pollInterval := 10
@@ -174,11 +171,11 @@ func (c *TrackRun) Execute(ctx core.ExecutionContext) error {
 	metadata := TrackRunMetadata{
 		RunID:         config.RunID,
 		WorkspaceName: workspaceName,
-		CurrentStatus: string(run.Status),
+		CurrentStatus: run.Attributes.Status,
 		StartedAt:     now,
 		PollInterval:  pollInterval,
 		StateHistory: []RunStateEntry{
-			{Status: string(run.Status), Timestamp: now, Message: "Started tracking"},
+			{Status: run.Attributes.Status, Timestamp: now, Message: "Started tracking"},
 		},
 	}
 
@@ -186,15 +183,15 @@ func (c *TrackRun) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to set metadata: %w", err)
 	}
 
-	ctx.Logger.Infof("Tracking run %s - current status: %s", config.RunID, run.Status)
+	ctx.Logger.Infof("Tracking run %s - current status: %s", config.RunID, run.Attributes.Status)
 
-	if isTerminalState(string(run.Status)) {
-		return c.emitFinalState(ctx, config.RunID, string(run.Status), metadata)
+	if isTerminalState(run.Attributes.Status) {
+		return c.emitFinalState(ctx, config.RunID, run.Attributes.Status, metadata)
 	}
 
-	if needsAttention(string(run.Status), run.Workspace) {
-		ctx.Logger.Infof("Run %s needs attention: %s", config.RunID, run.Status)
-		return c.emitNeedsAttentionFromExecution(ctx, config.RunID, string(run.Status), metadata)
+	if needsAttention(run.Attributes.Status, run.Workspace) {
+		ctx.Logger.Infof("Run %s needs attention: %s", config.RunID, run.Attributes.Status)
+		return c.emitNeedsAttentionFromExecution(ctx, config.RunID, run.Attributes.Status, metadata)
 	}
 
 	if err := ctx.Requests.ScheduleActionCall("poll", map[string]any{}, time.Duration(pollInterval)*time.Second); err != nil {
@@ -246,14 +243,12 @@ func (c *TrackRun) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	run, err := client.TFE.Runs.ReadWithOptions(context.Background(), runID, &tfe.RunReadOptions{
-		Include: []tfe.RunIncludeOpt{tfe.RunWorkspace},
-	})
+	run, err := client.ReadRun(context.Background(), runID)
 	if err != nil {
 		return fmt.Errorf("failed to read run %s: %w", runID, err)
 	}
 
-	currentStatus := string(run.Status)
+	currentStatus := run.Attributes.Status
 	now := time.Now().Format(time.RFC3339)
 
 	if currentStatus != metadata.CurrentStatus {
@@ -354,42 +349,41 @@ func (c *TrackRun) Cleanup(ctx core.SetupContext) error {
 }
 
 func isTerminalState(status string) bool {
-	switch tfe.RunStatus(status) {
-	case tfe.RunApplied, tfe.RunPlannedAndFinished,
-		tfe.RunDiscarded, tfe.RunErrored,
-		tfe.RunCanceled:
+	switch status {
+	case "applied", "planned_and_finished",
+		"discarded", "errored", "canceled":
 		return true
 	}
 	return false
 }
 
 func isFailedState(status string) bool {
-	switch tfe.RunStatus(status) {
-	case tfe.RunDiscarded, tfe.RunErrored, tfe.RunCanceled:
+	switch status {
+	case "discarded", "errored", "canceled":
 		return true
 	}
 	return false
 }
 
-func needsAttention(status string, workspace *tfe.Workspace) bool {
-	autoApply := workspace != nil && workspace.AutoApply
+func needsAttention(status string, workspace *WorkspacePayload) bool {
+	autoApply := workspace != nil && workspace.Attributes.AutoApply
 
-	switch tfe.RunStatus(status) {
-	case tfe.RunPlanned, tfe.RunCostEstimated, tfe.RunPolicyChecked:
+	switch status {
+	case "planned", "cost_estimated", "policy_checked":
 		return !autoApply
-	case tfe.RunPolicyOverride:
+	case "policy_override":
 		return true
 	}
 	return false
 }
 
 func getAttentionMessage(status string) string {
-	switch tfe.RunStatus(status) {
-	case tfe.RunPlanned:
+	switch status {
+	case "planned":
 		return "Run is planned and waiting for confirmation"
-	case tfe.RunPolicyOverride:
+	case "policy_override":
 		return "Run requires policy override"
-	case tfe.RunCostEstimated:
+	case "cost_estimated":
 		return "Cost estimation complete, awaiting confirmation"
 	default:
 		return "Run requires attention"

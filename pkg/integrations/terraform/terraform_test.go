@@ -363,7 +363,7 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 }
 
 func Test__TerraformNeedsAttention__HandleWebhook(t *testing.T) {
-	trigger := &TerraformNeedsAttention{}
+	trigger := &NeedsAttention{}
 	secret := "test-secret"
 
 	t.Run("action is not run:needs_attention -> event not emitted", func(t *testing.T) {
