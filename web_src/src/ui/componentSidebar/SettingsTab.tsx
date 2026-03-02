@@ -12,7 +12,12 @@ import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
-import { isFieldRequired, isFieldVisible, parseDefaultValues, validateFieldForSubmission } from "@/utils/components";
+import {
+  filterVisibleConfiguration,
+  isFieldRequired,
+  parseDefaultValues,
+  validateFieldForSubmission,
+} from "@/utils/components";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
 import { SimpleTooltip } from "./SimpleTooltip";
 
@@ -197,13 +202,7 @@ export function SettingsTab({
   // Function to filter out invisible fields
   const filterVisibleFields = useCallback(
     (config: Record<string, unknown>) => {
-      const filtered = { ...config };
-      configurationFields.forEach((field) => {
-        if (field.name && !isFieldVisible(field, config)) {
-          delete filtered[field.name];
-        }
-      });
-      return filtered;
+      return filterVisibleConfiguration(config, configurationFields);
     },
     [configurationFields],
   );

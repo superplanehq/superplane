@@ -7,6 +7,8 @@ import {
   canvasesDeleteCanvas,
   canvasesListNodeExecutions,
   canvasesListCanvasEvents,
+  canvasesListCanvasMemories,
+  canvasesDeleteCanvasMemory,
   canvasesListEventExecutions,
   canvasesListChildExecutions,
   canvasesListNodeQueueItems,
@@ -48,6 +50,7 @@ export const canvasKeys = {
     [...canvasKeys.nodeExecutions(), "infinite", canvasId, nodeId] as const,
   nodeQueueItemHistory: (canvasId: string, nodeId: string) =>
     [...canvasKeys.nodeQueueItems(), "infinite", canvasId, nodeId] as const,
+  canvasMemoryEntries: (canvasId: string) => [...canvasKeys.all, "memoryEntries", canvasId] as const,
 };
 
 export const triggerKeys = {
@@ -251,6 +254,54 @@ export const useCanvasEvents = (canvasId: string) => {
     },
     refetchOnWindowFocus: false,
     enabled: !!canvasId,
+  });
+};
+
+export interface CanvasMemoryEntry {
+  id: string;
+  namespace: string;
+  values: unknown;
+}
+
+export const useCanvasMemoryEntries = (canvasId: string) => {
+  return useQuery({
+    queryKey: canvasKeys.canvasMemoryEntries(canvasId),
+    queryFn: async () => {
+      const response = await canvasesListCanvasMemories(
+        withOrganizationHeader({
+          path: { canvasId },
+        }),
+      );
+      const items = response.data?.items || [];
+      return items.map((item) => ({
+        id: item.id || "",
+        namespace: item.namespace || "",
+        values: item.values,
+      }));
+    },
+    refetchOnWindowFocus: false,
+    refetchInterval: 3000,
+    enabled: !!canvasId,
+  });
+};
+
+export const useDeleteCanvasMemoryEntry = (canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (memoryId: string) => {
+      await canvasesDeleteCanvasMemory(
+        withOrganizationHeader({
+          path: {
+            canvasId,
+            memoryId,
+          },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.canvasMemoryEntries(canvasId) });
+    },
   });
 };
 

@@ -15,9 +15,9 @@ import (
 type GetPipelineExecution struct{}
 
 type GetPipelineExecutionSpec struct {
-	Region      string `json:"region" mapstructure:"region"`
-	Pipeline    string `json:"pipeline" mapstructure:"pipeline"`
-	ExecutionID string `json:"executionId" mapstructure:"executionId"`
+	Region    string `json:"region" mapstructure:"region"`
+	Pipeline  string `json:"pipeline" mapstructure:"pipeline"`
+	Execution string `json:"execution" mapstructure:"execution"`
 }
 
 func (c *GetPipelineExecution) Name() string {
@@ -107,11 +107,36 @@ func (c *GetPipelineExecution) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "executionId",
-			Label:       "Execution ID",
-			Type:        configuration.FieldTypeString,
+			Name:        "execution",
+			Label:       "Execution",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Pipeline execution ID to retrieve (supports expressions)",
+			Description: "Pipeline execution to retrieve",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "codepipeline.pipelineExecution",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+						{
+							Name: "pipeline",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "pipeline",
+							},
+						},
+					},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "pipeline",
+					Values: []string{"*"},
+				},
+			},
 		},
 	}
 }
@@ -130,8 +155,8 @@ func (c *GetPipelineExecution) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("pipeline is required")
 	}
 
-	if strings.TrimSpace(spec.ExecutionID) == "" {
-		return fmt.Errorf("execution ID is required")
+	if strings.TrimSpace(spec.Execution) == "" {
+		return fmt.Errorf("execution is required")
 	}
 
 	return nil
@@ -150,7 +175,7 @@ func (c *GetPipelineExecution) Execute(ctx core.ExecutionContext) error {
 
 	client := NewClient(ctx.HTTP, credentials, strings.TrimSpace(spec.Region))
 
-	response, err := client.GetPipelineExecutionDetails(strings.TrimSpace(spec.Pipeline), strings.TrimSpace(spec.ExecutionID))
+	response, err := client.GetPipelineExecutionDetails(strings.TrimSpace(spec.Pipeline), strings.TrimSpace(spec.Execution))
 	if err != nil {
 		return fmt.Errorf("failed to get pipeline execution: %w", err)
 	}

@@ -10,6 +10,9 @@ import (
 //go:embed example_output_create_sandbox.json
 var exampleOutputCreateSandboxBytes []byte
 
+//go:embed example_output_create_repository_sandbox.json
+var exampleOutputCreateRepositorySandboxBytes []byte
+
 //go:embed example_output_execute_code.json
 var exampleOutputExecuteCodeBytes []byte
 
@@ -25,6 +28,9 @@ var exampleOutputDeleteSandboxBytes []byte
 var exampleOutputCreateSandboxOnce sync.Once
 var exampleOutputCreateSandbox map[string]any
 
+var exampleOutputCreateRepositorySandboxOnce sync.Once
+var exampleOutputCreateRepositorySandbox map[string]any
+
 var exampleOutputExecuteCodeOnce sync.Once
 var exampleOutputExecuteCode map[string]any
 
@@ -39,6 +45,14 @@ var exampleOutputDeleteSandbox map[string]any
 
 func (c *CreateSandbox) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateSandboxOnce, exampleOutputCreateSandboxBytes, &exampleOutputCreateSandbox)
+}
+
+func (c *CreateRepositorySandbox) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputCreateRepositorySandboxOnce,
+		exampleOutputCreateRepositorySandboxBytes,
+		&exampleOutputCreateRepositorySandbox,
+	)
 }
 
 func (e *ExecuteCode) ExampleOutput() map[string]any {

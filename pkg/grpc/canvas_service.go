@@ -52,7 +52,16 @@ func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRe
 		return nil, status.Error(codes.InvalidArgument, "canvas is required")
 	}
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.UpdateCanvas(ctx, s.encryptor, s.registry, organizationID, req.Id, req.Canvas, s.webhookBaseURL)
+	return canvases.UpdateCanvasWithAutoLayout(
+		ctx,
+		s.encryptor,
+		s.registry,
+		organizationID,
+		req.Id,
+		req.Canvas,
+		req.AutoLayout,
+		s.webhookBaseURL,
+	)
 }
 
 func (s *CanvasService) DeleteCanvas(ctx context.Context, req *pb.DeleteCanvasRequest) (*pb.DeleteCanvasResponse, error) {
@@ -178,6 +187,16 @@ func (s *CanvasService) ListCanvasEvents(ctx context.Context, req *pb.ListCanvas
 	}
 
 	return canvases.ListCanvasEvents(ctx, s.registry, canvasID, req.Limit, req.Before)
+}
+
+func (s *CanvasService) ListCanvasMemories(ctx context.Context, req *pb.ListCanvasMemoriesRequest) (*pb.ListCanvasMemoriesResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListCanvasMemories(ctx, s.registry, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) DeleteCanvasMemory(ctx context.Context, req *pb.DeleteCanvasMemoryRequest) (*pb.DeleteCanvasMemoryResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.DeleteCanvasMemory(ctx, s.registry, organizationID, req.CanvasId, req.MemoryId)
 }
 
 func (s *CanvasService) ListEventExecutions(ctx context.Context, req *pb.ListEventExecutionsRequest) (*pb.ListEventExecutionsResponse, error) {

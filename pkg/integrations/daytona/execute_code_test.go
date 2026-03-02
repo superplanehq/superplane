@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -16,19 +17,19 @@ import (
 func Test__ExecuteCode__Setup(t *testing.T) {
 	component := ExecuteCode{}
 
-	t.Run("sandboxId is required", func(t *testing.T) {
+	t.Run("sandbox is required", func(t *testing.T) {
 		appCtx := &contexts.IntegrationContext{}
 		err := component.Setup(core.SetupContext{
 			Integration: appCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"sandboxId": "",
-				"code":      "print('hello')",
-				"language":  "python",
+				"sandbox":  "",
+				"code":     "print('hello')",
+				"language": "python",
 			},
 		})
 
-		require.ErrorContains(t, err, "sandboxId is required")
+		require.ErrorContains(t, err, "sandbox is required")
 	})
 
 	t.Run("code is required", func(t *testing.T) {
@@ -37,9 +38,9 @@ func Test__ExecuteCode__Setup(t *testing.T) {
 			Integration: appCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"code":      "",
-				"language":  "python",
+				"sandbox":  "sandbox-123",
+				"code":     "",
+				"language": "python",
 			},
 		})
 
@@ -52,9 +53,9 @@ func Test__ExecuteCode__Setup(t *testing.T) {
 			Integration: appCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"code":      "print('hello')",
-				"language":  "",
+				"sandbox":  "sandbox-123",
+				"code":     "print('hello')",
+				"language": "",
 			},
 		})
 
@@ -67,9 +68,9 @@ func Test__ExecuteCode__Setup(t *testing.T) {
 			Integration: appCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"code":      "print('hello')",
-				"language":  "ruby",
+				"sandbox":  "sandbox-123",
+				"code":     "print('hello')",
+				"language": "ruby",
 			},
 		})
 
@@ -83,9 +84,9 @@ func Test__ExecuteCode__Setup(t *testing.T) {
 			Integration: appCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"code":      "print('hello')",
-				"language":  "python",
+				"sandbox":  "sandbox-123",
+				"code":     "print('hello')",
+				"language": "python",
 			},
 		})
 
@@ -98,9 +99,9 @@ func Test__ExecuteCode__Setup(t *testing.T) {
 			Integration: appCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"code":      "console.log('hello')",
-				"language":  "typescript",
+				"sandbox":  "sandbox-123",
+				"code":     "console.log('hello')",
+				"language": "typescript",
 			},
 		})
 
@@ -113,9 +114,9 @@ func Test__ExecuteCode__Setup(t *testing.T) {
 			Integration: appCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"code":      "console.log('hello')",
-				"language":  "javascript",
+				"sandbox":  "sandbox-123",
+				"code":     "console.log('hello')",
+				"language": "javascript",
 			},
 		})
 
@@ -147,10 +148,10 @@ func Test__ExecuteCode__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"code":      "print('hello world')",
-				"language":  "python",
-				"timeout":   60,
+				"sandbox":  "sandbox-123",
+				"code":     "print('hello world')",
+				"language": "python",
+				"timeout":  60,
 			},
 			HTTP:           httpContext,
 			Integration:    appCtx,
@@ -189,9 +190,9 @@ func Test__ExecuteCode__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"code":      "print(42)",
-				"language":  "python",
+				"sandbox":  "sandbox-123",
+				"code":     "print(42)",
+				"language": "python",
 			},
 			HTTP:           httpContext,
 			Integration:    appCtx,
@@ -222,9 +223,9 @@ func Test__ExecuteCode__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"sandboxId": "invalid-sandbox",
-				"code":      "print('hello')",
-				"language":  "python",
+				"sandbox":  "invalid-sandbox",
+				"code":     "print('hello')",
+				"language": "python",
 			},
 			HTTP:           httpContext,
 			Integration:    appCtx,
@@ -387,19 +388,28 @@ func Test__ExecuteCode__Configuration(t *testing.T) {
 		fieldNames[i] = f.Name
 	}
 
-	assert.Contains(t, fieldNames, "sandboxId")
+	assert.Contains(t, fieldNames, "sandbox")
 	assert.Contains(t, fieldNames, "code")
 	assert.Contains(t, fieldNames, "language")
 	assert.Contains(t, fieldNames, "timeout")
 
 	for _, f := range config {
-		if f.Name == "sandboxId" || f.Name == "code" || f.Name == "language" {
+		if f.Name == "sandbox" || f.Name == "code" || f.Name == "language" {
 			assert.True(t, f.Required, "%s should be required", f.Name)
 		}
 		if f.Name == "timeout" {
 			assert.False(t, f.Required, "timeout should be optional")
 		}
 	}
+
+	var sandboxFieldType string
+	for _, field := range config {
+		if field.Name == "sandbox" {
+			sandboxFieldType = field.Type
+			break
+		}
+	}
+	assert.Equal(t, configuration.FieldTypeIntegrationResource, sandboxFieldType)
 }
 
 func Test__ExecuteCode__OutputChannels(t *testing.T) {

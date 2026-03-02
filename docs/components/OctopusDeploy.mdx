@@ -1,0 +1,157 @@
+---
+title: "Octopus Deploy"
+---
+
+Deploy releases and react to deployment events in Octopus Deploy
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Deployment Event" href="#on-deployment-event" description="Listen to Octopus Deploy deployment events" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Deploy Release" href="#deploy-release" description="Deploy a release to an environment in Octopus Deploy" />
+</CardGrid>
+
+## Instructions
+
+1. **Server URL:** Your Octopus Deploy instance URL (e.g. `https://my-company.octopus.app`).
+2. **API Key:** Create one in **Octopus Web Portal → Profile → My API Keys → New API Key**.
+   - Enter a purpose (e.g., "SuperPlane Integration") and click **Generate New**.
+   - **Copy the key immediately**—it cannot be viewed again.
+3. **Space:** Select the Octopus Deploy space to use. Leave empty to use the default space.
+4. **Auth:** SuperPlane sends requests using the `X-Octopus-ApiKey` header.
+5. **Webhooks:** SuperPlane creates Octopus subscriptions automatically to receive deployment events. No manual setup is required.
+
+<a id="on-deployment-event"></a>
+
+## On Deployment Event
+
+The On Deployment Event trigger emits events when a deployment's status changes in Octopus Deploy.
+
+### Use Cases
+
+- **Deploy notifications**: Notify Slack or PagerDuty when deployments succeed or fail
+- **Post-deploy automation**: Trigger smoke tests after a successful deployment
+- **Incident creation**: Create a ticket automatically when a deployment fails
+- **Deployment tracking**: Log deployment events for audit or reporting
+
+### Configuration
+
+- **Event Categories**: Deployment event types to listen for. Defaults to `DeploymentSucceeded` and `DeploymentFailed`.
+- **Project** (optional): Filter events to a specific Octopus Deploy project.
+- **Environment** (optional): Filter events to a specific deployment environment.
+
+### Event Categories
+
+|      Category       |             Description             |    
+|---------------------|-------------------------------------|
+| DeploymentQueued    | A deployment has been queued        |
+| DeploymentStarted   | A deployment has started executing  |
+| DeploymentSucceeded | A deployment completed successfully |
+| DeploymentFailed    | A deployment has failed             |
+
+### Webhook Verification
+
+Octopus Deploy subscriptions are configured with a custom header secret. SuperPlane verifies incoming webhooks by comparing the `X-SuperPlane-Webhook-Secret` header value against the stored secret.
+
+### Event Data
+
+Each emitted event includes the following fields:
+
+|      Field      |                        Description                         |
+|-----------------|------------------------------------------------------------|
+| `eventType`     | The deployment event category (e.g. `DeploymentSucceeded`) |
+| `category`      | Same as `eventType`                                        |
+| `timestamp`     | When the subscription payload was sent                     |
+| `occurredAt`    | When the event occurred in Octopus                         |
+| `message`       | Human-readable event description                           |
+| `projectId`     | Octopus project ID (e.g. `Projects-123`)                   |
+| `environmentId` | Octopus environment ID (e.g. `Environments-1`)             |
+| `releaseId`     | Octopus release ID (e.g. `Releases-789`)                   |
+| `deploymentId`  | Octopus deployment ID (e.g. `Deployments-1011`)            |
+| `serverUri`     | Your Octopus Deploy server URL                             |
+
+### Example Data
+
+```json
+{
+  "data": {
+    "category": "DeploymentSucceeded",
+    "deploymentId": "Deployments-1011",
+    "environmentId": "Environments-456",
+    "eventType": "DeploymentSucceeded",
+    "message": "Deploy to Production succeeded",
+    "occurredAt": "2026-02-05T16:00:00.000+00:00",
+    "projectId": "Projects-123",
+    "releaseId": "Releases-789",
+    "serverUri": "https://my-company.octopus.app",
+    "timestamp": "2026-02-05T16:00:00.000+00:00"
+  },
+  "timestamp": "2026-02-05T16:00:01.000+00:00",
+  "type": "octopus.deployment.succeeded"
+}
+```
+
+<a id="deploy-release"></a>
+
+## Deploy Release
+
+The Deploy Release component deploys a chosen release to a chosen environment in Octopus Deploy and waits for completion.
+
+### Use Cases
+
+- **Deploy on merge**: Trigger a deployment after code is merged
+- **Scheduled deployments**: Deploy to staging or production on a schedule
+- **Approval-based deploys**: Deploy after manual approval in a workflow
+- **Chained deployments**: Deploy to next environment after success in the previous one
+
+### How It Works
+
+1. Creates a deployment for the selected release and environment via the Octopus Deploy API
+2. Waits for the deployment task to complete (via webhook and polling fallback)
+3. Routes execution based on deployment outcome:
+   - **Success channel**: Task completed successfully
+   - **Failed channel**: Task failed, timed out, or was cancelled
+
+### Configuration
+
+- **Project**: The Octopus Deploy project
+- **Release**: The release to deploy (filtered by the selected project)
+- **Environment**: The target deployment environment
+
+### Output Channels
+
+- **Success**: Emitted when the deployment completes successfully
+- **Failed**: Emitted when the deployment fails, times out, or is cancelled
+
+### Notes
+
+- Deployment status is tracked via the Octopus Deploy task associated with the deployment
+- Polls the task status every 5 minutes as a fallback if the webhook does not arrive
+- Requires an API key configured on the Octopus Deploy integration
+
+### Example Output
+
+```json
+{
+  "data": {
+    "completedTime": "2026-02-05T16:05:00.000+00:00",
+    "created": "2026-02-05T16:00:00.000+00:00",
+    "deploymentId": "Deployments-1011",
+    "duration": "5 minutes",
+    "environmentId": "Environments-456",
+    "projectId": "Projects-123",
+    "releaseId": "Releases-789",
+    "taskState": "Success"
+  },
+  "timestamp": "2026-02-05T16:05:00.000+00:00",
+  "type": "octopus.deployment.finished"
+}
+```
+

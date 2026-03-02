@@ -218,6 +218,7 @@ gen:
 	$(MAKE) openapi.web.client.gen
 	$(MAKE) format.go
 	$(MAKE) format.js
+	$(MAKE) gen.components.docs
 
 gen.components.docs:
 	rm -rf docs/components

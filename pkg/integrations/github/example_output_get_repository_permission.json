@@ -1,0 +1,13 @@
+{
+  "data": {
+    "permission": "admin",
+    "role_name": "admin",
+    "user": {
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-02-26T14:30:00Z",
+  "type": "github.repositoryPermission"
+}

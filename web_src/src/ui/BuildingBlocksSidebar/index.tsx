@@ -63,6 +63,8 @@ import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.sv
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
+import firehydrantIcon from "@/assets/icons/integrations/firehydrant.svg";
+import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
@@ -70,9 +72,11 @@ import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
+import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
 import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
+import octopusIcon from "@/assets/icons/integrations/octopus.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 
@@ -135,6 +139,11 @@ export type AiCanvasOperation =
     }
   | {
       type: "connect_nodes";
+      source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null };
+      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
+    }
+  | {
+      type: "disconnect_nodes";
       source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null };
       target: { nodeKey?: string; nodeId?: string; nodeName?: string };
     }
@@ -433,6 +442,8 @@ export function BuildingBlocksSidebar({
         return `Add node ${operation.nodeName || operation.blockName} (${operation.blockName})`;
       case "connect_nodes":
         return `Connect ${resolveRefLabel(operation.source)} -> ${resolveRefLabel(operation.target)}`;
+      case "disconnect_nodes":
+        return `Disconnect ${resolveRefLabel(operation.source)} -> ${resolveRefLabel(operation.target)}`;
       case "update_node_config":
         return `Update configuration for ${operation.nodeName || operation.target.nodeName || "node"}`;
       case "delete_node":
@@ -1029,6 +1040,7 @@ function CategorySection({
     daytona: daytonaIcon,
     digitalocean: digitaloceanIcon,
     discord: discordIcon,
+    firehydrant: firehydrantIcon,
     github: githubIcon,
     gitlab: gitlabIcon,
     hetzner: hetznerIcon,
@@ -1042,6 +1054,7 @@ function CategorySection({
     pagerduty: pagerDutyIcon,
     rootly: rootlyIcon,
     incident: incidentIcon,
+    launchdarkly: launchdarklyIcon,
     semaphore: SemaphoreLogo,
     slack: slackIcon,
     telegram: telegramIcon,
@@ -1051,6 +1064,7 @@ function CategorySection({
     dockerhub: dockerIcon,
     harness: harnessIcon,
     newrelic: newrelicIcon,
+    octopus: octopusIcon,
     servicenow: servicenowIcon,
     statuspage: statuspageIcon,
     aws: {
@@ -1064,6 +1078,7 @@ function CategorySection({
       ecs: awsEcsIcon,
       sns: awsSnsIcon,
     },
+    honeycomb: honeycombIcon,
     gcp: gcpIcon,
   };
 
@@ -1158,6 +1173,7 @@ function CategorySection({
             datadog: datadogIcon,
             digitalocean: digitaloceanIcon,
             discord: discordIcon,
+            firehydrant: firehydrantIcon,
             github: githubIcon,
             gitlab: gitlabIcon,
             hetzner: hetznerIcon,
@@ -1170,6 +1186,7 @@ function CategorySection({
             pagerduty: pagerDutyIcon,
             rootly: rootlyIcon,
             incident: incidentIcon,
+            launchdarkly: launchdarklyIcon,
             semaphore: SemaphoreLogo,
             slack: slackIcon,
             telegram: telegramIcon,
@@ -1179,6 +1196,7 @@ function CategorySection({
             dockerhub: dockerIcon,
             harness: harnessIcon,
             newrelic: newrelicIcon,
+            octopus: octopusIcon,
             servicenow: servicenowIcon,
             statuspage: statuspageIcon,
             aws: {
@@ -1193,6 +1211,7 @@ function CategorySection({
               ecs: awsEcsIcon,
               sns: awsSnsIcon,
             },
+            honeycomb: honeycombIcon,
             gcp: gcpIcon,
           };
           const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;

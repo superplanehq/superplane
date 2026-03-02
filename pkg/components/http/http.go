@@ -625,8 +625,24 @@ func (e *HTTP) executeRequest(httpCtx core.HTTPContext, spec Spec, timeout time.
 
 	resp, err := httpCtx.Do(req)
 	if err != nil {
+		if reqCtx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("request timed out after %s", timeout)
+		}
+
 		return nil, err
 	}
+
+	// Read the entire response body before returning, because the deferred
+	// cancel() will cancel the request context and abort any in-flight reads.
+	// We replace resp.Body with the buffered content so callers (processResponse)
+	// can read it without hitting "context canceled" errors.
+	// See: https://github.com/superplanehq/superplane/issues/3141
+	bodyBytes, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+	resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
 	return resp, nil
 }

@@ -27,30 +27,48 @@ func (e *EventContext) Count() int {
 	return len(e.Payloads)
 }
 
-type WebhookContext struct {
+type NodeWebhookContext struct {
 	Secret string
 }
 
-func (w *WebhookContext) GetSecret() ([]byte, error) {
+func (w *NodeWebhookContext) GetSecret() ([]byte, error) {
 	return []byte(w.Secret), nil
 }
 
-func (w *WebhookContext) ResetSecret() ([]byte, []byte, error) {
+func (w *NodeWebhookContext) ResetSecret() ([]byte, []byte, error) {
 	return []byte(w.Secret), []byte(w.Secret), nil
 }
 
-func (w *WebhookContext) SetSecret(secret []byte) error {
+func (w *NodeWebhookContext) SetSecret(secret []byte) error {
 	w.Secret = string(secret)
 	return nil
 }
 
-func (w *WebhookContext) Setup() (string, error) {
+func (w *NodeWebhookContext) Setup() (string, error) {
 	id := uuid.New()
 	return id.String(), nil
 }
 
-func (w *WebhookContext) GetBaseURL() string {
+func (w *NodeWebhookContext) GetBaseURL() string {
 	return "http://localhost:3000/api/v1"
+}
+
+type WebhookContext struct {
+	ID            string
+	URL           string
+	Secret        []byte
+	Metadata      any
+	Configuration any
+}
+
+func (w *WebhookContext) GetID() string              { return w.ID }
+func (w *WebhookContext) GetURL() string             { return w.URL }
+func (w *WebhookContext) GetSecret() ([]byte, error) { return w.Secret, nil }
+func (w *WebhookContext) GetMetadata() any           { return w.Metadata }
+func (w *WebhookContext) GetConfiguration() any      { return w.Configuration }
+func (w *WebhookContext) SetSecret(secret []byte) error {
+	w.Secret = secret
+	return nil
 }
 
 type MetadataContext struct {
@@ -335,4 +353,17 @@ func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 	response := c.Responses[0]
 	c.Responses = c.Responses[1:]
 	return response, nil
+}
+
+type SecretsContext struct {
+	Values map[string][]byte
+}
+
+func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
+	value, ok := c.Values[secretName+"/"+keyName]
+	if !ok {
+		return nil, fmt.Errorf("secret not found: %s/%s", secretName, keyName)
+	}
+
+	return value, nil
 }

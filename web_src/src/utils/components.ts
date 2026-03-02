@@ -194,15 +194,37 @@ export function filterVisibleConfiguration(
   const filtered: Record<string, unknown> = {};
 
   for (const field of fields) {
-    if (field.name && isFieldVisible(field, configuration)) {
-      // Only include the field if it's visible and has a value
-      if (configuration[field.name] !== undefined) {
-        filtered[field.name] = configuration[field.name];
-      }
+    if (!field.name || !isFieldVisible(field, configuration)) {
+      continue;
     }
+
+    const fieldValue = configuration[field.name];
+    if (fieldValue === undefined) {
+      continue;
+    }
+
+    filtered[field.name] = filterFieldValueByVisibility(field, fieldValue);
   }
 
   return filtered;
+}
+
+function filterFieldValueByVisibility(field: ConfigurationField, value: unknown): unknown {
+  const objectSchema = field.typeOptions?.object?.schema;
+  if (field.type === "object" && objectSchema && isRecord(value)) {
+    return filterVisibleConfiguration(value, objectSchema);
+  }
+
+  const listItemSchema = field.typeOptions?.list?.itemDefinition?.schema;
+  if (field.type === "list" && listItemSchema && Array.isArray(value)) {
+    return value.map((item) => (isRecord(item) ? filterVisibleConfiguration(item, listItemSchema) : item));
+  }
+
+  return value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**

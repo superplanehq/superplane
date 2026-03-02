@@ -16,6 +16,8 @@ type TokenType =
   | "OPERATOR"
   | "LPAREN"
   | "RPAREN"
+  | "LBRACE"
+  | "RBRACE"
   | "LBRACKET"
   | "RBRACKET"
   | "DOT"
@@ -32,6 +34,7 @@ interface Token {
 
 type ASTNode =
   | { type: "Literal"; value: unknown }
+  | { type: "ObjectLiteral"; properties: { key: string; value: ASTNode }[] }
   | { type: "Identifier"; name: string }
   | { type: "MemberAccess"; object: ASTNode; property: string; optional: boolean }
   | { type: "IndexAccess"; object: ASTNode; index: ASTNode }
@@ -146,6 +149,16 @@ function tokenize(input: string): Token[] {
     }
     if (char === "[") {
       tokens.push({ type: "LBRACKET", value: "[", pos });
+      pos++;
+      continue;
+    }
+    if (char === "{") {
+      tokens.push({ type: "LBRACE", value: "{", pos });
+      pos++;
+      continue;
+    }
+    if (char === "}") {
+      tokens.push({ type: "RBRACE", value: "}", pos });
       pos++;
       continue;
     }
@@ -448,6 +461,36 @@ class Parser {
       const expr = this.parseExpression();
       this.expect("RPAREN");
       return expr;
+    }
+
+    if (token.type === "LBRACE") {
+      this.advance();
+      const properties: { key: string; value: ASTNode }[] = [];
+
+      if (this.current().type !== "RBRACE") {
+        while (true) {
+          const keyToken = this.current();
+          let key: string;
+          if (keyToken.type === "STRING" || keyToken.type === "IDENTIFIER") {
+            key = keyToken.value;
+            this.advance();
+          } else {
+            throw new Error(`Expected object key but got ${keyToken.type}`);
+          }
+
+          this.expect("COLON");
+          const value = this.parseExpression();
+          properties.push({ key, value });
+
+          if (this.current().type !== "COMMA") {
+            break;
+          }
+          this.advance();
+        }
+      }
+
+      this.expect("RBRACE");
+      return { type: "ObjectLiteral", properties };
     }
 
     throw new Error(`Unexpected token: ${token.type} (${token.value})`);
@@ -817,6 +860,14 @@ function evaluate(node: ASTNode, context: Record<string, unknown>): unknown {
   switch (node.type) {
     case "Literal":
       return node.value;
+
+    case "ObjectLiteral": {
+      const result: Record<string, unknown> = {};
+      for (const property of node.properties) {
+        result[property.key] = evaluate(property.value, context);
+      }
+      return result;
+    }
 
     case "Identifier":
       if (node.name === "$") {
