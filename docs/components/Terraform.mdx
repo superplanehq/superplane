@@ -22,7 +22,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Queue Run" href="#queue-run" description="Queues a new run for a specific Workspace." />
   <LinkCard title="Read Run Details" href="#read-run-details" description="Retrieves comprehensive details and status about a run." />
   <LinkCard title="Track Run" href="#track-run" description="Track a Terraform run through its lifecycle states (planning, applying, etc.)" />
-  <LinkCard title="Wait for Approval" href="#wait-for-approval" description="Display approve/reject buttons and optionally apply the run in Terraform Cloud" />
 </CardGrid>
 
 ## Instructions
@@ -169,49 +168,6 @@ The Track Run component monitors a Terraform run and tracks its progression thro
       "timestamp": "2024-01-01T12:02:00Z"
     }
   ]
-}
-```
-
-<a id="wait-for-approval"></a>
-
-## Wait for Approval
-
-The Wait for Approval component pauses the workflow and displays Approve/Reject buttons in the SuperPlane UI.
-
-### Use Cases
-
-- **Manual approval gates**: Require human approval before applying Terraform changes
-- **Review workflow**: Allow team members to review planned changes before applying
-- **Controlled deployments**: Implement approval workflows for infrastructure changes
-
-### Configuration
-
-- **Run ID**: The Terraform run ID to approve (required, usually from trigger data)
-- **Apply on Approve**: If enabled, automatically applies the run in Terraform Cloud when approved
-- **Timeout**: Maximum time to wait in seconds (optional, leave empty to wait indefinitely)
-- **Approve Label**: Custom label for the approve button (default: "Approve & Apply")
-- **Reject Label**: Custom label for the reject button (default: "Reject")
-
-### Output Channels
-
-- **Approved**: Emits when the user clicks Approve
-- **Rejected**: Emits when the user clicks Reject
-- **Timeout**: Emits when no decision is made within the configured timeout
-
-### Behavior
-
-- The workflow pauses until a decision is made or timeout occurs
-- If Apply on Approve is enabled, clicking Approve will also apply the run in Terraform Cloud
-- Only the first decision is processed; subsequent clicks are ignored
-
-### Example Output
-
-```json
-{
-  "appliedToTFC": true,
-  "decidedAt": "2024-01-01T12:00:00Z",
-  "decision": "approved",
-  "runId": "run-xxxxx"
 }
 ```
 
