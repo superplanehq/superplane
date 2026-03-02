@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-tfe"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -62,72 +61,132 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	}
 	webhookSecret := strings.TrimSpace(string(webhookSecretBytes))
 
-	listOpts := &tfe.NotificationConfigurationListOptions{}
-	existingHooks, err := client.TFE.NotificationConfigurations.List(context.Background(), resolvedWsId, listOpts)
-	if err == nil && existingHooks != nil {
-		for _, hook := range existingHooks.Items {
-			if hook.URL == targetURL {
-				updateOpts := tfe.NotificationConfigurationUpdateOptions{
-					Enabled: tfe.Bool(true),
-					Name:    tfe.String("SuperPlane"),
-					Triggers: []tfe.NotificationTriggerType{
-						tfe.NotificationTriggerCreated,
-						tfe.NotificationTriggerPlanning,
-						tfe.NotificationTriggerNeedsAttention,
-						tfe.NotificationTriggerApplying,
-						tfe.NotificationTriggerCompleted,
-						tfe.NotificationTriggerErrored,
-						tfe.NotificationTriggerAssessmentDrifted,
-						tfe.NotificationTriggerAssessmentFailed,
-					},
-				}
-				if webhookSecret != "" {
-					updateOpts.Token = tfe.String(webhookSecret)
-				}
+	triggers := []string{
+		"run:created",
+		"run:planning",
+		"run:needs_attention",
+		"run:applying",
+		"run:completed",
+		"run:errored",
+		"assessment:drifted",
+		"assessment:failed",
+	}
 
-				_, err := client.TFE.NotificationConfigurations.Update(context.Background(), hook.ID, updateOpts)
-				if err != nil {
-					return nil, fmt.Errorf("failed to update existing webhook: %w", err)
-				}
+	listPath := fmt.Sprintf("/api/v2/workspaces/%s/notification-configurations", resolvedWsId)
+	req, err := client.newRequest(context.Background(), http.MethodGet, listPath, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create list request: %w", err)
+	}
 
-				return map[string]string{
-					"notification_configuration_id": hook.ID,
-				}, nil
+	resp, err := client.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list webhooks: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		var listPayload struct {
+			Data []struct {
+				ID         string `json:"id"`
+				Attributes struct {
+					URL string `json:"url"`
+				} `json:"attributes"`
+			} `json:"data"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&listPayload); err == nil {
+			for _, hook := range listPayload.Data {
+				if hook.Attributes.URL == targetURL {
+					updateOpts := map[string]any{
+						"data": map[string]any{
+							"type": "notification-configurations",
+							"attributes": map[string]any{
+								"enabled":          true,
+								"name":             "SuperPlane",
+								"destination-type": "generic",
+								"url":              targetURL,
+								"triggers":         triggers,
+							},
+						},
+					}
+					if webhookSecret != "" {
+						updateOpts["data"].(map[string]any)["attributes"].(map[string]any)["token"] = webhookSecret
+					}
+
+					updatePath := fmt.Sprintf("/api/v2/notification-configurations/%s", hook.ID)
+					uReq, err := client.newRequest(context.Background(), http.MethodPatch, updatePath, updateOpts)
+					if err != nil {
+						return nil, fmt.Errorf("failed to create update request: %w", err)
+					}
+
+					uResp, err := client.HTTPClient.Do(uReq)
+					if err != nil {
+						return nil, fmt.Errorf("failed to update existing webhook: %w", err)
+					}
+					defer uResp.Body.Close()
+
+					if uResp.StatusCode >= 400 {
+						return nil, fmt.Errorf("failed to update existing webhook, status code: %d", uResp.StatusCode)
+					}
+
+					return map[string]string{
+						"notification_configuration_id": hook.ID,
+					}, nil
+				}
 			}
 		}
 	}
 
-	dType := tfe.NotificationDestinationType("generic")
-	createOpts := tfe.NotificationConfigurationCreateOptions{
-		DestinationType: &dType,
-		Enabled:         tfe.Bool(true),
-		Name:            tfe.String("SuperPlane"),
-		URL:             tfe.String(targetURL),
-		Triggers: []tfe.NotificationTriggerType{
-			tfe.NotificationTriggerCreated,
-			tfe.NotificationTriggerPlanning,
-			tfe.NotificationTriggerNeedsAttention,
-			tfe.NotificationTriggerApplying,
-			tfe.NotificationTriggerCompleted,
-			tfe.NotificationTriggerErrored,
-			tfe.NotificationTriggerAssessmentDrifted,
-			tfe.NotificationTriggerAssessmentFailed,
+	createOpts := map[string]any{
+		"data": map[string]any{
+			"type": "notification-configurations",
+			"attributes": map[string]any{
+				"enabled":          true,
+				"name":             "SuperPlane",
+				"destination-type": "generic",
+				"url":              targetURL,
+				"triggers":         triggers,
+			},
 		},
 	}
 
 	if webhookSecret != "" {
-		createOpts.Token = tfe.String(webhookSecret)
+		createOpts["data"].(map[string]any)["attributes"].(map[string]any)["token"] = webhookSecret
 	}
 
-	var nc *tfe.NotificationConfiguration
+	var ncID string
 	var createErr error
 	maxRetries := 3
 
 	for i := 0; i < maxRetries; i++ {
-		nc, createErr = client.TFE.NotificationConfigurations.Create(context.Background(), resolvedWsId, createOpts)
-		if createErr == nil {
+		cReq, err := client.newRequest(context.Background(), http.MethodPost, listPath, createOpts)
+		if err != nil {
+			createErr = err
 			break
 		}
+
+		cResp, err := client.HTTPClient.Do(cReq)
+		if err != nil {
+			createErr = err
+		} else {
+			defer cResp.Body.Close()
+			if cResp.StatusCode >= 400 {
+				createErr = fmt.Errorf("bad status code: %d", cResp.StatusCode)
+			} else {
+				var createPayload struct {
+					Data struct {
+						ID string `json:"id"`
+					} `json:"data"`
+				}
+				if err := json.NewDecoder(cResp.Body).Decode(&createPayload); err != nil {
+					createErr = err
+				} else {
+					ncID = createPayload.Data.ID
+					createErr = nil
+					break
+				}
+			}
+		}
+
 		if i < maxRetries-1 {
 			time.Sleep(2 * time.Second)
 		}
@@ -138,7 +197,7 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	}
 
 	return map[string]string{
-		"notification_configuration_id": nc.ID,
+		"notification_configuration_id": ncID,
 	}, nil
 }
 
@@ -162,9 +221,20 @@ func (h *WebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	if !ok {
 		return fmt.Errorf("notification_configuration_id is not a string")
 	}
-	err = client.TFE.NotificationConfigurations.Delete(context.Background(), id)
+	deletePath := fmt.Sprintf("/api/v2/notification-configurations/%s", id)
+	req, err := client.newRequest(context.Background(), http.MethodDelete, deletePath, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create delete request: %w", err)
+	}
+
+	resp, err := client.HTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to delete terraform webhook %s: %w", id, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 && resp.StatusCode != http.StatusNotFound {
+		return fmt.Errorf("failed to delete terraform webhook %s, status: %d", id, resp.StatusCode)
 	}
 
 	return nil
