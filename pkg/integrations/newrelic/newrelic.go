@@ -52,10 +52,10 @@ func init() {
 type NewRelic struct{}
 
 type Configuration struct {
-	AccountID  string `json:"accountId"`
-	Region     string `json:"region"`
-	UserAPIKey string `json:"userApiKey"`
-	LicenseKey string `json:"licenseKey"`
+	AccountID  string `json:"accountId" mapstructure:"accountId"`
+	Region     string `json:"region" mapstructure:"region"`
+	UserAPIKey string `json:"userApiKey" mapstructure:"userApiKey"`
+	LicenseKey string `json:"licenseKey" mapstructure:"licenseKey"`
 }
 
 func (n *NewRelic) Name() string {
