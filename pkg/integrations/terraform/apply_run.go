@@ -47,12 +47,13 @@ func (c *ApplyRun) Execute(ctx core.ExecutionContext) error {
 	}
 
 	confirmableStates := map[string]bool{
-		"planned":        true,
-		"cost_estimated": true,
-		"policy_checked": true,
+		"planned":           true,
+		"planned_and_saved": true,
+		"cost_estimated":    true,
+		"policy_checked":    true,
 	}
 	if !confirmableStates[run.Attributes.Status] {
-		return fmt.Errorf("run %s is currently '%s', cannot apply (must be 'planned', 'cost_estimated', or 'policy_checked')", spec.RunID, run.Attributes.Status)
+		return fmt.Errorf("run %s is currently '%s', cannot apply (must be 'planned', 'planned_and_saved', 'cost_estimated', or 'policy_checked')", spec.RunID, run.Attributes.Status)
 	}
 
 	err = client.ApplyRun(context.Background(), spec.RunID, spec.Comment)

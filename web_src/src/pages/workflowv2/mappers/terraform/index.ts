@@ -11,7 +11,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   overridePolicy: buildActionStateRegistry("overridden"),
   readRun: buildActionStateRegistry("retrieved"),
   trackRun: buildActionStateRegistry("tracked"),
-  waitForApproval: buildActionStateRegistry("decided"),
 };
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -21,7 +20,6 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   overridePolicy: terraformComponentMapper,
   readRun: terraformComponentMapper,
   trackRun: terraformComponentMapper,
-  waitForApproval: terraformComponentMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
