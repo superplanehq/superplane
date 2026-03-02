@@ -126,26 +126,17 @@ type NotificationData struct {
 }
 
 type NotificationIssue struct {
-	ID              string                   `json:"id"`
-	IssueIdentifier string                   `json:"issueIdentifier"`
-	Start           string                   `json:"start"`
-	End             string                   `json:"end"`
-	Status          string                   `json:"status"`
-	Summary         string                   `json:"summary"`
-	URL             string                   `json:"url"`
-	Dataset         string                   `json:"dataset"`
-	Description     string                   `json:"description"`
-	CheckRules      []NotificationCheckRule  `json:"checkrules"`
-	Labels          []NotificationIssueLabel `json:"labels"`
-}
-
-type NotificationIssueLabel struct {
-	Key   string                      `json:"key"`
-	Value NotificationIssueLabelValue `json:"value"`
-}
-
-type NotificationIssueLabelValue struct {
-	StringValue string `json:"stringValue"`
+	ID              string                  `json:"id"`
+	IssueIdentifier string                  `json:"issueIdentifier"`
+	Start           string                  `json:"start"`
+	End             string                  `json:"end"`
+	Status          string                  `json:"status"`
+	Summary         string                  `json:"summary"`
+	URL             string                  `json:"url"`
+	Dataset         string                  `json:"dataset"`
+	Description     string                  `json:"description"`
+	CheckRules      []NotificationCheckRule `json:"checkrules"`
+	Labels          []any                   `json:"labels"`
 }
 
 type NotificationCheckRule struct {
