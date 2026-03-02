@@ -171,6 +171,12 @@ import {
   eventStateRegistry as statuspageEventStateRegistry,
 } from "./statuspage";
 import {
+  componentMappers as cloudsmithComponentMappers,
+  customFieldRenderers as cloudsmithCustomFieldRenderers,
+  triggerRenderers as cloudsmithTriggerRenderers,
+  eventStateRegistry as cloudsmithEventStateRegistry,
+} from "./cloudsmith";
+import {
   componentMappers as dockerhubComponentMappers,
   customFieldRenderers as dockerhubCustomFieldRenderers,
   triggerRenderers as dockerhubTriggerRenderers,
@@ -261,6 +267,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   hetzner: hetznerComponentMappers,
   jfrogArtifactory: jfrogArtifactoryComponentMappers,
   statuspage: statuspageComponentMappers,
+  cloudsmith: cloudsmithComponentMappers,
   dockerhub: dockerhubComponentMappers,
   honeycomb: honeycombComponentMappers,
   harness: harnessComponentMappers,
@@ -298,6 +305,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   cursor: cursorTriggerRenderers,
   jfrogArtifactory: jfrogArtifactoryTriggerRenderers,
   statuspage: statuspageTriggerRenderers,
+  cloudsmith: cloudsmithTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
   honeycomb: honeycombTriggerRenderers,
   harness: harnessTriggerRenderers,
@@ -334,6 +342,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
+  cloudsmith: cloudsmithEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
   honeycomb: honeycombEventStateRegistry,
   harness: harnessEventStateRegistry,
@@ -365,6 +374,7 @@ const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer
   github: githubCustomFieldRenderers,
   grafana: grafanaCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
+  cloudsmith: cloudsmithCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
   incident: incidentCustomFieldRenderers,
   gcp: gcpCustomFieldRenderers,

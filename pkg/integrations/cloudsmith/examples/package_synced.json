@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "cloudsmith.package.event",
+  "data": {
+    "event": "package.synced",
+    "package": {
+      "name": "my-library",
+      "version": "1.2.3",
+      "slug_perm": "Wcpkg1234abcd",
+      "format": "python",
+      "cdn_url": "https://dl.cloudsmith.io/basic/my-org/my-repo/python/simple/my-library/",
+      "size": 45678,
+      "checksum_sha256": "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
+      "status_str": "Synchronised"
+    },
+    "repository": {
+      "name": "my-repo",
+      "slug": "my-repo",
+      "namespace": "my-org"
+    }
+  }
+}
