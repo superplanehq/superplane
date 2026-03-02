@@ -139,11 +139,6 @@ export function ZoomSlider({
         )}
         {...props}
       >
-        {leadingContent ? (
-          <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
-            {leadingContent}
-          </div>
-        ) : null}
         <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
           <div className={cn("flex items-center gap-1", orientation === "horizontal" ? "flex-row" : "flex-col-reverse")}>
             <Tooltip>
@@ -202,6 +197,7 @@ export function ZoomSlider({
             </TooltipTrigger>
             <TooltipContent>Fit all components in view (Ctrl/Cmd + 1)</TooltipContent>
           </Tooltip>
+          {leadingContent}
         </div>
         <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
           <Tooltip>
