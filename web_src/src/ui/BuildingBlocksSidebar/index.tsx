@@ -34,6 +34,7 @@ import { ComponentBase } from "../componentBase";
 import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
+import cloudsmithIcon from "@/assets/icons/integrations/cloudsmith.svg";
 import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
@@ -1033,6 +1034,7 @@ function CategorySection({
     bitbucket: bitbucketIcon,
     circleci: circleciIcon,
     cloudflare: cloudflareIcon,
+    cloudsmith: cloudsmithIcon,
     dash0: dash0Icon,
     datadog: datadogIcon,
     daytona: daytonaIcon,
@@ -1164,6 +1166,7 @@ function CategorySection({
             bitbucket: bitbucketIcon,
             circleci: circleciIcon,
             cloudflare: cloudflareIcon,
+            cloudsmith: cloudsmithIcon,
             dash0: dash0Icon,
             daytona: daytonaIcon,
             datadog: datadogIcon,
