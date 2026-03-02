@@ -15,16 +15,6 @@ interface Dash0NotificationIssue {
   url?: string;
   dataset?: string;
   description?: string;
-  labels?: IssueLabel[];
-}
-
-interface IssueLabel {
-  key?: string;
-  value?: IssueLabelValue;
-}
-
-interface IssueLabelValue {
-  stringValue?: string;
 }
 
 interface Dash0NotificationEventData {
@@ -61,9 +51,6 @@ export const onNotificationTriggerRenderer: TriggerRenderer = {
       Summary: stringOrDash(eventData?.issue?.summary),
       Dataset: stringOrDash(eventData?.issue?.dataset),
       Start: stringOrDash(eventData?.issue?.start),
-      Labels: stringOrDash(
-        eventData?.issue?.labels?.map((label) => `${label.key}: ${label.value?.stringValue}`).join(", "),
-      ),
     };
   },
 
