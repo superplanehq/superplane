@@ -17,7 +17,7 @@ func Test__OnIssue__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Configuration: map[string]any{"statuses": []string{}},
 			Integration:   &contexts.IntegrationContext{},
-			Webhook:       &contexts.WebhookContext{},
+			Webhook:       &contexts.NodeWebhookContext{},
 		})
 
 		require.ErrorContains(t, err, "at least one status must be selected")
@@ -33,7 +33,7 @@ func Test__OnIssue__Setup(t *testing.T) {
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}},
 			Integration:   integrationCtx,
 			Metadata:      metadataCtx,
-			Webhook:       &contexts.WebhookContext{},
+			Webhook:       &contexts.NodeWebhookContext{},
 		})
 
 		require.NoError(t, err)
@@ -212,7 +212,7 @@ func Test__OnIssue__Validation(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}, "priorities": []string{"BANANA"}},
 			Integration:   &contexts.IntegrationContext{},
-			Webhook:       &contexts.WebhookContext{},
+			Webhook:       &contexts.NodeWebhookContext{},
 		})
 
 		require.ErrorContains(t, err, "invalid priority")
