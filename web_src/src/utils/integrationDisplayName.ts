@@ -17,6 +17,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   semaphore: "Semaphore",
   rootly: "Rootly",
   incident: "Incident",
+  firehydrant: "FireHydrant",
   statuspage: "Statuspage",
   daytona: "Daytona",
   dash0: "Dash0",
