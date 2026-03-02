@@ -298,9 +298,16 @@ func optionalIntegrationConfig(integration core.IntegrationContext, name string)
 
 	value, err := integration.GetConfig(name)
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+		errText := strings.ToLower(err.Error())
+		if strings.Contains(errText, "not found") {
 			return "", nil
 		}
+
+		// Optional fields can be stored as null in configuration.
+		if strings.Contains(errText, "not a string") {
+			return "", nil
+		}
+
 		return "", err
 	}
 

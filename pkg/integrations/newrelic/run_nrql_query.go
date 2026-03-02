@@ -134,7 +134,7 @@ func (c *RunNRQLQuery) Execute(ctx core.ExecutionContext) error {
 
 	graphQLQuery := fmt.Sprintf(
 		`{ actor { account(id: %s) { nrql(query: %s, timeout: %d) { results } } } }`,
-		quoteGraphQL(client.AccountID),
+		client.AccountID,
 		quoteGraphQL(spec.Query),
 		timeout,
 	)
