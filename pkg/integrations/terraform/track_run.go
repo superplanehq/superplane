@@ -351,7 +351,7 @@ func (c *TrackRun) Cleanup(ctx core.SetupContext) error {
 func isTerminalState(status string) bool {
 	switch status {
 	case "applied", "planned_and_finished",
-		"discarded", "errored", "canceled", "policy_soft_failed":
+		"discarded", "errored", "canceled", "policy_soft_failed", "force_canceled":
 		return true
 	}
 	return false
@@ -359,7 +359,7 @@ func isTerminalState(status string) bool {
 
 func isFailedState(status string) bool {
 	switch status {
-	case "discarded", "errored", "canceled", "policy_soft_failed":
+	case "discarded", "errored", "canceled", "policy_soft_failed", "force_canceled":
 		return true
 	}
 	return false

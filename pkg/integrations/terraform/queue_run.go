@@ -49,9 +49,14 @@ func (c *QueueRun) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	resolvedWsID, err := client.ResolveWorkspaceID(context.Background(), spec.WorkspaceID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve workspace: %w", err)
+	}
+
 	msg := fmt.Sprintf("⚙ %s", spec.Message)
 
-	run, err := client.CreateRun(context.Background(), spec.WorkspaceID, msg)
+	run, err := client.CreateRun(context.Background(), resolvedWsID, msg)
 	if err != nil {
 		return fmt.Errorf("failed to queue run: %w", err)
 	}

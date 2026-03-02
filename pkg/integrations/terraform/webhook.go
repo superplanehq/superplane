@@ -167,11 +167,13 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 		cResp, err := client.HTTPClient.Do(cReq)
 		if err != nil {
 			createErr = err
+			if cResp != nil && cResp.Body != nil {
+				_ = cResp.Body.Close()
+			}
 		} else {
 			if cResp.StatusCode >= 400 {
 				createErr = fmt.Errorf("bad status code: %d", cResp.StatusCode)
 				if cResp.StatusCode >= 400 && cResp.StatusCode < 500 && cResp.StatusCode != 429 {
-					// Don't retry client errors like 400, 401, 403, 404, 409 etc.
 					_ = cResp.Body.Close()
 					break
 				}
