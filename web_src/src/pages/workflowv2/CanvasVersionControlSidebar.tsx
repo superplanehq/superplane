@@ -362,11 +362,6 @@ export function CanvasVersionControlSidebar({
           <section className="mt-3 rounded-md border border-slate-200 p-3">
             <div className="flex items-center justify-between">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Live</p>
-              {liveCanvasVersion ? (
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
-                  Active
-                </span>
-              ) : null}
             </div>
             {liveCanvasVersion ? (
               <VersionRow

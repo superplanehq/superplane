@@ -545,11 +545,25 @@ export function WorkflowPageV2() {
       return;
     }
 
-    queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-    queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+    queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+    if (isViewingLiveVersion) {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+    } else if (activeCanvasVersionId) {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, activeCanvasVersionId) });
+    }
+
     setRemoteCanvasUpdatePending(false);
-    showSuccessToast("Canvas updated from another session");
-  }, [remoteCanvasUpdatePending, hasUnsavedChanges, canvasDeletedRemotely, organizationId, canvasId, queryClient]);
+  }, [
+    remoteCanvasUpdatePending,
+    hasUnsavedChanges,
+    canvasDeletedRemotely,
+    organizationId,
+    canvasId,
+    queryClient,
+    isViewingLiveVersion,
+    activeCanvasVersionId,
+  ]);
 
   // Build maps from store for canvas display (using initial data from workflow.status and websocket updates)
   // Rebuild whenever store version changes (indicates data was updated)
@@ -1235,31 +1249,55 @@ export function WorkflowPageV2() {
   );
 
   const handleCanvasLifecycleEvent = useCallback(
-    (_payload: { id?: string; canvasId?: string }, eventName: string) => {
+    (payload: { canvasId: string; versionId?: string }, eventName: string) => {
       if (eventName === "canvas_deleted") {
         setCanvasDeletedRemotely(true);
         return;
       }
 
       const isLocalEcho =
-        eventName === "canvas_updated" &&
+        (eventName === "canvas_updated" || eventName === "canvas_version_updated") &&
         Date.now() - lastLocalCanvasSaveAtRef.current < LOCAL_CANVAS_UPDATE_SUPPRESSION_MS;
       if (isLocalEcho) {
         return;
       }
 
-      if (eventName === "canvas_updated" && hasUnsavedChanges) {
+      if (!canvasId) {
+        return;
+      }
+
+      if (eventName === "canvas_version_updated") {
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+        if (activeCanvasVersionId && payload.versionId === activeCanvasVersionId) {
+          if (hasUnsavedChanges) {
+            setRemoteCanvasUpdatePending(true);
+            return;
+          }
+          queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, activeCanvasVersionId) });
+        }
+        return;
+      }
+
+      if (eventName !== "canvas_updated") {
+        return;
+      }
+
+      if (hasUnsavedChanges) {
         setRemoteCanvasUpdatePending(true);
-      } else if (eventName === "canvas_updated") {
-        showSuccessToast("Canvas updated from another session");
+        return;
+      }
+
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      if (activeCanvasVersionId) {
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, activeCanvasVersionId) });
       }
     },
-    [hasUnsavedChanges],
+    [hasUnsavedChanges, queryClient, canvasId, activeCanvasVersionId],
   );
 
   const shouldApplyCanvasUpdate = useCallback(
-    () => !hasUnsavedChanges && !canvasDeletedRemotely,
-    [hasUnsavedChanges, canvasDeletedRemotely],
+    () => isViewingLiveVersion && !hasUnsavedChanges && !canvasDeletedRemotely,
+    [isViewingLiveVersion, hasUnsavedChanges, canvasDeletedRemotely],
   );
 
   useCanvasWebsocket(
@@ -1271,6 +1309,7 @@ export function WorkflowPageV2() {
     handleCanvasLifecycleEvent,
     shouldApplyCanvasUpdate,
     isViewingLiveVersion,
+    true,
   );
 
   const logEntries = useMemo(() => {
@@ -3501,8 +3540,16 @@ export function WorkflowPageV2() {
     setRemoteCanvasUpdatePending(false);
     lastSavedWorkflowRef.current = null;
 
-    await queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-    await queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+    await queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+    if (isViewingLiveVersion) {
+      await queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+      await queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+      return;
+    }
+
+    if (activeCanvasVersionId) {
+      await queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, activeCanvasVersionId) });
+    }
   };
 
   const hasRunBlockingChanges = hasUnsavedChanges && hasNonPositionalUnsavedChanges;

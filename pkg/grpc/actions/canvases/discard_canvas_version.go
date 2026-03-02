@@ -5,8 +5,10 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -74,6 +76,10 @@ func DiscardCanvasVersion(ctx context.Context, organizationID string, canvasID s
 			return nil, err
 		}
 		return nil, status.Errorf(codes.Internal, "failed to discard canvas version: %v", err)
+	}
+
+	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), versionID).PublishVersionUpdated(); err != nil {
+		log.Errorf("failed to publish canvas version updated RabbitMQ message: %v", err)
 	}
 
 	return &pb.DiscardCanvasVersionResponse{}, nil

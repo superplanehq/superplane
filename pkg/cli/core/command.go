@@ -29,6 +29,8 @@ type CommandContext struct {
 type ConfigContext interface {
 	GetActiveCanvas() string
 	SetActiveCanvas(canvasID string) error
+	GetActiveCanvasVersion() string
+	SetActiveCanvasVersion(versionID string) error
 }
 
 type BindOptions struct {

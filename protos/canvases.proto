@@ -770,3 +770,9 @@ message CanvasMessage {
   string canvas_id = 2;
   google.protobuf.Timestamp timestamp = 3;
 }
+
+message CanvasVersionMessage {
+  string canvas_id = 1;
+  string version_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
