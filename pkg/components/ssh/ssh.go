@@ -24,20 +24,11 @@ func init() {
 
 type SSHCommand struct{}
 
-type SecretKeyRef struct {
-	Secret string `json:"secret" mapstructure:"secret"`
-	Key    string `json:"key" mapstructure:"key"`
-}
-
-func (r SecretKeyRef) IsSet() bool {
-	return r.Secret != "" && r.Key != ""
-}
-
 type AuthSpec struct {
-	Method     string       `json:"authMethod" mapstructure:"authMethod"`
-	PrivateKey SecretKeyRef `json:"privateKey" mapstructure:"privateKey"`
-	Passphrase SecretKeyRef `json:"passphrase" mapstructure:"passphrase"`
-	Password   SecretKeyRef `json:"password" mapstructure:"password"`
+	Method     string                     `json:"authMethod" mapstructure:"authMethod"`
+	PrivateKey configuration.SecretKeyRef `json:"privateKey" mapstructure:"privateKey"`
+	Passphrase configuration.SecretKeyRef `json:"passphrase" mapstructure:"passphrase"`
+	Password   configuration.SecretKeyRef `json:"password" mapstructure:"password"`
 }
 
 type ConnectionRetrySpec struct {

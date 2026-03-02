@@ -65,29 +65,123 @@ This trigger automatically sets up a FireHydrant webhook endpoint when configure
   "data": {
     "event": "incident.created",
     "incident": {
-      "current_milestone": "started",
-      "customer_impact_summary": "Some customers are experiencing slow performance and intermittent errors when accessing the application.",
-      "description": "Users are experiencing slow database queries and connection timeouts.",
-      "id": "04d9fd1a-ba9c-417d-b396-58a6e2c374de",
-      "impacts": [],
-      "incident_url": "https://app.firehydrant.com/incidents/04d9fd1a-ba9c-417d-b396-58a6e2c374de",
-      "milestones": [
+      "conference_bridges": [
         {
-          "occurred_at": "2026-01-19T12:00:00Z",
-          "type": "started"
+          "id": "cb-9f1a2c3d",
+          "name": "Zoom War Room",
+          "provider": "zoom",
+          "url": "https://zoom.us/j/9876543210"
         }
       ],
-      "name": "Database connection issues",
-      "number": 603,
+      "counts": {
+        "starred_events": 3,
+        "starred_messages": 12
+      },
+      "created_at": "2026-03-02 14:43:05 UTC",
+      "current_milestone": "started",
+      "custom_fields": [
+        {
+          "display_name": "Detected by",
+          "id": "b370d5b8-9ef1-49d5-be4a-96ee6e536c8b",
+          "value": "Datadog Monitor: DB Health Check"
+        }
+      ],
+      "customer_impact_summary": "All production API requests are failing due to database deletion. Users cannot log in or access core features.",
+      "description": "Primary production database was accidentally deleted during maintenance.",
+      "follow_ups": [
+        {
+          "id": "fu-123",
+          "status": "pending",
+          "title": "Implement database deletion safeguards"
+        }
+      ],
+      "id": "21fe20b5-8012-4a51-a34c-623b1389af66",
+      "impacts": [
+        {
+          "description": "Production users unable to access platform",
+          "id": "impact-1",
+          "type": "customer"
+        }
+      ],
+      "incident_channels": [
+        {
+          "id": "ic-789",
+          "name": "#incident-001",
+          "type": "slack",
+          "visibility": "private"
+        }
+      ],
+      "labels": [
+        "database",
+        "production",
+        "outage"
+      ],
+      "last_note": "Engineering team restoring latest backup from 14:30 UTC.",
+      "milestones": [
+        {
+          "created_at": "2026-03-02 14:43:05 UTC",
+          "duration": "",
+          "id": "d0eaad5c-6922-4f35-adfb-9cf481d39f46",
+          "name": "Started",
+          "occurred_at": "2026-03-02 14:43:05 UTC",
+          "original_milestone_id": "99e55a31-894a-4e76-b680-89b3acab0d7b",
+          "type": "started",
+          "updated_at": "2026-03-02 14:43:06 UTC",
+          "updated_by_id": "bd23faac-dcda-4fd7-a968-4e0b6a04bf35",
+          "updated_by_type": "Bot"
+        }
+      ],
+      "name": "Production Database Accidentally Deleted",
+      "number": 42,
       "priority": "P1",
+      "private_status_page_url": "https://app.firehydrant.io/incidents/internal/status_page/mock-url",
+      "role_assignments": [
+        {
+          "role": "Incident Commander",
+          "user_id": "user-111",
+          "user_name": "Alice Johnson"
+        },
+        {
+          "role": "Communications Lead",
+          "user_id": "user-222",
+          "user_name": "Bob Smith"
+        }
+      ],
       "severity": "SEV1",
-      "summary": "Database connection pool exhausted causing cascading failures.",
-      "tag_list": []
+      "started_at": "2026-03-02 14:43:05 UTC",
+      "summary": "Production outage caused by accidental database deletion.",
+      "tags": [
+        "critical",
+        "customer-impacting"
+      ],
+      "tasks": [
+        {
+          "description": "Restore database from latest backup",
+          "id": "task-1",
+          "status": "in_progress"
+        },
+        {
+          "description": "Validate data integrity after restore",
+          "id": "task-2",
+          "status": "pending"
+        }
+      ],
+      "team_assignments": [
+        {
+          "team_id": "team-ops",
+          "team_name": "Operations"
+        },
+        {
+          "team_id": "team-eng",
+          "team_name": "Engineering"
+        }
+      ],
+      "updated_at": "2026-03-02 14:45:10 +0000"
     },
     "operation": "CREATED",
     "resource_type": "incident"
   },
-  "timestamp": "2026-01-19T12:00:00Z",
+  "timestamp": "2026-03-02T14:43:07.292043553Z",
   "type": "firehydrant.incident.created"
 }
 ```

@@ -189,6 +189,7 @@ func (e *ExecuteCode) Execute(ctx core.ExecutionContext) error {
 	default:
 		command = fmt.Sprintf("python3 -c %q", spec.Code)
 	}
+	command = wrapCommandWithSandboxSecretEnv(command)
 
 	sessionID := uuid.New().String()
 	if err := client.CreateSession(spec.Sandbox, sessionID); err != nil {

@@ -259,7 +259,10 @@ func (b *NodeConfigurationBuilder) BuildExpressionEnv(expression string) (map[st
 		return nil, err
 	}
 
-	env := map[string]any{"$": messageChain}
+	env := map[string]any{
+		"$":      messageChain,
+		"memory": b.buildMemoryExpressionNamespace(),
+	}
 
 	if strings.Contains(expression, "root(") {
 		rootPayload, err := b.resolveRootPayload()
@@ -299,7 +302,10 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 		return "", err
 	}
 
-	env := map[string]any{"$": messageChain}
+	env := map[string]any{
+		"$":      messageChain,
+		"memory": b.buildMemoryExpressionNamespace(),
+	}
 
 	if b.parentBlueprintNode != nil {
 		env["config"] = b.parentBlueprintNode.Configuration.Data()
@@ -751,6 +757,72 @@ func (b *NodeConfigurationBuilder) resolveFromRoot(depth int, step int) (any, er
 	}
 
 	return nil, nil
+}
+
+func (b *NodeConfigurationBuilder) buildMemoryExpressionNamespace() map[string]any {
+	return map[string]any{
+		"find": func(params ...any) (any, error) {
+			namespace, matches, err := parseMemoryFindParams(params)
+			if err != nil {
+				return nil, err
+			}
+
+			records, err := models.ListCanvasMemoriesByNamespaceAndMatchesInTransaction(b.tx, b.workflowID, namespace, matches)
+			if err != nil {
+				return nil, err
+			}
+
+			values := make([]any, 0, len(records))
+			for _, record := range records {
+				values = append(values, record.Values.Data())
+			}
+
+			return values, nil
+		},
+		"findFirst": func(params ...any) (any, error) {
+			namespace, matches, err := parseMemoryFindParams(params)
+			if err != nil {
+				return nil, err
+			}
+
+			record, err := models.FindFirstCanvasMemoryByNamespaceAndMatchesInTransaction(b.tx, b.workflowID, namespace, matches)
+			if err != nil {
+				return nil, err
+			}
+			if record != nil {
+				return record.Values.Data(), nil
+			}
+
+			return nil, nil
+		},
+	}
+}
+
+func parseMemoryFindParams(params []any) (string, map[string]any, error) {
+	if len(params) == 0 || len(params) > 2 {
+		return "", nil, fmt.Errorf("memory.find() and memory.findFirst() require a namespace and matches")
+	}
+
+	namespace, ok := params[0].(string)
+	if !ok {
+		return "", nil, fmt.Errorf("memory namespace must be a string")
+	}
+
+	namespace = strings.TrimSpace(namespace)
+	if namespace == "" {
+		return "", nil, fmt.Errorf("memory namespace is required")
+	}
+
+	if len(params) == 1 {
+		return namespace, nil, fmt.Errorf("at least one match expression is required")
+	}
+
+	matches, ok := params[1].(map[string]any)
+	if !ok {
+		return "", nil, fmt.Errorf("match expression must be an object")
+	}
+
+	return namespace, matches, nil
 }
 
 func (b *NodeConfigurationBuilder) singleInputPayload() (any, bool, error) {

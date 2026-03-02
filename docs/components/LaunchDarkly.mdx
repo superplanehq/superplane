@@ -1,0 +1,186 @@
+---
+title: "LaunchDarkly"
+---
+
+Manage feature flags and react to flag changes in LaunchDarkly
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Feature Flag Change" href="#on-feature-flag-change" description="Listen to feature flag change events from LaunchDarkly" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Delete Feature Flag" href="#delete-feature-flag" description="Delete a feature flag from LaunchDarkly" />
+  <LinkCard title="Get Feature Flag" href="#get-feature-flag" description="Get a feature flag from LaunchDarkly" />
+</CardGrid>
+
+## Instructions
+
+## API integration
+
+1. In the [LaunchDarkly Account settings > Authorization](https://app.launchdarkly.com/settings/authorization), click **Create token**.
+2. Give the token a name and select a role with at least **Reader** permissions for feature flags.
+   - For the **Delete Feature Flag** action, the role must also include **Writer** permissions.
+3. Create the token and **paste the API access token** in the Configuration section below.
+
+<a id="on-feature-flag-change"></a>
+
+## On Feature Flag Change
+
+The On Feature Flag Change trigger starts a workflow execution when LaunchDarkly sends webhooks for feature flags in a project.
+
+### Use Cases
+
+- **Deployment automation**: Trigger deployments or rollbacks when a feature flag changes
+- **Audit workflows**: Track and log changes to flags for compliance
+- **Notification workflows**: Send notifications when a flag is created, updated, or deleted
+- **Integration workflows**: Sync flag changes with external systems
+
+### Configuration
+
+- **Project**: The LaunchDarkly project to monitor
+- **Environments**: Optionally filter by environment(s). Leave empty to receive events for all environments.
+- **Feature Flags**: Optionally filter by specific flags or patterns. Leave empty to receive events for all flags.
+- **Actions**: Optionally filter by specific actions (e.g. only when a flag is turned on or off). Leave empty to receive all actions.
+
+### Webhook Setup
+
+The webhook is automatically created in LaunchDarkly when you save the canvas. No manual setup is required.
+
+SuperPlane uses the LaunchDarkly API (via your configured API access token) to create a signed webhook scoped to the selected project, and securely stores the auto-generated signing secret. When LaunchDarkly sends events, SuperPlane verifies the signature and filters to the configured environments, flags, and actions automatically.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "accesses": [
+      {
+        "action": "updateOn",
+        "resource": "proj/default:env/test:flag/another-toggle-feature"
+      }
+    ],
+    "date": 1771939563356,
+    "description": "",
+    "kind": "flag",
+    "member": {
+      "email": "user@example.com",
+      "firstName": "John",
+      "lastName": "Doe"
+    },
+    "name": "Another Toggle Feature",
+    "parent": {
+      "name": "Test",
+      "resource": "proj/default:env/test"
+    },
+    "target": {
+      "name": "Another Toggle Feature",
+      "resources": [
+        "proj/default:env/test:flag/another-toggle-feature"
+      ]
+    },
+    "title": "John Doe turned off the flag Another Toggle Feature in Test",
+    "titleVerb": "turned off the flag"
+  },
+  "timestamp": "2026-02-24T12:00:00Z",
+  "type": "launchdarkly.flag.updateOn"
+}
+```
+
+<a id="delete-feature-flag"></a>
+
+## Delete Feature Flag
+
+The Delete Feature Flag component permanently deletes a feature flag from a LaunchDarkly project.
+
+### Use Cases
+
+- **Flag cleanup**: Remove stale or temporary flags after rollout is complete
+- **Automated lifecycle**: Delete flags as part of a release workflow
+- **Maintenance workflows**: Clean up archived flags that are no longer needed
+
+### Configuration
+
+- **Project Key**: The key of the LaunchDarkly project containing the flag
+- **Flag Key**: The key of the feature flag to delete (supports expressions)
+
+### Output
+
+Returns a confirmation payload with the deleted flag's project and flag keys.
+
+**Warning**: This action is irreversible. Once deleted, the flag and all its targeting rules are permanently removed.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "flagKey": "toggle-feature",
+    "projectKey": "default"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "launchdarkly.flag.deleted"
+}
+```
+
+<a id="get-feature-flag"></a>
+
+## Get Feature Flag
+
+The Get Feature Flag component retrieves a specific feature flag from a LaunchDarkly project.
+
+### Use Cases
+
+- **Flag lookup**: Fetch flag details for processing or display
+- **Workflow automation**: Get flag information to make decisions in workflows
+- **Status checking**: Check flag status before performing actions
+- **Audit and monitoring**: Retrieve flag data for compliance workflows
+
+### Configuration
+
+- **Project Key**: The key of the LaunchDarkly project containing the flag
+- **Flag Key**: The key of the feature flag to retrieve (supports expressions)
+
+### Output
+
+Returns the complete feature flag object including:
+- Flag key, name, and description
+- Kind (boolean, multivariate)
+- Creation date
+- Archived and temporary status
+- Variations, environments, and targeting rules
+
+### Example Output
+
+```json
+{
+  "data": {
+    "archived": false,
+    "creationDate": 1704067200000,
+    "description": "Controls access to the new feature",
+    "key": "toggle-feature",
+    "kind": "boolean",
+    "name": "Toggle Feature",
+    "temporary": false,
+    "variations": [
+      {
+        "name": "Enabled",
+        "value": true
+      },
+      {
+        "name": "Disabled",
+        "value": false
+      }
+    ]
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "launchdarkly.flag"
+}
+```
+

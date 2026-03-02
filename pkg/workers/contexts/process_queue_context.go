@@ -127,6 +127,7 @@ func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *model
 			Requests:       NewExecutionRequestContext(tx, &execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), &execution, nil),
 			Notifications:  NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
+			CanvasMemory:   NewCanvasMemoryContext(tx, execution.WorkflowID),
 		}, nil
 	}
 
@@ -223,6 +224,7 @@ func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *model
 			Requests:       NewExecutionRequestContext(tx, execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), execution, nil),
 			Notifications:  NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
+			CanvasMemory:   NewCanvasMemoryContext(tx, execution.WorkflowID),
 		}, nil
 	}
 

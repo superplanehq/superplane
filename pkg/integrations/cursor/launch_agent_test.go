@@ -20,7 +20,7 @@ func Test__LaunchAgent__Setup(t *testing.T) {
 
 	t.Run("valid repository mode config", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		setupCtx := core.SetupContext{
 			Configuration: map[string]any{
 				"prompt":     "Fix the bug",
@@ -38,7 +38,7 @@ func Test__LaunchAgent__Setup(t *testing.T) {
 
 	t.Run("valid PR mode config", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		setupCtx := core.SetupContext{
 			Configuration: map[string]any{
 				"prompt":     "Fix the PR",
@@ -55,7 +55,7 @@ func Test__LaunchAgent__Setup(t *testing.T) {
 
 	t.Run("missing prompt -> error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		setupCtx := core.SetupContext{
 			Configuration: map[string]any{
 				"sourceMode": "repository",
@@ -72,7 +72,7 @@ func Test__LaunchAgent__Setup(t *testing.T) {
 
 	t.Run("repository mode without repository -> error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		setupCtx := core.SetupContext{
 			Configuration: map[string]any{
 				"prompt":     "Fix the bug",
@@ -89,7 +89,7 @@ func Test__LaunchAgent__Setup(t *testing.T) {
 
 	t.Run("PR mode without prUrl -> error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		setupCtx := core.SetupContext{
 			Configuration: map[string]any{
 				"prompt":     "Fix the PR",
@@ -106,7 +106,7 @@ func Test__LaunchAgent__Setup(t *testing.T) {
 
 	t.Run("repository mode with non-empty repository is accepted", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		setupCtx := core.SetupContext{
 			Configuration: map[string]any{
 				"prompt":     "Fix the bug",
@@ -150,7 +150,7 @@ func Test__LaunchAgent__Execute(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
 		executionStateCtx := &contexts.ExecutionStateContext{KVs: make(map[string]string)}
 		requestsCtx := &contexts.RequestContext{}
-		webhookCtx := &contexts.WebhookContext{Secret: "platform-managed-secret"}
+		webhookCtx := &contexts.NodeWebhookContext{Secret: "platform-managed-secret"}
 
 		execCtx := core.ExecutionContext{
 			ID: executionID,
@@ -238,7 +238,7 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
 			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
 					Metadata:       metadataCtx,
@@ -289,7 +289,7 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
 			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
 					Metadata:       metadataCtx,
@@ -318,7 +318,7 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
 			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 		}
 
 		status, err := c.HandleWebhook(webhookCtx)
@@ -334,7 +334,7 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 		webhookCtx := core.WebhookRequestContext{
 			Body:    []byte("not json"),
 			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 		}
 
 		status, err := c.HandleWebhook(webhookCtx)

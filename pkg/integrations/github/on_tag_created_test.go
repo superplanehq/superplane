@@ -35,7 +35,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Events:  &contexts.EventContext{},
-			Webhook: &contexts.WebhookContext{},
+			Webhook: &contexts.NodeWebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -58,7 +58,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "v1.0.0"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  &contexts.EventContext{},
 		})
 
@@ -88,7 +88,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeMatches, Value: ".*"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -119,7 +119,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "v1.0.0"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -150,7 +150,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeNotEquals, Value: "v1.0.0"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -181,7 +181,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeMatches, Value: "v.*"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -212,7 +212,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "v1.0.0"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -243,7 +243,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeMatches, Value: ".*"},
 				},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 

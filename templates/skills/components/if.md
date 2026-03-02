@@ -39,6 +39,8 @@ When generating workflow operations that include `if`:
 - `$["Approval"].status == "approved"`
 - `$["RiskScore"].value >= 80`
 - `previous().status == "success"`
+- `memory.findFirst("machines", {"sandbox_id": root().data.sandbox_id}) != nil`
+- `len(memory.find("machines", {"creator": "igor"})) > 0`
 
 ## Common Mistakes To Avoid
 

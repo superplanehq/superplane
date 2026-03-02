@@ -361,6 +361,13 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 		assert.Equal(t, ExecuteCommandOutputChannelSuccess, execCtx.Channel)
 		assert.Equal(t, ExecuteCommandPayloadType, execCtx.Type)
 		require.Len(t, execCtx.Payloads, 1)
+		wrappedPayload, ok := execCtx.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		data, ok := wrappedPayload["data"].(*ExecuteCommandResponse)
+		require.True(t, ok)
+		assert.Equal(t, 0, data.ExitCode)
+		assert.False(t, data.Timeout)
+		assert.Equal(t, "hello world", data.Result)
 	})
 
 	t.Run("poll emits failed channel when command exits non-zero", func(t *testing.T) {
@@ -403,6 +410,13 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 		assert.Equal(t, ExecuteCommandOutputChannelFailed, execCtx.Channel)
 		assert.Equal(t, ExecuteCommandPayloadType, execCtx.Type)
 		require.Len(t, execCtx.Payloads, 1)
+		wrappedPayload, ok := execCtx.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		data, ok := wrappedPayload["data"].(*ExecuteCommandResponse)
+		require.True(t, ok)
+		assert.Equal(t, 1, data.ExitCode)
+		assert.False(t, data.Timeout)
+		assert.Equal(t, "command failed", data.Result)
 	})
 
 	t.Run("poll times out", func(t *testing.T) {
@@ -412,6 +426,7 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 			},
 		}
 
+		execCtx := &contexts.ExecutionStateContext{}
 		err := component.HandleAction(core.ActionContext{
 			Name: "poll",
 			HTTP: &contexts.HTTPContext{},
@@ -424,13 +439,24 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 					"timeout":   60,
 				},
 			},
-			ExecutionState: &contexts.ExecutionStateContext{},
+			ExecutionState: execCtx,
 			Requests:       &contexts.RequestContext{},
 			Integration:    appCtx,
 		})
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "timed out")
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+		assert.Equal(t, ExecuteCommandOutputChannelFailed, execCtx.Channel)
+		assert.Equal(t, ExecuteCommandPayloadType, execCtx.Type)
+		require.Len(t, execCtx.Payloads, 1)
+		wrappedPayload, ok := execCtx.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		data, ok := wrappedPayload["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Nil(t, data["exitCode"])
+		assert.Equal(t, true, data["timeout"])
+		assert.Equal(t, "command timed out after 60 seconds", data["result"])
 	})
 
 	t.Run("poll reschedules on GetSession API error", func(t *testing.T) {

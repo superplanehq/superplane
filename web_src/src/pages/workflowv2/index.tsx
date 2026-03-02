@@ -42,6 +42,8 @@ import {
   useUpdateCanvas,
   useCanvas,
   useCanvasEvents,
+  useCanvasMemoryEntries,
+  useDeleteCanvasMemoryEntry,
   useWidgets,
   canvasKeys,
 } from "@/hooks/useCanvasData";
@@ -83,11 +85,13 @@ import {
   getStateMap,
 } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
+import { CanvasMemoryView } from "./CanvasMemoryView";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
+import { applyHorizontalAutoLayout } from "./autoLayout";
 import { useAccount } from "@/contexts/AccountContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
@@ -144,6 +148,12 @@ export function WorkflowPageV2() {
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const { data: canvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId!, canvasId!);
   const { data: canvasEventsResponse } = useCanvasEvents(canvasId!);
+  const {
+    data: canvasMemoryEntries = [],
+    isLoading: canvasMemoryLoading,
+    error: canvasMemoryError,
+  } = useCanvasMemoryEntries(canvasId!);
+  const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
   const canReadOrg = canAct("org", "read");
   const { data: agentSettings } = useOrganizationAgentSettings(organizationId || "", !!organizationId && canReadOrg);
   const canUpdateCanvas = canAct("canvases", "update");
@@ -156,6 +166,7 @@ export function WorkflowPageV2() {
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely;
   const isDev = import.meta.env.DEV;
+  const [topViewMode, setTopViewMode] = useState<"canvas" | "memory">("canvas");
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const createWorkflowMutation = useCreateCanvas(organizationId!);
 
@@ -1732,8 +1743,12 @@ export function WorkflowPageV2() {
     async (newNodeData: NewNodeData): Promise<string> => {
       if (!canvas || !organizationId || !canvasId) return "";
 
+      const latestWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+      if (!latestWorkflow) return "";
+
       // Save snapshot before making changes
-      saveWorkflowSnapshot(canvas);
+      saveWorkflowSnapshot(latestWorkflow);
 
       const { buildingBlock, configuration, position, sourceConnection, integrationRef } = newNodeData;
 
@@ -1741,7 +1756,7 @@ export function WorkflowPageV2() {
       const filteredConfiguration = filterVisibleConfiguration(configuration, buildingBlock.configuration || []);
 
       // Get existing node names for unique name generation
-      const existingNodeNames = (canvas.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
+      const existingNodeNames = (latestWorkflow.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
 
       // Generate unique node name based on component name + ordinal
       const uniqueNodeName = generateUniqueNodeName(buildingBlock.name || "node", existingNodeNames);
@@ -1769,7 +1784,7 @@ export function WorkflowPageV2() {
               y: Math.round(position.y),
             }
           : {
-              x: (canvas?.spec?.nodes?.length || 0) * 250,
+              x: (latestWorkflow?.spec?.nodes?.length || 0) * 250,
               y: 100,
             },
       };
@@ -1788,10 +1803,10 @@ export function WorkflowPageV2() {
       }
 
       // Add the new node to the workflow
-      const updatedNodes = [...(canvas.spec?.nodes || []), newNode];
+      const updatedNodes = [...(latestWorkflow.spec?.nodes || []), newNode];
 
       // If there's a source connection, create the edge
-      let updatedEdges = canvas.spec?.edges || [];
+      let updatedEdges = latestWorkflow.spec?.edges || [];
       if (sourceConnection) {
         const newEdge: ComponentsEdge = {
           sourceId: sourceConnection.nodeId,
@@ -1802,9 +1817,9 @@ export function WorkflowPageV2() {
       }
 
       const updatedWorkflow = {
-        ...canvas,
+        ...latestWorkflow,
         spec: {
-          ...canvas.spec,
+          ...latestWorkflow.spec,
           nodes: updatedNodes,
           edges: updatedEdges,
         },
@@ -1851,14 +1866,26 @@ export function WorkflowPageV2() {
         workflow: latestWorkflow,
         operations,
         buildingBlocks,
+        integrations,
       });
 
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+      const previousNodeIds = new Set((latestWorkflow.spec?.nodes || []).map((node) => node.id));
+      const aiAddedNodeIds = (updatedWorkflow.spec?.nodes || [])
+        .map((node) => node.id)
+        .filter((nodeId): nodeId is string => typeof nodeId === "string" && !previousNodeIds.has(nodeId));
+
+      let finalWorkflow = updatedWorkflow;
+      if (aiAddedNodeIds.length > 0) {
+        finalWorkflow = await applyHorizontalAutoLayout(updatedWorkflow);
+      }
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
 
       if (canAutoSave) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+        await handleSaveWorkflow(finalWorkflow, { showToast: false });
       } else {
-        markUnsavedChange("structural");
+        const changeKind = aiAddedNodeIds.length > 0 ? "position" : "structural";
+        markUnsavedChange(changeKind);
       }
     },
     [
@@ -1868,6 +1895,7 @@ export function WorkflowPageV2() {
       canvasId,
       handleSaveWorkflow,
       markUnsavedChange,
+      integrations,
       organizationId,
       queryClient,
       saveWorkflowSnapshot,
@@ -1882,7 +1910,11 @@ export function WorkflowPageV2() {
     }): Promise<string> => {
       if (!canvas || !organizationId || !canvasId) return "";
 
-      saveWorkflowSnapshot(canvas);
+      const latestWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+      if (!latestWorkflow) return "";
+
+      saveWorkflowSnapshot(latestWorkflow);
 
       const placeholderName = "New Component";
       const newNodeId = generateNodeId("component", "node");
@@ -1908,11 +1940,11 @@ export function WorkflowPageV2() {
       };
 
       const updatedWorkflow = {
-        ...canvas,
+        ...latestWorkflow,
         spec: {
-          ...canvas.spec,
-          nodes: [...(canvas.spec?.nodes || []), newNode],
-          edges: [...(canvas.spec?.edges || []), newEdge],
+          ...latestWorkflow.spec,
+          nodes: [...(latestWorkflow.spec?.nodes || []), newNode],
+          edges: [...(latestWorkflow.spec?.edges || []), newEdge],
         },
       };
 
@@ -2309,6 +2341,45 @@ export function WorkflowPageV2() {
       debouncedAutoSave,
       canAutoSave,
       saveWorkflowSnapshot,
+      markUnsavedChange,
+    ],
+  );
+
+  const handleAutoLayout = useCallback(
+    async (selectedNodeIDs: string[] = []) => {
+      if (!canvas || !organizationId || !canvasId) return;
+
+      const latestWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+
+      try {
+        if (!canAutoSave) {
+          saveWorkflowSnapshot(latestWorkflow);
+        }
+
+        const updatedWorkflow = await applyHorizontalAutoLayout(latestWorkflow, {
+          nodeIds: selectedNodeIDs,
+        });
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+        if (canAutoSave) {
+          await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+        } else {
+          markUnsavedChange("position");
+        }
+      } catch (error) {
+        console.error("Failed to auto layout canvas", error);
+        showErrorToast("Failed to auto layout canvas");
+      }
+    },
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      canAutoSave,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
       markUnsavedChange,
     ],
   );
@@ -2971,6 +3042,17 @@ export function WorkflowPageV2() {
         }}
         title={canvas?.metadata?.name || "Canvas"}
         headerBanner={headerBanner}
+        topViewMode={topViewMode}
+        onTopViewModeChange={setTopViewMode}
+        dataViewContent={
+          <CanvasMemoryView
+            entries={canvasMemoryEntries}
+            isLoading={canvasMemoryLoading}
+            errorMessage={canvasMemoryError instanceof Error ? canvasMemoryError.message : undefined}
+            onDeleteEntry={canUpdateCanvas ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined}
+            deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
+          />
+        }
         nodes={nodes}
         edges={edges}
         organizationId={organizationId}
@@ -2989,6 +3071,7 @@ export function WorkflowPageV2() {
         onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
         onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
         onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
+        onAutoLayout={!isReadOnly ? handleAutoLayout : undefined}
         onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
         onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
         onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}

@@ -35,7 +35,7 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Events:  &contexts.EventContext{},
-			Webhook: &contexts.WebhookContext{},
+			Webhook: &contexts.NodeWebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -55,7 +55,7 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"repository": "test",
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  &contexts.EventContext{},
 		})
 
@@ -82,7 +82,7 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"repository": "test",
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -110,7 +110,7 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"repository": "test",
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -139,7 +139,7 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 				"repository":    "test",
 				"contentFilter": "^/solve",
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -168,7 +168,7 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 				"repository":    "test",
 				"contentFilter": "^/solve",
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -197,7 +197,7 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 				"repository":    "test",
 				"contentFilter": "[invalid(regex",
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -224,7 +224,7 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"repository": "test",
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -255,7 +255,7 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"repository": "test",
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -283,7 +283,7 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"repository": "test",
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 

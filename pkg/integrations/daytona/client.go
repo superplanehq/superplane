@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/url"
+	"path"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -78,7 +81,16 @@ type ExecuteCommandRequest struct {
 // ExecuteCommandResponse represents the response from command execution
 type ExecuteCommandResponse struct {
 	ExitCode int    `json:"exitCode"`
+	Timeout  bool   `json:"timeout"`
 	Result   string `json:"result"`
+}
+
+func (e *ExecuteCommandResponse) ShortResult() string {
+	if len(e.Result) <= 1024 {
+		return e.Result
+	}
+
+	return e.Result[:1024] + "..."
 }
 
 // Snapshot represents a Daytona snapshot
@@ -280,6 +292,14 @@ type SessionExecuteRequest struct {
 	RunAsync bool   `json:"runAsync"`
 }
 
+// CloneRepositoryRequest is the request body for cloning a repository with the toolbox Git API.
+type CloneRepositoryRequest struct {
+	URL      string `json:"url"`
+	Path     string `json:"path"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+}
+
 // SessionExecuteResponse is the response from executing a command in a session
 type SessionExecuteResponse struct {
 	CmdID string `json:"cmdId"`
@@ -354,6 +374,22 @@ func (c *Client) ExecuteSessionCommand(sandboxID, sessionID, command string) (*S
 	return &response, nil
 }
 
+// CloneRepository clones a repository into the sandbox using the toolbox Git API.
+func (c *Client) CloneRepository(sandboxID string, req *CloneRepositoryRequest) error {
+	baseURL, err := c.toolboxBaseURL(sandboxID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve toolbox URL: %v", err)
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	_, err = c.execRequest(http.MethodPost, baseURL+"/git/clone", bytes.NewReader(body))
+	return err
+}
+
 // GetSession retrieves the session state including command statuses
 func (c *Client) GetSession(sandboxID, sessionID string) (*Session, error) {
 	baseURL, err := c.toolboxBaseURL(sandboxID)
@@ -389,6 +425,51 @@ func (c *Client) GetSessionCommandLogs(sandboxID, sessionID, commandID string) (
 	}
 
 	return string(responseBody), nil
+}
+
+// CreateFolder creates a folder in the sandbox filesystem.
+func (c *Client) CreateFolder(sandboxID, folderPath string) error {
+	baseURL, err := c.toolboxBaseURL(sandboxID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve toolbox URL: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/files/folder?path=%s", baseURL, url.QueryEscape(folderPath))
+	_, err = c.execRequest(http.MethodPost, url, nil)
+	return err
+}
+
+// UploadFile uploads a file to the sandbox filesystem.
+func (c *Client) UploadFile(sandboxID, filePath string, content []byte) error {
+	baseURL, err := c.toolboxBaseURL(sandboxID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve toolbox URL: %v", err)
+	}
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	name := path.Base(filePath)
+	if name == "" || name == "." || name == "/" {
+		name = "file"
+	}
+
+	part, err := writer.CreateFormFile("file", name)
+	if err != nil {
+		return fmt.Errorf("failed to build multipart file part: %v", err)
+	}
+
+	if _, err := part.Write(content); err != nil {
+		return fmt.Errorf("failed to write multipart file content: %v", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("failed to close multipart writer: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/files/upload?path=%s", baseURL, url.QueryEscape(filePath))
+	_, err = c.execRequestWithContentType(http.MethodPost, url, body, writer.FormDataContentType())
+	return err
 }
 
 // GetSandbox retrieves the current state of a sandbox
@@ -459,12 +540,18 @@ type APIError struct {
 }
 
 func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error) {
+	return c.execRequestWithContentType(method, url, body, "application/json")
+}
+
+func (c *Client) execRequestWithContentType(method, url string, body io.Reader, contentType string) ([]byte, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %v", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
 	res, err := c.http.Do(req)

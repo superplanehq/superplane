@@ -9,12 +9,61 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Repository Sandbox" href="#create-repository-sandbox" description="Create a sandbox, clone a repository, and run a bootstrap script" />
   <LinkCard title="Create Sandbox" href="#create-sandbox" description="Create an isolated sandbox environment for code execution" />
   <LinkCard title="Delete Sandbox" href="#delete-sandbox" description="Delete a sandbox environment" />
   <LinkCard title="Execute Code" href="#execute-code" description="Execute code in a sandbox environment" />
   <LinkCard title="Execute Command" href="#execute-command" description="Run a shell command in a sandbox environment" />
   <LinkCard title="Get Preview URL" href="#get-preview-url" description="Generate a preview URL for a sandbox port" />
 </CardGrid>
+
+<a id="create-repository-sandbox"></a>
+
+## Create Repository Sandbox
+
+The Create Repository Sandbox component creates a new Daytona sandbox, clones a repository, and runs a bootstrap script.
+
+### Use Cases
+
+- **Ephemeral dev environments**: Spin up a fresh environment for a repository on demand
+- **CI-like workflows**: Clone code and run setup scripts before downstream tasks
+- **Automated validation**: Prepare repository state before executing tests or commands
+
+### Notes
+
+- The component waits for the sandbox to reach the "started" state
+- Clone and bootstrap run sequentially in the same session
+- If clone or bootstrap fails, the component returns an error
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bootstrap": {
+      "from": "file",
+      "path": "scripts/bootstrap.sh"
+    },
+    "directory": "/home/daytona/example-app",
+    "repository": "https://github.com/superplanehq/example-app.git",
+    "sandboxId": "sandbox-abc123def456",
+    "sandboxStartedAt": "2026-01-19T12:00:00Z",
+    "secrets": [
+      {
+        "name": "API_KEY",
+        "type": "env",
+        "value": {
+          "key": "API_KEY",
+          "secret": "api-key-secret"
+        }
+      }
+    ],
+    "timeout": 300
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "daytona.repository.sandbox.created"
+}
+```
 
 <a id="create-sandbox"></a>
 
@@ -175,6 +224,7 @@ Routes to one of two channels:
 
 The payload includes:
 - **exitCode**: The process exit code (0 for success)
+- **timeout**: Whether the command timed out
 - **result**: The stdout/output from the command execution
 
 ### Notes
@@ -189,7 +239,8 @@ The payload includes:
 {
   "data": {
     "exitCode": 0,
-    "result": "Successfully installed requests-2.31.0\n"
+    "result": "Successfully installed requests-2.31.0\n",
+    "timeout": false
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "daytona.command.response"
