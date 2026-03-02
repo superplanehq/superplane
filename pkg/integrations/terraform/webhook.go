@@ -173,7 +173,7 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 		} else {
 			if cResp.StatusCode >= 400 {
 				createErr = fmt.Errorf("bad status code: %d", cResp.StatusCode)
-				if cResp.StatusCode >= 400 && cResp.StatusCode < 500 && cResp.StatusCode != 429 {
+				if cResp.StatusCode < 500 && cResp.StatusCode != 429 {
 					_ = cResp.Body.Close()
 					break
 				}
