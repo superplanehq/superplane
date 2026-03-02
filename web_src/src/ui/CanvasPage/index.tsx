@@ -11,7 +11,16 @@ import {
   type EdgeChange,
 } from "@xyflow/react";
 
-import { CircleX, Loader2, ScanLine, ScanText, ScrollText, TriangleAlert, Workflow } from "lucide-react";
+import {
+  CircleX,
+  Loader2,
+  Map as MapIcon,
+  ScanLine,
+  ScanText,
+  ScrollText,
+  TriangleAlert,
+  Workflow,
+} from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
@@ -42,6 +51,7 @@ import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
+import { CanvasMiniMap } from "./CanvasMiniMap";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header, type BreadcrumbItem } from "./Header";
@@ -1499,6 +1509,7 @@ function CanvasContent({
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set());
   const [logSidebarHeight, setLogSidebarHeight] = useState(320);
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
+  const [isMinimapVisible, setIsMinimapVisible] = useState(true);
 
   useEffect(() => {
     const activeNoteId = getActiveNoteId();
@@ -2157,119 +2168,145 @@ function CanvasContent({
             className="h-full w-full"
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
-            <ZoomSlider
-              position="bottom-left"
-              orientation="horizontal"
-              screenshotName={title}
-              isSnapToGridEnabled={isSnapToGridEnabled}
-              onSnapToGridToggle={() => setIsSnapToGridEnabled((prev) => !prev)}
-            >
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" onClick={handleToggleCollapse}>
-                    {state.isCollapsed ? <ScanText className="h-3 w-3" /> : <ScanLine className="h-3 w-3" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {state.isCollapsed
-                    ? "Switch components to Detailed view (Ctrl/Cmd + E)"
-                    : "Switch components to Compact view (Ctrl/Cmd + E)"}
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex">
-                    <Button
-                      variant={isAutoLayoutOnUpdateEnabled ? "secondary" : "ghost"}
-                      size="sm"
-                      className={`h-8 w-8 px-0 ${
-                        isAutoLayoutOnUpdateEnabled
-                          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                          : "text-slate-600 hover:text-slate-900"
-                      }`}
-                      onClick={handleToggleAutoLayoutOnUpdate}
-                      disabled={isAutoLayoutToggleDisabled}
-                      aria-pressed={isAutoLayoutOnUpdateEnabled}
-                    >
-                      <Workflow className="h-3 w-3" />
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
-              </Tooltip>
-              <NodeSearch
-                onSearch={(searchString) => {
-                  const query = searchString.toLowerCase();
-                  return state.nodes.filter((node) => {
-                    const label = ((node.data?.label as string) || "").toLowerCase();
-                    const nodeName = ((node.data as any)?.nodeName || "").toLowerCase();
-                    const id = (node.id || "").toLowerCase();
-                    return label.includes(query) || nodeName.includes(query) || id.includes(query);
-                  });
-                }}
-                onSelectNode={(node) => {
-                  const isAnnotationNode = (node.data as any)?.type === "annotation";
-                  if (isAnnotationNode) {
-                    return;
-                  }
-                  state.componentSidebar.open(node.id);
-                }}
-              />
-            </ZoomSlider>
+            <CanvasMiniMap nodes={state.nodes} edges={state.edges} isVisible={isMinimapVisible} />
             <Panel
               position="bottom-left"
-              className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8"
-              style={{ marginLeft: 370 }}
+              className="!bg-transparent !outline-none !shadow-none p-0 flex items-center gap-2"
             >
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 items-center text-xs font-medium"
-                    onClick={() => handleLogButtonClick("all")}
-                  >
-                    <ScrollText className="h-3 w-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>All Logs</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 items-center text-xs font-medium"
-                    onClick={() => handleLogButtonClick("error")}
-                  >
-                    <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
-                    <span className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}>
-                      {logCounts.error}
+              <ZoomSlider
+                orientation="horizontal"
+                className="!static !m-0"
+                screenshotName={title}
+                isSnapToGridEnabled={isSnapToGridEnabled}
+                onSnapToGridToggle={() => setIsSnapToGridEnabled((prev) => !prev)}
+                leadingContent={
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={isMinimapVisible ? "secondary" : "ghost"}
+                        size="sm"
+                        className={`h-8 w-8 px-0 ${
+                          isMinimapVisible
+                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                        onClick={() => setIsMinimapVisible((prev) => !prev)}
+                        aria-pressed={isMinimapVisible}
+                      >
+                        <MapIcon className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{isMinimapVisible ? "Hide minimap" : "Show minimap"}</TooltipContent>
+                  </Tooltip>
+                }
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon-sm" onClick={handleToggleCollapse}>
+                      {state.isCollapsed ? <ScanText className="h-3 w-3" /> : <ScanLine className="h-3 w-3" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {state.isCollapsed
+                      ? "Switch components to Detailed view (Ctrl/Cmd + E)"
+                      : "Switch components to Compact view (Ctrl/Cmd + E)"}
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <Button
+                        variant={isAutoLayoutOnUpdateEnabled ? "secondary" : "ghost"}
+                        size="sm"
+                        className={`h-8 w-8 px-0 ${
+                          isAutoLayoutOnUpdateEnabled
+                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                        onClick={handleToggleAutoLayoutOnUpdate}
+                        disabled={isAutoLayoutToggleDisabled}
+                        aria-pressed={isAutoLayoutOnUpdateEnabled}
+                      >
+                        <Workflow className="h-3 w-3" />
+                      </Button>
                     </span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Errors</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 items-center text-xs font-medium"
-                    onClick={() => handleLogButtonClick("warning")}
-                  >
-                    <TriangleAlert
-                      className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
-                    />
-                    <span
-                      className={logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"}
+                  </TooltipTrigger>
+                  <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
+                </Tooltip>
+                <NodeSearch
+                  onSearch={(searchString) => {
+                    const query = searchString.toLowerCase();
+                    return state.nodes.filter((node) => {
+                      const label = ((node.data?.label as string) || "").toLowerCase();
+                      const nodeName = ((node.data as any)?.nodeName || "").toLowerCase();
+                      const id = (node.id || "").toLowerCase();
+                      return label.includes(query) || nodeName.includes(query) || id.includes(query);
+                    });
+                  }}
+                  onSelectNode={(node) => {
+                    const isAnnotationNode = (node.data as any)?.type === "annotation";
+                    if (isAnnotationNode) {
+                      return;
+                    }
+                    state.componentSidebar.open(node.id);
+                  }}
+                />
+              </ZoomSlider>
+              <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 items-center text-xs font-medium"
+                      onClick={() => handleLogButtonClick("all")}
                     >
-                      {logCounts.warning}
-                    </span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Warnings</TooltipContent>
-              </Tooltip>
+                      <ScrollText className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>All Logs</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 items-center text-xs font-medium"
+                      onClick={() => handleLogButtonClick("error")}
+                    >
+                      <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
+                      <span
+                        className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}
+                      >
+                        {logCounts.error}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Errors</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 items-center text-xs font-medium"
+                      onClick={() => handleLogButtonClick("warning")}
+                    >
+                      <TriangleAlert
+                        className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
+                      />
+                      <span
+                        className={
+                          logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"
+                        }
+                      >
+                        {logCounts.warning}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Warnings</TooltipContent>
+                </Tooltip>
+              </div>
             </Panel>
           </ReactFlow>
         </div>
