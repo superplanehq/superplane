@@ -1,0 +1,1 @@
+{"data":{"resultType":"streams","result":[{"stream":{"job":"superplane","env":"prod"},"values":[["1708000000000000000","Deployment started"],["1708000015000000000","Deployment completed successfully"]]}]},"timestamp":"2026-02-15T10:30:05Z","type":"loki.queryLogs"}

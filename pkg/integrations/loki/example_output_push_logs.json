@@ -1,0 +1,1 @@
+{"data":{"labels":{"job":"superplane","env":"prod"},"message":"Deployment completed successfully"},"timestamp":"2026-02-15T10:30:00Z","type":"loki.pushLogs"}

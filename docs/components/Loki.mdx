@@ -1,0 +1,101 @@
+---
+title: "Loki"
+---
+
+Push and query logs in Grafana Loki
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Push Logs" href="#push-logs" description="Push log entries to Loki" />
+  <LinkCard title="Query Logs" href="#query-logs" description="Query logs from Loki using LogQL" />
+</CardGrid>
+
+## Instructions
+
+To configure Loki to work with SuperPlane:
+
+1. **Loki URL**: Provide the base URL of your Loki instance (e.g. `https://loki.example.com`)
+2. **Authentication**: Choose the authentication method:
+   - **None**: No authentication (e.g. local or internal Loki)
+   - **Basic**: Username and password (e.g. Grafana Cloud)
+   - **Bearer**: Bearer token (e.g. Loki behind an auth proxy)
+3. **Tenant ID** (optional): If your Loki instance is multi-tenant, provide the tenant ID (sent as `X-Scope-OrgID` header)
+
+<a id="push-logs"></a>
+
+## Push Logs
+
+The Push Logs component sends log entries to a Loki instance via the push API (`POST /loki/api/v1/push`).
+
+### Configuration
+
+- **Labels**: Comma-separated key=value pairs used as Loki stream labels (e.g. `job=superplane,env=prod`)
+- **Message**: Log message content to push
+
+### Output
+
+The component emits an event containing:
+- `labels`: The labels attached to the log stream
+- `message`: The log message that was pushed
+
+### Example Output
+
+```json
+{
+  "data": {
+    "labels": {
+      "job": "superplane",
+      "env": "prod"
+    },
+    "message": "Deployment completed successfully"
+  },
+  "timestamp": "2026-02-15T10:30:00Z",
+  "type": "loki.pushLogs"
+}
+```
+
+<a id="query-logs"></a>
+
+## Query Logs
+
+The Query Logs component executes a LogQL query against Loki (`GET /loki/api/v1/query_range`).
+
+### Configuration
+
+- **Query**: LogQL expression to evaluate (e.g. `{job="superplane"}`)
+- **Start** (optional): Start timestamp in RFC3339 or Unix nanosecond format
+- **End** (optional): End timestamp in RFC3339 or Unix nanosecond format
+- **Limit** (optional): Maximum number of entries to return (default: 100)
+
+### Output
+
+The component emits an event containing:
+- `resultType`: The type of result (e.g. `streams`)
+- `result`: Array of log stream results with their values
+
+### Example Output
+
+```json
+{
+  "data": {
+    "resultType": "streams",
+    "result": [
+      {
+        "stream": {
+          "job": "superplane",
+          "env": "prod"
+        },
+        "values": [
+          ["1708000000000000000", "Deployment started"],
+          ["1708000015000000000", "Deployment completed successfully"]
+        ]
+      }
+    ]
+  },
+  "timestamp": "2026-02-15T10:30:05Z",
+  "type": "loki.queryLogs"
+}
+```
