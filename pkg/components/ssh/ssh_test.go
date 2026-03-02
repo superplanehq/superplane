@@ -128,6 +128,26 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 		})
 		require.NoError(t, err)
 	})
+
+	t.Run("invalid environment variable name", func(t *testing.T) {
+		err := c.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"host":           "example.com",
+				"username":       "root",
+				"authentication": authWithPass,
+				"command":        "whoami",
+				"timeout":        60,
+				"environment": []map[string]any{
+					{
+						"name":  "BAD-NAME",
+						"value": "x",
+					},
+				},
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid environment variable name")
+	})
 }
 
 func TestSSHCommand_Execute_DoesNotPanicWithoutConnectionRetry(t *testing.T) {
@@ -156,4 +176,34 @@ func TestSSHCommand_Execute_DoesNotPanicWithoutConnectionRetry(t *testing.T) {
 	assert.Nil(t, saved.ConnectionRetry)
 	assert.Equal(t, 0, saved.MaxRetries)
 	assert.Equal(t, 0, saved.IntervalSeconds)
+}
+
+func TestSSHCommand_BuildRemoteCommand(t *testing.T) {
+	c := &SSHCommand{}
+
+	t.Run("command only", func(t *testing.T) {
+		command := c.buildRemoteCommand("", nil, "echo hello")
+		assert.Equal(t, "echo hello", command)
+	})
+
+	t.Run("working directory is shell quoted", func(t *testing.T) {
+		command := c.buildRemoteCommand("/opt/app's hardening", nil, "bash run.sh")
+		assert.Equal(t, "cd '/opt/app'\"'\"'s hardening' && bash run.sh", command)
+	})
+
+	t.Run("environment values are shell quoted and command wrapped", func(t *testing.T) {
+		command := c.buildRemoteCommand(
+			"",
+			[]EnvironmentVariable{
+				{Name: "PLAIN", Value: "ok"},
+				{Name: "SPECIAL", Value: "a'b;$PATH $(whoami)"},
+			},
+			"echo \"$SPECIAL\"",
+		)
+		assert.Equal(
+			t,
+			"env PLAIN='ok' SPECIAL='a'\"'\"'b;$PATH $(whoami)' sh -lc 'echo \"$SPECIAL\"'",
+			command,
+		)
+	})
 }
