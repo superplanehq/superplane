@@ -141,6 +141,11 @@ export type AiCanvasOperation =
       target: { nodeKey?: string; nodeId?: string; nodeName?: string };
     }
   | {
+      type: "disconnect_nodes";
+      source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null };
+      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
+    }
+  | {
       type: "update_node_config";
       target: { nodeKey?: string; nodeId?: string; nodeName?: string };
       configuration: Record<string, unknown>;
@@ -435,6 +440,8 @@ export function BuildingBlocksSidebar({
         return `Add node ${operation.nodeName || operation.blockName} (${operation.blockName})`;
       case "connect_nodes":
         return `Connect ${resolveRefLabel(operation.source)} -> ${resolveRefLabel(operation.target)}`;
+      case "disconnect_nodes":
+        return `Disconnect ${resolveRefLabel(operation.source)} -> ${resolveRefLabel(operation.target)}`;
       case "update_node_config":
         return `Update configuration for ${operation.nodeName || operation.target.nodeName || "node"}`;
       case "delete_node":
