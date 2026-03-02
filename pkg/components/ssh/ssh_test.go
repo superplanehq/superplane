@@ -9,6 +9,19 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+type testMetadataContext struct {
+	value any
+}
+
+func (m *testMetadataContext) Get() any {
+	return m.value
+}
+
+func (m *testMetadataContext) Set(value any) error {
+	m.value = value
+	return nil
+}
+
 func authConfig(method string, privateKey, password any) map[string]any {
 	m := map[string]any{"authMethod": method}
 	if privateKey != nil {
@@ -115,4 +128,32 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 		})
 		require.NoError(t, err)
 	})
+}
+
+func TestSSHCommand_Execute_DoesNotPanicWithoutConnectionRetry(t *testing.T) {
+	c := &SSHCommand{}
+	metadata := &testMetadataContext{}
+
+	err := c.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"host":     "example.com",
+			"port":     22,
+			"username": "root",
+			"command":  "ls -la",
+			"timeout":  60,
+			"authentication": map[string]any{
+				"authMethod": "invalid",
+			},
+		},
+		Metadata: metadata,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported authentication method")
+
+	saved, ok := metadata.Get().(ExecutionMetadata)
+	require.True(t, ok)
+	assert.Nil(t, saved.ConnectionRetry)
+	assert.Equal(t, 0, saved.MaxRetries)
+	assert.Equal(t, 0, saved.IntervalSeconds)
 }
