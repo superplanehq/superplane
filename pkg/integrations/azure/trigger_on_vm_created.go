@@ -205,7 +205,8 @@ func (t *OnVMCreatedTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int,
 	return http.StatusOK, nil
 }
 
-// handleSubscriptionValidation validates Event Grid subscription via the validationUrl GET approach.
+// handleSubscriptionValidation validates Event Grid subscription using the
+// synchronous handshake: return the validationCode in the HTTP response body.
 func (t *OnVMCreatedTrigger) handleSubscriptionValidation(ctx core.WebhookRequestContext, event EventGridEvent) error {
 	var validationData SubscriptionValidationEventData
 	if err := mapstructure.Decode(event.Data, &validationData); err != nil {
@@ -216,26 +217,21 @@ func (t *OnVMCreatedTrigger) handleSubscriptionValidation(ctx core.WebhookReques
 		return fmt.Errorf("validation code is empty")
 	}
 
-	ctx.Logger.Infof("Event Grid subscription validation received with code: %s", validationData.ValidationCode)
+	ctx.Logger.Infof("Event Grid subscription validation received, responding with validation code")
 
-	if validationData.ValidationURL == "" {
-		return fmt.Errorf("validation URL is empty; synchronous validation is not supported by the framework")
+	if ctx.Response != nil {
+		body, err := json.Marshal(map[string]string{
+			"validationResponse": validationData.ValidationCode,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to marshal validation response: %w", err)
+		}
+
+		ctx.Response.Body = body
+		ctx.Response.ContentType = "application/json"
 	}
 
-	// Use the validationUrl GET approach since the framework's HandleWebhook
-	// interface cannot return a custom response body for the synchronous handshake.
-	ctx.Logger.Infof("Validating Event Grid subscription via validation URL")
-	resp, err := http.Get(validationData.ValidationURL)
-	if err != nil {
-		return fmt.Errorf("failed to validate subscription via validation URL: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("validation URL returned status %d", resp.StatusCode)
-	}
-
-	ctx.Logger.Info("Event Grid subscription validated successfully via validation URL")
+	ctx.Logger.Info("Event Grid subscription validation response set successfully")
 	return nil
 }
 

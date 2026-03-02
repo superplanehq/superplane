@@ -109,6 +109,14 @@ type TriggerActionContext struct {
 	Integration   IntegrationContext
 }
 
+// WebhookResponseBody allows a trigger's HandleWebhook to set a custom
+// response body that will be written back to the caller. If Body is non-empty
+// the server uses it instead of the default empty 200 OK.
+type WebhookResponseBody struct {
+	Body        []byte
+	ContentType string
+}
+
 type WebhookRequestContext struct {
 	Body          []byte
 	Headers       http.Header
@@ -130,6 +138,10 @@ type WebhookRequestContext struct {
 	// Do not make HTTP calls as part of handling the webhook. This is useful for
 	// retrieving more data that is not part of the webhook payload.
 	HTTP HTTPContext
+
+	// Response allows handlers to set a custom response body.
+	// The pointer is allocated by the server; handlers may write to it.
+	Response *WebhookResponseBody
 }
 
 type NodeWebhookContext interface {
