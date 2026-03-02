@@ -65,7 +65,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as RunNRQLQueryConfiguration | undefined;
 
   if (configuration?.query) {
-    const truncated = configuration.query.length > 50 ? configuration.query.substring(0, 50) + "..." : configuration.query;
+    const truncated =
+      configuration.query.length > 50 ? configuration.query.substring(0, 50) + "..." : configuration.query;
     metadata.push({ icon: "search", label: `Query: ${truncated}` });
   }
 
@@ -88,7 +89,7 @@ function getDetailsForNRQLResult(result: NewRelicNRQLResultPayload): Record<stri
 
   const firstResult = result.results[0];
 
-  if (!firstResult || typeof firstResult !== 'object') {
+  if (!firstResult || typeof firstResult !== "object") {
     details["Result"] = String(firstResult);
     return details;
   }

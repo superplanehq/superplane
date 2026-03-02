@@ -178,6 +178,10 @@ func (c *ReportMetric) Execute(ctx core.ExecutionContext) error {
 		"timestamp": timestamp,
 	}
 
+	if spec.MetricType == "count" || spec.MetricType == "summary" {
+		metric["interval.ms"] = 60000
+	}
+
 	if spec.Attributes != nil && len(spec.Attributes) > 0 {
 		metric["attributes"] = spec.Attributes
 	}
