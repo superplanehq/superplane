@@ -3,6 +3,7 @@ package ssh
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -17,6 +18,8 @@ const (
 	channelSuccess = "success"
 	channelFailed  = "failed"
 )
+
+var environmentVariableNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func init() {
 	registry.RegisterComponent("ssh", &SSHCommand{})
@@ -37,30 +40,37 @@ type ConnectionRetrySpec struct {
 	IntervalSeconds int  `json:"intervalSeconds" mapstructure:"intervalSeconds"`
 }
 
+type EnvironmentVariable struct {
+	Name  string `json:"name" mapstructure:"name"`
+	Value string `json:"value" mapstructure:"value"`
+}
+
 type Spec struct {
-	Host             string               `json:"host" mapstructure:"host"`
-	Port             int                  `json:"port" mapstructure:"port"`
-	User             string               `json:"username" mapstructure:"username"`
-	Authentication   AuthSpec             `json:"authentication" mapstructure:"authentication"`
-	Command          string               `json:"command" mapstructure:"command"`
-	WorkingDirectory string               `json:"workingDirectory,omitempty" mapstructure:"workingDirectory"`
-	Timeout          int                  `json:"timeout" mapstructure:"timeout"`
-	ConnectionRetry  *ConnectionRetrySpec `json:"connectionRetry,omitempty" mapstructure:"connectionRetry"`
+	Host             string                `json:"host" mapstructure:"host"`
+	Port             int                   `json:"port" mapstructure:"port"`
+	User             string                `json:"username" mapstructure:"username"`
+	Authentication   AuthSpec              `json:"authentication" mapstructure:"authentication"`
+	Command          string                `json:"command" mapstructure:"command"`
+	WorkingDirectory string                `json:"workingDirectory,omitempty" mapstructure:"workingDirectory"`
+	Environment      []EnvironmentVariable `json:"environment,omitempty" mapstructure:"environment"`
+	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
+	ConnectionRetry  *ConnectionRetrySpec  `json:"connectionRetry,omitempty" mapstructure:"connectionRetry"`
 }
 
 type ExecutionMetadata struct {
-	Result           *CommandResult       `json:"result" mapstructure:"result"`
-	Host             string               `json:"host" mapstructure:"host"`
-	Port             int                  `json:"port" mapstructure:"port"`
-	User             string               `json:"user" mapstructure:"user"`
-	Command          string               `json:"command" mapstructure:"command"`
-	WorkingDirectory string               `json:"workingDirectory" mapstructure:"workingDirectory"`
-	Timeout          int                  `json:"timeout" mapstructure:"timeout"`
-	ConnectionRetry  *ConnectionRetrySpec `json:"connectionRetry" mapstructure:"connectionRetry"`
-	Attempt          int                  `json:"attempt" mapstructure:"attempt"`
-	MaxRetries       int                  `json:"maxRetries" mapstructure:"maxRetries"`
-	IntervalSeconds  int                  `json:"intervalSeconds" mapstructure:"intervalSeconds"`
-	Authentication   AuthSpec             `json:"authentication" mapstructure:"authentication"`
+	Result           *CommandResult        `json:"result" mapstructure:"result"`
+	Host             string                `json:"host" mapstructure:"host"`
+	Port             int                   `json:"port" mapstructure:"port"`
+	User             string                `json:"user" mapstructure:"user"`
+	Command          string                `json:"command" mapstructure:"command"`
+	WorkingDirectory string                `json:"workingDirectory" mapstructure:"workingDirectory"`
+	Environment      []EnvironmentVariable `json:"environment" mapstructure:"environment"`
+	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
+	ConnectionRetry  *ConnectionRetrySpec  `json:"connectionRetry" mapstructure:"connectionRetry"`
+	Attempt          int                   `json:"attempt" mapstructure:"attempt"`
+	MaxRetries       int                   `json:"maxRetries" mapstructure:"maxRetries"`
+	IntervalSeconds  int                   `json:"intervalSeconds" mapstructure:"intervalSeconds"`
+	Authentication   AuthSpec              `json:"authentication" mapstructure:"authentication"`
 }
 
 type ConnectionRetryState struct {
@@ -89,6 +99,7 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 - **Host**, **Port** (default 22), **Username**: Connection details.
 - **Command**: The command to run (supports expressions).
 - **Working directory**: Optional; Changes to this directory before running the command.
+- **Environment variables**: Optional list of key/value pairs available during command execution.
 - **Timeout (seconds)**: How long the command may run (default 60).
 - **Connection retry** (optional): Enable to retry connecting when the host is not reachable yet (e.g. server still booting). Set number of retries and interval between attempts.
 
@@ -220,6 +231,39 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 			Placeholder: "e.g. /home/user",
 		},
 		{
+			Name:        "environment",
+			Label:       "Environment variables",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "Optional key/value pairs available to the command",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Variable",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:        "name",
+								Label:       "Name",
+								Type:        configuration.FieldTypeString,
+								Description: "Environment variable name (letters, numbers, underscore)",
+								Placeholder: "e.g. ENVIRONMENT",
+								Required:    true,
+							},
+							{
+								Name:        "value",
+								Label:       "Value",
+								Type:        configuration.FieldTypeString,
+								Description: "Environment variable value",
+								Placeholder: "e.g. production",
+								Required:    true,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			Name:        "timeout",
 			Label:       "Timeout (seconds)",
 			Type:        configuration.FieldTypeNumber,
@@ -298,6 +342,14 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 	if spec.Timeout < 1 {
 		return errors.New("timeout is required and must be at least 1 second")
 	}
+	for _, variable := range spec.Environment {
+		if variable.Name == "" {
+			return errors.New("environment variable name is required")
+		}
+		if !environmentVariableNameRegex.MatchString(variable.Name) {
+			return fmt.Errorf("invalid environment variable name: %s", variable.Name)
+		}
+	}
 
 	switch spec.Authentication.Method {
 	case AuthMethodSSHKey:
@@ -329,6 +381,14 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
+	for _, variable := range spec.Environment {
+		if variable.Name == "" {
+			return errors.New("environment variable name is required")
+		}
+		if !environmentVariableNameRegex.MatchString(variable.Name) {
+			return fmt.Errorf("invalid environment variable name: %s", variable.Name)
+		}
+	}
 
 	metadata := ExecutionMetadata{
 		Host:             spec.Host,
@@ -336,6 +396,7 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 		User:             spec.User,
 		Command:          spec.Command,
 		WorkingDirectory: spec.WorkingDirectory,
+		Environment:      spec.Environment,
 		Timeout:          spec.Timeout,
 		ConnectionRetry:  spec.ConnectionRetry,
 		Attempt:          0,
@@ -406,7 +467,12 @@ func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
 	}
 	defer client.Close()
 
-	result, err := client.ExecuteCommand(ctx.execMetadata.Command, time.Duration(ctx.execMetadata.Timeout)*time.Second)
+	command := c.buildRemoteCommand(
+		ctx.execMetadata.WorkingDirectory,
+		ctx.execMetadata.Environment,
+		ctx.execMetadata.Command,
+	)
+	result, err := client.ExecuteCommand(command, time.Duration(ctx.execMetadata.Timeout)*time.Second)
 	if c.isConnectError(err) {
 		if c.shouldRetry(ctx.execMetadata.ConnectionRetry, ctx.metadataCtx) {
 			err = c.incrementRetryCount(ctx.metadataCtx)
@@ -517,6 +583,29 @@ func (c *SSHCommand) isConnectError(err error) bool {
 		strings.Contains(s, "i/o timeout") ||
 		strings.Contains(s, "connection reset") ||
 		strings.Contains(s, "no route to host")
+}
+
+func (c *SSHCommand) buildRemoteCommand(workingDirectory string, environment []EnvironmentVariable, command string) string {
+	finalCommand := command
+
+	if workingDirectory != "" {
+		finalCommand = fmt.Sprintf("cd %s && %s", shellQuote(workingDirectory), finalCommand)
+	}
+
+	if len(environment) == 0 {
+		return finalCommand
+	}
+
+	envAssignments := make([]string, 0, len(environment))
+	for _, variable := range environment {
+		envAssignments = append(envAssignments, fmt.Sprintf("%s=%s", variable.Name, shellQuote(variable.Value)))
+	}
+
+	return fmt.Sprintf("env %s sh -lc %s", strings.Join(envAssignments, " "), shellQuote(finalCommand))
+}
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
 }
 
 func (c *SSHCommand) Cancel(ctx core.ExecutionContext) error {
