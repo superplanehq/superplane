@@ -1,17 +1,23 @@
 package terraform
 
 import (
+	"bytes"
 	"context"
-	"errors"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"strings"
+	"time"
 
-	"github.com/hashicorp/go-tfe"
 	"github.com/mitchellh/mapstructure"
 )
 
 type Client struct {
-	TFE *tfe.Client
+	HTTPClient *http.Client
+	Token      string
+	BaseURL    string
 }
 
 func NewClient(configuration map[string]any) (*Client, error) {
@@ -30,34 +36,60 @@ func NewClient(configuration map[string]any) (*Client, error) {
 		address = "https://app.terraform.io"
 	}
 
-	tfeConfig := &tfe.Config{
-		Token:   config.APIToken,
-		Address: address,
-	}
-
-	tfeClient, err := tfe.NewClient(tfeConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create tfe client: %w", err)
-	}
-
 	return &Client{
-		TFE: tfeClient,
+		HTTPClient: &http.Client{Timeout: 30 * time.Second},
+		Token:      config.APIToken,
+		BaseURL:    address,
 	}, nil
 }
 
-func (c *Client) Validate() error {
-	_, err := c.TFE.Users.ReadCurrent(context.TODO())
-	if err != nil {
-		if isUnauthorized(err) {
-			return fmt.Errorf("invalid or expired API Token (Unauthorized): %w", err)
+func (c *Client) newRequest(ctx context.Context, method, path string, body any) (*http.Request, error) {
+	var bodyReader io.Reader
+	if body != nil {
+		bodyBytes, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
-		return fmt.Errorf("failed to validate api token: %w", err)
+		bodyReader = bytes.NewReader(bodyBytes)
 	}
-	return nil
+
+	baseURL := strings.TrimRight(c.BaseURL, "/")
+	reqPath := path
+	if !strings.HasPrefix(reqPath, "/") {
+		reqPath = "/" + reqPath
+	}
+	reqURL := baseURL + reqPath
+
+	req, err := http.NewRequestWithContext(ctx, method, reqURL, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Content-Type", "application/vnd.api+json")
+	return req, nil
 }
 
-func isUnauthorized(err error) bool {
-	return strings.Contains(err.Error(), "unauthorized") || errors.Is(err, tfe.ErrResourceNotFound)
+func (c *Client) Validate() error {
+	req, err := c.newRequest(context.TODO(), http.MethodGet, "/api/v2/account/details", nil)
+	if err != nil {
+		return fmt.Errorf("failed to create validation request: %w", err)
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to validate api token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("invalid or expired API Token (Unauthorized)")
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("unexpected status code during validation: %d", resp.StatusCode)
+	}
+
+	return nil
 }
 
 func (c *Client) ResolveWorkspaceID(ctx context.Context, identifier string) (string, error) {
@@ -66,11 +98,39 @@ func (c *Client) ResolveWorkspaceID(ctx context.Context, identifier string) (str
 	}
 	parts := strings.Split(identifier, "/")
 	if len(parts) == 2 {
-		ws, err := c.TFE.Workspaces.Read(ctx, parts[0], parts[1])
+		orgName := parts[0]
+		wsName := parts[1]
+
+		path := fmt.Sprintf("/api/v2/organizations/%s/workspaces/%s", url.PathEscape(orgName), url.PathEscape(wsName))
+		req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to create resolve workspace request: %w", err)
+		}
+
+		resp, err := c.HTTPClient.Do(req)
 		if err != nil {
 			return "", fmt.Errorf("failed to lookup workspace %s: %w", identifier, err)
 		}
-		return ws.ID, nil
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("failed to lookup workspace %s: expected 200 OK, got %d", identifier, resp.StatusCode)
+		}
+
+		var payload struct {
+			Data struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+			return "", fmt.Errorf("failed to decode workspace response: %w", err)
+		}
+
+		if payload.Data.ID == "" {
+			return "", fmt.Errorf("workspace ID missing from response")
+		}
+
+		return payload.Data.ID, nil
 	}
 	return "", fmt.Errorf("invalid workspace identifier format. Expected 'ws-xxx' or 'org_name/workspace_name'")
 }

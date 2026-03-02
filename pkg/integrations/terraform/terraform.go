@@ -80,7 +80,7 @@ func (i *TerraformIntegration) HandleRequest(ctx core.HTTPRequestContext) {}
 func (i *TerraformIntegration) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&RunEvent{},
-		&TerraformNeedsAttention{},
+		&NeedsAttention{},
 	}
 }
 
@@ -91,7 +91,6 @@ func (i *TerraformIntegration) Components() []core.Component {
 		&DiscardRun{},
 		&OverridePolicy{},
 		&ReadRun{},
-		&WaitForApproval{},
 		&TrackRun{},
 	}
 }
