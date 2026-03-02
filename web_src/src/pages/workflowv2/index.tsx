@@ -3049,6 +3049,7 @@ export function WorkflowPageV2() {
         headerBanner={headerBanner}
         topViewMode={topViewMode}
         onTopViewModeChange={setTopViewMode}
+        memoryItemCount={canvasMemoryEntries.length}
         dataViewContent={
           <CanvasMemoryView
             entries={canvasMemoryEntries}

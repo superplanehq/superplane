@@ -37,6 +37,7 @@ interface HeaderProps {
   onExportYamlDownload?: () => void;
   topViewMode?: "canvas" | "memory";
   onTopViewModeChange?: (mode: "canvas" | "memory") => void;
+  memoryItemCount?: number;
 }
 
 export function Header({
@@ -59,6 +60,7 @@ export function Header({
   onExportYamlDownload,
   topViewMode,
   onTopViewModeChange,
+  memoryItemCount,
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
   const navigate = useNavigate();
@@ -224,7 +226,12 @@ export function Header({
                     topViewMode === "memory" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
-                  Memory
+                  <span className="inline-flex items-center gap-1">
+                    <span>Memory</span>
+                    {memoryItemCount && memoryItemCount > 0 ? (
+                      <span aria-label={`${memoryItemCount} memory items`}>({memoryItemCount})</span>
+                    ) : null}
+                  </span>
                 </button>
               </div>
             )}

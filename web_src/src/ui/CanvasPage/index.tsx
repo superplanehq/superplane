@@ -156,6 +156,7 @@ export interface CanvasPageProps {
   autoLayoutOnUpdateDisabledTooltip?: string;
   topViewMode?: "canvas" | "memory";
   onTopViewModeChange?: (mode: "canvas" | "memory") => void;
+  memoryItemCount?: number;
   dataViewContent?: React.ReactNode;
   readOnly?: boolean;
   canReadIntegrations?: boolean;
@@ -835,6 +836,7 @@ function CanvasPage(props: CanvasPageProps) {
           autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
           topViewMode={props.topViewMode}
           onTopViewModeChange={props.onTopViewModeChange}
+          memoryItemCount={props.memoryItemCount}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
         />
@@ -1288,6 +1290,7 @@ function CanvasContentHeader({
   autoSaveDisabledTooltip,
   topViewMode,
   onTopViewModeChange,
+  memoryItemCount,
   onExportYamlCopy,
   onExportYamlDownload,
 }: {
@@ -1307,6 +1310,7 @@ function CanvasContentHeader({
   autoSaveDisabledTooltip?: string;
   topViewMode?: "canvas" | "memory";
   onTopViewModeChange?: (mode: "canvas" | "memory") => void;
+  memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
 }) {
@@ -1356,6 +1360,7 @@ function CanvasContentHeader({
       autoSaveDisabledTooltip={autoSaveDisabledTooltip}
       topViewMode={topViewMode}
       onTopViewModeChange={onTopViewModeChange}
+      memoryItemCount={memoryItemCount}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
     />
