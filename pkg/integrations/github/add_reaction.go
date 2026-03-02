@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
+	"strings"
 
 	"github.com/google/go-github/v74/github"
 	"github.com/google/uuid"
@@ -142,7 +144,7 @@ func (c *AddReaction) Setup(ctx core.SetupContext) error {
 		return errors.New("repository is required")
 	}
 
-	if config.CommentID == "" {
+	if strings.TrimSpace(config.CommentID) == "" {
 		return errors.New("comment ID is required")
 	}
 
@@ -175,7 +177,7 @@ func (c *AddReaction) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invalid target: %s", config.Target)
 	}
 
-	commentID, err := strconv.ParseInt(config.CommentID, 10, 64)
+	commentID, err := parseCommentID(config.CommentID)
 	if err != nil {
 		return fmt.Errorf("comment ID is not a number: %v", err)
 	}
@@ -242,4 +244,35 @@ func (c *AddReaction) Cancel(ctx core.ExecutionContext) error {
 
 func (c *AddReaction) Cleanup(ctx core.SetupContext) error {
 	return nil
+}
+
+func parseCommentID(value string) (int64, error) {
+	trimmedValue := strings.TrimSpace(value)
+	if trimmedValue == "" {
+		return 0, fmt.Errorf("value is empty")
+	}
+
+	commentID, err := strconv.ParseInt(trimmedValue, 10, 64)
+	if err == nil {
+		return commentID, nil
+	}
+
+	floatValue, floatErr := strconv.ParseFloat(trimmedValue, 64)
+	if floatErr != nil {
+		return 0, err
+	}
+
+	if math.IsNaN(floatValue) || math.IsInf(floatValue, 0) {
+		return 0, fmt.Errorf("value is not finite")
+	}
+
+	if floatValue != math.Trunc(floatValue) {
+		return 0, fmt.Errorf("value has decimals")
+	}
+
+	if floatValue > float64(math.MaxInt64) || floatValue < float64(math.MinInt64) {
+		return 0, fmt.Errorf("value is out of range")
+	}
+
+	return int64(floatValue), nil
 }

@@ -158,3 +158,22 @@ func Test__AddReaction__Execute(t *testing.T) {
 		require.ErrorContains(t, err, "failed to decode configuration")
 	})
 }
+
+func Test__parseCommentID(t *testing.T) {
+	t.Run("parses regular integer string", func(t *testing.T) {
+		commentID, err := parseCommentID("3983993590")
+		require.NoError(t, err)
+		require.EqualValues(t, 3983993590, commentID)
+	})
+
+	t.Run("parses scientific notation string", func(t *testing.T) {
+		commentID, err := parseCommentID("3.98399359e+09")
+		require.NoError(t, err)
+		require.EqualValues(t, 3983993590, commentID)
+	})
+
+	t.Run("rejects decimal value", func(t *testing.T) {
+		_, err := parseCommentID("3983993590.5")
+		require.ErrorContains(t, err, "value has decimals")
+	})
+}
