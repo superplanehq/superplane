@@ -339,9 +339,13 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 		Timeout:          spec.Timeout,
 		ConnectionRetry:  spec.ConnectionRetry,
 		Attempt:          0,
-		MaxRetries:       spec.ConnectionRetry.Retries,
-		IntervalSeconds:  spec.ConnectionRetry.IntervalSeconds,
+		MaxRetries:       0,
+		IntervalSeconds:  0,
 		Authentication:   spec.Authentication,
+	}
+	if spec.ConnectionRetry != nil {
+		metadata.MaxRetries = spec.ConnectionRetry.Retries
+		metadata.IntervalSeconds = spec.ConnectionRetry.IntervalSeconds
 	}
 
 	err = ctx.Metadata.Set(metadata)
