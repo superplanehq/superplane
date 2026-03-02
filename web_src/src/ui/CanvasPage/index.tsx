@@ -13,7 +13,16 @@ import {
   type EdgeChange,
 } from "@xyflow/react";
 
-import { CircleX, Loader2, MapIcon, ScanLine, ScanText, ScrollText, TriangleAlert, Workflow } from "lucide-react";
+import {
+  CircleX,
+  Loader2,
+  Map as MapIcon,
+  ScanLine,
+  ScanText,
+  ScrollText,
+  TriangleAlert,
+  Workflow,
+} from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
@@ -2293,7 +2302,7 @@ function CanvasContent({
                         size="sm"
                         className={`h-8 w-8 px-0 ${
                           isMinimapVisible
-                            ? "bg-slate-100 text-slate-900 hover:bg-slate-200"
+                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                             : "text-slate-600 hover:text-slate-900"
                         }`}
                         onClick={() => setIsMinimapVisible((prev) => !prev)}
