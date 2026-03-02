@@ -64,6 +64,7 @@ import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.sv
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
+import firehydrantIcon from "@/assets/icons/integrations/firehydrant.svg";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
@@ -1040,6 +1041,7 @@ function CategorySection({
     daytona: daytonaIcon,
     digitalocean: digitaloceanIcon,
     discord: discordIcon,
+    firehydrant: firehydrantIcon,
     github: githubIcon,
     gitlab: gitlabIcon,
     hetzner: hetznerIcon,
@@ -1172,6 +1174,7 @@ function CategorySection({
             datadog: datadogIcon,
             digitalocean: digitaloceanIcon,
             discord: discordIcon,
+            firehydrant: firehydrantIcon,
             github: githubIcon,
             gitlab: gitlabIcon,
             hetzner: hetznerIcon,
