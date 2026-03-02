@@ -1,0 +1,97 @@
+import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
+import { getState, getStateMap, getTriggerRenderer } from "..";
+import terraformIcon from "@/assets/icons/integrations/terraform.svg";
+import { MetadataItem } from "@/ui/metadataList";
+import {
+  OutputPayload,
+  ComponentBaseMapper,
+  ComponentBaseContext,
+  SubtitleContext,
+  ExecutionDetailsContext,
+  NodeInfo,
+  ExecutionInfo,
+} from "../types";
+
+export const terraformComponentMapper: ComponentBaseMapper = {
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const { nodes, node, componentDefinition, lastExecutions } = context;
+    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
+    const componentName = componentDefinition.name || node.componentName || "unknown";
+
+    const metadata: MetadataItem[] = [];
+    const config = node.configuration as Record<string, any>;
+    if (config?.workspaceId) {
+      metadata.push({ icon: "box", label: config.workspaceId });
+    }
+    if (config?.runId) {
+      metadata.push({ icon: "play", label: config.runId });
+    }
+
+    return {
+      iconSrc: terraformIcon,
+      iconColor: getColorClass(componentDefinition.color),
+      collapsedBackground: getBackgroundColorClass(componentDefinition.color),
+      collapsed: node.isCollapsed,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
+      eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
+      metadata,
+      includeEmptyState: !lastExecution,
+      eventStateMap: getStateMap(componentName),
+    };
+  },
+
+  subtitle(context: SubtitleContext): string {
+    const { execution } = context;
+    if (execution.result === "RESULT_FAILED") {
+      return execution.resultMessage || "Execution failed";
+    }
+    return "Action completed successfully";
+  },
+
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const CHANNELS = ["completed", "failed", "needsAttention", "approved", "rejected", "timeout", "default"];
+    const outputs = context.execution.outputs as Record<string, OutputPayload[]> | undefined;
+    const details: Record<string, string> = {};
+
+    if (!outputs) return details;
+
+    let outputData: Record<string, any> | undefined;
+    for (const channel of CHANNELS) {
+      const channelOutputs = outputs[channel];
+      if (channelOutputs && channelOutputs.length > 0) {
+        outputData = channelOutputs[0].data as Record<string, any>;
+        break;
+      }
+    }
+
+    if (!outputData) return details;
+
+    if (outputData?.runId) details["Run ID"] = outputData.runId;
+    if (outputData?.status) details["Status"] = outputData.status;
+    if (outputData?.finalStatus) details["Final Status"] = outputData.finalStatus;
+    if (outputData?.message) details["Message"] = outputData.message;
+    if (outputData?.decision) details["Decision"] = outputData.decision;
+    if (outputData?.decidedAt) details["Decided At"] = outputData.decidedAt;
+    if (outputData?.appliedToTFC !== undefined) details["Applied to TFC"] = outputData.appliedToTFC ? "Yes" : "No";
+    if (outputData?.timeoutAt) details["Timed Out At"] = outputData.timeoutAt;
+
+    return details;
+  },
+};
+
+function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
+
+  return [
+    {
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+      eventState: getState(componentName)(execution),
+      eventSubtitle: execution.result === "RESULT_FAILED" ? execution.resultMessage || "Failed" : "Success",
+      eventId: execution.rootEvent!.id!,
+    },
+  ];
+}
