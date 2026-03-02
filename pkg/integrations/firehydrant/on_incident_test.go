@@ -21,7 +21,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:        &contexts.EventContext{},
 		})
 
@@ -38,7 +38,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Events:        &contexts.EventContext{},
 		})
 
@@ -56,7 +56,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"current_milestone": []any{"started"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: ""},
+			Webhook: &contexts.NodeWebhookContext{Secret: ""},
 			Events:  eventContext,
 		})
 
@@ -75,7 +75,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        &contexts.EventContext{},
 		})
 
@@ -94,7 +94,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventContext,
 		})
 
@@ -114,7 +114,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
-			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
 			Events:        eventContext,
 		})
 
@@ -151,7 +151,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"current_milestone": []any{"started"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -199,7 +199,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 				"current_milestone": []any{"started"},
 				"severities":        []any{"SEV1", "SEV0"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -234,7 +234,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 				"current_milestone": []any{"started"},
 				"severities":        []any{"SEV1"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -268,7 +268,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 				"current_milestone": []any{"started"},
 				"severities":        []any{"SEV1"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -303,7 +303,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 				"current_milestone": []any{"started"},
 				"severities":        []any{"SEV1", "SEV0"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -338,7 +338,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 				"current_milestone": []any{"started"},
 				"severities":        []any{"SEV1"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -374,7 +374,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"current_milestone": []any{"mitigated", "resolved"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -415,7 +415,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"current_milestone": []any{"mitigated", "resolved"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -448,7 +448,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"current_milestone": []any{"mitigated"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -483,7 +483,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"current_milestone": []any{"started"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -520,7 +520,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 				"current_milestone": []any{"resolved"},
 				"severities":        []any{"SEV1"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
@@ -557,7 +557,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 				"current_milestone": []any{"resolved"},
 				"severities":        []any{"SEV1"},
 			},
-			Webhook: &contexts.WebhookContext{Secret: secret},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 			Events:  eventContext,
 		})
 
