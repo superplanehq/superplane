@@ -16,7 +16,7 @@ import (
 type AddReaction struct{}
 
 const (
-	ReactionTargetIssueComment = "issueComment"
+	ReactionTargetIssueComment  = "issueComment"
 	ReactionTargetReviewComment = "reviewComment"
 )
 

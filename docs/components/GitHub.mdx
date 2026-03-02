@@ -26,6 +26,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Add Issue Assignee" href="#add-issue-assignee" description="Add assignees to a GitHub issue" />
   <LinkCard title="Add Issue Label" href="#add-issue-label" description="Add labels to a GitHub issue" />
+  <LinkCard title="Add Reaction" href="#add-reaction" description="Add a reaction to a GitHub comment" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitHub repository" />
   <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a GitHub issue or pull request" />
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
@@ -1728,6 +1729,46 @@ Returns the full list of labels currently on the issue after the addition.
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.labels"
+}
+```
+
+<a id="add-reaction"></a>
+
+## Add Reaction
+
+The Add Reaction component adds a reaction emoji to a GitHub comment.
+
+### Use Cases
+
+- **Acknowledge commands**: Add eyes to PR comments to indicate automation saw them
+- **Workflow feedback**: React with +1 or rocket on success paths
+- **Fast triage signals**: Use reactions to show status without posting extra comments
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Target**: Choose PR conversation comment or PR review line comment
+- **Comment ID**: The GitHub comment ID to react to (supports expressions)
+- **Reaction**: One of GitHub's supported reaction values
+
+### Output
+
+Returns the created GitHub reaction object, including id, content, user, and timestamp.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "content": "eyes",
+    "created_at": "2026-01-16T17:56:16Z",
+    "id": 1,
+    "user": {
+      "login": "superplane-bot"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.reaction"
 }
 ```
 

@@ -88,9 +88,9 @@ func Test__AddReaction__Setup(t *testing.T) {
 			Integration: integrationCtx,
 			Metadata:    &nodeMetadataCtx,
 			Configuration: map[string]any{
-				"target":    ReactionTargetIssueComment,
-				"commentId": "42",
-				"content":   "eyes",
+				"target":     ReactionTargetIssueComment,
+				"commentId":  "42",
+				"content":    "eyes",
 				"repository": `{{$["github.onPRComment"].data.repository.full_name}}`,
 			},
 		}))
@@ -123,9 +123,9 @@ func Test__AddReaction__Execute(t *testing.T) {
 			Integration:    &contexts.IntegrationContext{},
 			ExecutionState: &contexts.ExecutionStateContext{},
 			Configuration: map[string]any{
-				"target":    "invalid",
-				"commentId": "42",
-				"content":   "eyes",
+				"target":     "invalid",
+				"commentId":  "42",
+				"content":    "eyes",
 				"repository": "hello",
 			},
 		})
@@ -138,9 +138,9 @@ func Test__AddReaction__Execute(t *testing.T) {
 			Integration:    &contexts.IntegrationContext{},
 			ExecutionState: &contexts.ExecutionStateContext{},
 			Configuration: map[string]any{
-				"target":    ReactionTargetIssueComment,
-				"commentId": "abc",
-				"content":   "eyes",
+				"target":     ReactionTargetIssueComment,
+				"commentId":  "abc",
+				"content":    "eyes",
 				"repository": "hello",
 			},
 		})
