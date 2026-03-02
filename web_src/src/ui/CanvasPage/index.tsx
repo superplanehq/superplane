@@ -2169,7 +2169,10 @@ function CanvasContent({
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
             <CanvasMiniMap nodes={state.nodes} edges={state.edges} isVisible={isMinimapVisible} />
-            <Panel position="bottom-left" className="!bg-transparent !outline-none !shadow-none p-0 flex items-center gap-2">
+            <Panel
+              position="bottom-left"
+              className="!bg-transparent !outline-none !shadow-none p-0 flex items-center gap-2"
+            >
               <ZoomSlider
                 orientation="horizontal"
                 className="!static !m-0"
@@ -2250,55 +2253,59 @@ function CanvasContent({
                 />
               </ZoomSlider>
               <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 items-center text-xs font-medium"
-                    onClick={() => handleLogButtonClick("all")}
-                  >
-                    <ScrollText className="h-3 w-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>All Logs</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 items-center text-xs font-medium"
-                    onClick={() => handleLogButtonClick("error")}
-                  >
-                    <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
-                    <span className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}>
-                      {logCounts.error}
-                    </span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Errors</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 items-center text-xs font-medium"
-                    onClick={() => handleLogButtonClick("warning")}
-                  >
-                    <TriangleAlert
-                      className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
-                    />
-                    <span
-                      className={logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 items-center text-xs font-medium"
+                      onClick={() => handleLogButtonClick("all")}
                     >
-                      {logCounts.warning}
-                    </span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Warnings</TooltipContent>
-              </Tooltip>
+                      <ScrollText className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>All Logs</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 items-center text-xs font-medium"
+                      onClick={() => handleLogButtonClick("error")}
+                    >
+                      <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
+                      <span
+                        className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}
+                      >
+                        {logCounts.error}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Errors</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 items-center text-xs font-medium"
+                      onClick={() => handleLogButtonClick("warning")}
+                    >
+                      <TriangleAlert
+                        className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
+                      />
+                      <span
+                        className={
+                          logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"
+                        }
+                      >
+                        {logCounts.warning}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Warnings</TooltipContent>
+                </Tooltip>
               </div>
             </Panel>
           </ReactFlow>

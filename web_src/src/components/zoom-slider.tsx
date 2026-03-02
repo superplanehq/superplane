@@ -132,15 +132,13 @@ export function ZoomSlider({
   return (
     <TooltipProvider delayDuration={300}>
       <Panel
-        className={cn(
-          "flex items-center gap-2 p-0",
-          orientation === "horizontal" ? "flex-row" : "flex-col",
-          className,
-        )}
+        className={cn("flex items-center gap-2 p-0", orientation === "horizontal" ? "flex-row" : "flex-col", className)}
         {...props}
       >
         <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
-          <div className={cn("flex items-center gap-1", orientation === "horizontal" ? "flex-row" : "flex-col-reverse")}>
+          <div
+            className={cn("flex items-center gap-1", orientation === "horizontal" ? "flex-row" : "flex-col-reverse")}
+          >
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => zoomOut({ duration: 300 })}>

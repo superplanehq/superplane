@@ -15,7 +15,8 @@ export function CanvasMiniMap({ nodes, edges, isVisible }: CanvasMiniMapProps) {
     const centers = new Map<string, { x: number; y: number }>();
 
     nodes.forEach((node) => {
-      const absolutePosition = (node as ReactFlowNode & { positionAbsolute?: { x: number; y: number } }).positionAbsolute;
+      const absolutePosition = (node as ReactFlowNode & { positionAbsolute?: { x: number; y: number } })
+        .positionAbsolute;
       const x = absolutePosition?.x ?? node.position?.x ?? 0;
       const y = absolutePosition?.y ?? node.position?.y ?? 0;
       const width = node.measured?.width ?? node.width ?? 160;
