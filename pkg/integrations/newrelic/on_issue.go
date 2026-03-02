@@ -178,7 +178,8 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusBadRequest, fmt.Errorf("failed to parse request body: %w", err)
 	}
 
-	if !containsIgnoreCase(config.Statuses, payload.State) {
+	filteredStatuses := filterEmptyStrings(config.Statuses)
+	if !containsIgnoreCase(filteredStatuses, payload.State) {
 		return http.StatusOK, nil
 	}
 
