@@ -9,6 +9,7 @@ import type { AuthorizationDomainType } from "@/api-client";
 
 const SECRET_KEY_DELIMITER = "::";
 const LABEL_SEPARATOR = " / ";
+const CLEAR_OPTION_VALUE = "__none__";
 const DOMAIN_TYPE_ORG: AuthorizationDomainType = "DOMAIN_TYPE_ORGANIZATION";
 
 export type SecretKeyRefValue = { secret: string; key: string } | undefined;
@@ -18,6 +19,7 @@ interface SecretKeyFieldRendererProps {
   onChange: (value: { secret: string; key: string } | undefined) => void;
   organizationId: string | undefined;
   placeholder?: string;
+  allowClear?: boolean;
 }
 
 /** Value to option value "secret::key" for the dropdown. */
@@ -35,6 +37,7 @@ export const SecretKeyFieldRenderer = ({
   onChange,
   organizationId,
   placeholder = "Select credential",
+  allowClear = false,
 }: SecretKeyFieldRendererProps) => {
   const domainId = organizationId ?? "";
   const optionValue = toOptionValue(value);
@@ -132,7 +135,7 @@ export const SecretKeyFieldRenderer = ({
     <Select
       value={optionValue}
       onValueChange={(val) => {
-        if (!val) {
+        if (!val || val === CLEAR_OPTION_VALUE) {
           onChange(undefined);
           return;
         }
@@ -146,6 +149,7 @@ export const SecretKeyFieldRenderer = ({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
+        {allowClear && <SelectItem value={CLEAR_OPTION_VALUE}>None</SelectItem>}
         {options.map((opt) => (
           <SelectItem key={opt.value} value={opt.value}>
             {opt.label}
