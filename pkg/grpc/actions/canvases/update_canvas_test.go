@@ -1411,3 +1411,104 @@ func TestUpdateCanvasWithAutoLayout_UnknownSeedNode(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "auto_layout.node_ids contains unknown node")
 }
+
+func TestUpdateCanvasWithAutoLayout_OrdersBranchesByOutputChannel(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{},
+		[]models.Edge{},
+	)
+
+	canvasPB := &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{
+			Name:        canvas.Name,
+			Description: canvas.Description,
+		},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "if-node",
+					Name: "If Node",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "if",
+					},
+					Configuration: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"expression": structpb.NewStringValue("true"),
+						},
+					},
+					Position: &componentpb.Position{X: 100, Y: 200},
+				},
+				{
+					Id:   "true-node",
+					Name: "True Node",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+					Position: &componentpb.Position{X: 700, Y: 900},
+				},
+				{
+					Id:   "false-node",
+					Name: "False Node",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+					Position: &componentpb.Position{X: 700, Y: 100},
+				},
+			},
+			Edges: []*componentpb.Edge{
+				{
+					SourceId: "if-node",
+					TargetId: "true-node",
+					Channel:  "true",
+				},
+				{
+					SourceId: "if-node",
+					TargetId: "false-node",
+					Channel:  "false",
+				},
+			},
+		},
+	}
+
+	response, err := UpdateCanvasWithAutoLayout(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		canvasPB,
+		&pb.CanvasAutoLayout{
+			Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
+		},
+		"http://localhost:3000/api/v1",
+	)
+	require.NoError(t, err)
+	require.NotNil(t, response.Canvas)
+	require.NotNil(t, response.Canvas.Spec)
+
+	nodesByID := make(map[string]*componentpb.Node, len(response.Canvas.Spec.Nodes))
+	for _, node := range response.Canvas.Spec.Nodes {
+		nodesByID[node.GetId()] = node
+	}
+
+	require.Contains(t, nodesByID, "if-node")
+	require.Contains(t, nodesByID, "true-node")
+	require.Contains(t, nodesByID, "false-node")
+
+	ifNode := nodesByID["if-node"].GetPosition()
+	trueNode := nodesByID["true-node"].GetPosition()
+	falseNode := nodesByID["false-node"].GetPosition()
+
+	assert.Less(t, ifNode.GetX(), trueNode.GetX())
+	assert.Less(t, ifNode.GetX(), falseNode.GetX())
+	assert.Less(t, trueNode.GetY(), falseNode.GetY(), "true channel should be above false channel")
+}
