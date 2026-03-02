@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/hashicorp/go-tfe"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -148,21 +147,21 @@ func (t *RunEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
 
-type TerraformNeedsAttention struct{}
+type NeedsAttention struct{}
 
-type TerraformNeedsAttentionConfiguration struct {
+type NeedsAttentionConfiguration struct {
 	WorkspaceID string `json:"workspaceId"`
 }
 
-func (t *TerraformNeedsAttention) Name() string  { return "terraform.needsAttention" }
-func (t *TerraformNeedsAttention) Label() string { return "On Run Needs Attention" }
-func (t *TerraformNeedsAttention) Description() string {
+func (t *NeedsAttention) Name() string  { return "terraform.needsAttention" }
+func (t *NeedsAttention) Label() string { return "On Run Needs Attention" }
+func (t *NeedsAttention) Description() string {
 	return "Trigger a workflow when a Terraform Run is paused for policy overrides or approval."
 }
-func (t *TerraformNeedsAttention) Icon() string  { return "terraform" }
-func (t *TerraformNeedsAttention) Color() string { return "orange" }
+func (t *NeedsAttention) Icon() string  { return "terraform" }
+func (t *NeedsAttention) Color() string { return "orange" }
 
-func (t *TerraformNeedsAttention) Configuration() []configuration.Field {
+func (t *NeedsAttention) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "workspaceId",
@@ -174,11 +173,11 @@ func (t *TerraformNeedsAttention) Configuration() []configuration.Field {
 	}
 }
 
-func (t *TerraformNeedsAttention) Cancel(ctx core.ExecutionContext) error { return nil }
-func (t *TerraformNeedsAttention) Cleanup(ctx core.TriggerContext) error  { return nil }
+func (t *NeedsAttention) Cancel(ctx core.ExecutionContext) error { return nil }
+func (t *NeedsAttention) Cleanup(ctx core.TriggerContext) error  { return nil }
 
-func (t *TerraformNeedsAttention) Setup(ctx core.TriggerContext) error {
-	config := TerraformNeedsAttentionConfiguration{}
+func (t *NeedsAttention) Setup(ctx core.TriggerContext) error {
+	config := NeedsAttentionConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return err
 	}
@@ -192,7 +191,7 @@ func (t *TerraformNeedsAttention) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *TerraformNeedsAttention) Actions() []core.Action {
+func (t *NeedsAttention) Actions() []core.Action {
 	return []core.Action{
 		{
 			Name:           "applyRun",
@@ -253,7 +252,7 @@ func (t *TerraformNeedsAttention) Actions() []core.Action {
 	}
 }
 
-func (t *TerraformNeedsAttention) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *NeedsAttention) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
 	client, err := getClientFromIntegration(ctx.Integration)
 	if err != nil {
 		return nil, err
@@ -267,11 +266,7 @@ func (t *TerraformNeedsAttention) HandleAction(ctx core.TriggerActionContext) (m
 			return nil, fmt.Errorf("runId is required")
 		}
 
-		applyOpts := tfe.RunApplyOptions{}
-		if comment != "" {
-			applyOpts.Comment = &comment
-		}
-		err := client.TFE.Runs.Apply(context.Background(), runID, applyOpts)
+		err := client.ApplyRun(context.Background(), runID, comment)
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply run: %w", err)
 		}
@@ -284,11 +279,7 @@ func (t *TerraformNeedsAttention) HandleAction(ctx core.TriggerActionContext) (m
 			return nil, fmt.Errorf("runId is required")
 		}
 
-		discardOpts := tfe.RunDiscardOptions{}
-		if comment != "" {
-			discardOpts.Comment = &comment
-		}
-		err := client.TFE.Runs.Discard(context.Background(), runID, discardOpts)
+		err := client.DiscardRun(context.Background(), runID, comment)
 		if err != nil {
 			return nil, fmt.Errorf("failed to discard run: %w", err)
 		}
@@ -300,7 +291,7 @@ func (t *TerraformNeedsAttention) HandleAction(ctx core.TriggerActionContext) (m
 			return nil, fmt.Errorf("policyCheckId is required")
 		}
 
-		_, err := client.TFE.PolicyChecks.Override(context.Background(), policyCheckID)
+		err := client.OverridePolicy(context.Background(), policyCheckID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to override policy: %w", err)
 		}
@@ -310,18 +301,18 @@ func (t *TerraformNeedsAttention) HandleAction(ctx core.TriggerActionContext) (m
 		return nil, fmt.Errorf("unknown action: %s", ctx.Name)
 	}
 }
-func (t *TerraformNeedsAttention) ExampleOutput() map[string]any { return nil }
-func (t *TerraformNeedsAttention) ExampleData() map[string]any   { return nil }
-func (t *TerraformNeedsAttention) Documentation() string         { return "" }
-func (t *TerraformNeedsAttention) Triggers() []string            { return []string{} }
+func (t *NeedsAttention) ExampleOutput() map[string]any { return nil }
+func (t *NeedsAttention) ExampleData() map[string]any   { return nil }
+func (t *NeedsAttention) Documentation() string         { return "" }
+func (t *NeedsAttention) Triggers() []string            { return []string{} }
 
-func (t *TerraformNeedsAttention) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *NeedsAttention) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	data, code, err := ParseAndValidateWebhook(ctx)
 	if err != nil {
 		return code, err
 	}
 
-	config := TerraformNeedsAttentionConfiguration{}
+	config := NeedsAttentionConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return http.StatusInternalServerError, err
 	}
