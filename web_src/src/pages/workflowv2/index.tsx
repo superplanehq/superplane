@@ -121,6 +121,7 @@ import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
 const CANVAS_AUTO_SAVE_STORAGE_KEY = "canvas-auto-save-enabled";
+const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const LOCAL_CANVAS_UPDATE_SUPPRESSION_MS = 2000;
 
 type UnsavedChangeKind = "position" | "structural";
@@ -239,6 +240,13 @@ export function WorkflowPageV2() {
     return true;
   });
   const canAutoSave = isAutoSaveEnabled && !isTemplate;
+  const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY);
+      return stored !== null ? JSON.parse(stored) : false;
+    }
+    return false;
+  });
 
   // Revert functionality - track initial workflow snapshot
   const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<CanvasesCanvas | null>(null);
@@ -415,6 +423,33 @@ export function WorkflowPageV2() {
       window.localStorage.setItem(CANVAS_AUTO_SAVE_STORAGE_KEY, JSON.stringify(newValue));
     }
   }, [isAutoSaveEnabled]);
+
+  const handleToggleAutoLayoutOnUpdate = useCallback(() => {
+    const newValue = !isAutoLayoutOnUpdateEnabled;
+    setIsAutoLayoutOnUpdateEnabled(newValue);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY, JSON.stringify(newValue));
+    }
+  }, [isAutoLayoutOnUpdateEnabled]);
+
+  const applyAutoLayoutOnAddedNode = useCallback(
+    async (workflow: CanvasesCanvas, nodeID?: string): Promise<CanvasesCanvas> => {
+      if (!isAutoLayoutOnUpdateEnabled || !nodeID) {
+        return workflow;
+      }
+
+      const node = workflow.spec?.nodes?.find((candidate) => candidate.id === nodeID);
+      if (!node || node.type === "TYPE_WIDGET") {
+        return workflow;
+      }
+
+      return applyHorizontalAutoLayout(workflow, {
+        scope: "connected-component",
+        nodeIds: [nodeID],
+      });
+    },
+    [isAutoLayoutOnUpdateEnabled],
+  );
 
   /**
    * Ref to track pending position updates that need to be auto-saved.
@@ -1825,11 +1860,13 @@ export function WorkflowPageV2() {
         },
       };
 
+      const finalWorkflow = await applyAutoLayoutOnAddedNode(updatedWorkflow, newNodeId);
+
       // Update local cache
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
 
       if (canAutoSave) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+        await handleSaveWorkflow(finalWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1844,6 +1881,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
+      applyAutoLayoutOnAddedNode,
       canAutoSave,
       markUnsavedChange,
     ],
@@ -1948,10 +1986,12 @@ export function WorkflowPageV2() {
         },
       };
 
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+      const finalWorkflow = await applyAutoLayoutOnAddedNode(updatedWorkflow, newNodeId);
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
 
       if (canAutoSave) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+        await handleSaveWorkflow(finalWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1965,6 +2005,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
+      applyAutoLayoutOnAddedNode,
       canAutoSave,
       markUnsavedChange,
     ],
@@ -2345,45 +2386,6 @@ export function WorkflowPageV2() {
     ],
   );
 
-  const handleAutoLayout = useCallback(
-    async (selectedNodeIDs: string[] = []) => {
-      if (!canvas || !organizationId || !canvasId) return;
-
-      const latestWorkflow =
-        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
-
-      try {
-        if (!canAutoSave) {
-          saveWorkflowSnapshot(latestWorkflow);
-        }
-
-        const updatedWorkflow = await applyHorizontalAutoLayout(latestWorkflow, {
-          nodeIds: selectedNodeIDs,
-        });
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-
-        if (canAutoSave) {
-          await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-        } else {
-          markUnsavedChange("position");
-        }
-      } catch (error) {
-        console.error("Failed to auto layout canvas", error);
-        showErrorToast("Failed to auto layout canvas");
-      }
-    },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      canAutoSave,
-      saveWorkflowSnapshot,
-      handleSaveWorkflow,
-      markUnsavedChange,
-    ],
-  );
-
   const handleNodeCollapseChange = useCallback(
     async (nodeId: string) => {
       if (!canvas || !organizationId || !canvasId) return;
@@ -2599,10 +2601,12 @@ export function WorkflowPageV2() {
         },
       };
 
+      const finalWorkflow = await applyAutoLayoutOnAddedNode(updatedWorkflow, newNodeId);
+
       // Update local cache
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
       if (canAutoSave) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+        await handleSaveWorkflow(finalWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -2615,6 +2619,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
+      applyAutoLayoutOnAddedNode,
       canAutoSave,
       markUnsavedChange,
     ],
@@ -3071,7 +3076,8 @@ export function WorkflowPageV2() {
         onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
         onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
         onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
-        onAutoLayout={!isReadOnly ? handleAutoLayout : undefined}
+        isAutoLayoutOnUpdateEnabled={isAutoLayoutOnUpdateEnabled && !isReadOnly}
+        onToggleAutoLayoutOnUpdate={!isReadOnly ? handleToggleAutoLayoutOnUpdate : undefined}
         onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
         onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
         onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
@@ -3107,6 +3113,8 @@ export function WorkflowPageV2() {
         onToggleAutoSave={isTemplate ? undefined : handleToggleAutoSave}
         autoSaveDisabled={autoSaveDisabled}
         autoSaveDisabledTooltip={autoSaveDisabledTooltip}
+        autoLayoutOnUpdateDisabled={isReadOnly}
+        autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
         onExportYamlCopy={isDev ? handleExportYamlCopy : undefined}
         onExportYamlDownload={isDev ? handleExportYamlDownload : undefined}
         runDisabled={runDisabled}

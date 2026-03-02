@@ -3,6 +3,7 @@ package canvases
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
@@ -39,6 +40,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	var (
 		canvasID string
 		canvas   openapi_client.CanvasesCanvas
+		current  *openapi_client.CanvasesCanvas
 		err      error
 	)
 
@@ -52,21 +54,34 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		if err != nil {
 			return err
 		}
+		current = &canvas
 	}
 
 	body := openapi_client.CanvasesUpdateCanvasBody{}
 	body.SetCanvas(canvas)
 
-	if autoLayoutValue == "" && (autoLayoutScopeValue != "" || len(autoLayoutNodeIDs) > 0) {
-		return fmt.Errorf("--auto-layout is required when using --auto-layout-scope or --auto-layout-node")
-	}
-
-	if autoLayoutValue != "" {
-		autoLayout, parseErr := parseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
-		if parseErr != nil {
-			return parseErr
+	if autoLayoutFlagsWereSet(ctx) {
+		if autoLayoutValue == "" && (autoLayoutScopeValue != "" || len(autoLayoutNodeIDs) > 0) {
+			return fmt.Errorf("--auto-layout is required when using --auto-layout-scope or --auto-layout-node")
 		}
-		body.SetAutoLayout(*autoLayout)
+
+		if autoLayoutValue != "" {
+			autoLayout, parseErr := parseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
+			if parseErr != nil {
+				return parseErr
+			}
+			body.SetAutoLayout(*autoLayout)
+		}
+	} else {
+		if current == nil {
+			existingCanvas, describeErr := describeCanvasByID(ctx, canvasID)
+			if describeErr != nil {
+				return describeErr
+			}
+			current = &existingCanvas
+		}
+
+		body.SetAutoLayout(buildDefaultAutoLayout(*current, canvas))
 	}
 
 	_, _, err = ctx.API.CanvasAPI.
@@ -124,15 +139,12 @@ func loadCanvasFromExisting(ctx core.CommandContext) (string, openapi_client.Can
 		return "", openapi_client.CanvasesCanvas{}, err
 	}
 
-	response, _, err := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, canvasID).Execute()
+	canvas, err := describeCanvasByID(ctx, canvasID)
 	if err != nil {
 		return "", openapi_client.CanvasesCanvas{}, err
 	}
-	if response.Canvas == nil {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas %q not found", target)
-	}
 
-	return canvasID, *response.Canvas, nil
+	return canvasID, canvas, nil
 }
 
 func parseAutoLayout(value string, scopeValue string, nodeIDs []string) (*openapi_client.CanvasesCanvasAutoLayout, error) {
@@ -178,4 +190,179 @@ func parseAutoLayout(value string, scopeValue string, nodeIDs []string) (*openap
 	}
 
 	return &autoLayout, nil
+}
+
+func autoLayoutFlagsWereSet(ctx core.CommandContext) bool {
+	if ctx.Cmd == nil {
+		return false
+	}
+
+	flags := ctx.Cmd.Flags()
+	if flags == nil {
+		return false
+	}
+
+	return flags.Changed("auto-layout") || flags.Changed("auto-layout-scope") || flags.Changed("auto-layout-node")
+}
+
+func describeCanvasByID(ctx core.CommandContext, canvasID string) (openapi_client.CanvasesCanvas, error) {
+	response, _, err := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, canvasID).Execute()
+	if err != nil {
+		return openapi_client.CanvasesCanvas{}, err
+	}
+	if response.Canvas == nil {
+		return openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas %q not found", canvasID)
+	}
+
+	return *response.Canvas, nil
+}
+
+func buildDefaultAutoLayout(current openapi_client.CanvasesCanvas, next openapi_client.CanvasesCanvas) openapi_client.CanvasesCanvasAutoLayout {
+	autoLayout := openapi_client.CanvasesCanvasAutoLayout{}
+	autoLayout.SetAlgorithm(openapi_client.CANVASAUTOLAYOUTALGORITHM_ALGORITHM_HORIZONTAL)
+
+	changedFlowNodeIDs := resolveChangedFlowNodeIDs(current, next)
+	if len(changedFlowNodeIDs) == 0 {
+		autoLayout.SetScope(openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS)
+		return autoLayout
+	}
+
+	autoLayout.SetScope(openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_CONNECTED_COMPONENT)
+	autoLayout.SetNodeIds(changedFlowNodeIDs)
+	return autoLayout
+}
+
+func resolveChangedFlowNodeIDs(current openapi_client.CanvasesCanvas, next openapi_client.CanvasesCanvas) []string {
+	currentSpec := current.GetSpec()
+	nextSpec := next.GetSpec()
+
+	currentNodesByID := mapNodesByID(currentSpec.GetNodes())
+	nextNodesByID := mapNodesByID(nextSpec.GetNodes())
+
+	changedNodeIDs := make(map[string]struct{})
+
+	for _, nextNode := range nextSpec.GetNodes() {
+		nodeID := strings.TrimSpace(nextNode.GetId())
+		if nodeID == "" {
+			continue
+		}
+
+		currentNode, exists := currentNodesByID[nodeID]
+		if !exists {
+			addChangedNodeIDIfFlow(changedNodeIDs, nodeID, nextNodesByID)
+			continue
+		}
+
+		if canvasNodesDifferForAutoLayout(currentNode, nextNode) {
+			addChangedNodeIDIfFlow(changedNodeIDs, nodeID, nextNodesByID)
+		}
+	}
+
+	for nodeID := range currentNodesByID {
+		if _, exists := nextNodesByID[nodeID]; exists {
+			continue
+		}
+
+		for _, edge := range currentSpec.GetEdges() {
+			sourceID := strings.TrimSpace(edge.GetSourceId())
+			targetID := strings.TrimSpace(edge.GetTargetId())
+
+			if sourceID == nodeID {
+				addChangedNodeIDIfFlow(changedNodeIDs, targetID, nextNodesByID)
+			}
+			if targetID == nodeID {
+				addChangedNodeIDIfFlow(changedNodeIDs, sourceID, nextNodesByID)
+			}
+		}
+	}
+
+	currentEdgesByKey := mapEdgesByKey(currentSpec.GetEdges())
+	nextEdgesByKey := mapEdgesByKey(nextSpec.GetEdges())
+
+	for key, edge := range nextEdgesByKey {
+		if _, exists := currentEdgesByKey[key]; exists {
+			continue
+		}
+		addChangedNodeIDIfFlow(changedNodeIDs, strings.TrimSpace(edge.GetSourceId()), nextNodesByID)
+		addChangedNodeIDIfFlow(changedNodeIDs, strings.TrimSpace(edge.GetTargetId()), nextNodesByID)
+	}
+
+	for key, edge := range currentEdgesByKey {
+		if _, exists := nextEdgesByKey[key]; exists {
+			continue
+		}
+		addChangedNodeIDIfFlow(changedNodeIDs, strings.TrimSpace(edge.GetSourceId()), nextNodesByID)
+		addChangedNodeIDIfFlow(changedNodeIDs, strings.TrimSpace(edge.GetTargetId()), nextNodesByID)
+	}
+
+	orderedNodeIDs := make([]string, 0, len(changedNodeIDs))
+	for _, nextNode := range nextSpec.GetNodes() {
+		nodeID := strings.TrimSpace(nextNode.GetId())
+		if nodeID == "" {
+			continue
+		}
+		if _, exists := changedNodeIDs[nodeID]; !exists {
+			continue
+		}
+		orderedNodeIDs = append(orderedNodeIDs, nodeID)
+	}
+
+	return orderedNodeIDs
+}
+
+func addChangedNodeIDIfFlow(
+	changedNodeIDs map[string]struct{},
+	nodeID string,
+	nextNodesByID map[string]openapi_client.ComponentsNode,
+) {
+	if nodeID == "" {
+		return
+	}
+
+	node, exists := nextNodesByID[nodeID]
+	if !exists {
+		return
+	}
+	if node.GetType() == openapi_client.COMPONENTSNODETYPE_TYPE_WIDGET {
+		return
+	}
+
+	changedNodeIDs[nodeID] = struct{}{}
+}
+
+func canvasNodesDifferForAutoLayout(current openapi_client.ComponentsNode, next openapi_client.ComponentsNode) bool {
+	normalizedCurrent := current
+	normalizedCurrent.ErrorMessage = nil
+	normalizedCurrent.WarningMessage = nil
+
+	normalizedNext := next
+	normalizedNext.ErrorMessage = nil
+	normalizedNext.WarningMessage = nil
+
+	return !reflect.DeepEqual(normalizedCurrent, normalizedNext)
+}
+
+func mapNodesByID(nodes []openapi_client.ComponentsNode) map[string]openapi_client.ComponentsNode {
+	nodesByID := make(map[string]openapi_client.ComponentsNode, len(nodes))
+	for _, node := range nodes {
+		nodeID := strings.TrimSpace(node.GetId())
+		if nodeID == "" {
+			continue
+		}
+		nodesByID[nodeID] = node
+	}
+	return nodesByID
+}
+
+func mapEdgesByKey(edges []openapi_client.ComponentsEdge) map[string]openapi_client.ComponentsEdge {
+	edgesByKey := make(map[string]openapi_client.ComponentsEdge, len(edges))
+	for _, edge := range edges {
+		edgeKey := strings.Join([]string{
+			strings.TrimSpace(edge.GetSourceId()),
+			strings.TrimSpace(edge.GetTargetId()),
+			strings.TrimSpace(edge.GetChannel()),
+		}, "\x00")
+		edgesByKey[edgeKey] = edge
+	}
+	return edgesByKey
 }

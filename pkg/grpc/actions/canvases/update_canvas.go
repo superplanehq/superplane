@@ -64,7 +64,7 @@ func UpdateCanvasWithAutoLayout(
 		return nil, actions.ToStatus(err)
 	}
 
-	nodes, edges, err = applyCanvasAutoLayout(nodes, edges, autoLayout)
+	nodes, edges, err = applyCanvasAutoLayout(nodes, edges, autoLayout, registry)
 	if err != nil {
 		return nil, actions.ToStatus(err)
 	}
