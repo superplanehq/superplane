@@ -114,6 +114,7 @@ func UpdateCanvasWithAutoLayout(
 
 			if workflowNode.State == models.CanvasNodeStateReady {
 				err = setupNode(ctx, tx, encryptor, registry, workflowNode, webhookBaseURL)
+
 				if err != nil {
 					workflowNode.State = models.CanvasNodeStateError
 					errorMsg := err.Error()

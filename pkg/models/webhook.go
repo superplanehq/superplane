@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	WebhookStatePending = "pending"
-	WebhookStateReady   = "ready"
-	WebhookStateFailed  = "failed"
+	WebhookStatePending      = "pending"
+	WebhookStateProvisioning = "provisioning"
+	WebhookStateReady        = "ready"
+	WebhookStateFailed       = "failed"
 )
 
 type Webhook struct {
@@ -47,6 +48,13 @@ func (w *Webhook) ReadyWithMetadata(tx *gorm.DB, metadata any) error {
 	return tx.Model(w).
 		Update("state", WebhookStateReady).
 		Update("metadata", datatypes.NewJSONType(metadata)).
+		Update("updated_at", time.Now()).
+		Error
+}
+
+func (w *Webhook) MarkProvisioning(tx *gorm.DB) error {
+	return tx.Model(w).
+		Update("state", WebhookStateProvisioning).
 		Update("updated_at", time.Now()).
 		Error
 }
@@ -149,6 +157,7 @@ func LockWebhook(tx *gorm.DB, ID uuid.UUID) (*Webhook, error) {
 	err := tx.Unscoped().
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("id = ?", ID).
+		Where("state = ?", WebhookStatePending).
 		First(&webhook).
 		Error
 
@@ -157,4 +166,19 @@ func LockWebhook(tx *gorm.DB, ID uuid.UUID) (*Webhook, error) {
 	}
 
 	return &webhook, nil
+}
+
+// ResetStuckProvisioningWebhooks resets webhooks that have been stuck in
+// "provisioning" state back to "pending". This handles the edge case where
+// the process crashes during the external API call (Phase 2).
+func ResetStuckProvisioningWebhooks() (int64, error) {
+	result := database.Conn().
+		Model(&Webhook{}).
+		Where("state = ?", WebhookStateProvisioning).
+		Updates(map[string]any{
+			"state":      WebhookStatePending,
+			"updated_at": time.Now(),
+		})
+
+	return result.RowsAffected, result.Error
 }
