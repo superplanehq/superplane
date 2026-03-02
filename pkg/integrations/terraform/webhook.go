@@ -168,9 +168,13 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 		if err != nil {
 			createErr = err
 		} else {
-			defer cResp.Body.Close()
 			if cResp.StatusCode >= 400 {
 				createErr = fmt.Errorf("bad status code: %d", cResp.StatusCode)
+				if cResp.StatusCode >= 400 && cResp.StatusCode < 500 && cResp.StatusCode != 429 {
+					// Don't retry client errors like 400, 401, 403, 404, 409 etc.
+					_ = cResp.Body.Close()
+					break
+				}
 			} else {
 				var createPayload struct {
 					Data struct {
@@ -182,8 +186,14 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 				} else {
 					ncID = createPayload.Data.ID
 					createErr = nil
-					break
 				}
+			}
+			err := cResp.Body.Close()
+			if err != nil {
+				return nil, err
+			}
+			if createErr == nil {
+				break
 			}
 		}
 
