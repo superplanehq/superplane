@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -100,6 +101,9 @@ func (t *RunEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	if err != nil {
 		return code, err
 	}
+	if data == nil {
+		return http.StatusOK, nil
+	}
 
 	config := RunEventConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
@@ -121,7 +125,7 @@ func (t *RunEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	}
 
 	runMessage, _ := data["runMessage"].(string)
-	if !config.IncludeSuperPlaneRuns && slices.Contains([]rune(runMessage), '⚙') {
+	if !config.IncludeSuperPlaneRuns && strings.ContainsRune(runMessage, '⚙') {
 		return http.StatusOK, nil
 	}
 
@@ -310,6 +314,9 @@ func (t *NeedsAttention) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 	data, code, err := ParseAndValidateWebhook(ctx)
 	if err != nil {
 		return code, err
+	}
+	if data == nil {
+		return http.StatusOK, nil
 	}
 
 	config := NeedsAttentionConfiguration{}
