@@ -12,6 +12,8 @@ import { MetadataItem } from "@/ui/metadataList";
 type HetznerConfiguration = {
   serverType?: unknown;
   image?: unknown;
+  snapshot?: unknown;
+  description?: unknown;
   location?: unknown;
   server?: unknown;
   loadBalancer?: unknown;
@@ -59,6 +61,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   const serverType = getConfigValue(configuration.serverType);
   const image = getConfigValue(configuration.image);
+  const snapshot = getConfigValue(configuration.snapshot);
+  const description = getConfigValue(configuration.description);
   const location = getConfigValue(configuration.location);
   const server = getConfigValue(configuration.server);
   const loadBalancer = getConfigValue(configuration.loadBalancer);
@@ -71,6 +75,12 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
   if (image) {
     metadata.push({ icon: "hard-drive", label: `Image: ${image}` });
+  }
+  if (description) {
+    metadata.push({ icon: "camera", label: `Snapshot: ${description}` });
+  }
+  if (snapshot) {
+    metadata.push({ icon: "hard-drive", label: `Snapshot image: ${snapshot}` });
   }
   if (location) {
     metadata.push({ icon: "map-pin", label: `Location: ${location}` });
@@ -102,6 +112,7 @@ function getExecutionDetails(context: ExecutionDetailsContext): Record<string, s
 
   const isServerComponent = context.node.componentName.includes("Server");
   const isLoadBalancerComponent = context.node.componentName.includes("LoadBalancer");
+  const isSnapshotComponent = context.node.componentName.includes("Snapshot");
 
   const serverId =
     (isServerComponent ? (output?.serverId ?? output?.id) : undefined) ??
@@ -111,6 +122,10 @@ function getExecutionDetails(context: ExecutionDetailsContext): Record<string, s
     (isLoadBalancerComponent ? (output?.loadBalancerId ?? output?.id) : undefined) ??
     metadata?.loadBalancerId ??
     (metadata?.loadBalancer as Record<string, unknown> | undefined)?.id;
+  const imageId =
+    (isSnapshotComponent ? (output?.imageId ?? output?.id) : undefined) ??
+    metadata?.imageId ??
+    (metadata?.image as Record<string, unknown> | undefined)?.id;
 
   if (serverId !== undefined) {
     details["Server ID"] = String(serverId);
@@ -118,6 +133,9 @@ function getExecutionDetails(context: ExecutionDetailsContext): Record<string, s
 
   if (loadBalancerId !== undefined) {
     details["Load Balancer ID"] = String(loadBalancerId);
+  }
+  if (imageId !== undefined) {
+    details["Image ID"] = String(imageId);
   }
 
   if (context.execution.createdAt) {

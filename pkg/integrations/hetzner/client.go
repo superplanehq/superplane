@@ -48,6 +48,16 @@ type createServerResponse struct {
 	Action *ActionResponse `json:"action"`
 }
 
+type createSnapshotRequest struct {
+	Type        string `json:"type"`
+	Description string `json:"description,omitempty"`
+}
+
+type createSnapshotResponse struct {
+	Image  *ImageResponse  `json:"image"`
+	Action *ActionResponse `json:"action"`
+}
+
 const (
 	LoadBalancerAlgorithmTypeRoundRobin       = "round_robin"
 	LoadBalancerAlgorithmTypeLeastConnections = "least_connections"
@@ -274,6 +284,32 @@ func (c *Client) DeleteServer(serverID string) (*ActionResponse, error) {
 	return &out.Action, nil
 }
 
+func (c *Client) CreateServerSnapshot(serverID, description string) (*ImageResponse, *ActionResponse, error) {
+	req := createSnapshotRequest{
+		Type:        "snapshot",
+		Description: description,
+	}
+
+	resp, err := c.do("POST", "/servers/"+serverID+"/actions/create_image", req)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, nil, c.parseError(resp)
+	}
+
+	var out createSnapshotResponse
+	if err := decodeJSON(resp.Body, &out); err != nil {
+		return nil, nil, fmt.Errorf("decode create snapshot response: %w", err)
+	}
+	if out.Image == nil || out.Action == nil {
+		return nil, nil, fmt.Errorf("create snapshot response missing image or action")
+	}
+	return out.Image, out.Action, nil
+}
+
 func (c *Client) ListServers() ([]ServerResponse, error) {
 	resp, err := c.do("GET", "/servers?per_page=50", nil)
 	if err != nil {
@@ -439,12 +475,14 @@ func (s *ServerTypeResponse) ServerTypeDisplayName() string {
 }
 
 type ImageResponse struct {
-	Name string `json:"name"`
-	ID   int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Type        string `json:"type"`
+	ID          int    `json:"id"`
 }
 
 func (c *Client) ListImages() ([]ImageResponse, error) {
-	resp, err := c.do("GET", "/images?per_page=50&type=system", nil)
+	resp, err := c.do("GET", "/images?per_page=50", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -457,10 +495,44 @@ func (c *Client) ListImages() ([]ImageResponse, error) {
 	var out struct {
 		Images []ImageResponse `json:"images"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := decodeJSON(resp.Body, &out); err != nil {
 		return nil, fmt.Errorf("decode list images response: %w", err)
 	}
 	return out.Images, nil
+}
+
+func (c *Client) GetImage(imageID string) (*ImageResponse, error) {
+	resp, err := c.do("GET", "/images/"+imageID, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var out struct {
+		Image ImageResponse `json:"image"`
+	}
+	if err := decodeJSON(resp.Body, &out); err != nil {
+		return nil, fmt.Errorf("decode get image response: %w", err)
+	}
+	return &out.Image, nil
+}
+
+func (c *Client) DeleteImage(imageID string) error {
+	resp, err := c.do("DELETE", "/images/"+imageID, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		return c.parseError(resp)
+	}
+
+	return nil
 }
 
 type LocationResponse struct {
@@ -605,5 +677,34 @@ func resolveLoadBalancerID(config any) (string, error) {
 		return fmt.Sprintf("%d", v), nil
 	default:
 		return "", fmt.Errorf("invalid loadBalancer value: %v", raw)
+	}
+}
+
+// resolveImageID extracts the image ID from configuration, handling
+// both string and numeric values.
+func resolveImageID(config any, fieldName string) (string, error) {
+	m, ok := config.(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("invalid configuration type")
+	}
+
+	raw, ok := m[fieldName]
+	if !ok {
+		return "", fmt.Errorf("%s is required", fieldName)
+	}
+
+	switch v := raw.(type) {
+	case string:
+		s := strings.TrimSpace(v)
+		if s == "" {
+			return "", fmt.Errorf("%s is required", fieldName)
+		}
+		return s, nil
+	case float64:
+		return fmt.Sprintf("%.0f", v), nil
+	case int:
+		return fmt.Sprintf("%d", v), nil
+	default:
+		return "", fmt.Errorf("invalid %s value: %v", fieldName, raw)
 	}
 }
