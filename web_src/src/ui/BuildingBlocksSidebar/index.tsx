@@ -63,6 +63,7 @@ import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.sv
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
+import firehydrantIcon from "@/assets/icons/integrations/firehydrant.svg";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
@@ -137,6 +138,11 @@ export type AiCanvasOperation =
     }
   | {
       type: "connect_nodes";
+      source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null };
+      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
+    }
+  | {
+      type: "disconnect_nodes";
       source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null };
       target: { nodeKey?: string; nodeId?: string; nodeName?: string };
     }
@@ -312,6 +318,14 @@ export function BuildingBlocksSidebar({
     persistedAiState?.pendingProposal || null,
   );
   const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
+  const applyShortcutHint = useMemo(() => {
+    if (typeof navigator === "undefined") {
+      return "Ctrl+Enter";
+    }
+
+    const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
+    return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
+  }, []);
 
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
@@ -435,6 +449,8 @@ export function BuildingBlocksSidebar({
         return `Add node ${operation.nodeName || operation.blockName} (${operation.blockName})`;
       case "connect_nodes":
         return `Connect ${resolveRefLabel(operation.source)} -> ${resolveRefLabel(operation.target)}`;
+      case "disconnect_nodes":
+        return `Disconnect ${resolveRefLabel(operation.source)} -> ${resolveRefLabel(operation.target)}`;
       case "update_node_config":
         return `Update configuration for ${operation.nodeName || operation.target.nodeName || "node"}`;
       case "delete_node":
@@ -502,6 +518,34 @@ export function BuildingBlocksSidebar({
       setIsApplyingProposal(false);
     }
   }, [onApplyAiOperations, pendingProposal]);
+
+  useEffect(() => {
+    if (activeTab !== "ai" || !pendingProposal || pendingProposal.operations.length === 0) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing || event.key !== "Enter") {
+        return;
+      }
+
+      if (!(event.metaKey || event.ctrlKey)) {
+        return;
+      }
+
+      if (disabled || isApplyingProposal) {
+        return;
+      }
+
+      event.preventDefault();
+      void handleApplyProposal();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeTab, disabled, handleApplyProposal, isApplyingProposal, pendingProposal]);
 
   // Save sidebar width to localStorage whenever it changes
   useEffect(() => {
@@ -865,7 +909,10 @@ export function BuildingBlocksSidebar({
                 )}
 
                 {pendingProposal && (
-                  <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-3 space-y-2">
+                  <div className="relative rounded-md border border-blue-200 bg-blue-50 px-3 py-3 space-y-2">
+                    <span className="absolute right-2 top-2 text-[10px] text-blue-800">
+                      {`${applyShortcutHint} to accept`}
+                    </span>
                     <ul className="text-sm text-blue-900 list-disc pl-5 space-y-1">
                       {pendingProposal.operations
                         .filter((operation) => operation.type !== "connect_nodes")
@@ -1031,6 +1078,7 @@ function CategorySection({
     daytona: daytonaIcon,
     digitalocean: digitaloceanIcon,
     discord: discordIcon,
+    firehydrant: firehydrantIcon,
     github: githubIcon,
     gitlab: gitlabIcon,
     hetzner: hetznerIcon,
@@ -1162,6 +1210,7 @@ function CategorySection({
             datadog: datadogIcon,
             digitalocean: digitaloceanIcon,
             discord: discordIcon,
+            firehydrant: firehydrantIcon,
             github: githubIcon,
             gitlab: gitlabIcon,
             hetzner: hetznerIcon,

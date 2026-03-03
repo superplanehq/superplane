@@ -23,6 +23,7 @@ export function ZoomSlider({
   className,
   orientation = "horizontal",
   children,
+  leadingContent,
   screenshotName,
   isSnapToGridEnabled,
   onSnapToGridToggle,
@@ -31,6 +32,7 @@ export function ZoomSlider({
 }: Omit<PanelProps, "children"> & {
   orientation?: "horizontal" | "vertical";
   children?: React.ReactNode;
+  leadingContent?: React.ReactNode;
   screenshotName?: string;
   isSnapToGridEnabled?: boolean;
   onSnapToGridToggle?: () => void;
@@ -194,6 +196,7 @@ export function ZoomSlider({
         </TooltipTrigger>
         <TooltipContent>Fit all components in view (Ctrl/Cmd + 1)</TooltipContent>
       </Tooltip>
+      {leadingContent}
       <Tooltip>
         <TooltipTrigger asChild>
           <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={handleScreenshot}>

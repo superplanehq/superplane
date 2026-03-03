@@ -74,15 +74,23 @@ func (c *versionsUpdateCommand) Execute(ctx core.CommandContext) error {
 	body := openapi_client.CanvasesUpdateCanvasVersionBody{}
 	body.SetCanvas(canvas)
 
-	if autoLayoutValue == "" && (autoLayoutScopeValue != "" || len(autoLayoutNodeIDs) > 0) {
-		return fmt.Errorf("--auto-layout is required when using --auto-layout-scope or --auto-layout-node")
-	}
-	if autoLayoutValue != "" {
-		autoLayout, parseErr := parseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
-		if parseErr != nil {
-			return parseErr
+	if autoLayoutFlagsWereSet(ctx) {
+		if autoLayoutValue == "" && (autoLayoutScopeValue != "" || len(autoLayoutNodeIDs) > 0) {
+			return fmt.Errorf("--auto-layout is required when using --auto-layout-scope or --auto-layout-node")
 		}
-		body.SetAutoLayout(*autoLayout)
+		if autoLayoutValue != "" {
+			autoLayout, parseErr := parseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
+			if parseErr != nil {
+				return parseErr
+			}
+			body.SetAutoLayout(*autoLayout)
+		}
+	} else {
+		currentCanvas, describeErr := describeCanvasByID(ctx, canvasID)
+		if describeErr != nil {
+			return describeErr
+		}
+		body.SetAutoLayout(buildDefaultAutoLayout(currentCanvas, canvas))
 	}
 
 	response, _, err := ctx.API.CanvasVersionAPI.

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Background,
+  Panel,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -10,7 +11,17 @@ import {
   type EdgeChange,
 } from "@xyflow/react";
 
-import { CircleX, GitBranch, Loader2, ScanLine, ScanText, ScrollText, TriangleAlert, Workflow } from "lucide-react";
+import {
+  CircleX,
+  GitBranch,
+  Loader2,
+  Map as MapIcon,
+  ScanLine,
+  ScanText,
+  ScrollText,
+  TriangleAlert,
+  Workflow,
+} from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
@@ -41,6 +52,7 @@ import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
+import { CanvasMiniMap } from "./CanvasMiniMap";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header, type BreadcrumbItem } from "./Header";
@@ -149,8 +161,13 @@ export interface CanvasPageProps {
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
+  isAutoLayoutOnUpdateEnabled?: boolean;
+  onToggleAutoLayoutOnUpdate?: () => void;
+  autoLayoutOnUpdateDisabled?: boolean;
+  autoLayoutOnUpdateDisabledTooltip?: string;
   topViewMode?: "canvas" | "memory";
   onTopViewModeChange?: (mode: "canvas" | "memory") => void;
+  memoryItemCount?: number;
   dataViewContent?: React.ReactNode;
   versionControlSidebar?: React.ReactNode;
   isVersionControlOpen?: boolean;
@@ -215,7 +232,6 @@ export interface CanvasPageProps {
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
-  onAutoLayout?: (selectedNodeIDs: string[]) => void | Promise<void>;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
 
   ai?: AiProps;
@@ -856,6 +872,7 @@ function CanvasPage(props: CanvasPageProps) {
           autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
           topViewMode={props.topViewMode}
           onTopViewModeChange={props.onTopViewModeChange}
+          memoryItemCount={props.memoryItemCount}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
         />
@@ -898,7 +915,6 @@ function CanvasPage(props: CanvasPageProps) {
                 hideHeader={true}
                 onToggleView={handleToggleView}
                 onToggleCollapse={props.onToggleCollapse}
-                onAutoLayout={props.onAutoLayout}
                 onRun={(nodeId) => handleNodeRun(nodeId)}
                 onDuplicate={props.onDuplicate}
                 onConfigure={props.onConfigure}
@@ -944,6 +960,10 @@ function CanvasPage(props: CanvasPageProps) {
                 onOpenVersionControl={props.onOpenVersionControl}
                 versionControlButtonLabel={props.versionControlButtonLabel}
                 versionControlButtonTooltip={props.versionControlButtonTooltip}
+                isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
+                onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
+                autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
+                autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
                 readOnly={props.readOnly}
                 logEntries={props.logEntries}
                 focusRequest={props.focusRequest}
@@ -1329,6 +1349,7 @@ function CanvasContentHeader({
   autoSaveDisabledTooltip,
   topViewMode,
   onTopViewModeChange,
+  memoryItemCount,
   onExportYamlCopy,
   onExportYamlDownload,
 }: {
@@ -1358,6 +1379,7 @@ function CanvasContentHeader({
   autoSaveDisabledTooltip?: string;
   topViewMode?: "canvas" | "memory";
   onTopViewModeChange?: (mode: "canvas" | "memory") => void;
+  memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
 }) {
@@ -1417,6 +1439,7 @@ function CanvasContentHeader({
       autoSaveDisabledTooltip={autoSaveDisabledTooltip}
       topViewMode={topViewMode}
       onTopViewModeChange={onTopViewModeChange}
+      memoryItemCount={memoryItemCount}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
     />
@@ -1437,7 +1460,6 @@ function CanvasContent({
   onTogglePause,
   onToggleView,
   onToggleCollapse,
-  onAutoLayout,
   onAnnotationUpdate,
   onAnnotationBlur,
   onBuildingBlockDrop,
@@ -1479,6 +1501,10 @@ function CanvasContent({
   isVersionControlOpen,
   onOpenVersionControl,
   versionControlButtonTooltip,
+  isAutoLayoutOnUpdateEnabled,
+  onToggleAutoLayoutOnUpdate,
+  autoLayoutOnUpdateDisabled,
+  autoLayoutOnUpdateDisabledTooltip,
   readOnly,
   logEntries = [],
   focusRequest,
@@ -1499,7 +1525,6 @@ function CanvasContent({
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
-  onAutoLayout?: (selectedNodeIDs: string[]) => void | Promise<void>;
   onDelete?: (nodeId: string) => void;
   onAnnotationUpdate?: (
     nodeId: string,
@@ -1549,6 +1574,10 @@ function CanvasContent({
   onOpenVersionControl?: () => void;
   versionControlButtonLabel?: string;
   versionControlButtonTooltip?: string;
+  isAutoLayoutOnUpdateEnabled?: boolean;
+  onToggleAutoLayoutOnUpdate?: () => void;
+  autoLayoutOnUpdateDisabled?: boolean;
+  autoLayoutOnUpdateDisabledTooltip?: string;
   readOnly?: boolean;
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
@@ -1607,7 +1636,7 @@ function CanvasContent({
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set());
   const [logSidebarHeight, setLogSidebarHeight] = useState(320);
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
-  const [isAutoLayouting, setIsAutoLayouting] = useState(false);
+  const [isMinimapVisible, setIsMinimapVisible] = useState(true);
 
   useEffect(() => {
     const activeNoteId = getActiveNoteId();
@@ -1816,29 +1845,19 @@ function CanvasContent({
     onToggleCollapse?.();
   }, [state.toggleCollapse, onToggleCollapse]);
 
-  const selectedNodeIDs = useMemo(
-    () => state.nodes.filter((node) => node.selected).map((node) => node.id),
-    [state.nodes],
-  );
-
-  const handleAutoLayout = useCallback(async () => {
-    if (!onAutoLayout || isReadOnly || isAutoLayouting || selectedNodeIDs.length === 0) {
+  const handleToggleAutoLayoutOnUpdate = useCallback(() => {
+    if (isReadOnly || !onToggleAutoLayoutOnUpdate || autoLayoutOnUpdateDisabled) {
       return;
     }
+    onToggleAutoLayoutOnUpdate();
+  }, [isReadOnly, onToggleAutoLayoutOnUpdate, autoLayoutOnUpdateDisabled]);
 
-    try {
-      setIsAutoLayouting(true);
-      await onAutoLayout(selectedNodeIDs);
-    } finally {
-      setIsAutoLayouting(false);
-    }
-  }, [onAutoLayout, isReadOnly, isAutoLayouting, selectedNodeIDs]);
-
-  const isAutoLayoutDisabled = isReadOnly || !onAutoLayout || isAutoLayouting || selectedNodeIDs.length === 0;
+  const isAutoLayoutToggleDisabled = isReadOnly || !onToggleAutoLayoutOnUpdate || autoLayoutOnUpdateDisabled;
   const autoLayoutTooltipMessage =
-    selectedNodeIDs.length === 0
-      ? "Select one or more nodes to auto arrange"
-      : "Auto arrange selected components left-to-right";
+    autoLayoutOnUpdateDisabledTooltip ||
+    (isAutoLayoutOnUpdateEnabled
+      ? "Auto-layout on add is enabled. New nodes reflow their connected graph."
+      : "Auto-layout on add is disabled. Click to enable connected-graph layout for newly added nodes.");
 
   useEffect(() => {
     if (!focusRequest) {
@@ -2279,13 +2298,37 @@ function CanvasContent({
             className="h-full w-full"
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
-            <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2">
+            <CanvasMiniMap nodes={state.nodes} edges={state.edges} isVisible={isMinimapVisible} />
+            <Panel
+              position="bottom-left"
+              className="!bg-transparent !outline-none !shadow-none p-0 flex items-center gap-2"
+            >
               <ZoomSlider
-                usePanel={false}
                 orientation="horizontal"
+                className="!static !m-0"
                 screenshotName={title}
                 isSnapToGridEnabled={isSnapToGridEnabled}
                 onSnapToGridToggle={() => setIsSnapToGridEnabled((prev) => !prev)}
+                leadingContent={
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={isMinimapVisible ? "secondary" : "ghost"}
+                        size="sm"
+                        className={`h-8 w-8 px-0 ${
+                          isMinimapVisible
+                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                        onClick={() => setIsMinimapVisible((prev) => !prev)}
+                        aria-pressed={isMinimapVisible}
+                      >
+                        <MapIcon className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{isMinimapVisible ? "Hide minimap" : "Show minimap"}</TooltipContent>
+                  </Tooltip>
+                }
               >
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -2303,17 +2346,18 @@ function CanvasContent({
                   <TooltipTrigger asChild>
                     <span className="inline-flex">
                       <Button
-                        variant="ghost"
+                        variant={isAutoLayoutOnUpdateEnabled ? "secondary" : "ghost"}
                         size="sm"
-                        className="h-8 px-2 text-xs font-medium"
-                        onClick={handleAutoLayout}
-                        disabled={isAutoLayoutDisabled}
+                        className={`h-8 w-8 px-0 ${
+                          isAutoLayoutOnUpdateEnabled
+                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                        onClick={handleToggleAutoLayoutOnUpdate}
+                        disabled={isAutoLayoutToggleDisabled}
+                        aria-pressed={isAutoLayoutOnUpdateEnabled}
                       >
-                        {isAutoLayouting ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Workflow className="h-3 w-3" />
-                        )}
+                        <Workflow className="h-3 w-3" />
                       </Button>
                     </span>
                   </TooltipTrigger>
@@ -2410,7 +2454,7 @@ function CanvasContent({
                   <TooltipContent>Warnings</TooltipContent>
                 </Tooltip>
               </div>
-            </div>
+            </Panel>
           </ReactFlow>
         </div>
       </div>

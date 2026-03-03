@@ -16,6 +16,18 @@
   cursor: grabbing;
 }
 
+.sp-canvas .sp-canvas-minimap {
+  cursor: grab;
+}
+
+.sp-canvas .sp-canvas-minimap:active {
+  cursor: grabbing;
+}
+
+.sp-canvas .sp-canvas-minimap * {
+  cursor: inherit;
+}
+
 .sp-canvas .react-flow__edge {
   z-index: 1;
 }
