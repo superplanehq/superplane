@@ -93,6 +93,35 @@ func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.Publis
 	)
 }
 
+func (s *CanvasService) CreateCanvasChangeRequest(ctx context.Context, req *pb.CreateCanvasChangeRequestRequest) (*pb.CreateCanvasChangeRequestResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CreateCanvasChangeRequest(ctx, organizationID, req.CanvasId, req.VersionId)
+}
+
+func (s *CanvasService) ListCanvasChangeRequests(ctx context.Context, req *pb.ListCanvasChangeRequestsRequest) (*pb.ListCanvasChangeRequestsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListCanvasChangeRequests(ctx, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) DescribeCanvasChangeRequest(ctx context.Context, req *pb.DescribeCanvasChangeRequestRequest) (*pb.DescribeCanvasChangeRequestResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.DescribeCanvasChangeRequest(ctx, organizationID, req.CanvasId, req.ChangeRequestId)
+}
+
+func (s *CanvasService) PublishCanvasChangeRequest(ctx context.Context, req *pb.PublishCanvasChangeRequestRequest) (*pb.PublishCanvasChangeRequestResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.PublishCanvasChangeRequest(
+		ctx,
+		s.encryptor,
+		s.registry,
+		organizationID,
+		req.CanvasId,
+		req.ChangeRequestId,
+		req.ExpectedLiveVersionId,
+		s.webhookBaseURL,
+	)
+}
+
 func (s *CanvasService) DiscardCanvasVersion(ctx context.Context, req *pb.DiscardCanvasVersionRequest) (*pb.DiscardCanvasVersionResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.DiscardCanvasVersion(ctx, organizationID, req.CanvasId, req.VersionId)

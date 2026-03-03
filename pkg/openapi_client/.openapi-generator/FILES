@@ -5,6 +5,7 @@ README.md
 api/openapi.yaml
 api_blueprint.go
 api_canvas.go
+api_canvas_change_request.go
 api_canvas_event.go
 api_canvas_node.go
 api_canvas_node_execution.go
@@ -35,6 +36,7 @@ docs/BlueprintsUpdateBlueprintResponse.md
 docs/CanvasAPI.md
 docs/CanvasAutoLayoutAlgorithm.md
 docs/CanvasAutoLayoutScope.md
+docs/CanvasChangeRequestAPI.md
 docs/CanvasEventAPI.md
 docs/CanvasNodeAPI.md
 docs/CanvasNodeExecutionAPI.md
@@ -47,6 +49,10 @@ docs/CanvasesCanvasAiBlockContext.md
 docs/CanvasesCanvasAiContext.md
 docs/CanvasesCanvasAiNodeContext.md
 docs/CanvasesCanvasAutoLayout.md
+docs/CanvasesCanvasChangeRequest.md
+docs/CanvasesCanvasChangeRequestDiff.md
+docs/CanvasesCanvasChangeRequestMetadata.md
+docs/CanvasesCanvasChangeRequestStatus.md
 docs/CanvasesCanvasEvent.md
 docs/CanvasesCanvasEventWithExecutions.md
 docs/CanvasesCanvasMemory.md
@@ -57,9 +63,12 @@ docs/CanvasesCanvasSpec.md
 docs/CanvasesCanvasStatus.md
 docs/CanvasesCanvasVersion.md
 docs/CanvasesCanvasVersionMetadata.md
+docs/CanvasesCreateCanvasChangeRequestBody.md
+docs/CanvasesCreateCanvasChangeRequestResponse.md
 docs/CanvasesCreateCanvasRequest.md
 docs/CanvasesCreateCanvasResponse.md
 docs/CanvasesCreateCanvasVersionResponse.md
+docs/CanvasesDescribeCanvasChangeRequestResponse.md
 docs/CanvasesDescribeCanvasResponse.md
 docs/CanvasesDescribeCanvasVersionResponse.md
 docs/CanvasesEmitNodeEventBody.md
@@ -67,6 +76,7 @@ docs/CanvasesEmitNodeEventResponse.md
 docs/CanvasesInvokeNodeExecutionActionBody.md
 docs/CanvasesInvokeNodeTriggerActionBody.md
 docs/CanvasesInvokeNodeTriggerActionResponse.md
+docs/CanvasesListCanvasChangeRequestsResponse.md
 docs/CanvasesListCanvasEventsResponse.md
 docs/CanvasesListCanvasMemoriesResponse.md
 docs/CanvasesListCanvasVersionsResponse.md
@@ -76,6 +86,8 @@ docs/CanvasesListEventExecutionsResponse.md
 docs/CanvasesListNodeEventsResponse.md
 docs/CanvasesListNodeExecutionsResponse.md
 docs/CanvasesListNodeQueueItemsResponse.md
+docs/CanvasesPublishCanvasChangeRequestBody.md
+docs/CanvasesPublishCanvasChangeRequestResponse.md
 docs/CanvasesPublishCanvasVersionBody.md
 docs/CanvasesPublishCanvasVersionResponse.md
 docs/CanvasesResolveExecutionErrorsBody.md
@@ -261,6 +273,10 @@ model_canvases_canvas_ai_block_context.go
 model_canvases_canvas_ai_context.go
 model_canvases_canvas_ai_node_context.go
 model_canvases_canvas_auto_layout.go
+model_canvases_canvas_change_request.go
+model_canvases_canvas_change_request_diff.go
+model_canvases_canvas_change_request_metadata.go
+model_canvases_canvas_change_request_status.go
 model_canvases_canvas_event.go
 model_canvases_canvas_event_with_executions.go
 model_canvases_canvas_memory.go
@@ -271,9 +287,12 @@ model_canvases_canvas_spec.go
 model_canvases_canvas_status.go
 model_canvases_canvas_version.go
 model_canvases_canvas_version_metadata.go
+model_canvases_create_canvas_change_request_body.go
+model_canvases_create_canvas_change_request_response.go
 model_canvases_create_canvas_request.go
 model_canvases_create_canvas_response.go
 model_canvases_create_canvas_version_response.go
+model_canvases_describe_canvas_change_request_response.go
 model_canvases_describe_canvas_response.go
 model_canvases_describe_canvas_version_response.go
 model_canvases_emit_node_event_body.go
@@ -281,6 +300,7 @@ model_canvases_emit_node_event_response.go
 model_canvases_invoke_node_execution_action_body.go
 model_canvases_invoke_node_trigger_action_body.go
 model_canvases_invoke_node_trigger_action_response.go
+model_canvases_list_canvas_change_requests_response.go
 model_canvases_list_canvas_events_response.go
 model_canvases_list_canvas_memories_response.go
 model_canvases_list_canvas_versions_response.go
@@ -290,6 +310,8 @@ model_canvases_list_event_executions_response.go
 model_canvases_list_node_events_response.go
 model_canvases_list_node_executions_response.go
 model_canvases_list_node_queue_items_response.go
+model_canvases_publish_canvas_change_request_body.go
+model_canvases_publish_canvas_change_request_response.go
 model_canvases_publish_canvas_version_body.go
 model_canvases_publish_canvas_version_response.go
 model_canvases_resolve_execution_errors_body.go
@@ -446,6 +468,7 @@ model_widgets_list_widgets_response.go
 model_widgets_widget.go
 response.go
 test/api_blueprint_test.go
+test/api_canvas_change_request_test.go
 test/api_canvas_event_test.go
 test/api_canvas_node_execution_test.go
 test/api_canvas_node_test.go

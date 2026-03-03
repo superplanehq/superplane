@@ -40,6 +40,7 @@ func PublishCanvasVersion(
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
+	organizationUUID := uuid.MustParse(organizationID)
 
 	versionUUID, err := uuid.Parse(versionID)
 	if err != nil {
@@ -55,7 +56,7 @@ func PublishCanvasVersion(
 		expectedLiveVersionUUID = &parsedExpected
 	}
 
-	canvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasUUID)
+	canvas, err := models.FindCanvas(organizationUUID, canvasUUID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
@@ -68,7 +69,7 @@ func PublishCanvasVersion(
 	var version *models.CanvasVersion
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		canvasForUpdate, err := models.FindCanvasInTransaction(tx, uuid.MustParse(organizationID), canvasUUID)
+		canvasForUpdate, err := models.FindCanvasInTransaction(tx, organizationUUID, canvasUUID)
 		if err != nil {
 			return err
 		}
@@ -194,6 +195,10 @@ func PublishCanvasVersion(
 		}
 
 		if err := tx.Delete(&models.CanvasUserDraft{}, "workflow_id = ? AND user_id = ?", canvasUUID, userUUID).Error; err != nil {
+			return err
+		}
+
+		if err := refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, uuid.Nil); err != nil {
 			return err
 		}
 

@@ -133,6 +133,52 @@ service Canvases {
     };
   }
 
+  rpc CreateCanvasChangeRequest(CreateCanvasChangeRequestRequest) returns (CreateCanvasChangeRequestResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/change-requests"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create canvas change request";
+      description: "Creates a change request for a draft canvas version";
+      tags: "CanvasChangeRequest";
+    };
+  }
+
+  rpc ListCanvasChangeRequests(ListCanvasChangeRequestsRequest) returns (ListCanvasChangeRequestsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/change-requests"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List canvas change requests";
+      description: "Lists change requests for a canvas";
+      tags: "CanvasChangeRequest";
+    };
+  }
+
+  rpc DescribeCanvasChangeRequest(DescribeCanvasChangeRequestRequest) returns (DescribeCanvasChangeRequestResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe canvas change request";
+      description: "Returns one canvas change request by ID";
+      tags: "CanvasChangeRequest";
+    };
+  }
+
+  rpc PublishCanvasChangeRequest(PublishCanvasChangeRequestRequest) returns (PublishCanvasChangeRequestResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}/publish"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Publish canvas change request";
+      description: "Publishes a canvas change request to live and applies runtime node setup";
+      tags: "CanvasChangeRequest";
+    };
+  }
+
   rpc DeleteCanvas(DeleteCanvasRequest) returns (DeleteCanvasResponse) {
     option (google.api.http) = {
       delete: "/api/v1/canvases/{id}"
@@ -425,6 +471,44 @@ message DiscardCanvasVersionRequest {
 
 message DiscardCanvasVersionResponse {}
 
+message CreateCanvasChangeRequestRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+}
+
+message CreateCanvasChangeRequestResponse {
+  CanvasChangeRequest change_request = 1;
+}
+
+message ListCanvasChangeRequestsRequest {
+  string canvas_id = 1;
+}
+
+message ListCanvasChangeRequestsResponse {
+  repeated CanvasChangeRequest change_requests = 1;
+}
+
+message DescribeCanvasChangeRequestRequest {
+  string canvas_id = 1;
+  string change_request_id = 2;
+}
+
+message DescribeCanvasChangeRequestResponse {
+  CanvasChangeRequest change_request = 1;
+}
+
+message PublishCanvasChangeRequestRequest {
+  string canvas_id = 1;
+  string change_request_id = 2;
+  string expected_live_version_id = 3;
+}
+
+message PublishCanvasChangeRequestResponse {
+  Canvas canvas = 1;
+  CanvasVersion version = 2;
+  CanvasChangeRequest change_request = 3;
+}
+
 message DeleteCanvasRequest {
   string id = 1;
 }
@@ -479,6 +563,36 @@ message CanvasVersion {
 
   Metadata metadata = 1;
   Canvas.Spec spec = 2;
+}
+
+message CanvasChangeRequestDiff {
+  repeated string changed_node_ids = 1;
+  repeated string conflicting_node_ids = 2;
+}
+
+message CanvasChangeRequest {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_OPEN = 1;
+    STATUS_PUBLISHED = 2;
+    STATUS_CONFLICTED = 3;
+  }
+
+  message Metadata {
+    string id = 1;
+    string canvas_id = 2;
+    string version_id = 3;
+    UserRef owner = 4;
+    string based_on_version_id = 5;
+    Status status = 6;
+    google.protobuf.Timestamp published_at = 7;
+    google.protobuf.Timestamp created_at = 8;
+    google.protobuf.Timestamp updated_at = 9;
+  }
+
+  Metadata metadata = 1;
+  CanvasVersion version = 2;
+  CanvasChangeRequestDiff diff = 3;
 }
 
 message ListNodeEventsRequest {

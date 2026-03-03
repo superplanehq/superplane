@@ -45,9 +45,10 @@ interface HeaderProps {
   autoSaveDisabledTooltip?: string;
   onExportYamlCopy?: () => void;
   onExportYamlDownload?: () => void;
-  topViewMode?: "canvas" | "memory";
-  onTopViewModeChange?: (mode: "canvas" | "memory") => void;
+  topViewMode?: "canvas" | "memory" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "memory" | "versioning") => void;
   memoryItemCount?: number;
+  versioningItemCount?: number;
 }
 
 export function Header({
@@ -71,6 +72,7 @@ export function Header({
   topViewMode,
   onTopViewModeChange,
   memoryItemCount,
+  versioningItemCount,
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
   const navigate = useNavigate();
@@ -240,6 +242,20 @@ export function Header({
                     <span>Memory</span>
                     {memoryItemCount && memoryItemCount > 0 ? (
                       <span aria-label={`${memoryItemCount} memory items`}>({memoryItemCount})</span>
+                    ) : null}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onTopViewModeChange("versioning")}
+                  className={`rounded px-2 py-1 text-xs font-medium ${
+                    topViewMode === "versioning" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    <span>Versioning</span>
+                    {versioningItemCount && versioningItemCount > 0 ? (
+                      <span aria-label={`${versioningItemCount} open change requests`}>({versioningItemCount})</span>
                     ) : null}
                   </span>
                 </button>

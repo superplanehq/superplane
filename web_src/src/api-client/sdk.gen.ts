@@ -21,6 +21,9 @@ import type {
   CanvasesCancelExecutionData,
   CanvasesCancelExecutionErrors,
   CanvasesCancelExecutionResponses,
+  CanvasesCreateCanvasChangeRequestData,
+  CanvasesCreateCanvasChangeRequestErrors,
+  CanvasesCreateCanvasChangeRequestResponses,
   CanvasesCreateCanvasData,
   CanvasesCreateCanvasErrors,
   CanvasesCreateCanvasResponses,
@@ -36,6 +39,9 @@ import type {
   CanvasesDeleteNodeQueueItemData,
   CanvasesDeleteNodeQueueItemErrors,
   CanvasesDeleteNodeQueueItemResponses,
+  CanvasesDescribeCanvasChangeRequestData,
+  CanvasesDescribeCanvasChangeRequestErrors,
+  CanvasesDescribeCanvasChangeRequestResponses,
   CanvasesDescribeCanvasData,
   CanvasesDescribeCanvasErrors,
   CanvasesDescribeCanvasResponses,
@@ -57,6 +63,9 @@ import type {
   CanvasesInvokeNodeTriggerActionData,
   CanvasesInvokeNodeTriggerActionErrors,
   CanvasesInvokeNodeTriggerActionResponses,
+  CanvasesListCanvasChangeRequestsData,
+  CanvasesListCanvasChangeRequestsErrors,
+  CanvasesListCanvasChangeRequestsResponses,
   CanvasesListCanvasesData,
   CanvasesListCanvasesErrors,
   CanvasesListCanvasesResponses,
@@ -84,6 +93,9 @@ import type {
   CanvasesListNodeQueueItemsData,
   CanvasesListNodeQueueItemsErrors,
   CanvasesListNodeQueueItemsResponses,
+  CanvasesPublishCanvasChangeRequestData,
+  CanvasesPublishCanvasChangeRequestErrors,
+  CanvasesPublishCanvasChangeRequestResponses,
   CanvasesPublishCanvasVersionData,
   CanvasesPublishCanvasVersionErrors,
   CanvasesPublishCanvasVersionResponses,
@@ -416,6 +428,76 @@ export const canvasesSendAiMessage = <ThrowOnError extends boolean = true>(
 ) =>
   (options.client ?? client).post<CanvasesSendAiMessageResponses, CanvasesSendAiMessageErrors, ThrowOnError>({
     url: "/api/v1/canvases/{canvasId}/ai/messages",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List canvas change requests
+ *
+ * Lists change requests for a canvas
+ */
+export const canvasesListCanvasChangeRequests = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesListCanvasChangeRequestsData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<
+    CanvasesListCanvasChangeRequestsResponses,
+    CanvasesListCanvasChangeRequestsErrors,
+    ThrowOnError
+  >({ url: "/api/v1/canvases/{canvasId}/change-requests", ...options });
+
+/**
+ * Create canvas change request
+ *
+ * Creates a change request for a draft canvas version
+ */
+export const canvasesCreateCanvasChangeRequest = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesCreateCanvasChangeRequestData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    CanvasesCreateCanvasChangeRequestResponses,
+    CanvasesCreateCanvasChangeRequestErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/change-requests",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Describe canvas change request
+ *
+ * Returns one canvas change request by ID
+ */
+export const canvasesDescribeCanvasChangeRequest = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesDescribeCanvasChangeRequestData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<
+    CanvasesDescribeCanvasChangeRequestResponses,
+    CanvasesDescribeCanvasChangeRequestErrors,
+    ThrowOnError
+  >({ url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}", ...options });
+
+/**
+ * Publish canvas change request
+ *
+ * Publishes a canvas change request to live and applies runtime node setup
+ */
+export const canvasesPublishCanvasChangeRequest = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesPublishCanvasChangeRequestData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    CanvasesPublishCanvasChangeRequestResponses,
+    CanvasesPublishCanvasChangeRequestErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/publish",
     ...options,
     headers: {
       "Content-Type": "application/json",

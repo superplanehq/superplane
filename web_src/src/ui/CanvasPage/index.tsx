@@ -165,9 +165,10 @@ export interface CanvasPageProps {
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
-  topViewMode?: "canvas" | "memory";
-  onTopViewModeChange?: (mode: "canvas" | "memory") => void;
+  topViewMode?: "canvas" | "memory" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "memory" | "versioning") => void;
   memoryItemCount?: number;
+  versioningItemCount?: number;
   dataViewContent?: React.ReactNode;
   versionControlSidebar?: React.ReactNode;
   isVersionControlOpen?: boolean;
@@ -873,14 +874,15 @@ function CanvasPage(props: CanvasPageProps) {
           topViewMode={props.topViewMode}
           onTopViewModeChange={props.onTopViewModeChange}
           memoryItemCount={props.memoryItemCount}
+          versioningItemCount={props.versioningItemCount}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
 
-      {/* Main content area with sidebar and canvas/memory */}
-      {props.topViewMode === "memory" ? (
+      {/* Main content area with sidebar and canvas/memory/versioning */}
+      {props.topViewMode && props.topViewMode !== "canvas" ? (
         <div className="flex-1 flex relative overflow-hidden">
           {props.versionControlSidebar}
           <div className="flex-1 overflow-auto bg-slate-50">{props.dataViewContent}</div>
@@ -1350,6 +1352,7 @@ function CanvasContentHeader({
   topViewMode,
   onTopViewModeChange,
   memoryItemCount,
+  versioningItemCount,
   onExportYamlCopy,
   onExportYamlDownload,
 }: {
@@ -1377,9 +1380,10 @@ function CanvasContentHeader({
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
-  topViewMode?: "canvas" | "memory";
-  onTopViewModeChange?: (mode: "canvas" | "memory") => void;
+  topViewMode?: "canvas" | "memory" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "memory" | "versioning") => void;
   memoryItemCount?: number;
+  versioningItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
 }) {
@@ -1440,6 +1444,7 @@ function CanvasContentHeader({
       topViewMode={topViewMode}
       onTopViewModeChange={onTopViewModeChange}
       memoryItemCount={memoryItemCount}
+      versioningItemCount={versioningItemCount}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
     />

@@ -428,6 +428,25 @@ CREATE TABLE public.webhooks (
 
 
 --
+-- Name: workflow_change_requests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_change_requests (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    workflow_id uuid NOT NULL,
+    version_id uuid NOT NULL,
+    owner_id uuid,
+    based_on_version_id uuid,
+    status character varying(32) NOT NULL,
+    changed_node_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    conflicting_node_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    published_at timestamp without time zone,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: workflow_events; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -896,6 +915,22 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
+-- Name: workflow_change_requests workflow_change_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_requests
+    ADD CONSTRAINT workflow_change_requests_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_change_requests workflow_change_requests_workflow_version_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_requests
+    ADD CONSTRAINT workflow_change_requests_workflow_version_key UNIQUE (workflow_id, version_id);
+
+
+--
 -- Name: workflow_events workflow_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1178,6 +1213,27 @@ CREATE INDEX idx_webhooks_app_installation_id ON public.webhooks USING btree (ap
 --
 
 CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at);
+
+
+--
+-- Name: idx_workflow_change_requests_owner; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_change_requests_owner ON public.workflow_change_requests USING btree (owner_id);
+
+
+--
+-- Name: idx_workflow_change_requests_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_change_requests_status ON public.workflow_change_requests USING btree (workflow_id, status, created_at DESC);
+
+
+--
+-- Name: idx_workflow_change_requests_workflow_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_change_requests_workflow_id ON public.workflow_change_requests USING btree (workflow_id);
 
 
 --
@@ -1577,6 +1633,38 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
+-- Name: workflow_change_requests workflow_change_requests_based_on_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_requests
+    ADD CONSTRAINT workflow_change_requests_based_on_version_id_fkey FOREIGN KEY (based_on_version_id) REFERENCES public.workflow_versions(id) ON DELETE SET NULL;
+
+
+--
+-- Name: workflow_change_requests workflow_change_requests_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_requests
+    ADD CONSTRAINT workflow_change_requests_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: workflow_change_requests workflow_change_requests_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_requests
+    ADD CONSTRAINT workflow_change_requests_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.workflow_versions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_change_requests workflow_change_requests_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_requests
+    ADD CONSTRAINT workflow_change_requests_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
 -- Name: workflow_events workflow_events_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1792,7 +1880,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260227135919	f
+20260303032506	f
 \.
 
 

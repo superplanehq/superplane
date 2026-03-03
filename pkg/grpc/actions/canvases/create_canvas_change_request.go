@@ -12,23 +12,17 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
-func UpdateCanvasVersion(
+func CreateCanvasChangeRequest(
 	ctx context.Context,
-	registry *registry.Registry,
 	organizationID string,
 	canvasID string,
 	versionID string,
-	pbCanvas *pb.Canvas,
-	autoLayout *pb.CanvasAutoLayout,
-) (*pb.UpdateCanvasVersionResponse, error) {
+) (*pb.CreateCanvasChangeRequestResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -53,17 +47,8 @@ func UpdateCanvasVersion(
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
-	if err != nil {
-		return nil, err
-	}
-
-	nodes, edges, err = applyCanvasAutoLayout(nodes, edges, autoLayout, registry)
-	if err != nil {
-		return nil, err
-	}
-
 	userUUID := uuid.MustParse(userID)
+	var request *models.CanvasChangeRequest
 	var version *models.CanvasVersion
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -85,61 +70,48 @@ func UpdateCanvasVersion(
 		}
 
 		if version.IsPublished {
-			return status.Error(codes.FailedPrecondition, "published versions are immutable")
+			return status.Error(codes.FailedPrecondition, "published versions cannot create change requests")
+		}
+
+		existingRequest, findErr := models.FindCanvasChangeRequestByVersionInTransaction(tx, canvasUUID, versionUUID)
+		if findErr == nil {
+			request = existingRequest
+			return refreshCanvasChangeRequestDiffInTransaction(tx, canvasInTx, version, request)
+		}
+		if !errors.Is(findErr, gorm.ErrRecordNotFound) {
+			return findErr
 		}
 
 		now := time.Now()
-		version.Nodes = datatypes.NewJSONSlice(nodes)
-		version.Edges = datatypes.NewJSONSlice(edges)
-		version.UpdatedAt = &now
-
-		if err := tx.Save(version).Error; err != nil {
-			return err
+		request = &models.CanvasChangeRequest{
+			ID:               uuid.New(),
+			WorkflowID:       canvasUUID,
+			VersionID:        versionUUID,
+			OwnerID:          &userUUID,
+			BasedOnVersionID: version.BasedOnVersionID,
+			Status:           models.CanvasChangeRequestStatusOpen,
+			CreatedAt:        &now,
+			UpdatedAt:        &now,
 		}
 
-		draft := models.CanvasUserDraft{
-			WorkflowID: canvasUUID,
-			UserID:     userUUID,
-			VersionID:  version.ID,
-			CreatedAt:  &now,
-			UpdatedAt:  &now,
+		if createErr := tx.Create(request).Error; createErr != nil {
+			return createErr
 		}
 
-		if err := tx.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "workflow_id"}, {Name: "user_id"}},
-			DoUpdates: clause.Assignments(map[string]any{
-				"version_id": version.ID,
-				"updated_at": now,
-			}),
-		}).Create(&draft).Error; err != nil {
-			return err
-		}
-
-		request, requestErr := models.FindCanvasChangeRequestByVersionInTransaction(tx, canvasUUID, versionUUID)
-		if requestErr == nil {
-			if request.Status != models.CanvasChangeRequestStatusPublished {
-				if err := refreshCanvasChangeRequestDiffInTransaction(tx, canvasInTx, version, request); err != nil {
-					return err
-				}
-			}
-		} else if !errors.Is(requestErr, gorm.ErrRecordNotFound) {
-			return requestErr
-		}
-
-		return nil
+		return refreshCanvasChangeRequestDiffInTransaction(tx, canvasInTx, version, request)
 	})
 	if err != nil {
 		if status.Code(err) != codes.Unknown {
 			return nil, err
 		}
-		return nil, status.Errorf(codes.Internal, "failed to update canvas version: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to create canvas change request: %v", err)
 	}
 
 	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {
 		log.Errorf("failed to publish canvas version updated RabbitMQ message: %v", err)
 	}
 
-	return &pb.UpdateCanvasVersionResponse{
-		Version: SerializeCanvasVersion(version, organizationID),
+	return &pb.CreateCanvasChangeRequestResponse{
+		ChangeRequest: SerializeCanvasChangeRequest(request, version, organizationID),
 	}, nil
 }

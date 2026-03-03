@@ -117,6 +117,35 @@ export type CanvasesCanvasAutoLayout = {
   scope?: CanvasAutoLayoutScope;
 };
 
+export type CanvasesCanvasChangeRequest = {
+  metadata?: CanvasesCanvasChangeRequestMetadata;
+  version?: CanvasesCanvasVersion;
+  diff?: CanvasesCanvasChangeRequestDiff;
+};
+
+export type CanvasesCanvasChangeRequestDiff = {
+  changedNodeIds?: Array<string>;
+  conflictingNodeIds?: Array<string>;
+};
+
+export type CanvasesCanvasChangeRequestMetadata = {
+  id?: string;
+  canvasId?: string;
+  versionId?: string;
+  owner?: SuperplaneCanvasesUserRef;
+  basedOnVersionId?: string;
+  status?: CanvasesCanvasChangeRequestStatus;
+  publishedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type CanvasesCanvasChangeRequestStatus =
+  | "STATUS_UNSPECIFIED"
+  | "STATUS_OPEN"
+  | "STATUS_PUBLISHED"
+  | "STATUS_CONFLICTED";
+
 export type CanvasesCanvasEvent = {
   id?: string;
   canvasId?: string;
@@ -227,6 +256,14 @@ export type CanvasesCanvasVersionMetadata = {
   updatedAt?: string;
 };
 
+export type CanvasesCreateCanvasChangeRequestBody = {
+  versionId?: string;
+};
+
+export type CanvasesCreateCanvasChangeRequestResponse = {
+  changeRequest?: CanvasesCanvasChangeRequest;
+};
+
 export type CanvasesCreateCanvasRequest = {
   canvas?: CanvasesCanvas;
 };
@@ -253,6 +290,10 @@ export type CanvasesDeleteCanvasResponse = {
 
 export type CanvasesDeleteNodeQueueItemResponse = {
   [key: string]: unknown;
+};
+
+export type CanvasesDescribeCanvasChangeRequestResponse = {
+  changeRequest?: CanvasesCanvasChangeRequest;
 };
 
 export type CanvasesDescribeCanvasResponse = {
@@ -298,6 +339,10 @@ export type CanvasesInvokeNodeTriggerActionResponse = {
   result?: {
     [key: string]: unknown;
   };
+};
+
+export type CanvasesListCanvasChangeRequestsResponse = {
+  changeRequests?: Array<CanvasesCanvasChangeRequest>;
 };
 
 export type CanvasesListCanvasEventsResponse = {
@@ -350,6 +395,16 @@ export type CanvasesListNodeQueueItemsResponse = {
   totalCount?: number;
   hasNextPage?: boolean;
   lastTimestamp?: string;
+};
+
+export type CanvasesPublishCanvasChangeRequestBody = {
+  expectedLiveVersionId?: string;
+};
+
+export type CanvasesPublishCanvasChangeRequestResponse = {
+  canvas?: CanvasesCanvas;
+  version?: CanvasesCanvasVersion;
+  changeRequest?: CanvasesCanvasChangeRequest;
 };
 
 export type CanvasesPublishCanvasVersionBody = {
@@ -1492,6 +1547,124 @@ export type CanvasesSendAiMessageResponses = {
 };
 
 export type CanvasesSendAiMessageResponse2 = CanvasesSendAiMessageResponses[keyof CanvasesSendAiMessageResponses];
+
+export type CanvasesListCanvasChangeRequestsData = {
+  body?: never;
+  path: {
+    canvasId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/change-requests";
+};
+
+export type CanvasesListCanvasChangeRequestsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesListCanvasChangeRequestsError =
+  CanvasesListCanvasChangeRequestsErrors[keyof CanvasesListCanvasChangeRequestsErrors];
+
+export type CanvasesListCanvasChangeRequestsResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesListCanvasChangeRequestsResponse;
+};
+
+export type CanvasesListCanvasChangeRequestsResponse2 =
+  CanvasesListCanvasChangeRequestsResponses[keyof CanvasesListCanvasChangeRequestsResponses];
+
+export type CanvasesCreateCanvasChangeRequestData = {
+  body: CanvasesCreateCanvasChangeRequestBody;
+  path: {
+    canvasId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/change-requests";
+};
+
+export type CanvasesCreateCanvasChangeRequestErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesCreateCanvasChangeRequestError =
+  CanvasesCreateCanvasChangeRequestErrors[keyof CanvasesCreateCanvasChangeRequestErrors];
+
+export type CanvasesCreateCanvasChangeRequestResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesCreateCanvasChangeRequestResponse;
+};
+
+export type CanvasesCreateCanvasChangeRequestResponse2 =
+  CanvasesCreateCanvasChangeRequestResponses[keyof CanvasesCreateCanvasChangeRequestResponses];
+
+export type CanvasesDescribeCanvasChangeRequestData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    changeRequestId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}";
+};
+
+export type CanvasesDescribeCanvasChangeRequestErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesDescribeCanvasChangeRequestError =
+  CanvasesDescribeCanvasChangeRequestErrors[keyof CanvasesDescribeCanvasChangeRequestErrors];
+
+export type CanvasesDescribeCanvasChangeRequestResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesDescribeCanvasChangeRequestResponse;
+};
+
+export type CanvasesDescribeCanvasChangeRequestResponse2 =
+  CanvasesDescribeCanvasChangeRequestResponses[keyof CanvasesDescribeCanvasChangeRequestResponses];
+
+export type CanvasesPublishCanvasChangeRequestData = {
+  body: CanvasesPublishCanvasChangeRequestBody;
+  path: {
+    canvasId: string;
+    changeRequestId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/publish";
+};
+
+export type CanvasesPublishCanvasChangeRequestErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesPublishCanvasChangeRequestError =
+  CanvasesPublishCanvasChangeRequestErrors[keyof CanvasesPublishCanvasChangeRequestErrors];
+
+export type CanvasesPublishCanvasChangeRequestResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesPublishCanvasChangeRequestResponse;
+};
+
+export type CanvasesPublishCanvasChangeRequestResponse2 =
+  CanvasesPublishCanvasChangeRequestResponses[keyof CanvasesPublishCanvasChangeRequestResponses];
 
 export type CanvasesListCanvasEventsData = {
   body?: never;

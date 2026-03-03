@@ -2,7 +2,7 @@ import { CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, CircleDot, GitBranch, Plus, Rocket, Trash2, User } from "lucide-react";
+import { ChevronLeft, CircleDot, GitBranch, GitPullRequest, Plus, Trash2, User } from "lucide-react";
 import { MouseEvent as ReactMouseEvent, ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 const CANVAS_VERSION_CONTROL_WIDTH_STORAGE_KEY = "canvasVersionControlSidebarWidth";
@@ -26,18 +26,18 @@ interface CanvasVersionControlSidebarProps {
   hasUnsavedChanges: boolean;
   canvasDeletedRemotely: boolean;
   onCreateVersion: () => void;
-  onPublishVersion: () => void;
   onDiscardVersion: () => void;
   onUseVersion: (versionID: string) => void;
+  onCreateChangeRequest: () => void;
   createVersionDisabled: boolean;
   createVersionDisabledTooltip?: string;
-  publishVersionDisabled: boolean;
-  publishVersionDisabledTooltip?: string;
   discardVersionDisabled: boolean;
   discardVersionDisabledTooltip?: string;
+  createChangeRequestDisabled: boolean;
+  createChangeRequestDisabledTooltip?: string;
   createVersionPending: boolean;
-  publishVersionPending: boolean;
   discardVersionPending: boolean;
+  createChangeRequestPending: boolean;
 }
 
 function isSameUserID(left?: string, right?: string): boolean {
@@ -111,18 +111,18 @@ export function CanvasVersionControlSidebar({
   hasUnsavedChanges,
   canvasDeletedRemotely,
   onCreateVersion,
-  onPublishVersion,
   onDiscardVersion,
   onUseVersion,
+  onCreateChangeRequest,
   createVersionDisabled,
   createVersionDisabledTooltip,
-  publishVersionDisabled,
-  publishVersionDisabledTooltip,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
+  createChangeRequestDisabled,
+  createChangeRequestDisabledTooltip,
   createVersionPending,
-  publishVersionPending,
   discardVersionPending,
+  createChangeRequestPending,
 }: CanvasVersionControlSidebarProps) {
   const selectedVersionId = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "";
   const selectedRevisionLabel = formatVersionLabelWithTimestamp(selectedCanvasVersion || liveCanvasVersion);
@@ -133,6 +133,7 @@ export function CanvasVersionControlSidebar({
   )[0];
   const currentUserLatestDraftID = currentUserLatestDraft?.metadata?.id;
   const canSwitchToLive = !!liveCanvasVersionId && selectedVersionId !== liveCanvasVersionId;
+
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     if (typeof window === "undefined") {
       return DEFAULT_CANVAS_VERSION_CONTROL_WIDTH;
@@ -251,7 +252,7 @@ export function CanvasVersionControlSidebar({
             <div className="mt-2 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-900 break-words">
-                  {hasEditableVersion ? "Draft version" : "Live version"} {selectedRevisionLabel}
+                  {hasEditableVersion ? "Working version" : "Live version"} {selectedRevisionLabel}
                 </p>
                 <p className="mt-0.5 text-xs text-slate-600 break-words">
                   {selectedOwner ? `Owner: ${selectedOwner}` : "Published canvas"}
@@ -267,7 +268,7 @@ export function CanvasVersionControlSidebar({
               </span>
             </div>
             {hasEditableVersion && hasUnsavedChanges ? (
-              <p className="mt-2 text-xs text-amber-700">You have unsaved draft changes.</p>
+              <p className="mt-2 text-xs text-amber-700">You have unsaved version changes.</p>
             ) : null}
             {canvasDeletedRemotely ? (
               <p className="mt-2 text-xs text-red-700">This canvas was deleted from another session.</p>
@@ -295,17 +296,17 @@ export function CanvasVersionControlSidebar({
 
               {hasEditableVersion &&
                 withTooltip(
-                  publishVersionDisabled,
-                  publishVersionDisabledTooltip,
+                  createChangeRequestDisabled,
+                  createChangeRequestDisabledTooltip,
                   <Button
-                    onClick={onPublishVersion}
-                    disabled={publishVersionDisabled}
+                    onClick={onCreateChangeRequest}
+                    disabled={createChangeRequestDisabled}
                     className="w-full justify-start min-w-0"
-                    variant="default"
+                    variant="outline"
                   >
-                    <Rocket className="h-4 w-4" />
+                    <GitPullRequest className="h-4 w-4" />
                     <span className="truncate min-w-0">
-                      {publishVersionPending ? "Publishing..." : "Publish current version"}
+                      {createChangeRequestPending ? "Creating change request..." : "Create change request"}
                     </span>
                   </Button>,
                 )}
@@ -322,7 +323,7 @@ export function CanvasVersionControlSidebar({
                   >
                     <Trash2 className="h-4 w-4" />
                     <span className="truncate min-w-0">
-                      {discardVersionPending ? "Discarding..." : "Discard current draft"}
+                      {discardVersionPending ? "Discarding..." : "Discard current version"}
                     </span>
                   </Button>,
                 )}
@@ -348,7 +349,7 @@ export function CanvasVersionControlSidebar({
                 >
                   <User className="h-4 w-4" />
                   <span className="truncate min-w-0">
-                    Switch to my draft {formatVersionLabelWithTimestamp(currentUserLatestDraft)}
+                    Switch to my version {formatVersionLabelWithTimestamp(currentUserLatestDraft)}
                   </span>
                 </Button>
               ) : null}
@@ -377,10 +378,10 @@ export function CanvasVersionControlSidebar({
 
           <section className="mt-3 rounded-md border border-slate-200 p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Drafts ({draftVersions.length})
+              Versions ({draftVersions.length})
             </p>
             {draftVersions.length === 0 ? (
-              <p className="mt-2 text-xs text-slate-600">No draft versions yet.</p>
+              <p className="mt-2 text-xs text-slate-600">No versions yet.</p>
             ) : (
               <div className="mt-2 space-y-2">
                 {draftVersions.map((version) => {
@@ -391,7 +392,7 @@ export function CanvasVersionControlSidebar({
                       key={versionID}
                       version={version}
                       isActive={isActive}
-                      subtitle="Your draft"
+                      subtitle="Your version"
                       onUseVersion={onUseVersion}
                     />
                   );
