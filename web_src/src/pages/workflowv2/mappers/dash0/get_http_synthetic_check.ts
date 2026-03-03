@@ -88,16 +88,24 @@ export const getHttpSyntheticCheckMapper: ComponentBaseMapper = {
     if (schedule) {
       const parts: string[] = [];
       if (schedule.interval) parts.push(`every ${schedule.interval}`);
-      if (schedule.locations) {
-        parts.push(`from ${(schedule.locations as string[]).join(", ")}`);
+      if (Array.isArray(schedule.locations) && schedule.locations.length > 0) {
+        const validLocations = schedule.locations.filter((loc): loc is string => typeof loc === "string");
+        if (validLocations.length > 0) {
+          parts.push(`from ${validLocations.join(", ")}`);
+        }
       }
       if (schedule.strategy) parts.push(`(${String(schedule.strategy).replace(/_/g, " ")})`);
       details["Scheduling"] = parts.join(" ");
     }
 
     if (notifications) {
-      const channels = notifications.channels as string[] | undefined;
-      details["Notification Channels"] = channels && channels.length > 0 ? channels.join(", ") : "None";
+      const channels = notifications.channels;
+      if (Array.isArray(channels) && channels.length > 0) {
+        const validChannels = channels.filter((ch): ch is string => typeof ch === "string");
+        details["Notification Channels"] = validChannels.length > 0 ? validChannels.join(", ") : "None";
+      } else {
+        details["Notification Channels"] = "None";
+      }
     }
 
     if (metrics?.totalRuns24h != null) {
@@ -139,17 +147,21 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 }
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+  if (!execution.createdAt || !execution.rootEvent?.id) {
+    return [];
+  }
+
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [
     {
-      receivedAt: new Date(execution.createdAt!),
+      receivedAt: new Date(execution.createdAt),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: formatTimeAgo(new Date(execution.createdAt)),
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
+      eventId: execution.rootEvent.id,
     },
   ];
 }
