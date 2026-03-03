@@ -357,9 +357,19 @@ func Test__TerraformRunEvent__Setup(t *testing.T) {
 	})
 
 	t.Run("valid configuration -> webhook requested", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/api/v2/workspaces/ws-123", r.URL.Path)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data": {"id": "ws-123", "attributes": {"name": "test-workspace"}}}`))
+		}))
+		defer ts.Close()
+
 		integrationCtx := &contexts.IntegrationContext{
 			WebhookRequests: []any{},
-			Configuration:   map[string]any{"apiToken": "test-token"},
+			Configuration: map[string]any{
+				"apiToken": "test-token",
+				"address":  ts.URL,
+			},
 		}
 
 		err := trigger.Setup(core.TriggerContext{

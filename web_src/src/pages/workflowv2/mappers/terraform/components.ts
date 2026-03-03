@@ -100,9 +100,6 @@ export const terraformComponentMapper: ComponentBaseMapper = {
     }
 
     const executionMetadata = lastExecution?.metadata as Record<string, any>;
-    if (executionMetadata?.workspaceName) {
-      metadata.push({ icon: "info", label: executionMetadata.workspaceName });
-    }
     if (executionMetadata?.runId) {
       metadata.push({ icon: "play", label: executionMetadata.runId });
     }
