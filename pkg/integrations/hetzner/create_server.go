@@ -293,6 +293,16 @@ func serverToPayload(s *ServerResponse) map[string]any {
 		"status":  s.Status,
 		"created": s.Created,
 	}
+	if s.Image.ID > 0 {
+		out["imageId"] = s.Image.ID
+	}
+	imageName := strings.TrimSpace(s.Image.Description)
+	if imageName == "" {
+		imageName = strings.TrimSpace(s.Image.Name)
+	}
+	if imageName != "" {
+		out["imageName"] = imageName
+	}
 	if s.PublicNet.IPv4.IP != "" {
 		out["publicIp"] = s.PublicNet.IPv4.IP
 	}

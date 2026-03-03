@@ -80,10 +80,16 @@ type createLoadBalancerResponse struct {
 }
 
 type ServerResponse struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Status    string `json:"status"`
-	Created   string `json:"created"`
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Status  string `json:"status"`
+	Created string `json:"created"`
+	Image   struct {
+		ID          int    `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Type        string `json:"type"`
+	} `json:"image"`
 	PublicNet struct {
 		IPv4 struct {
 			IP string `json:"ip"`
@@ -482,23 +488,48 @@ type ImageResponse struct {
 }
 
 func (c *Client) ListImages() ([]ImageResponse, error) {
-	resp, err := c.do("GET", "/images?per_page=50", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+	all := []ImageResponse{}
+	seen := map[int]struct{}{}
+	page := 1
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.parseError(resp)
+	for {
+		resp, err := c.do("GET", fmt.Sprintf("/images?per_page=50&page=%d", page), nil)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, c.parseError(resp)
+		}
+
+		var out struct {
+			Images []ImageResponse `json:"images"`
+			Meta   struct {
+				Pagination struct {
+					NextPage *int `json:"next_page"`
+				} `json:"pagination"`
+			} `json:"meta"`
+		}
+		if err := decodeJSON(resp.Body, &out); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("decode list images response: %w", err)
+		}
+		resp.Body.Close()
+
+		for _, img := range out.Images {
+			if _, ok := seen[img.ID]; ok {
+				continue
+			}
+			seen[img.ID] = struct{}{}
+			all = append(all, img)
+		}
+
+		if out.Meta.Pagination.NextPage == nil || *out.Meta.Pagination.NextPage <= page {
+			break
+		}
+		page = *out.Meta.Pagination.NextPage
 	}
 
-	var out struct {
-		Images []ImageResponse `json:"images"`
-	}
-	if err := decodeJSON(resp.Body, &out); err != nil {
-		return nil, fmt.Errorf("decode list images response: %w", err)
-	}
-	return out.Images, nil
+	return all, nil
 }
 
 func (c *Client) GetImage(imageID string) (*ImageResponse, error) {

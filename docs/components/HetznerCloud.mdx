@@ -2,7 +2,7 @@
 title: "Hetzner Cloud"
 ---
 
-Create and delete Hetzner Cloud servers and load balancers, and create/delete server snapshots
+Create and delete Hetzner Cloud servers/load balancers and create/delete server snapshots
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -10,11 +10,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a Hetzner Cloud Load Balancer." />
-  <LinkCard title="Create Snapshot" href="#create-snapshot" description="Create a snapshot image from an existing Hetzner Cloud server." />
   <LinkCard title="Create Server" href="#create-server" description="Create a Hetzner Cloud server and wait for the action to complete" />
-  <LinkCard title="Delete Snapshot" href="#delete-snapshot" description="Delete a snapshot image from Hetzner Cloud." />
+  <LinkCard title="Create Snapshot" href="#create-snapshot" description="Create a server snapshot in Hetzner Cloud and wait for completion" />
   <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a Hetzner Cloud Load Balancer" />
   <LinkCard title="Delete Server" href="#delete-server" description="Delete a Hetzner Cloud server and wait for the action to complete" />
+  <LinkCard title="Delete Snapshot" href="#delete-snapshot" description="Delete a Hetzner Cloud snapshot image" />
 </CardGrid>
 
 ## Instructions
@@ -111,25 +111,6 @@ The Create Snapshot component creates a snapshot image from an existing Hetzner 
 }
 ```
 
-<a id="delete-snapshot"></a>
-
-## Delete Snapshot
-
-The Delete Snapshot component deletes a snapshot image in Hetzner Cloud.
-
-### How It Works
-
-1. Deletes the selected snapshot via the Hetzner API
-2. Emits on the default output when the snapshot is deleted. If deletion fails, the execution errors.
-
-### Example Output
-
-```json
-{
-  "imageId": "67890"
-}
-```
-
 <a id="delete-load-balancer"></a>
 
 ## Delete Load Balancer
@@ -167,6 +148,25 @@ The Delete Server component deletes a server in Hetzner Cloud and waits for the 
 {
   "actionId": 123,
   "serverId": 42
+}
+```
+
+<a id="delete-snapshot"></a>
+
+## Delete Snapshot
+
+The Delete Snapshot component deletes a snapshot image in Hetzner Cloud.
+
+### How It Works
+
+1. Deletes the selected snapshot via the Hetzner API
+2. Emits on the default output when the snapshot is deleted. If deletion fails, the execution errors.
+
+### Example Output
+
+```json
+{
+  "imageId": "67890"
 }
 ```
 

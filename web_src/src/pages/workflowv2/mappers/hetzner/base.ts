@@ -2,6 +2,7 @@ import {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
+  ExecutionInfo,
   NodeInfo,
   SubtitleContext,
 } from "../types";
@@ -37,7 +38,7 @@ function getConfigValue(value: unknown): string | undefined {
   }
 
   const objectValue = value as Record<string, unknown>;
-  const fields = ["label", "name", "slug", "value", "id"];
+  const fields = ["label", "displayName", "name", "slug", "value", "id"];
 
   for (const field of fields) {
     const candidate = objectValue[field];
@@ -55,12 +56,15 @@ function getConfigValue(value: unknown): string | undefined {
   return undefined;
 }
 
-function metadataList(node: NodeInfo): MetadataItem[] {
+function metadataList(node: NodeInfo, execution?: ExecutionInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = (node.configuration as HetznerConfiguration | undefined) ?? {};
+  const output = execution?.outputs as { default?: Array<{ data?: Record<string, unknown> }> } | undefined;
+  const outputData = output?.default?.[0]?.data;
 
   const serverType = getConfigValue(configuration.serverType);
   const image = getConfigValue(configuration.image);
+  const outputImageName = getConfigValue(outputData?.imageName);
   const snapshot = getConfigValue(configuration.snapshot);
   const description = getConfigValue(configuration.description);
   const location = getConfigValue(configuration.location);
@@ -74,7 +78,9 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "cpu", label: `Type: ${serverType}` });
   }
   if (image) {
-    metadata.push({ icon: "hard-drive", label: `Image: ${image}` });
+    const imageLabel =
+      outputImageName && outputImageName !== image ? `${outputImageName} (${image})` : outputImageName || image;
+    metadata.push({ icon: "hard-drive", label: `Image: ${imageLabel}` });
   }
   if (description) {
     metadata.push({ icon: "camera", label: `Snapshot: ${description}` });
@@ -126,6 +132,7 @@ function getExecutionDetails(context: ExecutionDetailsContext): Record<string, s
     (isSnapshotComponent ? (output?.imageId ?? output?.id) : undefined) ??
     metadata?.imageId ??
     (metadata?.image as Record<string, unknown> | undefined)?.id;
+  const imageName = output?.imageName;
 
   if (serverId !== undefined) {
     details["Server ID"] = String(serverId);
@@ -136,6 +143,9 @@ function getExecutionDetails(context: ExecutionDetailsContext): Record<string, s
   }
   if (imageId !== undefined) {
     details["Image ID"] = String(imageId);
+  }
+  if (imageName !== undefined) {
+    details["Image"] = String(imageName);
   }
 
   if (context.execution.createdAt) {
@@ -154,9 +164,10 @@ function getExecutionDetails(context: ExecutionDetailsContext): Record<string, s
 
 function props(context: ComponentBaseContext) {
   const base = noopMapper.props(context);
+  const latestExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : undefined;
   return {
     ...base,
-    metadata: metadataList(context.node),
+    metadata: metadataList(context.node, latestExecution),
   };
 }
 
