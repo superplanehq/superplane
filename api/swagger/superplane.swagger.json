@@ -3708,6 +3708,12 @@
         },
         "canvas": {
           "$ref": "#/definitions/CanvasesCanvas"
+        },
+        "selectedNodeIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

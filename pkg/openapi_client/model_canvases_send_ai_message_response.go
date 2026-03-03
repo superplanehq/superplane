@@ -20,8 +20,8 @@ var _ MappedNullable = &CanvasesSendAiMessageResponse{}
 
 // CanvasesSendAiMessageResponse struct for CanvasesSendAiMessageResponse
 type CanvasesSendAiMessageResponse struct {
-	AssistantMessage *string                  `json:"assistantMessage,omitempty"`
-	Operations       []map[string]interface{} `json:"operations,omitempty"`
+	AssistantMessage *string `json:"assistantMessage,omitempty"`
+	Operations []map[string]interface{} `json:"operations,omitempty"`
 }
 
 // NewCanvasesSendAiMessageResponse instantiates a new CanvasesSendAiMessageResponse object
@@ -106,7 +106,7 @@ func (o *CanvasesSendAiMessageResponse) SetOperations(v []map[string]interface{}
 }
 
 func (o CanvasesSendAiMessageResponse) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,3 +159,5 @@ func (v *NullableCanvasesSendAiMessageResponse) UnmarshalJSON(src []byte) error 
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

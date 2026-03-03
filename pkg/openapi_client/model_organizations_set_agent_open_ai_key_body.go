@@ -20,8 +20,8 @@ var _ MappedNullable = &OrganizationsSetAgentOpenAIKeyBody{}
 
 // OrganizationsSetAgentOpenAIKeyBody struct for OrganizationsSetAgentOpenAIKeyBody
 type OrganizationsSetAgentOpenAIKeyBody struct {
-	ApiKey   *string `json:"apiKey,omitempty"`
-	Validate *bool   `json:"validate,omitempty"`
+	ApiKey *string `json:"apiKey,omitempty"`
+	Validate *bool `json:"validate,omitempty"`
 }
 
 // NewOrganizationsSetAgentOpenAIKeyBody instantiates a new OrganizationsSetAgentOpenAIKeyBody object
@@ -106,7 +106,7 @@ func (o *OrganizationsSetAgentOpenAIKeyBody) SetValidate(v bool) {
 }
 
 func (o OrganizationsSetAgentOpenAIKeyBody) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,3 +159,5 @@ func (v *NullableOrganizationsSetAgentOpenAIKeyBody) UnmarshalJSON(src []byte) e
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

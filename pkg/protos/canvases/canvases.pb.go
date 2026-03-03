@@ -3170,6 +3170,7 @@ type CanvasAiContext struct {
 	Nodes           []*CanvasAiNodeContext  `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
 	AvailableBlocks []*CanvasAiBlockContext `protobuf:"bytes,2,rep,name=available_blocks,json=availableBlocks,proto3" json:"available_blocks,omitempty"`
 	Canvas          *Canvas                 `protobuf:"bytes,3,opt,name=canvas,proto3" json:"canvas,omitempty"`
+	SelectedNodeIds []string                `protobuf:"bytes,4,rep,name=selected_node_ids,json=selectedNodeIds,proto3" json:"selected_node_ids,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -3221,6 +3222,13 @@ func (x *CanvasAiContext) GetAvailableBlocks() []*CanvasAiBlockContext {
 func (x *CanvasAiContext) GetCanvas() *Canvas {
 	if x != nil {
 		return x.Canvas
+	}
+	return nil
+}
+
+func (x *CanvasAiContext) GetSelectedNodeIds() []string {
+	if x != nil {
+		return x.SelectedNodeIds
 	}
 	return nil
 }
@@ -4076,11 +4084,12 @@ const file_canvases_proto_rawDesc = "" +
 	"\x14CanvasAiBlockContext\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x12\n" +
-	"\x04type\x18\x03 \x01(\tR\x04type\"\xdc\x01\n" +
+	"\x04type\x18\x03 \x01(\tR\x04type\"\x88\x02\n" +
 	"\x0fCanvasAiContext\x12>\n" +
 	"\x05nodes\x18\x01 \x03(\v2(.Superplane.Canvases.CanvasAiNodeContextR\x05nodes\x12T\n" +
 	"\x10available_blocks\x18\x02 \x03(\v2).Superplane.Canvases.CanvasAiBlockContextR\x0favailableBlocks\x123\n" +
-	"\x06canvas\x18\x03 \x01(\v2\x1b.Superplane.Canvases.CanvasR\x06canvas\"\x98\x01\n" +
+	"\x06canvas\x18\x03 \x01(\v2\x1b.Superplane.Canvases.CanvasR\x06canvas\x12*\n" +
+	"\x11selected_node_ids\x18\x04 \x03(\tR\x0fselectedNodeIds\"\x98\x01\n" +
 	"\x14SendAiMessageRequest\x12\x1b\n" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x16\n" +
 	"\x06prompt\x18\x02 \x01(\tR\x06prompt\x12K\n" +

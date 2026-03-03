@@ -871,6 +871,7 @@ function CanvasPage(props: CanvasPageProps) {
               nodes: props.aiCanvasNodes,
               edges: props.aiCanvasEdges,
             }}
+            selectedNodeIds={state.nodes.filter((node) => node.selected).map((node) => node.id)}
             onApplyAiOperations={props.onApplyAiOperations}
             integrations={props.integrations}
             canvasZoom={canvasZoom}

@@ -1002,6 +1002,7 @@ func buildCanvasContextJSON(ctx *pb.CanvasAiContext) ([]byte, error) {
 			"nodes":           []map[string]string{},
 			"availableBlocks": []map[string]string{},
 			"canvas":          map[string]any{},
+			"selectedNodeIds": []string{},
 		})
 	}
 
@@ -1032,10 +1033,20 @@ func buildCanvasContextJSON(ctx *pb.CanvasAiContext) ([]byte, error) {
 		}
 	}
 
+	selectedNodeIDs := make([]string, 0, len(ctx.GetSelectedNodeIds()))
+	for _, nodeID := range ctx.GetSelectedNodeIds() {
+		nodeID = strings.TrimSpace(nodeID)
+		if nodeID == "" {
+			continue
+		}
+		selectedNodeIDs = append(selectedNodeIDs, nodeID)
+	}
+
 	return json.Marshal(map[string]any{
 		"nodes":           nodes,
 		"availableBlocks": blocks,
 		"canvas":          canvas,
+		"selectedNodeIds": selectedNodeIDs,
 	})
 }
 

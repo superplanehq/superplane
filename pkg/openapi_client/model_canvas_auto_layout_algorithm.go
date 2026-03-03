@@ -22,7 +22,7 @@ type CanvasAutoLayoutAlgorithm string
 // List of CanvasAutoLayoutAlgorithm
 const (
 	CANVASAUTOLAYOUTALGORITHM_ALGORITHM_UNSPECIFIED CanvasAutoLayoutAlgorithm = "ALGORITHM_UNSPECIFIED"
-	CANVASAUTOLAYOUTALGORITHM_ALGORITHM_HORIZONTAL  CanvasAutoLayoutAlgorithm = "ALGORITHM_HORIZONTAL"
+	CANVASAUTOLAYOUTALGORITHM_ALGORITHM_HORIZONTAL CanvasAutoLayoutAlgorithm = "ALGORITHM_HORIZONTAL"
 )
 
 // All allowed values of CanvasAutoLayoutAlgorithm enum
@@ -109,3 +109,4 @@ func (v *NullableCanvasAutoLayoutAlgorithm) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+

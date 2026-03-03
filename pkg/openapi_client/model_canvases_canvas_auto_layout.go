@@ -21,8 +21,8 @@ var _ MappedNullable = &CanvasesCanvasAutoLayout{}
 // CanvasesCanvasAutoLayout struct for CanvasesCanvasAutoLayout
 type CanvasesCanvasAutoLayout struct {
 	Algorithm *CanvasAutoLayoutAlgorithm `json:"algorithm,omitempty"`
-	NodeIds   []string                   `json:"nodeIds,omitempty"`
-	Scope     *CanvasAutoLayoutScope     `json:"scope,omitempty"`
+	NodeIds []string `json:"nodeIds,omitempty"`
+	Scope *CanvasAutoLayoutScope `json:"scope,omitempty"`
 }
 
 // NewCanvasesCanvasAutoLayout instantiates a new CanvasesCanvasAutoLayout object
@@ -147,7 +147,7 @@ func (o *CanvasesCanvasAutoLayout) SetScope(v CanvasAutoLayoutScope) {
 }
 
 func (o CanvasesCanvasAutoLayout) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -203,3 +203,5 @@ func (v *NullableCanvasesCanvasAutoLayout) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

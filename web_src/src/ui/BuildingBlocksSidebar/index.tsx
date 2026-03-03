@@ -120,6 +120,7 @@ export interface BuildingBlocksSidebarProps {
     nodes?: ComponentsNode[];
     edges?: ComponentsEdge[];
   };
+  selectedNodeIds?: string[];
   onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
   integrations?: OrganizationsIntegration[];
   canvasZoom?: number;
@@ -233,6 +234,7 @@ export function BuildingBlocksSidebar({
   canvasId,
   canvasNodes = [],
   aiCanvas,
+  selectedNodeIds = [],
   onApplyAiOperations,
   integrations = [],
   canvasZoom = 1,
@@ -399,6 +401,7 @@ export function BuildingBlocksSidebar({
                     edges: aiCanvas?.edges || [],
                   },
                 },
+                selectedNodeIds,
               },
             },
           }),

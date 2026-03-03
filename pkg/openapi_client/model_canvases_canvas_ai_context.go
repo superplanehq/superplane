@@ -20,9 +20,10 @@ var _ MappedNullable = &CanvasesCanvasAiContext{}
 
 // CanvasesCanvasAiContext struct for CanvasesCanvasAiContext
 type CanvasesCanvasAiContext struct {
-	Nodes           []CanvasesCanvasAiNodeContext  `json:"nodes,omitempty"`
+	Nodes []CanvasesCanvasAiNodeContext `json:"nodes,omitempty"`
 	AvailableBlocks []CanvasesCanvasAiBlockContext `json:"availableBlocks,omitempty"`
-	Canvas          *CanvasesCanvas                `json:"canvas,omitempty"`
+	Canvas *CanvasesCanvas `json:"canvas,omitempty"`
+	SelectedNodeIds []string `json:"selectedNodeIds,omitempty"`
 }
 
 // NewCanvasesCanvasAiContext instantiates a new CanvasesCanvasAiContext object
@@ -138,8 +139,40 @@ func (o *CanvasesCanvasAiContext) SetCanvas(v CanvasesCanvas) {
 	o.Canvas = &v
 }
 
+// GetSelectedNodeIds returns the SelectedNodeIds field value if set, zero value otherwise.
+func (o *CanvasesCanvasAiContext) GetSelectedNodeIds() []string {
+	if o == nil || IsNil(o.SelectedNodeIds) {
+		var ret []string
+		return ret
+	}
+	return o.SelectedNodeIds
+}
+
+// GetSelectedNodeIdsOk returns a tuple with the SelectedNodeIds field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasAiContext) GetSelectedNodeIdsOk() ([]string, bool) {
+	if o == nil || IsNil(o.SelectedNodeIds) {
+		return nil, false
+	}
+	return o.SelectedNodeIds, true
+}
+
+// HasSelectedNodeIds returns a boolean if a field has been set.
+func (o *CanvasesCanvasAiContext) HasSelectedNodeIds() bool {
+	if o != nil && !IsNil(o.SelectedNodeIds) {
+		return true
+	}
+
+	return false
+}
+
+// SetSelectedNodeIds gets a reference to the given []string and assigns it to the SelectedNodeIds field.
+func (o *CanvasesCanvasAiContext) SetSelectedNodeIds(v []string) {
+	o.SelectedNodeIds = v
+}
+
 func (o CanvasesCanvasAiContext) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -156,6 +189,9 @@ func (o CanvasesCanvasAiContext) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Canvas) {
 		toSerialize["canvas"] = o.Canvas
+	}
+	if !IsNil(o.SelectedNodeIds) {
+		toSerialize["selectedNodeIds"] = o.SelectedNodeIds
 	}
 	return toSerialize, nil
 }
@@ -195,3 +231,5 @@ func (v *NullableCanvasesCanvasAiContext) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+
