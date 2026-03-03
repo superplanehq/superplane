@@ -441,18 +441,24 @@ func TestCreateBuildCancelPostsCancelRequest(t *testing.T) {
 		return client, nil
 	})
 
+	metadataCtx := &testcontexts.MetadataContext{Metadata: CreateBuildExecutionMetadata{
+		Build: map[string]any{
+			"id":        "build-123",
+			"projectId": "demo-project",
+			"status":    "WORKING",
+		},
+	}}
+
 	err := component.Cancel(core.ExecutionContext{
-		Metadata: &testcontexts.MetadataContext{Metadata: CreateBuildExecutionMetadata{
-			Build: map[string]any{
-				"id":        "build-123",
-				"projectId": "demo-project",
-				"status":    "WORKING",
-			},
-		}},
+		Metadata:    metadataCtx,
 		Integration: &testcontexts.IntegrationContext{},
 	})
 
 	require.NoError(t, err)
+
+	metadata := CreateBuildExecutionMetadata{}
+	require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &metadata))
+	assert.Equal(t, "CANCELLED", metadata.Build["status"])
 }
 
 func TestCreateBuildCancelUsesRegionalEndpointWhenBuildIsRegional(t *testing.T) {
@@ -478,19 +484,25 @@ func TestCreateBuildCancelUsesRegionalEndpointWhenBuildIsRegional(t *testing.T) 
 		return client, nil
 	})
 
+	metadataCtx := &testcontexts.MetadataContext{Metadata: CreateBuildExecutionMetadata{
+		Build: map[string]any{
+			"id":        "build-123",
+			"name":      "projects/demo-project/locations/us-central1/builds/build-123",
+			"projectId": "demo-project",
+			"status":    "WORKING",
+		},
+	}}
+
 	err := component.Cancel(core.ExecutionContext{
-		Metadata: &testcontexts.MetadataContext{Metadata: CreateBuildExecutionMetadata{
-			Build: map[string]any{
-				"id":        "build-123",
-				"name":      "projects/demo-project/locations/us-central1/builds/build-123",
-				"projectId": "demo-project",
-				"status":    "WORKING",
-			},
-		}},
+		Metadata:    metadataCtx,
 		Integration: &testcontexts.IntegrationContext{},
 	})
 
 	require.NoError(t, err)
+
+	metadata := CreateBuildExecutionMetadata{}
+	require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &metadata))
+	assert.Equal(t, "CANCELLED", metadata.Build["status"])
 }
 
 func TestCreateBuildCancelFullGlobalResourceNameIgnoresProjectOverride(t *testing.T) {
@@ -516,22 +528,28 @@ func TestCreateBuildCancelFullGlobalResourceNameIgnoresProjectOverride(t *testin
 		return client, nil
 	})
 
+	metadataCtx := &testcontexts.MetadataContext{Metadata: CreateBuildExecutionMetadata{
+		Build: map[string]any{
+			"id":        "build-123",
+			"name":      "projects/demo-project/locations/global/builds/build-123",
+			"projectId": "demo-project",
+			"status":    "WORKING",
+		},
+	}}
+
 	err := component.Cancel(core.ExecutionContext{
 		Configuration: map[string]any{
 			"projectId": "other-project",
 		},
-		Metadata: &testcontexts.MetadataContext{Metadata: CreateBuildExecutionMetadata{
-			Build: map[string]any{
-				"id":        "build-123",
-				"name":      "projects/demo-project/locations/global/builds/build-123",
-				"projectId": "demo-project",
-				"status":    "WORKING",
-			},
-		}},
+		Metadata:    metadataCtx,
 		Integration: &testcontexts.IntegrationContext{},
 	})
 
 	require.NoError(t, err)
+
+	metadata := CreateBuildExecutionMetadata{}
+	require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &metadata))
+	assert.Equal(t, "CANCELLED", metadata.Build["status"])
 }
 
 func TestDecodeCreateBuildConfigurationRejectsConflictingSourceFields(t *testing.T) {

@@ -3,6 +3,7 @@ package cloudbuild
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -12,13 +13,17 @@ import (
 const (
 	EmittedEventType = "gcp.cloudbuild.build"
 	SubscriptionType = "cloudbuild"
+
+	buildSourceTriggered = "triggered"
+	buildSourceDirect    = "direct"
 )
 
 type OnBuildComplete struct{}
 
 type OnBuildCompleteConfiguration struct {
-	Statuses  []string `json:"statuses" mapstructure:"statuses"`
-	TriggerID string   `json:"triggerId" mapstructure:"triggerId"`
+	Statuses    []string `json:"statuses" mapstructure:"statuses"`
+	TriggerID   string   `json:"triggerId" mapstructure:"triggerId"`
+	BuildSource string   `json:"buildSource" mapstructure:"buildSource"`
 }
 
 type OnBuildCompleteMetadata struct {
@@ -51,6 +56,12 @@ func (t *OnBuildComplete) Documentation() string {
 ## Setup
 
 **Required GCP setup:** Ensure the **Cloud Build API** is enabled in your project. The service account used by the integration must have ` + "`roles/pubsub.admin`" + ` to create a push subscription on the ` + "`cloud-builds`" + ` topic.
+
+## Configuration
+
+- **Statuses**: Filter by terminal Cloud Build status.
+- **Build Source**: Optionally limit events to trigger-based builds or direct/API builds. Leave empty to listen to both.
+- **Cloud Build Trigger**: Filter to a specific Cloud Build trigger. This only applies to trigger-based builds and cannot be combined with **Build Source = Direct/API Builds**.
 
 ## Event Data
 
@@ -97,11 +108,29 @@ func (t *OnBuildComplete) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "buildSource",
+			Label:       "Build Source",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Description: "Optionally listen only to trigger-based builds or only to direct/API builds. Leave empty to receive both.",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Trigger-Based Builds", Value: buildSourceTriggered},
+						{Label: "Direct/API Builds", Value: buildSourceDirect},
+					},
+				},
+			},
+		},
+		{
 			Name:        "triggerId",
 			Label:       "Cloud Build Trigger",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Description: "Only receive events from a specific Cloud Build trigger. Leave empty to receive events from all triggers.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "buildSource", Values: []string{"", buildSourceTriggered}},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: ResourceTypeTrigger,
@@ -112,6 +141,10 @@ func (t *OnBuildComplete) Configuration() []configuration.Field {
 }
 
 func (t *OnBuildComplete) Setup(ctx core.TriggerContext) error {
+	if _, err := decodeOnBuildCompleteConfiguration(ctx.Configuration); err != nil {
+		return err
+	}
+
 	if ctx.Integration == nil {
 		return fmt.Errorf("connect the GCP integration to this trigger to enable automatic event routing")
 	}
@@ -135,9 +168,9 @@ func (t *OnBuildComplete) HandleAction(ctx core.TriggerActionContext) (map[strin
 }
 
 func (t *OnBuildComplete) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {
-	var config OnBuildCompleteConfiguration
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
+	config, err := decodeOnBuildCompleteConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
 	}
 
 	var build struct {
@@ -150,6 +183,11 @@ func (t *OnBuildComplete) OnIntegrationMessage(ctx core.IntegrationMessageContex
 
 	if len(config.Statuses) > 0 && !slices.Contains(config.Statuses, build.Status) {
 		ctx.Logger.Infof("gcp cloud build: status %q does not match configured statuses, skipping", build.Status)
+		return nil
+	}
+
+	if !matchesBuildSource(config.BuildSource, build.BuildTriggerID) {
+		ctx.Logger.Infof("gcp cloud build: build source %q does not match configured build source filter %q, skipping", build.BuildTriggerID, config.BuildSource)
 		return nil
 	}
 
@@ -167,4 +205,39 @@ func (t *OnBuildComplete) Cleanup(ctx core.TriggerContext) error {
 
 func (t *OnBuildComplete) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return 200, nil
+}
+
+func decodeOnBuildCompleteConfiguration(raw any) (OnBuildCompleteConfiguration, error) {
+	config := OnBuildCompleteConfiguration{}
+	if err := mapstructure.Decode(raw, &config); err != nil {
+		return OnBuildCompleteConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	config.TriggerID = strings.TrimSpace(config.TriggerID)
+	config.BuildSource = strings.ToLower(strings.TrimSpace(config.BuildSource))
+
+	switch config.BuildSource {
+	case "", buildSourceTriggered, buildSourceDirect:
+	default:
+		return OnBuildCompleteConfiguration{}, fmt.Errorf("buildSource must be one of %q or %q", buildSourceTriggered, buildSourceDirect)
+	}
+
+	if config.BuildSource == buildSourceDirect && config.TriggerID != "" {
+		return OnBuildCompleteConfiguration{}, fmt.Errorf("triggerId cannot be combined with buildSource=%s", buildSourceDirect)
+	}
+
+	return config, nil
+}
+
+func matchesBuildSource(buildSource string, buildTriggerID string) bool {
+	hasTriggerID := strings.TrimSpace(buildTriggerID) != ""
+
+	switch buildSource {
+	case buildSourceTriggered:
+		return hasTriggerID
+	case buildSourceDirect:
+		return !hasTriggerID
+	default:
+		return true
+	}
 }

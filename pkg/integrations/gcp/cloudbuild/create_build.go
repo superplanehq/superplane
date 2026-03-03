@@ -854,20 +854,26 @@ func normalizeGitRepositoryURL(value string) string {
 }
 
 func storeCreateBuildMetadata(metadataCtx core.MetadataContext, build map[string]any, projectID string) error {
-	if build == nil {
-		build = map[string]any{}
-	}
-
-	buildCopy := map[string]any{}
-	for key, value := range build {
-		buildCopy[key] = value
-	}
+	buildCopy := copyBuildMetadata(build)
 
 	if strings.TrimSpace(readBuildString(buildCopy, "projectId")) == "" && strings.TrimSpace(projectID) != "" {
 		buildCopy["projectId"] = projectID
 	}
 
 	return metadataCtx.Set(CreateBuildExecutionMetadata{Build: buildCopy})
+}
+
+func copyBuildMetadata(build map[string]any) map[string]any {
+	if build == nil {
+		return map[string]any{}
+	}
+
+	buildCopy := make(map[string]any, len(build))
+	for key, value := range build {
+		buildCopy[key] = value
+	}
+
+	return buildCopy
 }
 
 func readBuildString(build map[string]any, key string) string {
@@ -1047,7 +1053,16 @@ func (c *CreateBuild) Cancel(ctx core.ExecutionContext) error {
 	}
 
 	cancelURL := buildCancelURL(projectID, buildID, readBuildString(metadata.Build, "name"))
-	_, _ = client.PostURL(context.Background(), cancelURL, map[string]any{})
+	if _, err := client.PostURL(context.Background(), cancelURL, map[string]any{}); err != nil {
+		return nil
+	}
+
+	cancelledBuild := copyBuildMetadata(metadata.Build)
+	cancelledBuild["status"] = "CANCELLED"
+	if err := storeCreateBuildMetadata(ctx.Metadata, cancelledBuild, projectID); err != nil {
+		return nil
+	}
+
 	return nil
 }
 func (c *CreateBuild) Cleanup(_ core.SetupContext) error { return nil }
