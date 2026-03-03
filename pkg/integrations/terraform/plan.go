@@ -166,13 +166,29 @@ func (c *Plan) poll(ctx core.ActionContext) error {
 	currentStatus := run.Attributes.Status
 	now := time.Now().Format(time.RFC3339)
 
+	metadataChanged := false
+
+	if run.Workspace != nil {
+		if metadata.WorkspaceName == "" && run.Workspace.Attributes.Name != "" {
+			metadata.WorkspaceName = run.Workspace.Attributes.Name
+			metadataChanged = true
+		}
+		if metadata.RunURL == "" && run.Workspace.Relationships.Organization.Data.ID != "" && client.BaseURL != "" {
+			metadata.RunURL = fmt.Sprintf("%s/app/%s/workspaces/%s/runs/%s", client.BaseURL, run.Workspace.Relationships.Organization.Data.ID, run.Workspace.Attributes.Name, run.ID)
+			metadataChanged = true
+		}
+	}
+
 	if currentStatus != metadata.CurrentStatus {
 		metadata.CurrentStatus = currentStatus
 		metadata.StateHistory = append(metadata.StateHistory, RunStateEntry{
 			Status:    currentStatus,
 			Timestamp: now,
 		})
+		metadataChanged = true
+	}
 
+	if metadataChanged {
 		if err := ctx.Metadata.Set(metadata); err != nil {
 			return fmt.Errorf("failed to update metadata: %w", err)
 		}

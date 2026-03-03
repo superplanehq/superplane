@@ -23,6 +23,13 @@ type WorkspacePayload struct {
 		Name      string `json:"name"`
 		AutoApply bool   `json:"auto-apply"`
 	} `json:"attributes"`
+	Relationships struct {
+		Organization struct {
+			Data struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		} `json:"organization"`
+	} `json:"relationships"`
 }
 
 type PolicyChecksPayload struct {
