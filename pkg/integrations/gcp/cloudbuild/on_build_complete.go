@@ -55,7 +55,7 @@ func (t *OnBuildComplete) Documentation() string {
 
 ## Setup
 
-**Required GCP setup:** Ensure the **Cloud Build API** is enabled in your project. The service account used by the integration must have ` + "`roles/pubsub.admin`" + ` to create a push subscription on the ` + "`cloud-builds`" + ` topic.
+**Required GCP setup:** Ensure the **Cloud Build API** and **Pub/Sub API** are enabled in your project. The service account used by the integration must have ` + "`roles/pubsub.admin`" + ` so SuperPlane can automatically create the ` + "`cloud-builds`" + ` topic and its push subscription.
 
 ## Configuration
 
@@ -147,6 +147,10 @@ func (t *OnBuildComplete) Setup(ctx core.TriggerContext) error {
 
 	if ctx.Integration == nil {
 		return fmt.Errorf("connect the GCP integration to this trigger to enable automatic event routing")
+	}
+
+	if err := scheduleCloudBuildSetupIfNeeded(ctx.Integration); err != nil {
+		return err
 	}
 
 	subscriptionID, err := ctx.Integration.Subscribe(map[string]any{"type": SubscriptionType})

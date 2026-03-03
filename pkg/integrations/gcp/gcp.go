@@ -353,27 +353,63 @@ func (g *GCP) configurePubSub(ctx core.SyncContext, client *gcpcommon.Client, me
 }
 
 func (g *GCP) configureCloudBuild(ctx core.SyncContext, client *gcpcommon.Client, metadata *gcpcommon.Metadata) error {
+	return g.ensureCloudBuildSetup(context.Background(), client, ctx.Integration, ctx.WebhooksBaseURL, metadata)
+}
+
+func (g *GCP) ensureCloudBuildSetup(
+	reqCtx context.Context,
+	client *gcpcommon.Client,
+	integration core.IntegrationContext,
+	webhooksBaseURL string,
+	metadata *gcpcommon.Metadata,
+) error {
 	if metadata.CloudBuildSubscription != "" {
 		return nil
 	}
 
 	projectID := client.ProjectID()
-	reqCtx := context.Background()
 
-	secret, err := g.cloudBuildSecret(ctx.Integration)
+	enabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "pubsub.googleapis.com")
+	if err != nil {
+		return fmt.Errorf("check Pub/Sub API: %w", err)
+	}
+	if !enabled {
+		return fmt.Errorf(
+			"Pub/Sub API is not enabled in project %s. Enable it at https://console.cloud.google.com/apis/library/pubsub.googleapis.com?project=%s",
+			projectID,
+			projectID,
+		)
+	}
+
+	enabled, err = gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "cloudbuild.googleapis.com")
+	if err != nil {
+		return fmt.Errorf("check Cloud Build API: %w", err)
+	}
+	if !enabled {
+		return fmt.Errorf(
+			"Cloud Build API is not enabled in project %s. Enable it at https://console.cloud.google.com/apis/library/cloudbuild.googleapis.com?project=%s",
+			projectID,
+			projectID,
+		)
+	}
+
+	secret, err := g.cloudBuildSecret(integration)
 	if err != nil {
 		return fmt.Errorf("generate cloud build secret: %w", err)
 	}
 
-	sanitized := sanitizeID(ctx.Integration.ID().String())
+	sanitized := sanitizeID(integration.ID().String())
 	subscriptionID := "sp-cb-sub-" + sanitized
-	pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/cloud-build-events?token=%s", ctx.WebhooksBaseURL, ctx.Integration.ID(), secret)
+	pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/cloud-build-events?token=%s", webhooksBaseURL, integration.ID(), secret)
+
+	if err := gcppubsub.CreateTopic(reqCtx, client, projectID, CloudBuildTopicID); err != nil {
+		return fmt.Errorf("create Cloud Build topic: %w", err)
+	}
 
 	if err := gcppubsub.CreatePushSubscription(reqCtx, client, projectID, subscriptionID, CloudBuildTopicID, pushEndpoint); err != nil {
 		return fmt.Errorf("create Cloud Build push subscription: %w", err)
 	}
 
-	ctx.Logger.Infof("Created Cloud Build push subscription %s", subscriptionID)
 	metadata.CloudBuildSubscription = subscriptionID
 	return nil
 }
@@ -477,10 +513,36 @@ func (g *GCP) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (g *GCP) Actions() []core.Action {
-	return nil
+	return []core.Action{
+		{Name: gcpcommon.ActionNameEnsureCloudBuild},
+	}
 }
 
 func (g *GCP) HandleAction(ctx core.IntegrationActionContext) error {
+	switch ctx.Name {
+	case gcpcommon.ActionNameEnsureCloudBuild:
+		return g.handleEnsureCloudBuild(ctx)
+	default:
+		return fmt.Errorf("unknown action: %s", ctx.Name)
+	}
+}
+
+func (g *GCP) handleEnsureCloudBuild(ctx core.IntegrationActionContext) error {
+	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create GCP client: %w", err)
+	}
+
+	var metadata gcpcommon.Metadata
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	}
+
+	if err := g.ensureCloudBuildSetup(context.Background(), client, ctx.Integration, ctx.WebhooksBaseURL, &metadata); err != nil {
+		return err
+	}
+
+	ctx.Integration.SetMetadata(metadata)
 	return nil
 }
 
