@@ -152,7 +152,7 @@ func ResolveCanvasChangeRequest(
 	}
 
 	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {
-		log.Errorf("failed to publish canvas version updated RabbitMQ message: %v", err)
+		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
 	}
 
 	return &pb.ResolveCanvasChangeRequestResponse{

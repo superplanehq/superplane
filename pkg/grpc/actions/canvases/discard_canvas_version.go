@@ -79,7 +79,7 @@ func DiscardCanvasVersion(ctx context.Context, organizationID string, canvasID s
 	}
 
 	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), versionID).PublishVersionUpdated(); err != nil {
-		log.Errorf("failed to publish canvas version updated RabbitMQ message: %v", err)
+		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
 	}
 
 	return &pb.DiscardCanvasVersionResponse{}, nil

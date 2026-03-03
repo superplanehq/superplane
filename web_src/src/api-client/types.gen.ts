@@ -416,15 +416,6 @@ export type CanvasesPublishCanvasChangeRequestResponse = {
   changeRequest?: CanvasesCanvasChangeRequest;
 };
 
-export type CanvasesPublishCanvasVersionBody = {
-  [key: string]: unknown;
-};
-
-export type CanvasesPublishCanvasVersionResponse = {
-  canvas?: CanvasesCanvas;
-  version?: CanvasesCanvasVersion;
-};
-
 export type CanvasesResolveCanvasChangeRequestBody = {
   canvas?: CanvasesCanvas;
   autoLayout?: CanvasesCanvasAutoLayout;
@@ -2372,36 +2363,6 @@ export type CanvasesDiscardCanvasVersionResponses = {
 
 export type CanvasesDiscardCanvasVersionResponse2 =
   CanvasesDiscardCanvasVersionResponses[keyof CanvasesDiscardCanvasVersionResponses];
-
-export type CanvasesPublishCanvasVersionData = {
-  body: CanvasesPublishCanvasVersionBody;
-  path: {
-    canvasId: string;
-    versionId: string;
-  };
-  query?: never;
-  url: "/api/v1/canvases/{canvasId}/versions/{versionId}/publish";
-};
-
-export type CanvasesPublishCanvasVersionErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type CanvasesPublishCanvasVersionError =
-  CanvasesPublishCanvasVersionErrors[keyof CanvasesPublishCanvasVersionErrors];
-
-export type CanvasesPublishCanvasVersionResponses = {
-  /**
-   * A successful response.
-   */
-  200: CanvasesPublishCanvasVersionResponse;
-};
-
-export type CanvasesPublishCanvasVersionResponse2 =
-  CanvasesPublishCanvasVersionResponses[keyof CanvasesPublishCanvasVersionResponses];
 
 export type CanvasesDeleteCanvasData = {
   body?: never;

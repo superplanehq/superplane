@@ -104,9 +104,25 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	_, _, err = ctx.API.CanvasVersionAPI.
-		CanvasesPublishCanvasVersion(ctx.Context, canvasID, versionID).
-		Body(openapi_client.CanvasesPublishCanvasVersionBody{}).
+	createChangeRequestResponse, _, err := ctx.API.CanvasChangeRequestAPI.
+		CanvasesCreateCanvasChangeRequest(ctx.Context, canvasID).
+		Body(openapi_client.CanvasesCreateCanvasChangeRequestBody{
+			VersionId: &versionID,
+		}).
+		Execute()
+	if err != nil {
+		return err
+	}
+	if createChangeRequestResponse.ChangeRequest == nil ||
+		createChangeRequestResponse.ChangeRequest.Metadata == nil ||
+		createChangeRequestResponse.ChangeRequest.Metadata.Id == nil {
+		return fmt.Errorf("failed to create canvas change request")
+	}
+
+	changeRequestID := createChangeRequestResponse.ChangeRequest.Metadata.GetId()
+	_, _, err = ctx.API.CanvasChangeRequestAPI.
+		CanvasesPublishCanvasChangeRequest(ctx.Context, canvasID, changeRequestID).
+		Body(map[string]interface{}{}).
 		Execute()
 	return err
 }

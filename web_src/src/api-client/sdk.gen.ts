@@ -99,9 +99,6 @@ import type {
   CanvasesPublishCanvasChangeRequestData,
   CanvasesPublishCanvasChangeRequestErrors,
   CanvasesPublishCanvasChangeRequestResponses,
-  CanvasesPublishCanvasVersionData,
-  CanvasesPublishCanvasVersionErrors,
-  CanvasesPublishCanvasVersionResponses,
   CanvasesResolveCanvasChangeRequestData,
   CanvasesResolveCanvasChangeRequestErrors,
   CanvasesResolveCanvasChangeRequestResponses,
@@ -887,27 +884,6 @@ export const canvasesDiscardCanvasVersion = <ThrowOnError extends boolean = true
     CanvasesDiscardCanvasVersionErrors,
     ThrowOnError
   >({ url: "/api/v1/canvases/{canvasId}/versions/{versionId}/discard", ...options });
-
-/**
- * Publish canvas version
- *
- * Publishes a canvas version to live and applies runtime node setup
- */
-export const canvasesPublishCanvasVersion = <ThrowOnError extends boolean = true>(
-  options: Options<CanvasesPublishCanvasVersionData, ThrowOnError>,
-) =>
-  (options.client ?? client).post<
-    CanvasesPublishCanvasVersionResponses,
-    CanvasesPublishCanvasVersionErrors,
-    ThrowOnError
-  >({
-    url: "/api/v1/canvases/{canvasId}/versions/{versionId}/publish",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
 
 /**
  * Delete canvas

@@ -107,18 +107,6 @@ service Canvases {
     };
   }
 
-  rpc PublishCanvasVersion(PublishCanvasVersionRequest) returns (PublishCanvasVersionResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/versions/{version_id}/publish"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Publish canvas version";
-      description: "Publishes a canvas version to live and applies runtime node setup";
-      tags: "CanvasVersion";
-    };
-  }
-
   rpc DiscardCanvasVersion(DiscardCanvasVersionRequest) returns (DiscardCanvasVersionResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id}/versions/{version_id}/discard"
@@ -475,16 +463,6 @@ message UpdateCanvasVersionRequest {
 
 message UpdateCanvasVersionResponse {
   CanvasVersion version = 1;
-}
-
-message PublishCanvasVersionRequest {
-  string canvas_id = 1;
-  string version_id = 2;
-}
-
-message PublishCanvasVersionResponse {
-  Canvas canvas = 1;
-  CanvasVersion version = 2;
 }
 
 message DiscardCanvasVersionRequest {

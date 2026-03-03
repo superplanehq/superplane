@@ -99,13 +99,21 @@ func TestResolveCanvasChangeRequestRebasesVersionAndClearsConflicts(t *testing.T
 	)
 	require.NoError(t, err)
 
-	publishSecondDraftResponse, err := PublishCanvasVersion(
+	secondChangeRequestResponse, err := CreateCanvasChangeRequest(
+		ctx,
+		r.Organization.ID.String(),
+		canvasID,
+		secondDraftID,
+	)
+	require.NoError(t, err)
+
+	publishSecondDraftResponse, err := PublishCanvasChangeRequest(
 		ctx,
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvasID,
-		secondDraftID,
+		secondChangeRequestResponse.ChangeRequest.Metadata.Id,
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)

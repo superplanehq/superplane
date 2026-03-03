@@ -23,7 +23,7 @@
 - `CreateCanvas` creates the workflow and writes revision `1` as published.
 - `CreateCanvasVersion` creates or returns the user draft version.
 - `UpdateCanvasVersion` updates only the draft graph (no runtime setup).
-- `PublishCanvasVersion` applies setup/upserts runtime nodes and sets that version as live.
+- `PublishCanvasChangeRequest` applies setup/upserts runtime nodes and sets that version as live.
 - `UpdateCanvas` still exists for compatibility and keeps its previous behavior.
 - Draft APIs are modeled in `pkg/models/canvas_version.go` with:
   - `SaveCanvasDraftInTransaction`

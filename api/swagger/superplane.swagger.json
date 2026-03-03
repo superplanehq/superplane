@@ -1505,52 +1505,6 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/versions/{versionId}/publish": {
-      "post": {
-        "summary": "Publish canvas version",
-        "description": "Publishes a canvas version to live and applies runtime node setup",
-        "operationId": "Canvases_PublishCanvasVersion",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/CanvasesPublishCanvasVersionResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "versionId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/CanvasesPublishCanvasVersionBody"
-            }
-          }
-        ],
-        "tags": [
-          "CanvasVersion"
-        ]
-      }
-    },
     "/api/v1/canvases/{id}": {
       "get": {
         "summary": "Describe canvas",
@@ -4901,20 +4855,6 @@
         },
         "changeRequest": {
           "$ref": "#/definitions/CanvasesCanvasChangeRequest"
-        }
-      }
-    },
-    "CanvasesPublishCanvasVersionBody": {
-      "type": "object"
-    },
-    "CanvasesPublishCanvasVersionResponse": {
-      "type": "object",
-      "properties": {
-        "canvas": {
-          "$ref": "#/definitions/CanvasesCanvas"
-        },
-        "version": {
-          "$ref": "#/definitions/CanvasesCanvasVersion"
         }
       }
     },

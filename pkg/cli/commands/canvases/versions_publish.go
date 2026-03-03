@@ -33,9 +33,24 @@ func (c *versionsPublishCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	response, _, err := ctx.API.CanvasVersionAPI.
-		CanvasesPublishCanvasVersion(ctx.Context, canvasID, versionID).
-		Body(openapi_client.CanvasesPublishCanvasVersionBody{}).
+	response, _, err := ctx.API.CanvasChangeRequestAPI.
+		CanvasesCreateCanvasChangeRequest(ctx.Context, canvasID).
+		Body(openapi_client.CanvasesCreateCanvasChangeRequestBody{
+			VersionId: &versionID,
+		}).
+		Execute()
+	if err != nil {
+		return err
+	}
+
+	if response.ChangeRequest == nil || response.ChangeRequest.Metadata == nil || response.ChangeRequest.Metadata.Id == nil {
+		return fmt.Errorf("failed to create change request")
+	}
+
+	changeRequestID := response.ChangeRequest.Metadata.GetId()
+	publishResponse, _, err := ctx.API.CanvasChangeRequestAPI.
+		CanvasesPublishCanvasChangeRequest(ctx.Context, canvasID, changeRequestID).
+		Body(map[string]interface{}{}).
 		Execute()
 	if err != nil {
 		return err
@@ -46,15 +61,16 @@ func (c *versionsPublishCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(response)
+		return ctx.Renderer.Render(publishResponse)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		_, _ = fmt.Fprintf(stdout, "Canvas: %s\n", canvasID)
 		_, _ = fmt.Fprintf(stdout, "Published version: %s\n", versionID)
-		if response.Version != nil && response.Version.Metadata != nil {
-			_, _ = fmt.Fprintf(stdout, "Revision: %d\n", response.Version.Metadata.GetRevision())
+		if publishResponse.Version != nil && publishResponse.Version.Metadata != nil {
+			_, _ = fmt.Fprintf(stdout, "Revision: %d\n", publishResponse.Version.Metadata.GetRevision())
 		}
+		_, _ = fmt.Fprintf(stdout, "Published change request: %s\n", changeRequestID)
 		_, err = fmt.Fprintln(stdout, "Active context switched to live")
 		return err
 	})

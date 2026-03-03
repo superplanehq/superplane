@@ -231,13 +231,21 @@ func TestListCanvasVersionsShowsOnlyOwnVersionsAndCurrentLive(t *testing.T) {
 	firstDraftResponse, err := CreateCanvasVersion(otherUserCtx, r.Organization.ID.String(), canvasID)
 	require.NoError(t, err)
 
-	firstPublishResponse, err := PublishCanvasVersion(
+	firstChangeRequestResponse, err := CreateCanvasChangeRequest(
+		otherUserCtx,
+		r.Organization.ID.String(),
+		canvasID,
+		firstDraftResponse.Version.Metadata.Id,
+	)
+	require.NoError(t, err)
+
+	firstPublishResponse, err := PublishCanvasChangeRequest(
 		otherUserCtx,
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvasID,
-		firstDraftResponse.Version.Metadata.Id,
+		firstChangeRequestResponse.ChangeRequest.Metadata.Id,
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)
@@ -245,13 +253,21 @@ func TestListCanvasVersionsShowsOnlyOwnVersionsAndCurrentLive(t *testing.T) {
 	secondDraftResponse, err := CreateCanvasVersion(otherUserCtx, r.Organization.ID.String(), canvasID)
 	require.NoError(t, err)
 
-	secondPublishResponse, err := PublishCanvasVersion(
+	secondChangeRequestResponse, err := CreateCanvasChangeRequest(
+		otherUserCtx,
+		r.Organization.ID.String(),
+		canvasID,
+		secondDraftResponse.Version.Metadata.Id,
+	)
+	require.NoError(t, err)
+
+	secondPublishResponse, err := PublishCanvasChangeRequest(
 		otherUserCtx,
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvasID,
-		secondDraftResponse.Version.Metadata.Id,
+		secondChangeRequestResponse.ChangeRequest.Metadata.Id,
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)
@@ -377,26 +393,42 @@ func TestDescribeCanvasVersionBlocksNonLivePublishedVersionFromOtherUsers(t *tes
 
 	firstDraftResponse, err := CreateCanvasVersion(otherUserCtx, r.Organization.ID.String(), canvasID)
 	require.NoError(t, err)
-	firstPublishResponse, err := PublishCanvasVersion(
+	firstChangeRequestResponse, err := CreateCanvasChangeRequest(
+		otherUserCtx,
+		r.Organization.ID.String(),
+		canvasID,
+		firstDraftResponse.Version.Metadata.Id,
+	)
+	require.NoError(t, err)
+
+	firstPublishResponse, err := PublishCanvasChangeRequest(
 		otherUserCtx,
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvasID,
-		firstDraftResponse.Version.Metadata.Id,
+		firstChangeRequestResponse.ChangeRequest.Metadata.Id,
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)
 
 	secondDraftResponse, err := CreateCanvasVersion(otherUserCtx, r.Organization.ID.String(), canvasID)
 	require.NoError(t, err)
-	secondPublishResponse, err := PublishCanvasVersion(
+	secondChangeRequestResponse, err := CreateCanvasChangeRequest(
+		otherUserCtx,
+		r.Organization.ID.String(),
+		canvasID,
+		secondDraftResponse.Version.Metadata.Id,
+	)
+	require.NoError(t, err)
+
+	secondPublishResponse, err := PublishCanvasChangeRequest(
 		otherUserCtx,
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvasID,
-		secondDraftResponse.Version.Metadata.Id,
+		secondChangeRequestResponse.ChangeRequest.Metadata.Id,
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)
@@ -617,7 +649,7 @@ func TestUpdateCanvasVersionOnlyUpdatesDraft(t *testing.T) {
 	assert.False(t, version.IsPublished)
 }
 
-func TestPublishCanvasVersionAppliesRuntimeChanges(t *testing.T) {
+func TestPublishCanvasChangeRequestAppliesRuntimeChanges(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
@@ -678,13 +710,21 @@ func TestPublishCanvasVersionAppliesRuntimeChanges(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	publishResponse, err := PublishCanvasVersion(
+	changeRequestResponse, err := CreateCanvasChangeRequest(
+		ctx,
+		r.Organization.ID.String(),
+		canvasID,
+		versionID,
+	)
+	require.NoError(t, err)
+
+	publishResponse, err := PublishCanvasChangeRequest(
 		ctx,
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvasID,
-		versionID,
+		changeRequestResponse.ChangeRequest.Metadata.Id,
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)

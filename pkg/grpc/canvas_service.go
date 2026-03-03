@@ -79,19 +79,6 @@ func (s *CanvasService) UpdateCanvasVersion(ctx context.Context, req *pb.UpdateC
 	)
 }
 
-func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.PublishCanvasVersionRequest) (*pb.PublishCanvasVersionResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.PublishCanvasVersion(
-		ctx,
-		s.encryptor,
-		s.registry,
-		organizationID,
-		req.CanvasId,
-		req.VersionId,
-		s.webhookBaseURL,
-	)
-}
-
 func (s *CanvasService) CreateCanvasChangeRequest(ctx context.Context, req *pb.CreateCanvasChangeRequestRequest) (*pb.CreateCanvasChangeRequestResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.CreateCanvasChangeRequest(ctx, organizationID, req.CanvasId, req.VersionId)

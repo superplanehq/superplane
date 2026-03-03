@@ -7,7 +7,6 @@ import {
   canvasesCreateCanvasVersion,
   canvasesListCanvasVersions,
   canvasesUpdateCanvasVersion,
-  canvasesPublishCanvasVersion,
   canvasesCreateCanvasChangeRequest,
   canvasesListCanvasChangeRequests,
   canvasesDescribeCanvasChangeRequest,
@@ -469,31 +468,6 @@ export const useCloseCanvasChangeRequest = (organizationId: string, canvasId: st
       }
 
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-    },
-  });
-};
-
-export const usePublishCanvasVersion = (organizationId: string, canvasId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: { versionId: string }) => {
-      return await canvasesPublishCanvasVersion(
-        withOrganizationHeader({
-          path: { canvasId, versionId: data.versionId },
-          body: {},
-        }),
-      );
-    },
-    onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-      queryClient.removeQueries({ queryKey: canvasKeys.versionDetails() });
-
-      if (response?.data?.canvas) {
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), response.data.canvas);
-      }
     },
   });
 };
