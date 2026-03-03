@@ -3,6 +3,7 @@ package cloudbuild
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/mitchellh/mapstructure"
@@ -216,7 +217,7 @@ func TestCreateBuildExecuteSchedulesPolling(t *testing.T) {
 		},
 	}
 
-	SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+	setTestClientFactory(t, func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 		return client, nil
 	})
 
@@ -282,7 +283,7 @@ func TestCreateBuildExecuteUsesRegionalEndpointForConnectedRepositories(t *testi
 		},
 	}
 
-	SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+	setTestClientFactory(t, func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 		return client, nil
 	})
 
@@ -327,7 +328,7 @@ func TestCreateBuildPollSuccess(t *testing.T) {
 		},
 	}
 
-	SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+	setTestClientFactory(t, func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 		return client, nil
 	})
 
@@ -371,7 +372,7 @@ func TestCreateBuildPollFailureEmitsFailedChannel(t *testing.T) {
 		},
 	}
 
-	SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+	setTestClientFactory(t, func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 		return client, nil
 	})
 
@@ -446,7 +447,7 @@ func TestCreateBuildCancelPostsCancelRequest(t *testing.T) {
 		},
 	}
 
-	SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+	setTestClientFactory(t, func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 		return client, nil
 	})
 
@@ -489,7 +490,7 @@ func TestCreateBuildCancelUsesRegionalEndpointWhenBuildIsRegional(t *testing.T) 
 		},
 	}
 
-	SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+	setTestClientFactory(t, func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 		return client, nil
 	})
 
@@ -533,7 +534,7 @@ func TestCreateBuildCancelFullGlobalResourceNameIgnoresProjectOverride(t *testin
 		},
 	}
 
-	SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+	setTestClientFactory(t, func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 		return client, nil
 	})
 
@@ -559,6 +560,61 @@ func TestCreateBuildCancelFullGlobalResourceNameIgnoresProjectOverride(t *testin
 	metadata := CreateBuildExecutionMetadata{}
 	require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &metadata))
 	assert.Equal(t, "CANCELLED", metadata.Build["status"])
+}
+
+func TestCreateBuildCancelPropagatesCancelRequestError(t *testing.T) {
+	component := &CreateBuild{}
+	setTestClientFactory(t, func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		return &mockClient{
+			projectID: "demo-project",
+			postURL: func(_ context.Context, _ string, _ any) ([]byte, error) {
+				return nil, errors.New("boom")
+			},
+		}, nil
+	})
+
+	err := component.Cancel(core.ExecutionContext{
+		Metadata: &testcontexts.MetadataContext{Metadata: CreateBuildExecutionMetadata{
+			Build: map[string]any{
+				"id":        "build-123",
+				"projectId": "demo-project",
+				"status":    "WORKING",
+			},
+		}},
+		Integration: &testcontexts.IntegrationContext{},
+	})
+
+	require.ErrorContains(t, err, "cancel Cloud Build build build-123")
+	require.ErrorContains(t, err, "boom")
+}
+
+func TestCreateBuildCancelPropagatesMetadataStoreError(t *testing.T) {
+	component := &CreateBuild{}
+	setTestClientFactory(t, func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		return &mockClient{
+			projectID: "demo-project",
+			postURL: func(_ context.Context, _ string, _ any) ([]byte, error) {
+				return []byte(`{}`), nil
+			},
+		}, nil
+	})
+
+	err := component.Cancel(core.ExecutionContext{
+		Metadata: &failingMetadataContext{
+			metadata: CreateBuildExecutionMetadata{
+				Build: map[string]any{
+					"id":        "build-123",
+					"projectId": "demo-project",
+					"status":    "WORKING",
+				},
+			},
+			err: errors.New("set failed"),
+		},
+		Integration: &testcontexts.IntegrationContext{},
+	})
+
+	require.ErrorContains(t, err, "store cancelled build metadata")
+	require.ErrorContains(t, err, "set failed")
 }
 
 func TestDecodeCreateBuildConfigurationRejectsConflictingSourceFields(t *testing.T) {
@@ -624,4 +680,17 @@ func TestCreateBuildFailureMetadataStaysJSONCompatible(t *testing.T) {
 	encoded, err := json.Marshal(metadataCtx.Get())
 	require.NoError(t, err)
 	assert.Contains(t, string(encoded), "build-123")
+}
+
+type failingMetadataContext struct {
+	metadata any
+	err      error
+}
+
+func (m *failingMetadataContext) Get() any {
+	return m.metadata
+}
+
+func (m *failingMetadataContext) Set(_ any) error {
+	return m.err
 }

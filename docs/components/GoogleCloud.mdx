@@ -71,7 +71,7 @@ The On Build Complete trigger starts a workflow execution when a GCP Cloud Build
 
 ### Event Data
 
-Each event contains the full Cloud Build resource, including `id`, `status` (SUCCESS, FAILURE, CANCELLED, TIMEOUT), `buildTriggerId`, `logUrl`, `createTime`, `finishTime`, and more.
+Each event contains the full Cloud Build resource, including `id`, `status` (SUCCESS, FAILURE, INTERNAL_ERROR, TIMEOUT, CANCELLED, EXPIRED), `buildTriggerId`, `logUrl`, `createTime`, `finishTime`, and more.
 
 ### Example Data
 

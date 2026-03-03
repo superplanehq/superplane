@@ -121,6 +121,21 @@ func Test_OnBuildComplete_OnIntegrationMessage(t *testing.T) {
 		}
 	})
 
+	t.Run("no status filter skips non-terminal statuses", func(t *testing.T) {
+		events := &testcontexts.EventContext{}
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Configuration: map[string]any{},
+			Message: map[string]any{
+				"id":     "build-123",
+				"status": "WORKING",
+			},
+			Logger: logger,
+			Events: events,
+		})
+		require.NoError(t, err)
+		assert.Zero(t, events.Count())
+	})
+
 	t.Run("status filter matches emits event", func(t *testing.T) {
 		events := &testcontexts.EventContext{}
 		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{

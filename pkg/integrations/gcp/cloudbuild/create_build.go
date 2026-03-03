@@ -1032,7 +1032,7 @@ func (c *CreateBuild) HandleWebhook(_ core.WebhookRequestContext) (int, error) {
 func (c *CreateBuild) Cancel(ctx core.ExecutionContext) error {
 	var metadata CreateBuildExecutionMetadata
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return nil
+		return fmt.Errorf("decode create build metadata: %w", err)
 	}
 
 	buildID := readBuildString(metadata.Build, "id")
@@ -1049,7 +1049,7 @@ func (c *CreateBuild) Cancel(ctx core.ExecutionContext) error {
 
 	client, err := getClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return nil
+		return fmt.Errorf("create GCP client: %w", err)
 	}
 
 	projectID := readBuildString(metadata.Build, "projectId")
@@ -1059,13 +1059,13 @@ func (c *CreateBuild) Cancel(ctx core.ExecutionContext) error {
 
 	cancelURL := buildCancelURL(projectID, buildID, readBuildString(metadata.Build, "name"))
 	if _, err := client.PostURL(context.Background(), cancelURL, map[string]any{}); err != nil {
-		return nil
+		return fmt.Errorf("cancel Cloud Build build %s: %w", buildID, err)
 	}
 
 	cancelledBuild := copyBuildMetadata(metadata.Build)
 	cancelledBuild["status"] = "CANCELLED"
 	if err := storeCreateBuildMetadata(ctx.Metadata, cancelledBuild, projectID); err != nil {
-		return nil
+		return fmt.Errorf("store cancelled build metadata: %w", err)
 	}
 
 	return nil

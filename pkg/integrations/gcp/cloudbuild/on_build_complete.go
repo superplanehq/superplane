@@ -65,7 +65,7 @@ func (t *OnBuildComplete) Documentation() string {
 
 ## Event Data
 
-Each event contains the full Cloud Build resource, including ` + "`id`" + `, ` + "`status`" + ` (SUCCESS, FAILURE, CANCELLED, TIMEOUT), ` + "`buildTriggerId`" + `, ` + "`logUrl`" + `, ` + "`createTime`" + `, ` + "`finishTime`" + `, and more.`
+Each event contains the full Cloud Build resource, including ` + "`id`" + `, ` + "`status`" + ` (SUCCESS, FAILURE, INTERNAL_ERROR, TIMEOUT, CANCELLED, EXPIRED), ` + "`buildTriggerId`" + `, ` + "`logUrl`" + `, ` + "`createTime`" + `, ` + "`finishTime`" + `, and more.`
 }
 
 func (t *OnBuildComplete) Icon() string {
@@ -187,6 +187,11 @@ func (t *OnBuildComplete) OnIntegrationMessage(ctx core.IntegrationMessageContex
 
 	if len(config.Statuses) > 0 && !slices.Contains(config.Statuses, build.Status) {
 		ctx.Logger.Infof("gcp cloud build: status %q does not match configured statuses, skipping", build.Status)
+		return nil
+	}
+
+	if len(config.Statuses) == 0 && !isTerminalBuildStatus(build.Status) {
+		ctx.Logger.Infof("gcp cloud build: status %q is not terminal, skipping", build.Status)
 		return nil
 	}
 

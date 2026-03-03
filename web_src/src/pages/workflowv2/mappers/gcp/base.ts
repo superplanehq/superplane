@@ -75,10 +75,6 @@ export const cloudBuildBaseMapper: ComponentBaseMapper = {
       type: payload?.type,
     });
   },
-  subtitle(context: SubtitleContext): string {
-    const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
-  },
 };
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {

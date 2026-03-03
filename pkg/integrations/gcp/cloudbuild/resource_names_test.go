@@ -64,6 +64,24 @@ func TestParseCloudBuildRepositoryName(t *testing.T) {
 		assert.Empty(t, connectionID)
 		assert.Empty(t, repositoryID)
 	})
+
+	t.Run("returns empty strings when identifier segments are empty", func(t *testing.T) {
+		projectID, location, connectionID, repositoryID := parseCloudBuildRepositoryName(
+			"projects//locations/us-central1/connections/conn/repositories/repo",
+		)
+		assert.Empty(t, projectID)
+		assert.Empty(t, location)
+		assert.Empty(t, connectionID)
+		assert.Empty(t, repositoryID)
+
+		projectID, location, connectionID, repositoryID = parseCloudBuildRepositoryName(
+			"projects/p/locations/us-central1/connections/conn/repositories/",
+		)
+		assert.Empty(t, projectID)
+		assert.Empty(t, location)
+		assert.Empty(t, connectionID)
+		assert.Empty(t, repositoryID)
+	})
 }
 
 func TestParseCloudBuildBuildName(t *testing.T) {
@@ -122,6 +140,22 @@ func TestParseCloudBuildBuildName(t *testing.T) {
 	t.Run("returns empty strings when too few parts", func(t *testing.T) {
 		projectID, location, buildID := parseCloudBuildBuildName(
 			"projects/my-project/locations/us-central1",
+		)
+		assert.Empty(t, projectID)
+		assert.Empty(t, location)
+		assert.Empty(t, buildID)
+	})
+
+	t.Run("returns empty strings when identifier segments are empty", func(t *testing.T) {
+		projectID, location, buildID := parseCloudBuildBuildName(
+			"projects//locations/us-central1/builds/123",
+		)
+		assert.Empty(t, projectID)
+		assert.Empty(t, location)
+		assert.Empty(t, buildID)
+
+		projectID, location, buildID = parseCloudBuildBuildName(
+			"projects/p/locations/us-central1/builds/",
 		)
 		assert.Empty(t, projectID)
 		assert.Empty(t, location)

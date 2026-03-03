@@ -260,3 +260,16 @@ func TestListGitRefResources(t *testing.T) {
 	assert.Equal(t, "main", resources[0].Name)
 	assert.Equal(t, "release/v1", resources[1].Name)
 }
+
+func TestWithPageTokenEncodesReservedCharacters(t *testing.T) {
+	assert.Equal(
+		t,
+		"https://example.com/resources?pageSize=50&pageToken=next%2Btoken%2Fwith%3Dchars",
+		withPageToken("https://example.com/resources?pageSize=50", "next+token/with=chars"),
+	)
+	assert.Equal(
+		t,
+		"https://example.com/resources?pageToken=next%2Btoken%2Fwith%3Dchars",
+		withPageToken("https://example.com/resources", "next+token/with=chars"),
+	)
+}

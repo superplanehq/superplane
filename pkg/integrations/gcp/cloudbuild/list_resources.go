@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -18,6 +19,19 @@ func isUnavailable(err error) bool {
 		return false
 	}
 	return apiErr.StatusCode == http.StatusForbidden || apiErr.StatusCode == http.StatusNotFound
+}
+
+func withPageToken(baseURL, token string) string {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return baseURL
+	}
+
+	encoded := url.Values{"pageToken": {token}}.Encode()
+	if strings.Contains(baseURL, "?") {
+		return baseURL + "&" + encoded
+	}
+	return baseURL + "?" + encoded
 }
 
 const (
@@ -73,7 +87,7 @@ func ListTriggerResources(ctx context.Context, client Client) ([]core.Integratio
 		if resp.NextPageToken == "" {
 			break
 		}
-		url = baseURL + "?pageToken=" + resp.NextPageToken
+		url = withPageToken(baseURL, resp.NextPageToken)
 	}
 
 	return resources, nil
@@ -145,7 +159,7 @@ func ListBuildResources(ctx context.Context, client Client, projectID string) ([
 		if resp.NextPageToken == "" {
 			break
 		}
-		url = baseURL + "&pageToken=" + resp.NextPageToken
+		url = withPageToken(baseURL, resp.NextPageToken)
 	}
 
 	return resources, nil
@@ -217,7 +231,7 @@ func ListLocationResources(ctx context.Context, client Client, projectID string)
 		if resp.NextPageToken == "" {
 			break
 		}
-		url = baseURL + "&pageToken=" + resp.NextPageToken
+		url = withPageToken(baseURL, resp.NextPageToken)
 	}
 
 	return resources, nil
@@ -298,7 +312,7 @@ func ListConnectionResources(ctx context.Context, client Client, projectID strin
 		if resp.NextPageToken == "" {
 			break
 		}
-		url = baseURL + "&pageToken=" + resp.NextPageToken
+		url = withPageToken(baseURL, resp.NextPageToken)
 	}
 
 	return resources, nil
@@ -364,7 +378,7 @@ func ListRepositoryResources(ctx context.Context, client Client, connectionName 
 		if resp.NextPageToken == "" {
 			break
 		}
-		url = baseURL + "&pageToken=" + resp.NextPageToken
+		url = withPageToken(baseURL, resp.NextPageToken)
 	}
 
 	return resources, nil
@@ -435,7 +449,7 @@ func listGitRefResources(
 		if resp.NextPageToken == "" {
 			break
 		}
-		url = baseURL + "&pageToken=" + resp.NextPageToken
+		url = withPageToken(baseURL, resp.NextPageToken)
 	}
 
 	return resources, nil

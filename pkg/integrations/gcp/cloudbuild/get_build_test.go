@@ -36,7 +36,7 @@ func TestGetBuildExecuteUsesGlobalEndpointForPlainBuildID(t *testing.T) {
 		},
 	}
 
-	SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+	setTestClientFactory(t, func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 		return client, nil
 	})
 
@@ -69,7 +69,7 @@ func TestGetBuildExecuteUsesFullResourceName(t *testing.T) {
 		},
 	}
 
-	SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+	setTestClientFactory(t, func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 		return client, nil
 	})
 
@@ -102,7 +102,7 @@ func TestGetBuildExecuteFullGlobalResourceNameIgnoresProjectOverride(t *testing.
 		},
 	}
 
-	SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+	setTestClientFactory(t, func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 		return client, nil
 	})
 
