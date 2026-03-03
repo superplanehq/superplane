@@ -138,23 +138,48 @@ func TestCreateBuildBuildRequest(t *testing.T) {
 
 func TestCreateBuildSetup(t *testing.T) {
 	component := &CreateBuild{}
-	integrationCtx := &testcontexts.IntegrationContext{}
-	metadataCtx := &testcontexts.MetadataContext{}
 
-	err := component.Setup(core.SetupContext{
-		Configuration: map[string]any{
-			"steps": `[{"name":"golang:1.22","args":["test","./..."]}]`,
-		},
-		Integration: integrationCtx,
-		Metadata:    metadataCtx,
+	t.Run("creates subscription on first setup", func(t *testing.T) {
+		integrationCtx := &testcontexts.IntegrationContext{}
+		metadataCtx := &testcontexts.MetadataContext{}
+
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"steps": `[{"name":"golang:1.22","args":["test","./..."]}]`,
+			},
+			Integration: integrationCtx,
+			Metadata:    metadataCtx,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, integrationCtx.Subscriptions, 1)
+
+		metadata := CreateBuildNodeMetadata{}
+		require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &metadata))
+		assert.NotEmpty(t, metadata.SubscriptionID)
 	})
 
-	require.NoError(t, err)
-	require.Len(t, integrationCtx.Subscriptions, 1)
+	t.Run("ensures subscription exists even when metadata already has a subscription id", func(t *testing.T) {
+		integrationCtx := &testcontexts.IntegrationContext{}
+		metadataCtx := &testcontexts.MetadataContext{
+			Metadata: CreateBuildNodeMetadata{SubscriptionID: "existing-id"},
+		}
 
-	metadata := CreateBuildNodeMetadata{}
-	require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &metadata))
-	assert.NotEmpty(t, metadata.SubscriptionID)
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"steps": `[{"name":"golang:1.22","args":["test","./..."]}]`,
+			},
+			Integration: integrationCtx,
+			Metadata:    metadataCtx,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, integrationCtx.Subscriptions, 1)
+
+		metadata := CreateBuildNodeMetadata{}
+		require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &metadata))
+		assert.NotEmpty(t, metadata.SubscriptionID)
+	})
 }
 
 func TestCreateBuildExecuteSchedulesPolling(t *testing.T) {

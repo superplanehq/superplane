@@ -116,15 +116,6 @@ func (t *OnBuildComplete) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("connect the GCP integration to this trigger to enable automatic event routing")
 	}
 
-	var metadata OnBuildCompleteMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode metadata: %w", err)
-	}
-
-	if metadata.SubscriptionID != "" {
-		return nil
-	}
-
 	subscriptionID, err := ctx.Integration.Subscribe(map[string]any{"type": SubscriptionType})
 	if err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
