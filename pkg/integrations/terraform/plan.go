@@ -188,6 +188,11 @@ func (c *Plan) poll(ctx core.ActionContext) error {
 		metadataChanged = true
 	}
 
+	if isTerminalStatePlanTarget(currentStatus) {
+		metadata.FinishedAt = now
+		metadataChanged = true
+	}
+
 	if metadataChanged {
 		if err := ctx.Metadata.Set(metadata); err != nil {
 			return fmt.Errorf("failed to update metadata: %w", err)
@@ -195,8 +200,6 @@ func (c *Plan) poll(ctx core.ActionContext) error {
 	}
 
 	if isTerminalStatePlanTarget(currentStatus) {
-		metadata.FinishedAt = now
-		_ = ctx.Metadata.Set(metadata)
 		return c.emitFinalState(ctx, metadata, run)
 	}
 
