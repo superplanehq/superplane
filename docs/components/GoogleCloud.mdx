@@ -166,6 +166,11 @@ Creates and starts a Google Cloud Build build, then waits for it to finish.
 
 The terminal Build resource, including `id`, `status`, `logUrl`, `createTime`, `finishTime`, and more.
 
+### Output Channels
+
+- **Passed**: Emitted when Cloud Build finishes with `SUCCESS`.
+- **Failed**: Emitted when Cloud Build finishes with any other terminal status, including `FAILURE`, `INTERNAL_ERROR`, `TIMEOUT`, `CANCELLED`, or `EXPIRED`.
+
 ### Notes
 
 - SuperPlane listens for Cloud Build notifications through the connected GCP integration and falls back to polling if an event does not arrive.
