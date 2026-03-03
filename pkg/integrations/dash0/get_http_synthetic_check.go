@@ -37,7 +37,6 @@ func (c *GetHTTPSyntheticCheck) Documentation() string {
 ## Use Cases
 
 - **Health dashboards**: Fetch current uptime and performance metrics for display in workflows
-- **Conditional logic**: Branch workflow execution based on check health (e.g., skip deployment if uptime < threshold)
 - **Audit and reporting**: Retrieve check configurations for compliance or documentation
 - **Incident response**: Quickly gather check status and recent performance data during incidents
 

@@ -23,7 +23,6 @@ type SyntheticCheckMetrics struct {
 func FetchSyntheticCheckMetrics(client *Client, dataset, checkID string) *SyntheticCheckMetrics {
 	metrics := &SyntheticCheckMetrics{}
 
-	// --- 24h metrics ---
 	totalRuns24h := queryInstantScalar(client, dataset, fmt.Sprintf(
 		`sum(increase({otel_metric_name="dash0.synthetic_check.runs", dash0_check_id="%s"}[24h]))`,
 		checkID,
