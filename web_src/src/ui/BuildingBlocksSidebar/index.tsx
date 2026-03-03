@@ -51,6 +51,7 @@ import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
+import openRouterIcon from "@/assets/icons/integrations/openrouter.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
@@ -1111,6 +1112,7 @@ function CategorySection({
     "open-ai": openAiIcon,
     claude: claudeIcon,
     cursor: cursorIcon,
+    openrouter: openRouterIcon,
     pagerduty: pagerDutyIcon,
     rootly: rootlyIcon,
     incident: incidentIcon,
@@ -1242,6 +1244,7 @@ function CategorySection({
             "open-ai": openAiIcon,
             claude: claudeIcon,
             cursor: cursorIcon,
+            openrouter: openRouterIcon,
             pagerduty: pagerDutyIcon,
             rootly: rootlyIcon,
             incident: incidentIcon,

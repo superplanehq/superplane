@@ -30,6 +30,7 @@ import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
+import openRouterIcon from "@/assets/icons/integrations/openrouter.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
@@ -72,6 +73,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   "open-ai": openAiIcon,
   claude: claudeIcon,
   cursor: cursorIcon,
+  openrouter: openRouterIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   incident: incidentIcon,
@@ -113,6 +115,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   "open-ai": openAiIcon,
   claude: claudeIcon,
   cursor: cursorIcon,
+  openrouter: openRouterIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   incident: incidentIcon,

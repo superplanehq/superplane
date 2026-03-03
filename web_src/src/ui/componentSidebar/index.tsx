@@ -130,6 +130,7 @@ interface ComponentSidebarProps {
   nodeName?: string;
   nodeLabel?: string;
   blockName?: string;
+  componentDescription?: string;
   nodeConfiguration?: Record<string, unknown>;
   nodeConfigurationFields?: ConfigurationField[];
   onNodeConfigSave?: (
@@ -217,6 +218,7 @@ export const ComponentSidebar = ({
   nodeName = "",
   nodeLabel,
   blockName,
+  componentDescription,
   nodeConfiguration = {},
   nodeConfigurationFields = [],
   onNodeConfigSave,
@@ -761,6 +763,7 @@ export const ComponentSidebar = ({
                   nodeId={nodeId}
                   nodeName={nodeName}
                   nodeLabel={nodeLabel}
+                  componentDescription={componentDescription}
                   configuration={nodeConfiguration}
                   configurationFields={nodeConfigurationFields}
                   onSave={onNodeConfigSave || (() => {})}
