@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	testcontexts "github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -153,6 +154,8 @@ func TestCreateBuildSetup(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, integrationCtx.Subscriptions, 1)
+		require.Len(t, integrationCtx.ActionRequests, 1)
+		assert.Equal(t, gcpcommon.ActionNameEnsureCloudBuild, integrationCtx.ActionRequests[0].ActionName)
 
 		metadata := CreateBuildNodeMetadata{}
 		require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &metadata))
@@ -160,7 +163,12 @@ func TestCreateBuildSetup(t *testing.T) {
 	})
 
 	t.Run("ensures subscription exists even when metadata already has a subscription id", func(t *testing.T) {
-		integrationCtx := &testcontexts.IntegrationContext{}
+		integrationCtx := &testcontexts.IntegrationContext{
+			Metadata: gcpcommon.Metadata{
+				ProjectID:              "demo-project",
+				CloudBuildSubscription: "sp-cb-sub-existing",
+			},
+		}
 		metadataCtx := &testcontexts.MetadataContext{
 			Metadata: CreateBuildNodeMetadata{SubscriptionID: "existing-id"},
 		}
@@ -175,6 +183,7 @@ func TestCreateBuildSetup(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, integrationCtx.Subscriptions, 1)
+		assert.Empty(t, integrationCtx.ActionRequests)
 
 		metadata := CreateBuildNodeMetadata{}
 		require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &metadata))

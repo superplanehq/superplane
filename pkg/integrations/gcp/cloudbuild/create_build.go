@@ -128,6 +128,7 @@ The terminal Build resource, including ` + "`id`" + `, ` + "`status`" + `, ` + "
 ## Notes
 
 - SuperPlane listens for Cloud Build notifications through the connected GCP integration and falls back to polling if an event does not arrive.
+- SuperPlane automatically creates the shared ` + "`cloud-builds`" + ` Pub/Sub topic and push subscription when the GCP integration has ` + "`roles/pubsub.admin`" + ` and both the **Cloud Build** and **Pub/Sub** APIs are enabled.
 - Cancelling the running execution from the UI sends a Cloud Build cancel request for the active build.`
 }
 
@@ -431,6 +432,10 @@ func (c *CreateBuild) Setup(ctx core.SetupContext) error {
 
 	if ctx.Integration == nil {
 		return fmt.Errorf("connect the GCP integration to this component to create builds")
+	}
+
+	if err := scheduleCloudBuildSetupIfNeeded(ctx.Integration); err != nil {
+		return err
 	}
 
 	subscriptionID, err := ctx.Integration.Subscribe(map[string]any{"type": SubscriptionType})

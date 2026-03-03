@@ -61,7 +61,7 @@ The On Build Complete trigger starts a workflow execution when a GCP Cloud Build
 
 ### Setup
 
-**Required GCP setup:** Ensure the **Cloud Build API** is enabled in your project. The service account used by the integration must have `roles/pubsub.admin` to create a push subscription on the `cloud-builds` topic.
+**Required GCP setup:** Ensure the **Cloud Build API** and **Pub/Sub API** are enabled in your project. The service account used by the integration must have `roles/pubsub.admin` so SuperPlane can automatically create the `cloud-builds` topic and its push subscription.
 
 ### Configuration
 
@@ -159,6 +159,7 @@ The terminal Build resource, including `id`, `status`, `logUrl`, `createTime`, `
 ### Notes
 
 - SuperPlane listens for Cloud Build notifications through the connected GCP integration and falls back to polling if an event does not arrive.
+- SuperPlane automatically creates the shared `cloud-builds` Pub/Sub topic and push subscription when the GCP integration has `roles/pubsub.admin` and both the **Cloud Build** and **Pub/Sub** APIs are enabled.
 - Cancelling the running execution from the UI sends a Cloud Build cancel request for the active build.
 
 ### Example Output
@@ -236,4 +237,3 @@ Emits a payload with instance details: instanceId, selfLink, internalIP, externa
   "zone": "us-central1-a"
 }
 ```
-

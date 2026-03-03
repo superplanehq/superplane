@@ -4,6 +4,7 @@ const (
 	SecretNameServiceAccountKey = "serviceAccountKey"
 	SecretNameAccessToken       = "accessToken"
 	ScopeCloudPlatform          = "https://www.googleapis.com/auth/cloud-platform"
+	ActionNameEnsureCloudBuild  = "ensureCloudBuild"
 )
 
 var RequiredJSONKeys = []string{"type", "project_id", "private_key_id", "private_key", "client_email", "client_id"}
