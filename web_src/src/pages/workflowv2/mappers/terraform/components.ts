@@ -1,4 +1,10 @@
-import { ComponentBaseProps, EventSection, DEFAULT_EVENT_STATE_MAP, EventStateMap, EventState } from "@/ui/componentBase";
+import {
+  ComponentBaseProps,
+  EventSection,
+  DEFAULT_EVENT_STATE_MAP,
+  EventStateMap,
+  EventState,
+} from "@/ui/componentBase";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { getTriggerRenderer } from "..";
 import terraformIcon from "@/assets/icons/integrations/terraform.svg";
@@ -48,19 +54,27 @@ export const terraformStateFunction: StateFunction = (execution: CanvasesCanvasN
   if (!execution) return "neutral";
   if (execution.result === "RESULT_FAILED" || execution.resultReason === "RESULT_REASON_ERROR") return "failed";
   if (execution.result === "RESULT_CANCELLED") return "cancelled";
-  
+
   const metadata = execution.metadata as Record<string, any>;
   const currentStatus = metadata?.currentStatus;
 
   if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
-    const needsAttentionStates = ["planned", "cost_estimated", "policy_checked", "policy_override", "planned_and_saved"];
+    const needsAttentionStates = [
+      "planned",
+      "cost_estimated",
+      "policy_checked",
+      "policy_override",
+      "planned_and_saved",
+    ];
     if (needsAttentionStates.includes(currentStatus)) {
       return "needsAttention";
     }
     return "running";
   }
 
-  const isFailedState = ["discarded", "errored", "canceled", "policy_soft_failed", "force_canceled"].includes(currentStatus);
+  const isFailedState = ["discarded", "errored", "canceled", "policy_soft_failed", "force_canceled"].includes(
+    currentStatus,
+  );
   if (isFailedState) return "failed";
 
   return "passed";
@@ -116,7 +130,7 @@ export const terraformComponentMapper: ComponentBaseMapper = {
       const parts: string[] = [];
       if (metadata.workspaceName) parts.push(metadata.workspaceName);
       if (metadata.runId) parts.push(metadata.runId);
-      
+
       if (parts.length > 0) {
         return timeStr ? `${parts.join(" - ")} • ${timeStr}` : parts.join(" - ");
       }
@@ -128,7 +142,7 @@ export const terraformComponentMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const details: Record<string, any> = {};
     const metadata = context.execution.metadata as Record<string, any>;
-    
+
     if (!metadata) return details;
 
     if (metadata.runId) details["Run ID"] = metadata.runId;
@@ -139,7 +153,7 @@ export const terraformComponentMapper: ComponentBaseMapper = {
     if (metadata.stateHistory && Array.isArray(metadata.stateHistory) && metadata.stateHistory.length > 0) {
       details["State History"] = {
         __type: "terraformStates",
-        states: metadata.stateHistory
+        states: metadata.stateHistory,
       };
     }
 
@@ -152,7 +166,8 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSe
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
   const executionState = terraformStateFunction(execution);
-  const subtitleTimestamp = executionState === "running" ? execution.createdAt : execution.updatedAt || execution.createdAt;
+  const subtitleTimestamp =
+    executionState === "running" ? execution.createdAt : execution.updatedAt || execution.createdAt;
 
   return [
     {
