@@ -150,16 +150,16 @@ func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb
 	}
 
 	now := time.Now()
+	liveVersionID := uuid.New()
 	canvas := models.Canvas{
 		ID:             uuid.New(),
 		OrganizationID: models.TemplateOrganizationID,
+		LiveVersionID:  &liveVersionID,
 		IsTemplate:     true,
 		Name:           template.Metadata.Name,
 		Description:    template.Metadata.Description,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
-		Edges:          datatypes.NewJSONSlice(edges),
-		Nodes:          datatypes.NewJSONSlice(expandedNodes),
 	}
 
 	if err := tx.Create(&canvas).Error; err != nil {
@@ -191,6 +191,19 @@ func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb
 			return err
 		}
 	}
+
+	version, err := models.CreatePublishedCanvasVersionInTransaction(
+		tx,
+		canvas.ID,
+		nil,
+		nil,
+		expandedNodes,
+		edges,
+	)
+	if err != nil {
+		return err
+	}
+	canvas.LiveVersionID = &version.ID
 
 	return nil
 }

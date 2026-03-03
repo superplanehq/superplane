@@ -49,6 +49,7 @@ func TestPublishCanvasChangeRequestMergesNonConflictingChangesWhenLiveAdvances(t
 
 	_, err = UpdateCanvasVersion(
 		ctx,
+		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvasID,
@@ -78,6 +79,7 @@ func TestPublishCanvasChangeRequestMergesNonConflictingChangesWhenLiveAdvances(t
 			},
 		},
 		nil,
+		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)
 
@@ -90,6 +92,7 @@ func TestPublishCanvasChangeRequestMergesNonConflictingChangesWhenLiveAdvances(t
 
 	_, err = UpdateCanvasVersion(
 		ctx,
+		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvasID,
@@ -119,6 +122,7 @@ func TestPublishCanvasChangeRequestMergesNonConflictingChangesWhenLiveAdvances(t
 			},
 		},
 		nil,
+		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)
 

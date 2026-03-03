@@ -600,6 +600,7 @@ func TestUpdateCanvasVersionOnlyUpdatesDraft(t *testing.T) {
 	canvasUUID := uuid.MustParse(canvasID)
 	updateVersionResponse, err := UpdateCanvasVersion(
 		ctx,
+		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvasID,
@@ -629,6 +630,7 @@ func TestUpdateCanvasVersionOnlyUpdatesDraft(t *testing.T) {
 			},
 		},
 		nil,
+		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)
 	require.NotNil(t, updateVersionResponse.Version)
@@ -678,6 +680,7 @@ func TestPublishCanvasChangeRequestAppliesRuntimeChanges(t *testing.T) {
 
 	_, err = UpdateCanvasVersion(
 		ctx,
+		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvasID,
@@ -707,6 +710,7 @@ func TestPublishCanvasChangeRequestAppliesRuntimeChanges(t *testing.T) {
 			},
 		},
 		nil,
+		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)
 
@@ -801,6 +805,7 @@ func TestUpdateCanvasVersionAppliesAutoLayout(t *testing.T) {
 
 	updateVersionResponse, err := UpdateCanvasVersion(
 		ctx,
+		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvasID,
@@ -846,6 +851,7 @@ func TestUpdateCanvasVersionAppliesAutoLayout(t *testing.T) {
 		&pb.CanvasAutoLayout{
 			Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
 		},
+		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)
 	require.NotNil(t, updateVersionResponse.Version)

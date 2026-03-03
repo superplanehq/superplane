@@ -91,6 +91,11 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 		tx.Rollback()
 		t.FailNow()
 	}
+	organization.CanvasSandboxModeEnabled = false
+	if err = tx.Save(organization).Error; !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
 
 	account, err := models.CreateAccountInTransaction(tx, "test@example.com", "test")
 	if !assert.NoError(t, err) {
@@ -145,6 +150,11 @@ func CreateOrganization(t *testing.T, r *ResourceRegistry, userID uuid.UUID) *mo
 	tx := database.Conn().Begin()
 	organization, err := models.CreateOrganizationInTransaction(tx, RandomName("org"), RandomName("org-display"))
 	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+	organization.CanvasSandboxModeEnabled = false
+	if err = tx.Save(organization).Error; !assert.NoError(t, err) {
 		tx.Rollback()
 		t.FailNow()
 	}
@@ -321,19 +331,17 @@ func CreateCanvas(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []model
 	//
 	// Create canvas
 	//
+	liveVersionID := uuid.New()
 	workflow := &models.Canvas{
 		ID:             uuid.New(),
 		OrganizationID: orgID,
+		LiveVersionID:  &liveVersionID,
 		Name:           RandomName("canvas"),
 		Description:    "Test canvas",
-		Nodes:          datatypes.NewJSONSlice(inputNodes),
-		Edges:          datatypes.NewJSONSlice(edges),
 		CreatedBy:      &userID,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
 	}
-
-	require.NoError(t, database.Conn().Create(workflow).Error)
 
 	//
 	// Expand blueprint nodes (convert WorkflowNode to Node, expand, then back to WorkflowNode)
@@ -342,32 +350,56 @@ func CreateCanvas(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []model
 	require.NoError(t, err)
 
 	var createdNodes []models.CanvasNode
-	for _, node := range expandedNodes {
-		var parentNodeID *string
-		if idx := strings.Index(node.ID, ":"); idx != -1 {
-			parent := node.ID[:idx]
-			parentNodeID = &parent
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(workflow).Error; err != nil {
+			return err
 		}
 
-		canvasNode := models.CanvasNode{
-			WorkflowID:    workflow.ID,
-			NodeID:        node.ID,
-			ParentNodeID:  parentNodeID,
-			Name:          node.Name,
-			State:         models.CanvasNodeStateReady,
-			Type:          node.Type,
-			Ref:           datatypes.NewJSONType(node.Ref),
-			Configuration: datatypes.NewJSONType(node.Configuration),
-			Position:      datatypes.NewJSONType(node.Position),
-			Metadata:      datatypes.NewJSONType(node.Metadata),
-			IsCollapsed:   node.IsCollapsed,
-			CreatedAt:     &now,
-			UpdatedAt:     &now,
+		for _, node := range expandedNodes {
+			var parentNodeID *string
+			if idx := strings.Index(node.ID, ":"); idx != -1 {
+				parent := node.ID[:idx]
+				parentNodeID = &parent
+			}
+
+			canvasNode := models.CanvasNode{
+				WorkflowID:    workflow.ID,
+				NodeID:        node.ID,
+				ParentNodeID:  parentNodeID,
+				Name:          node.Name,
+				State:         models.CanvasNodeStateReady,
+				Type:          node.Type,
+				Ref:           datatypes.NewJSONType(node.Ref),
+				Configuration: datatypes.NewJSONType(node.Configuration),
+				Position:      datatypes.NewJSONType(node.Position),
+				Metadata:      datatypes.NewJSONType(node.Metadata),
+				IsCollapsed:   node.IsCollapsed,
+				CreatedAt:     &now,
+				UpdatedAt:     &now,
+			}
+
+			if err := tx.Clauses(clause.Returning{}).Create(&canvasNode).Error; err != nil {
+				return err
+			}
+			createdNodes = append(createdNodes, canvasNode)
 		}
 
-		require.NoError(t, database.Conn().Clauses(clause.Returning{}).Create(&canvasNode).Error)
-		createdNodes = append(createdNodes, canvasNode)
-	}
+		version, err := models.CreatePublishedCanvasVersionInTransaction(
+			tx,
+			workflow.ID,
+			&userID,
+			nil,
+			expandedNodes,
+			edges,
+		)
+		if err != nil {
+			return err
+		}
+		workflow.LiveVersionID = &version.ID
+
+		return nil
+	})
+	require.NoError(t, err)
 
 	return workflow, createdNodes
 }

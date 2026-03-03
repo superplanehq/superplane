@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -82,6 +83,34 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		}
 
 		body.SetAutoLayout(buildDefaultAutoLayout(*current, canvas))
+	}
+
+	liveUpdateResponse, _, liveUpdateErr := ctx.API.CanvasVersionAPI.
+		CanvasesUpdateCanvasVersion2(ctx.Context, canvasID).
+		Body(body).
+		Execute()
+	if liveUpdateErr == nil {
+		if err := setActiveCanvasAndVersion(ctx, canvasID, ""); err != nil {
+			return err
+		}
+
+		if !ctx.Renderer.IsText() {
+			return ctx.Renderer.Render(liveUpdateResponse.Version)
+		}
+
+		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+			_, _ = fmt.Fprintf(stdout, "Canvas: %s\n", canvasID)
+			if liveUpdateResponse.Version != nil && liveUpdateResponse.Version.Metadata != nil {
+				_, _ = fmt.Fprintf(stdout, "Updated live version: %s\n", liveUpdateResponse.Version.Metadata.GetId())
+				_, _ = fmt.Fprintf(stdout, "Revision: %d\n", liveUpdateResponse.Version.Metadata.GetRevision())
+			}
+			_, err = fmt.Fprintln(stdout, "Active context switched to live")
+			return err
+		})
+	}
+
+	if !isSandboxModeDisabledError(liveUpdateErr) {
+		return liveUpdateErr
 	}
 
 	createVersionResponse, _, err := ctx.API.CanvasVersionAPI.

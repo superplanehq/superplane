@@ -447,6 +447,7 @@ export type CanvasesSendAiMessageResponse = {
 };
 
 export type CanvasesUpdateCanvasVersionBody = {
+  versionId?: string;
   canvas?: CanvasesCanvas;
   autoLayout?: CanvasesCanvasAutoLayout;
 };
@@ -930,6 +931,7 @@ export type OrganizationsOrganizationMetadata = {
   description?: string;
   createdAt?: string;
   updatedAt?: string;
+  canvasSandboxModeEnabled?: boolean;
 };
 
 export type OrganizationsRemoveInvitationResponse = {
@@ -2243,6 +2245,35 @@ export type CanvasesCreateCanvasVersionResponses = {
 
 export type CanvasesCreateCanvasVersionResponse2 =
   CanvasesCreateCanvasVersionResponses[keyof CanvasesCreateCanvasVersionResponses];
+
+export type CanvasesUpdateCanvasVersion2Data = {
+  body: CanvasesUpdateCanvasVersionBody;
+  path: {
+    canvasId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/versions";
+};
+
+export type CanvasesUpdateCanvasVersion2Errors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesUpdateCanvasVersion2Error =
+  CanvasesUpdateCanvasVersion2Errors[keyof CanvasesUpdateCanvasVersion2Errors];
+
+export type CanvasesUpdateCanvasVersion2Responses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesUpdateCanvasVersionResponse;
+};
+
+export type CanvasesUpdateCanvasVersion2Response =
+  CanvasesUpdateCanvasVersion2Responses[keyof CanvasesUpdateCanvasVersion2Responses];
 
 export type CanvasesDiscardCanvasVersion2Data = {
   body?: never;

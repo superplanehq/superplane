@@ -7,6 +7,7 @@ import {
   canvasesCreateCanvasVersion,
   canvasesListCanvasVersions,
   canvasesUpdateCanvasVersion,
+  canvasesUpdateCanvasVersion2,
   canvasesCreateCanvasChangeRequest,
   canvasesListCanvasChangeRequests,
   canvasesDescribeCanvasChangeRequest,
@@ -265,29 +266,40 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
 
   return useMutation({
     mutationFn: async (data: {
-      versionId: string;
+      versionId?: string;
       name: string;
       description?: string;
       nodes?: any[];
       edges?: any[];
       autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
     }) => {
-      return await canvasesUpdateCanvasVersion(
-        withOrganizationHeader({
-          path: { canvasId, versionId: data.versionId },
-          body: {
-            canvas: {
-              metadata: {
-                name: data.name,
-                description: data.description || "",
-              },
-              spec: {
-                nodes: data.nodes || [],
-                edges: data.edges || [],
-              },
-            },
-            autoLayout: data.autoLayout,
+      const body = {
+        canvas: {
+          metadata: {
+            name: data.name,
+            description: data.description || "",
           },
+          spec: {
+            nodes: data.nodes || [],
+            edges: data.edges || [],
+          },
+        },
+        autoLayout: data.autoLayout,
+      };
+
+      if (data.versionId) {
+        return await canvasesUpdateCanvasVersion(
+          withOrganizationHeader({
+            path: { canvasId, versionId: data.versionId },
+            body,
+          }),
+        );
+      }
+
+      return await canvasesUpdateCanvasVersion2(
+        withOrganizationHeader({
+          path: { canvasId },
+          body,
         }),
       );
     },
@@ -298,7 +310,9 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
         return;
       }
 
-      queryClient.setQueryData(canvasKeys.versionDetail(canvasId, variables.versionId), version);
+      if (variables.versionId) {
+        queryClient.setQueryData(canvasKeys.versionDetail(canvasId, variables.versionId), version);
+      }
 
       queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: any[] | undefined) => {
         if (!current) {

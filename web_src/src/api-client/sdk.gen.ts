@@ -108,6 +108,9 @@ import type {
   CanvasesSendAiMessageData,
   CanvasesSendAiMessageErrors,
   CanvasesSendAiMessageResponses,
+  CanvasesUpdateCanvasVersion2Data,
+  CanvasesUpdateCanvasVersion2Errors,
+  CanvasesUpdateCanvasVersion2Responses,
   CanvasesUpdateCanvasVersionData,
   CanvasesUpdateCanvasVersionErrors,
   CanvasesUpdateCanvasVersionResponses,
@@ -825,6 +828,27 @@ export const canvasesCreateCanvasVersion = <ThrowOnError extends boolean = true>
   });
 
 /**
+ * Update canvas version
+ *
+ * Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode
+ */
+export const canvasesUpdateCanvasVersion2 = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesUpdateCanvasVersion2Data, ThrowOnError>,
+) =>
+  (options.client ?? client).put<
+    CanvasesUpdateCanvasVersion2Responses,
+    CanvasesUpdateCanvasVersion2Errors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/versions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
  * Discard canvas version
  *
  * Discards a user-owned draft canvas version
@@ -855,7 +879,7 @@ export const canvasesDescribeCanvasVersion = <ThrowOnError extends boolean = tru
 /**
  * Update canvas version
  *
- * Updates a user-owned canvas version without applying runtime setup
+ * Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode
  */
 export const canvasesUpdateCanvasVersion = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesUpdateCanvasVersionData, ThrowOnError>,

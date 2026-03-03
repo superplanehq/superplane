@@ -11,15 +11,16 @@ func resolveCanvasVersionBaseAndLiveInTransaction(
 	canvas *models.Canvas,
 	version *models.CanvasVersion,
 ) (baseNodes []models.Node, baseEdges []models.Edge, liveNodes []models.Node, liveEdges []models.Edge, err error) {
-	liveNodes = append([]models.Node(nil), canvas.Nodes...)
-	liveEdges = append([]models.Edge(nil), canvas.Edges...)
-	if canvas.LiveVersionID != nil {
-		liveVersion, liveErr := models.FindCanvasVersionInTransaction(tx, canvas.ID, *canvas.LiveVersionID)
-		if liveErr == nil && liveVersion != nil {
-			liveNodes = append([]models.Node(nil), liveVersion.Nodes...)
-			liveEdges = append([]models.Edge(nil), liveVersion.Edges...)
-		}
+	if canvas.LiveVersionID == nil {
+		return nil, nil, nil, nil, gorm.ErrRecordNotFound
 	}
+
+	liveVersion, liveErr := models.FindCanvasVersionInTransaction(tx, canvas.ID, *canvas.LiveVersionID)
+	if liveErr != nil {
+		return nil, nil, nil, nil, liveErr
+	}
+	liveNodes = append([]models.Node(nil), liveVersion.Nodes...)
+	liveEdges = append([]models.Edge(nil), liveVersion.Edges...)
 
 	var baseVersionID *uuid.UUID
 	if version.BasedOnVersionID != nil {

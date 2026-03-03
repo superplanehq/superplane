@@ -47,6 +47,7 @@ interface HeaderProps {
   onExportYamlDownload?: () => void;
   topViewMode?: "canvas" | "memory" | "versioning";
   onTopViewModeChange?: (mode: "canvas" | "memory" | "versioning") => void;
+  showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;
 }
@@ -71,6 +72,7 @@ export function Header({
   onExportYamlDownload,
   topViewMode,
   onTopViewModeChange,
+  showVersioningTab = true,
   memoryItemCount,
   versioningItemCount,
 }: HeaderProps) {
@@ -245,20 +247,22 @@ export function Header({
                     ) : null}
                   </span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onTopViewModeChange("versioning")}
-                  className={`rounded px-2 py-1 text-xs font-medium ${
-                    topViewMode === "versioning" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-1">
-                    <span>Versioning</span>
-                    {versioningItemCount && versioningItemCount > 0 ? (
-                      <span aria-label={`${versioningItemCount} open change requests`}>({versioningItemCount})</span>
-                    ) : null}
-                  </span>
-                </button>
+                {showVersioningTab ? (
+                  <button
+                    type="button"
+                    onClick={() => onTopViewModeChange("versioning")}
+                    className={`rounded px-2 py-1 text-xs font-medium ${
+                      topViewMode === "versioning" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      <span>Versioning</span>
+                      {versioningItemCount && versioningItemCount > 0 ? (
+                        <span aria-label={`${versioningItemCount} open change requests`}>({versioningItemCount})</span>
+                      ) : null}
+                    </span>
+                  </button>
+                ) : null}
               </div>
             )}
           </div>

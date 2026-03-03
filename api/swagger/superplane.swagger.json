@@ -1347,6 +1347,44 @@
         "tags": [
           "CanvasVersion"
         ]
+      },
+      "put": {
+        "summary": "Update canvas version",
+        "description": "Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode",
+        "operationId": "Canvases_UpdateCanvasVersion2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateCanvasVersionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateCanvasVersionBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
       }
     },
     "/api/v1/canvases/{canvasId}/versions/{versionId}": {
@@ -1424,7 +1462,7 @@
       },
       "put": {
         "summary": "Update canvas version",
-        "description": "Updates a user-owned canvas version without applying runtime setup",
+        "description": "Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode",
         "operationId": "Canvases_UpdateCanvasVersion",
         "responses": {
           "200": {
@@ -4922,6 +4960,9 @@
     "CanvasesUpdateCanvasVersionBody": {
       "type": "object",
       "properties": {
+        "versionId": {
+          "type": "string"
+        },
         "canvas": {
           "$ref": "#/definitions/CanvasesCanvas"
         },
@@ -6099,6 +6140,9 @@
         "updatedAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "canvasSandboxModeEnabled": {
+          "type": "boolean"
         }
       }
     },

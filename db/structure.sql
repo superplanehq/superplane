@@ -341,7 +341,8 @@ CREATE TABLE public.organizations (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     deleted_at timestamp without time zone,
-    description text DEFAULT ''::text
+    description text DEFAULT ''::text,
+    canvas_sandbox_mode_enabled boolean DEFAULT true NOT NULL
 );
 
 
@@ -602,12 +603,10 @@ CREATE TABLE public.workflows (
     description text,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_by uuid,
     deleted_at timestamp without time zone,
-    nodes jsonb DEFAULT '[]'::jsonb NOT NULL,
     is_template boolean DEFAULT false NOT NULL,
-    live_version_id uuid
+    live_version_id uuid NOT NULL
 );
 
 
@@ -1845,7 +1844,7 @@ ALTER TABLE ONLY public.workflow_versions
 --
 
 ALTER TABLE ONLY public.workflows
-    ADD CONSTRAINT workflows_live_version_id_fkey FOREIGN KEY (live_version_id) REFERENCES public.workflow_versions(id) ON DELETE SET NULL;
+    ADD CONSTRAINT workflows_live_version_id_fkey FOREIGN KEY (live_version_id) REFERENCES public.workflow_versions(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -1880,7 +1879,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260303032506	f
+20260303200445	f
 \.
 
 

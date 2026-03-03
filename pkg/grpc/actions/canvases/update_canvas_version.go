@@ -3,11 +3,13 @@ package canvases
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -22,12 +24,14 @@ import (
 
 func UpdateCanvasVersion(
 	ctx context.Context,
+	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	organizationID string,
 	canvasID string,
 	versionID string,
 	pbCanvas *pb.Canvas,
 	autoLayout *pb.CanvasAutoLayout,
+	webhookBaseURL string,
 ) (*pb.UpdateCanvasVersionResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
@@ -38,13 +42,9 @@ func UpdateCanvasVersion(
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
+	organizationUUID := uuid.MustParse(organizationID)
 
-	versionUUID, err := uuid.Parse(versionID)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
-	}
-
-	canvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasUUID)
+	canvas, err := models.FindCanvas(organizationUUID, canvasUUID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
@@ -63,11 +63,43 @@ func UpdateCanvasVersion(
 		return nil, err
 	}
 
+	sandboxModeEnabled, err := isCanvasSandboxModeEnabled(organizationID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load organization sandbox mode: %v", err)
+	}
+
+	requestedVersionID := strings.TrimSpace(versionID)
+	if requestedVersionID == "" {
+		if !sandboxModeEnabled {
+			return nil, status.Error(codes.FailedPrecondition, "sandbox mode is disabled; version id is required")
+		}
+
+		return updateLiveCanvasInSandbox(
+			ctx,
+			encryptor,
+			registry,
+			organizationUUID,
+			canvas,
+			nodes,
+			edges,
+			webhookBaseURL,
+		)
+	}
+
+	if sandboxModeEnabled {
+		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled in sandbox mode")
+	}
+
+	versionUUID, err := uuid.Parse(requestedVersionID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
+	}
+
 	userUUID := uuid.MustParse(userID)
 	var version *models.CanvasVersion
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		canvasInTx, findCanvasErr := models.FindCanvasInTransaction(tx, uuid.MustParse(organizationID), canvasUUID)
+		canvasInTx, findCanvasErr := models.FindCanvasInTransaction(tx, organizationUUID, canvasUUID)
 		if findCanvasErr != nil {
 			return findCanvasErr
 		}
@@ -135,6 +167,139 @@ func UpdateCanvasVersion(
 		return nil, status.Errorf(codes.Internal, "failed to update canvas version: %v", err)
 	}
 
+	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {
+		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
+	}
+
+	return &pb.UpdateCanvasVersionResponse{
+		Version: SerializeCanvasVersion(version, organizationID),
+	}, nil
+}
+
+func updateLiveCanvasInSandbox(
+	ctx context.Context,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	organizationUUID uuid.UUID,
+	canvas *models.Canvas,
+	nodes []models.Node,
+	edges []models.Edge,
+	webhookBaseURL string,
+) (*pb.UpdateCanvasVersionResponse, error) {
+	organizationID := organizationUUID.String()
+	canvasID := canvas.ID
+	var version *models.CanvasVersion
+
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		canvasInTx, findCanvasErr := models.FindCanvasInTransaction(tx, organizationUUID, canvasID)
+		if findCanvasErr != nil {
+			return findCanvasErr
+		}
+		if canvasInTx.IsTemplate {
+			return status.Error(codes.FailedPrecondition, "templates are read-only")
+		}
+
+		liveVersion, liveVersionErr := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvasInTx)
+		if liveVersionErr != nil {
+			if errors.Is(liveVersionErr, gorm.ErrRecordNotFound) {
+				return status.Error(codes.FailedPrecondition, "canvas live version not found")
+			}
+			return liveVersionErr
+		}
+
+		now := time.Now()
+		existingNodes, findNodesErr := models.FindCanvasNodesInTransaction(tx, canvasID)
+		if findNodesErr != nil {
+			return findNodesErr
+		}
+
+		parentNodesByNodeID := make(map[string]*models.Node, len(nodes))
+		for i := range nodes {
+			parentNodesByNodeID[nodes[i].ID] = &nodes[i]
+		}
+
+		expandedNodes, expandErr := expandNodes(organizationID, nodes)
+		if expandErr != nil {
+			return expandErr
+		}
+
+		for _, node := range expandedNodes {
+			if node.Type == models.NodeTypeWidget {
+				continue
+			}
+
+			workflowNode, upsertErr := upsertNode(tx, existingNodes, node, canvasID)
+			if upsertErr != nil {
+				return upsertErr
+			}
+
+			if workflowNode.State == models.CanvasNodeStateReady {
+				setupErr := setupNode(ctx, tx, encryptor, registry, workflowNode, webhookBaseURL)
+				if setupErr != nil {
+					workflowNode.State = models.CanvasNodeStateError
+					errorMsg := setupErr.Error()
+					workflowNode.StateReason = &errorMsg
+					if saveErr := tx.Save(workflowNode).Error; saveErr != nil {
+						return saveErr
+					}
+
+					errorNodeID := node.ID
+					if workflowNode.ParentNodeID != nil {
+						errorNodeID = *workflowNode.ParentNodeID
+					}
+
+					parentNode, ok := parentNodesByNodeID[errorNodeID]
+					if ok {
+						parentNode.ErrorMessage = &errorMsg
+					}
+				}
+			}
+
+			if workflowNode.ParentNodeID != nil {
+				continue
+			}
+
+			parentNode, exists := parentNodesByNodeID[workflowNode.NodeID]
+			if !exists {
+				return status.Errorf(codes.Internal, "it was not possible to find the parent node %s", workflowNode.NodeID)
+			}
+			parentNode.Metadata = workflowNode.Metadata.Data()
+		}
+
+		if deleteErr := deleteNodes(tx, existingNodes, expandedNodes); deleteErr != nil {
+			return deleteErr
+		}
+
+		liveVersion.Nodes = datatypes.NewJSONSlice(nodes)
+		liveVersion.Edges = datatypes.NewJSONSlice(edges)
+		liveVersion.UpdatedAt = &now
+		if saveErr := tx.Save(liveVersion).Error; saveErr != nil {
+			return saveErr
+		}
+
+		canvasInTx.UpdatedAt = &now
+		canvasInTx.LiveVersionID = &liveVersion.ID
+		if saveErr := tx.Save(canvasInTx).Error; saveErr != nil {
+			return saveErr
+		}
+
+		if refreshErr := refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasID, uuid.Nil); refreshErr != nil {
+			return refreshErr
+		}
+
+		version = liveVersion
+		return nil
+	})
+	if err != nil {
+		if status.Code(err) != codes.Unknown {
+			return nil, err
+		}
+		return nil, status.Errorf(codes.Internal, "failed to update live canvas in sandbox mode: %v", err)
+	}
+
+	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String()).Publish(true); err != nil {
+		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", err)
+	}
 	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {
 		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
 	}

@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -36,17 +37,33 @@ func CreateCanvasVersion(ctx context.Context, organizationID string, canvasID st
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
+	sandboxModeEnabled, err := isCanvasSandboxModeEnabled(organizationID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load organization sandbox mode: %v", err)
+	}
+	if sandboxModeEnabled {
+		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled in sandbox mode")
+	}
+
 	userUUID := uuid.MustParse(userID)
 	var version *models.CanvasVersion
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		liveVersion, liveVersionErr := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+		if liveVersionErr != nil {
+			if errors.Is(liveVersionErr, gorm.ErrRecordNotFound) {
+				return status.Error(codes.FailedPrecondition, "canvas live version not found")
+			}
+			return liveVersionErr
+		}
+
 		version, err = models.SaveCanvasDraftInTransaction(
 			tx,
 			canvas.ID,
 			userUUID,
 			canvas.LiveVersionID,
-			canvas.Nodes,
-			canvas.Edges,
+			liveVersion.Nodes,
+			liveVersion.Edges,
 		)
 
 		return err

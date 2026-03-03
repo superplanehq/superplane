@@ -1,5 +1,6 @@
 import { CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import Editor from "@monaco-editor/react";
 import type { Monaco } from "@monaco-editor/react";
@@ -16,7 +17,7 @@ import {
   RefreshCw,
   Rocket,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
 import * as yaml from "js-yaml";
 import type { editor as MonacoEditor } from "monaco-editor";
@@ -54,9 +55,14 @@ interface CanvasVersioningViewProps {
   }) => Promise<void>;
   onCreateVersion: () => void;
   onCreateChangeRequest: () => void;
+  sandboxModeEnabled: boolean;
+  sandboxModeTooltip?: string;
   createVersionDisabled: boolean;
+  createVersionDisabledTooltip?: string;
   createChangeRequestDisabled: boolean;
+  createChangeRequestDisabledTooltip?: string;
   publishChangeRequestDisabled: boolean;
+  publishChangeRequestDisabledTooltip?: string;
   resolveChangeRequestPending: boolean;
   createVersionPending: boolean;
   createChangeRequestPending: boolean;
@@ -443,6 +449,21 @@ function getDiffSection(path: string): string {
   return "Other";
 }
 
+function withTooltip(disabled: boolean, message: string | undefined, element: ReactNode): ReactNode {
+  if (!disabled || !message) {
+    return element;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="inline-flex">{element}</div>
+      </TooltipTrigger>
+      <TooltipContent>{message}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 function buildNodeDiffGroups(lines: DiffLine[]): DiffGroup[] {
   if (lines.length === 0) {
     return [];
@@ -481,9 +502,14 @@ export function CanvasVersioningView({
   onResolveChangeRequest,
   onCreateVersion,
   onCreateChangeRequest,
+  sandboxModeEnabled,
+  sandboxModeTooltip,
   createVersionDisabled,
+  createVersionDisabledTooltip,
   createChangeRequestDisabled,
+  createChangeRequestDisabledTooltip,
   publishChangeRequestDisabled,
+  publishChangeRequestDisabledTooltip,
   resolveChangeRequestPending,
   createVersionPending,
   createChangeRequestPending,
@@ -644,20 +670,35 @@ export function CanvasVersioningView({
               <p className="text-xs text-slate-600">Manage live, your working versions, and change requests.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button onClick={onCreateVersion} disabled={createVersionDisabled}>
-                <Plus className="h-4 w-4" />
-                {createVersionPending ? "Creating version..." : "Create version from live"}
-              </Button>
-              <Button variant="outline" onClick={onCreateChangeRequest} disabled={createChangeRequestDisabled}>
-                <GitPullRequest className="h-4 w-4" />
-                {createChangeRequestPending ? "Creating change request..." : "Create change request"}
-              </Button>
-              <Button onClick={onPublishChangeRequest} disabled={publishChangeRequestDisabled}>
-                <Rocket className="h-4 w-4" />
-                {publishChangeRequestPending ? "Publishing..." : "Publish selected CR"}
-              </Button>
+              {withTooltip(
+                createVersionDisabled,
+                createVersionDisabledTooltip,
+                <Button onClick={onCreateVersion} disabled={createVersionDisabled}>
+                  <Plus className="h-4 w-4" />
+                  {createVersionPending ? "Creating version..." : "Create version from live"}
+                </Button>,
+              )}
+              {withTooltip(
+                createChangeRequestDisabled,
+                createChangeRequestDisabledTooltip,
+                <Button variant="outline" onClick={onCreateChangeRequest} disabled={createChangeRequestDisabled}>
+                  <GitPullRequest className="h-4 w-4" />
+                  {createChangeRequestPending ? "Creating change request..." : "Create change request"}
+                </Button>,
+              )}
+              {withTooltip(
+                publishChangeRequestDisabled,
+                publishChangeRequestDisabledTooltip,
+                <Button onClick={onPublishChangeRequest} disabled={publishChangeRequestDisabled}>
+                  <Rocket className="h-4 w-4" />
+                  {publishChangeRequestPending ? "Publishing..." : "Publish selected CR"}
+                </Button>,
+              )}
             </div>
           </div>
+          {sandboxModeEnabled ? (
+            <p className="mt-3 text-xs text-amber-700">{sandboxModeTooltip || "Sandbox mode is enabled."}</p>
+          ) : null}
         </section>
 
         <section className="grid gap-5 lg:grid-cols-3">
@@ -769,6 +810,7 @@ export function CanvasVersioningView({
                 const conflictCount = changeRequest.diff?.conflictingNodeIds?.length || 0;
                 const canResolve = status === "conflicted" && changeRequestID !== "";
                 const canClose = (status === "open" || status === "conflicted") && changeRequestID !== "";
+                const versioningActionDisabled = sandboxModeEnabled;
 
                 return (
                   <div key={changeRequestID} className="flex items-start gap-2">
@@ -809,30 +851,39 @@ export function CanvasVersioningView({
                       </div>
                     </button>
                     <div className="flex shrink-0 flex-col gap-1">
-                      {canResolve ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            onSelectChangeRequest(changeRequestID);
-                            setResolvingChangeRequestID(changeRequestID);
-                          }}
-                        >
-                          Resolve
-                        </Button>
-                      ) : null}
-                      {canClose ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={closeChangeRequestPending}
-                          onClick={() => onCloseChangeRequest(changeRequestID)}
-                        >
-                          {closeChangeRequestPending ? "Closing..." : "Close"}
-                        </Button>
-                      ) : null}
+                      {canResolve
+                        ? withTooltip(
+                            versioningActionDisabled,
+                            sandboxModeTooltip,
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={versioningActionDisabled}
+                              onClick={() => {
+                                onSelectChangeRequest(changeRequestID);
+                                setResolvingChangeRequestID(changeRequestID);
+                              }}
+                            >
+                              Resolve
+                            </Button>,
+                          )
+                        : null}
+                      {canClose
+                        ? withTooltip(
+                            versioningActionDisabled,
+                            sandboxModeTooltip,
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={versioningActionDisabled || closeChangeRequestPending}
+                              onClick={() => onCloseChangeRequest(changeRequestID)}
+                            >
+                              {closeChangeRequestPending ? "Closing..." : "Close"}
+                            </Button>,
+                          )
+                        : null}
                     </div>
                   </div>
                 );
@@ -872,20 +923,25 @@ export function CanvasVersioningView({
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected CR Diff</p>
                 <div className="flex items-center gap-2">
                   {(selectedChangeRequest.diff?.conflictingNodeIds?.length || 0) > 0 ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={
-                        normalizeChangeRequestStatus(
-                          selectedChangeRequest.metadata?.status as string | number | undefined,
-                        ) !== "conflicted"
-                      }
-                      onClick={() => setResolvingChangeRequestID(selectedChangeRequest.metadata?.id || "")}
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      Resolve conflicts
-                    </Button>
+                    withTooltip(
+                      sandboxModeEnabled,
+                      sandboxModeTooltip,
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={
+                          sandboxModeEnabled ||
+                          normalizeChangeRequestStatus(
+                            selectedChangeRequest.metadata?.status as string | number | undefined,
+                          ) !== "conflicted"
+                        }
+                        onClick={() => setResolvingChangeRequestID(selectedChangeRequest.metadata?.id || "")}
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Resolve conflicts
+                      </Button>,
+                    )
                   ) : (
                     <span className="inline-flex items-center gap-1 text-xs text-emerald-700">
                       <CheckCircle2 className="h-3.5 w-3.5" />
@@ -903,16 +959,18 @@ export function CanvasVersioningView({
                       return null;
                     }
 
-                    return (
+                    return withTooltip(
+                      sandboxModeEnabled,
+                      sandboxModeTooltip,
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={closeChangeRequestPending}
+                        disabled={sandboxModeEnabled || closeChangeRequestPending}
                         onClick={() => onCloseChangeRequest(selectedChangeRequest.metadata?.id || "")}
                       >
                         {closeChangeRequestPending ? "Closing..." : "Close CR"}
-                      </Button>
+                      </Button>,
                     );
                   })()}
                 </div>

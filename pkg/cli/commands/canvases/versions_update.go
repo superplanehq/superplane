@@ -53,9 +53,25 @@ func (c *versionsUpdateCommand) Execute(ctx core.CommandContext) error {
 		versionRef = ctx.Args[0]
 	}
 
-	versionID, err := resolveWorkingVersionIDFromArgOrActive(ctx, versionRef)
-	if err != nil {
-		return err
+	trimmedVersionRef := strings.TrimSpace(versionRef)
+	versionID := ""
+	targetLiveVersion := false
+	switch {
+	case strings.EqualFold(trimmedVersionRef, "live"):
+		targetLiveVersion = true
+	case trimmedVersionRef != "":
+		versionID = trimmedVersionRef
+	default:
+		if ctx.Config == nil {
+			targetLiveVersion = true
+			break
+		}
+		activeVersion := strings.TrimSpace(ctx.Config.GetActiveCanvasVersion())
+		if activeVersion == "" {
+			targetLiveVersion = true
+			break
+		}
+		versionID = activeVersion
 	}
 
 	autoLayoutValue := ""
@@ -93,10 +109,18 @@ func (c *versionsUpdateCommand) Execute(ctx core.CommandContext) error {
 		body.SetAutoLayout(buildDefaultAutoLayout(currentCanvas, canvas))
 	}
 
-	response, _, err := ctx.API.CanvasVersionAPI.
-		CanvasesUpdateCanvasVersion(ctx.Context, canvasID, versionID).
-		Body(body).
-		Execute()
+	var response *openapi_client.CanvasesUpdateCanvasVersionResponse
+	if targetLiveVersion {
+		response, _, err = ctx.API.CanvasVersionAPI.
+			CanvasesUpdateCanvasVersion2(ctx.Context, canvasID).
+			Body(body).
+			Execute()
+	} else {
+		response, _, err = ctx.API.CanvasVersionAPI.
+			CanvasesUpdateCanvasVersion(ctx.Context, canvasID, versionID).
+			Body(body).
+			Execute()
+	}
 	if err != nil {
 		return err
 	}
@@ -105,7 +129,12 @@ func (c *versionsUpdateCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("failed to update canvas version")
 	}
 
-	if err := setActiveCanvasAndVersion(ctx, canvasID, versionID); err != nil {
+	activeVersion := versionID
+	if targetLiveVersion {
+		activeVersion = ""
+	}
+
+	if err := setActiveCanvasAndVersion(ctx, canvasID, activeVersion); err != nil {
 		return err
 	}
 
@@ -116,7 +145,11 @@ func (c *versionsUpdateCommand) Execute(ctx core.CommandContext) error {
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		metadata := response.Version.GetMetadata()
 		_, _ = fmt.Fprintf(stdout, "Canvas: %s\n", canvasID)
-		_, _ = fmt.Fprintf(stdout, "Updated working version: %s\n", metadata.GetId())
+		if targetLiveVersion {
+			_, _ = fmt.Fprintf(stdout, "Updated live version: %s\n", metadata.GetId())
+		} else {
+			_, _ = fmt.Fprintf(stdout, "Updated working version: %s\n", metadata.GetId())
+		}
 		_, _ = fmt.Fprintf(stdout, "Revision: %d\n", metadata.GetRevision())
 		_, err = fmt.Fprintln(stdout, "Active context updated")
 		return err

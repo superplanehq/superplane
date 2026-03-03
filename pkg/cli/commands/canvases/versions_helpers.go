@@ -105,6 +105,14 @@ func describeCanvasVersion(ctx core.CommandContext, canvasID string, versionID s
 	return *response.Version, nil
 }
 
+func isSandboxModeDisabledError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return strings.Contains(strings.ToLower(err.Error()), "sandbox mode is disabled")
+}
+
 func setActiveCanvasAndVersion(ctx core.CommandContext, canvasID string, versionID string) error {
 	if ctx.Config == nil {
 		return nil

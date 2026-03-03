@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
@@ -210,69 +211,97 @@ func NewMergeTestSteps(t *testing.T) *MergeTestSteps {
 *           +--> (n2) /
  */
 func (s *MergeTestSteps) CreateWorkflow() {
-	wf := &models.Canvas{ID: uuid.New()}
-	require.NoError(s.t, s.Tx.Create(wf).Error)
-
-	n1 := &models.CanvasNode{
-		WorkflowID: wf.ID,
-		NodeID:     "start-node",
-		Name:       "start-node",
-		Type:       models.NodeTypeComponent,
-		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "start"}}),
-	}
-	require.NoError(s.t, s.Tx.Create(n1).Error)
-
-	n2 := &models.CanvasNode{
-		WorkflowID: wf.ID,
-		NodeID:     "process-1",
-		Name:       "process-1",
-		Type:       models.NodeTypeComponent,
-		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "process-1"}}),
-	}
-	require.NoError(s.t, s.Tx.Create(n2).Error)
-
-	n3 := &models.CanvasNode{
-		WorkflowID: wf.ID,
-		NodeID:     "process-3",
-		Name:       "process-3",
-		Type:       models.NodeTypeComponent,
-		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "process-2"}}),
-	}
-	require.NoError(s.t, s.Tx.Create(n3).Error)
-
-	n4 := &models.CanvasNode{
-		WorkflowID: wf.ID,
-		NodeID:     "merge-node",
-		Name:       "merge-node",
-		Type:       models.NodeTypeComponent,
-		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "merge"}}),
-	}
-	require.NoError(s.t, s.Tx.Create(n4).Error)
-
-	wf.Edges = []models.Edge{
-		{
-			SourceID: n1.NodeID,
-			TargetID: n2.NodeID,
-			Channel:  "default",
-		},
-		{
-			SourceID: n1.NodeID,
-			TargetID: n3.NodeID,
-			Channel:  "default",
-		},
-		{
-			SourceID: n2.NodeID,
-			TargetID: n4.NodeID,
-			Channel:  "default",
-		},
-		{
-			SourceID: n3.NodeID,
-			TargetID: n4.NodeID,
-			Channel:  "default",
-		},
+	now := time.Now()
+	liveVersionID := uuid.New()
+	wf := &models.Canvas{
+		ID:             uuid.New(),
+		OrganizationID: uuid.New(),
+		LiveVersionID:  &liveVersionID,
+		Name:           "merge-test-workflow",
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
 	}
 
-	require.NoError(s.t, s.Tx.Updates(&wf).Error)
+	var n1 *models.CanvasNode
+	var n2 *models.CanvasNode
+	var n3 *models.CanvasNode
+	var n4 *models.CanvasNode
+
+	err := s.Tx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(wf).Error; err != nil {
+			return err
+		}
+
+		n1 = &models.CanvasNode{
+			WorkflowID: wf.ID,
+			NodeID:     "start-node",
+			Name:       "start-node",
+			Type:       models.NodeTypeComponent,
+			Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "start"}}),
+		}
+		if err := tx.Create(n1).Error; err != nil {
+			return err
+		}
+
+		n2 = &models.CanvasNode{
+			WorkflowID: wf.ID,
+			NodeID:     "process-1",
+			Name:       "process-1",
+			Type:       models.NodeTypeComponent,
+			Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "process-1"}}),
+		}
+		if err := tx.Create(n2).Error; err != nil {
+			return err
+		}
+
+		n3 = &models.CanvasNode{
+			WorkflowID: wf.ID,
+			NodeID:     "process-3",
+			Name:       "process-3",
+			Type:       models.NodeTypeComponent,
+			Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "process-2"}}),
+		}
+		if err := tx.Create(n3).Error; err != nil {
+			return err
+		}
+
+		n4 = &models.CanvasNode{
+			WorkflowID: wf.ID,
+			NodeID:     "merge-node",
+			Name:       "merge-node",
+			Type:       models.NodeTypeComponent,
+			Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "merge"}}),
+		}
+		if err := tx.Create(n4).Error; err != nil {
+			return err
+		}
+
+		version, err := models.CreatePublishedCanvasVersionInTransaction(
+			tx,
+			wf.ID,
+			nil,
+			nil,
+			[]models.Node{
+				{ID: n1.NodeID, Name: n1.Name, Type: n1.Type, Ref: n1.Ref.Data()},
+				{ID: n2.NodeID, Name: n2.Name, Type: n2.Type, Ref: n2.Ref.Data()},
+				{ID: n3.NodeID, Name: n3.Name, Type: n3.Type, Ref: n3.Ref.Data()},
+				{ID: n4.NodeID, Name: n4.Name, Type: n4.Type, Ref: n4.Ref.Data()},
+			},
+			[]models.Edge{
+				{SourceID: n1.NodeID, TargetID: n2.NodeID, Channel: "default"},
+				{SourceID: n1.NodeID, TargetID: n3.NodeID, Channel: "default"},
+				{SourceID: n2.NodeID, TargetID: n4.NodeID, Channel: "default"},
+				{SourceID: n3.NodeID, TargetID: n4.NodeID, Channel: "default"},
+			},
+		)
+		if err != nil {
+			return err
+		}
+
+		wf.LiveVersionID = &version.ID
+		return nil
+	})
+	require.NoError(s.t, err)
 
 	s.Wf = wf
 	s.StartNode = n1
@@ -285,43 +314,83 @@ func (s *MergeTestSteps) CreateWorkflow() {
 // via two separate edges/channels. With the updated semantics, the merge should
 // require only one event (distinct source) to finish.
 func (s *MergeTestSteps) CreateWorkflowSingleSourceMultipleEdges() {
-	wf := &models.Canvas{ID: uuid.New()}
-	require.NoError(s.t, s.Tx.Create(wf).Error)
-
-	n1 := &models.CanvasNode{
-		WorkflowID: wf.ID,
-		NodeID:     "start-node",
-		Name:       "start-node",
-		Type:       models.NodeTypeComponent,
-		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "start"}}),
+	now := time.Now()
+	liveVersionID := uuid.New()
+	wf := &models.Canvas{
+		ID:             uuid.New(),
+		OrganizationID: uuid.New(),
+		LiveVersionID:  &liveVersionID,
+		Name:           "merge-test-single-source-workflow",
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
 	}
-	require.NoError(s.t, s.Tx.Create(n1).Error)
 
-	n2 := &models.CanvasNode{
-		WorkflowID: wf.ID,
-		NodeID:     "process-1",
-		Name:       "process-1",
-		Type:       models.NodeTypeComponent,
-		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "process-1"}}),
-	}
-	require.NoError(s.t, s.Tx.Create(n2).Error)
+	var n1 *models.CanvasNode
+	var n2 *models.CanvasNode
+	var n4 *models.CanvasNode
 
-	n4 := &models.CanvasNode{
-		WorkflowID: wf.ID,
-		NodeID:     "merge-node",
-		Name:       "merge-node",
-		Type:       models.NodeTypeComponent,
-		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "merge"}}),
-	}
-	require.NoError(s.t, s.Tx.Create(n4).Error)
+	err := s.Tx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(wf).Error; err != nil {
+			return err
+		}
 
-	wf.Edges = []models.Edge{
-		{SourceID: n1.NodeID, TargetID: n2.NodeID, Channel: "default"},
-		// Two edges from process-1 to merge-node on different channels
-		{SourceID: n2.NodeID, TargetID: n4.NodeID, Channel: "default"},
-		{SourceID: n2.NodeID, TargetID: n4.NodeID, Channel: "alt"},
-	}
-	require.NoError(s.t, s.Tx.Updates(&wf).Error)
+		n1 = &models.CanvasNode{
+			WorkflowID: wf.ID,
+			NodeID:     "start-node",
+			Name:       "start-node",
+			Type:       models.NodeTypeComponent,
+			Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "start"}}),
+		}
+		if err := tx.Create(n1).Error; err != nil {
+			return err
+		}
+
+		n2 = &models.CanvasNode{
+			WorkflowID: wf.ID,
+			NodeID:     "process-1",
+			Name:       "process-1",
+			Type:       models.NodeTypeComponent,
+			Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "process-1"}}),
+		}
+		if err := tx.Create(n2).Error; err != nil {
+			return err
+		}
+
+		n4 = &models.CanvasNode{
+			WorkflowID: wf.ID,
+			NodeID:     "merge-node",
+			Name:       "merge-node",
+			Type:       models.NodeTypeComponent,
+			Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "merge"}}),
+		}
+		if err := tx.Create(n4).Error; err != nil {
+			return err
+		}
+
+		version, err := models.CreatePublishedCanvasVersionInTransaction(
+			tx,
+			wf.ID,
+			nil,
+			nil,
+			[]models.Node{
+				{ID: n1.NodeID, Name: n1.Name, Type: n1.Type, Ref: n1.Ref.Data()},
+				{ID: n2.NodeID, Name: n2.Name, Type: n2.Type, Ref: n2.Ref.Data()},
+				{ID: n4.NodeID, Name: n4.Name, Type: n4.Type, Ref: n4.Ref.Data()},
+			},
+			[]models.Edge{
+				{SourceID: n1.NodeID, TargetID: n2.NodeID, Channel: "default"},
+				{SourceID: n2.NodeID, TargetID: n4.NodeID, Channel: "default"},
+				{SourceID: n2.NodeID, TargetID: n4.NodeID, Channel: "alt"},
+			},
+		)
+		if err != nil {
+			return err
+		}
+
+		wf.LiveVersionID = &version.ID
+		return nil
+	})
+	require.NoError(s.t, err)
 
 	s.Wf = wf
 	s.StartNode = n1

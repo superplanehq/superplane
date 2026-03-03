@@ -5673,7 +5673,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x1d\n" +
 	"\n" +
 	"version_id\x18\x02 \x01(\tR\tversionId\x128\n" +
-	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xe6C\n" +
+	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xb7D\n" +
 	"\bCanvases\x12\xb7\x01\n" +
 	"\fListCanvases\x12(.Superplane.Canvases.ListCanvasesRequest\x1a).Superplane.Canvases.ListCanvasesResponse\"R\x92A7\n" +
 	"\x06Canvas\x12\rList canvases\x1a\x1eReturns a list of all canvases\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/canvases\x12\xb0\x01\n" +
@@ -5686,9 +5686,9 @@ const file_canvases_proto_rawDesc = "" +
 	"\x12ListCanvasVersions\x12..Superplane.Canvases.ListCanvasVersionsRequest\x1a/.Superplane.Canvases.ListCanvasVersionsResponse\"v\x92AF\n" +
 	"\rCanvasVersion\x12\x14List canvas versions\x1a\x1fLists all versions for a canvas\x82\xd3\xe4\x93\x02'\x12%/api/v1/canvases/{canvas_id}/versions\x12\x88\x02\n" +
 	"\x15DescribeCanvasVersion\x121.Superplane.Canvases.DescribeCanvasVersionRequest\x1a2.Superplane.Canvases.DescribeCanvasVersionResponse\"\x87\x01\x92AJ\n" +
-	"\rCanvasVersion\x12\x17Describe canvas version\x1a Returns one canvas version by ID\x82\xd3\xe4\x93\x024\x122/api/v1/canvases/{canvas_id}/versions/{version_id}\x12\xa5\x02\n" +
-	"\x13UpdateCanvasVersion\x12/.Superplane.Canvases.UpdateCanvasVersionRequest\x1a0.Superplane.Canvases.UpdateCanvasVersionResponse\"\xaa\x01\x92Aj\n" +
-	"\rCanvasVersion\x12\x15Update canvas version\x1aBUpdates a user-owned canvas version without applying runtime setup\x82\xd3\xe4\x93\x027:\x01*\x1a2/api/v1/canvases/{canvas_id}/versions/{version_id}\x12\xcc\x02\n" +
+	"\rCanvasVersion\x12\x17Describe canvas version\x1a Returns one canvas version by ID\x82\xd3\xe4\x93\x024\x122/api/v1/canvases/{canvas_id}/versions/{version_id}\x12\xf6\x02\n" +
+	"\x13UpdateCanvasVersion\x12/.Superplane.Canvases.UpdateCanvasVersionRequest\x1a0.Superplane.Canvases.UpdateCanvasVersionResponse\"\xfb\x01\x92A\x8e\x01\n" +
+	"\rCanvasVersion\x12\x15Update canvas version\x1afUpdates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode\x82\xd3\xe4\x93\x02c:\x01*Z*:\x01*\x1a%/api/v1/canvases/{canvas_id}/versions\x1a2/api/v1/canvases/{canvas_id}/versions/{version_id}\x12\xcc\x02\n" +
 	"\x14DiscardCanvasVersion\x120.Superplane.Canvases.DiscardCanvasVersionRequest\x1a1.Superplane.Canvases.DiscardCanvasVersionResponse\"\xce\x01\x92AS\n" +
 	"\rCanvasVersion\x12\x16Discard canvas version\x1a*Discards a user-owned draft canvas version\x82\xd3\xe4\x93\x02rZ4*2/api/v1/canvases/{canvas_id}/versions/{version_id}\":/api/v1/canvases/{canvas_id}/versions/{version_id}/discard\x12\xaf\x02\n" +
 	"\x19CreateCanvasChangeRequest\x125.Superplane.Canvases.CreateCanvasChangeRequestRequest\x1a6.Superplane.Canvases.CreateCanvasChangeRequestResponse\"\xa2\x01\x92Ah\n" +

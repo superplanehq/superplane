@@ -28,6 +28,7 @@ import {
   useOrganizationAgentSettings,
   useOrganizationGroups,
   useOrganizationRoles,
+  useOrganization,
   useOrganizationUsers,
 } from "@/hooks/useOrganizationData";
 
@@ -282,7 +283,13 @@ export function WorkflowPageV2() {
       spec: versionSpec,
     };
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion]);
-  const hasEditableVersion = !!activeCanvasVersionId && !selectedCanvasVersion?.metadata?.isPublished;
+  const canReadOrg = canAct("org", "read");
+  const { data: organization } = useOrganization(organizationId || "", !!organizationId && canReadOrg);
+  const isSandboxModeEnabled = organization?.metadata?.canvasSandboxModeEnabled ?? true;
+  const showVersioningUI = !isSandboxModeEnabled;
+  const hasEditableVersion =
+    (!!activeCanvasVersionId && !selectedCanvasVersion?.metadata?.isPublished) ||
+    (isSandboxModeEnabled && !activeCanvasVersionId);
   const { data: canvasEventsResponse } = useCanvasEvents(canvasId!, isViewingLiveVersion);
   const {
     data: canvasMemoryEntries = [],
@@ -290,7 +297,6 @@ export function WorkflowPageV2() {
     error: canvasMemoryError,
   } = useCanvasMemoryEntries(canvasId!, isViewingLiveVersion);
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
-  const canReadOrg = canAct("org", "read");
   const { data: agentSettings } = useOrganizationAgentSettings(organizationId || "", !!organizationId && canReadOrg);
   const canUpdateCanvas = canAct("canvases", "update");
   const showAiBuilderTab = agentSettings?.agentModeEnabled ?? false;
@@ -406,6 +412,40 @@ export function WorkflowPageV2() {
     }
   }, [isVersionControlOpen]);
 
+  useEffect(() => {
+    if (!isSandboxModeEnabled) {
+      return;
+    }
+
+    if (topViewMode === "versioning") {
+      setTopViewMode("canvas");
+    }
+    if (isVersionControlOpen) {
+      setIsVersionControlOpen(false);
+    }
+    if (selectedChangeRequestId) {
+      setSelectedChangeRequestId("");
+    }
+    if (activeCanvasVersionId) {
+      setActiveCanvasVersion(null);
+    }
+    if (searchParams.get("version")) {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete("version");
+        return next;
+      });
+    }
+  }, [
+    isSandboxModeEnabled,
+    topViewMode,
+    isVersionControlOpen,
+    selectedChangeRequestId,
+    activeCanvasVersionId,
+    searchParams,
+    setSearchParams,
+  ]);
+
   // Revert functionality - track initial workflow snapshot
   const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<CanvasesCanvas | null>(null);
   const lastSavedWorkflowRef = useRef<CanvasesCanvas | null>(null);
@@ -483,7 +523,12 @@ export function WorkflowPageV2() {
   }, [isTemplate, canvasId]);
 
   useEffect(() => {
-    if (hasSyncedVersionFromURLRef.current || !visibleCanvasVersions.length || activeCanvasVersionId) {
+    if (
+      isSandboxModeEnabled ||
+      hasSyncedVersionFromURLRef.current ||
+      !visibleCanvasVersions.length ||
+      activeCanvasVersionId
+    ) {
       return;
     }
 
@@ -541,6 +586,7 @@ export function WorkflowPageV2() {
     searchParams,
     currentUserId,
     liveCanvasVersionId,
+    isSandboxModeEnabled,
     setSearchParams,
     queryClient,
     organizationId,
@@ -714,6 +760,11 @@ export function WorkflowPageV2() {
       return;
     }
 
+    if (isSandboxModeEnabled) {
+      showErrorToast("Versioning is disabled while sandbox mode is enabled");
+      return;
+    }
+
     if (hasEditableVersion && hasUnsavedChanges) {
       const shouldCreate = window.confirm(
         "You have unsaved changes in the current draft. Create a new draft from live anyway?",
@@ -773,6 +824,7 @@ export function WorkflowPageV2() {
     createCanvasVersionMutation,
     queryClient,
     setSearchParams,
+    isSandboxModeEnabled,
   ]);
 
   const handleRevert = useCallback(() => {
@@ -903,10 +955,10 @@ export function WorkflowPageV2() {
               : "Canvas changes saved";
 
             // Save the workflow with updated positions
-            if (!activeCanvasVersionId) {
+            if (!activeCanvasVersionId && !isSandboxModeEnabled) {
               return;
             }
-            const savingVersionID = activeCanvasVersionId;
+            const savingVersionID = activeCanvasVersionId || undefined;
 
             lastLocalCanvasSaveAtRef.current = Date.now();
             const updateResponse = await updateCanvasVersionMutation.mutateAsync({
@@ -916,10 +968,14 @@ export function WorkflowPageV2() {
               nodes: updatedNodes,
               edges: latestWorkflow.spec?.edges,
             });
-            if (updateResponse?.data?.version && activeCanvasVersionIdRef.current === savingVersionID) {
+            if (
+              updateResponse?.data?.version &&
+              savingVersionID &&
+              activeCanvasVersionIdRef.current === savingVersionID
+            ) {
               setActiveCanvasVersion(updateResponse.data.version);
             }
-            if (activeCanvasVersionIdRef.current !== savingVersionID) {
+            if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
               return;
             }
 
@@ -998,6 +1054,7 @@ export function WorkflowPageV2() {
       hasNonPositionalUnsavedChanges,
       canAutoSave,
       isTemplate,
+      isSandboxModeEnabled,
     ],
   );
 
@@ -1826,7 +1883,7 @@ export function WorkflowPageV2() {
         }
         return;
       }
-      if (!activeCanvasVersionId) {
+      if (!activeCanvasVersionId && !isSandboxModeEnabled) {
         if (options?.showToast !== false) {
           showErrorToast("Create a version before saving changes");
         }
@@ -1844,7 +1901,7 @@ export function WorkflowPageV2() {
         : "Canvas changes saved";
 
       try {
-        const savingVersionID = activeCanvasVersionId;
+        const savingVersionID = activeCanvasVersionId || undefined;
         lastLocalCanvasSaveAtRef.current = Date.now();
         const updateResponse = await updateCanvasVersionMutation.mutateAsync({
           versionId: savingVersionID,
@@ -1853,10 +1910,10 @@ export function WorkflowPageV2() {
           nodes: targetWorkflow.spec?.nodes,
           edges: targetWorkflow.spec?.edges,
         });
-        if (updateResponse?.data?.version && activeCanvasVersionIdRef.current === savingVersionID) {
+        if (updateResponse?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
           setActiveCanvasVersion(updateResponse.data.version);
         }
-        if (activeCanvasVersionIdRef.current !== savingVersionID) {
+        if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
           return;
         }
 
@@ -1901,7 +1958,15 @@ export function WorkflowPageV2() {
         }
       }
     },
-    [organizationId, canvasId, updateCanvasVersionMutation, activeCanvasVersionId, isTemplate, canUpdateCanvas],
+    [
+      organizationId,
+      canvasId,
+      updateCanvasVersionMutation,
+      activeCanvasVersionId,
+      isTemplate,
+      canUpdateCanvas,
+      isSandboxModeEnabled,
+    ],
   );
 
   const getNodeEditData = useCallback(
@@ -3075,7 +3140,7 @@ export function WorkflowPageV2() {
         showErrorToast("Template canvases are read-only");
         return;
       }
-      if (!activeCanvasVersionId) {
+      if (!activeCanvasVersionId && !isSandboxModeEnabled) {
         showErrorToast("Create a version before saving changes");
         return;
       }
@@ -3115,7 +3180,7 @@ export function WorkflowPageV2() {
         : "Canvas changes saved";
 
       try {
-        const savingVersionID = activeCanvasVersionId;
+        const savingVersionID = activeCanvasVersionId || undefined;
         lastLocalCanvasSaveAtRef.current = Date.now();
         const updateResponse = await updateCanvasVersionMutation.mutateAsync({
           versionId: savingVersionID,
@@ -3124,10 +3189,10 @@ export function WorkflowPageV2() {
           nodes: updatedNodes,
           edges: canvas.spec?.edges,
         });
-        if (updateResponse?.data?.version && activeCanvasVersionIdRef.current === savingVersionID) {
+        if (updateResponse?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
           setActiveCanvasVersion(updateResponse.data.version);
         }
-        if (activeCanvasVersionIdRef.current !== savingVersionID) {
+        if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
           return;
         }
 
@@ -3158,11 +3223,24 @@ export function WorkflowPageV2() {
         showErrorToast(errorMessage);
       }
     },
-    [canvas, organizationId, canvasId, updateCanvasVersionMutation, activeCanvasVersionId, isTemplate],
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      updateCanvasVersionMutation,
+      activeCanvasVersionId,
+      isTemplate,
+      isSandboxModeEnabled,
+    ],
   );
 
   const handleCreateChangeRequest = useCallback(async () => {
     if (!organizationId || !canvasId || !activeCanvasVersionId) {
+      return;
+    }
+
+    if (isSandboxModeEnabled) {
+      showErrorToast("Versioning is disabled while sandbox mode is enabled");
       return;
     }
 
@@ -3207,10 +3285,16 @@ export function WorkflowPageV2() {
     hasUnsavedChanges,
     createCanvasChangeRequestMutation,
     setSearchParams,
+    isSandboxModeEnabled,
   ]);
 
   const handlePublishChangeRequest = useCallback(async () => {
     if (!organizationId || !canvasId || !selectedChangeRequest?.metadata?.id) {
+      return;
+    }
+
+    if (isSandboxModeEnabled) {
+      showErrorToast("Versioning is disabled while sandbox mode is enabled");
       return;
     }
 
@@ -3278,11 +3362,17 @@ export function WorkflowPageV2() {
     publishCanvasChangeRequestMutation,
     queryClient,
     setSearchParams,
+    isSandboxModeEnabled,
   ]);
 
   const handleResolveChangeRequest = useCallback(
     async (data: { changeRequestId: string; nodes: Record<string, unknown>[]; edges: Record<string, unknown>[] }) => {
       if (!organizationId || !canvasId || !canvas?.metadata?.name) {
+        return;
+      }
+
+      if (isSandboxModeEnabled) {
+        showErrorToast("Versioning is disabled while sandbox mode is enabled");
         return;
       }
 
@@ -3325,12 +3415,18 @@ export function WorkflowPageV2() {
       canvas?.metadata?.name,
       canvas?.metadata?.description,
       resolveCanvasChangeRequestMutation,
+      isSandboxModeEnabled,
     ],
   );
 
   const handleCloseChangeRequest = useCallback(
     async (changeRequestId: string) => {
       if (!organizationId || !canvasId || !changeRequestId) {
+        return;
+      }
+
+      if (isSandboxModeEnabled) {
+        showErrorToast("Versioning is disabled while sandbox mode is enabled");
         return;
       }
 
@@ -3357,11 +3453,16 @@ export function WorkflowPageV2() {
         showErrorToast(errorMessage);
       }
     },
-    [organizationId, canvasId, closeCanvasChangeRequestMutation],
+    [organizationId, canvasId, closeCanvasChangeRequestMutation, isSandboxModeEnabled],
   );
 
   const handleDiscardVersion = useCallback(async () => {
     if (!organizationId || !canvasId || !activeCanvasVersionId || !hasEditableVersion) {
+      return;
+    }
+
+    if (isSandboxModeEnabled) {
+      showErrorToast("Versioning is disabled while sandbox mode is enabled");
       return;
     }
 
@@ -3405,6 +3506,7 @@ export function WorkflowPageV2() {
     discardCanvasVersionMutation,
     queryClient,
     setSearchParams,
+    isSandboxModeEnabled,
   ]);
 
   const handleUseVersion = useCallback(
@@ -3828,21 +3930,31 @@ export function WorkflowPageV2() {
   const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas;
   const canUndo =
     !isTemplate && canUpdateCanvas && hasEditableVersion && !isAutoSaveEnabled && initialWorkflowSnapshot !== null;
-  const createVersionDisabled = !canUpdateCanvas || canvasDeletedRemotely || createCanvasVersionMutation.isPending;
+  const sandboxModeVersioningTooltip = "Versioning is disabled while sandbox mode is enabled";
+  const createVersionDisabled =
+    isSandboxModeEnabled || !canUpdateCanvas || canvasDeletedRemotely || createCanvasVersionMutation.isPending;
   const createVersionDisabledTooltip = !canUpdateCanvas
     ? "You don't have permission to edit this canvas."
-    : canvasDeletedRemotely
-      ? "This canvas was deleted in another session."
-      : undefined;
+    : isSandboxModeEnabled
+      ? sandboxModeVersioningTooltip
+      : canvasDeletedRemotely
+        ? "This canvas was deleted in another session."
+        : undefined;
   const createChangeRequestDisabled =
-    !hasEditableVersion || hasUnsavedChanges || createCanvasChangeRequestMutation.isPending || canvasDeletedRemotely;
+    isSandboxModeEnabled ||
+    !hasEditableVersion ||
+    hasUnsavedChanges ||
+    createCanvasChangeRequestMutation.isPending ||
+    canvasDeletedRemotely;
   const createChangeRequestDisabledTooltip = canvasDeletedRemotely
     ? "This canvas was deleted in another session."
-    : !hasEditableVersion
-      ? "Only a working version can create a change request."
-      : hasUnsavedChanges
-        ? "Save your version before creating a change request."
-        : undefined;
+    : isSandboxModeEnabled
+      ? sandboxModeVersioningTooltip
+      : !hasEditableVersion
+        ? "Only a working version can create a change request."
+        : hasUnsavedChanges
+          ? "Save your version before creating a change request."
+          : undefined;
   const selectedChangeRequestStatus = selectedChangeRequest?.metadata?.status;
   const selectedChangeRequestHasConflicts = (selectedChangeRequest?.diff?.conflictingNodeIds?.length || 0) > 0;
   const selectedChangeRequestIsPublished = (() => {
@@ -3860,6 +3972,7 @@ export function WorkflowPageV2() {
     return (selectedChangeRequestStatus || "").toLowerCase().includes("closed");
   })();
   const publishChangeRequestDisabled =
+    isSandboxModeEnabled ||
     !selectedChangeRequest ||
     selectedChangeRequestIsPublished ||
     selectedChangeRequestIsClosed ||
@@ -3867,12 +3980,30 @@ export function WorkflowPageV2() {
     publishCanvasChangeRequestMutation.isPending ||
     canvasDeletedRemotely ||
     hasUnsavedChanges;
-  const discardVersionDisabled = !hasEditableVersion || discardCanvasVersionMutation.isPending || canvasDeletedRemotely;
+  const publishChangeRequestDisabledTooltip = isSandboxModeEnabled
+    ? sandboxModeVersioningTooltip
+    : canvasDeletedRemotely
+      ? "This canvas was deleted in another session."
+      : !selectedChangeRequest
+        ? "Select a change request to publish."
+        : selectedChangeRequestIsPublished
+          ? "This change request is already published."
+          : selectedChangeRequestIsClosed
+            ? "This change request is closed."
+            : selectedChangeRequestHasConflicts
+              ? "Resolve conflicts before publishing."
+              : hasUnsavedChanges
+                ? "Save your version changes before publishing this change request."
+                : undefined;
+  const discardVersionDisabled =
+    isSandboxModeEnabled || !hasEditableVersion || discardCanvasVersionMutation.isPending || canvasDeletedRemotely;
   const discardVersionDisabledTooltip = canvasDeletedRemotely
     ? "This canvas was deleted in another session."
-    : !hasEditableVersion
-      ? "Only draft versions can be discarded."
-      : undefined;
+    : isSandboxModeEnabled
+      ? sandboxModeVersioningTooltip
+      : !hasEditableVersion
+        ? "Only draft versions can be discarded."
+        : undefined;
   const runDisabled =
     hasRunBlockingChanges || isTemplate || !canUpdateCanvas || canvasDeletedRemotely || isViewingDraftVersion;
   const runDisabledTooltip = canvasDeletedRemotely
@@ -3899,7 +4030,7 @@ export function WorkflowPageV2() {
         }
         deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
       />
-    ) : (
+    ) : showVersioningUI ? (
       <CanvasVersioningView
         liveCanvasVersion={liveCanvasVersion}
         myVersions={draftVersions}
@@ -3916,16 +4047,21 @@ export function WorkflowPageV2() {
         onResolveChangeRequest={handleResolveChangeRequest}
         onCreateVersion={handleCreateVersion}
         onCreateChangeRequest={handleCreateChangeRequest}
+        sandboxModeEnabled={isSandboxModeEnabled}
+        sandboxModeTooltip={sandboxModeVersioningTooltip}
         createVersionDisabled={createVersionDisabled}
+        createVersionDisabledTooltip={createVersionDisabledTooltip}
         createChangeRequestDisabled={createChangeRequestDisabled}
+        createChangeRequestDisabledTooltip={createChangeRequestDisabledTooltip}
         publishChangeRequestDisabled={publishChangeRequestDisabled}
+        publishChangeRequestDisabledTooltip={publishChangeRequestDisabledTooltip}
         resolveChangeRequestPending={resolveCanvasChangeRequestMutation.isPending}
         createVersionPending={createCanvasVersionMutation.isPending}
         createChangeRequestPending={createCanvasChangeRequestMutation.isPending}
         publishChangeRequestPending={publishCanvasChangeRequestMutation.isPending}
         closeChangeRequestPending={closeCanvasChangeRequestMutation.isPending}
       />
-    );
+    ) : null;
 
   return (
     <>
@@ -3950,10 +4086,16 @@ export function WorkflowPageV2() {
         }}
         title={canvas?.metadata?.name || "Canvas"}
         headerBanner={headerBanner}
-        topViewMode={topViewMode}
-        onTopViewModeChange={setTopViewMode}
-        isVersionControlOpen={isVersionControlOpen}
-        onOpenVersionControl={() => setIsVersionControlOpen(true)}
+        topViewMode={showVersioningUI || topViewMode !== "versioning" ? topViewMode : "canvas"}
+        onTopViewModeChange={(mode) => {
+          if (!showVersioningUI && mode === "versioning") {
+            return;
+          }
+          setTopViewMode(mode);
+        }}
+        showVersioningTab={showVersioningUI}
+        isVersionControlOpen={showVersioningUI ? isVersionControlOpen : false}
+        onOpenVersionControl={showVersioningUI ? () => setIsVersionControlOpen(true) : undefined}
         versionControlButtonLabel={
           hasEditableVersion
             ? `Draft ${formatVersionLabelWithTimestamp(selectedVersionForLabel)}`
@@ -3961,7 +4103,7 @@ export function WorkflowPageV2() {
         }
         versionControlButtonTooltip="Open version control"
         memoryItemCount={canvasMemoryEntries.length}
-        versioningItemCount={openChangeRequestsCount}
+        versioningItemCount={showVersioningUI ? openChangeRequestsCount : undefined}
         dataViewContent={dataViewContent}
         nodes={nodes}
         edges={edges}
@@ -4057,7 +4199,7 @@ export function WorkflowPageV2() {
           },
         ]}
         versionControlSidebar={
-          topViewMode === "versioning" ? undefined : (
+          showVersioningUI && topViewMode !== "versioning" ? (
             <CanvasVersionControlSidebar
               isOpen={isVersionControlOpen}
               onToggle={setIsVersionControlOpen}
@@ -4086,7 +4228,7 @@ export function WorkflowPageV2() {
               discardVersionPending={discardCanvasVersionMutation.isPending}
               createChangeRequestPending={createCanvasChangeRequestMutation.isPending}
             />
-          )
+          ) : undefined
         }
       />
       {canvas ? (

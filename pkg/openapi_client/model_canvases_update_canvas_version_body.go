@@ -20,6 +20,7 @@ var _ MappedNullable = &CanvasesUpdateCanvasVersionBody{}
 
 // CanvasesUpdateCanvasVersionBody struct for CanvasesUpdateCanvasVersionBody
 type CanvasesUpdateCanvasVersionBody struct {
+	VersionId  *string                   `json:"versionId,omitempty"`
 	Canvas     *CanvasesCanvas           `json:"canvas,omitempty"`
 	AutoLayout *CanvasesCanvasAutoLayout `json:"autoLayout,omitempty"`
 }
@@ -39,6 +40,38 @@ func NewCanvasesUpdateCanvasVersionBody() *CanvasesUpdateCanvasVersionBody {
 func NewCanvasesUpdateCanvasVersionBodyWithDefaults() *CanvasesUpdateCanvasVersionBody {
 	this := CanvasesUpdateCanvasVersionBody{}
 	return &this
+}
+
+// GetVersionId returns the VersionId field value if set, zero value otherwise.
+func (o *CanvasesUpdateCanvasVersionBody) GetVersionId() string {
+	if o == nil || IsNil(o.VersionId) {
+		var ret string
+		return ret
+	}
+	return *o.VersionId
+}
+
+// GetVersionIdOk returns a tuple with the VersionId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesUpdateCanvasVersionBody) GetVersionIdOk() (*string, bool) {
+	if o == nil || IsNil(o.VersionId) {
+		return nil, false
+	}
+	return o.VersionId, true
+}
+
+// HasVersionId returns a boolean if a field has been set.
+func (o *CanvasesUpdateCanvasVersionBody) HasVersionId() bool {
+	if o != nil && !IsNil(o.VersionId) {
+		return true
+	}
+
+	return false
+}
+
+// SetVersionId gets a reference to the given string and assigns it to the VersionId field.
+func (o *CanvasesUpdateCanvasVersionBody) SetVersionId(v string) {
+	o.VersionId = &v
 }
 
 // GetCanvas returns the Canvas field value if set, zero value otherwise.
@@ -115,6 +148,9 @@ func (o CanvasesUpdateCanvasVersionBody) MarshalJSON() ([]byte, error) {
 
 func (o CanvasesUpdateCanvasVersionBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
+	if !IsNil(o.VersionId) {
+		toSerialize["versionId"] = o.VersionId
+	}
 	if !IsNil(o.Canvas) {
 		toSerialize["canvas"] = o.Canvas
 	}

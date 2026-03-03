@@ -99,10 +99,14 @@ service Canvases {
     option (google.api.http) = {
       put: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
       body: "*"
+      additional_bindings {
+        put: "/api/v1/canvases/{canvas_id}/versions"
+        body: "*"
+      }
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update canvas version";
-      description: "Updates a user-owned canvas version without applying runtime setup";
+      description: "Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode";
       tags: "CanvasVersion";
     };
   }

@@ -165,8 +165,6 @@ func CreatePublishedCanvasVersionInTransaction(
 	}
 
 	canvas.LiveVersionID = &version.ID
-	canvas.Nodes = version.Nodes
-	canvas.Edges = version.Edges
 	canvas.UpdatedAt = &now
 
 	if err := tx.Save(canvas).Error; err != nil {
@@ -276,8 +274,6 @@ func PublishCanvasDraftInTransaction(
 	}
 
 	canvas.LiveVersionID = &version.ID
-	canvas.Nodes = version.Nodes
-	canvas.Edges = version.Edges
 	canvas.UpdatedAt = &now
 
 	if err := tx.Save(canvas).Error; err != nil {
@@ -289,4 +285,32 @@ func PublishCanvasDraftInTransaction(
 	}
 
 	return version, nil
+}
+
+func FindLiveCanvasVersionInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*CanvasVersion, error) {
+	canvas, err := FindCanvasWithoutOrgScopeInTransaction(tx, workflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	return FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+}
+
+func FindLiveCanvasVersionByCanvasInTransaction(tx *gorm.DB, canvas *Canvas) (*CanvasVersion, error) {
+	if canvas.LiveVersionID == nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	return FindCanvasVersionInTransaction(tx, canvas.ID, *canvas.LiveVersionID)
+}
+
+func FindLiveCanvasSpecInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]Node, []Edge, error) {
+	version, err := FindLiveCanvasVersionInTransaction(tx, workflowID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nodes := append([]Node(nil), version.Nodes...)
+	edges := append([]Edge(nil), version.Edges...)
+	return nodes, edges, nil
 }

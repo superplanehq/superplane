@@ -41,6 +41,7 @@ func TestResolveCanvasChangeRequestRebasesVersionAndClearsConflicts(t *testing.T
 
 	_, err = UpdateCanvasVersion(
 		ctx,
+		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvasID,
@@ -62,6 +63,7 @@ func TestResolveCanvasChangeRequestRebasesVersionAndClearsConflicts(t *testing.T
 			},
 		},
 		nil,
+		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)
 
@@ -75,6 +77,7 @@ func TestResolveCanvasChangeRequestRebasesVersionAndClearsConflicts(t *testing.T
 
 	_, err = UpdateCanvasVersion(
 		ctx,
+		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvasID,
@@ -96,6 +99,7 @@ func TestResolveCanvasChangeRequestRebasesVersionAndClearsConflicts(t *testing.T
 			},
 		},
 		nil,
+		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)
 

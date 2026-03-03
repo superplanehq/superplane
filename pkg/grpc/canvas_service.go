@@ -70,12 +70,14 @@ func (s *CanvasService) UpdateCanvasVersion(ctx context.Context, req *pb.UpdateC
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.UpdateCanvasVersion(
 		ctx,
+		s.encryptor,
 		s.registry,
 		organizationID,
 		req.CanvasId,
 		req.VersionId,
 		req.Canvas,
 		req.AutoLayout,
+		s.webhookBaseURL,
 	)
 }
 

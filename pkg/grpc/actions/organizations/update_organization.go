@@ -35,6 +35,9 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 	if pbOrganization.Metadata.Description != "" {
 		organization.Description = pbOrganization.Metadata.Description
 	}
+	if pbOrganization.Metadata.CanvasSandboxModeEnabled != nil {
+		organization.CanvasSandboxModeEnabled = pbOrganization.Metadata.GetCanvasSandboxModeEnabled()
+	}
 
 	now := time.Now()
 	organization.UpdatedAt = &now
@@ -51,11 +54,12 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 	response := &pb.UpdateOrganizationResponse{
 		Organization: &pb.Organization{
 			Metadata: &pb.Organization_Metadata{
-				Id:          organization.ID.String(),
-				Name:        organization.Name,
-				Description: organization.Description,
-				CreatedAt:   timestamppb.New(*organization.CreatedAt),
-				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
+				Id:                       organization.ID.String(),
+				Name:                     organization.Name,
+				Description:              organization.Description,
+				CreatedAt:                timestamppb.New(*organization.CreatedAt),
+				UpdatedAt:                timestamppb.New(*organization.UpdatedAt),
+				CanvasSandboxModeEnabled: &organization.CanvasSandboxModeEnabled,
 			},
 		},
 	}
