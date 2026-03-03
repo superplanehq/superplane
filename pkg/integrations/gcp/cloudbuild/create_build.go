@@ -47,11 +47,12 @@ func getClient(httpCtx core.HTTPContext, integration core.IntegrationContext) (C
 }
 
 const (
-	createBuildPayloadType   = "gcp.cloudbuild.build"
-	createBuildOutputChannel = "default"
-	createBuildPollAction    = "poll"
-	createBuildPollInterval  = 30 * time.Second
-	createBuildExecutionKV   = "build_id"
+	createBuildPayloadType         = "gcp.cloudbuild.build"
+	createBuildPassedOutputChannel = "passed"
+	createBuildFailedOutputChannel = "failed"
+	createBuildPollAction          = "poll"
+	createBuildPollInterval        = 30 * time.Second
+	createBuildExecutionKV         = "build_id"
 
 	createBuildConnectedRevisionBranch = "branch"
 	createBuildConnectedRevisionTag    = "tag"
@@ -119,6 +120,11 @@ func (c *CreateBuild) Documentation() string {
 
 The terminal Build resource, including ` + "`id`" + `, ` + "`status`" + `, ` + "`logUrl`" + `, ` + "`createTime`" + `, ` + "`finishTime`" + `, and more.
 
+## Output Channels
+
+- **Passed**: Emitted when Cloud Build finishes with ` + "`SUCCESS`" + `.
+- **Failed**: Emitted when Cloud Build finishes with any other terminal status, including ` + "`FAILURE`" + `, ` + "`INTERNAL_ERROR`" + `, ` + "`TIMEOUT`" + `, ` + "`CANCELLED`" + `, or ` + "`EXPIRED`" + `.
+
 ## Notes
 
 - SuperPlane listens for Cloud Build notifications through the connected GCP integration and falls back to polling if an event does not arrive.
@@ -140,7 +146,16 @@ func (c *CreateBuild) ExampleOutput() map[string]any {
 }
 
 func (c *CreateBuild) OutputChannels(_ any) []core.OutputChannel {
-	return []core.OutputChannel{core.DefaultOutputChannel}
+	return []core.OutputChannel{
+		{
+			Name:  createBuildPassedOutputChannel,
+			Label: "Passed",
+		},
+		{
+			Name:  createBuildFailedOutputChannel,
+			Label: "Failed",
+		},
+	}
 }
 
 func (c *CreateBuild) Configuration() []configuration.Field {
@@ -889,29 +904,13 @@ func isTerminalBuildStatus(status string) bool {
 	}, strings.ToUpper(strings.TrimSpace(status)))
 }
 
-func buildFailureMessage(build map[string]any) string {
-	status := strings.ToUpper(readBuildString(build, "status"))
-	buildID := readBuildString(build, "id")
-	logURL := readBuildString(build, "logUrl")
-
-	message := fmt.Sprintf("Cloud Build finished with status %s", status)
-	if buildID != "" {
-		message = fmt.Sprintf("Cloud Build %s finished with status %s", buildID, status)
-	}
-	if logURL != "" {
-		message = fmt.Sprintf("%s (%s)", message, logURL)
-	}
-
-	return message
-}
-
 func completeCreateBuildExecution(executionState core.ExecutionStateContext, build map[string]any) error {
 	status := strings.ToUpper(readBuildString(build, "status"))
 	if status == "SUCCESS" {
-		return executionState.Emit(createBuildOutputChannel, createBuildPayloadType, []any{build})
+		return executionState.Emit(createBuildPassedOutputChannel, createBuildPayloadType, []any{build})
 	}
 
-	return executionState.Fail("error", buildFailureMessage(build))
+	return executionState.Emit(createBuildFailedOutputChannel, createBuildPayloadType, []any{build})
 }
 
 func (c *CreateBuild) poll(ctx core.ActionContext) error {

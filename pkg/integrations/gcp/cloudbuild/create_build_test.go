@@ -317,11 +317,55 @@ func TestCreateBuildPollSuccess(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, executionStateCtx.Passed)
-	assert.Equal(t, createBuildOutputChannel, executionStateCtx.Channel)
+	assert.Equal(t, createBuildPassedOutputChannel, executionStateCtx.Channel)
 	assert.Equal(t, createBuildPayloadType, executionStateCtx.Type)
 }
 
-func TestCreateBuildOnIntegrationMessageFailsBuild(t *testing.T) {
+func TestCreateBuildPollFailureEmitsFailedChannel(t *testing.T) {
+	component := &CreateBuild{}
+	client := &mockClient{
+		projectID: "demo-project",
+		getURL: func(_ context.Context, fullURL string) ([]byte, error) {
+			assert.Equal(t, "https://cloudbuild.googleapis.com/v1/projects/demo-project/builds/build-123", fullURL)
+			return []byte(`{
+				"id": "build-123",
+				"name": "projects/demo-project/locations/global/builds/build-123",
+				"projectId": "demo-project",
+				"status": "FAILURE",
+				"logUrl": "https://console.cloud.google.com/cloud-build/builds/build-123"
+			}`), nil
+		},
+	}
+
+	SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		return client, nil
+	})
+
+	metadataCtx := &testcontexts.MetadataContext{Metadata: CreateBuildExecutionMetadata{
+		Build: map[string]any{
+			"id":        "build-123",
+			"projectId": "demo-project",
+			"status":    "WORKING",
+		},
+	}}
+	executionStateCtx := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
+
+	err := component.HandleAction(core.ActionContext{
+		Name:           createBuildPollAction,
+		Configuration:  map[string]any{"steps": `[{"name":"golang:1.22"}]`},
+		Metadata:       metadataCtx,
+		ExecutionState: executionStateCtx,
+		Integration:    &testcontexts.IntegrationContext{},
+		Requests:       &testcontexts.RequestContext{},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, executionStateCtx.Passed)
+	assert.Equal(t, createBuildFailedOutputChannel, executionStateCtx.Channel)
+	assert.Equal(t, createBuildPayloadType, executionStateCtx.Type)
+}
+
+func TestCreateBuildOnIntegrationMessageEmitsFailedChannel(t *testing.T) {
 	component := &CreateBuild{}
 	executionMetadataCtx := &testcontexts.MetadataContext{}
 	executionStateCtx := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
@@ -344,8 +388,9 @@ func TestCreateBuildOnIntegrationMessageFailsBuild(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.False(t, executionStateCtx.Passed)
-	assert.Contains(t, executionStateCtx.FailureMessage, "FAILURE")
+	assert.True(t, executionStateCtx.Passed)
+	assert.Equal(t, createBuildFailedOutputChannel, executionStateCtx.Channel)
+	assert.Equal(t, createBuildPayloadType, executionStateCtx.Type)
 
 	metadata := CreateBuildExecutionMetadata{}
 	require.NoError(t, mapstructure.Decode(executionMetadataCtx.Get(), &metadata))

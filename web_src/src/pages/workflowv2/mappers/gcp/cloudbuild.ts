@@ -61,8 +61,10 @@ type CloudBuildOutputPayload = OutputPayload & {
 };
 
 export function getCloudBuildOutputPayload(execution: ExecutionInfo): CloudBuildOutputPayload | undefined {
-  const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
-  const payload = outputs?.default?.[0];
+  const outputs = execution.outputs as
+    | { passed?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] }
+    | undefined;
+  const payload = outputs?.passed?.[0] ?? outputs?.failed?.[0] ?? outputs?.default?.[0];
   if (!payload || typeof payload !== "object") {
     return undefined;
   }
