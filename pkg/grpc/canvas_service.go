@@ -47,21 +47,106 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 	return canvases.CreateCanvas(ctx, s.registry, organizationID, req.Canvas)
 }
 
-func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRequest) (*pb.UpdateCanvasResponse, error) {
+func (s *CanvasService) CreateCanvasVersion(ctx context.Context, req *pb.CreateCanvasVersionRequest) (*pb.CreateCanvasVersionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CreateCanvasVersion(ctx, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) ListCanvasVersions(ctx context.Context, req *pb.ListCanvasVersionsRequest) (*pb.ListCanvasVersionsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListCanvasVersions(ctx, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) DescribeCanvasVersion(ctx context.Context, req *pb.DescribeCanvasVersionRequest) (*pb.DescribeCanvasVersionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.DescribeCanvasVersion(ctx, organizationID, req.CanvasId, req.VersionId)
+}
+
+func (s *CanvasService) UpdateCanvasVersion(ctx context.Context, req *pb.UpdateCanvasVersionRequest) (*pb.UpdateCanvasVersionResponse, error) {
 	if req.Canvas == nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas is required")
 	}
+
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.UpdateCanvasWithAutoLayout(
+	return canvases.UpdateCanvasVersion(
+		ctx,
+		s.registry,
+		organizationID,
+		req.CanvasId,
+		req.VersionId,
+		req.Canvas,
+		req.AutoLayout,
+	)
+}
+
+func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.PublishCanvasVersionRequest) (*pb.PublishCanvasVersionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.PublishCanvasVersion(
 		ctx,
 		s.encryptor,
 		s.registry,
 		organizationID,
-		req.Id,
-		req.Canvas,
-		req.AutoLayout,
+		req.CanvasId,
+		req.VersionId,
+		req.ExpectedLiveVersionId,
 		s.webhookBaseURL,
 	)
+}
+
+func (s *CanvasService) CreateCanvasChangeRequest(ctx context.Context, req *pb.CreateCanvasChangeRequestRequest) (*pb.CreateCanvasChangeRequestResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CreateCanvasChangeRequest(ctx, organizationID, req.CanvasId, req.VersionId)
+}
+
+func (s *CanvasService) ListCanvasChangeRequests(ctx context.Context, req *pb.ListCanvasChangeRequestsRequest) (*pb.ListCanvasChangeRequestsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListCanvasChangeRequests(ctx, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) DescribeCanvasChangeRequest(ctx context.Context, req *pb.DescribeCanvasChangeRequestRequest) (*pb.DescribeCanvasChangeRequestResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.DescribeCanvasChangeRequest(ctx, organizationID, req.CanvasId, req.ChangeRequestId)
+}
+
+func (s *CanvasService) PublishCanvasChangeRequest(ctx context.Context, req *pb.PublishCanvasChangeRequestRequest) (*pb.PublishCanvasChangeRequestResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.PublishCanvasChangeRequest(
+		ctx,
+		s.encryptor,
+		s.registry,
+		organizationID,
+		req.CanvasId,
+		req.ChangeRequestId,
+		req.ExpectedLiveVersionId,
+		s.webhookBaseURL,
+	)
+}
+
+func (s *CanvasService) ResolveCanvasChangeRequest(ctx context.Context, req *pb.ResolveCanvasChangeRequestRequest) (*pb.ResolveCanvasChangeRequestResponse, error) {
+	if req.Canvas == nil {
+		return nil, status.Error(codes.InvalidArgument, "canvas is required")
+	}
+
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ResolveCanvasChangeRequest(
+		ctx,
+		s.registry,
+		organizationID,
+		req.CanvasId,
+		req.ChangeRequestId,
+		req.Canvas,
+		req.AutoLayout,
+	)
+}
+
+func (s *CanvasService) CloseCanvasChangeRequest(ctx context.Context, req *pb.CloseCanvasChangeRequestRequest) (*pb.CloseCanvasChangeRequestResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CloseCanvasChangeRequest(ctx, organizationID, req.CanvasId, req.ChangeRequestId)
+}
+
+func (s *CanvasService) DiscardCanvasVersion(ctx context.Context, req *pb.DiscardCanvasVersionRequest) (*pb.DiscardCanvasVersionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.DiscardCanvasVersion(ctx, organizationID, req.CanvasId, req.VersionId)
 }
 
 func (s *CanvasService) DeleteCanvas(ctx context.Context, req *pb.DeleteCanvasRequest) (*pb.DeleteCanvasResponse, error) {

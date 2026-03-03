@@ -200,7 +200,6 @@ const HomePage = () => {
                 filteredCanvases={filteredCanvases}
                 organizationId={organizationId}
                 searchQuery={searchQuery}
-                onEditCanvas={canvasModalState.onOpenEdit}
                 onNewClick={onNewClick}
                 canCreateCanvases={canCreateCanvases}
                 canUpdateCanvases={canUpdateCanvases}
@@ -355,7 +354,6 @@ function Content({
   filteredCanvases,
   organizationId,
   searchQuery,
-  onEditCanvas,
   onNewClick,
   canCreateCanvases,
   canUpdateCanvases,
@@ -369,7 +367,6 @@ function Content({
   filteredCanvases: CanvasCardData[];
   organizationId: string;
   searchQuery: string;
-  onEditCanvas: (canvas: CanvasCardData) => void;
   onNewClick: () => void;
   canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
@@ -394,7 +391,6 @@ function Content({
       <CanvasGridView
         filteredCanvases={filteredCanvases}
         organizationId={organizationId}
-        onEditCanvas={onEditCanvas}
         canUpdateCanvases={canUpdateCanvases}
         canDeleteCanvases={canDeleteCanvases}
         permissionsLoading={permissionsLoading}
@@ -478,7 +474,6 @@ function CanvasesEmptyState({
 interface CanvasGridViewProps {
   filteredCanvases: CanvasCardData[];
   organizationId: string;
-  onEditCanvas: (canvas: CanvasCardData) => void;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
@@ -487,7 +482,6 @@ interface CanvasGridViewProps {
 function CanvasGridView({
   filteredCanvases,
   organizationId,
-  onEditCanvas,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
@@ -502,7 +496,6 @@ function CanvasGridView({
           canvas={canvas}
           organizationId={organizationId}
           navigate={navigate}
-          onEdit={onEditCanvas}
           canUpdateCanvases={canUpdateCanvases}
           canDeleteCanvases={canDeleteCanvases}
           permissionsLoading={permissionsLoading}
@@ -516,7 +509,6 @@ interface CanvasCardProps {
   canvas: CanvasCardData;
   organizationId: string;
   navigate: any;
-  onEdit: (canvas: CanvasCardData) => void;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
@@ -526,7 +518,6 @@ function CanvasCard({
   canvas,
   organizationId,
   navigate,
-  onEdit,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
@@ -568,7 +559,6 @@ function CanvasCard({
             <CanvasActionsMenu
               canvas={canvas}
               organizationId={organizationId}
-              onEdit={onEdit}
               canUpdateCanvases={canUpdateCanvases}
               canDeleteCanvases={canDeleteCanvases}
               permissionsLoading={permissionsLoading}
@@ -695,7 +685,6 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
 interface CanvasActionsMenuProps {
   canvas: CanvasCardData;
   organizationId: string;
-  onEdit: (canvas: CanvasCardData) => void;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
@@ -704,7 +693,6 @@ interface CanvasActionsMenuProps {
 function CanvasActionsMenu({
   canvas,
   organizationId,
-  onEdit,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
@@ -795,7 +783,7 @@ function CanvasActionsMenu({
                   onClick={(event: MouseEvent<HTMLElement>) => {
                     event.stopPropagation();
                     if (!canUpdateCanvases) return;
-                    onEdit(canvas);
+                    navigate(`/${organizationId}/canvases/${canvas.id}`);
                   }}
                   disabled={!canUpdateCanvases}
                 >

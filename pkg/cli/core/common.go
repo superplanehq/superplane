@@ -63,6 +63,10 @@ func ResolveCanvasID(ctx CommandContext, canvasID string) (string, error) {
 		return canvasID, nil
 	}
 
+	if ctx.Config == nil {
+		return "", fmt.Errorf("canvas id is required; pass --canvas-id or set one with \"superplane canvases active\"")
+	}
+
 	activeCanvas := strings.TrimSpace(ctx.Config.GetActiveCanvas())
 	if activeCanvas == "" {
 		return "", fmt.Errorf("canvas id is required; pass --canvas-id or set one with \"superplane canvases active\"")

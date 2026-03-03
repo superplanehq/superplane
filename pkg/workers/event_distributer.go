@@ -58,6 +58,7 @@ func (e *EventDistributer) Start() error {
 		{messages.WorkflowExchange, messages.WorkflowQueueItemCreatedRoutingKey, e.createHandler(eventdistributer.HandleQueueItemCreated)},
 		{messages.WorkflowExchange, messages.WorkflowQueueItemConsumedRoutingKey, e.createHandler(eventdistributer.HandleQueueItemConsumed)},
 		{messages.WorkflowExchange, messages.WorkflowCanvasUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasUpdated)},
+		{messages.WorkflowExchange, messages.WorkflowCanvasVersionUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasVersionUpdated)},
 		{messages.WorkflowExchange, messages.WorkflowCanvasDeletedRoutingKey, e.createHandler(eventdistributer.HandleCanvasDeleted)},
 	}
 

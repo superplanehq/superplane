@@ -9,10 +9,11 @@ import (
 )
 
 type ConfigContext struct {
-	URL          string  `json:"url" yaml:"url"`
-	Organization string  `json:"organization" yaml:"organization"`
-	APIToken     string  `json:"apiToken" yaml:"apiToken"`
-	Canvas       *string `json:"canvas,omitempty" yaml:"canvas,omitempty"`
+	URL           string  `json:"url" yaml:"url"`
+	Organization  string  `json:"organization" yaml:"organization"`
+	APIToken      string  `json:"apiToken" yaml:"apiToken"`
+	Canvas        *string `json:"canvas,omitempty" yaml:"canvas,omitempty"`
+	CanvasVersion *string `json:"canvasVersion,omitempty" yaml:"canvasVersion,omitempty"`
 }
 
 func normalizeBaseURL(raw string) string {
@@ -189,6 +190,27 @@ func (c *CurrentContext) GetActiveCanvas() string {
 
 func (c *CurrentContext) SetActiveCanvas(canvasID string) error {
 	c.context.Canvas = &canvasID
+	c.context.CanvasVersion = nil
+	_, err := UpsertContext(c.context)
+	return err
+}
+
+func (c *CurrentContext) GetActiveCanvasVersion() string {
+	if c.context.CanvasVersion == nil {
+		return ""
+	}
+
+	return *c.context.CanvasVersion
+}
+
+func (c *CurrentContext) SetActiveCanvasVersion(versionID string) error {
+	trimmed := strings.TrimSpace(versionID)
+	if trimmed == "" {
+		c.context.CanvasVersion = nil
+	} else {
+		c.context.CanvasVersion = &trimmed
+	}
+
 	_, err := UpsertContext(c.context)
 	return err
 }

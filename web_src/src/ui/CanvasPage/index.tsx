@@ -13,6 +13,7 @@ import {
 
 import {
   CircleX,
+  GitBranch,
   Loader2,
   Map as MapIcon,
   ScanLine,
@@ -146,6 +147,16 @@ export interface CanvasPageProps {
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
   saveDisabledTooltip?: string;
+  versionLabel?: string;
+  onCreateVersion?: () => void;
+  onPublishVersion?: () => void;
+  onDiscardVersion?: () => void;
+  createVersionDisabled?: boolean;
+  createVersionDisabledTooltip?: string;
+  publishVersionDisabled?: boolean;
+  publishVersionDisabledTooltip?: string;
+  discardVersionDisabled?: boolean;
+  discardVersionDisabledTooltip?: string;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
@@ -154,10 +165,16 @@ export interface CanvasPageProps {
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
-  topViewMode?: "canvas" | "memory";
-  onTopViewModeChange?: (mode: "canvas" | "memory") => void;
+  topViewMode?: "canvas" | "memory" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "memory" | "versioning") => void;
   memoryItemCount?: number;
+  versioningItemCount?: number;
   dataViewContent?: React.ReactNode;
+  versionControlSidebar?: React.ReactNode;
+  isVersionControlOpen?: boolean;
+  onOpenVersionControl?: () => void;
+  versionControlButtonLabel?: string;
+  versionControlButtonTooltip?: string;
   readOnly?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
@@ -394,6 +411,16 @@ function CanvasPage(props: CanvasPageProps) {
     channels: string[];
     initialData?: string;
   } | null>(null);
+  const canvasNodesForAiContext = useMemo(
+    () =>
+      (props.workflowNodes || []).map((node) => ({
+        id: node.id || "",
+        name: node.name || "",
+        label: node.name || "",
+        type: node.type || "",
+      })),
+    [props.workflowNodes],
+  );
 
   useEffect(() => {
     if (!props.focusRequest?.tab || props.focusRequest.tab === "execution-chain") {
@@ -830,6 +857,16 @@ function CanvasPage(props: CanvasPageProps) {
           saveButtonHidden={props.saveButtonHidden}
           saveDisabled={props.saveDisabled}
           saveDisabledTooltip={props.saveDisabledTooltip}
+          versionLabel={props.versionLabel}
+          onCreateVersion={props.onCreateVersion}
+          onPublishVersion={props.onPublishVersion}
+          onDiscardVersion={props.onDiscardVersion}
+          createVersionDisabled={props.createVersionDisabled}
+          createVersionDisabledTooltip={props.createVersionDisabledTooltip}
+          publishVersionDisabled={props.publishVersionDisabled}
+          publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
+          discardVersionDisabled={props.discardVersionDisabled}
+          discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
           isAutoSaveEnabled={props.isAutoSaveEnabled}
           onToggleAutoSave={props.onToggleAutoSave}
           autoSaveDisabled={props.autoSaveDisabled}
@@ -837,29 +874,29 @@ function CanvasPage(props: CanvasPageProps) {
           topViewMode={props.topViewMode}
           onTopViewModeChange={props.onTopViewModeChange}
           memoryItemCount={props.memoryItemCount}
+          versioningItemCount={props.versioningItemCount}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
 
-      {/* Main content area with sidebar and canvas/memory */}
-      {props.topViewMode === "memory" ? (
-        <div className="flex-1 overflow-auto bg-slate-50">{props.dataViewContent}</div>
+      {/* Main content area with sidebar and canvas/memory/versioning */}
+      {props.topViewMode && props.topViewMode !== "canvas" ? (
+        <div className="flex-1 flex relative overflow-hidden">
+          {props.versionControlSidebar}
+          <div className="flex-1 overflow-auto bg-slate-50">{props.dataViewContent}</div>
+        </div>
       ) : (
         <div className="flex-1 flex relative overflow-hidden">
+          {props.versionControlSidebar}
           <BuildingBlocksSidebar
             isOpen={isBuildingBlocksSidebarOpen}
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
             showAiBuilderTab={props.showAiBuilderTab}
             canvasId={props.canvasId}
-            canvasNodes={state.nodes.map((node) => ({
-              id: node.id,
-              name: String((node.data as { nodeName?: string })?.nodeName || ""),
-              label: String((node.data as { label?: string })?.label || ""),
-              type: String((node.data as { type?: string })?.type || ""),
-            }))}
+            canvasNodes={canvasNodesForAiContext}
             onApplyAiOperations={props.onApplyAiOperations}
             integrations={props.integrations}
             canvasZoom={canvasZoom}
@@ -907,10 +944,24 @@ function CanvasPage(props: CanvasPageProps) {
                 saveButtonHidden={props.saveButtonHidden}
                 saveDisabled={props.saveDisabled}
                 saveDisabledTooltip={props.saveDisabledTooltip}
+                versionLabel={props.versionLabel}
+                onCreateVersion={props.onCreateVersion}
+                onPublishVersion={props.onPublishVersion}
+                onDiscardVersion={props.onDiscardVersion}
+                createVersionDisabled={props.createVersionDisabled}
+                createVersionDisabledTooltip={props.createVersionDisabledTooltip}
+                publishVersionDisabled={props.publishVersionDisabled}
+                publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
+                discardVersionDisabled={props.discardVersionDisabled}
+                discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
                 isAutoSaveEnabled={props.isAutoSaveEnabled}
                 onToggleAutoSave={props.onToggleAutoSave}
                 autoSaveDisabled={props.autoSaveDisabled}
                 autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
+                isVersionControlOpen={props.isVersionControlOpen}
+                onOpenVersionControl={props.onOpenVersionControl}
+                versionControlButtonLabel={props.versionControlButtonLabel}
+                versionControlButtonTooltip={props.versionControlButtonTooltip}
                 isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
                 onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
                 autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
@@ -1284,6 +1335,16 @@ function CanvasContentHeader({
   saveButtonHidden,
   saveDisabled,
   saveDisabledTooltip,
+  versionLabel,
+  onCreateVersion,
+  onPublishVersion,
+  onDiscardVersion,
+  createVersionDisabled,
+  createVersionDisabledTooltip,
+  publishVersionDisabled,
+  publishVersionDisabledTooltip,
+  discardVersionDisabled,
+  discardVersionDisabledTooltip,
   isAutoSaveEnabled,
   onToggleAutoSave,
   autoSaveDisabled,
@@ -1291,6 +1352,7 @@ function CanvasContentHeader({
   topViewMode,
   onTopViewModeChange,
   memoryItemCount,
+  versioningItemCount,
   onExportYamlCopy,
   onExportYamlDownload,
 }: {
@@ -1304,13 +1366,24 @@ function CanvasContentHeader({
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
   saveDisabledTooltip?: string;
+  versionLabel?: string;
+  onCreateVersion?: () => void;
+  onPublishVersion?: () => void;
+  onDiscardVersion?: () => void;
+  createVersionDisabled?: boolean;
+  createVersionDisabledTooltip?: string;
+  publishVersionDisabled?: boolean;
+  publishVersionDisabledTooltip?: string;
+  discardVersionDisabled?: boolean;
+  discardVersionDisabledTooltip?: string;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
-  topViewMode?: "canvas" | "memory";
-  onTopViewModeChange?: (mode: "canvas" | "memory") => void;
+  topViewMode?: "canvas" | "memory" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "memory" | "versioning") => void;
   memoryItemCount?: number;
+  versioningItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
 }) {
@@ -1354,6 +1427,16 @@ function CanvasContentHeader({
       saveButtonHidden={saveButtonHidden}
       saveDisabled={saveDisabled}
       saveDisabledTooltip={saveDisabledTooltip}
+      versionLabel={versionLabel}
+      onCreateVersion={onCreateVersion}
+      onPublishVersion={onPublishVersion}
+      onDiscardVersion={onDiscardVersion}
+      createVersionDisabled={createVersionDisabled}
+      createVersionDisabledTooltip={createVersionDisabledTooltip}
+      publishVersionDisabled={publishVersionDisabled}
+      publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+      discardVersionDisabled={discardVersionDisabled}
+      discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       isAutoSaveEnabled={isAutoSaveEnabled}
       onToggleAutoSave={onToggleAutoSave}
       autoSaveDisabled={autoSaveDisabled}
@@ -1361,6 +1444,7 @@ function CanvasContentHeader({
       topViewMode={topViewMode}
       onTopViewModeChange={onTopViewModeChange}
       memoryItemCount={memoryItemCount}
+      versioningItemCount={versioningItemCount}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
     />
@@ -1405,10 +1489,23 @@ function CanvasContent({
   saveButtonHidden,
   saveDisabled,
   saveDisabledTooltip,
+  versionLabel,
+  onCreateVersion,
+  onPublishVersion,
+  onDiscardVersion,
+  createVersionDisabled,
+  createVersionDisabledTooltip,
+  publishVersionDisabled,
+  publishVersionDisabledTooltip,
+  discardVersionDisabled,
+  discardVersionDisabledTooltip,
   isAutoSaveEnabled,
   onToggleAutoSave,
   autoSaveDisabled,
   autoSaveDisabledTooltip,
+  isVersionControlOpen,
+  onOpenVersionControl,
+  versionControlButtonTooltip,
   isAutoLayoutOnUpdateEnabled,
   onToggleAutoLayoutOnUpdate,
   autoLayoutOnUpdateDisabled,
@@ -1464,10 +1561,24 @@ function CanvasContent({
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
   saveDisabledTooltip?: string;
+  versionLabel?: string;
+  onCreateVersion?: () => void;
+  onPublishVersion?: () => void;
+  onDiscardVersion?: () => void;
+  createVersionDisabled?: boolean;
+  createVersionDisabledTooltip?: string;
+  publishVersionDisabled?: boolean;
+  publishVersionDisabledTooltip?: string;
+  discardVersionDisabled?: boolean;
+  discardVersionDisabledTooltip?: string;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
+  isVersionControlOpen?: boolean;
+  onOpenVersionControl?: () => void;
+  versionControlButtonLabel?: string;
+  versionControlButtonTooltip?: string;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -1504,6 +1615,22 @@ function CanvasContent({
 
   // Use viewport from ref as the state value
   const viewport = viewportRef.current;
+  const lastReportedZoomRef = useRef<number | null>(null);
+  const reportZoom = useCallback(
+    (zoom: number) => {
+      if (!onZoomChange) {
+        return;
+      }
+
+      if (lastReportedZoomRef.current === zoom) {
+        return;
+      }
+
+      lastReportedZoomRef.current = zoom;
+      onZoomChange(zoom);
+    },
+    [onZoomChange],
+  );
 
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
@@ -1713,12 +1840,9 @@ function CanvasContent({
     (_event: any, newViewport: { x: number; y: number; zoom: number }) => {
       // Store the viewport in the ref (which persists across re-renders)
       viewportRef.current = newViewport;
-
-      if (onZoomChange) {
-        onZoomChange(newViewport.zoom);
-      }
+      reportZoom(newViewport.zoom);
     },
-    [onZoomChange, viewportRef],
+    [reportZoom, viewportRef],
   );
 
   const handleToggleCollapse = useCallback(() => {
@@ -1814,18 +1938,12 @@ function CanvasContent({
           // Store the initial viewport after fit
           const initialViewport = getViewport();
           viewportRef.current = initialViewport;
-
-          if (onZoomChange) {
-            onZoomChange(initialViewport.zoom);
-          }
+          reportZoom(initialViewport.zoom);
         } else {
           const defaultViewport = viewportRef.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
           viewportRef.current = defaultViewport;
           reactFlowInstance.setViewport(defaultViewport);
-
-          if (onZoomChange) {
-            onZoomChange(defaultViewport.zoom);
-          }
+          reportZoom(defaultViewport.zoom);
         }
 
         hasFitToViewRef.current = true;
@@ -1838,7 +1956,7 @@ function CanvasContent({
         setIsInitialized(true);
       }
     },
-    [fitView, getViewport, onZoomChange, hasFitToViewRef, viewportRef, initialFocusNodeId],
+    [fitView, getViewport, reportZoom, hasFitToViewRef, viewportRef, initialFocusNodeId],
   );
 
   const showHeader = !isReadOnly;
@@ -2109,6 +2227,8 @@ function CanvasContent({
     });
   }, []);
 
+  const showVersionControlTrigger = !!onOpenVersionControl && !isVersionControlOpen;
+
   return (
     <div className="h-full w-full relative">
       {/* Header */}
@@ -2124,6 +2244,16 @@ function CanvasContent({
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}
           saveDisabledTooltip={saveDisabledTooltip}
+          versionLabel={versionLabel}
+          onCreateVersion={onCreateVersion}
+          onPublishVersion={onPublishVersion}
+          onDiscardVersion={onDiscardVersion}
+          createVersionDisabled={createVersionDisabled}
+          createVersionDisabledTooltip={createVersionDisabledTooltip}
+          publishVersionDisabled={publishVersionDisabled}
+          publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+          discardVersionDisabled={discardVersionDisabled}
+          discardVersionDisabledTooltip={discardVersionDisabledTooltip}
           isAutoSaveEnabled={isAutoSaveEnabled}
           onToggleAutoSave={onToggleAutoSave}
           autoSaveDisabled={autoSaveDisabled}
@@ -2257,6 +2387,23 @@ function CanvasContent({
                   }}
                 />
               </ZoomSlider>
+              {showVersionControlTrigger ? (
+                <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center rounded-md p-0.5 h-8">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 items-center text-xs font-medium gap-1.5"
+                        onClick={onOpenVersionControl}
+                      >
+                        <GitBranch className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{versionControlButtonTooltip || "Open version control"}</TooltipContent>
+                  </Tooltip>
+                </div>
+              ) : null}
               <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
                 <Tooltip>
                   <TooltipTrigger asChild>

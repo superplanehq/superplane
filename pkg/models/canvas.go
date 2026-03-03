@@ -14,6 +14,7 @@ import (
 type Canvas struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
+	LiveVersionID  *uuid.UUID
 	IsTemplate     bool
 	Name           string
 	Description    string

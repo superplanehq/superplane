@@ -15,34 +15,34 @@ import (
 	"encoding/json"
 )
 
-// checks if the CanvasesUpdateCanvasBody type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &CanvasesUpdateCanvasBody{}
+// checks if the CanvasesResolveCanvasChangeRequestBody type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &CanvasesResolveCanvasChangeRequestBody{}
 
-// CanvasesUpdateCanvasBody struct for CanvasesUpdateCanvasBody
-type CanvasesUpdateCanvasBody struct {
+// CanvasesResolveCanvasChangeRequestBody struct for CanvasesResolveCanvasChangeRequestBody
+type CanvasesResolveCanvasChangeRequestBody struct {
 	Canvas     *CanvasesCanvas           `json:"canvas,omitempty"`
 	AutoLayout *CanvasesCanvasAutoLayout `json:"autoLayout,omitempty"`
 }
 
-// NewCanvasesUpdateCanvasBody instantiates a new CanvasesUpdateCanvasBody object
+// NewCanvasesResolveCanvasChangeRequestBody instantiates a new CanvasesResolveCanvasChangeRequestBody object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewCanvasesUpdateCanvasBody() *CanvasesUpdateCanvasBody {
-	this := CanvasesUpdateCanvasBody{}
+func NewCanvasesResolveCanvasChangeRequestBody() *CanvasesResolveCanvasChangeRequestBody {
+	this := CanvasesResolveCanvasChangeRequestBody{}
 	return &this
 }
 
-// NewCanvasesUpdateCanvasBodyWithDefaults instantiates a new CanvasesUpdateCanvasBody object
+// NewCanvasesResolveCanvasChangeRequestBodyWithDefaults instantiates a new CanvasesResolveCanvasChangeRequestBody object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewCanvasesUpdateCanvasBodyWithDefaults() *CanvasesUpdateCanvasBody {
-	this := CanvasesUpdateCanvasBody{}
+func NewCanvasesResolveCanvasChangeRequestBodyWithDefaults() *CanvasesResolveCanvasChangeRequestBody {
+	this := CanvasesResolveCanvasChangeRequestBody{}
 	return &this
 }
 
 // GetCanvas returns the Canvas field value if set, zero value otherwise.
-func (o *CanvasesUpdateCanvasBody) GetCanvas() CanvasesCanvas {
+func (o *CanvasesResolveCanvasChangeRequestBody) GetCanvas() CanvasesCanvas {
 	if o == nil || IsNil(o.Canvas) {
 		var ret CanvasesCanvas
 		return ret
@@ -52,7 +52,7 @@ func (o *CanvasesUpdateCanvasBody) GetCanvas() CanvasesCanvas {
 
 // GetCanvasOk returns a tuple with the Canvas field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesUpdateCanvasBody) GetCanvasOk() (*CanvasesCanvas, bool) {
+func (o *CanvasesResolveCanvasChangeRequestBody) GetCanvasOk() (*CanvasesCanvas, bool) {
 	if o == nil || IsNil(o.Canvas) {
 		return nil, false
 	}
@@ -60,7 +60,7 @@ func (o *CanvasesUpdateCanvasBody) GetCanvasOk() (*CanvasesCanvas, bool) {
 }
 
 // HasCanvas returns a boolean if a field has been set.
-func (o *CanvasesUpdateCanvasBody) HasCanvas() bool {
+func (o *CanvasesResolveCanvasChangeRequestBody) HasCanvas() bool {
 	if o != nil && !IsNil(o.Canvas) {
 		return true
 	}
@@ -69,12 +69,12 @@ func (o *CanvasesUpdateCanvasBody) HasCanvas() bool {
 }
 
 // SetCanvas gets a reference to the given CanvasesCanvas and assigns it to the Canvas field.
-func (o *CanvasesUpdateCanvasBody) SetCanvas(v CanvasesCanvas) {
+func (o *CanvasesResolveCanvasChangeRequestBody) SetCanvas(v CanvasesCanvas) {
 	o.Canvas = &v
 }
 
 // GetAutoLayout returns the AutoLayout field value if set, zero value otherwise.
-func (o *CanvasesUpdateCanvasBody) GetAutoLayout() CanvasesCanvasAutoLayout {
+func (o *CanvasesResolveCanvasChangeRequestBody) GetAutoLayout() CanvasesCanvasAutoLayout {
 	if o == nil || IsNil(o.AutoLayout) {
 		var ret CanvasesCanvasAutoLayout
 		return ret
@@ -84,7 +84,7 @@ func (o *CanvasesUpdateCanvasBody) GetAutoLayout() CanvasesCanvasAutoLayout {
 
 // GetAutoLayoutOk returns a tuple with the AutoLayout field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesUpdateCanvasBody) GetAutoLayoutOk() (*CanvasesCanvasAutoLayout, bool) {
+func (o *CanvasesResolveCanvasChangeRequestBody) GetAutoLayoutOk() (*CanvasesCanvasAutoLayout, bool) {
 	if o == nil || IsNil(o.AutoLayout) {
 		return nil, false
 	}
@@ -92,7 +92,7 @@ func (o *CanvasesUpdateCanvasBody) GetAutoLayoutOk() (*CanvasesCanvasAutoLayout,
 }
 
 // HasAutoLayout returns a boolean if a field has been set.
-func (o *CanvasesUpdateCanvasBody) HasAutoLayout() bool {
+func (o *CanvasesResolveCanvasChangeRequestBody) HasAutoLayout() bool {
 	if o != nil && !IsNil(o.AutoLayout) {
 		return true
 	}
@@ -101,11 +101,11 @@ func (o *CanvasesUpdateCanvasBody) HasAutoLayout() bool {
 }
 
 // SetAutoLayout gets a reference to the given CanvasesCanvasAutoLayout and assigns it to the AutoLayout field.
-func (o *CanvasesUpdateCanvasBody) SetAutoLayout(v CanvasesCanvasAutoLayout) {
+func (o *CanvasesResolveCanvasChangeRequestBody) SetAutoLayout(v CanvasesCanvasAutoLayout) {
 	o.AutoLayout = &v
 }
 
-func (o CanvasesUpdateCanvasBody) MarshalJSON() ([]byte, error) {
+func (o CanvasesResolveCanvasChangeRequestBody) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -113,7 +113,7 @@ func (o CanvasesUpdateCanvasBody) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o CanvasesUpdateCanvasBody) ToMap() (map[string]interface{}, error) {
+func (o CanvasesResolveCanvasChangeRequestBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Canvas) {
 		toSerialize["canvas"] = o.Canvas
@@ -124,38 +124,38 @@ func (o CanvasesUpdateCanvasBody) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableCanvasesUpdateCanvasBody struct {
-	value *CanvasesUpdateCanvasBody
+type NullableCanvasesResolveCanvasChangeRequestBody struct {
+	value *CanvasesResolveCanvasChangeRequestBody
 	isSet bool
 }
 
-func (v NullableCanvasesUpdateCanvasBody) Get() *CanvasesUpdateCanvasBody {
+func (v NullableCanvasesResolveCanvasChangeRequestBody) Get() *CanvasesResolveCanvasChangeRequestBody {
 	return v.value
 }
 
-func (v *NullableCanvasesUpdateCanvasBody) Set(val *CanvasesUpdateCanvasBody) {
+func (v *NullableCanvasesResolveCanvasChangeRequestBody) Set(val *CanvasesResolveCanvasChangeRequestBody) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableCanvasesUpdateCanvasBody) IsSet() bool {
+func (v NullableCanvasesResolveCanvasChangeRequestBody) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableCanvasesUpdateCanvasBody) Unset() {
+func (v *NullableCanvasesResolveCanvasChangeRequestBody) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableCanvasesUpdateCanvasBody(val *CanvasesUpdateCanvasBody) *NullableCanvasesUpdateCanvasBody {
-	return &NullableCanvasesUpdateCanvasBody{value: val, isSet: true}
+func NewNullableCanvasesResolveCanvasChangeRequestBody(val *CanvasesResolveCanvasChangeRequestBody) *NullableCanvasesResolveCanvasChangeRequestBody {
+	return &NullableCanvasesResolveCanvasChangeRequestBody{value: val, isSet: true}
 }
 
-func (v NullableCanvasesUpdateCanvasBody) MarshalJSON() ([]byte, error) {
+func (v NullableCanvasesResolveCanvasChangeRequestBody) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableCanvasesUpdateCanvasBody) UnmarshalJSON(src []byte) error {
+func (v *NullableCanvasesResolveCanvasChangeRequestBody) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

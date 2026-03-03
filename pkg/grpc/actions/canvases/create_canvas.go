@@ -101,6 +101,17 @@ func CreateCanvas(ctx context.Context, registry *registry.Registry, organization
 			}
 		}
 
+		if _, err := models.CreatePublishedCanvasVersionInTransaction(
+			tx,
+			canvas.ID,
+			&createdBy,
+			nil,
+			expandedNodes,
+			edges,
+		); err != nil {
+			return err
+		}
+
 		return nil
 	})
 

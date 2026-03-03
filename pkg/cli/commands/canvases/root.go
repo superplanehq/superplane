@@ -68,6 +68,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	root.AddCommand(activeCmd)
 	root.AddCommand(createCmd)
 	root.AddCommand(updateCmd)
+	root.AddCommand(buildVersionsCommandGroup(options))
 
 	return root
 }

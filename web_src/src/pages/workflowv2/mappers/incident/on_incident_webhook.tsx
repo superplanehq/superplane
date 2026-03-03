@@ -1,8 +1,14 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { canvasesDescribeCanvas, canvasesInvokeNodeTriggerAction, canvasesUpdateCanvas } from "@/api-client";
-import type { CanvasesCanvas } from "@/api-client";
+import {
+  canvasesDescribeCanvas,
+  canvasesDescribeCanvasVersion,
+  canvasesInvokeNodeTriggerAction,
+  canvasesUpdateCanvasVersion,
+  type CanvasesCanvas,
+  type CanvasesCanvasVersion,
+} from "@/api-client";
 import { CustomFieldRenderer, NodeInfo } from "../types";
 import { Icon } from "@/components/Icon";
 import { Input } from "@/components/ui/input";
@@ -49,10 +55,10 @@ const CopyWebhookUrlButton: React.FC<{ webhookUrl: string }> = ({ webhookUrl }) 
 
 /** Applies signingSecretConfigured to the given node on a canvas copy. Does not mutate. */
 function applySigningSecretConfigured(
-  canvas: CanvasesCanvas,
+  canvas: CanvasesCanvasVersion,
   nodeId: string,
   configured: boolean,
-): CanvasesCanvas | null {
+): CanvasesCanvasVersion | null {
   if (!canvas?.spec?.nodes) return null;
   const updatedNodes = canvas.spec.nodes.map((n) =>
     n.id === nodeId ? { ...n, configuration: { ...n.configuration, signingSecretConfigured: configured } } : n,
@@ -66,9 +72,15 @@ const SetSigningSecretSection: React.FC<{ nodeId: string }> = ({ nodeId }) => {
   const [success, setSuccess] = useState(false);
   const queryClient = useQueryClient();
   const { organizationId, canvasId } = useParams<{ organizationId: string; canvasId: string }>();
+  const [searchParams] = useSearchParams();
+  const versionId = searchParams.get("version");
 
   const handleSetSecretAndSave = async () => {
     if (!canvasId || !organizationId) return;
+    if (!versionId) {
+      showErrorToast("Create or select a version before saving signing secret.");
+      return;
+    }
     setIsSubmitting(true);
     setSuccess(false);
     try {
@@ -80,45 +92,59 @@ const SetSigningSecretSection: React.FC<{ nodeId: string }> = ({ nodeId }) => {
       );
       const configured = (invokeResponse.data?.result?.signingSecretConfigured as boolean) ?? false;
 
-      // Refetch the canvas from the server so we save from the latest state instead of
-      // the query cache, avoiding overwriting concurrent edits from other tabs or users.
-      const freshCanvas = await queryClient.fetchQuery({
-        queryKey: canvasKeys.detail(organizationId, canvasId),
+      // Refetch the version from the server so we save from the latest draft state.
+      const freshVersion = await queryClient.fetchQuery({
+        queryKey: canvasKeys.versionDetail(canvasId, versionId),
         queryFn: async () => {
-          const response = await canvasesDescribeCanvas(withOrganizationHeader({ path: { id: canvasId } }));
-          return response.data?.canvas;
+          const response = await canvasesDescribeCanvasVersion(
+            withOrganizationHeader({ path: { canvasId, versionId } }),
+          );
+          return response.data?.version;
         },
       });
 
-      if (!freshCanvas) {
-        showErrorToast("Could not load canvas to save");
+      if (!freshVersion) {
+        showErrorToast("Could not load version to save");
         return;
       }
 
-      const updatedCanvas = applySigningSecretConfigured(freshCanvas, nodeId, configured);
-      if (updatedCanvas) {
-        await canvasesUpdateCanvas(
+      const updatedVersion = applySigningSecretConfigured(freshVersion, nodeId, configured);
+      if (updatedVersion) {
+        let liveCanvas = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
+        if (!liveCanvas) {
+          const canvasResponse = await canvasesDescribeCanvas(withOrganizationHeader({ path: { id: canvasId } }));
+          liveCanvas = canvasResponse.data?.canvas;
+        }
+        if (!liveCanvas?.metadata?.name) {
+          showErrorToast("Could not load canvas metadata for version update.");
+          return;
+        }
+
+        await canvasesUpdateCanvasVersion(
           withOrganizationHeader({
-            path: { id: canvasId },
+            path: { canvasId, versionId },
             body: {
               canvas: {
-                metadata: updatedCanvas.metadata,
-                spec: { nodes: updatedCanvas.spec?.nodes, edges: updatedCanvas.spec?.edges },
+                metadata: {
+                  name: liveCanvas.metadata.name,
+                  description: liveCanvas.metadata.description,
+                },
+                spec: { nodes: updatedVersion.spec?.nodes, edges: updatedVersion.spec?.edges },
               },
             },
           }),
         );
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedCanvas);
+        queryClient.setQueryData(canvasKeys.versionDetail(canvasId, versionId), updatedVersion);
         setSuccess(true);
         setSecret("");
         showSuccessToast(
-          configured ? "Signing secret set and canvas saved" : "Signing secret cleared and canvas saved",
+          configured ? "Signing secret set and version saved" : "Signing secret cleared and version saved",
         );
       } else {
-        showErrorToast("Could not update canvas (invalid canvas structure). Try saving the canvas and try again.");
+        showErrorToast("Could not update version (invalid canvas structure).");
       }
     } catch (_err) {
-      showErrorToast("Failed to set signing secret or save canvas");
+      showErrorToast("Failed to set signing secret or save version");
     } finally {
       setIsSubmitting(false);
     }
