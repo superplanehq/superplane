@@ -320,15 +320,13 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const EventBadgeColor = eventStateStyle.badgeColor;
 
   // Determine if actions menu should be shown (same logic as in SidebarEventActionsMenu)
-  const isProcessed = event.state === "triggered";
-  const isDiscarded = event.state === "discarded";
   const isWaiting = event.state === "waiting";
   const isQueued = event.state === "queued";
   const isRunning = event.state === "running";
 
   const showPushThrough = supportsPushThrough && !!event.executionId && (isRunning || isWaiting);
   const showCancel = (event.kind === "queue" && isQueued) || (event.kind === "execution" && (isRunning || isWaiting));
-  const showReEmit = (isProcessed || isDiscarded) && event.kind === "trigger";
+  const showReEmit = event.kind === "trigger";
   const showActionsMenu = showPushThrough || showCancel || showReEmit;
 
   return (
