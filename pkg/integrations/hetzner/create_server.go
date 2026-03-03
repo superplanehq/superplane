@@ -49,7 +49,7 @@ func (c *CreateServer) Documentation() string {
 
 ## How It Works
 
-1. Creates a server with the given name, server type, image, and optional location/SSH keys/user data
+1. Creates a server with the given name, server type, image (system image or snapshot), and optional location/SSH keys/user data
 2. Polls the Hetzner API until the create action finishes
 3. Emits the server details on the default output when ready. If creation fails, the execution errors.
 
@@ -57,7 +57,7 @@ func (c *CreateServer) Documentation() string {
 
 - **Name**: Server name (supports expressions)
 - **Server type**: e.g. cx11, cpx11, cax11
-- **Image**: Image name or ID, e.g. ubuntu-24.04
+- **Image**: System image or snapshot image ID
 - **Location** (optional): e.g. fsn1, nbg1, hel1
 - **SSH keys** (optional): List of SSH key names or IDs
 - **User data** (optional): Cloud-init user data
@@ -118,7 +118,7 @@ func (c *CreateServer) Configuration() []configuration.Field {
 					Type: "image",
 				},
 			},
-			Description: "Image",
+			Description: "System image or snapshot image ID",
 		},
 		{
 			Name:     "location",
@@ -292,6 +292,16 @@ func serverToPayload(s *ServerResponse) map[string]any {
 		"name":    s.Name,
 		"status":  s.Status,
 		"created": s.Created,
+	}
+	if s.Image.ID > 0 {
+		out["imageId"] = s.Image.ID
+	}
+	imageName := strings.TrimSpace(s.Image.Description)
+	if imageName == "" {
+		imageName = strings.TrimSpace(s.Image.Name)
+	}
+	if imageName != "" {
+		out["imageName"] = imageName
 	}
 	if s.PublicNet.IPv4.IP != "" {
 		out["publicIp"] = s.PublicNet.IPv4.IP

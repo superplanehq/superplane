@@ -2,7 +2,7 @@
 title: "Hetzner Cloud"
 ---
 
-Create and delete Hetzner Cloud servers and load balancers
+Create and delete Hetzner Cloud servers/load balancers and create/delete server snapshots
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -11,8 +11,10 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a Hetzner Cloud Load Balancer." />
   <LinkCard title="Create Server" href="#create-server" description="Create a Hetzner Cloud server and wait for the action to complete" />
+  <LinkCard title="Create Snapshot" href="#create-snapshot" description="Create a server snapshot in Hetzner Cloud and wait for completion" />
   <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a Hetzner Cloud Load Balancer" />
   <LinkCard title="Delete Server" href="#delete-server" description="Delete a Hetzner Cloud server and wait for the action to complete" />
+  <LinkCard title="Delete Snapshot" href="#delete-snapshot" description="Delete a Hetzner Cloud snapshot image" />
 </CardGrid>
 
 ## Instructions
@@ -55,7 +57,7 @@ The Create Server component creates a new server in Hetzner Cloud and waits for 
 
 ### How It Works
 
-1. Creates a server with the given name, server type, image, and optional location/SSH keys/user data
+1. Creates a server with the given name, server type, image (system image or snapshot), and optional location/SSH keys/user data
 2. Polls the Hetzner API until the create action finishes
 3. Emits the server details on the default output when ready. If creation fails, the execution errors.
 
@@ -63,7 +65,7 @@ The Create Server component creates a new server in Hetzner Cloud and waits for 
 
 - **Name**: Server name (supports expressions)
 - **Server type**: e.g. cx11, cpx11, cax11
-- **Image**: Image name or ID, e.g. ubuntu-24.04
+- **Image**: System image or snapshot image ID
 - **Location** (optional): e.g. fsn1, nbg1, hel1
 - **SSH keys** (optional): List of SSH key names or IDs
 - **User data** (optional): Cloud-init user data
@@ -77,6 +79,35 @@ The Create Server component creates a new server in Hetzner Cloud and waits for 
   "name": "my-server",
   "publicIp": "1.2.3.4",
   "status": "running"
+}
+```
+
+<a id="create-snapshot"></a>
+
+## Create Snapshot
+
+The Create Snapshot component creates a snapshot image from an existing Hetzner Cloud server and waits for completion.
+
+### How It Works
+
+1. Calls the Hetzner API to create a snapshot from the selected server
+2. Polls the action until snapshot creation finishes
+3. Emits snapshot details (including image ID) on success. If creation fails, the execution errors.
+
+### Configuration
+
+- **Server**: Existing server to snapshot
+- **Snapshot name** (optional): Snapshot description/name in Hetzner Cloud
+
+### Example Output
+
+```json
+{
+  "actionId": "12345",
+  "imageId": 67890,
+  "imageType": "snapshot",
+  "serverId": "42",
+  "snapshotName": "workflow-snapshot"
 }
 ```
 
@@ -117,6 +148,25 @@ The Delete Server component deletes a server in Hetzner Cloud and waits for the 
 {
   "actionId": 123,
   "serverId": 42
+}
+```
+
+<a id="delete-snapshot"></a>
+
+## Delete Snapshot
+
+The Delete Snapshot component deletes a snapshot image in Hetzner Cloud.
+
+### How It Works
+
+1. Deletes the selected snapshot via the Hetzner API
+2. Emits on the default output when the snapshot is deleted. If deletion fails, the execution errors.
+
+### Example Output
+
+```json
+{
+  "imageId": "67890"
 }
 ```
 
