@@ -85,7 +85,6 @@ export const TERRAFORM_STATE_REGISTRY: EventStateRegistry = {
   getState: terraformStateFunction,
 };
 
-// removed terraformDataBuilder
 export const terraformComponentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const { nodes, node, componentDefinition, lastExecutions } = context;
