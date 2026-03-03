@@ -113,6 +113,9 @@ func (c *GetHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
 	if strings.TrimSpace(spec.CheckID) == "" {
 		return errors.New("checkId is required")
 	}
+	if strings.TrimSpace(spec.Dataset) == "" {
+		return errors.New("dataset is required")
+	}
 
 	return nil
 }
