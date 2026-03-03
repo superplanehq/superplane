@@ -1,4 +1,10 @@
-import { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, NodeInfo, SubtitleContext } from "../types";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  NodeInfo,
+  SubtitleContext,
+} from "../types";
 import { noopMapper } from "../noop";
 import { formatTimeAgo } from "@/utils/date";
 import { MetadataItem } from "@/ui/metadataList";
