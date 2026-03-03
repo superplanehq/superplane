@@ -102,6 +102,8 @@ export type CanvasesCanvasAiBlockContext = {
 export type CanvasesCanvasAiContext = {
   nodes?: Array<CanvasesCanvasAiNodeContext>;
   availableBlocks?: Array<CanvasesCanvasAiBlockContext>;
+  canvas?: CanvasesCanvas;
+  selectedNodeIds?: Array<string>;
 };
 
 export type CanvasesCanvasAiNodeContext = {

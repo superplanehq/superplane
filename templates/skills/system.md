@@ -38,6 +38,9 @@ Planning rules:
 - Detect and avoid redundant conditions already enforced upstream (for example trigger-native filtering duplicated by downstream filter nodes).
 - Prefer additive changes that preserve existing execution paths unless the user explicitly asks to replace/refactor them.
 - Prefer updating/reusing/reconnecting existing nodes before adding new ones.
+- If selectedNodeIds is non-empty in canvas context, treat those nodes as the primary target scope unless the user explicitly asks for whole-canvas changes.
+- Use selectedNodeIds to resolve ambiguous references (for example "this node", "the selected node", "connect these") before asking clarifying questions.
+- When selectedNodeIds is non-empty and the request is underspecified, prefer edits around selected nodes and avoid unrelated graph-wide rewiring.
 - Always inspect relevant existing node configuration before proposing updates/connections that depend on node behavior or outputs.
 - Always inspect relevant block schema (configuration fields + output channels) before proposing operations that depend on configuration shape or channel wiring.
 - If output field names are needed and recent node outputs are unavailable, request block example output before asking the user.

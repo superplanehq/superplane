@@ -11,7 +11,16 @@ import {
   type EdgeChange,
 } from "@xyflow/react";
 
-import { CircleX, Loader2, ScanLine, ScanText, ScrollText, TriangleAlert, Workflow } from "lucide-react";
+import {
+  CircleX,
+  Loader2,
+  Map as MapIcon,
+  ScanLine,
+  ScanText,
+  ScrollText,
+  TriangleAlert,
+  Workflow,
+} from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
@@ -21,6 +30,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ConfigurationField,
   CanvasesCanvasNodeExecution,
+  ComponentsEdge,
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
@@ -42,6 +52,7 @@ import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
+import { CanvasMiniMap } from "./CanvasMiniMap";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header, type BreadcrumbItem } from "./Header";
@@ -140,8 +151,13 @@ export interface CanvasPageProps {
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
+  isAutoLayoutOnUpdateEnabled?: boolean;
+  onToggleAutoLayoutOnUpdate?: () => void;
+  autoLayoutOnUpdateDisabled?: boolean;
+  autoLayoutOnUpdateDisabledTooltip?: string;
   topViewMode?: "canvas" | "memory";
   onTopViewModeChange?: (mode: "canvas" | "memory") => void;
+  memoryItemCount?: number;
   dataViewContent?: React.ReactNode;
   readOnly?: boolean;
   canReadIntegrations?: boolean;
@@ -201,7 +217,6 @@ export interface CanvasPageProps {
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
-  onAutoLayout?: (selectedNodeIDs: string[]) => void | Promise<void>;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
 
   ai?: AiProps;
@@ -211,6 +226,10 @@ export interface CanvasPageProps {
   showAiBuilderTab?: boolean;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
   onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
+  aiCanvasName?: string;
+  aiCanvasDescription?: string;
+  aiCanvasNodes?: ComponentsNode[];
+  aiCanvasEdges?: ComponentsEdge[];
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
     sourceNodeId: string;
@@ -822,6 +841,7 @@ function CanvasPage(props: CanvasPageProps) {
           autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
           topViewMode={props.topViewMode}
           onTopViewModeChange={props.onTopViewModeChange}
+          memoryItemCount={props.memoryItemCount}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
         />
@@ -845,6 +865,13 @@ function CanvasPage(props: CanvasPageProps) {
               label: String((node.data as { label?: string })?.label || ""),
               type: String((node.data as { type?: string })?.type || ""),
             }))}
+            aiCanvas={{
+              name: props.aiCanvasName,
+              description: props.aiCanvasDescription,
+              nodes: props.aiCanvasNodes,
+              edges: props.aiCanvasEdges,
+            }}
+            selectedNodeIds={state.nodes.filter((node) => node.selected).map((node) => node.id)}
             onApplyAiOperations={props.onApplyAiOperations}
             integrations={props.integrations}
             canvasZoom={canvasZoom}
@@ -865,7 +892,6 @@ function CanvasPage(props: CanvasPageProps) {
                 hideHeader={true}
                 onToggleView={handleToggleView}
                 onToggleCollapse={props.onToggleCollapse}
-                onAutoLayout={props.onAutoLayout}
                 onRun={(nodeId) => handleNodeRun(nodeId)}
                 onDuplicate={props.onDuplicate}
                 onConfigure={props.onConfigure}
@@ -897,6 +923,10 @@ function CanvasPage(props: CanvasPageProps) {
                 onToggleAutoSave={props.onToggleAutoSave}
                 autoSaveDisabled={props.autoSaveDisabled}
                 autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
+                isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
+                onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
+                autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
+                autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
                 readOnly={props.readOnly}
                 logEntries={props.logEntries}
                 focusRequest={props.focusRequest}
@@ -1272,6 +1302,7 @@ function CanvasContentHeader({
   autoSaveDisabledTooltip,
   topViewMode,
   onTopViewModeChange,
+  memoryItemCount,
   onExportYamlCopy,
   onExportYamlDownload,
 }: {
@@ -1291,6 +1322,7 @@ function CanvasContentHeader({
   autoSaveDisabledTooltip?: string;
   topViewMode?: "canvas" | "memory";
   onTopViewModeChange?: (mode: "canvas" | "memory") => void;
+  memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
 }) {
@@ -1340,6 +1372,7 @@ function CanvasContentHeader({
       autoSaveDisabledTooltip={autoSaveDisabledTooltip}
       topViewMode={topViewMode}
       onTopViewModeChange={onTopViewModeChange}
+      memoryItemCount={memoryItemCount}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
     />
@@ -1360,7 +1393,6 @@ function CanvasContent({
   onTogglePause,
   onToggleView,
   onToggleCollapse,
-  onAutoLayout,
   onAnnotationUpdate,
   onAnnotationBlur,
   onBuildingBlockDrop,
@@ -1389,6 +1421,10 @@ function CanvasContent({
   onToggleAutoSave,
   autoSaveDisabled,
   autoSaveDisabledTooltip,
+  isAutoLayoutOnUpdateEnabled,
+  onToggleAutoLayoutOnUpdate,
+  autoLayoutOnUpdateDisabled,
+  autoLayoutOnUpdateDisabledTooltip,
   readOnly,
   logEntries = [],
   focusRequest,
@@ -1409,7 +1445,6 @@ function CanvasContent({
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
-  onAutoLayout?: (selectedNodeIDs: string[]) => void | Promise<void>;
   onDelete?: (nodeId: string) => void;
   onAnnotationUpdate?: (
     nodeId: string,
@@ -1445,6 +1480,10 @@ function CanvasContent({
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
+  isAutoLayoutOnUpdateEnabled?: boolean;
+  onToggleAutoLayoutOnUpdate?: () => void;
+  autoLayoutOnUpdateDisabled?: boolean;
+  autoLayoutOnUpdateDisabledTooltip?: string;
   readOnly?: boolean;
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
@@ -1487,7 +1526,7 @@ function CanvasContent({
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set());
   const [logSidebarHeight, setLogSidebarHeight] = useState(320);
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
-  const [isAutoLayouting, setIsAutoLayouting] = useState(false);
+  const [isMinimapVisible, setIsMinimapVisible] = useState(true);
 
   useEffect(() => {
     const activeNoteId = getActiveNoteId();
@@ -1699,29 +1738,19 @@ function CanvasContent({
     onToggleCollapse?.();
   }, [state.toggleCollapse, onToggleCollapse]);
 
-  const selectedNodeIDs = useMemo(
-    () => state.nodes.filter((node) => node.selected).map((node) => node.id),
-    [state.nodes],
-  );
-
-  const handleAutoLayout = useCallback(async () => {
-    if (!onAutoLayout || isReadOnly || isAutoLayouting || selectedNodeIDs.length === 0) {
+  const handleToggleAutoLayoutOnUpdate = useCallback(() => {
+    if (isReadOnly || !onToggleAutoLayoutOnUpdate || autoLayoutOnUpdateDisabled) {
       return;
     }
+    onToggleAutoLayoutOnUpdate();
+  }, [isReadOnly, onToggleAutoLayoutOnUpdate, autoLayoutOnUpdateDisabled]);
 
-    try {
-      setIsAutoLayouting(true);
-      await onAutoLayout(selectedNodeIDs);
-    } finally {
-      setIsAutoLayouting(false);
-    }
-  }, [onAutoLayout, isReadOnly, isAutoLayouting, selectedNodeIDs]);
-
-  const isAutoLayoutDisabled = isReadOnly || !onAutoLayout || isAutoLayouting || selectedNodeIDs.length === 0;
+  const isAutoLayoutToggleDisabled = isReadOnly || !onToggleAutoLayoutOnUpdate || autoLayoutOnUpdateDisabled;
   const autoLayoutTooltipMessage =
-    selectedNodeIDs.length === 0
-      ? "Select one or more nodes to auto arrange"
-      : "Auto arrange selected components left-to-right";
+    autoLayoutOnUpdateDisabledTooltip ||
+    (isAutoLayoutOnUpdateEnabled
+      ? "Auto-layout on add is enabled. New nodes reflow their connected graph."
+      : "Auto-layout on add is disabled. Click to enable connected-graph layout for newly added nodes.");
 
   useEffect(() => {
     if (!focusRequest) {
@@ -2156,118 +2185,145 @@ function CanvasContent({
             className="h-full w-full"
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
-            <ZoomSlider
+            <CanvasMiniMap nodes={state.nodes} edges={state.edges} isVisible={isMinimapVisible} />
+            <Panel
               position="bottom-left"
-              orientation="horizontal"
-              screenshotName={title}
-              isSnapToGridEnabled={isSnapToGridEnabled}
-              onSnapToGridToggle={() => setIsSnapToGridEnabled((prev) => !prev)}
+              className="!bg-transparent !outline-none !shadow-none p-0 flex items-center gap-2"
             >
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" onClick={handleToggleCollapse}>
-                    {state.isCollapsed ? <ScanText className="h-3 w-3" /> : <ScanLine className="h-3 w-3" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {state.isCollapsed
-                    ? "Switch components to Detailed view (Ctrl/Cmd + E)"
-                    : "Switch components to Compact view (Ctrl/Cmd + E)"}
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex">
+              <ZoomSlider
+                orientation="horizontal"
+                className="!static !m-0"
+                screenshotName={title}
+                isSnapToGridEnabled={isSnapToGridEnabled}
+                onSnapToGridToggle={() => setIsSnapToGridEnabled((prev) => !prev)}
+                leadingContent={
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={isMinimapVisible ? "secondary" : "ghost"}
+                        size="sm"
+                        className={`h-8 w-8 px-0 ${
+                          isMinimapVisible
+                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                        onClick={() => setIsMinimapVisible((prev) => !prev)}
+                        aria-pressed={isMinimapVisible}
+                      >
+                        <MapIcon className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{isMinimapVisible ? "Hide minimap" : "Show minimap"}</TooltipContent>
+                  </Tooltip>
+                }
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon-sm" onClick={handleToggleCollapse}>
+                      {state.isCollapsed ? <ScanText className="h-3 w-3" /> : <ScanLine className="h-3 w-3" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {state.isCollapsed
+                      ? "Switch components to Detailed view (Ctrl/Cmd + E)"
+                      : "Switch components to Compact view (Ctrl/Cmd + E)"}
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <Button
+                        variant={isAutoLayoutOnUpdateEnabled ? "secondary" : "ghost"}
+                        size="sm"
+                        className={`h-8 w-8 px-0 ${
+                          isAutoLayoutOnUpdateEnabled
+                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                        onClick={handleToggleAutoLayoutOnUpdate}
+                        disabled={isAutoLayoutToggleDisabled}
+                        aria-pressed={isAutoLayoutOnUpdateEnabled}
+                      >
+                        <Workflow className="h-3 w-3" />
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
+                </Tooltip>
+                <NodeSearch
+                  onSearch={(searchString) => {
+                    const query = searchString.toLowerCase();
+                    return state.nodes.filter((node) => {
+                      const label = ((node.data?.label as string) || "").toLowerCase();
+                      const nodeName = ((node.data as any)?.nodeName || "").toLowerCase();
+                      const id = (node.id || "").toLowerCase();
+                      return label.includes(query) || nodeName.includes(query) || id.includes(query);
+                    });
+                  }}
+                  onSelectNode={(node) => {
+                    const isAnnotationNode = (node.data as any)?.type === "annotation";
+                    if (isAnnotationNode) {
+                      return;
+                    }
+                    state.componentSidebar.open(node.id);
+                  }}
+                />
+              </ZoomSlider>
+              <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
+                <Tooltip>
+                  <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 px-2 text-xs font-medium"
-                      onClick={handleAutoLayout}
-                      disabled={isAutoLayoutDisabled}
+                      className="h-8 items-center text-xs font-medium"
+                      onClick={() => handleLogButtonClick("all")}
                     >
-                      {isAutoLayouting ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Workflow className="h-3 w-3" />
-                      )}
+                      <ScrollText className="h-3 w-3" />
                     </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
-              </Tooltip>
-              <NodeSearch
-                onSearch={(searchString) => {
-                  const query = searchString.toLowerCase();
-                  return state.nodes.filter((node) => {
-                    const label = ((node.data?.label as string) || "").toLowerCase();
-                    const nodeName = ((node.data as any)?.nodeName || "").toLowerCase();
-                    const id = (node.id || "").toLowerCase();
-                    return label.includes(query) || nodeName.includes(query) || id.includes(query);
-                  });
-                }}
-                onSelectNode={(node) => {
-                  const isAnnotationNode = (node.data as any)?.type === "annotation";
-                  if (isAnnotationNode) {
-                    return;
-                  }
-                  state.componentSidebar.open(node.id);
-                }}
-              />
-            </ZoomSlider>
-            <Panel
-              position="bottom-left"
-              className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8"
-              style={{ marginLeft: 370 }}
-            >
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 items-center text-xs font-medium"
-                    onClick={() => handleLogButtonClick("all")}
-                  >
-                    <ScrollText className="h-3 w-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>All Logs</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 items-center text-xs font-medium"
-                    onClick={() => handleLogButtonClick("error")}
-                  >
-                    <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
-                    <span className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}>
-                      {logCounts.error}
-                    </span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Errors</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 items-center text-xs font-medium"
-                    onClick={() => handleLogButtonClick("warning")}
-                  >
-                    <TriangleAlert
-                      className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
-                    />
-                    <span
-                      className={logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"}
+                  </TooltipTrigger>
+                  <TooltipContent>All Logs</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 items-center text-xs font-medium"
+                      onClick={() => handleLogButtonClick("error")}
                     >
-                      {logCounts.warning}
-                    </span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Warnings</TooltipContent>
-              </Tooltip>
+                      <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
+                      <span
+                        className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}
+                      >
+                        {logCounts.error}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Errors</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 items-center text-xs font-medium"
+                      onClick={() => handleLogButtonClick("warning")}
+                    >
+                      <TriangleAlert
+                        className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
+                      />
+                      <span
+                        className={
+                          logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"
+                        }
+                      >
+                        {logCounts.warning}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Warnings</TooltipContent>
+                </Tooltip>
+              </div>
             </Panel>
           </ReactFlow>
         </div>
