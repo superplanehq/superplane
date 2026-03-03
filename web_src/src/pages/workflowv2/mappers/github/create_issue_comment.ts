@@ -9,10 +9,39 @@ import {
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 import { Comment } from "./types";
+import { BaseNodeMetadata } from "./types";
+
+interface CreateIssueCommentConfiguration {
+  repository?: string;
+  issueNumber?: string;
+}
 
 export const createIssueCommentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    const props = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    const configuration = (context.node.configuration as CreateIssueCommentConfiguration | undefined) ?? {};
+    const metadata = (context.node.metadata as BaseNodeMetadata | undefined) ?? ({} as BaseNodeMetadata);
+    const metadataItems = [];
+
+    const repository = configuration.repository || metadata?.repository?.name;
+    if (repository) {
+      metadataItems.push({
+        icon: "book",
+        label: repository,
+      });
+    }
+
+    if (configuration.issueNumber) {
+      metadataItems.push({
+        icon: "hash",
+        label: `Issue: ${configuration.issueNumber}`,
+      });
+    }
+
+    return {
+      ...props,
+      metadata: metadataItems,
+    };
   },
   subtitle(context: SubtitleContext): string {
     return buildGithubExecutionSubtitle(context.execution);
