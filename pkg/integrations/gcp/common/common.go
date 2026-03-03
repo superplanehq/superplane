@@ -14,10 +14,11 @@ const (
 )
 
 type Metadata struct {
-	ProjectID            string `json:"projectId"`
-	ClientEmail          string `json:"clientEmail"`
-	AuthMethod           string `json:"authMethod"`
-	AccessTokenExpiresAt string `json:"accessTokenExpiresAt"`
-	PubSubTopic          string `json:"pubsubTopic,omitempty"`
-	PubSubSubscription   string `json:"pubsubSubscription,omitempty"`
+	ProjectID              string `json:"projectId"`
+	ClientEmail            string `json:"clientEmail"`
+	AuthMethod             string `json:"authMethod"`
+	AccessTokenExpiresAt   string `json:"accessTokenExpiresAt"`
+	PubSubTopic            string `json:"pubsubTopic,omitempty"`
+	PubSubSubscription     string `json:"pubsubSubscription,omitempty"`
+	CloudBuildSubscription string `json:"cloudBuildSubscription,omitempty"`
 }
