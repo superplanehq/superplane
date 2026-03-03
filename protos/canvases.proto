@@ -606,6 +606,8 @@ message CanvasAiBlockContext {
 message CanvasAiContext {
   repeated CanvasAiNodeContext nodes = 1;
   repeated CanvasAiBlockContext available_blocks = 2;
+  Canvas canvas = 3;
+  repeated string selected_node_ids = 4;
 }
 
 message SendAiMessageRequest {

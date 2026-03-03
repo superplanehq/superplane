@@ -3169,6 +3169,8 @@ type CanvasAiContext struct {
 	state           protoimpl.MessageState  `protogen:"open.v1"`
 	Nodes           []*CanvasAiNodeContext  `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
 	AvailableBlocks []*CanvasAiBlockContext `protobuf:"bytes,2,rep,name=available_blocks,json=availableBlocks,proto3" json:"available_blocks,omitempty"`
+	Canvas          *Canvas                 `protobuf:"bytes,3,opt,name=canvas,proto3" json:"canvas,omitempty"`
+	SelectedNodeIds []string                `protobuf:"bytes,4,rep,name=selected_node_ids,json=selectedNodeIds,proto3" json:"selected_node_ids,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -3213,6 +3215,20 @@ func (x *CanvasAiContext) GetNodes() []*CanvasAiNodeContext {
 func (x *CanvasAiContext) GetAvailableBlocks() []*CanvasAiBlockContext {
 	if x != nil {
 		return x.AvailableBlocks
+	}
+	return nil
+}
+
+func (x *CanvasAiContext) GetCanvas() *Canvas {
+	if x != nil {
+		return x.Canvas
+	}
+	return nil
+}
+
+func (x *CanvasAiContext) GetSelectedNodeIds() []string {
+	if x != nil {
+		return x.SelectedNodeIds
 	}
 	return nil
 }
@@ -4068,10 +4084,12 @@ const file_canvases_proto_rawDesc = "" +
 	"\x14CanvasAiBlockContext\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x12\n" +
-	"\x04type\x18\x03 \x01(\tR\x04type\"\xa7\x01\n" +
+	"\x04type\x18\x03 \x01(\tR\x04type\"\x88\x02\n" +
 	"\x0fCanvasAiContext\x12>\n" +
 	"\x05nodes\x18\x01 \x03(\v2(.Superplane.Canvases.CanvasAiNodeContextR\x05nodes\x12T\n" +
-	"\x10available_blocks\x18\x02 \x03(\v2).Superplane.Canvases.CanvasAiBlockContextR\x0favailableBlocks\"\x98\x01\n" +
+	"\x10available_blocks\x18\x02 \x03(\v2).Superplane.Canvases.CanvasAiBlockContextR\x0favailableBlocks\x123\n" +
+	"\x06canvas\x18\x03 \x01(\v2\x1b.Superplane.Canvases.CanvasR\x06canvas\x12*\n" +
+	"\x11selected_node_ids\x18\x04 \x03(\tR\x0fselectedNodeIds\"\x98\x01\n" +
 	"\x14SendAiMessageRequest\x12\x1b\n" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x16\n" +
 	"\x06prompt\x18\x02 \x01(\tR\x06prompt\x12K\n" +
@@ -4297,67 +4315,68 @@ var file_canvases_proto_depIdxs = []int32{
 	32, // 54: Superplane.Canvases.ListEventExecutionsResponse.executions:type_name -> Superplane.Canvases.CanvasNodeExecution
 	53, // 55: Superplane.Canvases.CanvasAiContext.nodes:type_name -> Superplane.Canvases.CanvasAiNodeContext
 	54, // 56: Superplane.Canvases.CanvasAiContext.available_blocks:type_name -> Superplane.Canvases.CanvasAiBlockContext
-	55, // 57: Superplane.Canvases.SendAiMessageRequest.canvas_context:type_name -> Superplane.Canvases.CanvasAiContext
-	66, // 58: Superplane.Canvases.SendAiMessageResponse.operations:type_name -> google.protobuf.Struct
-	65, // 59: Superplane.Canvases.CanvasNodeEventMessage.timestamp:type_name -> google.protobuf.Timestamp
-	65, // 60: Superplane.Canvases.CanvasNodeExecutionMessage.timestamp:type_name -> google.protobuf.Timestamp
-	65, // 61: Superplane.Canvases.CanvasNodeQueueItemMessage.timestamp:type_name -> google.protobuf.Timestamp
-	65, // 62: Superplane.Canvases.CanvasMessage.timestamp:type_name -> google.protobuf.Timestamp
-	65, // 63: Superplane.Canvases.Canvas.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	65, // 64: Superplane.Canvases.Canvas.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	16, // 65: Superplane.Canvases.Canvas.Metadata.created_by:type_name -> Superplane.Canvases.UserRef
-	67, // 66: Superplane.Canvases.Canvas.Spec.nodes:type_name -> Superplane.Components.Node
-	69, // 67: Superplane.Canvases.Canvas.Spec.edges:type_name -> Superplane.Components.Edge
-	32, // 68: Superplane.Canvases.Canvas.Status.last_executions:type_name -> Superplane.Canvases.CanvasNodeExecution
-	33, // 69: Superplane.Canvases.Canvas.Status.next_queue_items:type_name -> Superplane.Canvases.CanvasNodeQueueItem
-	45, // 70: Superplane.Canvases.Canvas.Status.last_events:type_name -> Superplane.Canvases.CanvasEvent
-	5,  // 71: Superplane.Canvases.Canvases.ListCanvases:input_type -> Superplane.Canvases.ListCanvasesRequest
-	9,  // 72: Superplane.Canvases.Canvases.CreateCanvas:input_type -> Superplane.Canvases.CreateCanvasRequest
-	7,  // 73: Superplane.Canvases.Canvases.DescribeCanvas:input_type -> Superplane.Canvases.DescribeCanvasRequest
-	12, // 74: Superplane.Canvases.Canvases.UpdateCanvas:input_type -> Superplane.Canvases.UpdateCanvasRequest
-	14, // 75: Superplane.Canvases.Canvases.DeleteCanvas:input_type -> Superplane.Canvases.DeleteCanvasRequest
-	22, // 76: Superplane.Canvases.Canvases.ListNodeQueueItems:input_type -> Superplane.Canvases.ListNodeQueueItemsRequest
-	24, // 77: Superplane.Canvases.Canvases.DeleteNodeQueueItem:input_type -> Superplane.Canvases.DeleteNodeQueueItemRequest
-	26, // 78: Superplane.Canvases.Canvases.UpdateNodePause:input_type -> Superplane.Canvases.UpdateNodePauseRequest
-	28, // 79: Superplane.Canvases.Canvases.ListNodeExecutions:input_type -> Superplane.Canvases.ListNodeExecutionsRequest
-	18, // 80: Superplane.Canvases.Canvases.ListNodeEvents:input_type -> Superplane.Canvases.ListNodeEventsRequest
-	20, // 81: Superplane.Canvases.Canvases.EmitNodeEvent:input_type -> Superplane.Canvases.EmitNodeEventRequest
-	34, // 82: Superplane.Canvases.Canvases.InvokeNodeExecutionAction:input_type -> Superplane.Canvases.InvokeNodeExecutionActionRequest
-	36, // 83: Superplane.Canvases.Canvases.InvokeNodeTriggerAction:input_type -> Superplane.Canvases.InvokeNodeTriggerActionRequest
-	30, // 84: Superplane.Canvases.Canvases.ListChildExecutions:input_type -> Superplane.Canvases.ListChildExecutionsRequest
-	49, // 85: Superplane.Canvases.Canvases.CancelExecution:input_type -> Superplane.Canvases.CancelExecutionRequest
-	51, // 86: Superplane.Canvases.Canvases.ResolveExecutionErrors:input_type -> Superplane.Canvases.ResolveExecutionErrorsRequest
-	38, // 87: Superplane.Canvases.Canvases.ListCanvasEvents:input_type -> Superplane.Canvases.ListCanvasEventsRequest
-	41, // 88: Superplane.Canvases.Canvases.ListCanvasMemories:input_type -> Superplane.Canvases.ListCanvasMemoriesRequest
-	43, // 89: Superplane.Canvases.Canvases.DeleteCanvasMemory:input_type -> Superplane.Canvases.DeleteCanvasMemoryRequest
-	47, // 90: Superplane.Canvases.Canvases.ListEventExecutions:input_type -> Superplane.Canvases.ListEventExecutionsRequest
-	56, // 91: Superplane.Canvases.Canvases.SendAiMessage:input_type -> Superplane.Canvases.SendAiMessageRequest
-	6,  // 92: Superplane.Canvases.Canvases.ListCanvases:output_type -> Superplane.Canvases.ListCanvasesResponse
-	10, // 93: Superplane.Canvases.Canvases.CreateCanvas:output_type -> Superplane.Canvases.CreateCanvasResponse
-	8,  // 94: Superplane.Canvases.Canvases.DescribeCanvas:output_type -> Superplane.Canvases.DescribeCanvasResponse
-	13, // 95: Superplane.Canvases.Canvases.UpdateCanvas:output_type -> Superplane.Canvases.UpdateCanvasResponse
-	15, // 96: Superplane.Canvases.Canvases.DeleteCanvas:output_type -> Superplane.Canvases.DeleteCanvasResponse
-	23, // 97: Superplane.Canvases.Canvases.ListNodeQueueItems:output_type -> Superplane.Canvases.ListNodeQueueItemsResponse
-	25, // 98: Superplane.Canvases.Canvases.DeleteNodeQueueItem:output_type -> Superplane.Canvases.DeleteNodeQueueItemResponse
-	27, // 99: Superplane.Canvases.Canvases.UpdateNodePause:output_type -> Superplane.Canvases.UpdateNodePauseResponse
-	29, // 100: Superplane.Canvases.Canvases.ListNodeExecutions:output_type -> Superplane.Canvases.ListNodeExecutionsResponse
-	19, // 101: Superplane.Canvases.Canvases.ListNodeEvents:output_type -> Superplane.Canvases.ListNodeEventsResponse
-	21, // 102: Superplane.Canvases.Canvases.EmitNodeEvent:output_type -> Superplane.Canvases.EmitNodeEventResponse
-	35, // 103: Superplane.Canvases.Canvases.InvokeNodeExecutionAction:output_type -> Superplane.Canvases.InvokeNodeExecutionActionResponse
-	37, // 104: Superplane.Canvases.Canvases.InvokeNodeTriggerAction:output_type -> Superplane.Canvases.InvokeNodeTriggerActionResponse
-	31, // 105: Superplane.Canvases.Canvases.ListChildExecutions:output_type -> Superplane.Canvases.ListChildExecutionsResponse
-	50, // 106: Superplane.Canvases.Canvases.CancelExecution:output_type -> Superplane.Canvases.CancelExecutionResponse
-	52, // 107: Superplane.Canvases.Canvases.ResolveExecutionErrors:output_type -> Superplane.Canvases.ResolveExecutionErrorsResponse
-	39, // 108: Superplane.Canvases.Canvases.ListCanvasEvents:output_type -> Superplane.Canvases.ListCanvasEventsResponse
-	42, // 109: Superplane.Canvases.Canvases.ListCanvasMemories:output_type -> Superplane.Canvases.ListCanvasMemoriesResponse
-	44, // 110: Superplane.Canvases.Canvases.DeleteCanvasMemory:output_type -> Superplane.Canvases.DeleteCanvasMemoryResponse
-	48, // 111: Superplane.Canvases.Canvases.ListEventExecutions:output_type -> Superplane.Canvases.ListEventExecutionsResponse
-	57, // 112: Superplane.Canvases.Canvases.SendAiMessage:output_type -> Superplane.Canvases.SendAiMessageResponse
-	92, // [92:113] is the sub-list for method output_type
-	71, // [71:92] is the sub-list for method input_type
-	71, // [71:71] is the sub-list for extension type_name
-	71, // [71:71] is the sub-list for extension extendee
-	0,  // [0:71] is the sub-list for field type_name
+	17, // 57: Superplane.Canvases.CanvasAiContext.canvas:type_name -> Superplane.Canvases.Canvas
+	55, // 58: Superplane.Canvases.SendAiMessageRequest.canvas_context:type_name -> Superplane.Canvases.CanvasAiContext
+	66, // 59: Superplane.Canvases.SendAiMessageResponse.operations:type_name -> google.protobuf.Struct
+	65, // 60: Superplane.Canvases.CanvasNodeEventMessage.timestamp:type_name -> google.protobuf.Timestamp
+	65, // 61: Superplane.Canvases.CanvasNodeExecutionMessage.timestamp:type_name -> google.protobuf.Timestamp
+	65, // 62: Superplane.Canvases.CanvasNodeQueueItemMessage.timestamp:type_name -> google.protobuf.Timestamp
+	65, // 63: Superplane.Canvases.CanvasMessage.timestamp:type_name -> google.protobuf.Timestamp
+	65, // 64: Superplane.Canvases.Canvas.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	65, // 65: Superplane.Canvases.Canvas.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	16, // 66: Superplane.Canvases.Canvas.Metadata.created_by:type_name -> Superplane.Canvases.UserRef
+	67, // 67: Superplane.Canvases.Canvas.Spec.nodes:type_name -> Superplane.Components.Node
+	69, // 68: Superplane.Canvases.Canvas.Spec.edges:type_name -> Superplane.Components.Edge
+	32, // 69: Superplane.Canvases.Canvas.Status.last_executions:type_name -> Superplane.Canvases.CanvasNodeExecution
+	33, // 70: Superplane.Canvases.Canvas.Status.next_queue_items:type_name -> Superplane.Canvases.CanvasNodeQueueItem
+	45, // 71: Superplane.Canvases.Canvas.Status.last_events:type_name -> Superplane.Canvases.CanvasEvent
+	5,  // 72: Superplane.Canvases.Canvases.ListCanvases:input_type -> Superplane.Canvases.ListCanvasesRequest
+	9,  // 73: Superplane.Canvases.Canvases.CreateCanvas:input_type -> Superplane.Canvases.CreateCanvasRequest
+	7,  // 74: Superplane.Canvases.Canvases.DescribeCanvas:input_type -> Superplane.Canvases.DescribeCanvasRequest
+	12, // 75: Superplane.Canvases.Canvases.UpdateCanvas:input_type -> Superplane.Canvases.UpdateCanvasRequest
+	14, // 76: Superplane.Canvases.Canvases.DeleteCanvas:input_type -> Superplane.Canvases.DeleteCanvasRequest
+	22, // 77: Superplane.Canvases.Canvases.ListNodeQueueItems:input_type -> Superplane.Canvases.ListNodeQueueItemsRequest
+	24, // 78: Superplane.Canvases.Canvases.DeleteNodeQueueItem:input_type -> Superplane.Canvases.DeleteNodeQueueItemRequest
+	26, // 79: Superplane.Canvases.Canvases.UpdateNodePause:input_type -> Superplane.Canvases.UpdateNodePauseRequest
+	28, // 80: Superplane.Canvases.Canvases.ListNodeExecutions:input_type -> Superplane.Canvases.ListNodeExecutionsRequest
+	18, // 81: Superplane.Canvases.Canvases.ListNodeEvents:input_type -> Superplane.Canvases.ListNodeEventsRequest
+	20, // 82: Superplane.Canvases.Canvases.EmitNodeEvent:input_type -> Superplane.Canvases.EmitNodeEventRequest
+	34, // 83: Superplane.Canvases.Canvases.InvokeNodeExecutionAction:input_type -> Superplane.Canvases.InvokeNodeExecutionActionRequest
+	36, // 84: Superplane.Canvases.Canvases.InvokeNodeTriggerAction:input_type -> Superplane.Canvases.InvokeNodeTriggerActionRequest
+	30, // 85: Superplane.Canvases.Canvases.ListChildExecutions:input_type -> Superplane.Canvases.ListChildExecutionsRequest
+	49, // 86: Superplane.Canvases.Canvases.CancelExecution:input_type -> Superplane.Canvases.CancelExecutionRequest
+	51, // 87: Superplane.Canvases.Canvases.ResolveExecutionErrors:input_type -> Superplane.Canvases.ResolveExecutionErrorsRequest
+	38, // 88: Superplane.Canvases.Canvases.ListCanvasEvents:input_type -> Superplane.Canvases.ListCanvasEventsRequest
+	41, // 89: Superplane.Canvases.Canvases.ListCanvasMemories:input_type -> Superplane.Canvases.ListCanvasMemoriesRequest
+	43, // 90: Superplane.Canvases.Canvases.DeleteCanvasMemory:input_type -> Superplane.Canvases.DeleteCanvasMemoryRequest
+	47, // 91: Superplane.Canvases.Canvases.ListEventExecutions:input_type -> Superplane.Canvases.ListEventExecutionsRequest
+	56, // 92: Superplane.Canvases.Canvases.SendAiMessage:input_type -> Superplane.Canvases.SendAiMessageRequest
+	6,  // 93: Superplane.Canvases.Canvases.ListCanvases:output_type -> Superplane.Canvases.ListCanvasesResponse
+	10, // 94: Superplane.Canvases.Canvases.CreateCanvas:output_type -> Superplane.Canvases.CreateCanvasResponse
+	8,  // 95: Superplane.Canvases.Canvases.DescribeCanvas:output_type -> Superplane.Canvases.DescribeCanvasResponse
+	13, // 96: Superplane.Canvases.Canvases.UpdateCanvas:output_type -> Superplane.Canvases.UpdateCanvasResponse
+	15, // 97: Superplane.Canvases.Canvases.DeleteCanvas:output_type -> Superplane.Canvases.DeleteCanvasResponse
+	23, // 98: Superplane.Canvases.Canvases.ListNodeQueueItems:output_type -> Superplane.Canvases.ListNodeQueueItemsResponse
+	25, // 99: Superplane.Canvases.Canvases.DeleteNodeQueueItem:output_type -> Superplane.Canvases.DeleteNodeQueueItemResponse
+	27, // 100: Superplane.Canvases.Canvases.UpdateNodePause:output_type -> Superplane.Canvases.UpdateNodePauseResponse
+	29, // 101: Superplane.Canvases.Canvases.ListNodeExecutions:output_type -> Superplane.Canvases.ListNodeExecutionsResponse
+	19, // 102: Superplane.Canvases.Canvases.ListNodeEvents:output_type -> Superplane.Canvases.ListNodeEventsResponse
+	21, // 103: Superplane.Canvases.Canvases.EmitNodeEvent:output_type -> Superplane.Canvases.EmitNodeEventResponse
+	35, // 104: Superplane.Canvases.Canvases.InvokeNodeExecutionAction:output_type -> Superplane.Canvases.InvokeNodeExecutionActionResponse
+	37, // 105: Superplane.Canvases.Canvases.InvokeNodeTriggerAction:output_type -> Superplane.Canvases.InvokeNodeTriggerActionResponse
+	31, // 106: Superplane.Canvases.Canvases.ListChildExecutions:output_type -> Superplane.Canvases.ListChildExecutionsResponse
+	50, // 107: Superplane.Canvases.Canvases.CancelExecution:output_type -> Superplane.Canvases.CancelExecutionResponse
+	52, // 108: Superplane.Canvases.Canvases.ResolveExecutionErrors:output_type -> Superplane.Canvases.ResolveExecutionErrorsResponse
+	39, // 109: Superplane.Canvases.Canvases.ListCanvasEvents:output_type -> Superplane.Canvases.ListCanvasEventsResponse
+	42, // 110: Superplane.Canvases.Canvases.ListCanvasMemories:output_type -> Superplane.Canvases.ListCanvasMemoriesResponse
+	44, // 111: Superplane.Canvases.Canvases.DeleteCanvasMemory:output_type -> Superplane.Canvases.DeleteCanvasMemoryResponse
+	48, // 112: Superplane.Canvases.Canvases.ListEventExecutions:output_type -> Superplane.Canvases.ListEventExecutionsResponse
+	57, // 113: Superplane.Canvases.Canvases.SendAiMessage:output_type -> Superplane.Canvases.SendAiMessageResponse
+	93, // [93:114] is the sub-list for method output_type
+	72, // [72:93] is the sub-list for method input_type
+	72, // [72:72] is the sub-list for extension type_name
+	72, // [72:72] is the sub-list for extension extendee
+	0,  // [0:72] is the sub-list for field type_name
 }
 
 func init() { file_canvases_proto_init() }

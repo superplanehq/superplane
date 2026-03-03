@@ -3089,6 +3089,10 @@ export function WorkflowPageV2() {
         onConfigure={!isReadOnly ? handleConfigure : undefined}
         buildingBlocks={buildingBlocks}
         showAiBuilderTab={showAiBuilderTab}
+        aiCanvasName={canvas?.metadata?.name}
+        aiCanvasDescription={canvas?.metadata?.description}
+        aiCanvasNodes={canvas?.spec?.nodes}
+        aiCanvasEdges={canvas?.spec?.edges}
         onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
         onApplyAiOperations={!isReadOnly ? handleApplyAiOperations : undefined}
         onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}

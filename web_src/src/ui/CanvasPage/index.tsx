@@ -30,6 +30,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ConfigurationField,
   CanvasesCanvasNodeExecution,
+  ComponentsEdge,
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
@@ -225,6 +226,10 @@ export interface CanvasPageProps {
   showAiBuilderTab?: boolean;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
   onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
+  aiCanvasName?: string;
+  aiCanvasDescription?: string;
+  aiCanvasNodes?: ComponentsNode[];
+  aiCanvasEdges?: ComponentsEdge[];
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
     sourceNodeId: string;
@@ -860,6 +865,13 @@ function CanvasPage(props: CanvasPageProps) {
               label: String((node.data as { label?: string })?.label || ""),
               type: String((node.data as { type?: string })?.type || ""),
             }))}
+            aiCanvas={{
+              name: props.aiCanvasName,
+              description: props.aiCanvasDescription,
+              nodes: props.aiCanvasNodes,
+              edges: props.aiCanvasEdges,
+            }}
+            selectedNodeIds={state.nodes.filter((node) => node.selected).map((node) => node.id)}
             onApplyAiOperations={props.onApplyAiOperations}
             integrations={props.integrations}
             canvasZoom={canvasZoom}
