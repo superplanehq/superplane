@@ -50,6 +50,7 @@ import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
+import cloudBuildIcon from "@/assets/icons/integrations/cloud_build.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
@@ -1138,14 +1139,23 @@ function CategorySection({
       sns: awsSnsIcon,
     },
     honeycomb: honeycombIcon,
-    gcp: gcpIcon,
+    gcp: {
+      cloudbuild: cloudBuildIcon,
+    },
   };
 
   // Get integration name from first block if available, or match category name
   const firstBlock = allBlocks[0];
   const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
   const appLogo = appLogoMap[integrationName];
-  const categoryIconSrc = typeof appLogo === "string" ? appLogo : integrationName === "aws" ? awsIcon : undefined;
+  const categoryIconSrc =
+    typeof appLogo === "string"
+      ? appLogo
+      : integrationName === "aws"
+        ? awsIcon
+        : integrationName === "gcp"
+          ? gcpIcon
+          : undefined;
 
   // Mirror org/integrations colors: ready=green, pending=amber, error=red, default=gray.
   const normalizedIntegrationName = normalizeIntegrationName(firstBlock?.integrationName);
@@ -1270,10 +1280,17 @@ function CategorySection({
               sns: awsSnsIcon,
             },
             honeycomb: honeycombIcon,
-            gcp: gcpIcon,
+            gcp: {
+              cloudbuild: cloudBuildIcon,
+            },
           };
           const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;
-          const appIconSrc = typeof appLogo === "string" ? appLogo : nameParts[1] ? appLogo?.[nameParts[1]] : undefined;
+          const appIconSrc =
+            typeof appLogo === "string"
+              ? appLogo
+              : nameParts[1]
+                ? (appLogo?.[nameParts[1]] ?? (nameParts[0] === "gcp" ? gcpIcon : undefined))
+                : undefined;
           const IconComponent = resolveIcon(iconSlug);
 
           const isLive = !!block.isLive;
