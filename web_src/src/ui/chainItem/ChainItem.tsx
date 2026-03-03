@@ -715,7 +715,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                 {entryIndex < value.states.length - 1 && (
                                   <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200" />
                                 )}
-                                <div className="text-[13px] text-gray-800 font-medium capitalize truncate" title={entry.status}>
+                                <div
+                                  className="text-[13px] text-gray-800 font-medium capitalize truncate"
+                                  title={entry.status}
+                                >
                                   {entry.status}
                                 </div>
                                 {entry.timestamp && (
