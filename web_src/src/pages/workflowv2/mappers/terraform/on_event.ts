@@ -59,4 +59,3 @@ export const onRunEventTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
-
