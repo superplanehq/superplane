@@ -71,6 +71,7 @@ import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
+import awsS3Icon from "@/assets/icons/integrations/aws.s3.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
 import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
@@ -1111,6 +1112,7 @@ function CategorySection({
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
       sqs: awsSqsIcon,
+      s3: awsS3Icon,
       route53: awsRoute53Icon,
       ecs: awsEcsIcon,
       sns: awsSnsIcon,
@@ -1243,6 +1245,7 @@ function CategorySection({
               ec2: awsEc2Icon,
               lambda: awsLambdaIcon,
               sqs: awsSqsIcon,
+              s3: awsS3Icon,
               route53: awsRoute53Icon,
               ecs: awsEcsIcon,
               sns: awsSnsIcon,

@@ -1,0 +1,8 @@
+{
+  "type": "aws.s3.object",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "bucket": "my-bucket",
+    "key": "path/to/file.json"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "type": "aws.s3.bucket",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "bucket": "my-bucket",
+    "region": "us-east-1",
+    "exists": true,
+    "accessPointAlias": false
+  }
+}

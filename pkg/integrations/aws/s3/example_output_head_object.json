@@ -1,0 +1,13 @@
+{
+  "type": "aws.s3.object",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "bucket": "my-bucket",
+    "key": "path/to/file.txt",
+    "contentType": "application/json",
+    "contentLength": "1024",
+    "etag": "\"d41d8cd98f00b204e9800998ecf8427e\"",
+    "lastModified": "Tue, 11 Feb 2026 12:00:00 GMT",
+    "storageClass": "STANDARD"
+  }
+}

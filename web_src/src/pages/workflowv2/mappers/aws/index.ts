@@ -9,6 +9,17 @@ import { scanImageMapper } from "./ecr/scan_image";
 import { onPackageVersionTriggerRenderer } from "./codeartifact/on_package_version";
 import { getPackageVersionMapper } from "./codeartifact/get_package_version";
 import { createQueueMapper, deleteQueueMapper, getQueueMapper, purgeQueueMapper, sendMessageMapper } from "./sqs";
+import {
+  createBucketMapper,
+  deleteBucketMapper,
+  copyObjectMapper,
+  deleteObjectMapper,
+  headObjectMapper,
+  headBucketMapper,
+  getObjectAttributesMapper,
+  putObjectMapper,
+  emptyBucketMapper,
+} from "./s3";
 import { createRepositoryMapper } from "./codeartifact/create_repository";
 import { copyPackageVersionsMapper } from "./codeartifact/copy_package_versions";
 import { deletePackageVersionsMapper } from "./codeartifact/delete_package_versions";
@@ -89,6 +100,15 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "ec2.enableImage": enableImageMapper,
   "ec2.enableImageDeprecation": enableImageDeprecationMapper,
   "ec2.getImage": getEc2ImageMapper,
+  "s3.createBucket": createBucketMapper,
+  "s3.deleteBucket": deleteBucketMapper,
+  "s3.copyObject": copyObjectMapper,
+  "s3.deleteObject": deleteObjectMapper,
+  "s3.headObject": headObjectMapper,
+  "s3.headBucket": headBucketMapper,
+  "s3.getObjectAttributes": getObjectAttributesMapper,
+  "s3.putObject": putObjectMapper,
+  "s3.emptyBucket": emptyBucketMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -143,4 +163,13 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ec2.enableImage": buildActionStateRegistry("enabled"),
   "ec2.enableImageDeprecation": buildActionStateRegistry("enabled"),
   "ec2.getImage": buildActionStateRegistry("retrieved"),
+  "s3.createBucket": buildActionStateRegistry("created"),
+  "s3.deleteBucket": buildActionStateRegistry("deleted"),
+  "s3.copyObject": buildActionStateRegistry("copied"),
+  "s3.deleteObject": buildActionStateRegistry("deleted"),
+  "s3.headObject": buildActionStateRegistry("retrieved"),
+  "s3.headBucket": buildActionStateRegistry("retrieved"),
+  "s3.getObjectAttributes": buildActionStateRegistry("retrieved"),
+  "s3.putObject": buildActionStateRegistry("uploaded"),
+  "s3.emptyBucket": buildActionStateRegistry("emptied"),
 };

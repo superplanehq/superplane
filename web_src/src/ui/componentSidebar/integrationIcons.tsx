@@ -3,6 +3,7 @@ import React from "react";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
+import awsS3Icon from "@/assets/icons/integrations/aws.s3.svg";
 import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
@@ -134,6 +135,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
     ecr: awsEcrIcon,
     lambda: awsLambdaIcon,
     sqs: awsSqsIcon,
+    s3: awsS3Icon,
     ec2: awsEc2Icon,
     route53: awsRoute53Icon,
     ecs: awsEcsIcon,

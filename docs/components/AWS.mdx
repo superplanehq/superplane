@@ -62,6 +62,15 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="SQS • Delete Queue" href="#sqs-•-delete-queue" description="Delete an SQS queue" />
   <LinkCard title="SQS • Get Queue" href="#sqs-•-get-queue" description="Get metadata and attributes for an SQS queue" />
   <LinkCard title="SQS • Purge Queue" href="#sqs-•-purge-queue" description="Purge all messages from an SQS queue" />
+  <LinkCard title="S3 • Create Bucket" href="#s3-•-create-bucket" description="Create a new S3 bucket" />
+  <LinkCard title="S3 • Copy Object" href="#s3-•-copy-object" description="Copy an object from one S3 location to another" />
+  <LinkCard title="S3 • Delete Object" href="#s3-•-delete-object" description="Delete an object from an S3 bucket" />
+  <LinkCard title="S3 • Head Object" href="#s3-•-head-object" description="Retrieve metadata for an S3 object without downloading it" />
+  <LinkCard title="S3 • Head Bucket" href="#s3-•-head-bucket" description="Check if an S3 bucket exists and you have access" />
+  <LinkCard title="S3 • Get Object Attributes" href="#s3-•-get-object-attributes" description="Retrieve attributes for an S3 object" />
+  <LinkCard title="S3 • Put Object" href="#s3-•-put-object" description="Upload an object to an S3 bucket" />
+  <LinkCard title="S3 • Delete Bucket" href="#s3-•-delete-bucket" description="Delete an S3 bucket (bucket must be empty)" />
+  <LinkCard title="S3 • Empty Bucket" href="#s3-•-empty-bucket" description="Delete all objects in an S3 bucket" />
   <LinkCard title="SQS • Send Message" href="#sqs-•-send-message" description="Send a message to an SQS queue" />
 </CardGrid>
 
@@ -2009,6 +2018,300 @@ The Publish Message component sends a message to an AWS SNS topic.
   },
   "timestamp": "2026-01-10T10:00:02.000000000Z",
   "type": "aws.sns.message.published"
+}
+```
+
+<a id="s3-•-create-bucket"></a>
+
+## S3 • Create Bucket
+
+The Create Bucket component creates a new AWS S3 bucket.
+
+### Use Cases
+
+- **Infrastructure provisioning**: Create buckets as part of automated setup workflows
+- **Multi-region deployment**: Create replicated buckets across regions
+- **Temporary storage**: Create buckets for short-lived processing pipelines
+
+### Configuration
+
+- **Region**: AWS region for the S3 bucket
+- **Bucket Name**: Name of the bucket to create
+
+### Example Output
+
+```json
+{
+  "type": "aws.s3.bucket",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "bucket": "my-new-bucket",
+    "region": "us-east-1"
+  }
+}
+```
+
+<a id="s3-•-copy-object"></a>
+
+## S3 • Copy Object
+
+The Copy Object component copies an object from one S3 location to another.
+
+### Use Cases
+
+- **Data replication**: Copy objects between buckets for backup
+- **Content migration**: Move files between environments
+- **File processing pipelines**: Copy input files to processing locations
+
+### Configuration
+
+- **Region**: AWS region of the destination S3 bucket
+- **Destination Bucket**: Target S3 bucket
+- **Destination Key**: Object key in the destination bucket
+- **Copy Source**: Source object path (bucket/key)
+
+### Example Output
+
+```json
+{
+  "type": "aws.s3.object.copied",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "bucket": "destination-bucket",
+    "key": "destination/file.txt",
+    "copySource": "source-bucket/source/file.txt",
+    "etag": "\"d41d8cd98f00b204e9800998ecf8427e\"",
+    "lastModified": "2026-02-11T12:00:00.000Z"
+  }
+}
+```
+
+<a id="s3-•-delete-object"></a>
+
+## S3 • Delete Object
+
+The Delete Object component deletes an object from an AWS S3 bucket.
+
+### Use Cases
+
+- **Cleanup workflows**: Remove temporary or expired files
+- **Data lifecycle management**: Delete objects as part of retention policies
+- **Pipeline cleanup**: Remove intermediate processing artifacts
+
+### Configuration
+
+- **Region**: AWS region of the S3 bucket
+- **Bucket**: Target S3 bucket
+- **Object Key**: Key of the object to delete
+
+### Example Output
+
+```json
+{
+  "type": "aws.s3.object.deleted",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "bucket": "my-bucket",
+    "key": "path/to/file.txt",
+    "deleted": true
+  }
+}
+```
+
+<a id="s3-•-head-object"></a>
+
+## S3 • Head Object
+
+The Head Object component retrieves metadata for an S3 object without downloading it.
+
+### Use Cases
+
+- **Object validation**: Verify an object exists before processing
+- **Metadata inspection**: Check content type, size, and storage class
+- **Conditional workflows**: Branch based on object properties
+
+### Configuration
+
+- **Region**: AWS region of the S3 bucket
+- **Bucket**: Target S3 bucket
+- **Object Key**: Key of the object to inspect
+
+### Example Output
+
+```json
+{
+  "type": "aws.s3.object",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "bucket": "my-bucket",
+    "key": "path/to/file.txt",
+    "contentType": "application/json",
+    "contentLength": "1024",
+    "etag": "\"d41d8cd98f00b204e9800998ecf8427e\"",
+    "lastModified": "Tue, 11 Feb 2026 12:00:00 GMT",
+    "storageClass": "STANDARD"
+  }
+}
+```
+
+<a id="s3-•-head-bucket"></a>
+
+## S3 • Head Bucket
+
+The Head Bucket component checks whether an S3 bucket exists and you have permission to access it.
+
+### Use Cases
+
+- **Pre-flight checks**: Verify bucket accessibility before operations
+- **Health monitoring**: Check bucket availability in monitoring workflows
+- **Conditional provisioning**: Create buckets only when they don't exist
+
+### Configuration
+
+- **Region**: AWS region of the S3 bucket
+- **Bucket**: Target S3 bucket to check
+
+### Example Output
+
+```json
+{
+  "type": "aws.s3.bucket",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "bucket": "my-bucket",
+    "region": "us-east-1",
+    "exists": true,
+    "accessPointAlias": false
+  }
+}
+```
+
+<a id="s3-•-get-object-attributes"></a>
+
+## S3 • Get Object Attributes
+
+The Get Object Attributes component retrieves attributes for an S3 object including ETag, storage class, and object size.
+
+### Use Cases
+
+- **Storage analysis**: Inspect object sizes and storage classes
+- **Data validation**: Verify object integrity using ETags
+- **Cost optimization**: Check storage class for cost management
+
+### Configuration
+
+- **Region**: AWS region of the S3 bucket
+- **Bucket**: Target S3 bucket
+- **Object Key**: Key of the object
+
+### Example Output
+
+```json
+{
+  "type": "aws.s3.object",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "bucket": "my-bucket",
+    "key": "path/to/file.txt",
+    "etag": "\"d41d8cd98f00b204e9800998ecf8427e\"",
+    "storageClass": "STANDARD",
+    "objectSize": 1024,
+    "lastModified": "Tue, 11 Feb 2026 12:00:00 GMT"
+  }
+}
+```
+
+<a id="s3-•-put-object"></a>
+
+## S3 • Put Object
+
+The Put Object component uploads an object to an AWS S3 bucket.
+
+### Use Cases
+
+- **Data export**: Write workflow results to S3
+- **Configuration management**: Store configuration files in S3
+- **Report generation**: Upload generated reports to S3
+
+### Configuration
+
+- **Region**: AWS region of the S3 bucket
+- **Bucket**: Target S3 bucket
+- **Object Key**: Key for the object
+- **Content Format**: JSON or Text
+- **Content**: Object content to upload
+
+### Example Output
+
+```json
+{
+  "type": "aws.s3.object",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "bucket": "my-bucket",
+    "key": "path/to/file.json"
+  }
+}
+```
+
+<a id="s3-•-delete-bucket"></a>
+
+## S3 • Delete Bucket
+
+The Delete Bucket component deletes an AWS S3 bucket. The bucket must be empty before it can be deleted.
+
+### Use Cases
+
+- **Infrastructure teardown**: Remove buckets during cleanup workflows
+- **Environment cleanup**: Delete temporary buckets after processing
+- **Resource management**: Automate bucket lifecycle management
+
+### Configuration
+
+- **Region**: AWS region of the S3 bucket
+- **Bucket**: Target S3 bucket to delete
+
+### Example Output
+
+```json
+{
+  "type": "aws.s3.bucket.deleted",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "bucket": "my-bucket",
+    "deleted": true
+  }
+}
+```
+
+<a id="s3-•-empty-bucket"></a>
+
+## S3 • Empty Bucket
+
+The Empty Bucket component deletes all objects in an AWS S3 bucket.
+
+### Use Cases
+
+- **Bucket cleanup**: Remove all objects before deleting a bucket
+- **Data reset**: Clear all data in a bucket for fresh processing
+- **Environment teardown**: Empty buckets as part of automated cleanup
+
+### Configuration
+
+- **Region**: AWS region of the S3 bucket
+- **Bucket**: Target S3 bucket to empty
+
+### Example Output
+
+```json
+{
+  "type": "aws.s3.bucket.emptied",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "bucket": "my-bucket",
+    "deletedCount": 42,
+    "emptied": true
+  }
 }
 ```
 

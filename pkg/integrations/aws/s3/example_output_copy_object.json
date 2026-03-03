@@ -1,0 +1,11 @@
+{
+  "type": "aws.s3.object.copied",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "bucket": "destination-bucket",
+    "key": "destination/file.txt",
+    "copySource": "source-bucket/source/file.txt",
+    "etag": "\"d41d8cd98f00b204e9800998ecf8427e\"",
+    "lastModified": "2026-02-11T12:00:00.000Z"
+  }
+}
