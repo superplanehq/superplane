@@ -1,0 +1,51 @@
+---
+title: "Terraform"
+---
+
+HashiCorp HCP Terraform & Enterprise Integration
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Run Event" href="#on-run-event" description="Trigger a workflow when a Terraform Run transitions to selected states." />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Run plan" href="#run-plan" description="Create a Terraform run and wait for its plan" />
+</CardGrid>
+
+## Instructions
+
+## Terraform Configuration
+
+To use the Terraform integration, you need an HCP Terraform API Token.
+
+1. Go to the [Team API Tokens page](https://app.terraform.io/app/&lt;YOUR_ORG&gt;/settings/authentication-tokens?tabIndex=1) in HCP Terraform, replacing "&lt;YOUR_ORG&gt;" with your actual organization name.
+2. Click **Create a team token** and provide a description.
+3. Once generated, paste the token in the API Token field below.
+
+<a id="on-run-event"></a>
+
+## On Run Event
+
+Trigger a workflow when a Terraform Run transitions to selected states.
+
+<a id="run-plan"></a>
+
+## Run plan
+
+Creates a Terraform run, polls its status, and waits for the plan to complete. It creates a plan only and does not allow applying.
+
+### Example Output
+
+```json
+{
+  "finalStatus": "planned",
+  "runId": "run-xxxxx"
+}
+```
+
