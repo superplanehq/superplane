@@ -16,7 +16,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Create Build" href="#create-build" description="Create and run a Cloud Build build" />
+  <LinkCard title="Create Build" href="#create-build" description="Create a Cloud Build build and wait for it to finish" />
   <LinkCard title="Get Build" href="#get-build" description="Retrieve a Cloud Build build by ID" />
   <LinkCard title="Create Virtual Machine" href="#create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
 </CardGrid>
@@ -62,6 +62,12 @@ The On Build Complete trigger starts a workflow execution when a GCP Cloud Build
 ### Setup
 
 **Required GCP setup:** Ensure the **Cloud Build API** is enabled in your project. The service account used by the integration must have `roles/pubsub.admin` to create a push subscription on the `cloud-builds` topic.
+
+### Configuration
+
+- **Statuses**: Filter by terminal Cloud Build status.
+- **Build Source**: Optionally limit events to trigger-based builds or direct/API builds. Leave empty to listen to both.
+- **Cloud Build Trigger**: Filter to a specific Cloud Build trigger. This only applies to trigger-based builds and cannot be combined with **Build Source = Direct/API Builds**.
 
 ### Event Data
 
@@ -128,39 +134,18 @@ Each event includes the audit log entry with resourceName (e.g. projects/my-proj
 
 ## Create Build
 
-Creates and starts a Google Cloud Build build, then waits for it to finish.
+Creates and starts a Google Cloud Build build, then waits for the build to reach a terminal status.
 
 ### Configuration
 
 - **Steps** (required): JSON array of build steps. Each step needs at minimum a `name` (builder image) and optional `args`. Example: `[{"name":"gcr.io/cloud-builders/docker","args":["build","-t","gcr.io/$PROJECT_ID/myapp","."]}]`
-- **Source**: Optional JSON object for the build source. Use this for advanced sources like `gitSource`, `repoSource`, `connectedRepository`, or `storageSource`. Example: `{"gitSource":{"url":"https://github.com/org/repo.git","revision":"main"}}`
-- **Use Connected Repository**: Enable this to pick a Cloud Build 2nd-gen region, connection, repository, and branch/tag/commit directly from GCP. SuperPlane sends `source.connectedRepository` and creates the build in that region.
-- **Cloud Build Location / Connection / Connected Repository**: Select the regional Cloud Build connection and repository to build from.
-- **Connected Repository Revision**: Choose whether the connected repository uses a branch, tag, or commit SHA.
-- **Connected Branch / Tag / Commit SHA**: Choose exactly one connected repository revision based on the selected revision type.
-- **Repository URL / Cloud Source Repo**: Manual shortcut source field. If the value is a Git URL such as `https://github.com/org/repo.git` or `git@github.com:org/repo.git`, SuperPlane creates `source.gitSource`. If it is a plain repository name, SuperPlane treats it as a Cloud Source Repository and creates `source.repoSource`.
-- **Branch Name / Tag Name / Commit SHA**: Choose exactly one revision field when using **Repository URL / Cloud Source Repo**.
+- **Source**: Optional JSON object for the build source. This is the most flexible option and supports `gitSource`, `repoSource`, or `storageSource`. Example: `{"gitSource":{"url":"https://github.com/org/repo.git","revision":"main"}}`
+- **Connected Repository**: Optional Cloud Build 2nd-gen repository path. Select a location, connection, repository, and branch/tag/commit directly from GCP. SuperPlane sends `source.connectedRepository` and creates the build in the repository's region.
+- **Repository / Branch / Tag / Commit SHA**: Convenience shortcut for repository-backed builds. If the repository value looks like a Git URL (`https://...`, `ssh://...`, or `git@...`), SuperPlane creates `source.gitSource`. Otherwise it treats the value as a Cloud Source Repository name and creates `source.repoSource`. Choose exactly one revision field.
 - **Images**: Optional list of Docker image names to push after the build.
 - **Substitutions**: JSON object of substitution key-value pairs (e.g. `{"_ENV":"production"}`).
 - **Timeout**: Build timeout (e.g. `600s`). Defaults to Cloud Build default (10 minutes).
-- **Project ID Override**: Override the connected GCP project when needed.
-
-### How To Use
-
-- **Custom build**: Provide **Steps** only, or **Steps** plus **Source** if you need an advanced source definition.
-- **Connected repository build**: Enable **Use Connected Repository**, select the **Cloud Build Location**, **Connection**, **Connected Repository**, then choose **Branch**, **Tag**, or **Commit SHA** from the connected repository selectors.
-- **Repository build**: Set **Repository URL / Cloud Source Repo** to a Git URL, then set exactly one of **Branch Name**, **Tag Name**, or **Commit SHA**. Cloud Build checks out the repository and runs your steps against that workspace.
-- **Cloud Source Repository build**: Either set **Repository URL / Cloud Source Repo** to the repository name and one revision field, or use **Source** with a `repoSource` object if you need full control.
-
-### Example Repository Build
-
-```json
-{
-  "repoName": "https://github.com/org/repo.git",
-  "branchName": "main",
-  "steps": "[{\"name\":\"golang:1.22\",\"entrypoint\":\"bash\",\"args\":[\"-lc\",\"go test ./...\"]}]"
-}
-```
+- **Project ID Override**: Optionally run the build in a different project than the connected integration.
 
 ### Output
 
@@ -251,3 +236,4 @@ Emits a payload with instance details: instanceId, selfLink, internalIP, externa
   "zone": "us-central1-a"
 }
 ```
+

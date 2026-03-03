@@ -57,6 +57,19 @@ func TestOnBuildCompleteSetup(t *testing.T) {
 
 		require.ErrorContains(t, err, "connect the GCP integration")
 	})
+
+	t.Run("rejects direct build source with trigger id filter", func(t *testing.T) {
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: map[string]any{
+				"buildSource": buildSourceDirect,
+				"triggerId":   "trigger-abc",
+			},
+			Integration: &testcontexts.IntegrationContext{},
+			Metadata:    &testcontexts.MetadataContext{},
+		})
+
+		require.ErrorContains(t, err, "triggerId cannot be combined")
+	})
 }
 
 func Test_OnBuildComplete_Metadata(t *testing.T) {
@@ -132,6 +145,96 @@ func Test_OnBuildComplete_OnIntegrationMessage(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("no build source filter listens to both triggered and direct builds", func(t *testing.T) {
+		for _, message := range []map[string]any{
+			{
+				"id":             "build-123",
+				"status":         "SUCCESS",
+				"buildTriggerId": "trigger-abc",
+			},
+			{
+				"id":     "build-456",
+				"status": "SUCCESS",
+			},
+		} {
+			events := &testcontexts.EventContext{}
+			err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+				Configuration: map[string]any{},
+				Message:       message,
+				Logger:        logger,
+				Events:        events,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, 1, events.Count())
+		}
+	})
+
+	t.Run("triggered build source emits only builds with buildTriggerId", func(t *testing.T) {
+		triggeredEvents := &testcontexts.EventContext{}
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Configuration: map[string]any{
+				"buildSource": buildSourceTriggered,
+			},
+			Message: map[string]any{
+				"id":             "build-123",
+				"status":         "SUCCESS",
+				"buildTriggerId": "trigger-abc",
+			},
+			Logger: logger,
+			Events: triggeredEvents,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 1, triggeredEvents.Count())
+
+		directEvents := &testcontexts.EventContext{}
+		err = trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Configuration: map[string]any{
+				"buildSource": buildSourceTriggered,
+			},
+			Message: map[string]any{
+				"id":     "build-456",
+				"status": "SUCCESS",
+			},
+			Logger: logger,
+			Events: directEvents,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 0, directEvents.Count())
+	})
+
+	t.Run("direct build source emits only builds without buildTriggerId", func(t *testing.T) {
+		directEvents := &testcontexts.EventContext{}
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Configuration: map[string]any{
+				"buildSource": buildSourceDirect,
+			},
+			Message: map[string]any{
+				"id":     "build-456",
+				"status": "SUCCESS",
+			},
+			Logger: logger,
+			Events: directEvents,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 1, directEvents.Count())
+
+		triggeredEvents := &testcontexts.EventContext{}
+		err = trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Configuration: map[string]any{
+				"buildSource": buildSourceDirect,
+			},
+			Message: map[string]any{
+				"id":             "build-123",
+				"status":         "SUCCESS",
+				"buildTriggerId": "trigger-abc",
+			},
+			Logger: logger,
+			Events: triggeredEvents,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 0, triggeredEvents.Count())
 	})
 
 	t.Run("trigger ID filter matches emits event", func(t *testing.T) {
