@@ -1,4 +1,6 @@
 import type {
+  ComponentsEdge,
+  ComponentsNode,
   OrganizationsIntegration,
   SuperplaneBlueprintsOutputChannel,
   SuperplaneComponentsOutputChannel,
@@ -112,6 +114,12 @@ export interface BuildingBlocksSidebarProps {
     label?: string;
     type?: string;
   }>;
+  aiCanvas?: {
+    name?: string;
+    description?: string;
+    nodes?: ComponentsNode[];
+    edges?: ComponentsEdge[];
+  };
   onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
   integrations?: OrganizationsIntegration[];
   canvasZoom?: number;
@@ -224,6 +232,7 @@ export function BuildingBlocksSidebar({
   showAiBuilderTab = false,
   canvasId,
   canvasNodes = [],
+  aiCanvas,
   onApplyAiOperations,
   integrations = [],
   canvasZoom = 1,
@@ -380,6 +389,16 @@ export function BuildingBlocksSidebar({
               canvasContext: {
                 nodes: canvasNodes,
                 availableBlocks,
+                canvas: {
+                  metadata: {
+                    name: aiCanvas?.name || "",
+                    description: aiCanvas?.description || "",
+                  },
+                  spec: {
+                    nodes: aiCanvas?.nodes || [],
+                    edges: aiCanvas?.edges || [],
+                  },
+                },
               },
             },
           }),

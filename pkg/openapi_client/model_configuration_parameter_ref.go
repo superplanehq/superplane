@@ -20,8 +20,8 @@ var _ MappedNullable = &ConfigurationParameterRef{}
 
 // ConfigurationParameterRef struct for ConfigurationParameterRef
 type ConfigurationParameterRef struct {
-	Name      *string                          `json:"name,omitempty"`
-	Value     *string                          `json:"value,omitempty"`
+	Name *string `json:"name,omitempty"`
+	Value *string `json:"value,omitempty"`
 	ValueFrom *ConfigurationParameterValueFrom `json:"valueFrom,omitempty"`
 }
 
@@ -139,7 +139,7 @@ func (o *ConfigurationParameterRef) SetValueFrom(v ConfigurationParameterValueFr
 }
 
 func (o ConfigurationParameterRef) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,3 +195,5 @@ func (v *NullableConfigurationParameterRef) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

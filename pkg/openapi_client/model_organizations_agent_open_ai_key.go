@@ -21,13 +21,13 @@ var _ MappedNullable = &OrganizationsAgentOpenAIKey{}
 
 // OrganizationsAgentOpenAIKey struct for OrganizationsAgentOpenAIKey
 type OrganizationsAgentOpenAIKey struct {
-	Configured      *bool      `json:"configured,omitempty"`
-	Last4           *string    `json:"last4,omitempty"`
-	Status          *string    `json:"status,omitempty"`
-	ValidationError *string    `json:"validationError,omitempty"`
-	ValidatedAt     *time.Time `json:"validatedAt,omitempty"`
-	UpdatedAt       *time.Time `json:"updatedAt,omitempty"`
-	UpdatedBy       *string    `json:"updatedBy,omitempty"`
+	Configured *bool `json:"configured,omitempty"`
+	Last4 *string `json:"last4,omitempty"`
+	Status *string `json:"status,omitempty"`
+	ValidationError *string `json:"validationError,omitempty"`
+	ValidatedAt *time.Time `json:"validatedAt,omitempty"`
+	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	UpdatedBy *string `json:"updatedBy,omitempty"`
 }
 
 // NewOrganizationsAgentOpenAIKey instantiates a new OrganizationsAgentOpenAIKey object
@@ -272,7 +272,7 @@ func (o *OrganizationsAgentOpenAIKey) SetUpdatedBy(v string) {
 }
 
 func (o OrganizationsAgentOpenAIKey) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -340,3 +340,5 @@ func (v *NullableOrganizationsAgentOpenAIKey) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

@@ -73,7 +73,7 @@ func (o *OrganizationsUpdateAgentSettingsResponse) SetAgentSettings(v Organizati
 }
 
 func (o OrganizationsUpdateAgentSettingsResponse) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -123,3 +123,5 @@ func (v *NullableOrganizationsUpdateAgentSettingsResponse) UnmarshalJSON(src []b
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

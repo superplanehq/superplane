@@ -3705,6 +3705,9 @@
             "type": "object",
             "$ref": "#/definitions/CanvasesCanvasAiBlockContext"
           }
+        },
+        "canvas": {
+          "$ref": "#/definitions/CanvasesCanvas"
         }
       }
     },
