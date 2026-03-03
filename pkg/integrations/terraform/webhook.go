@@ -55,9 +55,15 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 
 	targetURL := ctx.Webhook.GetURL()
 
-	webhookSecretBytes, err := ctx.Integration.GetConfig("webhookSecret")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get webhook secret: %w", err)
+	var webhookSecretBytes []byte
+	secrets, err := ctx.Integration.GetSecrets()
+	if err == nil {
+		for _, s := range secrets {
+			if s.Name == "webhookSecret" {
+				webhookSecretBytes = s.Value
+				break
+			}
+		}
 	}
 	webhookSecret := strings.TrimSpace(string(webhookSecretBytes))
 
@@ -82,7 +88,7 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list webhooks: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusOK {
 		var listPayload struct {
@@ -122,7 +128,7 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 					if err != nil {
 						return nil, fmt.Errorf("failed to update existing webhook: %w", err)
 					}
-					defer uResp.Body.Close()
+					defer func() { _ = uResp.Body.Close() }()
 
 					if uResp.StatusCode >= 400 {
 						return nil, fmt.Errorf("failed to update existing webhook, status code: %d", uResp.StatusCode)
@@ -243,7 +249,7 @@ func (h *WebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete terraform webhook %s: %w", id, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 && resp.StatusCode != http.StatusNotFound {
 		return fmt.Errorf("failed to delete terraform webhook %s, status: %d", id, resp.StatusCode)
@@ -253,9 +259,18 @@ func (h *WebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 }
 
 func ParseAndValidateWebhook(ctx core.WebhookRequestContext) (map[string]any, int, error) {
-	webhookSecretBytes, err := ctx.Integration.GetConfig("webhookSecret")
-	if err != nil {
-		return nil, http.StatusInternalServerError, fmt.Errorf("failed to get webhook secret: %w", err)
+	var webhookSecretBytes []byte
+	secrets, err := ctx.Integration.GetSecrets()
+	if err == nil {
+		for _, s := range secrets {
+			if s.Name == "webhookSecret" {
+				webhookSecretBytes = s.Value
+				break
+			}
+		}
+	}
+	if len(webhookSecretBytes) == 0 {
+		return nil, http.StatusInternalServerError, fmt.Errorf("failed to get webhook secret or none configured")
 	}
 
 	webhookSecret := strings.TrimSpace(string(webhookSecretBytes))
