@@ -31,7 +31,7 @@ func TestOnBuildCompleteSetup(t *testing.T) {
 		assert.NotEmpty(t, metadata.SubscriptionID)
 	})
 
-	t.Run("is idempotent when subscription already exists", func(t *testing.T) {
+	t.Run("ensures subscription exists even when metadata already has a subscription id", func(t *testing.T) {
 		integrationCtx := &testcontexts.IntegrationContext{}
 		metadataCtx := &testcontexts.MetadataContext{
 			Metadata: OnBuildCompleteMetadata{SubscriptionID: "existing-id"},
@@ -43,7 +43,11 @@ func TestOnBuildCompleteSetup(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Empty(t, integrationCtx.Subscriptions)
+		require.Len(t, integrationCtx.Subscriptions, 1)
+
+		metadata := OnBuildCompleteMetadata{}
+		require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &metadata))
+		assert.NotEmpty(t, metadata.SubscriptionID)
 	})
 
 	t.Run("returns error when integration is nil", func(t *testing.T) {
