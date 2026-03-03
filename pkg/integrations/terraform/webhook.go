@@ -162,8 +162,10 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	var ncID string
 	var createErr error
 	maxRetries := 3
+	attempts := 0
 
 	for i := 0; i < maxRetries; i++ {
+		attempts++
 		cReq, err := client.newRequest(context.Background(), http.MethodPost, listPath, createOpts)
 		if err != nil {
 			createErr = err
@@ -211,7 +213,7 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	}
 
 	if createErr != nil {
-		return nil, fmt.Errorf("failed to create terraform webhook after %d attempts: %w", maxRetries, createErr)
+		return nil, fmt.Errorf("failed to create terraform webhook after %d attempts: %w", attempts, createErr)
 	}
 
 	return map[string]string{
