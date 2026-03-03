@@ -665,20 +665,7 @@ func resolveServerID(config any) (string, error) {
 		return "", fmt.Errorf("server is required")
 	}
 
-	switch v := raw.(type) {
-	case string:
-		s := strings.TrimSpace(v)
-		if s == "" {
-			return "", fmt.Errorf("server is required")
-		}
-		return s, nil
-	case float64:
-		return fmt.Sprintf("%.0f", v), nil
-	case int:
-		return fmt.Sprintf("%d", v), nil
-	default:
-		return "", fmt.Errorf("invalid server value: %v", raw)
-	}
+	return resolveResourceID(raw, "server")
 }
 
 // resolveLoadBalancerID extracts the load balancer ID from the configuration map,
@@ -695,20 +682,7 @@ func resolveLoadBalancerID(config any) (string, error) {
 		return "", fmt.Errorf("loadBalancer is required")
 	}
 
-	switch v := raw.(type) {
-	case string:
-		s := strings.TrimSpace(v)
-		if s == "" {
-			return "", fmt.Errorf("loadBalancer is required")
-		}
-		return s, nil
-	case float64:
-		return fmt.Sprintf("%.0f", v), nil
-	case int:
-		return fmt.Sprintf("%d", v), nil
-	default:
-		return "", fmt.Errorf("invalid loadBalancer value: %v", raw)
-	}
+	return resolveResourceID(raw, "loadBalancer")
 }
 
 // resolveImageID extracts the image ID from configuration, handling
@@ -724,10 +698,14 @@ func resolveImageID(config any, fieldName string) (string, error) {
 		return "", fmt.Errorf("%s is required", fieldName)
 	}
 
+	return resolveResourceID(raw, fieldName)
+}
+
+func resolveResourceID(raw any, fieldName string) (string, error) {
 	switch v := raw.(type) {
 	case string:
 		s := strings.TrimSpace(v)
-		if s == "" {
+		if isInvalidResourceIDValue(s) {
 			return "", fmt.Errorf("%s is required", fieldName)
 		}
 		return s, nil
@@ -738,4 +716,13 @@ func resolveImageID(config any, fieldName string) (string, error) {
 	default:
 		return "", fmt.Errorf("invalid %s value: %v", fieldName, raw)
 	}
+}
+
+func isInvalidResourceIDValue(value string) bool {
+	if value == "" {
+		return true
+	}
+
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	return normalized == "<nil>" || normalized == "nil" || normalized == "null" || strings.Contains(normalized, "{{")
 }
