@@ -76,6 +76,9 @@ func CreateCanvasChangeRequest(
 		existingRequest, findErr := models.FindCanvasChangeRequestByVersionInTransaction(tx, canvasUUID, versionUUID)
 		if findErr == nil {
 			request = existingRequest
+			if request.Status == models.CanvasChangeRequestStatusClosed {
+				request.Status = models.CanvasChangeRequestStatusOpen
+			}
 			return refreshCanvasChangeRequestDiffInTransaction(tx, canvasInTx, version, request)
 		}
 		if !errors.Is(findErr, gorm.ErrRecordNotFound) {

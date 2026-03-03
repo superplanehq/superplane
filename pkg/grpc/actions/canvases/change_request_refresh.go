@@ -29,7 +29,8 @@ func refreshCanvasChangeRequestDiffInTransaction(
 	request.ConflictingNodeIDs = datatypes.NewJSONSlice(diff.ConflictingNodeIDs)
 	request.UpdatedAt = &now
 
-	if request.Status != models.CanvasChangeRequestStatusPublished {
+	if request.Status != models.CanvasChangeRequestStatusPublished &&
+		request.Status != models.CanvasChangeRequestStatusClosed {
 		if len(diff.ConflictingNodeIDs) > 0 {
 			request.Status = models.CanvasChangeRequestStatusConflicted
 		} else {

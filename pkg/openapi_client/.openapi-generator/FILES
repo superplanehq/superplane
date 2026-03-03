@@ -63,6 +63,7 @@ docs/CanvasesCanvasSpec.md
 docs/CanvasesCanvasStatus.md
 docs/CanvasesCanvasVersion.md
 docs/CanvasesCanvasVersionMetadata.md
+docs/CanvasesCloseCanvasChangeRequestResponse.md
 docs/CanvasesCreateCanvasChangeRequestBody.md
 docs/CanvasesCreateCanvasChangeRequestResponse.md
 docs/CanvasesCreateCanvasRequest.md
@@ -90,6 +91,8 @@ docs/CanvasesPublishCanvasChangeRequestBody.md
 docs/CanvasesPublishCanvasChangeRequestResponse.md
 docs/CanvasesPublishCanvasVersionBody.md
 docs/CanvasesPublishCanvasVersionResponse.md
+docs/CanvasesResolveCanvasChangeRequestBody.md
+docs/CanvasesResolveCanvasChangeRequestResponse.md
 docs/CanvasesResolveExecutionErrorsBody.md
 docs/CanvasesSendAiMessageBody.md
 docs/CanvasesSendAiMessageResponse.md
@@ -287,6 +290,7 @@ model_canvases_canvas_spec.go
 model_canvases_canvas_status.go
 model_canvases_canvas_version.go
 model_canvases_canvas_version_metadata.go
+model_canvases_close_canvas_change_request_response.go
 model_canvases_create_canvas_change_request_body.go
 model_canvases_create_canvas_change_request_response.go
 model_canvases_create_canvas_request.go
@@ -314,6 +318,8 @@ model_canvases_publish_canvas_change_request_body.go
 model_canvases_publish_canvas_change_request_response.go
 model_canvases_publish_canvas_version_body.go
 model_canvases_publish_canvas_version_response.go
+model_canvases_resolve_canvas_change_request_body.go
+model_canvases_resolve_canvas_change_request_response.go
 model_canvases_resolve_execution_errors_body.go
 model_canvases_send_ai_message_body.go
 model_canvases_send_ai_message_response.go

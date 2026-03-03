@@ -45,6 +45,8 @@ import {
   useDiscardCanvasVersion,
   useUpdateCanvasVersion,
   usePublishCanvasChangeRequest,
+  useCloseCanvasChangeRequest,
+  useResolveCanvasChangeRequest,
   useCanvasChangeRequests,
   useTriggers,
   useCanvas,
@@ -195,6 +197,8 @@ export function WorkflowPageV2() {
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
   const createCanvasChangeRequestMutation = useCreateCanvasChangeRequest(organizationId!, canvasId!);
   const publishCanvasChangeRequestMutation = usePublishCanvasChangeRequest(organizationId!, canvasId!);
+  const closeCanvasChangeRequestMutation = useCloseCanvasChangeRequest(organizationId!, canvasId!);
+  const resolveCanvasChangeRequestMutation = useResolveCanvasChangeRequest(organizationId!, canvasId!);
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
@@ -240,10 +244,11 @@ export function WorkflowPageV2() {
       canvasChangeRequests.filter((changeRequest) => {
         const status = changeRequest.metadata?.status;
         if (typeof status === "number") {
-          return status !== 2;
+          return status !== 2 && status !== 4;
         }
 
-        return !(status || "").toLowerCase().includes("publish");
+        const statusText = (status || "").toLowerCase();
+        return !statusText.includes("publish") && !statusText.includes("closed");
       }).length,
     [canvasChangeRequests],
   );
@@ -3276,6 +3281,86 @@ export function WorkflowPageV2() {
     setSearchParams,
   ]);
 
+  const handleResolveChangeRequest = useCallback(
+    async (data: { changeRequestId: string; nodes: Record<string, unknown>[]; edges: Record<string, unknown>[] }) => {
+      if (!organizationId || !canvasId || !canvas?.metadata?.name) {
+        return;
+      }
+
+      try {
+        const response = await resolveCanvasChangeRequestMutation.mutateAsync({
+          changeRequestId: data.changeRequestId,
+          name: canvas.metadata.name,
+          description: canvas.metadata?.description,
+          nodes: data.nodes,
+          edges: data.edges,
+        });
+
+        const resolvedVersion = response?.data?.version;
+        const resolvedVersionID = resolvedVersion?.metadata?.id || "";
+        if (resolvedVersion && resolvedVersionID) {
+          setActiveCanvasVersion(resolvedVersion);
+          setSearchParams((current) => {
+            const next = new URLSearchParams(current);
+            next.set("version", resolvedVersionID);
+            return next;
+          });
+        }
+
+        const resolvedChangeRequestID = response?.data?.changeRequest?.metadata?.id || "";
+        if (resolvedChangeRequestID) {
+          setSelectedChangeRequestId(resolvedChangeRequestID);
+        }
+
+        showSuccessToast("Change request conflicts resolved");
+      } catch (error) {
+        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        const errorMessage =
+          responseMessage || (error as { message?: string })?.message || "Failed to resolve change request conflicts";
+        showErrorToast(errorMessage);
+      }
+    },
+    [
+      organizationId,
+      canvasId,
+      canvas?.metadata?.name,
+      canvas?.metadata?.description,
+      resolveCanvasChangeRequestMutation,
+    ],
+  );
+
+  const handleCloseChangeRequest = useCallback(
+    async (changeRequestId: string) => {
+      if (!organizationId || !canvasId || !changeRequestId) {
+        return;
+      }
+
+      const shouldClose = window.confirm("Close this change request?");
+      if (!shouldClose) {
+        return;
+      }
+
+      try {
+        const response = await closeCanvasChangeRequestMutation.mutateAsync({
+          changeRequestId,
+        });
+
+        const closedChangeRequestID = response?.data?.changeRequest?.metadata?.id || changeRequestId;
+        if (closedChangeRequestID) {
+          setSelectedChangeRequestId(closedChangeRequestID);
+        }
+
+        showSuccessToast("Change request closed");
+      } catch (error) {
+        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        const errorMessage =
+          responseMessage || (error as { message?: string })?.message || "Failed to close change request";
+        showErrorToast(errorMessage);
+      }
+    },
+    [organizationId, canvasId, closeCanvasChangeRequestMutation],
+  );
+
   const handleDiscardVersion = useCallback(async () => {
     if (!organizationId || !canvasId || !activeCanvasVersionId || !hasEditableVersion) {
       return;
@@ -3768,9 +3853,17 @@ export function WorkflowPageV2() {
 
     return (selectedChangeRequestStatus || "").toLowerCase().includes("publish");
   })();
+  const selectedChangeRequestIsClosed = (() => {
+    if (typeof selectedChangeRequestStatus === "number") {
+      return selectedChangeRequestStatus === 4;
+    }
+
+    return (selectedChangeRequestStatus || "").toLowerCase().includes("closed");
+  })();
   const publishChangeRequestDisabled =
     !selectedChangeRequest ||
     selectedChangeRequestIsPublished ||
+    selectedChangeRequestIsClosed ||
     selectedChangeRequestHasConflicts ||
     publishCanvasChangeRequestMutation.isPending ||
     canvasDeletedRemotely ||
@@ -3812,19 +3905,26 @@ export function WorkflowPageV2() {
         liveCanvasVersion={liveCanvasVersion}
         myVersions={draftVersions}
         activeCanvasVersionId={activeCanvasVersionId}
+        canvasName={canvas?.metadata?.name || ""}
+        canvasDescription={canvas?.metadata?.description}
         changeRequests={canvasChangeRequests}
         selectedChangeRequestId={selectedChangeRequestId}
+        currentUserId={currentUserId}
         onUseVersion={handleUseVersion}
         onSelectChangeRequest={handleSelectChangeRequest}
         onPublishChangeRequest={handlePublishChangeRequest}
+        onCloseChangeRequest={handleCloseChangeRequest}
+        onResolveChangeRequest={handleResolveChangeRequest}
         onCreateVersion={handleCreateVersion}
         onCreateChangeRequest={handleCreateChangeRequest}
         createVersionDisabled={createVersionDisabled}
         createChangeRequestDisabled={createChangeRequestDisabled}
         publishChangeRequestDisabled={publishChangeRequestDisabled}
+        resolveChangeRequestPending={resolveCanvasChangeRequestMutation.isPending}
         createVersionPending={createCanvasVersionMutation.isPending}
         createChangeRequestPending={createCanvasChangeRequestMutation.isPending}
         publishChangeRequestPending={publishCanvasChangeRequestMutation.isPending}
+        closeChangeRequestPending={closeCanvasChangeRequestMutation.isPending}
       />
     );
 

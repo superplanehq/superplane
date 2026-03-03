@@ -122,6 +122,28 @@ func (s *CanvasService) PublishCanvasChangeRequest(ctx context.Context, req *pb.
 	)
 }
 
+func (s *CanvasService) ResolveCanvasChangeRequest(ctx context.Context, req *pb.ResolveCanvasChangeRequestRequest) (*pb.ResolveCanvasChangeRequestResponse, error) {
+	if req.Canvas == nil {
+		return nil, status.Error(codes.InvalidArgument, "canvas is required")
+	}
+
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ResolveCanvasChangeRequest(
+		ctx,
+		s.registry,
+		organizationID,
+		req.CanvasId,
+		req.ChangeRequestId,
+		req.Canvas,
+		req.AutoLayout,
+	)
+}
+
+func (s *CanvasService) CloseCanvasChangeRequest(ctx context.Context, req *pb.CloseCanvasChangeRequestRequest) (*pb.CloseCanvasChangeRequestResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CloseCanvasChangeRequest(ctx, organizationID, req.CanvasId, req.ChangeRequestId)
+}
+
 func (s *CanvasService) DiscardCanvasVersion(ctx context.Context, req *pb.DiscardCanvasVersionRequest) (*pb.DiscardCanvasVersionResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.DiscardCanvasVersion(ctx, organizationID, req.CanvasId, req.VersionId)

@@ -13,6 +13,7 @@ const (
 	CanvasChangeRequestStatusOpen       = "open"
 	CanvasChangeRequestStatusPublished  = "published"
 	CanvasChangeRequestStatusConflicted = "conflicted"
+	CanvasChangeRequestStatusClosed     = "closed"
 )
 
 type CanvasChangeRequest struct {

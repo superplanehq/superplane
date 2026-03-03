@@ -144,7 +144,8 @@ export type CanvasesCanvasChangeRequestStatus =
   | "STATUS_UNSPECIFIED"
   | "STATUS_OPEN"
   | "STATUS_PUBLISHED"
-  | "STATUS_CONFLICTED";
+  | "STATUS_CONFLICTED"
+  | "STATUS_CLOSED";
 
 export type CanvasesCanvasEvent = {
   id?: string;
@@ -254,6 +255,14 @@ export type CanvasesCanvasVersionMetadata = {
   publishedAt?: string;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type CanvasesCloseCanvasChangeRequestBody = {
+  [key: string]: unknown;
+};
+
+export type CanvasesCloseCanvasChangeRequestResponse = {
+  changeRequest?: CanvasesCanvasChangeRequest;
 };
 
 export type CanvasesCreateCanvasChangeRequestBody = {
@@ -414,6 +423,16 @@ export type CanvasesPublishCanvasVersionBody = {
 export type CanvasesPublishCanvasVersionResponse = {
   canvas?: CanvasesCanvas;
   version?: CanvasesCanvasVersion;
+};
+
+export type CanvasesResolveCanvasChangeRequestBody = {
+  canvas?: CanvasesCanvas;
+  autoLayout?: CanvasesCanvasAutoLayout;
+};
+
+export type CanvasesResolveCanvasChangeRequestResponse = {
+  version?: CanvasesCanvasVersion;
+  changeRequest?: CanvasesCanvasChangeRequest;
 };
 
 export type CanvasesResolveExecutionErrorsBody = {
@@ -1636,6 +1655,36 @@ export type CanvasesDescribeCanvasChangeRequestResponses = {
 export type CanvasesDescribeCanvasChangeRequestResponse2 =
   CanvasesDescribeCanvasChangeRequestResponses[keyof CanvasesDescribeCanvasChangeRequestResponses];
 
+export type CanvasesCloseCanvasChangeRequestData = {
+  body: CanvasesCloseCanvasChangeRequestBody;
+  path: {
+    canvasId: string;
+    changeRequestId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/close";
+};
+
+export type CanvasesCloseCanvasChangeRequestErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesCloseCanvasChangeRequestError =
+  CanvasesCloseCanvasChangeRequestErrors[keyof CanvasesCloseCanvasChangeRequestErrors];
+
+export type CanvasesCloseCanvasChangeRequestResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesCloseCanvasChangeRequestResponse;
+};
+
+export type CanvasesCloseCanvasChangeRequestResponse2 =
+  CanvasesCloseCanvasChangeRequestResponses[keyof CanvasesCloseCanvasChangeRequestResponses];
+
 export type CanvasesPublishCanvasChangeRequestData = {
   body: CanvasesPublishCanvasChangeRequestBody;
   path: {
@@ -1665,6 +1714,36 @@ export type CanvasesPublishCanvasChangeRequestResponses = {
 
 export type CanvasesPublishCanvasChangeRequestResponse2 =
   CanvasesPublishCanvasChangeRequestResponses[keyof CanvasesPublishCanvasChangeRequestResponses];
+
+export type CanvasesResolveCanvasChangeRequestData = {
+  body: CanvasesResolveCanvasChangeRequestBody;
+  path: {
+    canvasId: string;
+    changeRequestId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/resolve";
+};
+
+export type CanvasesResolveCanvasChangeRequestErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesResolveCanvasChangeRequestError =
+  CanvasesResolveCanvasChangeRequestErrors[keyof CanvasesResolveCanvasChangeRequestErrors];
+
+export type CanvasesResolveCanvasChangeRequestResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesResolveCanvasChangeRequestResponse;
+};
+
+export type CanvasesResolveCanvasChangeRequestResponse2 =
+  CanvasesResolveCanvasChangeRequestResponses[keyof CanvasesResolveCanvasChangeRequestResponses];
 
 export type CanvasesListCanvasEventsData = {
   body?: never;

@@ -179,6 +179,30 @@ service Canvases {
     };
   }
 
+  rpc ResolveCanvasChangeRequest(ResolveCanvasChangeRequestRequest) returns (ResolveCanvasChangeRequestResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}/resolve"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Resolve canvas change request conflicts";
+      description: "Updates a change request version with a resolved result and rebases it on the current live version";
+      tags: "CanvasChangeRequest";
+    };
+  }
+
+  rpc CloseCanvasChangeRequest(CloseCanvasChangeRequestRequest) returns (CloseCanvasChangeRequestResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}/close"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Close canvas change request";
+      description: "Closes an open or conflicted canvas change request";
+      tags: "CanvasChangeRequest";
+    };
+  }
+
   rpc DeleteCanvas(DeleteCanvasRequest) returns (DeleteCanvasResponse) {
     option (google.api.http) = {
       delete: "/api/v1/canvases/{id}"
@@ -509,6 +533,27 @@ message PublishCanvasChangeRequestResponse {
   CanvasChangeRequest change_request = 3;
 }
 
+message ResolveCanvasChangeRequestRequest {
+  string canvas_id = 1;
+  string change_request_id = 2;
+  Canvas canvas = 3;
+  CanvasAutoLayout auto_layout = 4;
+}
+
+message ResolveCanvasChangeRequestResponse {
+  CanvasVersion version = 1;
+  CanvasChangeRequest change_request = 2;
+}
+
+message CloseCanvasChangeRequestRequest {
+  string canvas_id = 1;
+  string change_request_id = 2;
+}
+
+message CloseCanvasChangeRequestResponse {
+  CanvasChangeRequest change_request = 1;
+}
+
 message DeleteCanvasRequest {
   string id = 1;
 }
@@ -576,6 +621,7 @@ message CanvasChangeRequest {
     STATUS_OPEN = 1;
     STATUS_PUBLISHED = 2;
     STATUS_CONFLICTED = 3;
+    STATUS_CLOSED = 4;
   }
 
   message Metadata {

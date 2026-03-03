@@ -12,6 +12,8 @@ import {
   canvasesListCanvasChangeRequests,
   canvasesDescribeCanvasChangeRequest,
   canvasesPublishCanvasChangeRequest,
+  canvasesCloseCanvasChangeRequest,
+  canvasesResolveCanvasChangeRequest,
   canvasesDiscardCanvasVersion,
   canvasesDiscardCanvasVersion2,
   canvasesDeleteCanvas,
@@ -389,6 +391,86 @@ export const usePublishCanvasChangeRequest = (organizationId: string, canvasId: 
       if (response?.data?.canvas) {
         queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), response.data.canvas);
       }
+    },
+  });
+};
+
+export const useResolveCanvasChangeRequest = (organizationId: string, canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      changeRequestId: string;
+      name: string;
+      description?: string;
+      nodes?: any[];
+      edges?: any[];
+      autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
+    }) => {
+      return await canvasesResolveCanvasChangeRequest(
+        withOrganizationHeader({
+          path: { canvasId, changeRequestId: data.changeRequestId },
+          body: {
+            canvas: {
+              metadata: {
+                name: data.name,
+                description: data.description || "",
+              },
+              spec: {
+                nodes: data.nodes || [],
+                edges: data.edges || [],
+              },
+            },
+            autoLayout: data.autoLayout,
+          },
+        }),
+      );
+    },
+    onSuccess: (response, variables) => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
+
+      const version = response?.data?.version;
+      if (version?.metadata?.id) {
+        queryClient.setQueryData(canvasKeys.versionDetail(canvasId, version.metadata.id), version);
+      }
+
+      const changeRequest = response?.data?.changeRequest;
+      if (changeRequest?.metadata?.id) {
+        queryClient.setQueryData(canvasKeys.changeRequestDetail(canvasId, changeRequest.metadata.id), changeRequest);
+      } else {
+        queryClient.removeQueries({ queryKey: canvasKeys.changeRequestDetail(canvasId, variables.changeRequestId) });
+      }
+
+      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+    },
+  });
+};
+
+export const useCloseCanvasChangeRequest = (organizationId: string, canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { changeRequestId: string }) => {
+      return await canvasesCloseCanvasChangeRequest(
+        withOrganizationHeader({
+          path: { canvasId, changeRequestId: data.changeRequestId },
+          body: {},
+        }),
+      );
+    },
+    onSuccess: (response, variables) => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+
+      const changeRequest = response?.data?.changeRequest;
+      if (changeRequest?.metadata?.id) {
+        queryClient.setQueryData(canvasKeys.changeRequestDetail(canvasId, changeRequest.metadata.id), changeRequest);
+      } else {
+        queryClient.removeQueries({ queryKey: canvasKeys.changeRequestDetail(canvasId, variables.changeRequestId) });
+      }
+
+      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
     },
   });
 };

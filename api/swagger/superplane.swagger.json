@@ -429,6 +429,52 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/close": {
+      "post": {
+        "summary": "Close canvas change request",
+        "description": "Closes an open or conflicted canvas change request",
+        "operationId": "Canvases_CloseCanvasChangeRequest",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesCloseCanvasChangeRequestResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "changeRequestId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesCloseCanvasChangeRequestBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasChangeRequest"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/publish": {
       "post": {
         "summary": "Publish canvas change request",
@@ -467,6 +513,52 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/CanvasesPublishCanvasChangeRequestBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasChangeRequest"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/resolve": {
+      "patch": {
+        "summary": "Resolve canvas change request conflicts",
+        "description": "Updates a change request version with a resolved result and rebases it on the current live version",
+        "operationId": "Canvases_ResolveCanvasChangeRequest",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesResolveCanvasChangeRequestResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "changeRequestId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesResolveCanvasChangeRequestBody"
             }
           }
         ],
@@ -4202,7 +4294,8 @@
         "STATUS_UNSPECIFIED",
         "STATUS_OPEN",
         "STATUS_PUBLISHED",
-        "STATUS_CONFLICTED"
+        "STATUS_CONFLICTED",
+        "STATUS_CLOSED"
       ],
       "default": "STATUS_UNSPECIFIED"
     },
@@ -4488,6 +4581,17 @@
         "updatedAt": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "CanvasesCloseCanvasChangeRequestBody": {
+      "type": "object"
+    },
+    "CanvasesCloseCanvasChangeRequestResponse": {
+      "type": "object",
+      "properties": {
+        "changeRequest": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequest"
         }
       }
     },
@@ -4821,6 +4925,28 @@
         },
         "version": {
           "$ref": "#/definitions/CanvasesCanvasVersion"
+        }
+      }
+    },
+    "CanvasesResolveCanvasChangeRequestBody": {
+      "type": "object",
+      "properties": {
+        "canvas": {
+          "$ref": "#/definitions/CanvasesCanvas"
+        },
+        "autoLayout": {
+          "$ref": "#/definitions/CanvasesCanvasAutoLayout"
+        }
+      }
+    },
+    "CanvasesResolveCanvasChangeRequestResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "$ref": "#/definitions/CanvasesCanvasVersion"
+        },
+        "changeRequest": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequest"
         }
       }
     },

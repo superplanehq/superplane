@@ -14,6 +14,8 @@ func canvasChangeRequestStatusToProto(status string) pb.CanvasChangeRequest_Stat
 		return pb.CanvasChangeRequest_STATUS_PUBLISHED
 	case models.CanvasChangeRequestStatusConflicted:
 		return pb.CanvasChangeRequest_STATUS_CONFLICTED
+	case models.CanvasChangeRequestStatusClosed:
+		return pb.CanvasChangeRequest_STATUS_CLOSED
 	default:
 		return pb.CanvasChangeRequest_STATUS_UNSPECIFIED
 	}

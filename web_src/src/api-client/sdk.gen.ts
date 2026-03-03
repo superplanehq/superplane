@@ -21,6 +21,9 @@ import type {
   CanvasesCancelExecutionData,
   CanvasesCancelExecutionErrors,
   CanvasesCancelExecutionResponses,
+  CanvasesCloseCanvasChangeRequestData,
+  CanvasesCloseCanvasChangeRequestErrors,
+  CanvasesCloseCanvasChangeRequestResponses,
   CanvasesCreateCanvasChangeRequestData,
   CanvasesCreateCanvasChangeRequestErrors,
   CanvasesCreateCanvasChangeRequestResponses,
@@ -99,6 +102,9 @@ import type {
   CanvasesPublishCanvasVersionData,
   CanvasesPublishCanvasVersionErrors,
   CanvasesPublishCanvasVersionResponses,
+  CanvasesResolveCanvasChangeRequestData,
+  CanvasesResolveCanvasChangeRequestErrors,
+  CanvasesResolveCanvasChangeRequestResponses,
   CanvasesResolveExecutionErrorsData,
   CanvasesResolveExecutionErrorsErrors,
   CanvasesResolveExecutionErrorsResponses,
@@ -485,6 +491,27 @@ export const canvasesDescribeCanvasChangeRequest = <ThrowOnError extends boolean
   >({ url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}", ...options });
 
 /**
+ * Close canvas change request
+ *
+ * Closes an open or conflicted canvas change request
+ */
+export const canvasesCloseCanvasChangeRequest = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesCloseCanvasChangeRequestData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    CanvasesCloseCanvasChangeRequestResponses,
+    CanvasesCloseCanvasChangeRequestErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/close",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
  * Publish canvas change request
  *
  * Publishes a canvas change request to live and applies runtime node setup
@@ -498,6 +525,27 @@ export const canvasesPublishCanvasChangeRequest = <ThrowOnError extends boolean 
     ThrowOnError
   >({
     url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/publish",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Resolve canvas change request conflicts
+ *
+ * Updates a change request version with a resolved result and rebases it on the current live version
+ */
+export const canvasesResolveCanvasChangeRequest = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesResolveCanvasChangeRequestData, ThrowOnError>,
+) =>
+  (options.client ?? client).patch<
+    CanvasesResolveCanvasChangeRequestResponses,
+    CanvasesResolveCanvasChangeRequestErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/resolve",
     ...options,
     headers: {
       "Content-Type": "application/json",

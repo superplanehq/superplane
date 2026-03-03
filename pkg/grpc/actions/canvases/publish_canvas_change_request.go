@@ -85,6 +85,9 @@ func PublishCanvasChangeRequest(
 		if request.Status == models.CanvasChangeRequestStatusPublished {
 			return status.Error(codes.FailedPrecondition, "change request was already published")
 		}
+		if request.Status == models.CanvasChangeRequestStatusClosed {
+			return status.Error(codes.FailedPrecondition, "change request is closed")
+		}
 
 		version, err = models.FindCanvasVersionInTransaction(tx, canvasUUID, request.VersionID)
 		if err != nil {
