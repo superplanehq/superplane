@@ -80,7 +80,7 @@ func (c *Client) Validate() error {
 	if err != nil {
 		return fmt.Errorf("failed to validate api token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusNotFound {
 		return fmt.Errorf("invalid or expired API Token (Unauthorized)")
@@ -111,7 +111,7 @@ func (c *Client) ResolveWorkspaceID(ctx context.Context, identifier string) (str
 		if err != nil {
 			return "", fmt.Errorf("failed to lookup workspace %s: %w", identifier, err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("failed to lookup workspace %s: expected 200 OK, got %d", identifier, resp.StatusCode)

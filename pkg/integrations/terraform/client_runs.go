@@ -47,7 +47,7 @@ func (c *Client) ReadRun(ctx context.Context, runID string) (*RunPayload, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read run: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("failed to read run: bad status %d", resp.StatusCode)
@@ -72,12 +72,13 @@ func (c *Client) ReadRun(ctx context.Context, runID string) (*RunPayload, error)
 	return &payload.Data, nil
 }
 
-func (c *Client) CreateRun(ctx context.Context, workspaceID, message string) (*RunPayload, error) {
+func (c *Client) CreateRun(ctx context.Context, workspaceID, message string, isPlanOnly bool) (*RunPayload, error) {
 	opts := map[string]any{
 		"data": map[string]any{
 			"type": "runs",
 			"attributes": map[string]any{
-				"message": message,
+				"message":   message,
+				"plan-only": isPlanOnly,
 			},
 			"relationships": map[string]any{
 				"workspace": map[string]any{
@@ -98,7 +99,7 @@ func (c *Client) CreateRun(ctx context.Context, workspaceID, message string) (*R
 	if err != nil {
 		return nil, fmt.Errorf("failed to create run: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("failed to create run: bad status %d", resp.StatusCode)
@@ -129,7 +130,7 @@ func (c *Client) ApplyRun(ctx context.Context, runID, comment string) error {
 	if err != nil {
 		return fmt.Errorf("failed to apply run: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("failed to apply run: bad status %d", resp.StatusCode)
@@ -152,10 +153,33 @@ func (c *Client) DiscardRun(ctx context.Context, runID, comment string) error {
 	if err != nil {
 		return fmt.Errorf("failed to discard run: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("failed to discard run: bad status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+func (c *Client) CancelRun(ctx context.Context, runID, comment string) error {
+	opts := map[string]any{}
+	if comment != "" {
+		opts = map[string]any{"comment": comment}
+	}
+	path := fmt.Sprintf("/api/v2/runs/%s/actions/cancel", runID)
+	req, err := c.newRequest(ctx, http.MethodPost, path, opts)
+	if err != nil {
+		return fmt.Errorf("failed to create cancel request: %w", err)
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to cancel run: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("failed to cancel run: bad status %d", resp.StatusCode)
 	}
 	return nil
 }
@@ -171,7 +195,7 @@ func (c *Client) OverridePolicy(ctx context.Context, policyCheckID string) error
 	if err != nil {
 		return fmt.Errorf("failed to override policy: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("failed to override policy: bad status %d", resp.StatusCode)
@@ -190,7 +214,7 @@ func (c *Client) ListPolicyChecks(ctx context.Context, runID string) (*PolicyChe
 	if err != nil {
 		return nil, fmt.Errorf("failed to list policy checks: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("failed to list policy checks: bad status %d", resp.StatusCode)
