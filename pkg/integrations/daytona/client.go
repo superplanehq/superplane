@@ -225,18 +225,8 @@ func (c *Client) ExecuteCode(sandboxID string, req *ExecuteCodeRequest) (*Execut
 		return nil, fmt.Errorf("failed to resolve toolbox URL: %v", err)
 	}
 
-	// Convert code execution to a command based on language
-	var command string
-	switch req.Language {
-	case "python":
-		command = fmt.Sprintf("python3 -c %q", req.Code)
-	case "javascript":
-		command = fmt.Sprintf("node -e %q", req.Code)
-	case "typescript":
-		command = fmt.Sprintf("npx ts-node -e %q", req.Code)
-	default:
-		command = fmt.Sprintf("python3 -c %q", req.Code)
-	}
+	// Convert code execution to a command based on language.
+	command := buildExecuteCodeCommand(req.Language, req.Code)
 
 	cmdReq := &ExecuteCommandRequest{
 		Command: command,
