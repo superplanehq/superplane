@@ -20,16 +20,15 @@ import (
 	"strings"
 )
 
-
 // CanvasNodeExecutionAPIService CanvasNodeExecutionAPI service
 type CanvasNodeExecutionAPIService service
 
 type ApiCanvasesCancelExecutionRequest struct {
-	ctx context.Context
-	ApiService *CanvasNodeExecutionAPIService
-	canvasId string
+	ctx         context.Context
+	ApiService  *CanvasNodeExecutionAPIService
+	canvasId    string
 	executionId string
-	body *map[string]interface{}
+	body        *map[string]interface{}
 }
 
 func (r ApiCanvasesCancelExecutionRequest) Body(body map[string]interface{}) ApiCanvasesCancelExecutionRequest {
@@ -46,28 +45,29 @@ CanvasesCancelExecution Cancel execution
 
 Cancels a running canvas node execution
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId
- @param executionId
- @return ApiCanvasesCancelExecutionRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param canvasId
+	@param executionId
+	@return ApiCanvasesCancelExecutionRequest
 */
 func (a *CanvasNodeExecutionAPIService) CanvasesCancelExecution(ctx context.Context, canvasId string, executionId string) ApiCanvasesCancelExecutionRequest {
 	return ApiCanvasesCancelExecutionRequest{
-		ApiService: a,
-		ctx: ctx,
-		canvasId: canvasId,
+		ApiService:  a,
+		ctx:         ctx,
+		canvasId:    canvasId,
 		executionId: executionId,
 	}
 }
 
 // Execute executes the request
-//  @return map[string]interface{}
+//
+//	@return map[string]interface{}
 func (a *CanvasNodeExecutionAPIService) CanvasesCancelExecutionExecute(r ApiCanvasesCancelExecutionRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPatch
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
+		localVarHTTPMethod  = http.MethodPatch
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasNodeExecutionAPIService.CanvasesCancelExecution")
@@ -127,14 +127,14 @@ func (a *CanvasNodeExecutionAPIService) CanvasesCancelExecutionExecute(r ApiCanv
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -151,12 +151,12 @@ func (a *CanvasNodeExecutionAPIService) CanvasesCancelExecutionExecute(r ApiCanv
 }
 
 type ApiCanvasesInvokeNodeExecutionActionRequest struct {
-	ctx context.Context
-	ApiService *CanvasNodeExecutionAPIService
-	canvasId string
+	ctx         context.Context
+	ApiService  *CanvasNodeExecutionAPIService
+	canvasId    string
 	executionId string
-	actionName string
-	body *CanvasesInvokeNodeExecutionActionBody
+	actionName  string
+	body        *CanvasesInvokeNodeExecutionActionBody
 }
 
 func (r ApiCanvasesInvokeNodeExecutionActionRequest) Body(body CanvasesInvokeNodeExecutionActionBody) ApiCanvasesInvokeNodeExecutionActionRequest {
@@ -173,30 +173,31 @@ CanvasesInvokeNodeExecutionAction Invoke execution action
 
 Invokes a custom action on a canvas node execution
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId
- @param executionId
- @param actionName
- @return ApiCanvasesInvokeNodeExecutionActionRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param canvasId
+	@param executionId
+	@param actionName
+	@return ApiCanvasesInvokeNodeExecutionActionRequest
 */
 func (a *CanvasNodeExecutionAPIService) CanvasesInvokeNodeExecutionAction(ctx context.Context, canvasId string, executionId string, actionName string) ApiCanvasesInvokeNodeExecutionActionRequest {
 	return ApiCanvasesInvokeNodeExecutionActionRequest{
-		ApiService: a,
-		ctx: ctx,
-		canvasId: canvasId,
+		ApiService:  a,
+		ctx:         ctx,
+		canvasId:    canvasId,
 		executionId: executionId,
-		actionName: actionName,
+		actionName:  actionName,
 	}
 }
 
 // Execute executes the request
-//  @return map[string]interface{}
+//
+//	@return map[string]interface{}
 func (a *CanvasNodeExecutionAPIService) CanvasesInvokeNodeExecutionActionExecute(r ApiCanvasesInvokeNodeExecutionActionRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPost
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasNodeExecutionAPIService.CanvasesInvokeNodeExecutionAction")
@@ -257,14 +258,14 @@ func (a *CanvasNodeExecutionAPIService) CanvasesInvokeNodeExecutionActionExecute
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -281,11 +282,11 @@ func (a *CanvasNodeExecutionAPIService) CanvasesInvokeNodeExecutionActionExecute
 }
 
 type ApiCanvasesListChildExecutionsRequest struct {
-	ctx context.Context
-	ApiService *CanvasNodeExecutionAPIService
-	canvasId string
+	ctx         context.Context
+	ApiService  *CanvasNodeExecutionAPIService
+	canvasId    string
 	executionId string
-	body *map[string]interface{}
+	body        *map[string]interface{}
 }
 
 func (r ApiCanvasesListChildExecutionsRequest) Body(body map[string]interface{}) ApiCanvasesListChildExecutionsRequest {
@@ -302,28 +303,29 @@ CanvasesListChildExecutions List child executions for an execution
 
 List child executions for an execution
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId
- @param executionId
- @return ApiCanvasesListChildExecutionsRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param canvasId
+	@param executionId
+	@return ApiCanvasesListChildExecutionsRequest
 */
 func (a *CanvasNodeExecutionAPIService) CanvasesListChildExecutions(ctx context.Context, canvasId string, executionId string) ApiCanvasesListChildExecutionsRequest {
 	return ApiCanvasesListChildExecutionsRequest{
-		ApiService: a,
-		ctx: ctx,
-		canvasId: canvasId,
+		ApiService:  a,
+		ctx:         ctx,
+		canvasId:    canvasId,
 		executionId: executionId,
 	}
 }
 
 // Execute executes the request
-//  @return CanvasesListChildExecutionsResponse
+//
+//	@return CanvasesListChildExecutionsResponse
 func (a *CanvasNodeExecutionAPIService) CanvasesListChildExecutionsExecute(r ApiCanvasesListChildExecutionsRequest) (*CanvasesListChildExecutionsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPost
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *CanvasesListChildExecutionsResponse
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *CanvasesListChildExecutionsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasNodeExecutionAPIService.CanvasesListChildExecutions")
@@ -383,14 +385,14 @@ func (a *CanvasNodeExecutionAPIService) CanvasesListChildExecutionsExecute(r Api
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -407,10 +409,10 @@ func (a *CanvasNodeExecutionAPIService) CanvasesListChildExecutionsExecute(r Api
 }
 
 type ApiCanvasesResolveExecutionErrorsRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *CanvasNodeExecutionAPIService
-	canvasId string
-	body *CanvasesResolveExecutionErrorsBody
+	canvasId   string
+	body       *CanvasesResolveExecutionErrorsBody
 }
 
 func (r ApiCanvasesResolveExecutionErrorsRequest) Body(body CanvasesResolveExecutionErrorsBody) ApiCanvasesResolveExecutionErrorsRequest {
@@ -427,26 +429,27 @@ CanvasesResolveExecutionErrors Resolve execution errors
 
 Marks canvas node execution errors as resolved
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId
- @return ApiCanvasesResolveExecutionErrorsRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param canvasId
+	@return ApiCanvasesResolveExecutionErrorsRequest
 */
 func (a *CanvasNodeExecutionAPIService) CanvasesResolveExecutionErrors(ctx context.Context, canvasId string) ApiCanvasesResolveExecutionErrorsRequest {
 	return ApiCanvasesResolveExecutionErrorsRequest{
 		ApiService: a,
-		ctx: ctx,
-		canvasId: canvasId,
+		ctx:        ctx,
+		canvasId:   canvasId,
 	}
 }
 
 // Execute executes the request
-//  @return map[string]interface{}
+//
+//	@return map[string]interface{}
 func (a *CanvasNodeExecutionAPIService) CanvasesResolveExecutionErrorsExecute(r ApiCanvasesResolveExecutionErrorsRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPatch
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
+		localVarHTTPMethod  = http.MethodPatch
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasNodeExecutionAPIService.CanvasesResolveExecutionErrors")
@@ -505,14 +508,14 @@ func (a *CanvasNodeExecutionAPIService) CanvasesResolveExecutionErrorsExecute(r 
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

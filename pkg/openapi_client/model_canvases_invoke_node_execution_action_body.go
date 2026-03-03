@@ -73,7 +73,7 @@ func (o *CanvasesInvokeNodeExecutionActionBody) SetParameters(v map[string]inter
 }
 
 func (o CanvasesInvokeNodeExecutionActionBody) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -123,5 +123,3 @@ func (v *NullableCanvasesInvokeNodeExecutionActionBody) UnmarshalJSON(src []byte
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

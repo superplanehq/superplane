@@ -22,7 +22,7 @@ var _ MappedNullable = &OrganizationsIntegrationResourceRef{}
 type OrganizationsIntegrationResourceRef struct {
 	Type *string `json:"type,omitempty"`
 	Name *string `json:"name,omitempty"`
-	Id *string `json:"id,omitempty"`
+	Id   *string `json:"id,omitempty"`
 }
 
 // NewOrganizationsIntegrationResourceRef instantiates a new OrganizationsIntegrationResourceRef object
@@ -139,7 +139,7 @@ func (o *OrganizationsIntegrationResourceRef) SetId(v string) {
 }
 
 func (o OrganizationsIntegrationResourceRef) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,5 +195,3 @@ func (v *NullableOrganizationsIntegrationResourceRef) UnmarshalJSON(src []byte) 
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

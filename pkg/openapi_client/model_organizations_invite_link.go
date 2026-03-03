@@ -21,12 +21,12 @@ var _ MappedNullable = &OrganizationsInviteLink{}
 
 // OrganizationsInviteLink struct for OrganizationsInviteLink
 type OrganizationsInviteLink struct {
-	Id *string `json:"id,omitempty"`
-	OrganizationId *string `json:"organizationId,omitempty"`
-	Token *string `json:"token,omitempty"`
-	Enabled *bool `json:"enabled,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	Id             *string    `json:"id,omitempty"`
+	OrganizationId *string    `json:"organizationId,omitempty"`
+	Token          *string    `json:"token,omitempty"`
+	Enabled        *bool      `json:"enabled,omitempty"`
+	CreatedAt      *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt      *time.Time `json:"updatedAt,omitempty"`
 }
 
 // NewOrganizationsInviteLink instantiates a new OrganizationsInviteLink object
@@ -239,7 +239,7 @@ func (o *OrganizationsInviteLink) SetUpdatedAt(v time.Time) {
 }
 
 func (o OrganizationsInviteLink) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -304,5 +304,3 @@ func (v *NullableOrganizationsInviteLink) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-
