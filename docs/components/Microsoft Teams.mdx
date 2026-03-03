@@ -27,22 +27,25 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
    - Go to **Azure Portal** → **App registrations** → **New registration**
    - Name: "SuperPlane Bot" (or your preference)
    - Supported account types: **Accounts in any organizational directory** (multi-tenant) or single-tenant
-   - Note the **Application (client) ID** — this is the **App ID** below
-   - Go to **Certificates & secrets** → **New client secret** → copy the **Value** — this is the **App Password** below
+   - Note the **Application (client) ID** — this is the **App ID**
+   - Note the **Directory (tenant) ID** — this is the **Tenant ID**
+   - Go to **Certificates & secrets** → **New client secret** → copy the **Value** — this is the **App Password**
 
-2. **Create an Azure Bot**:
-   - Go to **Azure Portal** → **Create a resource** → search **Azure Bot**
-   - Link it to the App Registration from step 1
-   - Set the **Messaging endpoint** to your SuperPlane webhook URL
-   - Under **Channels**, click **Microsoft Teams** to enable it
-
-3. **Add Graph API permissions** (required for channel listing):
+2. **Add Graph API permissions** (required for channel listing):
    - Go to your **App Registration** → **API permissions** → **Add a permission**
    - Select **Microsoft Graph** → **Application permissions**
    - Add: **Team.ReadBasic.All** and **Channel.ReadBasic.All**
    - Click **Grant admin consent**
 
-4. **Enter credentials** in the fields below and save
+3. **Enter credentials in SuperPlane** and click Connect. SuperPlane will verify your credentials and show your webhook URL.
+
+4. **Create an Azure Bot**:
+   - Go to **Azure Portal** → **Create a resource** → search **Azure Bot**
+   - Link it to the App Registration from step 1
+   - Set the **Messaging endpoint** to the webhook URL shown by SuperPlane
+   - Under **Channels**, click **Microsoft Teams** to enable it
+
+5. **Install the Teams App**: Download the manifest ZIP from SuperPlane and upload it to **Teams Admin Center** → **Manage apps** → **Upload new app**, or sideload to specific teams
 
 <a id="on-mention"></a>
 

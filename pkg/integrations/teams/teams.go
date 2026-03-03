@@ -31,23 +31,29 @@ const (
    - Note the **Application (client) ID** — this is the **App ID** below
    - Go to **Certificates & secrets** → **New client secret** → copy the **Value** — this is the **App Password** below
 
-2. **Create an Azure Bot**:
-   - Go to **Azure Portal** → **Create a resource** → search **Azure Bot**
-   - Link it to the App Registration from step 1
-   - Set the **Messaging endpoint** to your SuperPlane webhook URL
-   - Under **Channels**, click **Microsoft Teams** to enable it
-
-3. **Add Graph API permissions** (required for channel listing):
+2. **Add Graph API permissions** (required for channel listing):
    - Go to your **App Registration** → **API permissions** → **Add a permission**
    - Select **Microsoft Graph** → **Application permissions**
    - Add: **Team.ReadBasic.All** and **Channel.ReadBasic.All**
    - Click **Grant admin consent**
 
-4. **Enter credentials** in the fields below and save
+3. **Enter credentials** in the fields below and save
 `
 
-	installAppInstructions = `
-## Install the Teams App
+	installAppInstructionsTemplate = `
+## Finish Azure Setup
+
+Your webhook URL:
+` + "`%s`" + `
+
+### Create an Azure Bot
+
+1. Go to **Azure Portal** → **Create a resource** → search **Azure Bot**
+2. Link it to the App Registration from the previous step
+3. Set the **Messaging endpoint** to the webhook URL above
+4. Under **Channels**, click **Microsoft Teams** to enable it
+
+### Install the Teams App
 
 Click **Continue** to download the auto-generated Teams app manifest ZIP.
 Then upload it to **Teams Admin Center** → **Manage apps** → **Upload new app**, or sideload to specific teams.
@@ -169,13 +175,14 @@ func (t *Teams) Sync(ctx core.SyncContext) error {
 
 	// Generate manifest ZIP and offer it as a download via BrowserAction
 	webhookURL := fmt.Sprintf("%s/api/v1/integrations/%s/messages", ctx.WebhooksBaseURL, ctx.Integration.ID())
+	instructions := fmt.Sprintf(installAppInstructionsTemplate, webhookURL)
 	zipBytes, err := generateManifestZIP(string(appID), webhookURL)
 	if err != nil {
 		ctx.Integration.RemoveBrowserAction()
 	} else {
 		dataURI := "data:application/zip;base64," + base64.StdEncoding.EncodeToString(zipBytes)
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: installAppInstructions,
+			Description: instructions,
 			URL:         dataURI,
 			Method:      "GET",
 		})
@@ -337,19 +344,19 @@ func (t *Teams) HandleAction(ctx core.IntegrationActionContext) error {
 // generateManifestZIP creates a Teams app manifest ZIP ready for upload to Teams Admin Center.
 func generateManifestZIP(appID, webhookURL string) ([]byte, error) {
 	manifest := map[string]any{
-		"$schema":         "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
-		"manifestVersion": "1.17",
+		"$schema":         "https://developer.microsoft.com/en-us/json-schemas/teams/v1.25/MicrosoftTeams.schema.json",
+		"manifestVersion":          "1.25",
+		"supportsChannelFeatures": "tier1",
 		"version":         "1.0.0",
 		"id":              appID,
 		"developer": map[string]string{
 			"name":          "SuperPlane",
-			"websiteUrl":    "https://superplane.com",
+			"websiteUrl":    "https://superplane.com/",
 			"privacyUrl":    "https://superplane.com/privacy",
 			"termsOfUseUrl": "https://superplane.com/terms",
 		},
 		"name": map[string]string{
 			"short": "SuperPlane Bot",
-			"full":  "SuperPlane Integration Bot",
 		},
 		"description": map[string]string{
 			"short": "SuperPlane workflow automation bot",
@@ -359,25 +366,25 @@ func generateManifestZIP(appID, webhookURL string) ([]byte, error) {
 			"color":   "color.png",
 			"outline": "outline.png",
 		},
-		"accentColor": "#5059C9",
+		"accentColor": "#FFFFFF",
 		"bots": []map[string]any{
 			{
 				"botId": appID,
 				"scopes": []string{
-					"team",
 					"groupChat",
+					"team",
+					"personal",
 				},
-				"supportsFiles":      false,
 				"isNotificationOnly": false,
+				"supportsFiles":      false,
 				"supportsCalling":    false,
 				"supportsVideo":      false,
 			},
 		},
-		"permissions": []string{
-			"identity",
-			"messageTeamMembers",
-		},
 		"validDomains": []string{},
+		"webApplicationInfo": map[string]string{
+			"id": appID,
+		},
 		"authorization": map[string]any{
 			"permissions": map[string]any{
 				"resourceSpecific": []map[string]string{
@@ -420,8 +427,8 @@ func generateManifestZIP(appID, webhookURL string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to write color.png: %w", err)
 	}
 
-	// outline.png — white placeholder icon
-	outlinePNG, err := solidPNG(32, color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF})
+	// outline.png — white icon on transparent background (required by Teams)
+	outlinePNG, err := outlineIconPNG(32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate outline.png: %w", err)
 	}
@@ -455,4 +462,60 @@ func solidPNG(size int, c color.Color) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+// outlineIconPNG generates a white rounded-rectangle on a transparent background.
+// This satisfies Teams' outline icon requirement: transparent PNG with white content.
+func outlineIconPNG(size int) ([]byte, error) {
+	img := image.NewNRGBA(image.Rect(0, 0, size, size))
+	white := color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}
+
+	// Draw a white rounded rectangle with 2px padding and ~4px corner radius.
+	pad := 2
+	radius := 4
+	for y := pad; y < size-pad; y++ {
+		for x := pad; x < size-pad; x++ {
+			// Check corners for rounding
+			if inRoundedRect(x, y, pad, pad, size-pad-1, size-pad-1, radius) {
+				img.Set(x, y, white)
+			}
+		}
+	}
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+// inRoundedRect checks if (x, y) is inside a rounded rectangle defined by
+// (x0, y0)-(x1, y1) with the given corner radius.
+func inRoundedRect(x, y, x0, y0, x1, y1, r int) bool {
+	// Inside the main body (not in a corner zone)
+	if x >= x0+r && x <= x1-r {
+		return true
+	}
+	if y >= y0+r && y <= y1-r {
+		return true
+	}
+
+	// Check each corner
+	corners := [][2]int{
+		{x0 + r, y0 + r}, // top-left
+		{x1 - r, y0 + r}, // top-right
+		{x0 + r, y1 - r}, // bottom-left
+		{x1 - r, y1 - r}, // bottom-right
+	}
+
+	for _, c := range corners {
+		dx := x - c[0]
+		dy := y - c[1]
+		if dx*dx+dy*dy <= r*r {
+			return true
+		}
+	}
+
+	return false
 }

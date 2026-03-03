@@ -65,7 +65,8 @@ func Test__Teams__Sync(t *testing.T) {
 		// After validation, a BrowserAction with the manifest ZIP download should be set
 		require.NotNil(t, integrationCtx.BrowserAction)
 		assert.Contains(t, integrationCtx.BrowserAction.URL, "data:application/zip;base64,")
-		assert.Contains(t, integrationCtx.BrowserAction.Description, "Install the Teams App")
+		assert.Contains(t, integrationCtx.BrowserAction.Description, "Finish Azure Setup")
+		assert.Contains(t, integrationCtx.BrowserAction.Description, "webhook URL")
 
 		metadata, ok := integrationCtx.Metadata.(Metadata)
 		require.True(t, ok)
