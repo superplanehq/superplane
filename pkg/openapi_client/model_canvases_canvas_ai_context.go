@@ -20,10 +20,10 @@ var _ MappedNullable = &CanvasesCanvasAiContext{}
 
 // CanvasesCanvasAiContext struct for CanvasesCanvasAiContext
 type CanvasesCanvasAiContext struct {
-	Nodes []CanvasesCanvasAiNodeContext `json:"nodes,omitempty"`
+	Nodes           []CanvasesCanvasAiNodeContext  `json:"nodes,omitempty"`
 	AvailableBlocks []CanvasesCanvasAiBlockContext `json:"availableBlocks,omitempty"`
-	Canvas *CanvasesCanvas `json:"canvas,omitempty"`
-	SelectedNodeIds []string `json:"selectedNodeIds,omitempty"`
+	Canvas          *CanvasesCanvas                `json:"canvas,omitempty"`
+	SelectedNodeIds []string                       `json:"selectedNodeIds,omitempty"`
 }
 
 // NewCanvasesCanvasAiContext instantiates a new CanvasesCanvasAiContext object
@@ -172,7 +172,7 @@ func (o *CanvasesCanvasAiContext) SetSelectedNodeIds(v []string) {
 }
 
 func (o CanvasesCanvasAiContext) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -231,5 +231,3 @@ func (v *NullableCanvasesCanvasAiContext) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

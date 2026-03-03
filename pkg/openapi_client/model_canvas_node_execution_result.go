@@ -21,9 +21,9 @@ type CanvasNodeExecutionResult string
 
 // List of CanvasNodeExecutionResult
 const (
-	CANVASNODEEXECUTIONRESULT_RESULT_UNKNOWN CanvasNodeExecutionResult = "RESULT_UNKNOWN"
-	CANVASNODEEXECUTIONRESULT_RESULT_PASSED CanvasNodeExecutionResult = "RESULT_PASSED"
-	CANVASNODEEXECUTIONRESULT_RESULT_FAILED CanvasNodeExecutionResult = "RESULT_FAILED"
+	CANVASNODEEXECUTIONRESULT_RESULT_UNKNOWN   CanvasNodeExecutionResult = "RESULT_UNKNOWN"
+	CANVASNODEEXECUTIONRESULT_RESULT_PASSED    CanvasNodeExecutionResult = "RESULT_PASSED"
+	CANVASNODEEXECUTIONRESULT_RESULT_FAILED    CanvasNodeExecutionResult = "RESULT_FAILED"
 	CANVASNODEEXECUTIONRESULT_RESULT_CANCELLED CanvasNodeExecutionResult = "RESULT_CANCELLED"
 )
 
@@ -113,4 +113,3 @@ func (v *NullableCanvasNodeExecutionResult) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-

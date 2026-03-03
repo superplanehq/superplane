@@ -20,14 +20,13 @@ import (
 	"strings"
 )
 
-
 // BlueprintAPIService BlueprintAPI service
 type BlueprintAPIService service
 
 type ApiBlueprintsCreateBlueprintRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *BlueprintAPIService
-	body *BlueprintsCreateBlueprintRequest
+	body       *BlueprintsCreateBlueprintRequest
 }
 
 func (r ApiBlueprintsCreateBlueprintRequest) Body(body BlueprintsCreateBlueprintRequest) ApiBlueprintsCreateBlueprintRequest {
@@ -44,24 +43,25 @@ BlueprintsCreateBlueprint Create blueprint
 
 Creates a new blueprint
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiBlueprintsCreateBlueprintRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiBlueprintsCreateBlueprintRequest
 */
 func (a *BlueprintAPIService) BlueprintsCreateBlueprint(ctx context.Context) ApiBlueprintsCreateBlueprintRequest {
 	return ApiBlueprintsCreateBlueprintRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return BlueprintsCreateBlueprintResponse
+//
+//	@return BlueprintsCreateBlueprintResponse
 func (a *BlueprintAPIService) BlueprintsCreateBlueprintExecute(r ApiBlueprintsCreateBlueprintRequest) (*BlueprintsCreateBlueprintResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPost
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *BlueprintsCreateBlueprintResponse
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *BlueprintsCreateBlueprintResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "BlueprintAPIService.BlueprintsCreateBlueprint")
@@ -119,14 +119,14 @@ func (a *BlueprintAPIService) BlueprintsCreateBlueprintExecute(r ApiBlueprintsCr
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -143,9 +143,9 @@ func (a *BlueprintAPIService) BlueprintsCreateBlueprintExecute(r ApiBlueprintsCr
 }
 
 type ApiBlueprintsDeleteBlueprintRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *BlueprintAPIService
-	id string
+	id         string
 }
 
 func (r ApiBlueprintsDeleteBlueprintRequest) Execute() (map[string]interface{}, *http.Response, error) {
@@ -157,26 +157,27 @@ BlueprintsDeleteBlueprint Delete blueprint
 
 Deletes an existing blueprint
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id
- @return ApiBlueprintsDeleteBlueprintRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiBlueprintsDeleteBlueprintRequest
 */
 func (a *BlueprintAPIService) BlueprintsDeleteBlueprint(ctx context.Context, id string) ApiBlueprintsDeleteBlueprintRequest {
 	return ApiBlueprintsDeleteBlueprintRequest{
 		ApiService: a,
-		ctx: ctx,
-		id: id,
+		ctx:        ctx,
+		id:         id,
 	}
 }
 
 // Execute executes the request
-//  @return map[string]interface{}
+//
+//	@return map[string]interface{}
 func (a *BlueprintAPIService) BlueprintsDeleteBlueprintExecute(r ApiBlueprintsDeleteBlueprintRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodDelete
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
+		localVarHTTPMethod  = http.MethodDelete
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "BlueprintAPIService.BlueprintsDeleteBlueprint")
@@ -230,14 +231,14 @@ func (a *BlueprintAPIService) BlueprintsDeleteBlueprintExecute(r ApiBlueprintsDe
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -254,9 +255,9 @@ func (a *BlueprintAPIService) BlueprintsDeleteBlueprintExecute(r ApiBlueprintsDe
 }
 
 type ApiBlueprintsDescribeBlueprintRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *BlueprintAPIService
-	id string
+	id         string
 }
 
 func (r ApiBlueprintsDescribeBlueprintRequest) Execute() (*BlueprintsDescribeBlueprintResponse, *http.Response, error) {
@@ -268,26 +269,27 @@ BlueprintsDescribeBlueprint Describe blueprint
 
 Returns a blueprint
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id
- @return ApiBlueprintsDescribeBlueprintRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiBlueprintsDescribeBlueprintRequest
 */
 func (a *BlueprintAPIService) BlueprintsDescribeBlueprint(ctx context.Context, id string) ApiBlueprintsDescribeBlueprintRequest {
 	return ApiBlueprintsDescribeBlueprintRequest{
 		ApiService: a,
-		ctx: ctx,
-		id: id,
+		ctx:        ctx,
+		id:         id,
 	}
 }
 
 // Execute executes the request
-//  @return BlueprintsDescribeBlueprintResponse
+//
+//	@return BlueprintsDescribeBlueprintResponse
 func (a *BlueprintAPIService) BlueprintsDescribeBlueprintExecute(r ApiBlueprintsDescribeBlueprintRequest) (*BlueprintsDescribeBlueprintResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *BlueprintsDescribeBlueprintResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *BlueprintsDescribeBlueprintResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "BlueprintAPIService.BlueprintsDescribeBlueprint")
@@ -341,14 +343,14 @@ func (a *BlueprintAPIService) BlueprintsDescribeBlueprintExecute(r ApiBlueprints
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -365,7 +367,7 @@ func (a *BlueprintAPIService) BlueprintsDescribeBlueprintExecute(r ApiBlueprints
 }
 
 type ApiBlueprintsListBlueprintsRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *BlueprintAPIService
 }
 
@@ -378,24 +380,25 @@ BlueprintsListBlueprints List blueprints
 
 Returns a list of all blueprints
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiBlueprintsListBlueprintsRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiBlueprintsListBlueprintsRequest
 */
 func (a *BlueprintAPIService) BlueprintsListBlueprints(ctx context.Context) ApiBlueprintsListBlueprintsRequest {
 	return ApiBlueprintsListBlueprintsRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return BlueprintsListBlueprintsResponse
+//
+//	@return BlueprintsListBlueprintsResponse
 func (a *BlueprintAPIService) BlueprintsListBlueprintsExecute(r ApiBlueprintsListBlueprintsRequest) (*BlueprintsListBlueprintsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *BlueprintsListBlueprintsResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *BlueprintsListBlueprintsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "BlueprintAPIService.BlueprintsListBlueprints")
@@ -448,14 +451,14 @@ func (a *BlueprintAPIService) BlueprintsListBlueprintsExecute(r ApiBlueprintsLis
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -472,10 +475,10 @@ func (a *BlueprintAPIService) BlueprintsListBlueprintsExecute(r ApiBlueprintsLis
 }
 
 type ApiBlueprintsUpdateBlueprintRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *BlueprintAPIService
-	id string
-	body *BlueprintsUpdateBlueprintBody
+	id         string
+	body       *BlueprintsUpdateBlueprintBody
 }
 
 func (r ApiBlueprintsUpdateBlueprintRequest) Body(body BlueprintsUpdateBlueprintBody) ApiBlueprintsUpdateBlueprintRequest {
@@ -492,26 +495,27 @@ BlueprintsUpdateBlueprint Update blueprint
 
 Updates an existing blueprint
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id
- @return ApiBlueprintsUpdateBlueprintRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiBlueprintsUpdateBlueprintRequest
 */
 func (a *BlueprintAPIService) BlueprintsUpdateBlueprint(ctx context.Context, id string) ApiBlueprintsUpdateBlueprintRequest {
 	return ApiBlueprintsUpdateBlueprintRequest{
 		ApiService: a,
-		ctx: ctx,
-		id: id,
+		ctx:        ctx,
+		id:         id,
 	}
 }
 
 // Execute executes the request
-//  @return BlueprintsUpdateBlueprintResponse
+//
+//	@return BlueprintsUpdateBlueprintResponse
 func (a *BlueprintAPIService) BlueprintsUpdateBlueprintExecute(r ApiBlueprintsUpdateBlueprintRequest) (*BlueprintsUpdateBlueprintResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPatch
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *BlueprintsUpdateBlueprintResponse
+		localVarHTTPMethod  = http.MethodPatch
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *BlueprintsUpdateBlueprintResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "BlueprintAPIService.BlueprintsUpdateBlueprint")
@@ -570,14 +574,14 @@ func (a *BlueprintAPIService) BlueprintsUpdateBlueprintExecute(r ApiBlueprintsUp
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

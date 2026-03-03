@@ -23,8 +23,8 @@ type ComponentsNodeType string
 const (
 	COMPONENTSNODETYPE_TYPE_COMPONENT ComponentsNodeType = "TYPE_COMPONENT"
 	COMPONENTSNODETYPE_TYPE_BLUEPRINT ComponentsNodeType = "TYPE_BLUEPRINT"
-	COMPONENTSNODETYPE_TYPE_TRIGGER ComponentsNodeType = "TYPE_TRIGGER"
-	COMPONENTSNODETYPE_TYPE_WIDGET ComponentsNodeType = "TYPE_WIDGET"
+	COMPONENTSNODETYPE_TYPE_TRIGGER   ComponentsNodeType = "TYPE_TRIGGER"
+	COMPONENTSNODETYPE_TYPE_WIDGET    ComponentsNodeType = "TYPE_WIDGET"
 )
 
 // All allowed values of ComponentsNodeType enum
@@ -113,4 +113,3 @@ func (v *NullableComponentsNodeType) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
