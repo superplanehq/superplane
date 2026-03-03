@@ -176,12 +176,12 @@ func ensureWorkspaceInMetadata(ctx core.MetadataContext, integration core.Integr
 
 	resolvedID, err := client.ResolveWorkspaceID(context.Background(), wsID)
 	if err != nil {
-		return nil
+		return fmt.Errorf("failed to resolve workspace id: %w", err)
 	}
 
 	ws, err := client.ReadWorkspace(context.Background(), resolvedID)
 	if err != nil {
-		return nil
+		return fmt.Errorf("failed to read workspace: %w", err)
 	}
 
 	return ctx.Set(NodeMetadata{
