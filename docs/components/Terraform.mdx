@@ -9,30 +9,24 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Triggers
 
 <CardGrid>
-  <LinkCard title="On Run Needs Attention" href="#on-run-needs-attention" description="Trigger a workflow when a Terraform Run is paused for policy overrides or approval." />
   <LinkCard title="On Run Event" href="#on-run-event" description="Trigger a workflow when a Terraform Run transitions to selected states." />
 </CardGrid>
 
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Apply Run" href="#apply-run" description="Applies a run that is paused in 'needs attention' or 'planned'." />
-  <LinkCard title="Discard Run" href="#discard-run" description="Discards a pending or planned run." />
-  <LinkCard title="Override Policy" href="#override-policy" description="Overrides a failed Sentinel policy block." />
-  <LinkCard title="Queue Run" href="#queue-run" description="Queues a new run for a specific Workspace." />
-  <LinkCard title="Read Run Details" href="#read-run-details" description="Retrieves comprehensive details and status about a run." />
-  <LinkCard title="Track Run" href="#track-run" description="Track a Terraform run through its lifecycle states (planning, applying, etc.)" />
+  <LinkCard title="Run plan" href="#run-plan" description="Create a Terraform run and wait for its plan" />
 </CardGrid>
 
 ## Instructions
 
-Generate an API token from your HCP Terraform Team settings.
+## Terraform Configuration
 
-<a id="on-run-needs-attention"></a>
+To use the Terraform integration, you need an HCP Terraform API Token.
 
-## On Run Needs Attention
-
-Trigger a workflow when a Terraform Run is paused for policy overrides or approval.
+1. Go to the [Team API Tokens page](https://app.terraform.io/app/&lt;YOUR_ORG&gt;/settings/authentication-tokens?tabIndex=1) in HCP Terraform, replacing "&lt;YOUR_ORG&gt;" with your actual organization name.
+2. Click **Create a team token** and provide a description.
+3. Once generated, paste the token in the API Token field below.
 
 <a id="on-run-event"></a>
 
@@ -40,134 +34,18 @@ Trigger a workflow when a Terraform Run is paused for policy overrides or approv
 
 Trigger a workflow when a Terraform Run transitions to selected states.
 
-<a id="apply-run"></a>
+<a id="run-plan"></a>
 
-## Apply Run
+## Run plan
 
-Applies a run that is paused in 'needs attention' or 'planned'.
-
-### Example Output
-
-```json
-{
-  "action": "applied",
-  "runId": "run-xxxxxx"
-}
-```
-
-<a id="discard-run"></a>
-
-## Discard Run
-
-Discards a pending or planned run.
+Creates a Terraform run, polls its status, and waits for the plan to complete. It creates a plan only and does not allow applying.
 
 ### Example Output
 
 ```json
 {
-  "action": "discarded",
-  "runId": "run-xxxxxx"
-}
-```
-
-<a id="override-policy"></a>
-
-## Override Policy
-
-Overrides a failed Sentinel policy block.
-
-### Example Output
-
-```json
-{
-  "action": "overridden",
-  "runId": "run-xxxxxx"
-}
-```
-
-<a id="queue-run"></a>
-
-## Queue Run
-
-Queues a new run for a specific Workspace.
-
-### Example Output
-
-```json
-{
-  "runId": "run-xxxxxx",
-  "status": "pending"
-}
-```
-
-<a id="read-run-details"></a>
-
-## Read Run Details
-
-Retrieves comprehensive details and status about a run.
-
-### Example Output
-
-```json
-{
-  "createdAt": "2024-01-01T12:00:00Z",
-  "message": "Queued manually",
-  "runId": "run-xxxxxx",
-  "status": "planned"
-}
-```
-
-<a id="track-run"></a>
-
-## Track Run
-
-The Track Run component monitors a Terraform run and tracks its progression through states.
-
-### States Tracked
-
-- **Pending** → **Planning** → **Planned** → **Applying** → **Applied**
-- Or: **Planned** → **Discarded** / **Errored** / **Canceled**
-
-### Output Channels
-
-- **Completed**: Run finished successfully (applied or planned_and_finished)
-- **Failed**: Run errored, was canceled, or was discarded
-- **Needs Attention**: Run requires manual confirmation or policy override
-
-### Use Cases
-
-- Track infrastructure changes through their lifecycle
-- Get notified when runs complete or fail
-- Chain actions based on run completion
-
-### Example Output
-
-```json
-{
-  "finalStatus": "applied",
-  "runId": "run-xxxxx",
-  "stateHistory": [
-    {
-      "status": "pending",
-      "timestamp": "2024-01-01T12:00:00Z"
-    },
-    {
-      "status": "planning",
-      "timestamp": "2024-01-01T12:00:05Z"
-    },
-    {
-      "status": "planned",
-      "timestamp": "2024-01-01T12:01:00Z"
-    },
-    {
-      "status": "applying",
-      "timestamp": "2024-01-01T12:01:05Z"
-    },
-    {
-      "status": "applied",
-      "timestamp": "2024-01-01T12:02:00Z"
-    }
-  ]
+  "finalStatus": "planned",
+  "runId": "run-xxxxx"
 }
 ```
 
