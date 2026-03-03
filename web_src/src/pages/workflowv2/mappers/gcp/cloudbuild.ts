@@ -87,13 +87,13 @@ export const cloudBuildExecutionStateFunction: StateFunction = (execution: Execu
     return "neutral";
   }
 
+  if (execution.result === "RESULT_CANCELLED") {
+    return "cancelled";
+  }
+
   const buildState = cloudBuildStatusToExecutionState(getCloudBuildData(execution)?.status);
   if (buildState) {
     return buildState;
-  }
-
-  if (execution.result === "RESULT_CANCELLED") {
-    return "cancelled";
   }
 
   if (
