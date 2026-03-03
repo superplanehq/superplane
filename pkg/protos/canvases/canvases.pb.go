@@ -1041,12 +1041,11 @@ func (x *UpdateCanvasVersionResponse) GetVersion() *CanvasVersion {
 }
 
 type PublishCanvasVersionRequest struct {
-	state                 protoimpl.MessageState `protogen:"open.v1"`
-	CanvasId              string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
-	VersionId             string                 `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
-	ExpectedLiveVersionId string                 `protobuf:"bytes,3,opt,name=expected_live_version_id,json=expectedLiveVersionId,proto3" json:"expected_live_version_id,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
+	VersionId     string                 `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PublishCanvasVersionRequest) Reset() {
@@ -1089,13 +1088,6 @@ func (x *PublishCanvasVersionRequest) GetCanvasId() string {
 func (x *PublishCanvasVersionRequest) GetVersionId() string {
 	if x != nil {
 		return x.VersionId
-	}
-	return ""
-}
-
-func (x *PublishCanvasVersionRequest) GetExpectedLiveVersionId() string {
-	if x != nil {
-		return x.ExpectedLiveVersionId
 	}
 	return ""
 }
@@ -1521,12 +1513,11 @@ func (x *DescribeCanvasChangeRequestResponse) GetChangeRequest() *CanvasChangeRe
 }
 
 type PublishCanvasChangeRequestRequest struct {
-	state                 protoimpl.MessageState `protogen:"open.v1"`
-	CanvasId              string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
-	ChangeRequestId       string                 `protobuf:"bytes,2,opt,name=change_request_id,json=changeRequestId,proto3" json:"change_request_id,omitempty"`
-	ExpectedLiveVersionId string                 `protobuf:"bytes,3,opt,name=expected_live_version_id,json=expectedLiveVersionId,proto3" json:"expected_live_version_id,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	CanvasId        string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
+	ChangeRequestId string                 `protobuf:"bytes,2,opt,name=change_request_id,json=changeRequestId,proto3" json:"change_request_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *PublishCanvasChangeRequestRequest) Reset() {
@@ -1569,13 +1560,6 @@ func (x *PublishCanvasChangeRequestRequest) GetCanvasId() string {
 func (x *PublishCanvasChangeRequestRequest) GetChangeRequestId() string {
 	if x != nil {
 		return x.ChangeRequestId
-	}
-	return ""
-}
-
-func (x *PublishCanvasChangeRequestRequest) GetExpectedLiveVersionId() string {
-	if x != nil {
-		return x.ExpectedLiveVersionId
 	}
 	return ""
 }
@@ -5447,12 +5431,11 @@ const file_canvases_proto_rawDesc = "" +
 	"\vauto_layout\x18\x04 \x01(\v2%.Superplane.Canvases.CanvasAutoLayoutR\n" +
 	"autoLayout\"[\n" +
 	"\x1bUpdateCanvasVersionResponse\x12<\n" +
-	"\aversion\x18\x01 \x01(\v2\".Superplane.Canvases.CanvasVersionR\aversion\"\x92\x01\n" +
+	"\aversion\x18\x01 \x01(\v2\".Superplane.Canvases.CanvasVersionR\aversion\"Y\n" +
 	"\x1bPublishCanvasVersionRequest\x12\x1b\n" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x1d\n" +
 	"\n" +
-	"version_id\x18\x02 \x01(\tR\tversionId\x127\n" +
-	"\x18expected_live_version_id\x18\x03 \x01(\tR\x15expectedLiveVersionId\"\x91\x01\n" +
+	"version_id\x18\x02 \x01(\tR\tversionId\"\x91\x01\n" +
 	"\x1cPublishCanvasVersionResponse\x123\n" +
 	"\x06canvas\x18\x01 \x01(\v2\x1b.Superplane.Canvases.CanvasR\x06canvas\x12<\n" +
 	"\aversion\x18\x02 \x01(\v2\".Superplane.Canvases.CanvasVersionR\aversion\"Y\n" +
@@ -5475,11 +5458,10 @@ const file_canvases_proto_rawDesc = "" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12*\n" +
 	"\x11change_request_id\x18\x02 \x01(\tR\x0fchangeRequestId\"v\n" +
 	"#DescribeCanvasChangeRequestResponse\x12O\n" +
-	"\x0echange_request\x18\x01 \x01(\v2(.Superplane.Canvases.CanvasChangeRequestR\rchangeRequest\"\xa5\x01\n" +
+	"\x0echange_request\x18\x01 \x01(\v2(.Superplane.Canvases.CanvasChangeRequestR\rchangeRequest\"l\n" +
 	"!PublishCanvasChangeRequestRequest\x12\x1b\n" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12*\n" +
-	"\x11change_request_id\x18\x02 \x01(\tR\x0fchangeRequestId\x127\n" +
-	"\x18expected_live_version_id\x18\x03 \x01(\tR\x15expectedLiveVersionId\"\xe8\x01\n" +
+	"\x11change_request_id\x18\x02 \x01(\tR\x0fchangeRequestId\"\xe8\x01\n" +
 	"\"PublishCanvasChangeRequestResponse\x123\n" +
 	"\x06canvas\x18\x01 \x01(\v2\x1b.Superplane.Canvases.CanvasR\x06canvas\x12<\n" +
 	"\aversion\x18\x02 \x01(\v2\".Superplane.Canvases.CanvasVersionR\aversion\x12O\n" +

@@ -506,10 +506,10 @@ type ApiCanvasesPublishCanvasChangeRequestRequest struct {
 	ApiService      *CanvasChangeRequestAPIService
 	canvasId        string
 	changeRequestId string
-	body            *CanvasesPublishCanvasChangeRequestBody
+	body            *map[string]interface{}
 }
 
-func (r ApiCanvasesPublishCanvasChangeRequestRequest) Body(body CanvasesPublishCanvasChangeRequestBody) ApiCanvasesPublishCanvasChangeRequestRequest {
+func (r ApiCanvasesPublishCanvasChangeRequestRequest) Body(body map[string]interface{}) ApiCanvasesPublishCanvasChangeRequestRequest {
 	r.body = &body
 	return r
 }

@@ -88,7 +88,6 @@ func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.Publis
 		organizationID,
 		req.CanvasId,
 		req.VersionId,
-		req.ExpectedLiveVersionId,
 		s.webhookBaseURL,
 	)
 }
@@ -117,7 +116,6 @@ func (s *CanvasService) PublishCanvasChangeRequest(ctx context.Context, req *pb.
 		organizationID,
 		req.CanvasId,
 		req.ChangeRequestId,
-		req.ExpectedLiveVersionId,
 		s.webhookBaseURL,
 	)
 }

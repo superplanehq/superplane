@@ -611,10 +611,10 @@ type ApiCanvasesPublishCanvasVersionRequest struct {
 	ApiService *CanvasVersionAPIService
 	canvasId   string
 	versionId  string
-	body       *CanvasesPublishCanvasVersionBody
+	body       *map[string]interface{}
 }
 
-func (r ApiCanvasesPublishCanvasVersionRequest) Body(body CanvasesPublishCanvasVersionBody) ApiCanvasesPublishCanvasVersionRequest {
+func (r ApiCanvasesPublishCanvasVersionRequest) Body(body map[string]interface{}) ApiCanvasesPublishCanvasVersionRequest {
 	r.body = &body
 	return r
 }

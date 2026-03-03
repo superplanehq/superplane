@@ -106,7 +106,6 @@ func TestResolveCanvasChangeRequestRebasesVersionAndClearsConflicts(t *testing.T
 		r.Organization.ID.String(),
 		canvasID,
 		secondDraftID,
-		"",
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)

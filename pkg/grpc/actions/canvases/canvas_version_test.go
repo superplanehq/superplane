@@ -238,7 +238,6 @@ func TestListCanvasVersionsShowsOnlyOwnVersionsAndCurrentLive(t *testing.T) {
 		r.Organization.ID.String(),
 		canvasID,
 		firstDraftResponse.Version.Metadata.Id,
-		"",
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)
@@ -253,7 +252,6 @@ func TestListCanvasVersionsShowsOnlyOwnVersionsAndCurrentLive(t *testing.T) {
 		r.Organization.ID.String(),
 		canvasID,
 		secondDraftResponse.Version.Metadata.Id,
-		"",
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)
@@ -386,7 +384,6 @@ func TestDescribeCanvasVersionBlocksNonLivePublishedVersionFromOtherUsers(t *tes
 		r.Organization.ID.String(),
 		canvasID,
 		firstDraftResponse.Version.Metadata.Id,
-		"",
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)
@@ -400,7 +397,6 @@ func TestDescribeCanvasVersionBlocksNonLivePublishedVersionFromOtherUsers(t *tes
 		r.Organization.ID.String(),
 		canvasID,
 		secondDraftResponse.Version.Metadata.Id,
-		"",
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)
@@ -689,7 +685,6 @@ func TestPublishCanvasVersionAppliesRuntimeChanges(t *testing.T) {
 		r.Organization.ID.String(),
 		canvasID,
 		versionID,
-		"",
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err)

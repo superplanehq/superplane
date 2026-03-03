@@ -58,22 +58,14 @@ func buildVersionsCommandGroup(options core.BindOptions) *cobra.Command {
 	}, options)
 
 	var publishCanvas string
-	var publishExpectedLive string
 	publishCmd := &cobra.Command{
 		Use:   "publish [version-id]",
 		Short: "Publish a working version",
 		Args:  cobra.MaximumNArgs(1),
 	}
 	publishCmd.Flags().StringVar(&publishCanvas, "canvas", "", "canvas id or name (defaults to active canvas)")
-	publishCmd.Flags().StringVar(
-		&publishExpectedLive,
-		"expect-live-version-id",
-		"",
-		"expected live version id (set to \"auto\" to use current live version)",
-	)
 	core.Bind(publishCmd, &versionsPublishCommand{
-		canvas:              &publishCanvas,
-		expectedLiveVersion: &publishExpectedLive,
+		canvas: &publishCanvas,
 	}, options)
 
 	var discardCanvas string

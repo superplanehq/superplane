@@ -407,7 +407,7 @@ export type CanvasesListNodeQueueItemsResponse = {
 };
 
 export type CanvasesPublishCanvasChangeRequestBody = {
-  expectedLiveVersionId?: string;
+  [key: string]: unknown;
 };
 
 export type CanvasesPublishCanvasChangeRequestResponse = {
@@ -417,7 +417,7 @@ export type CanvasesPublishCanvasChangeRequestResponse = {
 };
 
 export type CanvasesPublishCanvasVersionBody = {
-  expectedLiveVersionId?: string;
+  [key: string]: unknown;
 };
 
 export type CanvasesPublishCanvasVersionResponse = {

@@ -4888,12 +4888,7 @@
       }
     },
     "CanvasesPublishCanvasChangeRequestBody": {
-      "type": "object",
-      "properties": {
-        "expectedLiveVersionId": {
-          "type": "string"
-        }
-      }
+      "type": "object"
     },
     "CanvasesPublishCanvasChangeRequestResponse": {
       "type": "object",
@@ -4910,12 +4905,7 @@
       }
     },
     "CanvasesPublishCanvasVersionBody": {
-      "type": "object",
-      "properties": {
-        "expectedLiveVersionId": {
-          "type": "string"
-        }
-      }
+      "type": "object"
     },
     "CanvasesPublishCanvasVersionResponse": {
       "type": "object",

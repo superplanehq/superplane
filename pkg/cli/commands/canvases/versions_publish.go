@@ -3,15 +3,13 @@ package canvases
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 type versionsPublishCommand struct {
-	canvas              *string
-	expectedLiveVersion *string
+	canvas *string
 }
 
 func (c *versionsPublishCommand) Execute(ctx core.CommandContext) error {
@@ -35,23 +33,9 @@ func (c *versionsPublishCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	body := openapi_client.CanvasesPublishCanvasVersionBody{}
-	if c.expectedLiveVersion != nil {
-		expected := strings.TrimSpace(*c.expectedLiveVersion)
-		if strings.EqualFold(expected, "auto") {
-			liveVersionID, liveErr := findLiveCanvasVersionID(ctx, canvasID)
-			if liveErr != nil {
-				return liveErr
-			}
-			body.SetExpectedLiveVersionId(liveVersionID)
-		} else if expected != "" {
-			body.SetExpectedLiveVersionId(expected)
-		}
-	}
-
 	response, _, err := ctx.API.CanvasVersionAPI.
 		CanvasesPublishCanvasVersion(ctx.Context, canvasID, versionID).
-		Body(body).
+		Body(openapi_client.CanvasesPublishCanvasVersionBody{}).
 		Execute()
 	if err != nil {
 		return err

@@ -480,7 +480,6 @@ message UpdateCanvasVersionResponse {
 message PublishCanvasVersionRequest {
   string canvas_id = 1;
   string version_id = 2;
-  string expected_live_version_id = 3;
 }
 
 message PublishCanvasVersionResponse {
@@ -524,7 +523,6 @@ message DescribeCanvasChangeRequestResponse {
 message PublishCanvasChangeRequestRequest {
   string canvas_id = 1;
   string change_request_id = 2;
-  string expected_live_version_id = 3;
 }
 
 message PublishCanvasChangeRequestResponse {

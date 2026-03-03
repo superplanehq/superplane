@@ -28,7 +28,6 @@ func PublishCanvasVersion(
 	organizationID string,
 	canvasID string,
 	versionID string,
-	expectedLiveVersionID string,
 	webhookBaseURL string,
 ) (*pb.PublishCanvasVersionResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
@@ -45,15 +44,6 @@ func PublishCanvasVersion(
 	versionUUID, err := uuid.Parse(versionID)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
-	}
-
-	var expectedLiveVersionUUID *uuid.UUID
-	if expectedLiveVersionID != "" {
-		parsedExpected, err := uuid.Parse(expectedLiveVersionID)
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid expected live version id: %v", err)
-		}
-		expectedLiveVersionUUID = &parsedExpected
 	}
 
 	canvas, err := models.FindCanvas(organizationUUID, canvasUUID)
@@ -84,12 +74,6 @@ func PublishCanvasVersion(
 
 		if version.OwnerID == nil || *version.OwnerID != userUUID {
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
-		}
-
-		if expectedLiveVersionUUID != nil {
-			if canvasForUpdate.LiveVersionID == nil || *canvasForUpdate.LiveVersionID != *expectedLiveVersionUUID {
-				return status.Error(codes.FailedPrecondition, "live version changed")
-			}
 		}
 
 		if version.BasedOnVersionID != nil {

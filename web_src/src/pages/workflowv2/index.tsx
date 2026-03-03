@@ -3223,7 +3223,6 @@ export function WorkflowPageV2() {
     try {
       const response = await publishCanvasChangeRequestMutation.mutateAsync({
         changeRequestId: selectedChangeRequest.metadata.id,
-        expectedLiveVersionId: selectedChangeRequest.metadata?.basedOnVersionId,
       });
 
       if (response?.data?.canvas) {

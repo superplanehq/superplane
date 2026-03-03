@@ -370,13 +370,11 @@ export const usePublishCanvasChangeRequest = (organizationId: string, canvasId: 
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { changeRequestId: string; expectedLiveVersionId?: string }) => {
+    mutationFn: async (data: { changeRequestId: string }) => {
       return await canvasesPublishCanvasChangeRequest(
         withOrganizationHeader({
           path: { canvasId, changeRequestId: data.changeRequestId },
-          body: {
-            expectedLiveVersionId: data.expectedLiveVersionId,
-          },
+          body: {},
         }),
       );
     },
@@ -479,13 +477,11 @@ export const usePublishCanvasVersion = (organizationId: string, canvasId: string
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { versionId: string; expectedLiveVersionId?: string }) => {
+    mutationFn: async (data: { versionId: string }) => {
       return await canvasesPublishCanvasVersion(
         withOrganizationHeader({
           path: { canvasId, versionId: data.versionId },
-          body: {
-            expectedLiveVersionId: data.expectedLiveVersionId,
-          },
+          body: {},
         }),
       );
     },

@@ -31,10 +31,7 @@
 
 ## Conflict detection
 
-`PublishCanvasDraftInTransaction` fails with `ErrCanvasVersionConflict` when:
-
-- an `expectedLiveVersionID` is provided and does not match current live revision, or
-- draft `based_on_version_id` does not match current live revision.
+`PublishCanvasDraftInTransaction` fails with `ErrCanvasVersionConflict` when draft `based_on_version_id` does not match current live revision.
 
 ## Next backend steps
 

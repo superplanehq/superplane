@@ -241,7 +241,6 @@ func PublishCanvasDraftInTransaction(
 	tx *gorm.DB,
 	workflowID uuid.UUID,
 	userID uuid.UUID,
-	expectedLiveVersionID *uuid.UUID,
 ) (*CanvasVersion, error) {
 	canvas, err := lockCanvasForVersioningInTransaction(tx, workflowID)
 	if err != nil {
@@ -259,12 +258,6 @@ func PublishCanvasDraftInTransaction(
 	version, err := FindCanvasVersionInTransaction(tx, workflowID, draft.VersionID)
 	if err != nil {
 		return nil, err
-	}
-
-	if expectedLiveVersionID != nil {
-		if canvas.LiveVersionID == nil || *canvas.LiveVersionID != *expectedLiveVersionID {
-			return nil, ErrCanvasVersionConflict
-		}
 	}
 
 	if version.BasedOnVersionID != nil {

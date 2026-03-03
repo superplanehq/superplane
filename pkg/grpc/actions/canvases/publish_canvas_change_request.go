@@ -28,7 +28,6 @@ func PublishCanvasChangeRequest(
 	organizationID string,
 	canvasID string,
 	changeRequestID string,
-	expectedLiveVersionID string,
 	webhookBaseURL string,
 ) (*pb.PublishCanvasChangeRequestResponse, error) {
 	_, ok := authentication.GetUserIdFromMetadata(ctx)
@@ -45,15 +44,6 @@ func PublishCanvasChangeRequest(
 	changeRequestUUID, err := uuid.Parse(changeRequestID)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid change request id: %v", err)
-	}
-
-	var expectedLiveVersionUUID *uuid.UUID
-	if expectedLiveVersionID != "" {
-		parsedExpected, parseErr := uuid.Parse(expectedLiveVersionID)
-		if parseErr != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid expected live version id: %v", parseErr)
-		}
-		expectedLiveVersionUUID = &parsedExpected
 	}
 
 	canvas, err := models.FindCanvas(organizationUUID, canvasUUID)
@@ -95,12 +85,6 @@ func PublishCanvasChangeRequest(
 				return status.Error(codes.NotFound, "version not found")
 			}
 			return err
-		}
-
-		if expectedLiveVersionUUID != nil {
-			if canvasForUpdate.LiveVersionID == nil || *canvasForUpdate.LiveVersionID != *expectedLiveVersionUUID {
-				return status.Error(codes.FailedPrecondition, "live version changed")
-			}
 		}
 
 		if err := refreshCanvasChangeRequestDiffInTransaction(tx, canvasForUpdate, version, request); err != nil {
