@@ -433,15 +433,6 @@ func (c *CreateBuild) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("connect the GCP integration to this component to create builds")
 	}
 
-	var metadata CreateBuildNodeMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode metadata: %w", err)
-	}
-
-	if metadata.SubscriptionID != "" {
-		return nil
-	}
-
 	subscriptionID, err := ctx.Integration.Subscribe(map[string]any{"type": SubscriptionType})
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to Cloud Build notifications: %w", err)
