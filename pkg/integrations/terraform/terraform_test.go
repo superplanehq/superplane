@@ -5,6 +5,7 @@ import (
 	"crypto/sha512"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,7 +30,7 @@ func Test__ParseAndValidateWebhook(t *testing.T) {
 		_, code, err := ParseAndValidateWebhook(core.WebhookRequestContext{
 			Headers:     headers,
 			Body:        body,
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
+			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 		})
 
 		assert.Equal(t, http.StatusUnauthorized, code)
@@ -44,7 +45,7 @@ func Test__ParseAndValidateWebhook(t *testing.T) {
 		_, code, err := ParseAndValidateWebhook(core.WebhookRequestContext{
 			Headers:     headers,
 			Body:        body,
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
+			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 		})
 
 		assert.Equal(t, http.StatusUnauthorized, code)
@@ -61,7 +62,7 @@ func Test__ParseAndValidateWebhook(t *testing.T) {
 		payload, code, err := ParseAndValidateWebhook(core.WebhookRequestContext{
 			Headers:     headers,
 			Body:        body,
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
+			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -98,7 +99,7 @@ func Test__ParseAndValidateWebhook(t *testing.T) {
 		})
 
 		assert.Equal(t, http.StatusInternalServerError, code)
-		assert.ErrorContains(t, err, "webhook secret is not configured")
+		assert.ErrorContains(t, err, "failed to get webhook secret or none configured")
 	})
 
 	t.Run("verification handshake -> 200 with nil payload", func(t *testing.T) {
@@ -111,7 +112,7 @@ func Test__ParseAndValidateWebhook(t *testing.T) {
 		payload, code, err := ParseAndValidateWebhook(core.WebhookRequestContext{
 			Headers:     headers,
 			Body:        body,
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
+			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -129,7 +130,7 @@ func Test__ParseAndValidateWebhook(t *testing.T) {
 		_, code, err := ParseAndValidateWebhook(core.WebhookRequestContext{
 			Headers:     headers,
 			Body:        body,
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
+			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -146,7 +147,7 @@ func Test__ParseAndValidateWebhook(t *testing.T) {
 		_, code, err := ParseAndValidateWebhook(core.WebhookRequestContext{
 			Headers:     headers,
 			Body:        body,
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
+			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -163,7 +164,7 @@ func Test__ParseAndValidateWebhook(t *testing.T) {
 		payload, code, err := ParseAndValidateWebhook(core.WebhookRequestContext{
 			Headers:     headers,
 			Body:        body,
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
+			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -197,7 +198,7 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 				"workspaceId": "ws-DIFFERENT",
 				"events":      []any{"run:created"},
 			},
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
+			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 			Events:      eventContext,
 		})
 
@@ -221,7 +222,7 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 				"workspaceId": "my-org/my-ws",
 				"events":      []any{"run:created"},
 			},
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
+			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 			Events:      eventContext,
 		})
 
@@ -245,7 +246,7 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 				"workspaceId": "ws-222",
 				"events":      []any{"run:completed", "run:errored"},
 			},
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
+			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 			Events:      eventContext,
 		})
 
@@ -269,7 +270,7 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 				"workspaceId": "ws-222",
 				"events":      []any{"run:completed"},
 			},
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
+			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 			Events:      eventContext,
 		})
 
@@ -286,8 +287,8 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "my-org", emittedData["organizationName"])
 	})
 
-	t.Run("SuperPlane-initiated run (gear emoji) -> event not emitted by default", func(t *testing.T) {
-		body := []byte(`{"payload_version": 1, "run_id": "run-111", "run_message": "⚙ Triggered by SuperPlane", "workspace_id": "ws-222", "notifications": [{"trigger": "run:created", "run_status": "pending"}]}`)
+	t.Run("SuperPlane-initiated run (gear emoji) -> event emitted by default", func(t *testing.T) {
+		body := []byte(`{"payload_version": 1, "run_id": "run-111", "run_message": "⚙ Triggered by SuperPlane", "workspace_id": "ws-222", "workspace_name": "my-ws", "organization_name": "my-org", "notifications": [{"trigger": "run:created", "run_status": "pending"}]}`)
 		signature := signPayload(secret, body)
 
 		headers := http.Header{}
@@ -298,36 +299,10 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
-				"workspaceId":           "ws-222",
-				"events":                []any{"run:created"},
-				"includeSuperPlaneRuns": false,
+				"workspaceId": "ws-222",
+				"events":      []any{"run:created"},
 			},
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
-			Events:      eventContext,
-		})
-
-		assert.Equal(t, http.StatusOK, code)
-		assert.NoError(t, err)
-		assert.Equal(t, 0, eventContext.Count())
-	})
-
-	t.Run("SuperPlane-initiated run with includeSuperPlaneRuns=true -> event emitted", func(t *testing.T) {
-		body := []byte(`{"payload_version": 1, "run_id": "run-111", "run_message": "⚙ Triggered by SuperPlane", "workspace_id": "ws-222", "notifications": [{"trigger": "run:created", "run_status": "pending"}]}`)
-		signature := signPayload(secret, body)
-
-		headers := http.Header{}
-		headers.Set("X-TFE-Notification-Signature", signature)
-
-		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:    body,
-			Headers: headers,
-			Configuration: map[string]any{
-				"workspaceId":           "ws-222",
-				"events":                []any{"run:created"},
-				"includeSuperPlaneRuns": true,
-			},
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
+			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 			Events:      eventContext,
 		})
 
@@ -351,7 +326,7 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 				"workspaceId": "ws-222",
 				"events":      []any{"run:created", "run:errored", "run:completed"},
 			},
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
+			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 			Events:      eventContext,
 		})
 
@@ -362,122 +337,18 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 	})
 }
 
-func Test__TerraformNeedsAttention__HandleWebhook(t *testing.T) {
-	trigger := &NeedsAttention{}
-	secret := "test-secret"
-
-	t.Run("action is not run:needs_attention -> event not emitted", func(t *testing.T) {
-		body := []byte(`{"payload_version": 1, "run_id": "run-111", "workspace_id": "ws-222", "notifications": [{"trigger": "run:completed", "run_status": "applied"}]}`)
-		signature := signPayload(secret, body)
-
-		headers := http.Header{}
-		headers.Set("X-TFE-Notification-Signature", signature)
-
-		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:    body,
-			Headers: headers,
-			Configuration: map[string]any{
-				"workspaceId": "ws-222",
-			},
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
-			Events:      eventContext,
-		})
-
-		assert.Equal(t, http.StatusOK, code)
-		assert.NoError(t, err)
-		assert.Equal(t, 0, eventContext.Count())
-	})
-
-	t.Run("workspace ID mismatch -> event not emitted", func(t *testing.T) {
-		body := []byte(`{"payload_version": 1, "run_id": "run-111", "workspace_id": "ws-222", "notifications": [{"trigger": "run:needs_attention", "run_status": "policy_override"}]}`)
-		signature := signPayload(secret, body)
-
-		headers := http.Header{}
-		headers.Set("X-TFE-Notification-Signature", signature)
-
-		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:    body,
-			Headers: headers,
-			Configuration: map[string]any{
-				"workspaceId": "ws-DIFFERENT",
-			},
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
-			Events:      eventContext,
-		})
-
-		assert.Equal(t, http.StatusOK, code)
-		assert.NoError(t, err)
-		assert.Equal(t, 0, eventContext.Count())
-	})
-
-	t.Run("workspace org/name format match -> event emitted", func(t *testing.T) {
-		body := []byte(`{"payload_version": 1, "run_id": "run-111", "workspace_id": "ws-222", "workspace_name": "prod", "organization_name": "acme", "notifications": [{"trigger": "run:needs_attention", "run_status": "policy_override"}]}`)
-		signature := signPayload(secret, body)
-
-		headers := http.Header{}
-		headers.Set("X-TFE-Notification-Signature", signature)
-
-		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:    body,
-			Headers: headers,
-			Configuration: map[string]any{
-				"workspaceId": "acme/prod",
-			},
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
-			Events:      eventContext,
-		})
-
-		assert.Equal(t, http.StatusOK, code)
-		assert.NoError(t, err)
-		assert.Equal(t, 1, eventContext.Count())
-	})
-
-	t.Run("needs_attention with workspace match -> event emitted with correct data", func(t *testing.T) {
-		body := []byte(`{"payload_version": 1, "run_id": "run-111", "workspace_id": "ws-222", "workspace_name": "staging", "organization_name": "myorg", "run_url": "https://app.terraform.io/runs/run-111", "run_message": "Plan requires approval", "run_created_by": "user@example.com", "notifications": [{"trigger": "run:needs_attention", "run_status": "planned"}]}`)
-		signature := signPayload(secret, body)
-
-		headers := http.Header{}
-		headers.Set("X-TFE-Notification-Signature", signature)
-
-		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:    body,
-			Headers: headers,
-			Configuration: map[string]any{
-				"workspaceId": "ws-222",
-			},
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"webhookSecret": secret}},
-			Events:      eventContext,
-		})
-
-		assert.Equal(t, http.StatusOK, code)
-		assert.NoError(t, err)
-		require.Equal(t, 1, eventContext.Count())
-
-		assert.Equal(t, "terraform.needsAttention", eventContext.Payloads[0].Type)
-		emittedData := eventContext.Payloads[0].Data.(map[string]any)
-		assert.Equal(t, "run-111", emittedData["runId"])
-		assert.Equal(t, "ws-222", emittedData["workspaceId"])
-		assert.Equal(t, "run:needs_attention", emittedData["action"])
-		assert.Equal(t, "planned", emittedData["runStatus"])
-		assert.Equal(t, "staging", emittedData["workspaceName"])
-		assert.Equal(t, "myorg", emittedData["organizationName"])
-	})
-}
-
 func Test__TerraformRunEvent__Setup(t *testing.T) {
 	trigger := &RunEvent{}
 
 	t.Run("workspaceId is required", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			WebhookRequests: []any{},
+			Configuration:   map[string]any{"apiToken": "test-token"},
 		}
 
 		err := trigger.Setup(core.TriggerContext{
 			Integration:   integrationCtx,
+			Metadata:      &contexts.MetadataContext{},
 			Configuration: map[string]any{"workspaceId": "", "events": []string{"run:created"}},
 		})
 
@@ -488,10 +359,12 @@ func Test__TerraformRunEvent__Setup(t *testing.T) {
 	t.Run("valid configuration -> webhook requested", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			WebhookRequests: []any{},
+			Configuration:   map[string]any{"apiToken": "test-token"},
 		}
 
 		err := trigger.Setup(core.TriggerContext{
 			Integration:   integrationCtx,
+			Metadata:      &contexts.MetadataContext{},
 			Configuration: map[string]any{"workspaceId": "ws-123", "events": []string{"run:created"}},
 		})
 
@@ -500,5 +373,64 @@ func Test__TerraformRunEvent__Setup(t *testing.T) {
 
 		webhookConfig := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
 		assert.Equal(t, "ws-123", webhookConfig.WorkspaceID)
+	})
+}
+
+func Test__TerraformPlan__Cancel(t *testing.T) {
+	plan := &Plan{}
+
+	t.Run("successfully cancels the running plan via API", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/api/v2/runs/run-123/actions/cancel", r.URL.Path)
+			assert.Equal(t, http.MethodPost, r.Method)
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer ts.Close()
+
+		metadata := ExecutionMetadata{RunID: "run-123"}
+
+		metaCtx := &contexts.MetadataContext{}
+		_ = metaCtx.Set(metadata)
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "test-token",
+				"address":  ts.URL,
+			},
+		}
+
+		err := plan.Cancel(core.ExecutionContext{
+			Integration: integrationCtx,
+			Metadata:    metaCtx,
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("returns error when API fails to cancel", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+		}))
+		defer ts.Close()
+
+		metadata := ExecutionMetadata{RunID: "run-invalid"}
+
+		metaCtx := &contexts.MetadataContext{}
+		_ = metaCtx.Set(metadata)
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "test-token",
+				"address":  ts.URL,
+			},
+		}
+
+		err := plan.Cancel(core.ExecutionContext{
+			Integration: integrationCtx,
+			Metadata:    metaCtx,
+		})
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to cancel terraform run")
 	})
 }
