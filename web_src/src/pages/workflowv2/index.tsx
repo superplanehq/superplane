@@ -2346,7 +2346,17 @@ export function WorkflowPageV2() {
         markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, blueprints, queryClient, saveWorkflowSnapshot, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      blueprints,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      canAutoSave,
+      markUnsavedChange,
+    ],
   );
 
   const handleEdgeDelete = useCallback(
