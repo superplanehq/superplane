@@ -23,25 +23,18 @@ func Test__OnIssue__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "at least one status must be selected")
 	})
 
-	t.Run("valid setup requests shared webhook and stores metadata", func(t *testing.T) {
+	t.Run("valid setup requests shared webhook", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{},
 		}
-		metadataCtx := &contexts.MetadataContext{}
 
 		err := trigger.Setup(core.TriggerContext{
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}},
 			Integration:   integrationCtx,
-			Metadata:      metadataCtx,
-			Webhook:       &contexts.NodeWebhookContext{},
 		})
 
 		require.NoError(t, err)
 		require.Len(t, integrationCtx.WebhookRequests, 1)
-
-		metadata, ok := metadataCtx.Metadata.(OnIssueMetadata)
-		require.True(t, ok)
-		assert.NotEmpty(t, metadata.WebhookURL)
 	})
 }
 

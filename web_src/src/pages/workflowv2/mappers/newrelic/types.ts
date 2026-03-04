@@ -29,10 +29,6 @@ export interface OnIssueConfiguration {
   priorities?: string[];
 }
 
-export interface OnIssueMetadata {
-  webhookUrl?: string;
-}
-
 export interface ReportMetricConfiguration {
   metricName?: string;
   metricType?: string;

@@ -17,11 +17,6 @@ const (
 	NewRelicIssuePayloadType = "newrelic.issue"
 )
 
-// IntegrationMetadata stores metadata set during webhook provisioning.
-type IntegrationMetadata struct {
-	WebhookURL string `json:"webhookUrl,omitempty" mapstructure:"webhookUrl"`
-}
-
 const installationInstructions = `### Getting your credentials
 
 1. **Account ID**: Click your name in the bottom-left corner of New Relic. Your Account ID is displayed under the account name.
@@ -34,15 +29,7 @@ const installationInstructions = `### Getting your credentials
 
 ### Webhook Setup
 
-After saving the integration, a webhook URL will be generated for receiving New Relic alert issues. The URL is shown in the **On Issue** trigger configuration panel. To complete the setup:
-
-1. Add the **On Issue** trigger to your canvas and save it to generate the webhook URL.
-2. Copy the webhook URL from the trigger configuration panel.
-3. In New Relic, go to **Alerts & AI → Destinations → Create a destination**.
-4. Choose **Webhook** as the destination type.
-5. Paste the webhook URL as the endpoint URL.
-6. Create a **Notification Channel** using this webhook destination.
-7. Attach the channel to the desired **alert policies/workflows**.
+SuperPlane automatically creates a Webhook Notification Channel named "SuperPlane" in your New Relic account when you add the **On Issue** trigger to your canvas. Just attach it to your alert workflow in New Relic to start receiving alerts.
 `
 
 func init() {
