@@ -33,15 +33,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ### Webhook Setup
 
-After saving the integration, a webhook URL will be generated for receiving New Relic alert issues. The URL is shown in the **On Issue** trigger configuration panel. To complete the setup:
-
-1. Add the **On Issue** trigger to your canvas and save it to generate the webhook URL.
-2. Copy the webhook URL from the trigger configuration panel.
-3. In New Relic, go to **Alerts & AI → Destinations → Create a destination**.
-4. Choose **Webhook** as the destination type.
-5. Paste the webhook URL as the endpoint URL.
-6. Create a **Notification Channel** using this webhook destination.
-7. Attach the channel to the desired **alert policies/workflows**.
+SuperPlane automatically creates a Webhook Notification Channel named "SuperPlane" in your New Relic account when you add the **On Issue** trigger to your canvas. Just attach it to your alert workflow in New Relic to start receiving alerts.
 
 <a id="on-issue"></a>
 
@@ -52,7 +44,7 @@ The On Issue trigger starts a workflow execution when a New Relic alert issue is
 ### What this trigger does
 
 - Receives New Relic webhook payloads for alert issues
-- Filters by issue state (ACTIVATED, ACKNOWLEDGED, CLOSED)
+- Filters by issue state (CREATED, ACTIVATED, ACKNOWLEDGED, CLOSED)
 - Optionally filters by priority (CRITICAL, HIGH, MEDIUM, LOW)
 - Emits matching issues as `newrelic.issue` events
 
@@ -63,7 +55,7 @@ The On Issue trigger starts a workflow execution when a New Relic alert issue is
 
 ### Webhook Setup
 
-The webhook URL is generated when the integration is saved. See the integration setup instructions for how to configure it in New Relic.
+SuperPlane automatically creates a Webhook Notification Channel named "SuperPlane" in your New Relic account. Just attach it to your alert workflow to start receiving alerts.
 
 ### Example Data
 
