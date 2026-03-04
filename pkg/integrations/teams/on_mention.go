@@ -3,6 +3,8 @@ package teams
 import (
 	"fmt"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
@@ -15,7 +17,8 @@ type OnMention struct{}
 
 // OnMentionConfiguration defines the trigger's configurable fields.
 type OnMentionConfiguration struct {
-	Channel string `json:"channel" mapstructure:"channel"`
+	Channel       string `json:"channel" mapstructure:"channel"`
+	ContentFilter string `json:"contentFilter" mapstructure:"contentFilter"`
 }
 
 // OnMentionMetadata stores metadata after trigger setup.
@@ -55,6 +58,7 @@ func (t *OnMention) Documentation() string {
 ## Configuration
 
 - **Channel**: Optional channel filter — if specified, only mentions in this channel will trigger (leave empty to listen to all channels)
+- **Content Filter**: Optional regex pattern to filter messages by content (e.g., ` + "`/deploy`" + ` to only trigger on mentions containing "/deploy")
 
 ## Event Data
 
@@ -94,6 +98,14 @@ func (t *OnMention) Configuration() []configuration.Field {
 					Type: "channel",
 				},
 			},
+		},
+		{
+			Name:        "contentFilter",
+			Label:       "Content Filter",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Placeholder: "e.g., /deploy",
+			Description: "Optional regex pattern to filter mentions by content",
 		},
 	}
 }
@@ -174,21 +186,39 @@ func (t *OnMention) OnIntegrationMessage(ctx core.IntegrationMessageContext) err
 		return fmt.Errorf("unexpected message type: %T", ctx.Message)
 	}
 
+	ctx.Logger.Infof("OnMention: received message, channel filter=%q, contentFilter=%q", config.Channel, config.ContentFilter)
+
 	// Filter by channel if configured
 	if config.Channel != "" {
 		conversation, ok := message["conversation"].(map[string]any)
 		if !ok {
-			ctx.Logger.Infof("message has no conversation info, ignoring")
+			ctx.Logger.Infof("OnMention: message has no conversation info, ignoring")
 			return nil
 		}
 
 		conversationID, _ := conversation["id"].(string)
+		ctx.Logger.Infof("OnMention: conversation ID=%q, configured channel=%q", conversationID, config.Channel)
 		if conversationID != "" && !channelMatches(config.Channel, conversationID) {
-			ctx.Logger.Infof("message channel %s does not match configured channel %s, ignoring", conversationID, config.Channel)
+			ctx.Logger.Infof("OnMention: channel mismatch, ignoring")
 			return nil
 		}
 	}
 
+	// Apply content filter if configured
+	if config.ContentFilter != "" {
+		text, _ := message["text"].(string)
+		matched, err := regexp.MatchString(config.ContentFilter, text)
+		if err != nil {
+			return fmt.Errorf("invalid content filter regex: %w", err)
+		}
+
+		if !matched {
+			ctx.Logger.Infof("OnMention: content filter %q did not match text %q, ignoring", config.ContentFilter, text)
+			return nil
+		}
+	}
+
+	ctx.Logger.Infof("OnMention: emitting teams.bot.mention event")
 	return ctx.Events.Emit("teams.bot.mention", ctx.Message)
 }
 
@@ -209,7 +239,24 @@ func (t *OnMention) Cleanup(ctx core.TriggerContext) error {
 }
 
 // channelMatches checks if a conversation ID matches a configured channel.
-// Teams conversation IDs can have complex formats, so we check for containment.
+// Graph API channel IDs look like "19:abc123@thread.tacv2".
+// Bot Framework conversation IDs may include a messageid suffix like
+// "19:abc123@thread.tacv2;messageid=1234567890".
+// We handle both by checking exact match and prefix containment.
 func channelMatches(configured, actual string) bool {
-	return configured == actual || fmt.Sprintf("19:%s", configured) == actual
+	if configured == actual {
+		return true
+	}
+
+	// Bot Framework may append ;messageid=... to the conversation ID
+	if strings.HasPrefix(actual, configured+";") || strings.HasPrefix(actual, configured+"/") {
+		return true
+	}
+
+	// Also check the reverse — configured may be more specific than actual
+	if strings.HasPrefix(configured, actual+";") || strings.HasPrefix(configured, actual+"/") {
+		return true
+	}
+
+	return false
 }

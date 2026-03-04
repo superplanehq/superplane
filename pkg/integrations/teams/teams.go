@@ -73,6 +73,7 @@ type Teams struct{}
 type Metadata struct {
 	AppID    string `json:"appId" mapstructure:"appId"`
 	TenantID string `json:"tenantId,omitempty" mapstructure:"tenantId,omitempty"`
+	BotName  string `json:"botName,omitempty" mapstructure:"botName,omitempty"`
 }
 
 func (t *Teams) Name() string {
@@ -120,6 +121,14 @@ func (t *Teams) Configuration() []configuration.Field {
 			Description: "Azure Tenant ID (required for Graph API permissions to list channels)",
 			Required:    true,
 		},
+		{
+			Name:        "botName",
+			Label:       "Bot Name",
+			Type:        configuration.FieldTypeString,
+			Description: "Display name for the Teams bot (used in the app manifest)",
+			Required:    false,
+			Placeholder: "SuperPlane Bot",
+		},
 	}
 }
 
@@ -143,11 +152,6 @@ func (t *Teams) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode metadata: %v", err)
 	}
 
-	// If metadata is already set, nothing to do.
-	if metadata.AppID != "" {
-		return nil
-	}
-
 	appID, _ := ctx.Integration.GetConfig("appId")
 	appPassword, _ := ctx.Integration.GetConfig("appPassword")
 
@@ -161,22 +165,31 @@ func (t *Teams) Sync(ctx core.SyncContext) error {
 		tenantID = string(tenantIDBytes)
 	}
 
-	// Verify credentials by fetching a Bot Framework token
-	client := NewClientFromConfig(string(appID), string(appPassword), tenantID)
-	_, err = client.GetBotToken()
-	if err != nil {
-		return fmt.Errorf("failed to verify credentials: %v", err)
+	botName := "SuperPlane Bot"
+	botNameBytes, err := ctx.Integration.GetConfig("botName")
+	if err == nil && botNameBytes != nil && string(botNameBytes) != "" {
+		botName = string(botNameBytes)
+	}
+
+	// Verify credentials if not already done
+	if metadata.AppID == "" {
+		client := NewClientFromConfig(string(appID), string(appPassword), tenantID)
+		_, err = client.GetBotToken()
+		if err != nil {
+			return fmt.Errorf("failed to verify credentials: %v", err)
+		}
 	}
 
 	ctx.Integration.SetMetadata(Metadata{
 		AppID:    string(appID),
 		TenantID: tenantID,
+		BotName:  botName,
 	})
 
-	// Generate manifest ZIP and offer it as a download via BrowserAction
+	// Always regenerate manifest ZIP so config changes (e.g. bot name) take effect
 	webhookURL := fmt.Sprintf("%s/api/v1/integrations/%s/messages", ctx.WebhooksBaseURL, ctx.Integration.ID())
 	instructions := fmt.Sprintf(installAppInstructionsTemplate, webhookURL)
-	zipBytes, err := generateManifestZIP(string(appID), webhookURL)
+	zipBytes, err := generateManifestZIP(string(appID), botName)
 	if err != nil {
 		ctx.Integration.RemoveBrowserAction()
 	} else {
@@ -261,42 +274,66 @@ func (t *Teams) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (t *Teams) handleMessage(ctx core.HTTPRequestContext, activity Activity) {
+	ctx.Logger.Infof("handling message activity: id=%s, from=%s, conversation=%s, text=%q",
+		activity.ID, activity.From.Name, activity.Conversation.ID, activity.Text)
+
 	subscriptions, err := ctx.Integration.ListSubscriptions()
 	if err != nil {
 		ctx.Logger.Errorf("error listing subscriptions: %v", err)
 		return
 	}
 
+	ctx.Logger.Infof("found %d subscriptions", len(subscriptions))
+
 	isMention := hasBotMention(activity)
+	ctx.Logger.Infof("is bot mention: %v", isMention)
 
 	eventData := map[string]any{
-		"type":         activity.Type,
-		"id":           activity.ID,
-		"timestamp":    activity.Timestamp,
-		"channelId":    activity.ChannelID,
-		"serviceUrl":   activity.ServiceURL,
-		"from":         activity.From,
-		"conversation": activity.Conversation,
-		"recipient":    activity.Recipient,
-		"text":         activity.Text,
-		"entities":     activity.Entities,
-		"channelData":  activity.ChannelData,
+		"type":      activity.Type,
+		"id":        activity.ID,
+		"timestamp": activity.Timestamp,
+		"channelId": activity.ChannelID,
+		"serviceUrl": activity.ServiceURL,
+		"from": map[string]any{
+			"id":          activity.From.ID,
+			"name":        activity.From.Name,
+			"aadObjectId": activity.From.AADObjectID,
+		},
+		"conversation": map[string]any{
+			"id":               activity.Conversation.ID,
+			"name":             activity.Conversation.Name,
+			"isGroup":          activity.Conversation.IsGroup,
+			"conversationType": activity.Conversation.ConversationType,
+			"tenantId":         activity.Conversation.TenantID,
+		},
+		"recipient": map[string]any{
+			"id":          activity.Recipient.ID,
+			"name":        activity.Recipient.Name,
+			"aadObjectId": activity.Recipient.AADObjectID,
+		},
+		"text":        activity.Text,
+		"entities":    activity.Entities,
+		"channelData": activity.ChannelData,
 	}
 
-	for _, subscription := range subscriptions {
+	for i, subscription := range subscriptions {
 		c := SubscriptionConfiguration{}
 		if err := mapstructure.Decode(subscription.Configuration(), &c); err != nil {
-			ctx.Logger.Errorf("error decoding subscription configuration: %v", err)
+			ctx.Logger.Errorf("error decoding subscription %d configuration: %v", i, err)
 			continue
 		}
 
+		ctx.Logger.Infof("subscription %d: eventTypes=%v", i, c.EventTypes)
+
 		if isMention && slices.Contains(c.EventTypes, "mention") {
+			ctx.Logger.Infof("dispatching mention event to subscription %d", i)
 			if err := subscription.SendMessage(eventData); err != nil {
 				ctx.Logger.Errorf("error sending mention message: %v", err)
 			}
 		}
 
 		if slices.Contains(c.EventTypes, "message") {
+			ctx.Logger.Infof("dispatching message event to subscription %d", i)
 			if err := subscription.SendMessage(eventData); err != nil {
 				ctx.Logger.Errorf("error sending message: %v", err)
 			}
@@ -342,13 +379,13 @@ func (t *Teams) HandleAction(ctx core.IntegrationActionContext) error {
 }
 
 // generateManifestZIP creates a Teams app manifest ZIP ready for upload to Teams Admin Center.
-func generateManifestZIP(appID, webhookURL string) ([]byte, error) {
+func generateManifestZIP(appID, botName string) ([]byte, error) {
 	manifest := map[string]any{
-		"$schema":         "https://developer.microsoft.com/en-us/json-schemas/teams/v1.25/MicrosoftTeams.schema.json",
-		"manifestVersion":          "1.25",
+		"$schema":                 "https://developer.microsoft.com/en-us/json-schemas/teams/v1.25/MicrosoftTeams.schema.json",
+		"manifestVersion":         "1.25",
 		"supportsChannelFeatures": "tier1",
-		"version":         "1.0.0",
-		"id":              appID,
+		"version":                 "1.0.0",
+		"id":                      appID,
 		"developer": map[string]string{
 			"name":          "SuperPlane",
 			"websiteUrl":    "https://superplane.com/",
@@ -356,7 +393,7 @@ func generateManifestZIP(appID, webhookURL string) ([]byte, error) {
 			"termsOfUseUrl": "https://superplane.com/terms",
 		},
 		"name": map[string]string{
-			"short": "SuperPlane Bot",
+			"short": botName,
 		},
 		"description": map[string]string{
 			"short": "SuperPlane workflow automation bot",
@@ -379,6 +416,17 @@ func generateManifestZIP(appID, webhookURL string) ([]byte, error) {
 				"supportsFiles":      false,
 				"supportsCalling":    false,
 				"supportsVideo":      false,
+				"commandLists": []map[string]any{
+					{
+						"scopes": []string{"team", "groupChat"},
+						"commands": []map[string]string{
+							{
+								"title":       "help",
+								"description": "Show available commands",
+							},
+						},
+					},
+				},
 			},
 		},
 		"validDomains": []string{},
@@ -390,6 +438,18 @@ func generateManifestZIP(appID, webhookURL string) ([]byte, error) {
 				"resourceSpecific": []map[string]string{
 					{
 						"name": "ChannelMessage.Read.Group",
+						"type": "Application",
+					},
+					{
+						"name": "ChannelMessage.Send.Group",
+						"type": "Application",
+					},
+					{
+						"name": "ChatMessage.Read.Chat",
+						"type": "Application",
+					},
+					{
+						"name": "ChatMessage.Send.Chat",
 						"type": "Application",
 					},
 				},

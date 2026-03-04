@@ -3,6 +3,7 @@ package teams
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
@@ -15,7 +16,8 @@ type OnMessage struct{}
 
 // OnMessageConfiguration defines the trigger's configurable fields.
 type OnMessageConfiguration struct {
-	Channel string `json:"channel" mapstructure:"channel"`
+	Channel       string `json:"channel" mapstructure:"channel"`
+	ContentFilter string `json:"contentFilter" mapstructure:"contentFilter"`
 }
 
 // OnMessageMetadata stores metadata after trigger setup.
@@ -49,6 +51,7 @@ func (t *OnMessage) Documentation() string {
 ## Configuration
 
 - **Channel**: Optional channel filter — if specified, only messages in this channel will trigger (leave empty to listen to all channels)
+- **Content Filter**: Optional regex pattern to filter messages by content (e.g., ` + "`/ci`" + ` to only trigger on messages containing "/ci")
 
 ## Event Data
 
@@ -90,6 +93,14 @@ func (t *OnMessage) Configuration() []configuration.Field {
 					Type: "channel",
 				},
 			},
+		},
+		{
+			Name:        "contentFilter",
+			Label:       "Content Filter",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Placeholder: "e.g., /ci",
+			Description: "Optional regex pattern to filter messages by content",
 		},
 	}
 }
@@ -167,21 +178,39 @@ func (t *OnMessage) OnIntegrationMessage(ctx core.IntegrationMessageContext) err
 		return fmt.Errorf("unexpected message type: %T", ctx.Message)
 	}
 
+	ctx.Logger.Infof("OnMessage: received message, channel filter=%q, contentFilter=%q", config.Channel, config.ContentFilter)
+
 	// Filter by channel if configured
 	if config.Channel != "" {
 		conversation, ok := message["conversation"].(map[string]any)
 		if !ok {
-			ctx.Logger.Infof("message has no conversation info, ignoring")
+			ctx.Logger.Infof("OnMessage: message has no conversation info, ignoring")
 			return nil
 		}
 
 		conversationID, _ := conversation["id"].(string)
+		ctx.Logger.Infof("OnMessage: conversation ID=%q, configured channel=%q", conversationID, config.Channel)
 		if conversationID != "" && !channelMatches(config.Channel, conversationID) {
-			ctx.Logger.Infof("message channel %s does not match configured channel %s, ignoring", conversationID, config.Channel)
+			ctx.Logger.Infof("OnMessage: channel mismatch, ignoring")
 			return nil
 		}
 	}
 
+	// Apply content filter if configured
+	if config.ContentFilter != "" {
+		text, _ := message["text"].(string)
+		matched, err := regexp.MatchString(config.ContentFilter, text)
+		if err != nil {
+			return fmt.Errorf("invalid content filter regex: %w", err)
+		}
+
+		if !matched {
+			ctx.Logger.Infof("OnMessage: content filter %q did not match text %q, ignoring", config.ContentFilter, text)
+			return nil
+		}
+	}
+
+	ctx.Logger.Infof("OnMessage: emitting teams.channel.message event")
 	return ctx.Events.Emit("teams.channel.message", ctx.Message)
 }
 
