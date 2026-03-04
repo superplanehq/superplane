@@ -45,11 +45,24 @@ func Test__GetHTTPSyntheticCheck__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "checkId is required")
 	})
 
-	t.Run("valid setup with checkId", func(t *testing.T) {
+	t.Run("dataset is required", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: map[string]any{"checkId": "64617368-3073-796e-7468-73599f287bf4"},
+		})
+
+		require.ErrorContains(t, err, "dataset is required")
+	})
+
+	t.Run("valid setup with checkId", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Integration: &contexts.IntegrationContext{},
+			Metadata:    &contexts.MetadataContext{},
+			Configuration: map[string]any{
+				"checkId": "64617368-3073-796e-7468-73599f287bf4",
+				"dataset": "default",
+			},
 		})
 
 		require.NoError(t, err)
@@ -326,23 +339,15 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 		assert.Equal(t, "https://example.com/health", config.Spec.Plugin.Spec.Request.URL)
 
 		metrics := payload["metrics"].(*SyntheticCheckMetrics)
-		assert.NotNil(t, metrics.TotalRuns24h)
-		assert.Equal(t, 61, *metrics.TotalRuns24h)
-		assert.NotNil(t, metrics.HealthyRuns24h)
-		assert.Equal(t, 58, *metrics.HealthyRuns24h)
-		assert.NotNil(t, metrics.CriticalRuns24h)
-		assert.Equal(t, 3, *metrics.CriticalRuns24h)
-		assert.NotNil(t, metrics.AvgDuration24h)
-		assert.InDelta(t, 540.0, *metrics.AvgDuration24h, 1.0)
+		assert.Equal(t, 61, metrics.TotalRuns24h)
+		assert.Equal(t, 58, metrics.HealthyRuns24h)
+		assert.Equal(t, 3, metrics.CriticalRuns24h)
+		assert.InDelta(t, 540.0, metrics.AvgDuration24h, 1.0)
 
-		assert.NotNil(t, metrics.TotalRuns7d)
-		assert.Equal(t, 402, *metrics.TotalRuns7d)
-		assert.NotNil(t, metrics.HealthyRuns7d)
-		assert.Equal(t, 390, *metrics.HealthyRuns7d)
-		assert.NotNil(t, metrics.CriticalRuns7d)
-		assert.Equal(t, 12, *metrics.CriticalRuns7d)
-		assert.NotNil(t, metrics.AvgDuration7d)
-		assert.InDelta(t, 520.0, *metrics.AvgDuration7d, 1.0)
+		assert.Equal(t, 402, metrics.TotalRuns7d)
+		assert.Equal(t, 390, metrics.HealthyRuns7d)
+		assert.Equal(t, 12, metrics.CriticalRuns7d)
+		assert.InDelta(t, 520.0, metrics.AvgDuration7d, 1.0)
 	})
 
 	t.Run("successful fetch with partial metrics", func(t *testing.T) {
@@ -512,15 +517,15 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 		payload := wrappedPayload["data"].(map[string]any)
 		metrics := payload["metrics"].(*SyntheticCheckMetrics)
 
-		// All metrics should be nil when no data is available
-		assert.Nil(t, metrics.TotalRuns24h)
-		assert.Nil(t, metrics.HealthyRuns24h)
-		assert.Nil(t, metrics.CriticalRuns24h)
-		assert.Nil(t, metrics.AvgDuration24h)
-		assert.Nil(t, metrics.TotalRuns7d)
-		assert.Nil(t, metrics.HealthyRuns7d)
-		assert.Nil(t, metrics.CriticalRuns7d)
-		assert.Nil(t, metrics.AvgDuration7d)
+		// All metrics should be 0 when no data is available
+		assert.Equal(t, 0, metrics.TotalRuns24h)
+		assert.Equal(t, 0, metrics.HealthyRuns24h)
+		assert.Equal(t, 0, metrics.CriticalRuns24h)
+		assert.Equal(t, 0.0, metrics.AvgDuration24h)
+		assert.Equal(t, 0, metrics.TotalRuns7d)
+		assert.Equal(t, 0, metrics.HealthyRuns7d)
+		assert.Equal(t, 0, metrics.CriticalRuns7d)
+		assert.Equal(t, 0.0, metrics.AvgDuration7d)
 	})
 
 	t.Run("uses default dataset when not provided", func(t *testing.T) {
