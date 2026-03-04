@@ -41,7 +41,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 - `roles/logging.configWriter` — create logging sinks for event triggers
 - `roles/pubsub.admin` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management, `roles/cloudfunctions.invoker` for Cloud Functions)
+- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management, `roles/cloudfunctions.developer` for Cloud Functions)
 
 <a id="compute-•-on-vm-instance"></a>
 
@@ -144,7 +144,10 @@ Invokes a Google Cloud Function and waits for the response.
 
 ### Required IAM roles
 
-The integration's service account must have `roles/cloudfunctions.invoker` on the target function.
+The integration's service account must have one of:
+
+- `roles/cloudfunctions.developer` — covers listing locations/functions and invoking (recommended)
+- `roles/cloudfunctions.viewer` + `roles/cloudfunctions.invoker` — minimum set for listing and invoking
 
 ### Output
 

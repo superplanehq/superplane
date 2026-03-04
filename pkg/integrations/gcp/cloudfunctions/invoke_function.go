@@ -55,7 +55,11 @@ func (c *InvokeFunction) Documentation() string {
 
 ## Required IAM roles
 
-The service account used by the integration must have ` + "`roles/cloudfunctions.invoker`" + ` on the target function.
+The service account used by the integration must have ` + "`roles/cloudfunctions.developer`" + ` (or ` + "`roles/cloudfunctions.viewer`" + ` + ` + "`roles/cloudfunctions.invoker`" + `) on the project.
+
+- ` + "`roles/cloudfunctions.viewer`" + ` — list locations and functions (required for dropdowns)
+- ` + "`roles/cloudfunctions.invoker`" + ` — invoke the function
+- ` + "`roles/cloudfunctions.developer`" + ` — covers both of the above
 
 ## Output
 
