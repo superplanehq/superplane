@@ -77,13 +77,17 @@ Each event contains the full Cloud Build resource, including `id`, `status` (SUC
 
 ```json
 {
-  "buildTriggerId": "abcdefgh-1234-5678-abcd-123456789012",
-  "createTime": "2025-01-01T00:00:00Z",
-  "finishTime": "2025-01-01T00:05:00Z",
-  "id": "12345678-abcd-1234-5678-abcdef012345",
-  "logUrl": "https://console.cloud.google.com/cloud-build/builds/12345678-abcd-1234-5678-abcdef012345",
-  "projectId": "my-project",
-  "status": "SUCCESS"
+  "data": {
+    "id": "12345678-abcd-1234-5678-abcdef012345",
+    "projectId": "my-project",
+    "status": "SUCCESS",
+    "buildTriggerId": "abcdefgh-1234-5678-abcd-123456789012",
+    "logUrl": "https://console.cloud.google.com/cloud-build/builds/12345678-abcd-1234-5678-abcdef012345",
+    "createTime": "2025-01-01T00:00:00Z",
+    "finishTime": "2025-01-01T00:05:00Z"
+  },
+  "timestamp": "2025-01-01T00:05:00Z",
+  "type": "gcp.cloudbuild.build"
 }
 ```
 
@@ -166,12 +170,16 @@ The terminal Build resource, including `id`, `status`, `logUrl`, `createTime`, `
 
 ```json
 {
-  "createTime": "2025-01-01T00:00:00Z",
-  "finishTime": "2025-01-01T00:05:00Z",
-  "id": "12345678-abcd-1234-5678-abcdef012345",
-  "logUrl": "https://console.cloud.google.com/cloud-build/builds/12345678-abcd-1234-5678-abcdef012345",
-  "projectId": "my-project",
-  "status": "SUCCESS"
+  "data": {
+    "id": "12345678-abcd-1234-5678-abcdef012345",
+    "projectId": "my-project",
+    "status": "SUCCESS",
+    "logUrl": "https://console.cloud.google.com/cloud-build/builds/12345678-abcd-1234-5678-abcdef012345",
+    "createTime": "2025-01-01T00:00:00Z",
+    "finishTime": "2025-01-01T00:05:00Z"
+  },
+  "timestamp": "2025-01-01T00:05:00Z",
+  "type": "gcp.cloudbuild.build"
 }
 ```
 
@@ -194,12 +202,16 @@ The full Build resource, including `id`, `status` (SUCCESS, FAILURE, WORKING, QU
 
 ```json
 {
-  "createTime": "2025-01-01T00:00:00Z",
-  "finishTime": "2025-01-01T00:05:00Z",
-  "id": "12345678-abcd-1234-5678-abcdef012345",
-  "logUrl": "https://console.cloud.google.com/cloud-build/builds/12345678-abcd-1234-5678-abcdef012345",
-  "projectId": "my-project",
-  "status": "SUCCESS"
+  "data": {
+    "id": "12345678-abcd-1234-5678-abcdef012345",
+    "projectId": "my-project",
+    "status": "SUCCESS",
+    "logUrl": "https://console.cloud.google.com/cloud-build/builds/12345678-abcd-1234-5678-abcdef012345",
+    "createTime": "2025-01-01T00:00:00Z",
+    "finishTime": "2025-01-01T00:05:00Z"
+  },
+  "timestamp": "2025-01-01T00:05:00Z",
+  "type": "gcp.cloudbuild.build"
 }
 ```
 

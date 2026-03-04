@@ -76,18 +76,6 @@ func (t *OnBuildComplete) Color() string {
 	return "gray"
 }
 
-func (t *OnBuildComplete) ExampleData() map[string]any {
-	return map[string]any{
-		"id":             "12345678-abcd-1234-5678-abcdef012345",
-		"projectId":      "my-project",
-		"status":         "SUCCESS",
-		"buildTriggerId": "abcdefgh-1234-5678-abcd-123456789012",
-		"logUrl":         "https://console.cloud.google.com/cloud-build/builds/12345678-abcd-1234-5678-abcdef012345",
-		"createTime":     "2025-01-01T00:00:00Z",
-		"finishTime":     "2025-01-01T00:05:00Z",
-	}
-}
-
 func (t *OnBuildComplete) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

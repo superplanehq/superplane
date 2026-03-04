@@ -53,17 +53,6 @@ The full Build resource, including ` + "`id`" + `, ` + "`status`" + ` (SUCCESS, 
 func (c *GetBuild) Icon() string  { return "gcp" }
 func (c *GetBuild) Color() string { return "gray" }
 
-func (c *GetBuild) ExampleOutput() map[string]any {
-	return map[string]any{
-		"id":         "12345678-abcd-1234-5678-abcdef012345",
-		"projectId":  "my-project",
-		"status":     "SUCCESS",
-		"logUrl":     "https://console.cloud.google.com/cloud-build/builds/12345678-abcd-1234-5678-abcdef012345",
-		"createTime": "2025-01-01T00:00:00Z",
-		"finishTime": "2025-01-01T00:05:00Z",
-	}
-}
-
 func (c *GetBuild) OutputChannels(_ any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
@@ -96,25 +85,34 @@ func (c *GetBuild) Configuration() []configuration.Field {
 	}
 }
 
-func (c *GetBuild) Setup(ctx core.SetupContext) error {
+func decodeGetBuildConfiguration(raw any) (GetBuildConfiguration, error) {
 	var config GetBuildConfiguration
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
+	if err := mapstructure.Decode(raw, &config); err != nil {
+		return GetBuildConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if strings.TrimSpace(config.BuildID) == "" {
+	config.BuildID = strings.TrimSpace(config.BuildID)
+	config.ProjectID = strings.TrimSpace(config.ProjectID)
+	return config, nil
+}
+
+func (c *GetBuild) Setup(ctx core.SetupContext) error {
+	config, err := decodeGetBuildConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+	if config.BuildID == "" {
 		return fmt.Errorf("buildId is required")
 	}
 	return nil
 }
 
 func (c *GetBuild) Execute(ctx core.ExecutionContext) error {
-	var config GetBuildConfiguration
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
+	config, err := decodeGetBuildConfiguration(ctx.Configuration)
+	if err != nil {
+		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
-	buildID := strings.TrimSpace(config.BuildID)
-	if buildID == "" {
+	if config.BuildID == "" {
 		return ctx.ExecutionState.Fail("error", "buildId is required")
 	}
 
@@ -123,12 +121,12 @@ func (c *GetBuild) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
 	}
 
-	projectID := strings.TrimSpace(config.ProjectID)
+	projectID := config.ProjectID
 	if projectID == "" {
 		projectID = client.ProjectID()
 	}
 
-	url := buildGetURL(projectID, buildID, buildID)
+	url := buildGetURL(projectID, config.BuildID, config.BuildID)
 	responseBody, err := client.GetURL(context.Background(), url)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to get build: %v", err))

@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,42 +16,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const cloudBuildBaseURL = "https://cloudbuild.googleapis.com/v1"
-
-// Client is the interface used by Cloud Build components to call the API.
-type Client interface {
-	GetURL(ctx context.Context, fullURL string) ([]byte, error)
-	PostURL(ctx context.Context, fullURL string, body any) ([]byte, error)
-	ProjectID() string
-}
-
-var (
-	clientFactoryMu sync.RWMutex
-	clientFactory   func(httpCtx core.HTTPContext, integration core.IntegrationContext) (Client, error)
-)
-
-func SetClientFactory(fn func(httpCtx core.HTTPContext, integration core.IntegrationContext) (Client, error)) {
-	clientFactoryMu.Lock()
-	defer clientFactoryMu.Unlock()
-	clientFactory = fn
-}
-
-func getClient(httpCtx core.HTTPContext, integration core.IntegrationContext) (Client, error) {
-	clientFactoryMu.RLock()
-	fn := clientFactory
-	clientFactoryMu.RUnlock()
-	if fn == nil {
-		panic("gcp cloudbuild: SetClientFactory was not called by the gcp integration")
-	}
-	return fn(httpCtx, integration)
-}
-
 const (
 	createBuildPayloadType         = "gcp.cloudbuild.build"
 	createBuildPassedOutputChannel = "passed"
 	createBuildFailedOutputChannel = "failed"
 	createBuildPollAction          = "poll"
-	createBuildPollInterval        = 30 * time.Second
+	createBuildPollInterval        = 5 * time.Minute
 	createBuildExecutionKV         = "build_id"
 
 	createBuildConnectedRevisionBranch = "branch"
@@ -134,17 +104,6 @@ The terminal Build resource, including ` + "`id`" + `, ` + "`status`" + `, ` + "
 
 func (c *CreateBuild) Icon() string  { return "gcp" }
 func (c *CreateBuild) Color() string { return "gray" }
-
-func (c *CreateBuild) ExampleOutput() map[string]any {
-	return map[string]any{
-		"id":         "12345678-abcd-1234-5678-abcdef012345",
-		"projectId":  "my-project",
-		"status":     "SUCCESS",
-		"logUrl":     "https://console.cloud.google.com/cloud-build/builds/12345678-abcd-1234-5678-abcdef012345",
-		"createTime": "2025-01-01T00:00:00Z",
-		"finishTime": "2025-01-01T00:05:00Z",
-	}
-}
 
 func (c *CreateBuild) OutputChannels(_ any) []core.OutputChannel {
 	return []core.OutputChannel{
@@ -513,7 +472,7 @@ func buildRequest(config CreateBuildConfiguration) (map[string]any, error) {
 		"steps": steps,
 	}
 
-	if strings.TrimSpace(config.ConnectedRepository) != "" {
+	if config.ConnectedRepository != "" {
 		source, err := buildConnectedRepositorySource(config)
 		if err != nil {
 			return nil, err
@@ -521,7 +480,7 @@ func buildRequest(config CreateBuildConfiguration) (map[string]any, error) {
 		build["source"] = source
 	}
 
-	if strings.TrimSpace(config.Source) != "" {
+	if config.Source != "" {
 		var source map[string]any
 		if err := json.Unmarshal([]byte(config.Source), &source); err != nil {
 			return nil, fmt.Errorf("source must be a valid JSON object: %w", err)
@@ -529,7 +488,7 @@ func buildRequest(config CreateBuildConfiguration) (map[string]any, error) {
 		build["source"] = source
 	}
 
-	if strings.TrimSpace(config.RepoName) != "" {
+	if config.RepoName != "" {
 		source, err := buildRepositoryShortcutSource(config)
 		if err != nil {
 			return nil, err
@@ -550,7 +509,7 @@ func buildRequest(config CreateBuildConfiguration) (map[string]any, error) {
 	}
 
 	if config.Timeout != "" {
-		build["timeout"] = strings.TrimSpace(config.Timeout)
+		build["timeout"] = config.Timeout
 	}
 
 	return build, nil
@@ -568,11 +527,27 @@ func extractBuildFromOperation(op map[string]any) map[string]any {
 }
 
 func decodeCreateBuildConfiguration(raw any) (CreateBuildConfiguration, error) {
+	config, err := normalizeCreateBuildConfiguration(raw)
+	if err != nil {
+		return CreateBuildConfiguration{}, err
+	}
+	if err := validateBuildSteps(config); err != nil {
+		return CreateBuildConfiguration{}, err
+	}
+	if err := validateBuildSource(config); err != nil {
+		return CreateBuildConfiguration{}, err
+	}
+	if usesConnectedRepository(config) {
+		return validateConnectedRepositoryConfig(config)
+	}
+	return config, validateRepoShortcutConfig(config)
+}
+
+func normalizeCreateBuildConfiguration(raw any) (CreateBuildConfiguration, error) {
 	config := CreateBuildConfiguration{}
 	if err := mapstructure.Decode(raw, &config); err != nil {
 		return CreateBuildConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
 	}
-
 	config.ProjectID = strings.TrimSpace(config.ProjectID)
 	config.Source = strings.TrimSpace(config.Source)
 	config.ConnectionLocation = strings.TrimSpace(config.ConnectionLocation)
@@ -589,33 +564,42 @@ func decodeCreateBuildConfiguration(raw any) (CreateBuildConfiguration, error) {
 	config.Steps = strings.TrimSpace(config.Steps)
 	config.Substitutions = strings.TrimSpace(config.Substitutions)
 	config.Timeout = strings.TrimSpace(config.Timeout)
+	return config, nil
+}
 
+func validateBuildSteps(config CreateBuildConfiguration) error {
 	if config.Steps == "" {
-		return CreateBuildConfiguration{}, fmt.Errorf("steps is required")
+		return fmt.Errorf("steps is required")
 	}
-
 	var steps []any
 	if err := json.Unmarshal([]byte(config.Steps), &steps); err != nil {
-		return CreateBuildConfiguration{}, fmt.Errorf("steps must be a valid JSON array: %w", err)
+		return fmt.Errorf("steps must be a valid JSON array: %w", err)
 	}
 	if len(steps) == 0 {
-		return CreateBuildConfiguration{}, fmt.Errorf("steps must contain at least one build step")
+		return fmt.Errorf("steps must contain at least one build step")
 	}
+	return nil
+}
 
-	if config.Source != "" {
-		var source map[string]any
-		if err := json.Unmarshal([]byte(config.Source), &source); err != nil {
-			return CreateBuildConfiguration{}, fmt.Errorf("source must be a valid JSON object: %w", err)
-		}
-		if len(source) == 0 {
-			return CreateBuildConfiguration{}, fmt.Errorf("source must not be empty when provided")
-		}
-		if config.RepoName != "" || config.BranchName != "" || config.TagName != "" || config.CommitSHA != "" {
-			return CreateBuildConfiguration{}, fmt.Errorf("source cannot be combined with repoName, branchName, tagName, or commitSha")
-		}
+func validateBuildSource(config CreateBuildConfiguration) error {
+	if config.Source == "" {
+		return nil
 	}
+	var source map[string]any
+	if err := json.Unmarshal([]byte(config.Source), &source); err != nil {
+		return fmt.Errorf("source must be a valid JSON object: %w", err)
+	}
+	if len(source) == 0 {
+		return fmt.Errorf("source must not be empty when provided")
+	}
+	if config.RepoName != "" || config.BranchName != "" || config.TagName != "" || config.CommitSHA != "" {
+		return fmt.Errorf("source cannot be combined with repoName, branchName, tagName, or commitSha")
+	}
+	return nil
+}
 
-	useConnectedRepository := config.UseConnectedRepository ||
+func usesConnectedRepository(config CreateBuildConfiguration) bool {
+	return config.UseConnectedRepository ||
 		config.ConnectionLocation != "" ||
 		config.Connection != "" ||
 		config.ConnectedRepository != "" ||
@@ -623,119 +607,118 @@ func decodeCreateBuildConfiguration(raw any) (CreateBuildConfiguration, error) {
 		config.ConnectedBranch != "" ||
 		config.ConnectedTag != "" ||
 		config.ConnectedCommitSHA != ""
+}
 
-	if useConnectedRepository {
-		if config.Source != "" || config.RepoName != "" || config.BranchName != "" || config.TagName != "" || config.CommitSHA != "" {
-			return CreateBuildConfiguration{}, fmt.Errorf("connected repository fields cannot be combined with source, repoName, branchName, tagName, or commitSha")
-		}
-		if config.ConnectionLocation == "" {
-			return CreateBuildConfiguration{}, fmt.Errorf("connectionLocation is required when using a connected repository")
-		}
-		if config.Connection == "" {
-			return CreateBuildConfiguration{}, fmt.Errorf("connection is required when using a connected repository")
-		}
-		if config.ConnectedRepository == "" {
-			return CreateBuildConfiguration{}, fmt.Errorf("connectedRepository is required when using a connected repository")
-		}
-
-		repositoryProjectID, repositoryLocation, repositoryConnectionID, _ := parseCloudBuildRepositoryName(config.ConnectedRepository)
-		if repositoryProjectID == "" || repositoryLocation == "" || repositoryConnectionID == "" {
-			return CreateBuildConfiguration{}, fmt.Errorf("connectedRepository must be a valid Cloud Build repository resource name")
-		}
-		if config.ProjectID != "" && config.ProjectID != repositoryProjectID {
-			return CreateBuildConfiguration{}, fmt.Errorf("projectId override must match the connected repository project")
-		}
-		if config.ConnectionLocation != repositoryLocation {
-			return CreateBuildConfiguration{}, fmt.Errorf("connectionLocation must match the connected repository location")
-		}
-		if strings.TrimSpace(config.Connection) != fmt.Sprintf(
-			"projects/%s/locations/%s/connections/%s",
-			repositoryProjectID,
-			repositoryLocation,
-			repositoryConnectionID,
-		) {
-			return CreateBuildConfiguration{}, fmt.Errorf("connection must match the selected connected repository")
-		}
-
-		if config.ConnectedRevisionType == "" {
-			switch {
-			case config.ConnectedBranch != "" && config.ConnectedTag == "" && config.ConnectedCommitSHA == "":
-				config.ConnectedRevisionType = createBuildConnectedRevisionBranch
-			case config.ConnectedTag != "" && config.ConnectedBranch == "" && config.ConnectedCommitSHA == "":
-				config.ConnectedRevisionType = createBuildConnectedRevisionTag
-			case config.ConnectedCommitSHA != "" && config.ConnectedBranch == "" && config.ConnectedTag == "":
-				config.ConnectedRevisionType = createBuildConnectedRevisionCommit
-			default:
-				config.ConnectedRevisionType = createBuildConnectedRevisionBranch
-			}
-		}
-
-		connectedRevisionFields := 0
-		if config.ConnectedBranch != "" {
-			connectedRevisionFields++
-		}
-		if config.ConnectedTag != "" {
-			connectedRevisionFields++
-		}
-		if config.ConnectedCommitSHA != "" {
-			connectedRevisionFields++
-		}
-		if connectedRevisionFields > 1 {
-			return CreateBuildConfiguration{}, fmt.Errorf("connectedBranch, connectedTag, and connectedCommitSha are mutually exclusive")
-		}
-
-		switch config.ConnectedRevisionType {
-		case createBuildConnectedRevisionBranch:
-			if config.ConnectedBranch == "" {
-				return CreateBuildConfiguration{}, fmt.Errorf("connectedBranch is required when connectedRevisionType is branch")
-			}
-			if config.ConnectedTag != "" || config.ConnectedCommitSHA != "" {
-				return CreateBuildConfiguration{}, fmt.Errorf("connectedBranch cannot be combined with connectedTag or connectedCommitSha")
-			}
-		case createBuildConnectedRevisionTag:
-			if config.ConnectedTag == "" {
-				return CreateBuildConfiguration{}, fmt.Errorf("connectedTag is required when connectedRevisionType is tag")
-			}
-			if config.ConnectedBranch != "" || config.ConnectedCommitSHA != "" {
-				return CreateBuildConfiguration{}, fmt.Errorf("connectedTag cannot be combined with connectedBranch or connectedCommitSha")
-			}
-		case createBuildConnectedRevisionCommit:
-			if config.ConnectedCommitSHA == "" {
-				return CreateBuildConfiguration{}, fmt.Errorf("connectedCommitSha is required when connectedRevisionType is commit")
-			}
-			if config.ConnectedBranch != "" || config.ConnectedTag != "" {
-				return CreateBuildConfiguration{}, fmt.Errorf("connectedCommitSha cannot be combined with connectedBranch or connectedTag")
-			}
-		default:
-			return CreateBuildConfiguration{}, fmt.Errorf("connectedRevisionType must be one of branch, tag, or commit")
-		}
-
-		return config, nil
+func validateConnectedRepositoryConfig(config CreateBuildConfiguration) (CreateBuildConfiguration, error) {
+	if config.Source != "" || config.RepoName != "" || config.BranchName != "" || config.TagName != "" || config.CommitSHA != "" {
+		return CreateBuildConfiguration{}, fmt.Errorf("connected repository fields cannot be combined with source, repoName, branchName, tagName, or commitSha")
+	}
+	if config.ConnectionLocation == "" {
+		return CreateBuildConfiguration{}, fmt.Errorf("connectionLocation is required when using a connected repository")
+	}
+	if config.Connection == "" {
+		return CreateBuildConfiguration{}, fmt.Errorf("connection is required when using a connected repository")
+	}
+	if config.ConnectedRepository == "" {
+		return CreateBuildConfiguration{}, fmt.Errorf("connectedRepository is required when using a connected repository")
 	}
 
-	if config.RepoName == "" && (config.BranchName != "" || config.TagName != "" || config.CommitSHA != "") {
-		return CreateBuildConfiguration{}, fmt.Errorf("repoName is required when branchName, tagName, or commitSha is set")
+	repositoryProjectID, repositoryLocation, repositoryConnectionID, _ := parseCloudBuildRepositoryName(config.ConnectedRepository)
+	if repositoryProjectID == "" || repositoryLocation == "" || repositoryConnectionID == "" {
+		return CreateBuildConfiguration{}, fmt.Errorf("connectedRepository must be a valid Cloud Build repository resource name")
+	}
+	if config.ProjectID != "" && config.ProjectID != repositoryProjectID {
+		return CreateBuildConfiguration{}, fmt.Errorf("projectId override must match the connected repository project")
+	}
+	if config.ConnectionLocation != repositoryLocation {
+		return CreateBuildConfiguration{}, fmt.Errorf("connectionLocation must match the connected repository location")
+	}
+	if config.Connection != fmt.Sprintf("projects/%s/locations/%s/connections/%s", repositoryProjectID, repositoryLocation, repositoryConnectionID) {
+		return CreateBuildConfiguration{}, fmt.Errorf("connection must match the selected connected repository")
 	}
 
-	if config.RepoName != "" && config.BranchName == "" && config.TagName == "" && config.CommitSHA == "" {
-		return CreateBuildConfiguration{}, fmt.Errorf("branchName, tagName, or commitSha is required when repoName is set")
-	}
+	config = inferConnectedRevisionType(config)
 
-	revisionFields := 0
-	if config.BranchName != "" {
-		revisionFields++
-	}
-	if config.TagName != "" {
-		revisionFields++
-	}
-	if config.CommitSHA != "" {
-		revisionFields++
-	}
-	if revisionFields > 1 {
-		return CreateBuildConfiguration{}, fmt.Errorf("branchName, tagName, and commitSha are mutually exclusive")
+	if err := validateConnectedRevision(config); err != nil {
+		return CreateBuildConfiguration{}, err
 	}
 
 	return config, nil
+}
+
+func inferConnectedRevisionType(config CreateBuildConfiguration) CreateBuildConfiguration {
+	if config.ConnectedRevisionType != "" {
+		return config
+	}
+	switch {
+	case config.ConnectedBranch != "" && config.ConnectedTag == "" && config.ConnectedCommitSHA == "":
+		config.ConnectedRevisionType = createBuildConnectedRevisionBranch
+	case config.ConnectedTag != "" && config.ConnectedBranch == "" && config.ConnectedCommitSHA == "":
+		config.ConnectedRevisionType = createBuildConnectedRevisionTag
+	case config.ConnectedCommitSHA != "" && config.ConnectedBranch == "" && config.ConnectedTag == "":
+		config.ConnectedRevisionType = createBuildConnectedRevisionCommit
+	default:
+		config.ConnectedRevisionType = createBuildConnectedRevisionBranch
+	}
+	return config
+}
+
+func validateConnectedRevision(config CreateBuildConfiguration) error {
+	set := 0
+	if config.ConnectedBranch != "" {
+		set++
+	}
+	if config.ConnectedTag != "" {
+		set++
+	}
+	if config.ConnectedCommitSHA != "" {
+		set++
+	}
+	if set > 1 {
+		return fmt.Errorf("connectedBranch, connectedTag, and connectedCommitSha are mutually exclusive")
+	}
+
+	switch config.ConnectedRevisionType {
+	case createBuildConnectedRevisionBranch:
+		if config.ConnectedBranch == "" {
+			return fmt.Errorf("connectedBranch is required when connectedRevisionType is branch")
+		}
+	case createBuildConnectedRevisionTag:
+		if config.ConnectedTag == "" {
+			return fmt.Errorf("connectedTag is required when connectedRevisionType is tag")
+		}
+	case createBuildConnectedRevisionCommit:
+		if config.ConnectedCommitSHA == "" {
+			return fmt.Errorf("connectedCommitSha is required when connectedRevisionType is commit")
+		}
+	default:
+		return fmt.Errorf("connectedRevisionType must be one of branch, tag, or commit")
+	}
+
+	return nil
+}
+
+func validateRepoShortcutConfig(config CreateBuildConfiguration) error {
+	if config.RepoName == "" && (config.BranchName != "" || config.TagName != "" || config.CommitSHA != "") {
+		return fmt.Errorf("repoName is required when branchName, tagName, or commitSha is set")
+	}
+	if config.RepoName != "" && config.BranchName == "" && config.TagName == "" && config.CommitSHA == "" {
+		return fmt.Errorf("branchName, tagName, or commitSha is required when repoName is set")
+	}
+	set := 0
+	if config.BranchName != "" {
+		set++
+	}
+	if config.TagName != "" {
+		set++
+	}
+	if config.CommitSHA != "" {
+		set++
+	}
+	if set > 1 {
+		return fmt.Errorf("branchName, tagName, and commitSha are mutually exclusive")
+	}
+	return nil
 }
 
 func buildConnectedRepositorySource(config CreateBuildConfiguration) (map[string]any, error) {
@@ -780,7 +763,7 @@ func buildRepositoryShortcutSource(config CreateBuildConfiguration) (map[string]
 		return nil, err
 	}
 
-	repo := strings.TrimSpace(config.RepoName)
+	repo := config.RepoName
 	if isGitRepositoryURL(repo) {
 		repo = normalizeGitRepositoryURL(repo)
 		return map[string]any{
@@ -828,7 +811,7 @@ func repositoryRevision(config CreateBuildConfiguration) (string, string, error)
 }
 
 func isGitRepositoryURL(value string) bool {
-	repo := strings.ToLower(strings.TrimSpace(value))
+	repo := strings.ToLower(value)
 	return strings.HasPrefix(repo, "https://") ||
 		strings.HasPrefix(repo, "http://") ||
 		strings.HasPrefix(repo, "ssh://") ||
@@ -840,7 +823,7 @@ func isGitRepositoryURL(value string) bool {
 }
 
 func normalizeGitRepositoryURL(value string) string {
-	repo := strings.TrimSpace(value)
+	repo := value
 	lower := strings.ToLower(repo)
 	if strings.HasPrefix(lower, "https://") ||
 		strings.HasPrefix(lower, "http://") ||
@@ -861,7 +844,7 @@ func normalizeGitRepositoryURL(value string) string {
 func storeCreateBuildMetadata(metadataCtx core.MetadataContext, build map[string]any, projectID string) error {
 	buildCopy := copyBuildMetadata(build)
 
-	if strings.TrimSpace(readBuildString(buildCopy, "projectId")) == "" && strings.TrimSpace(projectID) != "" {
+	if readBuildString(buildCopy, "projectId") == "" && projectID != "" {
 		buildCopy["projectId"] = projectID
 	}
 
@@ -874,10 +857,7 @@ func copyBuildMetadata(build map[string]any) map[string]any {
 	}
 
 	buildCopy := make(map[string]any, len(build))
-	for key, value := range build {
-		buildCopy[key] = value
-	}
-
+	maps.Copy(buildCopy, build)
 	return buildCopy
 }
 
@@ -1080,7 +1060,6 @@ func buildCreateTarget(
 	integrationProjectID string,
 	build map[string]any,
 ) (string, string, error) {
-	projectOverride = strings.TrimSpace(projectOverride)
 	integrationProjectID = strings.TrimSpace(integrationProjectID)
 
 	connectedRepository := connectedRepositoryNameFromBuild(build)
@@ -1123,10 +1102,6 @@ func connectedRepositoryNameFromBuild(build map[string]any) string {
 }
 
 func buildGetURL(projectID string, buildID string, buildName string) string {
-	projectID = strings.TrimSpace(projectID)
-	buildID = strings.TrimSpace(buildID)
-	buildName = strings.TrimSpace(buildName)
-
 	nameProjectID, location, nameBuildID := parseCloudBuildBuildName(buildName)
 	if location != "" && location != "global" {
 		return fmt.Sprintf("%s/%s", cloudBuildBaseURL, buildName)
@@ -1142,10 +1117,6 @@ func buildGetURL(projectID string, buildID string, buildName string) string {
 }
 
 func buildCancelURL(projectID string, buildID string, buildName string) string {
-	projectID = strings.TrimSpace(projectID)
-	buildID = strings.TrimSpace(buildID)
-	buildName = strings.TrimSpace(buildName)
-
 	nameProjectID, location, nameBuildID := parseCloudBuildBuildName(buildName)
 	if location != "" && location != "global" {
 		return fmt.Sprintf("%s/%s:cancel", cloudBuildBaseURL, buildName)

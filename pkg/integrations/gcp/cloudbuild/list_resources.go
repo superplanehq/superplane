@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/common"
@@ -513,44 +512,12 @@ func gitRefDisplayName(refName string) string {
 }
 
 func buildResourceLabel(build buildResourceItem) string {
-	parts := []string{}
-
-	if status := strings.TrimSpace(build.Status); status != "" {
-		parts = append(parts, status)
-	}
-
 	buildID := strings.TrimSpace(build.ID)
 	if buildID == "" {
 		buildID = buildIDFromName(build.Name)
 	}
-	if buildID != "" {
-		parts = append(parts, buildID)
-	}
-
-	if createdAt := formatBuildResourceTime(build.CreateTime); createdAt != "" {
-		parts = append(parts, createdAt)
-	}
-
-	if len(parts) == 0 {
+	if buildID == "" {
 		return "Unnamed build"
 	}
-
-	return strings.Join(parts, " · ")
-}
-
-func formatBuildResourceTime(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return ""
-	}
-
-	t, err := time.Parse(time.RFC3339Nano, raw)
-	if err != nil {
-		t, err = time.Parse(time.RFC3339, raw)
-		if err != nil {
-			return raw
-		}
-	}
-
-	return t.UTC().Format("2006-01-02 15:04 UTC")
+	return buildID
 }
