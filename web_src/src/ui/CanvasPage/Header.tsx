@@ -263,11 +263,10 @@ export function Header({
                               key={workflow.metadata?.id}
                               type="button"
                               onClick={() => handleWorkflowClick(workflow.metadata?.id || "")}
-                              className={`group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-left ${
-                                isSelected
-                                  ? "bg-sky-100 text-gray-800"
-                                  : "text-gray-500 hover:bg-sky-100 hover:text-gray-800"
-                              }`}
+                              className={`group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-left ${isSelected
+                                ? "bg-sky-100 text-gray-800"
+                                : "text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                                }`}
                             >
                               {isSelected ? (
                                 <Palette size={16} className="text-gray-800 transition group-hover:text-gray-800" />
@@ -292,18 +291,16 @@ export function Header({
                 <button
                   type="button"
                   onClick={() => onTopViewModeChange("canvas")}
-                  className={`rounded px-2 py-1 text-xs font-medium ${
-                    topViewMode === "canvas" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
-                  }`}
+                  className={`rounded px-2 py-1 text-xs font-medium ${topViewMode === "canvas" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+                    }`}
                 >
                   Canvas
                 </button>
                 <button
                   type="button"
                   onClick={() => onTopViewModeChange("memory")}
-                  className={`rounded px-2 py-1 text-xs font-medium ${
-                    topViewMode === "memory" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
-                  }`}
+                  className={`rounded px-2 py-1 text-xs font-medium ${topViewMode === "memory" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+                    }`}
                 >
                   <span className="inline-flex items-center gap-1">
                     <span>Memory</span>
