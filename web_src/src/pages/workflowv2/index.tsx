@@ -2213,6 +2213,47 @@ export function WorkflowPageV2() {
     ],
   );
 
+  const handleNodesDelete = useCallback(
+    async (nodeIds: string[]) => {
+      if (!canvas || !organizationId || !canvasId) return;
+
+      saveWorkflowSnapshot(canvas);
+
+      const nodeIdSet = new Set(nodeIds);
+      const updatedNodes = canvas.spec?.nodes?.filter((node) => !nodeIdSet.has(node.id!));
+      const updatedEdges = canvas.spec?.edges?.filter(
+        (edge) => !nodeIdSet.has(edge.sourceId!) && !nodeIdSet.has(edge.targetId!),
+      );
+
+      const updatedWorkflow = {
+        ...canvas,
+        spec: {
+          ...canvas.spec,
+          nodes: updatedNodes,
+          edges: updatedEdges,
+        },
+      };
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+      if (canAutoSave) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      canAutoSave,
+      markUnsavedChange,
+    ],
+  );
+
   const handleEdgeDelete = useCallback(
     async (edgeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
@@ -3076,6 +3117,7 @@ export function WorkflowPageV2() {
         onSave={isTemplate ? undefined : handleSave}
         onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
         onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
+        onNodesDelete={!isReadOnly ? handleNodesDelete : undefined}
         onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
         isAutoLayoutOnUpdateEnabled={isAutoLayoutOnUpdateEnabled && !isReadOnly}
         onToggleAutoLayoutOnUpdate={!isReadOnly ? handleToggleAutoLayoutOnUpdate : undefined}
