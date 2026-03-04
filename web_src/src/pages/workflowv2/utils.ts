@@ -75,14 +75,16 @@ export function mapTriggerEventsToSidebarEvents(
 
 export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: ComponentsNode): SidebarEvent {
   const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
-  const { title, subtitle } = triggerRenderer.getTitleAndSubtitle({ event: buildEventInfo(event) });
-  const values = triggerRenderer.getRootEventValues({ event: buildEventInfo(event) });
+  const eventInfo = buildEventInfo(event);
+  const { title, subtitle } = triggerRenderer.getTitleAndSubtitle({ event: eventInfo });
+  const values = triggerRenderer.getRootEventValues({ event: eventInfo });
+  const state = triggerRenderer.getEventState?.({ event: eventInfo }) || "triggered";
 
   return {
     id: event.id!,
     title,
     subtitle: subtitle || formatTimeAgo(new Date(event.createdAt!)),
-    state: "triggered" as const,
+    state,
     isOpen: false,
     receivedAt: event.createdAt ? new Date(event.createdAt) : undefined,
     values,
