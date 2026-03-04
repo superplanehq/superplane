@@ -50,19 +50,17 @@ func Test__OnSyntheticCheckNotification__Setup(t *testing.T) {
 func Test__OnSyntheticCheckNotification__OnIntegrationMessage(t *testing.T) {
 	trigger := &OnSyntheticCheckNotification{}
 
-	t.Run("emits event for matching status with synthetic check labels", func(t *testing.T) {
+	t.Run("valid synthetic.alert.ongoing event with matching status -> emits event", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		message := map[string]any{
-			"type": "alert.ongoing",
+			"type": "synthetic.alert.ongoing",
 			"data": map[string]any{
 				"issue": map[string]any{
-					"status":  "critical",
-					"summary": "Synthetic check failed",
-					"labels": []any{
-						[]any{"0", map[string]any{"key": "dash0.resource.type", "value": map[string]any{"stringValue": "synthetic"}}},
-						[]any{"1", map[string]any{"key": "dash0.synthetic_check.attempt_id", "value": map[string]any{"stringValue": "73768e2c"}}},
-						[]any{"2", map[string]any{"key": "dash0.synthetic_check.id", "value": map[string]any{"stringValue": "api-health"}}},
-					},
+					"id":              "issue-123",
+					"issueIdentifier": "synthetic-check-1",
+					"status":          "critical",
+					"summary":         "Check failed",
+					"url":             "https://example.com/issue",
 				},
 			},
 		}
@@ -82,19 +80,78 @@ func Test__OnSyntheticCheckNotification__OnIntegrationMessage(t *testing.T) {
 		require.True(t, ok)
 		require.NotNil(t, payload.Issue)
 		assert.Equal(t, "critical", payload.Issue.Status)
-		assert.Len(t, payload.Issue.Labels, 3)
+		assert.Equal(t, "issue-123", payload.Issue.ID)
 	})
 
-	t.Run("ignores event with non-matching status", func(t *testing.T) {
+	t.Run("test event type -> ignored", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		message := map[string]any{
-			"type": "alert.ongoing",
+			"type": "test",
+			"data": map[string]any{
+				"issue": map[string]any{
+					"status": "critical",
+				},
+			},
+		}
+
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Message:       message,
+			Configuration: map[string]any{"statuses": []string{"critical"}},
+			Logger:        logrus.NewEntry(logrus.New()),
+			Events:        events,
+		})
+
+		require.NoError(t, err)
+		require.Empty(t, events.Payloads)
+	})
+
+	t.Run("unsupported event type -> ignored", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		message := map[string]any{
+			"type": "synthetic.alert.resolved",
+			"data": map[string]any{
+				"issue": map[string]any{
+					"status": "critical",
+				},
+			},
+		}
+
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Message:       message,
+			Configuration: map[string]any{"statuses": []string{"critical"}},
+			Logger:        logrus.NewEntry(logrus.New()),
+			Events:        events,
+		})
+
+		require.NoError(t, err)
+		require.Empty(t, events.Payloads)
+	})
+
+	t.Run("event without issue -> ignored", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		message := map[string]any{
+			"type": "synthetic.alert.ongoing",
+			"data": map[string]any{},
+		}
+
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Message:       message,
+			Configuration: map[string]any{"statuses": []string{"critical"}},
+			Logger:        logrus.NewEntry(logrus.New()),
+			Events:        events,
+		})
+
+		require.NoError(t, err)
+		require.Empty(t, events.Payloads)
+	})
+
+	t.Run("status not in configured statuses -> ignored", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		message := map[string]any{
+			"type": "synthetic.alert.ongoing",
 			"data": map[string]any{
 				"issue": map[string]any{
 					"status": "closed",
-					"labels": []any{
-						[]any{"0", map[string]any{"key": "dash0.resource.type", "value": map[string]any{"stringValue": "synthetic"}}},
-					},
 				},
 			},
 		}
@@ -110,12 +167,54 @@ func Test__OnSyntheticCheckNotification__OnIntegrationMessage(t *testing.T) {
 		require.Empty(t, events.Payloads)
 	})
 
-	t.Run("ignores test event", func(t *testing.T) {
+	t.Run("multiple configured statuses -> emits when matching", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		message := map[string]any{
-			"type": "test",
-			"data": map[string]any{},
+			"type": "synthetic.alert.ongoing",
+			"data": map[string]any{
+				"issue": map[string]any{
+					"status": "degraded",
+				},
+			},
 		}
+
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Message:       message,
+			Configuration: map[string]any{"statuses": []string{"critical", "degraded", "closed"}},
+			Logger:        logrus.NewEntry(logrus.New()),
+			Events:        events,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, events.Payloads, 1)
+		assert.Equal(t, "dash0.syntheticCheckNotification", events.Payloads[0].Type)
+	})
+
+	t.Run("invalid configuration -> returns error", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		message := map[string]any{
+			"type": "synthetic.alert.ongoing",
+			"data": map[string]any{
+				"issue": map[string]any{
+					"status": "critical",
+				},
+			},
+		}
+
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Message:       message,
+			Configuration: "invalid",
+			Logger:        logrus.NewEntry(logrus.New()),
+			Events:        events,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to decode configuration")
+	})
+
+	t.Run("invalid message format -> returns error", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		message := "invalid message"
 
 		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
 			Message:       message,
@@ -124,65 +223,7 @@ func Test__OnSyntheticCheckNotification__OnIntegrationMessage(t *testing.T) {
 			Events:        events,
 		})
 
-		require.NoError(t, err)
-		require.Empty(t, events.Payloads)
-	})
-
-	t.Run("ignores event without issue", func(t *testing.T) {
-		events := &contexts.EventContext{}
-		message := map[string]any{
-			"type": "alert.ongoing",
-			"data": map[string]any{},
-		}
-
-		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
-			Message:       message,
-			Configuration: map[string]any{"statuses": []string{"critical"}},
-			Logger:        logrus.NewEntry(logrus.New()),
-			Events:        events,
-		})
-
-		require.NoError(t, err)
-		require.Empty(t, events.Payloads)
-	})
-}
-
-func Test__NormalizeSyntheticCheckLabels(t *testing.T) {
-	t.Run("normalizes tuple-format labels", func(t *testing.T) {
-		raw := []any{
-			[]any{"0", map[string]any{"key": "dash0.resource.type", "value": map[string]any{"stringValue": "synthetic"}}},
-			[]any{"1", map[string]any{"key": "dash0.synthetic_check.attempt_id", "value": map[string]any{"stringValue": "73768e2c"}}},
-		}
-
-		labels := normalizeSyntheticCheckLabels(raw)
-		require.Len(t, labels, 2)
-		assert.Equal(t, "dash0.resource.type", labels[0].Key)
-		assert.Equal(t, "synthetic", labels[0].Value)
-		assert.Equal(t, "dash0.synthetic_check.attempt_id", labels[1].Key)
-		assert.Equal(t, "73768e2c", labels[1].Value)
-	})
-
-	t.Run("handles empty labels", func(t *testing.T) {
-		labels := normalizeSyntheticCheckLabels([]any{})
-		assert.Empty(t, labels)
-	})
-
-	t.Run("handles nil labels", func(t *testing.T) {
-		labels := normalizeSyntheticCheckLabels(nil)
-		assert.Empty(t, labels)
-	})
-
-	t.Run("skips malformed entries", func(t *testing.T) {
-		raw := []any{
-			"not-an-array",
-			[]any{"0"},
-			[]any{"0", "not-a-map"},
-			[]any{"0", map[string]any{"key": "valid.key", "value": map[string]any{"stringValue": "valid"}}},
-		}
-
-		labels := normalizeSyntheticCheckLabels(raw)
-		require.Len(t, labels, 1)
-		assert.Equal(t, "valid.key", labels[0].Key)
-		assert.Equal(t, "valid", labels[0].Value)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to decode synthetic check notification event")
 	})
 }

@@ -179,6 +179,10 @@ func (t *OnAlertNotification) OnIntegrationMessage(ctx core.IntegrationMessageCo
 		ctx.Logger.Info("Ignoring test alert notification event")
 		return nil
 	}
+	if event.Type != "alert.ongoing" {
+		ctx.Logger.Infof("Ignoring unsupported notification event type %s", event.Type)
+		return nil
+	}
 
 	if event.Data.Issue == nil {
 		ctx.Logger.Info("Ignoring alert notification event without issue")

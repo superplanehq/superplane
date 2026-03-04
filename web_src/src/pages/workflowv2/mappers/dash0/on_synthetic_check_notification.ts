@@ -18,9 +18,6 @@ interface SyntheticCheckNotificationIssue {
   labels?: SyntheticCheckLabelTuple[];
 }
 
-/**
- * Synthetic check labels use a tuple format: [index, {key, value: {stringValue}}].
- */
 type SyntheticCheckLabelTuple = [string, SyntheticCheckLabelEntry];
 
 interface SyntheticCheckLabelEntry {
@@ -40,10 +37,6 @@ interface OnSyntheticCheckNotificationConfiguration {
   statuses?: string[];
 }
 
-/**
- * Normalizes synthetic check tuple-format labels into a readable "key: value" string.
- * Input format: [[index, {key, value: {stringValue}}], ...]
- */
 function formatSyntheticCheckLabels(labels?: SyntheticCheckLabelTuple[]): string | undefined {
   if (!labels?.length) {
     return undefined;
@@ -68,8 +61,7 @@ export const onSyntheticCheckNotificationTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     const eventData = context.event?.data as SyntheticCheckNotificationEventData | undefined;
     const issue = eventData?.issue;
-    const title =
-      issue?.summary || issue?.issueIdentifier || issue?.id || "Dash0 synthetic check notification";
+    const title = issue?.summary || issue?.issueIdentifier || issue?.id || "Dash0 synthetic check notification";
     const subtitleParts = [issue?.status].filter(Boolean).join(" · ");
     const timeAgo = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
     const subtitle = subtitleParts && timeAgo ? `${subtitleParts} · ${timeAgo}` : subtitleParts || timeAgo;

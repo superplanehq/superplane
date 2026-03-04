@@ -160,42 +160,6 @@ type SyntheticCheckNotificationCheckRule struct {
 	Thresholds    map[string]any `json:"thresholds"`
 }
 
-// NormalizedLabel represents a label extracted from the synthetic check tuple format.
-type NormalizedLabel struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
-// normalizeSyntheticCheckLabels converts the tuple-based label format
-// (e.g. [["0", {"key": "k", "value": {"stringValue": "v"}}], ...])
-// into a flat list of NormalizedLabel structs.
-func normalizeSyntheticCheckLabels(raw []any) []NormalizedLabel {
-	var labels []NormalizedLabel
-
-	for _, item := range raw {
-		tuple, ok := item.([]any)
-		if !ok || len(tuple) < 2 {
-			continue
-		}
-
-		labelMap, ok := tuple[1].(map[string]any)
-		if !ok {
-			continue
-		}
-
-		key, _ := labelMap["key"].(string)
-
-		var value string
-		if v, ok := labelMap["value"].(map[string]any); ok {
-			value, _ = v["stringValue"].(string)
-		}
-
-		labels = append(labels, NormalizedLabel{Key: key, Value: value})
-	}
-
-	return labels
-}
-
 func (t *OnSyntheticCheckNotification) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {
 	config := OnSyntheticCheckNotificationConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
@@ -211,6 +175,10 @@ func (t *OnSyntheticCheckNotification) OnIntegrationMessage(ctx core.Integration
 
 	if event.Type == "test" {
 		ctx.Logger.Info("Ignoring test synthetic check notification event")
+		return nil
+	}
+	if event.Type != "synthetic.alert.ongoing" {
+		ctx.Logger.Infof("Ignoring unsupported notification event type %s", event.Type)
 		return nil
 	}
 
