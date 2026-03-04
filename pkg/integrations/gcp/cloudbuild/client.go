@@ -2,6 +2,8 @@ package cloudbuild
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -35,4 +37,80 @@ func getClient(httpCtx core.HTTPContext, integration core.IntegrationContext) (C
 		panic("gcp cloudbuild: SetClientFactory was not called by the gcp integration")
 	}
 	return fn(httpCtx, integration)
+}
+
+func buildGetURL(projectID string, buildID string, buildName string) string {
+	nameProjectID, location, nameBuildID := parseCloudBuildBuildName(buildName)
+	if location != "" && location != "global" {
+		return fmt.Sprintf("%s/%s", cloudBuildBaseURL, buildName)
+	}
+	if nameProjectID != "" {
+		projectID = nameProjectID
+	}
+	if nameBuildID != "" {
+		buildID = nameBuildID
+	}
+
+	return fmt.Sprintf("%s/projects/%s/builds/%s", cloudBuildBaseURL, projectID, buildID)
+}
+
+func buildCancelURL(projectID string, buildID string, buildName string) string {
+	nameProjectID, location, nameBuildID := parseCloudBuildBuildName(buildName)
+	if location != "" && location != "global" {
+		return fmt.Sprintf("%s/%s:cancel", cloudBuildBaseURL, buildName)
+	}
+	if nameProjectID != "" {
+		projectID = nameProjectID
+	}
+	if nameBuildID != "" {
+		buildID = nameBuildID
+	}
+
+	return fmt.Sprintf("%s/projects/%s/builds/%s:cancel", cloudBuildBaseURL, projectID, buildID)
+}
+
+func buildCreateTarget(
+	projectOverride string,
+	integrationProjectID string,
+	build map[string]any,
+) (string, string, error) {
+	integrationProjectID = strings.TrimSpace(integrationProjectID)
+
+	connectedRepository := connectedRepositoryNameFromBuild(build)
+	if connectedRepository != "" {
+		projectID, location, _, _ := parseCloudBuildRepositoryName(connectedRepository)
+		if projectID == "" || location == "" {
+			return "", "", fmt.Errorf("connectedRepository must be a valid Cloud Build repository resource name")
+		}
+		if projectOverride != "" && projectOverride != projectID {
+			return "", "", fmt.Errorf("projectId override must match the connected repository project")
+		}
+
+		return projectID, fmt.Sprintf("%s/projects/%s/locations/%s/builds", cloudBuildBaseURL, projectID, location), nil
+	}
+
+	projectID := projectOverride
+	if projectID == "" {
+		projectID = integrationProjectID
+	}
+	if projectID == "" {
+		return "", "", fmt.Errorf("projectId is required")
+	}
+
+	return projectID, fmt.Sprintf("%s/projects/%s/builds", cloudBuildBaseURL, projectID), nil
+}
+
+func connectedRepositoryNameFromBuild(build map[string]any) string {
+	source, ok := build["source"].(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	connectedRepository, ok := source["connectedRepository"].(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	repository, _ := connectedRepository["repository"].(string)
+	return strings.TrimSpace(repository)
 }
