@@ -2706,6 +2706,23 @@ export function WorkflowPageV2() {
     [canvas, organizationId, canvasId, updateWorkflowMutation, isTemplate],
   );
 
+  const handleRenameCanvas = useCallback(
+    async (newName: string) => {
+      if (!canvas || !organizationId || !canvasId) return;
+
+      lastLocalCanvasSaveAtRef.current = Date.now();
+      await updateWorkflowMutation.mutateAsync({
+        name: newName,
+        description: canvas.metadata?.description,
+        nodes: canvas.spec?.nodes,
+        edges: canvas.spec?.edges,
+      });
+
+      showSuccessToast("Canvas renamed");
+    },
+    [canvas, organizationId, canvasId, updateWorkflowMutation],
+  );
+
   const getYamlExportPayload = useCallback(
     (canvasNodes: CanvasNode[]) => {
       if (!canvas) return null;
@@ -3074,6 +3091,7 @@ export function WorkflowPageV2() {
         onAnnotationUpdate={!isReadOnly ? handleAnnotationUpdate : undefined}
         onAnnotationBlur={!isReadOnly ? handleAnnotationBlur : undefined}
         onSave={isTemplate ? undefined : handleSave}
+        onRenameCanvas={!isReadOnly && !isTemplate ? handleRenameCanvas : undefined}
         onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
         onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
         onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
