@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,7 +24,10 @@ type ReportMetricSpec struct {
 	Value      any            `json:"value" mapstructure:"value"`
 	Attributes map[string]any `json:"attributes" mapstructure:"attributes"`
 	Timestamp  *int64         `json:"timestamp" mapstructure:"timestamp"`
+	Interval   *int64         `json:"interval" mapstructure:"interval"`
 }
+
+const defaultIntervalMs = 60000
 
 func (c *ReportMetric) Name() string {
 	return "newrelic.reportMetric"
@@ -124,6 +128,14 @@ func (c *ReportMetric) Configuration() []configuration.Field {
 			Required:    false,
 			Description: "Optional Unix epoch milliseconds (defaults to now)",
 		},
+		{
+			Name:        "interval",
+			Label:       "Interval (ms)",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Default:     defaultIntervalMs,
+			Description: "Interval in milliseconds for count and summary metrics",
+		},
 	}
 }
 
@@ -151,6 +163,20 @@ func (c *ReportMetric) Setup(ctx core.SetupContext) error {
 		return errors.New("value is required")
 	}
 
+	if spec.MetricType == "summary" {
+		valueMap, ok := spec.Value.(map[string]any)
+		if !ok {
+			return errors.New("summary metric value must be an object with keys: count, sum, min, max")
+		}
+
+		requiredKeys := []string{"count", "sum", "min", "max"}
+		for _, key := range requiredKeys {
+			if _, exists := valueMap[key]; !exists {
+				return fmt.Errorf("summary metric value missing required key %q", key)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -167,19 +193,28 @@ func (c *ReportMetric) Execute(ctx core.ExecutionContext) error {
 	}
 
 	timestamp := time.Now().UnixMilli()
-	if spec.Timestamp != nil {
+	if spec.Timestamp != nil && *spec.Timestamp > 0 {
 		timestamp = *spec.Timestamp
+	}
+
+	numericValue, err := toNumericValue(spec.MetricType, spec.Value)
+	if err != nil {
+		return fmt.Errorf("invalid metric value: %v", err)
 	}
 
 	metric := map[string]any{
 		"name":      spec.MetricName,
 		"type":      spec.MetricType,
-		"value":     spec.Value,
+		"value":     numericValue,
 		"timestamp": timestamp,
 	}
 
 	if spec.MetricType == "count" || spec.MetricType == "summary" {
-		metric["interval.ms"] = 60000
+		intervalMs := int64(defaultIntervalMs)
+		if spec.Interval != nil {
+			intervalMs = *spec.Interval
+		}
+		metric["interval.ms"] = intervalMs
 	}
 
 	if spec.Attributes != nil && len(spec.Attributes) > 0 {
@@ -236,4 +271,60 @@ func (c *ReportMetric) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 
 func (c *ReportMetric) Cleanup(ctx core.SetupContext) error {
 	return nil
+}
+
+// toNumericValue coerces a metric value to the numeric type expected by the
+// New Relic Metric API. For gauge and count metrics it returns a float64.
+// For summary metrics it returns a map with float64 values.
+func toNumericValue(metricType string, value any) (any, error) {
+	if metricType == "summary" {
+		return toSummaryValue(value)
+	}
+
+	return toFloat64(value)
+}
+
+func toFloat64(v any) (float64, error) {
+	switch n := v.(type) {
+	case float64:
+		return n, nil
+	case float32:
+		return float64(n), nil
+	case int:
+		return float64(n), nil
+	case int64:
+		return float64(n), nil
+	case string:
+		f, err := strconv.ParseFloat(n, 64)
+		if err != nil {
+			return 0, fmt.Errorf("cannot convert %q to a number", n)
+		}
+		return f, nil
+	case json.Number:
+		return n.Float64()
+	default:
+		return 0, fmt.Errorf("unsupported value type %T", v)
+	}
+}
+
+func toSummaryValue(value any) (map[string]any, error) {
+	m, ok := value.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("summary value must be an object")
+	}
+
+	result := make(map[string]any, len(m))
+	for _, key := range []string{"count", "sum", "min", "max"} {
+		v, exists := m[key]
+		if !exists {
+			return nil, fmt.Errorf("summary value missing required key %q", key)
+		}
+		f, err := toFloat64(v)
+		if err != nil {
+			return nil, fmt.Errorf("summary key %q: %w", key, err)
+		}
+		result[key] = f
+	}
+
+	return result, nil
 }

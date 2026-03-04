@@ -7,11 +7,22 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 const MaxResponseSize = 1 * 1024 * 1024 // 1MB
+
+// APIError represents an HTTP error response from New Relic.
+type APIError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("request got %d code: %s", e.StatusCode, e.Body)
+}
 
 type Client struct {
 	AccountID    string
@@ -113,6 +124,226 @@ func (c *Client) ReportMetric(ctx context.Context, payload []byte) ([]byte, erro
 	return c.execRequest(req)
 }
 
+// CreateNotificationDestination creates a webhook destination in New Relic via NerdGraph.
+func (c *Client) CreateNotificationDestination(ctx context.Context, webhookURL string) (string, error) {
+	name := fmt.Sprintf("SuperPlane-%d", time.Now().UnixMilli())
+	query := fmt.Sprintf(`mutation {
+		aiNotificationsCreateDestination(accountId: %s, destination: {
+			name: %s,
+			type: WEBHOOK,
+			properties: [{key: "url", value: %s}]
+		}) {
+			destination { id }
+			error {
+				... on AiNotificationsResponseError { description }
+				... on AiNotificationsDataValidationError { details }
+				... on AiNotificationsSuggestionError { description details }
+			}
+		}
+	}`, c.AccountID, quoteGraphQL(name), quoteGraphQL(webhookURL))
+
+	body, err := c.NerdGraphQuery(ctx, query)
+	if err != nil {
+		return "", fmt.Errorf("failed to create notification destination: %w", err)
+	}
+
+	var res struct {
+		Data struct {
+			Result struct {
+				Destination struct {
+					ID string `json:"id"`
+				} `json:"destination"`
+				Error *struct {
+					Description string `json:"description"`
+					Details     string `json:"details"`
+				} `json:"error"`
+			} `json:"aiNotificationsCreateDestination"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+
+	if err := json.Unmarshal(body, &res); err != nil {
+		return "", fmt.Errorf("failed to parse destination response: %w", err)
+	}
+
+	if len(res.Errors) > 0 {
+		return "", fmt.Errorf("GraphQL error creating destination: %s", res.Errors[0].Message)
+	}
+
+	if res.Data.Result.Error != nil {
+		errMsg := res.Data.Result.Error.Description
+		if errMsg == "" {
+			errMsg = res.Data.Result.Error.Details
+		}
+		if errMsg == "" {
+			errMsg = "unknown error"
+		}
+		return "", fmt.Errorf("failed to create destination: %s", errMsg)
+	}
+
+	if res.Data.Result.Destination.ID == "" {
+		return "", fmt.Errorf("destination created but no ID returned")
+	}
+
+	return res.Data.Result.Destination.ID, nil
+}
+
+// CreateNotificationChannel creates a webhook notification channel in New Relic via NerdGraph.
+func (c *Client) CreateNotificationChannel(ctx context.Context, destinationID string, payloadTemplate string) (string, error) {
+	name := fmt.Sprintf("SuperPlane-%d", time.Now().UnixMilli())
+	query := fmt.Sprintf(`mutation {
+		aiNotificationsCreateChannel(accountId: %s, channel: {
+			name: %s,
+			type: WEBHOOK,
+			product: IINT,
+			destinationId: %s,
+			properties: [{key: "payload", value: %s}]
+		}) {
+			channel { id }
+			error {
+				... on AiNotificationsResponseError { description }
+				... on AiNotificationsDataValidationError { details }
+				... on AiNotificationsSuggestionError { description details }
+			}
+		}
+	}`, c.AccountID, quoteGraphQL(name), quoteGraphQL(destinationID), quoteGraphQL(payloadTemplate))
+
+	body, err := c.NerdGraphQuery(ctx, query)
+	if err != nil {
+		return "", fmt.Errorf("failed to create notification channel: %w", err)
+	}
+
+	var res struct {
+		Data struct {
+			Result struct {
+				Channel struct {
+					ID string `json:"id"`
+				} `json:"channel"`
+				Error *struct {
+					Description string `json:"description"`
+					Details     string `json:"details"`
+				} `json:"error"`
+			} `json:"aiNotificationsCreateChannel"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+
+	if err := json.Unmarshal(body, &res); err != nil {
+		return "", fmt.Errorf("failed to parse channel response: %w", err)
+	}
+
+	if len(res.Errors) > 0 {
+		return "", fmt.Errorf("GraphQL error creating channel: %s", res.Errors[0].Message)
+	}
+
+	if res.Data.Result.Error != nil {
+		errMsg := res.Data.Result.Error.Description
+		if errMsg == "" {
+			errMsg = res.Data.Result.Error.Details
+		}
+		if errMsg == "" {
+			errMsg = "unknown error"
+		}
+		return "", fmt.Errorf("failed to create channel: %s", errMsg)
+	}
+
+	if res.Data.Result.Channel.ID == "" {
+		return "", fmt.Errorf("channel created but no ID returned")
+	}
+
+	return res.Data.Result.Channel.ID, nil
+}
+
+// DeleteNotificationChannel deletes a notification channel in New Relic via NerdGraph.
+func (c *Client) DeleteNotificationChannel(ctx context.Context, channelID string) error {
+	query := fmt.Sprintf(`mutation {
+		aiNotificationsDeleteChannel(accountId: %s, channelId: %s) {
+			ids
+			error { details }
+		}
+	}`, c.AccountID, quoteGraphQL(channelID))
+
+	body, err := c.NerdGraphQuery(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to delete notification channel: %w", err)
+	}
+
+	var res struct {
+		Data struct {
+			Result struct {
+				IDs   []string `json:"ids"`
+				Error *struct {
+					Details string `json:"details"`
+				} `json:"error"`
+			} `json:"aiNotificationsDeleteChannel"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+
+	if err := json.Unmarshal(body, &res); err != nil {
+		return fmt.Errorf("failed to parse delete channel response: %w", err)
+	}
+
+	if len(res.Errors) > 0 {
+		return fmt.Errorf("GraphQL error deleting channel: %s", res.Errors[0].Message)
+	}
+
+	if res.Data.Result.Error != nil && res.Data.Result.Error.Details != "" {
+		return fmt.Errorf("failed to delete channel: %s", res.Data.Result.Error.Details)
+	}
+
+	return nil
+}
+
+// DeleteNotificationDestination deletes a notification destination in New Relic via NerdGraph.
+func (c *Client) DeleteNotificationDestination(ctx context.Context, destinationID string) error {
+	query := fmt.Sprintf(`mutation {
+		aiNotificationsDeleteDestination(accountId: %s, destinationId: %s) {
+			ids
+			error { details }
+		}
+	}`, c.AccountID, quoteGraphQL(destinationID))
+
+	body, err := c.NerdGraphQuery(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to delete notification destination: %w", err)
+	}
+
+	var res struct {
+		Data struct {
+			Result struct {
+				IDs   []string `json:"ids"`
+				Error *struct {
+					Details string `json:"details"`
+				} `json:"error"`
+			} `json:"aiNotificationsDeleteDestination"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+
+	if err := json.Unmarshal(body, &res); err != nil {
+		return fmt.Errorf("failed to parse delete destination response: %w", err)
+	}
+
+	if len(res.Errors) > 0 {
+		return fmt.Errorf("GraphQL error deleting destination: %s", res.Errors[0].Message)
+	}
+
+	if res.Data.Result.Error != nil && res.Data.Result.Error.Details != "" {
+		return fmt.Errorf("failed to delete destination: %s", res.Data.Result.Error.Details)
+	}
+
+	return nil
+}
+
 func (c *Client) nerdGraphRequest(ctx context.Context, body []byte) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.NerdGraphURL, bytes.NewReader(body))
 	if err != nil {
@@ -147,7 +378,7 @@ func (c *Client) execRequest(req *http.Request) ([]byte, error) {
 		if len(errBody) > 256 {
 			errBody = errBody[:256] + "... (truncated)"
 		}
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, errBody)
+		return nil, &APIError{StatusCode: res.StatusCode, Body: errBody}
 	}
 
 	return responseBody, nil

@@ -13,7 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-var validStatuses = []string{"ACTIVATED", "ACKNOWLEDGED", "CLOSED"}
+var validStatuses = []string{"CREATED", "ACTIVATED", "ACKNOWLEDGED", "CLOSED"}
 var validPriorities = []string{"CRITICAL", "HIGH", "MEDIUM", "LOW"}
 
 type OnIssue struct{}
@@ -21,10 +21,6 @@ type OnIssue struct{}
 type OnIssueConfiguration struct {
 	Statuses   []string `json:"statuses" mapstructure:"statuses"`
 	Priorities []string `json:"priorities" mapstructure:"priorities"`
-}
-
-type OnIssueMetadata struct {
-	WebhookURL string `json:"webhookUrl" mapstructure:"webhookUrl"`
 }
 
 type NewRelicIssuePayload struct {
@@ -59,7 +55,7 @@ func (t *OnIssue) Documentation() string {
 ## What this trigger does
 
 - Receives New Relic webhook payloads for alert issues
-- Filters by issue state (ACTIVATED, ACKNOWLEDGED, CLOSED)
+- Filters by issue state (CREATED, ACTIVATED, ACKNOWLEDGED, CLOSED)
 - Optionally filters by priority (CRITICAL, HIGH, MEDIUM, LOW)
 - Emits matching issues as ` + "`newrelic.issue`" + ` events
 
@@ -70,7 +66,7 @@ func (t *OnIssue) Documentation() string {
 
 ## Webhook Setup
 
-The webhook URL is generated when the integration is saved. See the integration setup instructions for how to configure it in New Relic.
+SuperPlane automatically creates a Webhook Notification Channel named "SuperPlane" in your New Relic account. Just attach it to your alert workflow to start receiving alerts.
 `
 }
 
@@ -89,10 +85,11 @@ func (t *OnIssue) Configuration() []configuration.Field {
 			Label:    "Statuses",
 			Type:     configuration.FieldTypeMultiSelect,
 			Required: true,
-			Default:  []string{"ACTIVATED"},
+			Default:  []string{"CREATED", "ACTIVATED"},
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
+						{Label: "Created", Value: "CREATED"},
 						{Label: "Activated", Value: "ACTIVATED"},
 						{Label: "Acknowledged", Value: "ACKNOWLEDGED"},
 						{Label: "Closed", Value: "CLOSED"},
@@ -122,37 +119,11 @@ func (t *OnIssue) Configuration() []configuration.Field {
 }
 
 func (t *OnIssue) Setup(ctx core.TriggerContext) error {
-	metadata := OnIssueMetadata{}
-	if ctx.Metadata != nil && ctx.Metadata.Get() != nil {
-		if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-			return fmt.Errorf("failed to decode metadata: %w", err)
-		}
-	}
-
 	if _, err := parseAndValidateOnIssueConfiguration(ctx.Configuration); err != nil {
 		return err
 	}
 
-	if err := ctx.Integration.RequestWebhook(struct{}{}); err != nil {
-		return err
-	}
-
-	if ctx.Webhook == nil {
-		return fmt.Errorf("missing webhook context")
-	}
-
-	webhookURL, err := ctx.Webhook.Setup()
-	if err != nil {
-		return fmt.Errorf("failed to setup webhook URL: %w", err)
-	}
-
-	metadata.WebhookURL = webhookURL
-
-	if ctx.Metadata == nil {
-		return nil
-	}
-
-	return ctx.Metadata.Set(metadata)
+	return ctx.Integration.RequestWebhook(struct{}{})
 }
 
 func (t *OnIssue) Actions() []core.Action {
