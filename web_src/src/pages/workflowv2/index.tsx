@@ -457,7 +457,7 @@ export function WorkflowPageV2() {
    */
   const pendingPositionUpdatesRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const pendingAnnotationUpdatesRef = useRef<Map<string, { text?: string; color?: string }>>(new Map());
-  const logNodeSelectRef = useRef<(nodeId: string) => void>(() => {});
+  const logNodeSelectRef = useRef<(nodeId: string) => void>(() => { });
 
   /**
    * Debounced auto-save function for node position changes.
@@ -1815,13 +1815,13 @@ export function WorkflowPageV2() {
         integration: integrationRef,
         position: position
           ? {
-              x: Math.round(position.x),
-              y: Math.round(position.y),
-            }
+            x: Math.round(position.x),
+            y: Math.round(position.y),
+          }
           : {
-              x: (latestWorkflow?.spec?.nodes?.length || 0) * 250,
-              y: 100,
-            },
+            x: (latestWorkflow?.spec?.nodes?.length || 0) * 250,
+            y: 100,
+          },
       };
 
       // Add type-specific reference
@@ -2290,9 +2290,9 @@ export function WorkflowPageV2() {
       const updatedNodes = canvas.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              position: roundedPosition,
-            }
+            ...node,
+            position: roundedPosition,
+          }
           : node,
       );
 
@@ -2346,9 +2346,9 @@ export function WorkflowPageV2() {
       const updatedNodes = canvas.spec?.nodes?.map((node) =>
         node.id && positionMap.has(node.id)
           ? {
-              ...node,
-              position: positionMap.get(node.id)!,
-            }
+            ...node,
+            position: positionMap.get(node.id)!,
+          }
           : node,
       );
 
@@ -2403,9 +2403,9 @@ export function WorkflowPageV2() {
       const updatedNodes = canvas.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              isCollapsed: newIsCollapsed,
-            }
+            ...node,
+            isCollapsed: newIsCollapsed,
+          }
           : node,
       );
 
@@ -3193,7 +3193,7 @@ export function WorkflowPageV2() {
           fromTemplate
         />
       ) : null}
-      <Dialog open={canvasDeletedRemotely} onOpenChange={() => {}}>
+      <Dialog open={canvasDeletedRemotely} onOpenChange={() => { }}>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>Canvas deleted</DialogTitle>
@@ -3449,18 +3449,18 @@ function prepareCompositeNode(
         parameters:
           Object.keys(node.configuration!).length > 0
             ? [
-                {
-                  icon: "cog",
-                  items: Object.keys(node.configuration!).reduce(
-                    (acc, key) => {
-                      const displayKey = fieldLabelMap[key] || key;
-                      acc[displayKey] = `${node.configuration![key]}`;
-                      return acc;
-                    },
-                    {} as Record<string, string>,
-                  ),
-                },
-              ]
+              {
+                icon: "cog",
+                items: Object.keys(node.configuration!).reduce(
+                  (acc, key) => {
+                    const displayKey = fieldLabelMap[key] || key;
+                    acc[displayKey] = `${node.configuration![key]}`;
+                    return acc;
+                  },
+                  {} as Record<string, string>,
+                ),
+              },
+            ]
             : [],
       },
     },
@@ -3671,15 +3671,15 @@ function prepareComponentBaseNode(
 
   const additionalData = componentDef
     ? getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData({
-        nodes: nodes.map((n) => buildNodeInfo(n)),
-        node: buildNodeInfo(node),
-        componentDefinition: buildComponentDefinition(componentDef!),
-        lastExecutions: executions.map((e) => buildExecutionInfo(e)),
-        canvasId: workflowId,
-        queryClient: queryClient,
-        organizationId: organizationId,
-        currentUser: currentUser,
-      })
+      nodes: nodes.map((n) => buildNodeInfo(n)),
+      node: buildNodeInfo(node),
+      componentDefinition: buildComponentDefinition(componentDef!),
+      lastExecutions: executions.map((e) => buildExecutionInfo(e)),
+      canvasId: workflowId,
+      queryClient: queryClient,
+      organizationId: organizationId,
+      currentUser: currentUser,
+    })
     : undefined;
 
   const componentBaseProps = getComponentBaseMapper(node.component?.name || "").props({
@@ -3705,10 +3705,10 @@ function prepareComponentBaseNode(
   const emptyStateProps =
     hasError && showingEmptyState
       ? {
-          ...componentBaseProps.emptyStateProps,
-          icon: componentBaseProps.emptyStateProps?.icon || Puzzle,
-          title: "Finish configuring this component",
-        }
+        ...componentBaseProps.emptyStateProps,
+        icon: componentBaseProps.emptyStateProps?.icon || Puzzle,
+        title: "Finish configuring this component",
+      }
       : componentBaseProps.emptyStateProps;
 
   return {
