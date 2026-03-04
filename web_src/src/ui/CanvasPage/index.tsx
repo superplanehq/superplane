@@ -1538,6 +1538,7 @@ function CanvasContent({
 
   const [multiSelectedNodes, setMultiSelectedNodes] = useState<ReactFlowNode[]>([]);
   const [isSelecting, setIsSelecting] = useState(false);
+  const previouslySelectedRef = useRef<Set<string>>(new Set());
 
   useOnSelectionChange({
     onChange: useCallback(({ nodes }: { nodes: ReactFlowNode[] }) => {
@@ -1820,6 +1821,8 @@ function CanvasContent({
     // Do not close sidebar or reset state while creating a new component
     if (templateNodeId) return;
 
+    previouslySelectedRef.current = new Set();
+
     // Clear ReactFlow's selection state and close both sidebars
     stateRef.current.setNodes((nodes) =>
       nodes.map((node) => ({
@@ -2040,6 +2043,16 @@ function CanvasContent({
 
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
+      const prev = previouslySelectedRef.current;
+      if (prev.size > 0) {
+        changes = changes.map((c) => {
+          if (c.type === "select" && !c.selected && prev.has(c.id)) {
+            return { ...c, selected: true };
+          }
+          return c;
+        });
+      }
+
       if (!isReadOnly) {
         state.onNodesChange(changes);
         return;
@@ -2212,8 +2225,15 @@ function CanvasContent({
             onInit={handleInit}
             deleteKeyCode={null}
             onPaneClick={handlePaneClick}
-            onSelectionStart={() => setIsSelecting(true)}
-            onSelectionEnd={() => setIsSelecting(false)}
+            onSelectionStart={() => {
+              setIsSelecting(true);
+              const selected = (stateRef.current.nodes || []).filter((n) => n.selected).map((n) => n.id);
+              previouslySelectedRef.current = new Set(selected);
+            }}
+            onSelectionEnd={() => {
+              setIsSelecting(false);
+              previouslySelectedRef.current = new Set();
+            }}
             onEdgeMouseEnter={handleEdgeMouseEnter}
             onEdgeMouseLeave={handleEdgeMouseLeave}
             defaultViewport={viewport}
