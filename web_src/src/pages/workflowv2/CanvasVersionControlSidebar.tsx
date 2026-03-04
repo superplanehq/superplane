@@ -2,9 +2,12 @@ import { CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, GitBranch, GitPullRequest, RotateCcw } from "lucide-react";
-import { MouseEvent as ReactMouseEvent, ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, Eye, GitBranch, GitCompareArrows, GitPullRequest, RotateCcw } from "lucide-react";
+import { MouseEvent as ReactMouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import * as yaml from "js-yaml";
 
 const CANVAS_VERSION_CONTROL_WIDTH_STORAGE_KEY = "canvasVersionControlSidebarWidth";
 const DEFAULT_CANVAS_VERSION_CONTROL_WIDTH = 460;
@@ -74,6 +77,177 @@ function formatVersionLabelWithTimestamp(version?: CanvasesCanvasVersion): strin
   return `${label} · ${timestamp}`;
 }
 
+type DiffLine = {
+  prefix: "meta" | "context" | "+" | "-";
+  text: string;
+};
+
+type VersionNodeDiffItem = {
+  id: string;
+  name: string;
+  changeType: "added" | "updated" | "removed";
+  lines: DiffLine[];
+};
+
+type VersionNodeDiffSummary = {
+  items: VersionNodeDiffItem[];
+  addedCount: number;
+  updatedCount: number;
+  removedCount: number;
+};
+
+function summarizeNodeDiff(
+  currentVersion?: CanvasesCanvasVersion,
+  previousVersion?: CanvasesCanvasVersion,
+): VersionNodeDiffSummary {
+  const previousNodes = (previousVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
+  const currentNodes = (currentVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
+
+  const toNodeMap = (nodes: Array<Record<string, unknown>>) => {
+    const map = new Map<string, Record<string, unknown>>();
+    nodes.forEach((node) => {
+      const nodeID = String(node.id || "");
+      if (nodeID) {
+        map.set(nodeID, node);
+      }
+    });
+    return map;
+  };
+
+  const comparableNode = (node: Record<string, unknown>) => ({
+    name: node.name || null,
+    type: node.type || null,
+    ref: node.ref || null,
+    configuration: node.configuration || null,
+    position: node.position || null,
+    isCollapsed: node.isCollapsed || false,
+    integrationId: node.integrationId || null,
+  });
+
+  const formatDiffValueLines = (value: unknown): string[] => {
+    const normalizedValue = value === undefined ? null : value;
+    const dumped = yaml
+      .dump(normalizedValue, {
+        lineWidth: -1,
+        noRefs: true,
+        sortKeys: true,
+      })
+      .trimEnd();
+    return dumped.split("\n");
+  };
+
+  const buildYamlFieldLines = (prefix: "+" | "-", key: string, value: unknown): DiffLine[] => {
+    const valueLines = formatDiffValueLines(value);
+    if (valueLines.length === 1) {
+      return [{ prefix, text: `${key}: ${valueLines[0]}` }];
+    }
+
+    return [{ prefix, text: `${key}:` }, ...valueLines.map((line) => ({ prefix, text: `  ${line}` }))];
+  };
+
+  const buildNodeLines = (prefix: "+" | "-", node: Record<string, unknown>): DiffLine[] => {
+    const nodeComparable = comparableNode(node) as Record<string, unknown>;
+    const keys = ["id", ...Object.keys(nodeComparable).sort((left, right) => left.localeCompare(right))];
+    const nodeFilePath = `nodes/${String(node.id || "unknown")}.yaml`;
+    const header: DiffLine[] = [
+      { prefix: "meta", text: `diff --git a/${nodeFilePath} b/${nodeFilePath}` },
+      { prefix: "meta", text: `--- ${prefix === "-" ? `a/${nodeFilePath}` : "/dev/null"}` },
+      { prefix: "meta", text: `+++ ${prefix === "+" ? `b/${nodeFilePath}` : "/dev/null"}` },
+      { prefix: "context", text: "@@ -1,0 +1,0 @@" },
+    ];
+
+    return keys.flatMap((key) => {
+      const value = key === "id" ? node.id : nodeComparable[key];
+      return [...(key === "id" ? header : []), ...buildYamlFieldLines(prefix, key, value)];
+    });
+  };
+
+  const buildUpdatedLines = (
+    previousNode: Record<string, unknown>,
+    currentNode: Record<string, unknown>,
+  ): DiffLine[] => {
+    const previousComparable = comparableNode(previousNode) as Record<string, unknown>;
+    const currentComparable = comparableNode(currentNode) as Record<string, unknown>;
+    const allKeys = ["id", ...Object.keys({ ...previousComparable, ...currentComparable })].sort((left, right) =>
+      left.localeCompare(right),
+    );
+
+    const nodeFilePath = `nodes/${String(currentNode.id || previousNode.id || "unknown")}.yaml`;
+    const lines: DiffLine[] = [
+      { prefix: "meta", text: `diff --git a/${nodeFilePath} b/${nodeFilePath}` },
+      { prefix: "meta", text: `--- a/${nodeFilePath}` },
+      { prefix: "meta", text: `+++ b/${nodeFilePath}` },
+      { prefix: "context", text: "@@ -1,0 +1,0 @@" },
+    ];
+    allKeys.forEach((key) => {
+      const previousValue = key === "id" ? previousNode.id : previousComparable[key];
+      const currentValue = key === "id" ? currentNode.id : currentComparable[key];
+      if (JSON.stringify(previousValue) === JSON.stringify(currentValue)) {
+        return;
+      }
+
+      lines.push(...buildYamlFieldLines("-", key, previousValue));
+      lines.push(...buildYamlFieldLines("+", key, currentValue));
+    });
+
+    return lines;
+  };
+
+  const previousByID = toNodeMap(previousNodes);
+  const currentByID = toNodeMap(currentNodes);
+  const allNodeIDs = Array.from(new Set([...previousByID.keys(), ...currentByID.keys()])).sort((left, right) =>
+    left.localeCompare(right),
+  );
+
+  const items: VersionNodeDiffItem[] = [];
+  let addedCount = 0;
+  let removedCount = 0;
+  let updatedCount = 0;
+
+  allNodeIDs.forEach((nodeID) => {
+    const previousNode = previousByID.get(nodeID);
+    const currentNode = currentByID.get(nodeID);
+
+    if (!previousNode && currentNode) {
+      items.push({
+        id: nodeID,
+        name: String(currentNode.name || "Unnamed node"),
+        changeType: "added",
+        lines: buildNodeLines("+", currentNode),
+      });
+      addedCount += 1;
+      return;
+    }
+
+    if (previousNode && !currentNode) {
+      items.push({
+        id: nodeID,
+        name: String(previousNode.name || "Unnamed node"),
+        changeType: "removed",
+        lines: buildNodeLines("-", previousNode),
+      });
+      removedCount += 1;
+      return;
+    }
+
+    if (!previousNode || !currentNode) {
+      return;
+    }
+
+    if (JSON.stringify(comparableNode(previousNode)) !== JSON.stringify(comparableNode(currentNode))) {
+      items.push({
+        id: nodeID,
+        name: String(currentNode.name || previousNode.name || "Unnamed node"),
+        changeType: "updated",
+        lines: buildUpdatedLines(previousNode, currentNode),
+      });
+      updatedCount += 1;
+    }
+  });
+
+  return { items, addedCount, removedCount, updatedCount };
+}
+
 function withTooltip(disabled: boolean, message: string | undefined, element: ReactNode): ReactNode {
   if (!disabled || !message) {
     return element;
@@ -139,6 +313,17 @@ export function CanvasVersionControlSidebar({
   });
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
+  const [diffContext, setDiffContext] = useState<{
+    version: CanvasesCanvasVersion;
+    previousVersion: CanvasesCanvasVersion;
+  } | null>(null);
+
+  const diffSummary = useMemo(() => {
+    if (!diffContext) {
+      return null;
+    }
+    return summarizeNodeDiff(diffContext.version, diffContext.previousVersion);
+  }, [diffContext]);
 
   const handleMouseDown = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -312,17 +497,26 @@ export function CanvasVersionControlSidebar({
             ) : (
               <>
                 <div className="mt-2 space-y-2">
-                  {liveVersions.map((version) => {
+                  {liveVersions.map((version, index) => {
                     const versionID = version.metadata?.id || "";
                     const isActive = versionID === selectedVersionId;
                     const isCurrentLive = liveCanvasVersionId === versionID;
+                    const previousVersion = liveVersions[index + 1];
+
                     return (
                       <VersionRow
                         key={versionID}
                         version={version}
                         isActive={isActive}
                         subtitle={isCurrentLive ? "Current live" : "Live history"}
+                        previousVersion={previousVersion}
                         onUseVersion={onUseVersion}
+                        onViewDiff={(selectedVersion, selectedPreviousVersion) =>
+                          setDiffContext({
+                            version: selectedVersion,
+                            previousVersion: selectedPreviousVersion,
+                          })
+                        }
                       />
                     );
                   })}
@@ -343,20 +537,111 @@ export function CanvasVersionControlSidebar({
           </section>
         </div>
       </div>
+
+      <Dialog open={!!diffContext} onOpenChange={(open) => !open && setDiffContext(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Version Node Diff</DialogTitle>
+            <DialogDescription>
+              Comparing {formatVersionLabelWithTimestamp(diffContext?.version)} against the previous published version.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!diffSummary ? null : (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-700">
+                Added: {diffSummary.addedCount} · Updated: {diffSummary.updatedCount} · Removed:{" "}
+                {diffSummary.removedCount}
+              </p>
+              {diffSummary.items.length === 0 ? (
+                <p className="text-xs text-slate-600">No node changes found between these versions.</p>
+              ) : (
+                <Accordion type="multiple" className="w-full rounded-md border border-slate-200 px-3">
+                  {diffSummary.items.map((item, index) => (
+                    <AccordionItem
+                      key={`${item.id}-${item.changeType}-${index}`}
+                      value={`${item.id}-${item.changeType}-${index}`}
+                      className="border-slate-200"
+                    >
+                      <AccordionTrigger className="py-3 hover:no-underline">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className={cn(
+                              "inline-flex min-w-8 justify-center rounded px-1.5 py-0.5 text-[11px] font-semibold",
+                              item.changeType === "removed"
+                                ? "bg-amber-100 text-amber-700"
+                                : item.changeType === "added"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-sky-100 text-sky-700",
+                            )}
+                          >
+                            {item.changeType === "updated" ? "+/-" : item.changeType === "removed" ? "-" : "+"}
+                          </span>
+                          <span className="truncate text-sm text-slate-900">{item.name}</span>
+                          <span className="truncate text-xs text-slate-500">{item.id}</span>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="rounded-md bg-slate-950 px-3 py-2 font-mono text-xs">
+                          {item.lines.map((line, lineIndex) => (
+                            <div key={`${item.id}-${lineIndex}`} className="flex gap-2 py-0.5">
+                              <span
+                                className={cn(
+                                  line.prefix === "+"
+                                    ? "text-emerald-300"
+                                    : line.prefix === "-"
+                                      ? "text-rose-300"
+                                      : line.prefix === "meta"
+                                        ? "text-sky-300"
+                                        : "text-slate-400",
+                                )}
+                              >
+                                {line.prefix === "meta" || line.prefix === "context" ? " " : line.prefix}
+                              </span>
+                              <span
+                                className={cn(
+                                  "break-all",
+                                  line.prefix === "+"
+                                    ? "text-emerald-200"
+                                    : line.prefix === "-"
+                                      ? "text-rose-200"
+                                      : line.prefix === "meta"
+                                        ? "text-sky-200"
+                                        : "text-slate-100",
+                                )}
+                              >
+                                {line.text}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </aside>
   );
 }
 
 function VersionRow({
   version,
+  previousVersion,
   isActive = false,
   subtitle,
   onUseVersion,
+  onViewDiff,
 }: {
   version: CanvasesCanvasVersion;
+  previousVersion?: CanvasesCanvasVersion;
   isActive?: boolean;
   subtitle?: string;
   onUseVersion: (versionID: string) => void;
+  onViewDiff: (version: CanvasesCanvasVersion, previousVersion: CanvasesCanvasVersion) => void;
 }) {
   const versionID = version.metadata?.id;
   const ownerName = version.metadata?.owner?.name || "Unknown owner";
@@ -367,26 +652,66 @@ function VersionRow({
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => onUseVersion(versionID)}
+    <div
       className={cn(
         "w-full rounded-md border px-2.5 py-2 text-left transition",
         isActive ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white",
-        "hover:border-slate-300 hover:bg-slate-50",
+        "hover:border-slate-300",
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium text-slate-900 truncate flex-1 min-w-0">{versionLabel}</p>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-slate-900 truncate">{versionLabel}</p>
+          <p className="mt-0.5 text-xs text-slate-600 truncate">{subtitle || ownerName}</p>
+        </div>
         <div className="flex items-center gap-1.5">
           {isActive ? (
             <span className="rounded bg-sky-600 px-1.5 py-0.5 text-[10px] font-medium text-white max-w-[72px] truncate whitespace-nowrap">
               Active
             </span>
           ) : null}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="h-7 w-7"
+                onClick={() => onUseVersion(versionID)}
+                aria-label="Use version"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Use this version</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="h-7 w-7"
+                  disabled={!previousVersion}
+                  onClick={() => {
+                    if (!previousVersion) {
+                      return;
+                    }
+                    onViewDiff(version, previousVersion);
+                  }}
+                  aria-label="View diff with previous version"
+                >
+                  <GitCompareArrows className="h-4 w-4" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {previousVersion ? "View node diff with previous version" : "No previous version to compare"}
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
-      <p className="mt-0.5 text-xs text-slate-600 truncate">{subtitle || ownerName}</p>
-    </button>
+    </div>
   );
 }
