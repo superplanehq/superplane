@@ -131,7 +131,6 @@ type SyntheticCheckNotificationData struct {
 }
 
 // SyntheticCheckNotificationIssue represents the issue in a synthetic check notification.
-// Labels use the synthetic check tuple format: [[index, {key, value}], ...].
 type SyntheticCheckNotificationIssue struct {
 	ID              string                                `json:"id"`
 	IssueIdentifier string                                `json:"issueIdentifier"`
