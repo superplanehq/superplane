@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
+	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudfunctions"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/compute"
 	gcppubsub "github.com/superplanehq/superplane/pkg/integrations/gcp/pubsub"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -24,6 +25,9 @@ func init() {
 	registry.RegisterIntegration("gcp", &GCP{})
 	compute.SetClientFactory(func(ctx core.ExecutionContext) (compute.Client, error) {
 		return gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
+	})
+	cloudfunctions.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (cloudfunctions.Client, error) {
+		return gcpcommon.NewClient(httpCtx, integration)
 	})
 }
 
@@ -140,6 +144,7 @@ func (g *GCP) Configuration() []configuration.Field {
 func (g *GCP) Components() []core.Component {
 	return []core.Component{
 		&compute.CreateVM{},
+		&cloudfunctions.InvokeFunction{},
 	}
 }
 
@@ -423,6 +428,10 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	p := ctx.Parameters
 
 	switch resourceType {
+	case cloudfunctions.ResourceTypeLocation:
+		return cloudfunctions.ListLocationResources(reqCtx, client, p["projectId"])
+	case cloudfunctions.ResourceTypeFunction:
+		return cloudfunctions.ListFunctionResources(reqCtx, client, p["projectId"], p["location"])
 	case compute.ResourceTypeRegion:
 		return compute.ListRegionResources(reqCtx, client)
 	case compute.ResourceTypeZone:
