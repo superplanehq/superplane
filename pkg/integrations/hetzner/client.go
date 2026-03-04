@@ -34,14 +34,14 @@ func (e *APIError) Error() string {
 }
 
 type createServerRequest struct {
-	Name             string   `json:"name"`
-	ServerType       string   `json:"server_type"`
-	Image            string   `json:"image"`
-	Location         string   `json:"location,omitempty"`
-	SSHKeys          []string `json:"ssh_keys,omitempty"`
+	Name             string                 `json:"name"`
+	ServerType       string                 `json:"server_type"`
+	Image            string                 `json:"image"`
+	Location         string                 `json:"location,omitempty"`
+	SSHKeys          []string               `json:"ssh_keys,omitempty"`
 	Firewalls        []createServerFirewall `json:"firewalls,omitempty"`
-	UserData         string   `json:"user_data,omitempty"`
-	StartAfterCreate *bool    `json:"start_after_create,omitempty"`
+	UserData         string                 `json:"user_data,omitempty"`
+	StartAfterCreate *bool                  `json:"start_after_create,omitempty"`
 }
 
 type createServerFirewall struct {
