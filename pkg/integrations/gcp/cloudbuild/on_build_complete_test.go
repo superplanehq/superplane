@@ -52,7 +52,8 @@ func TestOnBuildCompleteSetup(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, integrationCtx.Subscriptions, 1)
-		assert.Empty(t, integrationCtx.ActionRequests)
+		require.Len(t, integrationCtx.ActionRequests, 1)
+		assert.Equal(t, gcpcommon.ActionNameEnsureCloudBuild, integrationCtx.ActionRequests[0].ActionName)
 
 		metadata := OnBuildCompleteMetadata{}
 		require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &metadata))
