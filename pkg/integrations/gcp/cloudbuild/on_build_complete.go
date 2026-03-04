@@ -227,7 +227,7 @@ func decodeOnBuildCompleteConfiguration(raw any) (OnBuildCompleteConfiguration, 
 }
 
 func matchesBuildSource(buildSource string, buildTriggerID string) bool {
-	hasTriggerID := strings.TrimSpace(buildTriggerID) != ""
+	hasTriggerID := buildTriggerID != ""
 
 	switch buildSource {
 	case buildSourceTriggered:

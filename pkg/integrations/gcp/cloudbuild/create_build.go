@@ -872,7 +872,7 @@ func readBuildString(build map[string]any, key string) string {
 		return ""
 	}
 
-	return strings.TrimSpace(str)
+	return str
 }
 
 func isTerminalBuildStatus(status string) bool {
@@ -1054,4 +1054,3 @@ func (c *CreateBuild) Cleanup(_ core.SetupContext) error { return nil }
 func (c *CreateBuild) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
-

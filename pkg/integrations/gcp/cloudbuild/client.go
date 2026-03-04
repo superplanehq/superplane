@@ -3,7 +3,6 @@ package cloudbuild
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -74,7 +73,6 @@ func buildCreateTarget(
 	integrationProjectID string,
 	build map[string]any,
 ) (string, string, error) {
-	integrationProjectID = strings.TrimSpace(integrationProjectID)
 
 	connectedRepository := connectedRepositoryNameFromBuild(build)
 	if connectedRepository != "" {
@@ -112,5 +110,5 @@ func connectedRepositoryNameFromBuild(build map[string]any) string {
 	}
 
 	repository, _ := connectedRepository["repository"].(string)
-	return strings.TrimSpace(repository)
+	return repository
 }
