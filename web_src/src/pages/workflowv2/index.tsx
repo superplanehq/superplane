@@ -4084,18 +4084,20 @@ export function WorkflowPageV2() {
     [canvas],
   );
 
-  // Show loading indicator while data is being fetched
-  if (
-    canvasLoading ||
-    canvasVersionLoading ||
-    triggersLoading ||
-    blueprintsLoading ||
-    componentsLoading ||
-    widgetsLoading ||
-    usersLoading ||
-    rolesLoading ||
-    groupsLoading
-  ) {
+  const isInitialCanvasBootstrapLoading =
+    !canvas &&
+    (canvasLoading ||
+      triggersLoading ||
+      blueprintsLoading ||
+      componentsLoading ||
+      widgetsLoading ||
+      usersLoading ||
+      rolesLoading ||
+      groupsLoading);
+
+  // Keep full-screen loading only for initial bootstrap.
+  // Version switches should not unmount the page.
+  if (isInitialCanvasBootstrapLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-3">
@@ -4174,9 +4176,16 @@ export function WorkflowPageV2() {
       </Button>
     </div>
   ) : null;
+  const revisionLoadingBanner =
+    canvasVersionLoading && activeCanvasVersionId ? (
+      <div className="bg-slate-100 px-4 py-2.5 flex items-center gap-2">
+        <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+        <p className="text-[13px] text-slate-700">Loading selected revision...</p>
+      </div>
+    ) : null;
   const selectedVersionForLabel = selectedCanvasVersion || liveCanvasVersion;
   const canvasViewKey = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "live";
-  const headerBanners = [remoteUpdateBanner, templateBanner].filter(Boolean);
+  const headerBanners = [revisionLoadingBanner, remoteUpdateBanner, templateBanner].filter(Boolean);
   const headerBanner = headerBanners.length > 0 ? <div className="flex flex-col">{headerBanners}</div> : null;
   const saveDisabled = !canUpdateCanvas || !hasEditableVersion;
   const saveDisabledTooltip = !canUpdateCanvas
