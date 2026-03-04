@@ -1,0 +1,84 @@
+{
+  "type": "dash0.syntheticCheckNotification",
+  "timestamp": "2026-02-20T12:00:00Z",
+  "data": {
+    "issue": {
+      "id": "issue_789",
+      "issueIdentifier": "synthetic-check-api-health",
+      "start": "2026-02-20T12:00:00Z",
+      "end": "",
+      "status": "critical",
+      "summary": "Synthetic check failed: API Health Check",
+      "url": "https://app.dash0.com/issues/issue_789",
+      "dataset": "default",
+      "description": "Synthetic check detected failures for API health endpoint.",
+      "checkrules": [
+        {
+          "id": "check_101",
+          "name": "API Health Check",
+          "for": "5m",
+          "keepFiringFor": "10m",
+          "interval": "1m",
+          "description": "Monitor API health endpoint availability",
+          "url": "https://app.dash0.com/check-rules/check_101",
+          "expression": "",
+          "annotations": {
+            "summary": "API health check failure detected"
+          },
+          "labels": {
+            "service": "api",
+            "env": "prod"
+          },
+          "thresholds": {}
+        }
+      ],
+      "labels": [
+        [
+          "0",
+          {
+            "key": "dash0.resource.type",
+            "value": {
+              "stringValue": "synthetic"
+            }
+          }
+        ],
+        [
+          "1",
+          {
+            "key": "dash0.synthetic_check.attempt_id",
+            "value": {
+              "stringValue": "73768e2c"
+            }
+          }
+        ],
+        [
+          "2",
+          {
+            "key": "dash0.synthetic_check.failed_critical_assertions",
+            "value": {
+              "stringValue": "{\"be-brussels\":[{\"actualValue\":\"503\",\"assertion\":{\"kind\":\"status_code\",\"spec\":{\"operator\":\"is\",\"value\":\"200\"}},\"explanation\":\"Expected value to be 200, but got 503\"}]}"
+            }
+          }
+        ],
+        [
+          "3",
+          {
+            "key": "dash0.synthetic_check.id",
+            "value": {
+              "stringValue": "api-health-check"
+            }
+          }
+        ],
+        [
+          "4",
+          {
+            "key": "dash0.synthetic_check.name",
+            "value": {
+              "stringValue": "API Health Check"
+            }
+          }
+        ]
+      ]
+    }
+  }
+}
