@@ -54,10 +54,15 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 		return nil, fmt.Errorf("error getting licenseKey: %v", err)
 	}
 
+	accountIDStr := string(accountID)
+	if !accountIDRegexp.MatchString(accountIDStr) {
+		return nil, fmt.Errorf("accountId must be numeric, got %q", accountIDStr)
+	}
+
 	nerdGraphURL, metricAPIURL := urlsForRegion(string(region))
 
 	return &Client{
-		AccountID:    string(accountID),
+		AccountID:    accountIDStr,
 		UserAPIKey:   string(userAPIKey),
 		LicenseKey:   string(licenseKey),
 		NerdGraphURL: nerdGraphURL,
