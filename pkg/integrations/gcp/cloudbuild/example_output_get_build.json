@@ -1,0 +1,12 @@
+{
+  "data": {
+    "id": "12345678-abcd-1234-5678-abcdef012345",
+    "projectId": "my-project",
+    "status": "SUCCESS",
+    "logUrl": "https://console.cloud.google.com/cloud-build/builds/12345678-abcd-1234-5678-abcdef012345",
+    "createTime": "2025-01-01T00:00:00Z",
+    "finishTime": "2025-01-01T00:05:00Z"
+  },
+  "timestamp": "2025-01-01T00:05:00Z",
+  "type": "gcp.cloudbuild.build"
+}
