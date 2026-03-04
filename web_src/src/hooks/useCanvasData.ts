@@ -480,6 +480,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
         };
       });
 
+      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequests() });
       queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
     },

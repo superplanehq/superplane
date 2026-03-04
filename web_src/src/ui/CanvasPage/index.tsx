@@ -176,6 +176,7 @@ export interface CanvasPageProps {
   onOpenVersionControl?: () => void;
   versionControlButtonLabel?: string;
   versionControlButtonTooltip?: string;
+  showBottomStatusControls?: boolean;
   readOnly?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
@@ -964,6 +965,7 @@ function CanvasPage(props: CanvasPageProps) {
                 onOpenVersionControl={props.onOpenVersionControl}
                 versionControlButtonLabel={props.versionControlButtonLabel}
                 versionControlButtonTooltip={props.versionControlButtonTooltip}
+                showBottomStatusControls={props.showBottomStatusControls}
                 isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
                 onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
                 autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
@@ -1511,6 +1513,7 @@ function CanvasContent({
   isVersionControlOpen,
   onOpenVersionControl,
   versionControlButtonTooltip,
+  showBottomStatusControls = true,
   isAutoLayoutOnUpdateEnabled,
   onToggleAutoLayoutOnUpdate,
   autoLayoutOnUpdateDisabled,
@@ -1584,6 +1587,7 @@ function CanvasContent({
   onOpenVersionControl?: () => void;
   versionControlButtonLabel?: string;
   versionControlButtonTooltip?: string;
+  showBottomStatusControls?: boolean;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -1647,6 +1651,12 @@ function CanvasContent({
   const [logSidebarHeight, setLogSidebarHeight] = useState(320);
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
   const [isMinimapVisible, setIsMinimapVisible] = useState(true);
+
+  useEffect(() => {
+    if (!showBottomStatusControls) {
+      setIsLogSidebarOpen(false);
+    }
+  }, [showBottomStatusControls]);
 
   useEffect(() => {
     const activeNoteId = getActiveNoteId();
@@ -2232,7 +2242,7 @@ function CanvasContent({
     });
   }, []);
 
-  const showVersionControlTrigger = !!onOpenVersionControl && !isVersionControlOpen;
+  const showVersionControlTrigger = showBottomStatusControls && !!onOpenVersionControl && !isVersionControlOpen;
 
   return (
     <div className="h-full w-full relative">
@@ -2409,82 +2419,86 @@ function CanvasContent({
                   </Tooltip>
                 </div>
               ) : null}
-              <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 items-center text-xs font-medium"
-                      onClick={() => handleLogButtonClick("all")}
-                    >
-                      <ScrollText className="h-3 w-3" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>All Logs</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 items-center text-xs font-medium"
-                      onClick={() => handleLogButtonClick("error")}
-                    >
-                      <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
-                      <span
-                        className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}
+              {showBottomStatusControls ? (
+                <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 items-center text-xs font-medium"
+                        onClick={() => handleLogButtonClick("all")}
                       >
-                        {logCounts.error}
-                      </span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Errors</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 items-center text-xs font-medium"
-                      onClick={() => handleLogButtonClick("warning")}
-                    >
-                      <TriangleAlert
-                        className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
-                      />
-                      <span
-                        className={
-                          logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"
-                        }
+                        <ScrollText className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>All Logs</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 items-center text-xs font-medium"
+                        onClick={() => handleLogButtonClick("error")}
                       >
-                        {logCounts.warning}
-                      </span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Warnings</TooltipContent>
-                </Tooltip>
-              </div>
+                        <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
+                        <span
+                          className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}
+                        >
+                          {logCounts.error}
+                        </span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Errors</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 items-center text-xs font-medium"
+                        onClick={() => handleLogButtonClick("warning")}
+                      >
+                        <TriangleAlert
+                          className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
+                        />
+                        <span
+                          className={
+                            logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"
+                          }
+                        >
+                          {logCounts.warning}
+                        </span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Warnings</TooltipContent>
+                  </Tooltip>
+                </div>
+              ) : null}
             </Panel>
           </ReactFlow>
         </div>
       </div>
-      <CanvasLogSidebar
-        isOpen={isLogSidebarOpen}
-        onClose={() => setIsLogSidebarOpen(false)}
-        filter={logFilter}
-        onFilterChange={setLogFilter}
-        onResolveErrors={onResolveExecutionErrors}
-        height={logSidebarHeight}
-        onHeightChange={setLogSidebarHeight}
-        scope={logScope}
-        onScopeChange={setLogScope}
-        searchValue={logSearch}
-        onSearchChange={setLogSearch}
-        entries={filteredLogEntries}
-        counts={logCounts}
-        expandedRuns={expandedRuns}
-        onToggleRun={handleRunToggle}
-      />
+      {showBottomStatusControls ? (
+        <CanvasLogSidebar
+          isOpen={isLogSidebarOpen}
+          onClose={() => setIsLogSidebarOpen(false)}
+          filter={logFilter}
+          onFilterChange={setLogFilter}
+          onResolveErrors={onResolveExecutionErrors}
+          height={logSidebarHeight}
+          onHeightChange={setLogSidebarHeight}
+          scope={logScope}
+          onScopeChange={setLogScope}
+          searchValue={logSearch}
+          onSearchChange={setLogSearch}
+          entries={filteredLogEntries}
+          counts={logCounts}
+          expandedRuns={expandedRuns}
+          onToggleRun={handleRunToggle}
+        />
+      ) : null}
     </div>
   );
 }

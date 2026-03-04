@@ -277,6 +277,16 @@ func (s *CanvasSteps) GetWorkflowFromDB() *models.Canvas {
 	return workflow
 }
 
+func (s *CanvasSteps) GetLiveWorkflowVersionFromDB() *models.CanvasVersion {
+	workflow, err := models.FindCanvas(s.session.OrgID, s.WorkflowID)
+	require.NoError(s.t, err)
+
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.Conn(), workflow)
+	require.NoError(s.t, err)
+
+	return version
+}
+
 func (s *CanvasSteps) GetNodeFromDB(name string) *models.CanvasNode {
 	canvas, err := models.FindCanvas(s.session.OrgID, s.WorkflowID)
 	require.NoError(s.t, err)

@@ -42,6 +42,7 @@ interface CanvasVersioningViewProps {
   changeRequests: CanvasesCanvasChangeRequest[];
   selectedChangeRequestId?: string;
   onSelectChangeRequest: (changeRequestID: string) => void;
+  onEditChangeRequest: (changeRequest: CanvasesCanvasChangeRequest) => void;
   onPublishChangeRequest: () => void;
   onCloseChangeRequest: (changeRequestID: string) => void;
   onResolveChangeRequest: (data: {
@@ -502,6 +503,7 @@ export function CanvasVersioningView({
   changeRequests,
   selectedChangeRequestId,
   onSelectChangeRequest,
+  onEditChangeRequest,
   onPublishChangeRequest,
   onCloseChangeRequest,
   onResolveChangeRequest,
@@ -615,7 +617,6 @@ export function CanvasVersioningView({
       return [];
     }
 
-    const changedNodeIDs = selectedChangeRequest.diff?.changedNodeIds || [];
     const conflictingNodeIDSet = new Set(selectedChangeRequest.diff?.conflictingNodeIds || []);
     const liveNodes = (liveCanvasVersion?.spec?.nodes || []) as Record<string, unknown>[];
     const crNodes = (selectedChangeRequest.version?.spec?.nodes || []) as Record<string, unknown>[];
@@ -636,21 +637,41 @@ export function CanvasVersioningView({
       }
     });
 
-    return changedNodeIDs.map((nodeID) => {
-      const oldNode = liveNodeByID.get(nodeID);
-      const newNode = crNodeByID.get(nodeID);
-      const lines = buildNodeDiffLines(oldNode, newNode);
-      const groups = buildNodeDiffGroups(lines);
-      const kind = !oldNode && newNode ? "added" : oldNode && !newNode ? "removed" : "updated";
+    const allNodeIDs = Array.from(new Set([...liveNodeByID.keys(), ...crNodeByID.keys()])).sort((left, right) =>
+      left.localeCompare(right),
+    );
 
-      return {
-        nodeID,
-        kind,
-        isConflicting: conflictingNodeIDSet.has(nodeID),
-        lines,
-        groups,
-      };
-    });
+    return allNodeIDs
+      .map((nodeID) => {
+        const oldNode = liveNodeByID.get(nodeID);
+        const newNode = crNodeByID.get(nodeID);
+        const lines = buildNodeDiffLines(oldNode, newNode);
+        if (lines.length === 0) {
+          return null;
+        }
+
+        const groups = buildNodeDiffGroups(lines);
+        const kind = !oldNode && newNode ? "added" : oldNode && !newNode ? "removed" : "updated";
+
+        return {
+          nodeID,
+          kind,
+          isConflicting: conflictingNodeIDSet.has(nodeID),
+          lines,
+          groups,
+        };
+      })
+      .filter(
+        (
+          item,
+        ): item is {
+          nodeID: string;
+          kind: "added" | "removed" | "updated";
+          isConflicting: boolean;
+          lines: DiffLine[];
+          groups: DiffGroup[];
+        } => Boolean(item),
+      );
   }, [selectedChangeRequest, liveCanvasVersion?.spec?.nodes]);
 
   const createChangeRequestNodeDiffs = useMemo(() => {
@@ -1057,7 +1078,7 @@ export function CanvasVersioningView({
               {selectedLiveHistoryVersion ? (
                 <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Selected Revision Diff · {formatVersionLabel(selectedLiveHistoryVersion)}
+                    Selected version diff · {formatVersionLabel(selectedLiveHistoryVersion)}
                   </p>
                   <p className="mt-1 text-xs text-slate-600">
                     Showing changes applied against{" "}
@@ -1187,16 +1208,12 @@ export function CanvasVersioningView({
                 );
                 const changedCount = changeRequest.diff?.changedNodeIds?.length || 0;
                 const conflictCount = changeRequest.diff?.conflictingNodeIds?.length || 0;
-                const canResolve =
-                  (status === "open" || status === "conflicted") && conflictCount > 0 && changeRequestID !== "";
-                const canClose = (status === "open" || status === "conflicted") && changeRequestID !== "";
-                const versioningActionDisabled = sandboxModeEnabled;
 
                 return (
                   <div key={changeRequestID} className="flex items-start gap-2">
                     <button
                       type="button"
-                      onClick={() => onSelectChangeRequest(changeRequestID)}
+                      onClick={() => selectedChangeRequestId === changeRequestID ? onSelectChangeRequest("") : onSelectChangeRequest(changeRequestID)}
                       className={cn(
                         "w-full rounded-md border px-3 py-2 text-left",
                         selectedChangeRequestId === changeRequestID
@@ -1232,41 +1249,6 @@ export function CanvasVersioningView({
                         </span>
                       </div>
                     </button>
-                    <div className="flex shrink-0 flex-col gap-1">
-                      {canResolve
-                        ? withTooltip(
-                            versioningActionDisabled,
-                            sandboxModeTooltip,
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={versioningActionDisabled}
-                              onClick={() => {
-                                onSelectChangeRequest(changeRequestID);
-                                setResolvingChangeRequestID(changeRequestID);
-                              }}
-                            >
-                              Resolve
-                            </Button>,
-                          )
-                        : null}
-                      {canClose
-                        ? withTooltip(
-                            versioningActionDisabled,
-                            sandboxModeTooltip,
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={versioningActionDisabled || closeChangeRequestPending}
-                              onClick={() => onCloseChangeRequest(changeRequestID)}
-                            >
-                              {closeChangeRequestPending ? "Rejecting..." : "Reject"}
-                            </Button>,
-                          )
-                        : null}
-                    </div>
                   </div>
                 );
               })}
@@ -1291,6 +1273,31 @@ export function CanvasVersioningView({
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected CR Diff</p>
                 <div className="flex items-center gap-2">
+                  {(() => {
+                    const selectedStatus = normalizeChangeRequestStatus(
+                      selectedChangeRequest.metadata?.status as string | number | undefined,
+                    );
+                    const canEditSelected =
+                      (selectedStatus === "open" || selectedStatus === "conflicted" || selectedStatus === "rejected") &&
+                      !!selectedChangeRequest.metadata?.id;
+                    if (!canEditSelected) {
+                      return null;
+                    }
+
+                    return withTooltip(
+                      sandboxModeEnabled,
+                      sandboxModeTooltip,
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={sandboxModeEnabled}
+                        onClick={() => onEditChangeRequest(selectedChangeRequest)}
+                      >
+                        Edit
+                      </Button>,
+                    );
+                  })()}
                   {(selectedChangeRequest.diff?.conflictingNodeIds?.length || 0) > 0 ? (
                     withTooltip(
                       sandboxModeEnabled,
@@ -1363,7 +1370,7 @@ export function CanvasVersioningView({
                         disabled={sandboxModeEnabled || closeChangeRequestPending}
                         onClick={() => onCloseChangeRequest(selectedChangeRequest.metadata?.id || "")}
                       >
-                        {closeChangeRequestPending ? "Rejecting..." : "Reject CR"}
+                        {closeChangeRequestPending ? "Rejecting..." : "Reject"}
                       </Button>,
                     );
                   })()}
