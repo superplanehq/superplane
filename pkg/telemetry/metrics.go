@@ -32,6 +32,9 @@ var (
 	workflowCleanupWorkerTickHistogram          metric.Float64Histogram
 	workflowCleanupWorkerCanvasesCountHistogram metric.Int64Histogram
 
+	nodeCleanupWorkerTickHistogram       metric.Float64Histogram
+	nodeCleanupWorkerNodesCountHistogram metric.Int64Histogram
+
 	dbLocksCountHistogram       metric.Int64Histogram
 	dbLongQueriesCountHistogram metric.Int64Histogram
 )
@@ -135,6 +138,24 @@ func InitMetrics(ctx context.Context) error {
 	workflowCleanupWorkerCanvasesCountHistogram, err = meter.Int64Histogram(
 		"workflow_cleanup_worker.tick.canvases.deleted",
 		metric.WithDescription("Number of deleted canvases processed each tick"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	nodeCleanupWorkerTickHistogram, err = meter.Float64Histogram(
+		"node_cleanup_worker.tick.duration.seconds",
+		metric.WithDescription("Duration of each CanvasNodeCleanupWorker tick"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	nodeCleanupWorkerNodesCountHistogram, err = meter.Int64Histogram(
+		"node_cleanup_worker.tick.nodes.deleted",
+		metric.WithDescription("Number of deleted canvas nodes processed each tick"),
 		metric.WithUnit("1"),
 	)
 	if err != nil {
@@ -258,6 +279,22 @@ func RecordWorkflowCleanupWorkerCanvasesCount(ctx context.Context, count int) {
 	}
 
 	workflowCleanupWorkerCanvasesCountHistogram.Record(ctx, int64(count))
+}
+
+func RecordNodeCleanupWorkerTickDuration(ctx context.Context, d time.Duration) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	nodeCleanupWorkerTickHistogram.Record(ctx, d.Seconds())
+}
+
+func RecordNodeCleanupWorkerNodesCount(ctx context.Context, count int) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	nodeCleanupWorkerNodesCountHistogram.Record(ctx, int64(count))
 }
 
 func RecordDBLocksCount(ctx context.Context, count int64) {
