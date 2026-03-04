@@ -309,6 +309,7 @@ const EDGE_STYLE = {
 } as const;
 
 const DEFAULT_CANVAS_ZOOM = 0.8;
+const MIN_CANVAS_ZOOM = 0.1;
 
 /*
  * nodeTypes must be defined outside of the component to prevent
@@ -2208,7 +2209,7 @@ function CanvasContent({
             edges={styledEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
-            minZoom={0.4}
+            minZoom={MIN_CANVAS_ZOOM}
             maxZoom={1.5}
             zoomOnScroll={true}
             zoomOnPinch={true}
