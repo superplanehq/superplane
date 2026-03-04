@@ -95,9 +95,13 @@ func Test_OnBuildComplete_Metadata(t *testing.T) {
 func Test_OnBuildComplete_ExampleData(t *testing.T) {
 	trigger := &OnBuildComplete{}
 	data := trigger.ExampleData()
-	assert.Equal(t, "SUCCESS", data["status"])
-	assert.NotEmpty(t, data["id"])
-	assert.NotEmpty(t, data["logUrl"])
+	assert.NotEmpty(t, data["type"])
+	assert.NotEmpty(t, data["timestamp"])
+	payload, ok := data["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "SUCCESS", payload["status"])
+	assert.NotEmpty(t, payload["id"])
+	assert.NotEmpty(t, payload["logUrl"])
 }
 
 func Test_OnBuildComplete_OnIntegrationMessage(t *testing.T) {

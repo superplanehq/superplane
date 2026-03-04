@@ -68,7 +68,7 @@ func TestListBuildResources(t *testing.T) {
 			core.IntegrationResource{
 				Type: ResourceTypeBuild,
 				ID:   "9f7d716f-a898-424e-8bda-ac2dc2bf8247",
-				Name: "SUCCESS · 9f7d716f-a898-424e-8bda-ac2dc2bf8247 · 2026-03-03 04:35 UTC",
+				Name: "9f7d716f-a898-424e-8bda-ac2dc2bf8247",
 			},
 			resources[0],
 		)
@@ -113,7 +113,7 @@ func TestListBuildResources(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, resources, 1)
 		assert.Equal(t, "projects/integration-project/locations/global/builds/build-from-name", resources[0].ID)
-		assert.Equal(t, "FAILURE · build-from-name", resources[0].Name)
+		assert.Equal(t, "build-from-name", resources[0].Name)
 	})
 
 	t.Run("returns empty resources when cloud build is unavailable", func(t *testing.T) {
