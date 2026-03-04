@@ -35,6 +35,12 @@ export interface TriggerRenderer {
    * @returns The title and subtitle to display
    */
   getTitleAndSubtitle: (context: TriggerEventContext) => { title: string; subtitle: string };
+
+  /**
+   * Optional event-state mapper for triggers that have meaningful terminal/running states.
+   * Defaults to "triggered" when omitted.
+   */
+  getEventState?: (context: TriggerEventContext) => EventState;
 }
 
 export type TriggerEventContext = {
