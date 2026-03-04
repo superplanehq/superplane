@@ -66,11 +66,11 @@ func (c *versionsPublishCommand) Execute(ctx core.CommandContext) error {
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		_, _ = fmt.Fprintf(stdout, "Canvas: %s\n", canvasID)
-		_, _ = fmt.Fprintf(stdout, "Published version: %s\n", versionID)
+		_, _ = fmt.Fprintf(stdout, "Merged from edit version: %s\n", versionID)
 		if publishResponse.Version != nil && publishResponse.Version.Metadata != nil {
-			_, _ = fmt.Fprintf(stdout, "Revision: %d\n", publishResponse.Version.Metadata.GetRevision())
+			_, _ = fmt.Fprintf(stdout, "Live revision: %d\n", publishResponse.Version.Metadata.GetRevision())
 		}
-		_, _ = fmt.Fprintf(stdout, "Published change request: %s\n", changeRequestID)
+		_, _ = fmt.Fprintf(stdout, "Merged change request: %s\n", changeRequestID)
 		_, err = fmt.Fprintln(stdout, "Active context switched to live")
 		return err
 	})

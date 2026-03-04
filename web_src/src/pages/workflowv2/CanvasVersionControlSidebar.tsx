@@ -1,8 +1,9 @@
 import { CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, CircleDot, GitBranch, GitPullRequest, Plus, Trash2, User } from "lucide-react";
+import { ChevronLeft, GitBranch, GitPullRequest, RefreshCw, RotateCcw } from "lucide-react";
 import { MouseEvent as ReactMouseEvent, ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 const CANVAS_VERSION_CONTROL_WIDTH_STORAGE_KEY = "canvasVersionControlSidebarWidth";
@@ -14,42 +15,35 @@ const MAX_CANVAS_VERSION_CONTROL_WIDTH = 640;
 interface CanvasVersionControlSidebarProps {
   isOpen: boolean;
   onToggle: (open: boolean) => void;
-  currentUserId?: string;
-  activeCanvasVersionId?: string;
   liveCanvasVersionId?: string;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
-  liveCanvasVersion?: CanvasesCanvasVersion;
-  draftVersions: CanvasesCanvasVersion[];
+  liveVersions: CanvasesCanvasVersion[];
+  liveVersionsTotalCount?: number;
   canUpdateCanvas: boolean;
   isTemplate: boolean;
   hasEditableVersion: boolean;
-  hasUnsavedChanges: boolean;
+  isEditModeEnabled: boolean;
   canvasDeletedRemotely: boolean;
-  onCreateVersion: () => void;
-  onDiscardVersion: () => void;
+  onToggleEditMode: () => void;
+  onSyncWithLive: () => void;
+  onResetDraft: () => void;
   onUseVersion: (versionID: string) => void;
   onCreateChangeRequest: () => void;
-  createVersionDisabled: boolean;
-  createVersionDisabledTooltip?: string;
-  discardVersionDisabled: boolean;
-  discardVersionDisabledTooltip?: string;
+  onLoadMoreLiveVersions?: () => void;
+  toggleEditModeDisabled: boolean;
+  toggleEditModeDisabledTooltip?: string;
+  syncWithLiveDisabled: boolean;
+  syncWithLiveDisabledTooltip?: string;
+  resetDraftDisabled: boolean;
+  resetDraftDisabledTooltip?: string;
   createChangeRequestDisabled: boolean;
   createChangeRequestDisabledTooltip?: string;
-  createVersionPending: boolean;
-  discardVersionPending: boolean;
+  loadMoreLiveVersionsDisabled?: boolean;
+  toggleEditModePending: boolean;
+  syncWithLivePending: boolean;
+  resetDraftPending: boolean;
   createChangeRequestPending: boolean;
-}
-
-function isSameUserID(left?: string, right?: string): boolean {
-  if (!left || !right) {
-    return false;
-  }
-
-  return left.trim().toLowerCase() === right.trim().toLowerCase();
-}
-
-function getVersionRevision(version?: CanvasesCanvasVersion): number {
-  return version?.metadata?.revision ?? 0;
+  loadMoreLiveVersionsPending?: boolean;
 }
 
 function formatVersionTimestamp(version?: CanvasesCanvasVersion): string | undefined {
@@ -99,40 +93,37 @@ function withTooltip(disabled: boolean, message: string | undefined, element: Re
 export function CanvasVersionControlSidebar({
   isOpen,
   onToggle,
-  currentUserId,
-  activeCanvasVersionId,
   liveCanvasVersionId,
   selectedCanvasVersion,
-  liveCanvasVersion,
-  draftVersions,
+  liveVersions,
+  liveVersionsTotalCount,
   canUpdateCanvas,
   isTemplate,
   hasEditableVersion,
-  hasUnsavedChanges,
+  isEditModeEnabled,
   canvasDeletedRemotely,
-  onCreateVersion,
-  onDiscardVersion,
+  onToggleEditMode,
+  onSyncWithLive,
+  onResetDraft,
   onUseVersion,
   onCreateChangeRequest,
-  createVersionDisabled,
-  createVersionDisabledTooltip,
-  discardVersionDisabled,
-  discardVersionDisabledTooltip,
+  onLoadMoreLiveVersions,
+  toggleEditModeDisabled,
+  toggleEditModeDisabledTooltip,
+  syncWithLiveDisabled,
+  syncWithLiveDisabledTooltip,
+  resetDraftDisabled,
+  resetDraftDisabledTooltip,
   createChangeRequestDisabled,
   createChangeRequestDisabledTooltip,
-  createVersionPending,
-  discardVersionPending,
+  loadMoreLiveVersionsDisabled,
+  toggleEditModePending,
+  syncWithLivePending,
+  resetDraftPending,
   createChangeRequestPending,
+  loadMoreLiveVersionsPending,
 }: CanvasVersionControlSidebarProps) {
   const selectedVersionId = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "";
-  const selectedRevisionLabel = formatVersionLabelWithTimestamp(selectedCanvasVersion || liveCanvasVersion);
-  const selectedOwner = selectedCanvasVersion?.metadata?.owner?.name;
-  const currentUserDrafts = draftVersions.filter((version) => isSameUserID(version.metadata?.owner?.id, currentUserId));
-  const currentUserLatestDraft = [...currentUserDrafts].sort(
-    (a, b) => getVersionRevision(b) - getVersionRevision(a),
-  )[0];
-  const currentUserLatestDraftID = currentUserLatestDraft?.metadata?.id;
-  const canSwitchToLive = !!liveCanvasVersionId && selectedVersionId !== liveCanvasVersionId;
 
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     if (typeof window === "undefined") {
@@ -247,52 +238,66 @@ export function CanvasVersionControlSidebar({
         </div>
 
         <div className="flex-1 overflow-auto p-3">
-          <section className="rounded-md border border-slate-200 bg-slate-50/70 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Current</p>
-            <div className="mt-2 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-900 break-words">
-                  {hasEditableVersion ? "Working version" : "Live version"} {selectedRevisionLabel}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-600 break-words">
-                  {selectedOwner ? `Owner: ${selectedOwner}` : "Published canvas"}
-                </p>
-              </div>
-              <span
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-[11px] font-medium max-w-[140px] truncate whitespace-nowrap",
-                  hasEditableVersion ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800",
-                )}
-              >
-                {hasEditableVersion ? "Editing" : "Read-only"}
-              </span>
-            </div>
-            {hasEditableVersion && hasUnsavedChanges ? (
-              <p className="mt-2 text-xs text-amber-700">You have unsaved version changes.</p>
-            ) : null}
-            {canvasDeletedRemotely ? (
-              <p className="mt-2 text-xs text-red-700">This canvas was deleted from another session.</p>
-            ) : null}
-            {isTemplate ? <p className="mt-2 text-xs text-slate-600">Template canvases are read-only.</p> : null}
-          </section>
-
-          <section className="mt-3 rounded-md border border-slate-200 p-3">
+          <section className="rounded-md border border-slate-200 p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Actions</p>
             <div className="mt-2 flex flex-col gap-2">
               {withTooltip(
-                createVersionDisabled,
-                createVersionDisabledTooltip,
-                <Button
-                  onClick={onCreateVersion}
-                  disabled={createVersionDisabled}
-                  className="w-full justify-start min-w-0"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span className="truncate min-w-0">
-                    {createVersionPending ? "Creating version..." : "Create version from live"}
-                  </span>
-                </Button>,
+                toggleEditModeDisabled,
+                toggleEditModeDisabledTooltip,
+                <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-900">Edit mode</p>
+                    <p className="text-xs text-slate-600">
+                      {toggleEditModePending
+                        ? "Updating..."
+                        : isEditModeEnabled
+                          ? "Enabled"
+                          : "Enable to create or use your draft"}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={isEditModeEnabled}
+                    onCheckedChange={() => onToggleEditMode()}
+                    disabled={toggleEditModeDisabled || toggleEditModePending}
+                  />
+                </div>,
               )}
+
+              {isEditModeEnabled
+                ? withTooltip(
+                    syncWithLiveDisabled,
+                    syncWithLiveDisabledTooltip,
+                    <Button
+                      onClick={onSyncWithLive}
+                      disabled={syncWithLiveDisabled}
+                      className="w-full justify-start min-w-0"
+                      variant="outline"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      <span className="truncate min-w-0">
+                        {syncWithLivePending ? "Syncing with live..." : "Sync Draft with Live"}
+                      </span>
+                    </Button>,
+                  )
+                : null}
+
+              {isEditModeEnabled
+                ? withTooltip(
+                    resetDraftDisabled,
+                    resetDraftDisabledTooltip,
+                    <Button
+                      onClick={onResetDraft}
+                      disabled={resetDraftDisabled}
+                      className="w-full justify-start min-w-0"
+                      variant="outline"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      <span className="truncate min-w-0">
+                        {resetDraftPending ? "Resetting draft..." : "Reset Draft Changes"}
+                      </span>
+                    </Button>,
+                  )
+                : null}
 
               {hasEditableVersion &&
                 withTooltip(
@@ -311,93 +316,52 @@ export function CanvasVersionControlSidebar({
                   </Button>,
                 )}
 
-              {hasEditableVersion &&
-                withTooltip(
-                  discardVersionDisabled,
-                  discardVersionDisabledTooltip,
-                  <Button
-                    onClick={onDiscardVersion}
-                    disabled={discardVersionDisabled}
-                    className="w-full justify-start text-red-700 border-red-200 hover:text-red-800 hover:border-red-300 min-w-0"
-                    variant="outline"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="truncate min-w-0">
-                      {discardVersionPending ? "Discarding..." : "Discard current version"}
-                    </span>
-                  </Button>,
-                )}
-
-              {canSwitchToLive && liveCanvasVersionId ? (
-                <Button
-                  variant="outline"
-                  className="w-full justify-start min-w-0"
-                  onClick={() => onUseVersion(liveCanvasVersionId)}
-                >
-                  <CircleDot className="h-4 w-4 text-emerald-600" />
-                  <span className="truncate min-w-0">
-                    Switch to live {formatVersionLabelWithTimestamp(liveCanvasVersion)}
-                  </span>
-                </Button>
-              ) : null}
-
-              {!hasEditableVersion && currentUserLatestDraftID ? (
-                <Button
-                  variant="outline"
-                  className="w-full justify-start min-w-0"
-                  onClick={() => onUseVersion(currentUserLatestDraftID)}
-                >
-                  <User className="h-4 w-4" />
-                  <span className="truncate min-w-0">
-                    Switch to my version {formatVersionLabelWithTimestamp(currentUserLatestDraft)}
-                  </span>
-                </Button>
-              ) : null}
-
               {!canUpdateCanvas && !canvasDeletedRemotely ? (
                 <p className="text-xs text-slate-600">You do not have permission to edit this canvas.</p>
               ) : null}
+              {canvasDeletedRemotely ? (
+                <p className="text-xs text-red-700">This canvas was deleted from another session.</p>
+              ) : null}
+              {isTemplate ? <p className="text-xs text-slate-600">Template canvases are read-only.</p> : null}
             </div>
-          </section>
-
-          <section className="mt-3 rounded-md border border-slate-200 p-3">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Live</p>
-            </div>
-            {liveCanvasVersion ? (
-              <VersionRow
-                version={liveCanvasVersion}
-                isActive={selectedVersionId === liveCanvasVersion.metadata?.id}
-                subtitle="Published"
-                onUseVersion={onUseVersion}
-              />
-            ) : (
-              <p className="mt-2 text-xs text-slate-600">No live version available.</p>
-            )}
           </section>
 
           <section className="mt-3 rounded-md border border-slate-200 p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Versions ({draftVersions.length})
+              Live History ({liveVersionsTotalCount ?? liveVersions.length})
             </p>
-            {draftVersions.length === 0 ? (
-              <p className="mt-2 text-xs text-slate-600">No versions yet.</p>
+            {liveVersions.length === 0 ? (
+              <p className="mt-2 text-xs text-slate-600">No published history yet.</p>
             ) : (
-              <div className="mt-2 space-y-2">
-                {draftVersions.map((version) => {
-                  const versionID = version.metadata?.id || "";
-                  const isActive = versionID === activeCanvasVersionId;
-                  return (
-                    <VersionRow
-                      key={versionID}
-                      version={version}
-                      isActive={isActive}
-                      subtitle="Your version"
-                      onUseVersion={onUseVersion}
-                    />
-                  );
-                })}
-              </div>
+              <>
+                <div className="mt-2 space-y-2">
+                  {liveVersions.map((version) => {
+                    const versionID = version.metadata?.id || "";
+                    const isActive = versionID === selectedVersionId;
+                    const isCurrentLive = liveCanvasVersionId === versionID;
+                    return (
+                      <VersionRow
+                        key={versionID}
+                        version={version}
+                        isActive={isActive}
+                        subtitle={isCurrentLive ? "Current live" : "Live history"}
+                        onUseVersion={onUseVersion}
+                      />
+                    );
+                  })}
+                </div>
+                {onLoadMoreLiveVersions ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 w-full"
+                    onClick={onLoadMoreLiveVersions}
+                    disabled={loadMoreLiveVersionsDisabled}
+                  >
+                    {loadMoreLiveVersionsPending ? "Loading..." : "Load older revisions"}
+                  </Button>
+                ) : null}
+              </>
             )}
           </section>
         </div>

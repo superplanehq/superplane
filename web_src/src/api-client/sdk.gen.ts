@@ -108,6 +108,9 @@ import type {
   CanvasesSendAiMessageData,
   CanvasesSendAiMessageErrors,
   CanvasesSendAiMessageResponses,
+  CanvasesSyncCanvasDraftVersionData,
+  CanvasesSyncCanvasDraftVersionErrors,
+  CanvasesSyncCanvasDraftVersionResponses,
   CanvasesUpdateCanvasVersion2Data,
   CanvasesUpdateCanvasVersion2Errors,
   CanvasesUpdateCanvasVersion2Responses,
@@ -841,6 +844,27 @@ export const canvasesUpdateCanvasVersion2 = <ThrowOnError extends boolean = true
     ThrowOnError
   >({
     url: "/api/v1/canvases/{canvasId}/versions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Sync canvas draft version with live
+ *
+ * Rebases the current user's draft on the latest live version while preserving draft edits
+ */
+export const canvasesSyncCanvasDraftVersion = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesSyncCanvasDraftVersionData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    CanvasesSyncCanvasDraftVersionResponses,
+    CanvasesSyncCanvasDraftVersionErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/versions/sync",
     ...options,
     headers: {
       "Content-Type": "application/json",

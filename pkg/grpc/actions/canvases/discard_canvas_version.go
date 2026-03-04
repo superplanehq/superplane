@@ -67,10 +67,19 @@ func DiscardCanvasVersion(ctx context.Context, organizationID string, canvasID s
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}
 
-		if err := tx.
-			Where("workflow_id = ? AND user_id = ? AND version_id = ?", canvasUUID, userUUID, versionUUID).
-			Delete(&models.CanvasUserDraft{}).
-			Error; err != nil {
+		if canvas.LiveVersionID != nil && *canvas.LiveVersionID == versionUUID {
+			return status.Error(codes.FailedPrecondition, "live version cannot be discarded")
+		}
+
+		draft, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvasUUID, userUUID, versionUUID)
+		if draftErr != nil {
+			if errors.Is(draftErr, gorm.ErrRecordNotFound) {
+				return status.Error(codes.FailedPrecondition, "only your current edit version can be discarded")
+			}
+			return draftErr
+		}
+
+		if err := tx.Delete(draft).Error; err != nil {
 			return err
 		}
 

@@ -93,6 +93,7 @@ docs/CanvasesResolveCanvasChangeRequestResponse.md
 docs/CanvasesResolveExecutionErrorsBody.md
 docs/CanvasesSendAiMessageBody.md
 docs/CanvasesSendAiMessageResponse.md
+docs/CanvasesSyncCanvasDraftVersionResponse.md
 docs/CanvasesUpdateCanvasVersionBody.md
 docs/CanvasesUpdateCanvasVersionResponse.md
 docs/CanvasesUpdateNodePauseBody.md
@@ -317,6 +318,7 @@ model_canvases_resolve_canvas_change_request_response.go
 model_canvases_resolve_execution_errors_body.go
 model_canvases_send_ai_message_body.go
 model_canvases_send_ai_message_response.go
+model_canvases_sync_canvas_draft_version_response.go
 model_canvases_update_canvas_version_body.go
 model_canvases_update_canvas_version_response.go
 model_canvases_update_node_pause_body.go

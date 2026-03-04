@@ -81,11 +81,69 @@ func ListCanvasVersions(workflowID uuid.UUID) ([]CanvasVersion, error) {
 	return ListCanvasVersionsInTransaction(database.Conn(), workflowID)
 }
 
+func ListPublishedCanvasVersionsInTransaction(
+	tx *gorm.DB,
+	workflowID uuid.UUID,
+	limit int,
+	before *time.Time,
+) ([]CanvasVersion, error) {
+	query := tx.
+		Where("workflow_id = ?", workflowID).
+		Where("is_published = ?", true).
+		Order("published_at DESC, revision DESC")
+
+	if before != nil {
+		query = query.Where("published_at < ?", *before)
+	}
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	var versions []CanvasVersion
+	if err := query.Find(&versions).Error; err != nil {
+		return nil, err
+	}
+
+	return versions, nil
+}
+
+func CountPublishedCanvasVersionsInTransaction(tx *gorm.DB, workflowID uuid.UUID) (int64, error) {
+	var count int64
+	err := tx.
+		Model(&CanvasVersion{}).
+		Where("workflow_id = ?", workflowID).
+		Where("is_published = ?", true).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 func FindCanvasDraftInTransaction(tx *gorm.DB, workflowID, userID uuid.UUID) (*CanvasUserDraft, error) {
 	var draft CanvasUserDraft
 	err := tx.
 		Where("workflow_id = ?", workflowID).
 		Where("user_id = ?", userID).
+		First(&draft).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &draft, nil
+}
+
+func FindCanvasDraftByVersionInTransaction(tx *gorm.DB, workflowID, userID, versionID uuid.UUID) (*CanvasUserDraft, error) {
+	var draft CanvasUserDraft
+	err := tx.
+		Where("workflow_id = ?", workflowID).
+		Where("user_id = ?", userID).
+		Where("version_id = ?", versionID).
 		First(&draft).
 		Error
 
@@ -229,6 +287,127 @@ func SaveCanvasDraftInTransaction(
 			"updated_at": now,
 		}),
 	}).Create(draft).Error; err != nil {
+		return nil, err
+	}
+
+	return &version, nil
+}
+
+func CreateOrResetCanvasDraftInTransaction(
+	tx *gorm.DB,
+	workflowID uuid.UUID,
+	userID uuid.UUID,
+	nodes []Node,
+	edges []Edge,
+) (*CanvasVersion, error) {
+	canvas, err := lockCanvasForVersioningInTransaction(tx, workflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	if canvas.LiveVersionID == nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	now := time.Now()
+	draft, draftErr := FindCanvasDraftInTransaction(tx, workflowID, userID)
+	if draftErr == nil {
+		version, versionErr := FindCanvasVersionInTransaction(tx, workflowID, draft.VersionID)
+		if versionErr != nil {
+			return nil, versionErr
+		}
+
+		version.OwnerID = &userID
+		version.BasedOnVersionID = canvas.LiveVersionID
+		version.Nodes = datatypes.NewJSONSlice(nodes)
+		version.Edges = datatypes.NewJSONSlice(edges)
+		version.IsPublished = false
+		version.PublishedAt = nil
+		version.UpdatedAt = &now
+
+		if err := tx.Save(version).Error; err != nil {
+			return nil, err
+		}
+
+		draft.VersionID = version.ID
+		draft.UpdatedAt = &now
+		if err := tx.Save(draft).Error; err != nil {
+			return nil, err
+		}
+
+		return version, nil
+	}
+	if !errors.Is(draftErr, gorm.ErrRecordNotFound) {
+		return nil, draftErr
+	}
+
+	nextRevision, err := nextCanvasRevisionInTransaction(tx, workflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	version := CanvasVersion{
+		ID:               uuid.New(),
+		WorkflowID:       workflowID,
+		Revision:         nextRevision,
+		OwnerID:          &userID,
+		BasedOnVersionID: canvas.LiveVersionID,
+		IsPublished:      false,
+		Nodes:            datatypes.NewJSONSlice(nodes),
+		Edges:            datatypes.NewJSONSlice(edges),
+		CreatedAt:        &now,
+		UpdatedAt:        &now,
+	}
+	if err := tx.Create(&version).Error; err != nil {
+		return nil, err
+	}
+
+	draft = &CanvasUserDraft{
+		WorkflowID: workflowID,
+		UserID:     userID,
+		VersionID:  version.ID,
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
+	}
+	if err := tx.Create(draft).Error; err != nil {
+		return nil, err
+	}
+
+	return &version, nil
+}
+
+func CreateCanvasSnapshotVersionInTransaction(
+	tx *gorm.DB,
+	workflowID uuid.UUID,
+	ownerID uuid.UUID,
+	basedOnVersionID *uuid.UUID,
+	nodes []Node,
+	edges []Edge,
+) (*CanvasVersion, error) {
+	if _, err := lockCanvasForVersioningInTransaction(tx, workflowID); err != nil {
+		return nil, err
+	}
+
+	nextRevision, err := nextCanvasRevisionInTransaction(tx, workflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	version := CanvasVersion{
+		ID:               uuid.New(),
+		WorkflowID:       workflowID,
+		Revision:         nextRevision,
+		OwnerID:          &ownerID,
+		BasedOnVersionID: basedOnVersionID,
+		IsPublished:      false,
+		Nodes:            datatypes.NewJSONSlice(nodes),
+		Edges:            datatypes.NewJSONSlice(edges),
+		CreatedAt:        &now,
+		UpdatedAt:        &now,
+	}
+
+	if err := tx.Create(&version).Error; err != nil {
 		return nil, err
 	}
 

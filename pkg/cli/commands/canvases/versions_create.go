@@ -42,9 +42,9 @@ func (c *versionsCreateCommand) Execute(ctx core.CommandContext) error {
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		_, _ = fmt.Fprintf(stdout, "Canvas: %s\n", canvasID)
-		_, _ = fmt.Fprintf(stdout, "Working version: %s\n", versionID)
+		_, _ = fmt.Fprintf(stdout, "Edit version: %s\n", versionID)
 		_, _ = fmt.Fprintf(stdout, "Revision: %d\n", response.Version.Metadata.GetRevision())
-		_, err = fmt.Fprintln(stdout, "Active context updated to this working version")
+		_, err = fmt.Fprintln(stdout, "Active context updated to edit mode")
 		return err
 	})
 }

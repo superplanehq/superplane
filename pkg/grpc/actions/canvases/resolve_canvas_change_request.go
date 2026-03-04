@@ -17,7 +17,6 @@ import (
 	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 func ResolveCanvasChangeRequest(
@@ -91,10 +90,10 @@ func ResolveCanvasChangeRequest(
 		}
 
 		if request.Status == models.CanvasChangeRequestStatusPublished {
-			return status.Error(codes.FailedPrecondition, "change request was already published")
+			return status.Error(codes.FailedPrecondition, "change request was already merged")
 		}
 		if request.Status == models.CanvasChangeRequestStatusClosed {
-			return status.Error(codes.FailedPrecondition, "change request is closed")
+			return status.Error(codes.FailedPrecondition, "change request is rejected")
 		}
 
 		if request.OwnerID == nil || *request.OwnerID != userUUID {
@@ -129,24 +128,6 @@ func ResolveCanvasChangeRequest(
 		}
 
 		if saveErr := tx.Save(version).Error; saveErr != nil {
-			return saveErr
-		}
-
-		draft := models.CanvasUserDraft{
-			WorkflowID: canvasUUID,
-			UserID:     userUUID,
-			VersionID:  version.ID,
-			CreatedAt:  &now,
-			UpdatedAt:  &now,
-		}
-
-		if saveErr := tx.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "workflow_id"}, {Name: "user_id"}},
-			DoUpdates: clause.Assignments(map[string]any{
-				"version_id": version.ID,
-				"updated_at": now,
-			}),
-		}).Create(&draft).Error; saveErr != nil {
 			return saveErr
 		}
 

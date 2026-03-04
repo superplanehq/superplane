@@ -73,6 +73,18 @@ service Canvases {
     };
   }
 
+  rpc SyncCanvasDraftVersion(SyncCanvasDraftVersionRequest) returns (SyncCanvasDraftVersionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/versions/sync"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Sync canvas draft version with live";
+      description: "Rebases the current user's draft on the latest live version while preserving draft edits";
+      tags: "CanvasVersion";
+    };
+  }
+
   rpc ListCanvasVersions(ListCanvasVersionsRequest) returns (ListCanvasVersionsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/versions"
@@ -441,12 +453,25 @@ message CreateCanvasVersionResponse {
   CanvasVersion version = 1;
 }
 
+message SyncCanvasDraftVersionRequest {
+  string canvas_id = 1;
+}
+
+message SyncCanvasDraftVersionResponse {
+  CanvasVersion version = 1;
+}
+
 message ListCanvasVersionsRequest {
   string canvas_id = 1;
+  uint32 limit = 2;
+  google.protobuf.Timestamp before = 3;
 }
 
 message ListCanvasVersionsResponse {
   repeated CanvasVersion versions = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
 }
 
 message DescribeCanvasVersionRequest {
@@ -479,6 +504,8 @@ message DiscardCanvasVersionResponse {}
 message CreateCanvasChangeRequestRequest {
   string canvas_id = 1;
   string version_id = 2;
+  string title = 3;
+  string description = 4;
 }
 
 message CreateCanvasChangeRequestResponse {
@@ -614,6 +641,8 @@ message CanvasChangeRequest {
     google.protobuf.Timestamp published_at = 7;
     google.protobuf.Timestamp created_at = 8;
     google.protobuf.Timestamp updated_at = 9;
+    string title = 10;
+    string description = 11;
   }
 
   Metadata metadata = 1;

@@ -62,16 +62,19 @@ func (c *versionsUpdateCommand) Execute(ctx core.CommandContext) error {
 	case trimmedVersionRef != "":
 		versionID = trimmedVersionRef
 	default:
-		if ctx.Config == nil {
-			targetLiveVersion = true
-			break
+		if ctx.Config != nil {
+			activeVersion := strings.TrimSpace(ctx.Config.GetActiveCanvasVersion())
+			if activeVersion != "" {
+				versionID = activeVersion
+				break
+			}
 		}
-		activeVersion := strings.TrimSpace(ctx.Config.GetActiveCanvasVersion())
-		if activeVersion == "" {
-			targetLiveVersion = true
-			break
+
+		resolvedVersionID, resolveErr := resolveOrCreateEditVersionID(ctx, canvasID)
+		if resolveErr != nil {
+			return resolveErr
 		}
-		versionID = activeVersion
+		versionID = resolvedVersionID
 	}
 
 	autoLayoutValue := ""
@@ -148,7 +151,7 @@ func (c *versionsUpdateCommand) Execute(ctx core.CommandContext) error {
 		if targetLiveVersion {
 			_, _ = fmt.Fprintf(stdout, "Updated live version: %s\n", metadata.GetId())
 		} else {
-			_, _ = fmt.Fprintf(stdout, "Updated working version: %s\n", metadata.GetId())
+			_, _ = fmt.Fprintf(stdout, "Updated edit version: %s\n", metadata.GetId())
 		}
 		_, _ = fmt.Fprintf(stdout, "Revision: %d\n", metadata.GetRevision())
 		_, err = fmt.Fprintln(stdout, "Active context updated")

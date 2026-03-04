@@ -138,6 +138,8 @@ export type CanvasesCanvasChangeRequestMetadata = {
   publishedAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  title?: string;
+  description?: string;
 };
 
 export type CanvasesCanvasChangeRequestStatus =
@@ -267,6 +269,8 @@ export type CanvasesCloseCanvasChangeRequestResponse = {
 
 export type CanvasesCreateCanvasChangeRequestBody = {
   versionId?: string;
+  title?: string;
+  description?: string;
 };
 
 export type CanvasesCreateCanvasChangeRequestResponse = {
@@ -367,6 +371,9 @@ export type CanvasesListCanvasMemoriesResponse = {
 
 export type CanvasesListCanvasVersionsResponse = {
   versions?: Array<CanvasesCanvasVersion>;
+  totalCount?: number;
+  hasNextPage?: boolean;
+  lastTimestamp?: string;
 };
 
 export type CanvasesListCanvasesResponse = {
@@ -444,6 +451,14 @@ export type CanvasesSendAiMessageResponse = {
   operations?: Array<{
     [key: string]: unknown;
   }>;
+};
+
+export type CanvasesSyncCanvasDraftVersionBody = {
+  [key: string]: unknown;
+};
+
+export type CanvasesSyncCanvasDraftVersionResponse = {
+  version?: CanvasesCanvasVersion;
 };
 
 export type CanvasesUpdateCanvasVersionBody = {
@@ -2194,7 +2209,10 @@ export type CanvasesListCanvasVersionsData = {
   path: {
     canvasId: string;
   };
-  query?: never;
+  query?: {
+    limit?: number;
+    before?: string;
+  };
   url: "/api/v1/canvases/{canvasId}/versions";
 };
 
@@ -2274,6 +2292,35 @@ export type CanvasesUpdateCanvasVersion2Responses = {
 
 export type CanvasesUpdateCanvasVersion2Response =
   CanvasesUpdateCanvasVersion2Responses[keyof CanvasesUpdateCanvasVersion2Responses];
+
+export type CanvasesSyncCanvasDraftVersionData = {
+  body: CanvasesSyncCanvasDraftVersionBody;
+  path: {
+    canvasId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/versions/sync";
+};
+
+export type CanvasesSyncCanvasDraftVersionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesSyncCanvasDraftVersionError =
+  CanvasesSyncCanvasDraftVersionErrors[keyof CanvasesSyncCanvasDraftVersionErrors];
+
+export type CanvasesSyncCanvasDraftVersionResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesSyncCanvasDraftVersionResponse;
+};
+
+export type CanvasesSyncCanvasDraftVersionResponse2 =
+  CanvasesSyncCanvasDraftVersionResponses[keyof CanvasesSyncCanvasDraftVersionResponses];
 
 export type CanvasesDiscardCanvasVersion2Data = {
   body?: never;

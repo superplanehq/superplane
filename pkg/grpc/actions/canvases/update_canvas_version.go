@@ -19,7 +19,6 @@ import (
 	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 func UpdateCanvasVersion(
@@ -120,6 +119,33 @@ func UpdateCanvasVersion(
 			return status.Error(codes.FailedPrecondition, "published versions are immutable")
 		}
 
+		isUserDraft := false
+		if _, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvasUUID, userUUID, version.ID); draftErr == nil {
+			isUserDraft = true
+		} else if !errors.Is(draftErr, gorm.ErrRecordNotFound) {
+			return draftErr
+		}
+
+		var request *models.CanvasChangeRequest
+		if !isUserDraft {
+			request, err = models.FindCanvasChangeRequestByVersionInTransaction(tx, canvasUUID, versionUUID)
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return status.Error(codes.FailedPrecondition, "version is not editable in this flow")
+				}
+				return err
+			}
+			if request.OwnerID == nil || *request.OwnerID != userUUID {
+				return status.Error(codes.PermissionDenied, "change request owner mismatch")
+			}
+			if request.Status == models.CanvasChangeRequestStatusPublished {
+				return status.Error(codes.FailedPrecondition, "change request was already merged")
+			}
+			if request.Status == models.CanvasChangeRequestStatusClosed {
+				return status.Error(codes.FailedPrecondition, "change request is rejected")
+			}
+		}
+
 		now := time.Now()
 		version.Nodes = datatypes.NewJSONSlice(nodes)
 		version.Edges = datatypes.NewJSONSlice(edges)
@@ -129,33 +155,19 @@ func UpdateCanvasVersion(
 			return err
 		}
 
-		draft := models.CanvasUserDraft{
-			WorkflowID: canvasUUID,
-			UserID:     userUUID,
-			VersionID:  version.ID,
-			CreatedAt:  &now,
-			UpdatedAt:  &now,
-		}
-
-		if err := tx.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "workflow_id"}, {Name: "user_id"}},
-			DoUpdates: clause.Assignments(map[string]any{
-				"version_id": version.ID,
-				"updated_at": now,
-			}),
-		}).Create(&draft).Error; err != nil {
-			return err
-		}
-
-		request, requestErr := models.FindCanvasChangeRequestByVersionInTransaction(tx, canvasUUID, versionUUID)
-		if requestErr == nil {
-			if request.Status != models.CanvasChangeRequestStatusPublished {
-				if err := refreshCanvasChangeRequestDiffInTransaction(tx, canvasInTx, version, request); err != nil {
-					return err
-				}
+		if isUserDraft {
+			if err := tx.Model(&models.CanvasUserDraft{}).
+				Where("workflow_id = ? AND user_id = ? AND version_id = ?", canvasUUID, userUUID, version.ID).
+				Update("updated_at", now).
+				Error; err != nil {
+				return err
 			}
-		} else if !errors.Is(requestErr, gorm.ErrRecordNotFound) {
-			return requestErr
+		}
+
+		if request != nil {
+			if err := refreshCanvasChangeRequestDiffInTransaction(tx, canvasInTx, version, request); err != nil {
+				return err
+			}
 		}
 
 		return nil

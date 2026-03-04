@@ -1304,6 +1304,20 @@
             "in": "path",
             "required": true,
             "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
           }
         ],
         "tags": [
@@ -1379,6 +1393,46 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/CanvasesUpdateCanvasVersionBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/versions/sync": {
+      "post": {
+        "summary": "Sync canvas draft version with live",
+        "description": "Rebases the current user's draft on the latest live version while preserving draft edits",
+        "operationId": "Canvases_SyncCanvasDraftVersion",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesSyncCanvasDraftVersionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesSyncCanvasDraftVersionBody"
             }
           }
         ],
@@ -4277,6 +4331,12 @@
         "updatedAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
         }
       }
     },
@@ -4592,6 +4652,12 @@
       "properties": {
         "versionId": {
           "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
         }
       }
     },
@@ -4768,6 +4834,17 @@
             "type": "object",
             "$ref": "#/definitions/CanvasesCanvasVersion"
           }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -4954,6 +5031,17 @@
           "items": {
             "type": "object"
           }
+        }
+      }
+    },
+    "CanvasesSyncCanvasDraftVersionBody": {
+      "type": "object"
+    },
+    "CanvasesSyncCanvasDraftVersionResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "$ref": "#/definitions/CanvasesCanvasVersion"
         }
       }
     },

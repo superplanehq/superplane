@@ -20,7 +20,7 @@ func buildVersionsCommandGroup(options core.BindOptions) *cobra.Command {
 
 	createCmd := &cobra.Command{
 		Use:   "create [canvas-id-or-name]",
-		Short: "Create a working version from live",
+		Short: "Create or reset edit mode from live",
 		Args:  cobra.MaximumNArgs(1),
 	}
 	core.Bind(createCmd, &versionsCreateCommand{}, options)
@@ -41,7 +41,7 @@ func buildVersionsCommandGroup(options core.BindOptions) *cobra.Command {
 	var updateAutoLayoutNodes []string
 	updateCmd := &cobra.Command{
 		Use:   "update [version-id]",
-		Short: "Update a working version from a canvas file",
+		Short: "Update edit mode or a change request snapshot from a canvas file",
 		Args:  cobra.MaximumNArgs(1),
 	}
 	updateCmd.Flags().StringVar(&updateCanvas, "canvas", "", "canvas id or name (defaults to active canvas)")
@@ -60,7 +60,7 @@ func buildVersionsCommandGroup(options core.BindOptions) *cobra.Command {
 	var publishCanvas string
 	publishCmd := &cobra.Command{
 		Use:   "publish [version-id]",
-		Short: "Publish a working version",
+		Short: "Create and merge a change request from an edit version",
 		Args:  cobra.MaximumNArgs(1),
 	}
 	publishCmd.Flags().StringVar(&publishCanvas, "canvas", "", "canvas id or name (defaults to active canvas)")
@@ -71,7 +71,7 @@ func buildVersionsCommandGroup(options core.BindOptions) *cobra.Command {
 	var discardCanvas string
 	discardCmd := &cobra.Command{
 		Use:   "discard [version-id]",
-		Short: "Discard a working version",
+		Short: "Discard your current edit version",
 		Args:  cobra.MaximumNArgs(1),
 	}
 	discardCmd.Flags().StringVar(&discardCanvas, "canvas", "", "canvas id or name (defaults to active canvas)")

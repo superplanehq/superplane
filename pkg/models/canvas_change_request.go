@@ -22,6 +22,8 @@ type CanvasChangeRequest struct {
 	VersionID          uuid.UUID
 	OwnerID            *uuid.UUID
 	BasedOnVersionID   *uuid.UUID
+	Title              string
+	Description        string
 	Status             string
 	ChangedNodeIDs     datatypes.JSONSlice[string]
 	ConflictingNodeIDs datatypes.JSONSlice[string]

@@ -30,6 +30,8 @@ type CanvasesCanvasChangeRequestMetadata struct {
 	PublishedAt      *time.Time                         `json:"publishedAt,omitempty"`
 	CreatedAt        *time.Time                         `json:"createdAt,omitempty"`
 	UpdatedAt        *time.Time                         `json:"updatedAt,omitempty"`
+	Title            *string                            `json:"title,omitempty"`
+	Description      *string                            `json:"description,omitempty"`
 }
 
 // NewCanvasesCanvasChangeRequestMetadata instantiates a new CanvasesCanvasChangeRequestMetadata object
@@ -341,6 +343,70 @@ func (o *CanvasesCanvasChangeRequestMetadata) SetUpdatedAt(v time.Time) {
 	o.UpdatedAt = &v
 }
 
+// GetTitle returns the Title field value if set, zero value otherwise.
+func (o *CanvasesCanvasChangeRequestMetadata) GetTitle() string {
+	if o == nil || IsNil(o.Title) {
+		var ret string
+		return ret
+	}
+	return *o.Title
+}
+
+// GetTitleOk returns a tuple with the Title field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasChangeRequestMetadata) GetTitleOk() (*string, bool) {
+	if o == nil || IsNil(o.Title) {
+		return nil, false
+	}
+	return o.Title, true
+}
+
+// HasTitle returns a boolean if a field has been set.
+func (o *CanvasesCanvasChangeRequestMetadata) HasTitle() bool {
+	if o != nil && !IsNil(o.Title) {
+		return true
+	}
+
+	return false
+}
+
+// SetTitle gets a reference to the given string and assigns it to the Title field.
+func (o *CanvasesCanvasChangeRequestMetadata) SetTitle(v string) {
+	o.Title = &v
+}
+
+// GetDescription returns the Description field value if set, zero value otherwise.
+func (o *CanvasesCanvasChangeRequestMetadata) GetDescription() string {
+	if o == nil || IsNil(o.Description) {
+		var ret string
+		return ret
+	}
+	return *o.Description
+}
+
+// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasChangeRequestMetadata) GetDescriptionOk() (*string, bool) {
+	if o == nil || IsNil(o.Description) {
+		return nil, false
+	}
+	return o.Description, true
+}
+
+// HasDescription returns a boolean if a field has been set.
+func (o *CanvasesCanvasChangeRequestMetadata) HasDescription() bool {
+	if o != nil && !IsNil(o.Description) {
+		return true
+	}
+
+	return false
+}
+
+// SetDescription gets a reference to the given string and assigns it to the Description field.
+func (o *CanvasesCanvasChangeRequestMetadata) SetDescription(v string) {
+	o.Description = &v
+}
+
 func (o CanvasesCanvasChangeRequestMetadata) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -377,6 +443,12 @@ func (o CanvasesCanvasChangeRequestMetadata) ToMap() (map[string]interface{}, er
 	}
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updatedAt"] = o.UpdatedAt
+	}
+	if !IsNil(o.Title) {
+		toSerialize["title"] = o.Title
+	}
+	if !IsNil(o.Description) {
+		toSerialize["description"] = o.Description
 	}
 	return toSerialize, nil
 }

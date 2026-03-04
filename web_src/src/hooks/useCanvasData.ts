@@ -5,6 +5,7 @@ import {
   canvasesDescribeCanvasVersion,
   canvasesCreateCanvas,
   canvasesCreateCanvasVersion,
+  canvasesSyncCanvasDraftVersion,
   canvasesListCanvasVersions,
   canvasesUpdateCanvasVersion,
   canvasesUpdateCanvasVersion2,
@@ -43,6 +44,7 @@ export const canvasKeys = {
   detail: (orgId: string, id: string) => [...canvasKeys.details(), orgId, id] as const,
   versions: () => [...canvasKeys.all, "versions"] as const,
   versionList: (canvasId: string) => [...canvasKeys.versions(), canvasId] as const,
+  versionHistory: (canvasId: string) => [...canvasKeys.versions(), canvasId, "history"] as const,
   versionDetails: () => [...canvasKeys.versions(), "detail"] as const,
   versionDetail: (canvasId: string, versionId: string) =>
     [...canvasKeys.versionDetails(), canvasId, versionId] as const,
@@ -145,11 +147,49 @@ export const useCanvasVersions = (organizationId: string, canvasId: string) => {
       const response = await canvasesListCanvasVersions(
         withOrganizationHeader({
           path: { canvasId },
+          query: { limit: 1 },
         }),
       );
       return response.data?.versions || [];
     },
     enabled: !!organizationId && !!canvasId,
+  });
+};
+
+export const useInfiniteCanvasLiveVersions = (
+  organizationId: string,
+  canvasId: string,
+  enabled: boolean = true,
+  limit: number = 20,
+) => {
+  return useInfiniteQuery({
+    queryKey: canvasKeys.versionHistory(canvasId),
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      const response = await canvasesListCanvasVersions(
+        withOrganizationHeader({
+          path: { canvasId },
+          query: {
+            limit,
+            ...(pageParam ? { before: pageParam } : {}),
+          },
+        }),
+      );
+      return response.data;
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const loadedPublishedCount = allPages.reduce(
+        (acc, page) => acc + (page?.versions?.filter((version) => version.metadata?.isPublished).length || 0),
+        0,
+      );
+      const totalCount = lastPage?.totalCount || 0;
+
+      if (loadedPublishedCount >= totalCount) return undefined;
+      if (!lastPage?.hasNextPage) return undefined;
+      return lastPage?.lastTimestamp || undefined;
+    },
+    initialPageParam: undefined as string | undefined,
+    enabled: enabled && !!organizationId && !!canvasId,
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -257,6 +297,33 @@ export const useCreateCanvasVersion = (organizationId: string, canvasId: string)
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+    },
+  });
+};
+
+export const useSyncCanvasDraftVersion = (organizationId: string, canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      return await canvasesSyncCanvasDraftVersion(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: {},
+        }),
+      );
+    },
+    onSuccess: (response) => {
+      const version = response?.data?.version;
+      if (version?.metadata?.id) {
+        queryClient.setQueryData(canvasKeys.versionDetail(canvasId, version.metadata.id), version);
+      }
+
+      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
     },
   });
 };
@@ -307,6 +374,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       const version = response?.data?.version;
       if (!version) {
         queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
         return;
       }
 
@@ -348,6 +416,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       });
 
       queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
     },
   });
 };
@@ -356,12 +425,14 @@ export const useCreateCanvasChangeRequest = (_organizationId: string, canvasId: 
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { versionId: string }) => {
+    mutationFn: async (data: { versionId: string; title?: string; description?: string }) => {
       return await canvasesCreateCanvasChangeRequest(
         withOrganizationHeader({
           path: { canvasId },
           body: {
             versionId: data.versionId,
+            title: data.title,
+            description: data.description,
           },
         }),
       );
@@ -369,6 +440,7 @@ export const useCreateCanvasChangeRequest = (_organizationId: string, canvasId: 
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
 
       const changeRequest = response?.data?.changeRequest;
       const changeRequestID = changeRequest?.metadata?.id;
@@ -395,6 +467,7 @@ export const usePublishCanvasChangeRequest = (organizationId: string, canvasId: 
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
       queryClient.removeQueries({ queryKey: canvasKeys.versionDetails() });
       queryClient.removeQueries({ queryKey: canvasKeys.changeRequestDetail(canvasId, variables.changeRequestId) });
@@ -439,6 +512,7 @@ export const useResolveCanvasChangeRequest = (organizationId: string, canvasId: 
     },
     onSuccess: (response, variables) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
 
       const version = response?.data?.version;
@@ -473,6 +547,7 @@ export const useCloseCanvasChangeRequest = (organizationId: string, canvasId: st
     onSuccess: (response, variables) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
 
       const changeRequest = response?.data?.changeRequest;
       if (changeRequest?.metadata?.id) {
@@ -508,6 +583,7 @@ export const useDiscardCanvasVersion = (organizationId: string, canvasId: string
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
       queryClient.removeQueries({ queryKey: canvasKeys.versionDetail(canvasId, variables.versionId) });
     },
   });

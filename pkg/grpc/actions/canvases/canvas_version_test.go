@@ -14,6 +14,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
@@ -152,6 +153,76 @@ func TestListCanvasVersionsReturnsVersionsSortedByRevision(t *testing.T) {
 	assert.Equal(t, int32(1), response.Versions[1].Metadata.Revision)
 	assert.False(t, response.Versions[0].Metadata.IsPublished)
 	assert.True(t, response.Versions[1].Metadata.IsPublished)
+}
+
+func TestListCanvasVersionsPaginatedByBeforeTimestamp(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	createCanvasResponse, err := CreateCanvas(ctx, r.Registry, r.Organization.ID.String(), &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{Name: "canvas-for-version-pagination"},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-1",
+					Name: "Node 1",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	})
+	require.NoError(t, err)
+
+	canvasID := createCanvasResponse.Canvas.Metadata.Id
+
+	// Publish two new revisions so we can paginate through live history.
+	for i := 0; i < 2; i++ {
+		draftResponse, createErr := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
+		require.NoError(t, createErr)
+
+		changeRequestResponse, changeRequestErr := CreateCanvasChangeRequest(
+			ctx,
+			r.Organization.ID.String(),
+			canvasID,
+			draftResponse.Version.Metadata.Id,
+		)
+		require.NoError(t, changeRequestErr)
+
+		_, publishErr := PublishCanvasChangeRequest(
+			ctx,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID.String(),
+			canvasID,
+			changeRequestResponse.ChangeRequest.Metadata.Id,
+			"http://localhost:3000/api/v1",
+		)
+		require.NoError(t, publishErr)
+	}
+
+	firstPage, err := ListCanvasVersionsPaginated(ctx, r.Organization.ID.String(), canvasID, 1, nil)
+	require.NoError(t, err)
+	require.Len(t, firstPage.Versions, 1)
+	require.True(t, firstPage.Versions[0].Metadata.IsPublished)
+	require.Equal(t, uint32(3), firstPage.TotalCount)
+	require.True(t, firstPage.HasNextPage)
+	require.NotNil(t, firstPage.LastTimestamp)
+
+	secondPage, err := ListCanvasVersionsPaginated(
+		ctx,
+		r.Organization.ID.String(),
+		canvasID,
+		1,
+		timestamppb.New(firstPage.LastTimestamp.AsTime()),
+	)
+	require.NoError(t, err)
+	require.Len(t, secondPage.Versions, 1)
+	require.True(t, secondPage.Versions[0].Metadata.IsPublished)
+	assert.NotEqual(t, firstPage.Versions[0].Metadata.Id, secondPage.Versions[0].Metadata.Id)
 }
 
 func TestListCanvasVersionsHidesDraftsFromOtherUsers(t *testing.T) {

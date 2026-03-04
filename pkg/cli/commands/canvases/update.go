@@ -113,47 +113,35 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return liveUpdateErr
 	}
 
-	createVersionResponse, _, err := ctx.API.CanvasVersionAPI.
-		CanvasesCreateCanvasVersion(ctx.Context, canvasID).
-		Execute()
+	editVersionID, err := resolveOrCreateEditVersionID(ctx, canvasID)
 	if err != nil {
 		return err
 	}
-	if createVersionResponse.Version == nil || createVersionResponse.Version.Metadata == nil || createVersionResponse.Version.Metadata.Id == nil {
-		return fmt.Errorf("failed to create canvas version")
-	}
-
-	versionID := createVersionResponse.Version.Metadata.GetId()
-
-	_, _, err = ctx.API.CanvasVersionAPI.
-		CanvasesUpdateCanvasVersion(ctx.Context, canvasID, versionID).
+	updateVersionResponse, _, err := ctx.API.CanvasVersionAPI.
+		CanvasesUpdateCanvasVersion(ctx.Context, canvasID, editVersionID).
 		Body(body).
 		Execute()
 	if err != nil {
 		return err
 	}
 
-	createChangeRequestResponse, _, err := ctx.API.CanvasChangeRequestAPI.
-		CanvasesCreateCanvasChangeRequest(ctx.Context, canvasID).
-		Body(openapi_client.CanvasesCreateCanvasChangeRequestBody{
-			VersionId: &versionID,
-		}).
-		Execute()
-	if err != nil {
+	if err := setActiveCanvasAndVersion(ctx, canvasID, editVersionID); err != nil {
 		return err
 	}
-	if createChangeRequestResponse.ChangeRequest == nil ||
-		createChangeRequestResponse.ChangeRequest.Metadata == nil ||
-		createChangeRequestResponse.ChangeRequest.Metadata.Id == nil {
-		return fmt.Errorf("failed to create canvas change request")
+
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(updateVersionResponse.Version)
 	}
 
-	changeRequestID := createChangeRequestResponse.ChangeRequest.Metadata.GetId()
-	_, _, err = ctx.API.CanvasChangeRequestAPI.
-		CanvasesPublishCanvasChangeRequest(ctx.Context, canvasID, changeRequestID).
-		Body(map[string]interface{}{}).
-		Execute()
-	return err
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		_, _ = fmt.Fprintf(stdout, "Canvas: %s\n", canvasID)
+		if updateVersionResponse.Version != nil && updateVersionResponse.Version.Metadata != nil {
+			_, _ = fmt.Fprintf(stdout, "Updated edit version: %s\n", updateVersionResponse.Version.Metadata.GetId())
+			_, _ = fmt.Fprintf(stdout, "Revision: %d\n", updateVersionResponse.Version.Metadata.GetRevision())
+		}
+		_, err = fmt.Fprintln(stdout, "Active context switched to edit mode")
+		return err
+	})
 }
 
 func loadCanvasFromFile(filePath string) (string, openapi_client.CanvasesCanvas, error) {
@@ -280,6 +268,45 @@ func describeCanvasByID(ctx core.CommandContext, canvasID string) (openapi_clien
 	}
 
 	return *response.Canvas, nil
+}
+
+func resolveOrCreateEditVersionID(ctx core.CommandContext, canvasID string) (string, error) {
+	if ctx.Config != nil {
+		activeVersion := strings.TrimSpace(ctx.Config.GetActiveCanvasVersion())
+		if activeVersion != "" {
+			version, err := describeCanvasVersion(ctx, canvasID, activeVersion)
+			metadata := version.GetMetadata()
+			if err == nil && !metadata.GetIsPublished() {
+				return activeVersion, nil
+			}
+		}
+	}
+
+	response, _, err := ctx.API.CanvasVersionAPI.
+		CanvasesListCanvasVersions(ctx.Context, canvasID).
+		Execute()
+	if err != nil {
+		return "", err
+	}
+
+	for _, version := range response.GetVersions() {
+		metadata := version.GetMetadata()
+		if !metadata.GetIsPublished() {
+			return metadata.GetId(), nil
+		}
+	}
+
+	createVersionResponse, _, err := ctx.API.CanvasVersionAPI.
+		CanvasesCreateCanvasVersion(ctx.Context, canvasID).
+		Execute()
+	if err != nil {
+		return "", err
+	}
+	if createVersionResponse.Version == nil || createVersionResponse.Version.Metadata == nil {
+		return "", fmt.Errorf("failed to create edit version")
+	}
+
+	return createVersionResponse.Version.Metadata.GetId(), nil
 }
 
 func buildDefaultAutoLayout(current openapi_client.CanvasesCanvas, next openapi_client.CanvasesCanvas) openapi_client.CanvasesCanvasAutoLayout {

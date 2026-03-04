@@ -48,6 +48,8 @@ func SerializeCanvasChangeRequest(
 		Owner:            owner,
 		BasedOnVersionId: basedOnVersionID,
 		Status:           canvasChangeRequestStatusToProto(request.Status),
+		Title:            request.Title,
+		Description:      request.Description,
 	}
 
 	if request.PublishedAt != nil {

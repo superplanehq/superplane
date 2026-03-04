@@ -67,10 +67,10 @@ func versionStateLabel(version openapi_client.CanvasesCanvasVersion, liveVersion
 		if metadata.GetId() == liveVersionID {
 			return "live"
 		}
-		return "published"
+		return "live-history"
 	}
 
-	return "working"
+	return "edit-mode"
 }
 
 func versionOwnerLabel(version openapi_client.CanvasesCanvasVersion) string {

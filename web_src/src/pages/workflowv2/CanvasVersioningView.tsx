@@ -1,8 +1,10 @@
 import { CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import Editor from "@monaco-editor/react";
+import ReactMarkdown from "react-markdown";
 import type { Monaco } from "@monaco-editor/react";
 import {
   AlertTriangle,
@@ -11,9 +13,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  CircleDot,
   GitPullRequest,
-  Plus,
   RefreshCw,
   Rocket,
 } from "lucide-react";
@@ -37,6 +37,11 @@ type DiffGroup = {
 
 interface CanvasVersioningViewProps {
   liveCanvasVersion?: CanvasesCanvasVersion;
+  liveVersions: CanvasesCanvasVersion[];
+  liveVersionsTotalCount?: number;
+  hasMoreLiveVersions?: boolean;
+  onLoadMoreLiveVersions?: () => void;
+  loadMoreLiveVersionsPending?: boolean;
   myVersions: CanvasesCanvasVersion[];
   activeCanvasVersionId?: string;
   canvasName: string;
@@ -53,18 +58,14 @@ interface CanvasVersioningViewProps {
     nodes: Record<string, unknown>[];
     edges: Record<string, unknown>[];
   }) => Promise<void>;
-  onCreateVersion: () => void;
-  onCreateChangeRequest: () => void;
+  createChangeRequestMode: boolean;
+  onCreateChangeRequestModeChange: (enabled: boolean) => void;
+  onSubmitCreateChangeRequest: (data: { title: string; description: string }) => Promise<void>;
   sandboxModeEnabled: boolean;
   sandboxModeTooltip?: string;
-  createVersionDisabled: boolean;
-  createVersionDisabledTooltip?: string;
-  createChangeRequestDisabled: boolean;
-  createChangeRequestDisabledTooltip?: string;
   publishChangeRequestDisabled: boolean;
   publishChangeRequestDisabledTooltip?: string;
   resolveChangeRequestPending: boolean;
-  createVersionPending: boolean;
   createChangeRequestPending: boolean;
   publishChangeRequestPending: boolean;
   closeChangeRequestPending: boolean;
@@ -93,41 +94,45 @@ function formatVersionLabel(version?: CanvasesCanvasVersion): string {
   return readable ? `Revision ${revision} · ${readable}` : `Revision ${revision}`;
 }
 
-type ChangeRequestStatus = "open" | "published" | "conflicted" | "closed" | "unknown";
-type ChangeRequestFilter = "open" | "closed" | "merged" | "conflicted" | "all";
+type ChangeRequestStatus = "open" | "merged" | "rejected" | "unknown";
+type ChangeRequestFilter = "open" | "rejected" | "merged" | "conflicted" | "all";
 
 function normalizeChangeRequestStatus(status?: string | number): ChangeRequestStatus {
   if (typeof status === "number") {
     if (status === 1) return "open";
-    if (status === 2) return "published";
-    if (status === 3) return "conflicted";
-    if (status === 4) return "closed";
+    if (status === 2) return "merged";
+    if (status === 3) return "open";
+    if (status === 4) return "rejected";
     return "unknown";
   }
 
   const value = (status || "").toLowerCase();
   if (value.includes("open")) return "open";
-  if (value.includes("publish")) return "published";
-  if (value.includes("conflict")) return "conflicted";
-  if (value.includes("close")) return "closed";
+  if (value.includes("publish") || value.includes("merge")) return "merged";
+  if (value.includes("close") || value.includes("reject")) return "rejected";
+  if (value.includes("conflict")) return "open";
   return "unknown";
 }
 
-function matchesChangeRequestFilter(status: ChangeRequestStatus, filter: ChangeRequestFilter): boolean {
+function matchesChangeRequestFilter(
+  status: ChangeRequestStatus,
+  filter: ChangeRequestFilter,
+  hasConflicts: boolean,
+): boolean {
   if (filter === "all") {
     return true;
   }
   if (filter === "open") {
-    return status === "open" || status === "conflicted";
+    return status === "open";
   }
   if (filter === "merged") {
-    return status === "published";
+    return status === "merged";
   }
-  if (filter === "closed") {
-    return status === "closed";
+  if (filter === "rejected") {
+    return status === "rejected";
   }
   if (filter === "conflicted") {
-    return status === "conflicted";
+    return status === "open" && hasConflicts;
   }
   return true;
 }
@@ -464,6 +469,33 @@ function withTooltip(disabled: boolean, message: string | undefined, element: Re
   );
 }
 
+const MARKDOWN_PREVIEW_WRAPPER_CLASS =
+  "[&_a]:underline [&_a]:underline-offset-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:text-slate-700 [&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_hr]:my-3 [&_hr]:border-slate-200 [&_li]:mb-1 [&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:mb-2 [&_p]:last:mb-0 [&_pre]:mb-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-100 [&_pre]:p-2 [&_strong]:font-semibold [&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc";
+
+const markdownPreviewComponents = {
+  h1: ({ children }: { children?: ReactNode }) => <h1 className="mb-2 text-base font-semibold">{children}</h1>,
+  h2: ({ children }: { children?: ReactNode }) => <h2 className="mb-2 text-base font-semibold">{children}</h2>,
+  h3: ({ children }: { children?: ReactNode }) => <h3 className="mb-1 text-sm font-semibold">{children}</h3>,
+  h4: ({ children }: { children?: ReactNode }) => <h4 className="mb-1 text-sm font-medium">{children}</h4>,
+  p: ({ children }: { children?: ReactNode }) => <p className="mb-2 last:mb-0">{children}</p>,
+  ul: ({ children }: { children?: ReactNode }) => <ul className="mb-2 ml-5 list-disc">{children}</ul>,
+  ol: ({ children }: { children?: ReactNode }) => <ol className="mb-2 ml-5 list-decimal">{children}</ol>,
+  li: ({ children }: { children?: ReactNode }) => <li className="mb-1">{children}</li>,
+  a: ({ children, href }: { children?: ReactNode; href?: string }) => (
+    <a className="underline underline-offset-2" target="_blank" rel="noopener noreferrer" href={href}>
+      {children}
+    </a>
+  ),
+  code: ({ children }: { children?: ReactNode }) => (
+    <code className="rounded bg-slate-100 px-1 py-0.5">{children}</code>
+  ),
+  pre: ({ children }: { children?: ReactNode }) => (
+    <pre className="mb-2 overflow-auto rounded bg-slate-100 p-2">{children}</pre>
+  ),
+  strong: ({ children }: { children?: ReactNode }) => <strong className="font-semibold">{children}</strong>,
+  em: ({ children }: { children?: ReactNode }) => <em className="italic">{children}</em>,
+};
+
 function buildNodeDiffGroups(lines: DiffLine[]): DiffGroup[] {
   if (lines.length === 0) {
     return [];
@@ -488,6 +520,11 @@ function buildNodeDiffGroups(lines: DiffLine[]): DiffGroup[] {
 
 export function CanvasVersioningView({
   liveCanvasVersion,
+  liveVersions,
+  liveVersionsTotalCount,
+  hasMoreLiveVersions,
+  onLoadMoreLiveVersions,
+  loadMoreLiveVersionsPending,
   myVersions,
   activeCanvasVersionId,
   canvasName,
@@ -500,18 +537,14 @@ export function CanvasVersioningView({
   onPublishChangeRequest,
   onCloseChangeRequest,
   onResolveChangeRequest,
-  onCreateVersion,
-  onCreateChangeRequest,
+  createChangeRequestMode,
+  onCreateChangeRequestModeChange,
+  onSubmitCreateChangeRequest,
   sandboxModeEnabled,
   sandboxModeTooltip,
-  createVersionDisabled,
-  createVersionDisabledTooltip,
-  createChangeRequestDisabled,
-  createChangeRequestDisabledTooltip,
   publishChangeRequestDisabled,
   publishChangeRequestDisabledTooltip,
   resolveChangeRequestPending,
-  createVersionPending,
   createChangeRequestPending,
   publishChangeRequestPending,
   closeChangeRequestPending,
@@ -521,12 +554,41 @@ export function CanvasVersioningView({
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [resolvingChangeRequestID, setResolvingChangeRequestID] = useState("");
+  const [createChangeRequestTitle, setCreateChangeRequestTitle] = useState("");
+  const [createChangeRequestDescription, setCreateChangeRequestDescription] = useState("");
+  const [createChangeRequestDescriptionMode, setCreateChangeRequestDescriptionMode] = useState<"write" | "preview">(
+    "write",
+  );
+
+  const createChangeRequestVersion = useMemo(() => {
+    if (activeCanvasVersionId) {
+      const activeVersion = myVersions.find((version) => version.metadata?.id === activeCanvasVersionId);
+      if (activeVersion && !activeVersion.metadata?.isPublished) {
+        return activeVersion;
+      }
+    }
+
+    return myVersions[0];
+  }, [activeCanvasVersionId, myVersions]);
+
+  useEffect(() => {
+    if (!createChangeRequestMode) {
+      return;
+    }
+
+    const revision = createChangeRequestVersion?.metadata?.revision ?? "?";
+    const defaultTitle = `Update ${canvasName || "Canvas"} - Revision ${revision}`;
+    setCreateChangeRequestTitle(defaultTitle);
+    setCreateChangeRequestDescription("");
+    setCreateChangeRequestDescriptionMode("write");
+  }, [createChangeRequestMode, createChangeRequestVersion?.metadata?.revision, canvasName]);
 
   const visibleChangeRequests = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return changeRequests.filter((changeRequest) => {
       const status = normalizeChangeRequestStatus(changeRequest.metadata?.status as string | number | undefined);
-      if (!matchesChangeRequestFilter(status, changeRequestFilter)) {
+      const hasConflicts = (changeRequest.diff?.conflictingNodeIds?.length || 0) > 0;
+      if (!matchesChangeRequestFilter(status, changeRequestFilter, hasConflicts)) {
         return false;
       }
 
@@ -545,10 +607,15 @@ export function CanvasVersioningView({
 
       const ownerName = (changeRequest.metadata?.owner?.name || "").toLowerCase();
       const ownerID = (changeRequest.metadata?.owner?.id || "").toLowerCase();
+      const title = (changeRequest.metadata?.title || "").toLowerCase();
       const revision = String(changeRequest.version?.metadata?.revision || "").toLowerCase();
       const statusText = status.toLowerCase();
       return (
-        ownerName.includes(query) || ownerID.includes(query) || revision.includes(query) || statusText.includes(query)
+        ownerName.includes(query) ||
+        ownerID.includes(query) ||
+        title.includes(query) ||
+        revision.includes(query) ||
+        statusText.includes(query)
       );
     });
   }, [changeRequests, changeRequestFilter, onlyMine, currentUserId, searchQuery]);
@@ -643,6 +710,66 @@ export function CanvasVersioningView({
     });
   }, [selectedChangeRequest, liveCanvasVersion?.spec?.nodes]);
 
+  const createChangeRequestNodeDiffs = useMemo(() => {
+    if (!createChangeRequestVersion) {
+      return [];
+    }
+
+    const liveNodes = (liveCanvasVersion?.spec?.nodes || []) as Record<string, unknown>[];
+    const draftNodes = (createChangeRequestVersion.spec?.nodes || []) as Record<string, unknown>[];
+
+    const liveNodeByID = new Map<string, Record<string, unknown>>();
+    liveNodes.forEach((node) => {
+      const nodeID = (node.id as string) || "";
+      if (nodeID) {
+        liveNodeByID.set(nodeID, node);
+      }
+    });
+
+    const draftNodeByID = new Map<string, Record<string, unknown>>();
+    draftNodes.forEach((node) => {
+      const nodeID = (node.id as string) || "";
+      if (nodeID) {
+        draftNodeByID.set(nodeID, node);
+      }
+    });
+
+    const allNodeIDs = Array.from(new Set([...liveNodeByID.keys(), ...draftNodeByID.keys()])).sort((left, right) =>
+      left.localeCompare(right),
+    );
+
+    return allNodeIDs
+      .map((nodeID) => {
+        const oldNode = liveNodeByID.get(nodeID);
+        const newNode = draftNodeByID.get(nodeID);
+        const lines = buildNodeDiffLines(oldNode, newNode);
+        if (lines.length === 0) {
+          return null;
+        }
+
+        const kind = !oldNode && newNode ? "added" : oldNode && !newNode ? "removed" : "updated";
+        return {
+          nodeID,
+          kind,
+          lines,
+          groups: buildNodeDiffGroups(lines),
+        };
+      })
+      .filter(
+        (
+          item,
+        ): item is { nodeID: string; kind: "added" | "removed" | "updated"; lines: DiffLine[]; groups: DiffGroup[] } =>
+          Boolean(item),
+      );
+  }, [createChangeRequestVersion, liveCanvasVersion?.spec?.nodes]);
+
+  const handleSubmitCreateChangeRequest = useCallback(async () => {
+    await onSubmitCreateChangeRequest({
+      title: createChangeRequestTitle.trim(),
+      description: createChangeRequestDescription,
+    });
+  }, [onSubmitCreateChangeRequest, createChangeRequestTitle, createChangeRequestDescription]);
+
   if (resolvingChangeRequest) {
     return (
       <CanvasChangeRequestConflictResolver
@@ -660,76 +787,204 @@ export function CanvasVersioningView({
     );
   }
 
+  if (createChangeRequestMode) {
+    const liveRevision = liveCanvasVersion?.metadata?.revision ?? "?";
+    const addedNodes = createChangeRequestNodeDiffs.filter((nodeDiff) => nodeDiff.kind === "added").length;
+    const removedNodes = createChangeRequestNodeDiffs.filter((nodeDiff) => nodeDiff.kind === "removed").length;
+    const updatedNodes = createChangeRequestNodeDiffs.filter((nodeDiff) => nodeDiff.kind === "updated").length;
+
+    return (
+      <div className="h-full overflow-auto bg-slate-100">
+        <div className="mx-auto max-w-6xl space-y-4 p-5 md:p-7">
+          <section className="rounded-md border border-slate-300 bg-white">
+            <div className="border-b border-slate-200 px-4 py-3">
+              <p className="text-lg font-semibold text-slate-900">Open Change Request</p>
+              <p className="mt-1 text-sm text-slate-600">Review your draft changes and open a request for review.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 px-4 py-3 text-xs">
+              <span className="rounded border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">
+                base: Live Revision {liveRevision}
+              </span>
+            </div>
+          </section>
+
+          {!createChangeRequestVersion ? (
+            <section className="rounded-md border border-slate-300 bg-white p-4">
+              <p className="text-sm text-slate-600">
+                Enable edit mode and save your changes before creating a change request.
+              </p>
+            </section>
+          ) : (
+            <>
+              <section className="rounded-md border border-slate-300 bg-white">
+                <div className="border-b border-slate-200 px-4 py-3">
+                  <input
+                    value={createChangeRequestTitle}
+                    onChange={(event) => setCreateChangeRequestTitle(event.target.value)}
+                    placeholder="Title"
+                    className="h-10 w-full rounded-md border border-slate-300 px-3 text-base text-slate-900 focus:border-sky-400 focus:outline-none"
+                  />
+                </div>
+
+                <div className="px-4 py-3">
+                  <Tabs
+                    value={createChangeRequestDescriptionMode}
+                    onValueChange={(value) => setCreateChangeRequestDescriptionMode(value as "write" | "preview")}
+                    className="w-full"
+                  >
+                    <TabsList className="h-9 gap-1 rounded-md border border-slate-200 bg-slate-50 p-0.5">
+                      <TabsTrigger value="write" className="px-3 text-xs">
+                        Write
+                      </TabsTrigger>
+                      <TabsTrigger value="preview" className="px-3 text-xs">
+                        Preview
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="write" className="mt-2">
+                      <textarea
+                        value={createChangeRequestDescription}
+                        onChange={(event) => setCreateChangeRequestDescription(event.target.value)}
+                        rows={12}
+                        placeholder="Describe what changed and why."
+                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-sky-400 focus:outline-none"
+                      />
+                    </TabsContent>
+                    <TabsContent value="preview" className="mt-2">
+                      <div
+                        className={cn(
+                          "min-h-[280px] rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900",
+                          MARKDOWN_PREVIEW_WRAPPER_CLASS,
+                        )}
+                      >
+                        {createChangeRequestDescription.trim() ? (
+                          <ReactMarkdown components={markdownPreviewComponents}>
+                            {createChangeRequestDescription}
+                          </ReactMarkdown>
+                        ) : (
+                          <p className="text-xs text-slate-500">Nothing to preview.</p>
+                        )}
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                  <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+                    <Button variant="outline" onClick={() => onCreateChangeRequestModeChange(false)}>
+                      Cancel
+                    </Button>
+                    {withTooltip(
+                      !createChangeRequestVersion || createChangeRequestPending || sandboxModeEnabled,
+                      sandboxModeEnabled ? sandboxModeTooltip : undefined,
+                      <Button
+                        onClick={handleSubmitCreateChangeRequest}
+                        disabled={!createChangeRequestVersion || createChangeRequestPending || sandboxModeEnabled}
+                      >
+                        <GitPullRequest className="h-4 w-4" />
+                        {createChangeRequestPending ? "Creating change request..." : "Create change request"}
+                      </Button>,
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-md border border-slate-300 bg-white p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900">Nodes Changed</p>
+                  <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700">
+                      +{addedNodes} added
+                    </span>
+                    <span className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700">
+                      ~{updatedNodes} updated
+                    </span>
+                    <span className="rounded border border-red-200 bg-red-50 px-2 py-0.5 text-red-700">
+                      -{removedNodes} removed
+                    </span>
+                  </div>
+                </div>
+                {createChangeRequestNodeDiffs.length === 0 ? (
+                  <p className="mt-2 text-xs text-slate-600">No changes between your edit version and live.</p>
+                ) : (
+                  <Accordion type="multiple" className="mt-2 rounded-md border border-slate-200 bg-white px-3">
+                    {createChangeRequestNodeDiffs.map((nodeDiff) => (
+                      <AccordionItem key={nodeDiff.nodeID} value={nodeDiff.nodeID} className="border-slate-200">
+                        <AccordionTrigger className="py-3 text-xs hover:no-underline">
+                          <div className="min-w-0 flex-1 text-left">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="break-all font-semibold text-slate-900">{nodeDiff.nodeID}</span>
+                              <span
+                                className={cn(
+                                  "rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide",
+                                  nodeDiff.kind === "added" && "bg-emerald-100 text-emerald-700",
+                                  nodeDiff.kind === "removed" && "bg-red-100 text-red-700",
+                                  nodeDiff.kind === "updated" && "bg-blue-100 text-blue-700",
+                                )}
+                              >
+                                {nodeDiff.kind}
+                              </span>
+                            </div>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pb-3">
+                          <div className="space-y-3">
+                            {nodeDiff.groups.map((group) => (
+                              <div
+                                key={`${nodeDiff.nodeID}-${group.section}`}
+                                className="rounded-md border border-slate-200 bg-slate-50"
+                              >
+                                <div className="border-b border-slate-200 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                                  {group.section}
+                                </div>
+                                <div className="px-3 py-2 font-mono text-xs">
+                                  {group.lines.map((line, index) => (
+                                    <p
+                                      key={`${nodeDiff.nodeID}-${group.section}-${line.kind}-${line.path}-${index}`}
+                                      className={cn(
+                                        "break-all",
+                                        line.kind === "add" ? "text-emerald-700" : "text-red-700",
+                                      )}
+                                    >
+                                      {line.kind === "add" ? "+" : "-"} {line.path}: {line.value}
+                                    </p>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                )}
+              </section>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-auto bg-slate-50">
       <div className="mx-auto max-w-6xl p-5 md:p-7 space-y-5">
         <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-slate-900">Versioning</p>
-              <p className="text-xs text-slate-600">Manage live, your working versions, and change requests.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {withTooltip(
-                createVersionDisabled,
-                createVersionDisabledTooltip,
-                <Button onClick={onCreateVersion} disabled={createVersionDisabled}>
-                  <Plus className="h-4 w-4" />
-                  {createVersionPending ? "Creating version..." : "Create version from live"}
-                </Button>,
-              )}
-              {withTooltip(
-                createChangeRequestDisabled,
-                createChangeRequestDisabledTooltip,
-                <Button variant="outline" onClick={onCreateChangeRequest} disabled={createChangeRequestDisabled}>
-                  <GitPullRequest className="h-4 w-4" />
-                  {createChangeRequestPending ? "Creating change request..." : "Create change request"}
-                </Button>,
-              )}
-              {withTooltip(
-                publishChangeRequestDisabled,
-                publishChangeRequestDisabledTooltip,
-                <Button onClick={onPublishChangeRequest} disabled={publishChangeRequestDisabled}>
-                  <Rocket className="h-4 w-4" />
-                  {publishChangeRequestPending ? "Publishing..." : "Publish selected CR"}
-                </Button>,
-              )}
-            </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Versioning</p>
+            <p className="text-xs text-slate-600">Manage live history and change requests.</p>
           </div>
           {sandboxModeEnabled ? (
             <p className="mt-3 text-xs text-amber-700">{sandboxModeTooltip || "Sandbox mode is enabled."}</p>
           ) : null}
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Live Version</p>
-            {liveCanvasVersion?.metadata?.id ? (
-              <button
-                type="button"
-                onClick={() => onUseVersion(liveCanvasVersion.metadata?.id || "")}
-                className="mt-3 w-full rounded-md border border-emerald-200 bg-emerald-50 p-3 text-left"
-              >
-                <p className="text-sm font-medium text-slate-900">{formatVersionLabel(liveCanvasVersion)}</p>
-                <p className="mt-1 text-xs text-emerald-700 inline-flex items-center gap-1">
-                  <CircleDot className="h-3.5 w-3.5" />
-                  Published
-                </p>
-              </button>
-            ) : (
-              <p className="mt-3 text-xs text-slate-600">No live version available.</p>
-            )}
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              My Versions ({myVersions.length})
-            </p>
-            {myVersions.length === 0 ? (
-              <p className="mt-3 text-xs text-slate-600">You don&apos;t have working versions yet.</p>
-            ) : (
-              <div className="mt-3 grid gap-2 md:grid-cols-2">
-                {myVersions.map((version) => {
+        <section className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Live History ({liveVersionsTotalCount ?? liveVersions.length})
+          </p>
+          {liveVersions.length === 0 ? (
+            <p className="mt-3 text-xs text-slate-600">No published history yet.</p>
+          ) : (
+            <>
+              <div className="mt-3 flex max-h-[320px] flex-col gap-2 overflow-y-auto pr-1">
+                {liveVersions.map((version) => {
                   const versionID = version.metadata?.id || "";
                   const isActive = versionID !== "" && versionID === activeCanvasVersionId;
 
@@ -739,18 +994,28 @@ export function CanvasVersioningView({
                       type="button"
                       onClick={() => onUseVersion(versionID)}
                       className={cn(
-                        "rounded-md border px-3 py-2 text-left",
+                        "w-full rounded-md border px-3 py-2 text-left",
                         isActive ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white hover:bg-slate-50",
                       )}
                     >
                       <p className="text-sm font-medium text-slate-900">{formatVersionLabel(version)}</p>
-                      {isActive ? <p className="mt-1 text-[11px] text-sky-700">Active</p> : null}
                     </button>
                   );
                 })}
               </div>
-            )}
-          </div>
+              {hasMoreLiveVersions ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={onLoadMoreLiveVersions}
+                  disabled={!onLoadMoreLiveVersions || loadMoreLiveVersionsPending}
+                >
+                  {loadMoreLiveVersionsPending ? "Loading..." : "Load older revisions"}
+                </Button>
+              ) : null}
+            </>
+          )}
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white p-4">
@@ -772,7 +1037,7 @@ export function CanvasVersioningView({
                 [
                   { key: "open", label: "Open" },
                   { key: "conflicted", label: "Conflicted" },
-                  { key: "closed", label: "Closed" },
+                  { key: "rejected", label: "Rejected" },
                   { key: "merged", label: "Merged" },
                   { key: "all", label: "All" },
                 ] as { key: ChangeRequestFilter; label: string }[]
@@ -792,7 +1057,7 @@ export function CanvasVersioningView({
               type="text"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search by owner, revision, or status"
+              placeholder="Search by title, owner, revision, or status"
               className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm text-slate-900 focus:border-sky-400 focus:outline-none"
             />
           </div>
@@ -808,8 +1073,8 @@ export function CanvasVersioningView({
                 );
                 const changedCount = changeRequest.diff?.changedNodeIds?.length || 0;
                 const conflictCount = changeRequest.diff?.conflictingNodeIds?.length || 0;
-                const canResolve = status === "conflicted" && changeRequestID !== "";
-                const canClose = (status === "open" || status === "conflicted") && changeRequestID !== "";
+                const canResolve = status === "open" && conflictCount > 0 && changeRequestID !== "";
+                const canClose = status === "open" && changeRequestID !== "";
                 const versioningActionDisabled = sandboxModeEnabled;
 
                 return (
@@ -826,15 +1091,16 @@ export function CanvasVersioningView({
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-sm font-medium text-slate-900 break-words">
-                          CR · Revision {changeRequest.version?.metadata?.revision ?? "?"}
+                          {changeRequest.metadata?.title?.trim()
+                            ? changeRequest.metadata.title
+                            : `CR · Revision ${changeRequest.version?.metadata?.revision ?? "?"}`}
                         </p>
                         <span
                           className={cn(
                             "rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                             status === "open" && "bg-blue-100 text-blue-800",
-                            status === "published" && "bg-emerald-100 text-emerald-700",
-                            status === "conflicted" && "bg-red-100 text-red-700",
-                            status === "closed" && "bg-slate-200 text-slate-700",
+                            status === "merged" && "bg-emerald-100 text-emerald-700",
+                            status === "rejected" && "bg-slate-200 text-slate-700",
                             status === "unknown" && "bg-slate-100 text-slate-700",
                           )}
                         >
@@ -880,7 +1146,7 @@ export function CanvasVersioningView({
                               disabled={versioningActionDisabled || closeChangeRequestPending}
                               onClick={() => onCloseChangeRequest(changeRequestID)}
                             >
-                              {closeChangeRequestPending ? "Closing..." : "Close"}
+                              {closeChangeRequestPending ? "Rejecting..." : "Reject"}
                             </Button>,
                           )
                         : null}
@@ -934,7 +1200,7 @@ export function CanvasVersioningView({
                           sandboxModeEnabled ||
                           normalizeChangeRequestStatus(
                             selectedChangeRequest.metadata?.status as string | number | undefined,
-                          ) !== "conflicted"
+                          ) !== "open"
                         }
                         onClick={() => setResolvingChangeRequestID(selectedChangeRequest.metadata?.id || "")}
                       >
@@ -952,9 +1218,30 @@ export function CanvasVersioningView({
                     const selectedStatus = normalizeChangeRequestStatus(
                       selectedChangeRequest.metadata?.status as string | number | undefined,
                     );
-                    const canCloseSelected =
-                      (selectedStatus === "open" || selectedStatus === "conflicted") &&
-                      !!selectedChangeRequest.metadata?.id;
+                    const canPublishSelected = selectedStatus === "open";
+                    if (!canPublishSelected) {
+                      return null;
+                    }
+
+                    return withTooltip(
+                      publishChangeRequestDisabled,
+                      publishChangeRequestDisabledTooltip,
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={publishChangeRequestDisabled}
+                        onClick={onPublishChangeRequest}
+                      >
+                        <Rocket className="h-3.5 w-3.5" />
+                        {publishChangeRequestPending ? "Publishing..." : "Publish"}
+                      </Button>,
+                    );
+                  })()}
+                  {(() => {
+                    const selectedStatus = normalizeChangeRequestStatus(
+                      selectedChangeRequest.metadata?.status as string | number | undefined,
+                    );
+                    const canCloseSelected = selectedStatus === "open" && !!selectedChangeRequest.metadata?.id;
                     if (!canCloseSelected) {
                       return null;
                     }
@@ -969,7 +1256,7 @@ export function CanvasVersioningView({
                         disabled={sandboxModeEnabled || closeChangeRequestPending}
                         onClick={() => onCloseChangeRequest(selectedChangeRequest.metadata?.id || "")}
                       >
-                        {closeChangeRequestPending ? "Closing..." : "Close CR"}
+                        {closeChangeRequestPending ? "Rejecting..." : "Reject CR"}
                       </Button>,
                     );
                   })()}
@@ -1178,6 +1465,16 @@ function CanvasChangeRequestConflictResolver({
   const currentNode = selectedNodeID ? liveNodeByID.get(selectedNodeID) : undefined;
   const incomingNode = selectedNodeID ? incomingNodeByID.get(selectedNodeID) : undefined;
   const finalNode = selectedNodeID ? finalNodeByID.get(selectedNodeID) : undefined;
+  const unresolvedNodeCount = useMemo(
+    () => conflictingNodeIDs.filter((nodeID) => !resolvedNodeIDs.has(nodeID)).length,
+    [conflictingNodeIDs, resolvedNodeIDs],
+  );
+  const allConflictsMarkedResolved = unresolvedNodeCount === 0;
+  const selectedNodeHasConflictMarkers = useMemo(
+    () => /^(<<<<<<< |=======|>>>>>>> )/m.test(finalDraftYAML),
+    [finalDraftYAML],
+  );
+  const canMarkSelectedNodeAsResolved = Boolean(selectedNodeID) && !selectedNodeHasConflictMarkers;
   const liveRevision = liveCanvasVersion?.metadata?.revision ?? "?";
   const incomingRevision = changeRequest.version?.metadata?.revision ?? "?";
   const incomingOwnerName = changeRequest.metadata?.owner?.name || "Unknown owner";
@@ -1386,7 +1683,11 @@ function CanvasChangeRequestConflictResolver({
     applyConflictDecorations();
   }, [finalDraftYAML, applyConflictDecorations]);
 
-  const onApplyFinalYAML = () => {
+  const onMarkNodeAsResolved = () => {
+    if (!canMarkSelectedNodeAsResolved) {
+      return;
+    }
+
     if (!selectedNodeID) {
       return;
     }
@@ -1477,6 +1778,10 @@ function CanvasChangeRequestConflictResolver({
   };
 
   const handleResolve = async () => {
+    if (!allConflictsMarkedResolved) {
+      return;
+    }
+
     const prunedEdges = pruneEdgesByNodes(finalEdges, finalNodes);
     const changeRequestID = changeRequest.metadata?.id || "";
     if (!changeRequestID) {
@@ -1528,8 +1833,14 @@ function CanvasChangeRequestConflictResolver({
               <p className="text-xs text-slate-600">
                 Review Current vs Incoming, then edit Final Result and save the resolved version.
               </p>
+              {!allConflictsMarkedResolved ? (
+                <p className="text-xs text-amber-700">
+                  {unresolvedNodeCount} conflicting node{unresolvedNodeCount === 1 ? "" : "s"} still need to be marked
+                  as resolved.
+                </p>
+              ) : null}
             </div>
-            <Button onClick={handleResolve} disabled={isSubmitting || !canvasName}>
+            <Button onClick={handleResolve} disabled={isSubmitting || !canvasName || !allConflictsMarkedResolved}>
               <Check className="h-4 w-4" />
               {isSubmitting ? "Resolving..." : "Save resolved result"}
             </Button>
@@ -1555,6 +1866,7 @@ function CanvasChangeRequestConflictResolver({
                     incomingNodeByID.get(nodeID),
                     finalNodeByID.get(nodeID),
                   );
+                  const isResolved = resolvedNodeIDs.has(nodeID);
 
                   return (
                     <button
@@ -1569,7 +1881,17 @@ function CanvasChangeRequestConflictResolver({
                       )}
                     >
                       <p className="text-xs font-medium text-slate-900 break-all">{nodeID}</p>
-                      <p className="mt-1 text-[11px] text-slate-600">final: {resolution}</p>
+                      <div className="mt-1 flex items-center gap-1.5 text-[11px]">
+                        <span className="text-slate-600">final: {resolution}</span>
+                        <span
+                          className={cn(
+                            "rounded px-1.5 py-0.5 uppercase tracking-wide",
+                            isResolved ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700",
+                          )}
+                        >
+                          {isResolved ? "resolved" : "pending"}
+                        </span>
+                      </div>
                     </button>
                   );
                 })}
@@ -1587,10 +1909,17 @@ function CanvasChangeRequestConflictResolver({
                   <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-800 break-all">
                     {selectedNodeID}
                   </span>
-                  {(changeRequest.diff?.conflictingNodeIds || []).includes(selectedNodeID) ? (
+                  {(changeRequest.diff?.conflictingNodeIds || []).includes(selectedNodeID) &&
+                  !resolvedNodeIDs.has(selectedNodeID) ? (
                     <span className="inline-flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-xs text-red-700">
                       <AlertTriangle className="h-3.5 w-3.5" />
                       conflict
+                    </span>
+                  ) : null}
+                  {selectedNodeID && resolvedNodeIDs.has(selectedNodeID) ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      resolved
                     </span>
                   ) : null}
                 </div>
@@ -1613,15 +1942,20 @@ function CanvasChangeRequestConflictResolver({
                       <Button variant="outline" size="sm" onClick={onToggleIncludeNode}>
                         {finalNode ? "Exclude node" : "Include node"}
                       </Button>
-                      <Button variant="default" size="sm" onClick={onApplyFinalYAML}>
-                        Apply YAML
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={onMarkNodeAsResolved}
+                        disabled={!canMarkSelectedNodeAsResolved}
+                      >
+                        Mark as resolved
                       </Button>
                     </div>
                   </div>
 
                   <p className="mb-2 text-[11px] text-slate-600">
                     Resolve markers directly in this editor using the inline conflict actions for each block (or edit
-                    manually), then apply YAML.
+                    manually), then mark this node as resolved.
                   </p>
                   <div className="h-[520px] overflow-hidden rounded border border-slate-200 bg-white">
                     <Editor

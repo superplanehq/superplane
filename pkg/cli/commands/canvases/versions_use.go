@@ -51,7 +51,7 @@ func (c *versionsUseCommand) Execute(ctx core.CommandContext) error {
 		if isLive {
 			_, _ = fmt.Fprintf(stdout, "Using live version: %s\n", metadata.GetId())
 		} else {
-			_, _ = fmt.Fprintf(stdout, "Using working version: %s\n", metadata.GetId())
+			_, _ = fmt.Fprintf(stdout, "Using edit version: %s\n", metadata.GetId())
 		}
 		_, _ = fmt.Fprintf(stdout, "Revision: %d\n", metadata.GetRevision())
 		_, err = fmt.Fprintln(stdout, "Active context updated")

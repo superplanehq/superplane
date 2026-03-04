@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -43,15 +44,38 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 	}
 
 	userUUID := uuid.MustParse(userID)
-	isOwnedByUser := version.OwnerID != nil && *version.OwnerID == userUUID
-	isLiveVersion := canvas.LiveVersionID != nil && *canvas.LiveVersionID == version.ID
-
 	if version.IsPublished {
-		if !isLiveVersion && !isOwnedByUser {
-			return nil, status.Error(codes.PermissionDenied, "version owner mismatch")
+		return &pb.DescribeCanvasVersionResponse{
+			Version: SerializeCanvasVersion(version, organizationID),
+		}, nil
+	}
+
+	canAccess := false
+	if err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if _, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvas.ID, userUUID, version.ID); draftErr == nil {
+			canAccess = true
+			return nil
+		} else if !errors.Is(draftErr, gorm.ErrRecordNotFound) {
+			return draftErr
 		}
-	} else if !isOwnedByUser {
-		return nil, status.Error(codes.PermissionDenied, "version owner mismatch")
+
+		request, requestErr := models.FindCanvasChangeRequestByVersionInTransaction(tx, canvas.ID, version.ID)
+		if requestErr != nil {
+			if errors.Is(requestErr, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return requestErr
+		}
+		if request.OwnerID != nil && *request.OwnerID == userUUID {
+			canAccess = true
+		}
+		return nil
+	}); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to resolve version access: %v", err)
+	}
+
+	if !canAccess {
+		return nil, status.Error(codes.PermissionDenied, "version is not visible in current flow")
 	}
 
 	return &pb.DescribeCanvasVersionResponse{

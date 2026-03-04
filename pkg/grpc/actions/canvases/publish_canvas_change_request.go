@@ -17,7 +17,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -65,6 +64,7 @@ func PublishCanvasChangeRequest(
 
 	var version *models.CanvasVersion
 	var request *models.CanvasChangeRequest
+	var liveVersion *models.CanvasVersion
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		canvasForUpdate, canvasErr := models.FindCanvasInTransaction(tx, organizationUUID, canvasUUID)
@@ -81,10 +81,10 @@ func PublishCanvasChangeRequest(
 		}
 
 		if request.Status == models.CanvasChangeRequestStatusPublished {
-			return status.Error(codes.FailedPrecondition, "change request was already published")
+			return status.Error(codes.FailedPrecondition, "change request was already merged")
 		}
 		if request.Status == models.CanvasChangeRequestStatusClosed {
-			return status.Error(codes.FailedPrecondition, "change request is closed")
+			return status.Error(codes.FailedPrecondition, "change request is rejected")
 		}
 
 		version, err = models.FindCanvasVersionInTransaction(tx, canvasUUID, request.VersionID)
@@ -188,34 +188,29 @@ func PublishCanvasChangeRequest(
 			parentNode.Metadata = workflowNode.Metadata.Data()
 		}
 
-		canvasForUpdate.UpdatedAt = &now
-		canvasForUpdate.LiveVersionID = &version.ID
-		if saveErr := tx.Save(canvasForUpdate).Error; saveErr != nil {
-			return saveErr
-		}
-
 		if deleteErr := deleteNodes(tx, existingNodes, expandedNodes); deleteErr != nil {
 			return deleteErr
 		}
 
-		version.Nodes = datatypes.NewJSONSlice(mergedNodes)
-		version.Edges = datatypes.NewJSONSlice(mergedEdges)
-		version.IsPublished = true
-		version.PublishedAt = &now
-		version.UpdatedAt = &now
-		if saveErr := tx.Save(version).Error; saveErr != nil {
-			return saveErr
+		liveVersion, err = models.CreatePublishedCanvasVersionInTransaction(
+			tx,
+			canvasUUID,
+			request.OwnerID,
+			canvasForUpdate.LiveVersionID,
+			mergedNodes,
+			mergedEdges,
+		)
+		if err != nil {
+			return err
 		}
+		canvasForUpdate.LiveVersionID = &liveVersion.ID
+		canvasForUpdate.UpdatedAt = liveVersion.UpdatedAt
 
 		request.Status = models.CanvasChangeRequestStatusPublished
 		request.PublishedAt = &now
 		request.UpdatedAt = &now
 		if saveErr := tx.Save(request).Error; saveErr != nil {
 			return saveErr
-		}
-
-		if deleteErr := tx.Where("workflow_id = ? AND version_id = ?", canvasUUID, version.ID).Delete(&models.CanvasUserDraft{}).Error; deleteErr != nil {
-			return deleteErr
 		}
 
 		if refreshErr := refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, request.ID); refreshErr != nil {
@@ -240,13 +235,23 @@ func PublishCanvasChangeRequest(
 	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String()).Publish(true); err != nil {
 		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", err)
 	}
+	if liveVersion != nil {
+		if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), liveVersion.ID.String()).PublishVersionUpdated(); err != nil {
+			log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
+		}
+	}
 	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {
 		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
 	}
 
+	responseVersion := version
+	if liveVersion != nil {
+		responseVersion = liveVersion
+	}
+
 	return &pb.PublishCanvasChangeRequestResponse{
 		Canvas:        protoCanvas,
-		Version:       SerializeCanvasVersion(version, organizationID),
+		Version:       SerializeCanvasVersion(responseVersion, organizationID),
 		ChangeRequest: SerializeCanvasChangeRequest(request, version, organizationID),
 	}, nil
 }

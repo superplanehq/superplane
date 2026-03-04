@@ -31,11 +31,7 @@ func refreshCanvasChangeRequestDiffInTransaction(
 
 	if request.Status != models.CanvasChangeRequestStatusPublished &&
 		request.Status != models.CanvasChangeRequestStatusClosed {
-		if len(diff.ConflictingNodeIDs) > 0 {
-			request.Status = models.CanvasChangeRequestStatusConflicted
-		} else {
-			request.Status = models.CanvasChangeRequestStatusOpen
-		}
+		request.Status = models.CanvasChangeRequestStatusOpen
 	}
 
 	return tx.Save(request).Error

@@ -52,9 +52,14 @@ func (s *CanvasService) CreateCanvasVersion(ctx context.Context, req *pb.CreateC
 	return canvases.CreateCanvasVersion(ctx, organizationID, req.CanvasId)
 }
 
+func (s *CanvasService) SyncCanvasDraftVersion(ctx context.Context, req *pb.SyncCanvasDraftVersionRequest) (*pb.SyncCanvasDraftVersionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.SyncCanvasDraftVersion(ctx, organizationID, req.CanvasId)
+}
+
 func (s *CanvasService) ListCanvasVersions(ctx context.Context, req *pb.ListCanvasVersionsRequest) (*pb.ListCanvasVersionsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.ListCanvasVersions(ctx, organizationID, req.CanvasId)
+	return canvases.ListCanvasVersionsPaginated(ctx, organizationID, req.CanvasId, req.Limit, req.Before)
 }
 
 func (s *CanvasService) DescribeCanvasVersion(ctx context.Context, req *pb.DescribeCanvasVersionRequest) (*pb.DescribeCanvasVersionResponse, error) {
@@ -83,7 +88,14 @@ func (s *CanvasService) UpdateCanvasVersion(ctx context.Context, req *pb.UpdateC
 
 func (s *CanvasService) CreateCanvasChangeRequest(ctx context.Context, req *pb.CreateCanvasChangeRequestRequest) (*pb.CreateCanvasChangeRequestResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.CreateCanvasChangeRequest(ctx, organizationID, req.CanvasId, req.VersionId)
+	return canvases.CreateCanvasChangeRequestWithMetadata(
+		ctx,
+		organizationID,
+		req.CanvasId,
+		req.VersionId,
+		req.Title,
+		req.Description,
+	)
 }
 
 func (s *CanvasService) ListCanvasChangeRequests(ctx context.Context, req *pb.ListCanvasChangeRequestsRequest) (*pb.ListCanvasChangeRequestsResponse, error) {

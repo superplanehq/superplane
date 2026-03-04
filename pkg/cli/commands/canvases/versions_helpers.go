@@ -30,18 +30,18 @@ func resolveWorkingVersionIDFromArgOrActive(ctx core.CommandContext, versionRef 
 	trimmed := strings.TrimSpace(versionRef)
 	if trimmed == "" {
 		if ctx.Config == nil {
-			return "", fmt.Errorf("version id is required; pass one or select one with \"superplane canvases versions use\"")
+			return "", fmt.Errorf("edit version id is required; pass one or select one with \"superplane canvases versions use\"")
 		}
 
 		activeVersion := strings.TrimSpace(ctx.Config.GetActiveCanvasVersion())
 		if activeVersion == "" {
-			return "", fmt.Errorf("version id is required; pass one or select one with \"superplane canvases versions use\"")
+			return "", fmt.Errorf("edit version id is required; pass one or select one with \"superplane canvases versions use\"")
 		}
 		return activeVersion, nil
 	}
 
 	if strings.EqualFold(trimmed, "live") {
-		return "", fmt.Errorf("live is read-only; create a working version first")
+		return "", fmt.Errorf("live is read-only; create an edit version first")
 	}
 
 	return trimmed, nil

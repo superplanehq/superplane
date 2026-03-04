@@ -20,7 +20,9 @@ var _ MappedNullable = &CanvasesCreateCanvasChangeRequestBody{}
 
 // CanvasesCreateCanvasChangeRequestBody struct for CanvasesCreateCanvasChangeRequestBody
 type CanvasesCreateCanvasChangeRequestBody struct {
-	VersionId *string `json:"versionId,omitempty"`
+	VersionId   *string `json:"versionId,omitempty"`
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
 
 // NewCanvasesCreateCanvasChangeRequestBody instantiates a new CanvasesCreateCanvasChangeRequestBody object
@@ -72,6 +74,70 @@ func (o *CanvasesCreateCanvasChangeRequestBody) SetVersionId(v string) {
 	o.VersionId = &v
 }
 
+// GetTitle returns the Title field value if set, zero value otherwise.
+func (o *CanvasesCreateCanvasChangeRequestBody) GetTitle() string {
+	if o == nil || IsNil(o.Title) {
+		var ret string
+		return ret
+	}
+	return *o.Title
+}
+
+// GetTitleOk returns a tuple with the Title field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCreateCanvasChangeRequestBody) GetTitleOk() (*string, bool) {
+	if o == nil || IsNil(o.Title) {
+		return nil, false
+	}
+	return o.Title, true
+}
+
+// HasTitle returns a boolean if a field has been set.
+func (o *CanvasesCreateCanvasChangeRequestBody) HasTitle() bool {
+	if o != nil && !IsNil(o.Title) {
+		return true
+	}
+
+	return false
+}
+
+// SetTitle gets a reference to the given string and assigns it to the Title field.
+func (o *CanvasesCreateCanvasChangeRequestBody) SetTitle(v string) {
+	o.Title = &v
+}
+
+// GetDescription returns the Description field value if set, zero value otherwise.
+func (o *CanvasesCreateCanvasChangeRequestBody) GetDescription() string {
+	if o == nil || IsNil(o.Description) {
+		var ret string
+		return ret
+	}
+	return *o.Description
+}
+
+// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCreateCanvasChangeRequestBody) GetDescriptionOk() (*string, bool) {
+	if o == nil || IsNil(o.Description) {
+		return nil, false
+	}
+	return o.Description, true
+}
+
+// HasDescription returns a boolean if a field has been set.
+func (o *CanvasesCreateCanvasChangeRequestBody) HasDescription() bool {
+	if o != nil && !IsNil(o.Description) {
+		return true
+	}
+
+	return false
+}
+
+// SetDescription gets a reference to the given string and assigns it to the Description field.
+func (o *CanvasesCreateCanvasChangeRequestBody) SetDescription(v string) {
+	o.Description = &v
+}
+
 func (o CanvasesCreateCanvasChangeRequestBody) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -84,6 +150,12 @@ func (o CanvasesCreateCanvasChangeRequestBody) ToMap() (map[string]interface{}, 
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.VersionId) {
 		toSerialize["versionId"] = o.VersionId
+	}
+	if !IsNil(o.Title) {
+		toSerialize["title"] = o.Title
+	}
+	if !IsNil(o.Description) {
+		toSerialize["description"] = o.Description
 	}
 	return toSerialize, nil
 }

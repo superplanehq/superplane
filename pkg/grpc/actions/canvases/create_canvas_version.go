@@ -57,11 +57,10 @@ func CreateCanvasVersion(ctx context.Context, organizationID string, canvasID st
 			return liveVersionErr
 		}
 
-		version, err = models.SaveCanvasDraftInTransaction(
+		version, err = models.CreateOrResetCanvasDraftInTransaction(
 			tx,
 			canvas.ID,
 			userUUID,
-			canvas.LiveVersionID,
 			liveVersion.Nodes,
 			liveVersion.Edges,
 		)
