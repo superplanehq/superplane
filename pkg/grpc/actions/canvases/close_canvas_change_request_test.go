@@ -56,6 +56,6 @@ func TestCloseCanvasChangeRequestClosesAndCreateReopens(t *testing.T) {
 	reopenResponse, err := CreateCanvasChangeRequest(ctx, r.Organization.ID.String(), canvasID, versionID)
 	require.NoError(t, err)
 	require.NotNil(t, reopenResponse.ChangeRequest)
-	assert.Equal(t, changeRequestID, reopenResponse.ChangeRequest.Metadata.Id)
+	assert.NotEqual(t, changeRequestID, reopenResponse.ChangeRequest.Metadata.Id)
 	assert.Equal(t, pb.CanvasChangeRequest_STATUS_OPEN, reopenResponse.ChangeRequest.Metadata.Status)
 }

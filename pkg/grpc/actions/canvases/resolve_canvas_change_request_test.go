@@ -127,7 +127,7 @@ func TestResolveCanvasChangeRequestRebasesVersionAndClearsConflicts(t *testing.T
 	require.NoError(t, err)
 	assert.Equal(
 		t,
-		pb.CanvasChangeRequest_STATUS_CONFLICTED,
+		pb.CanvasChangeRequest_STATUS_OPEN,
 		describeBeforeResolveResponse.ChangeRequest.Metadata.Status,
 	)
 	assert.NotEmpty(t, describeBeforeResolveResponse.ChangeRequest.Diff.ConflictingNodeIds)

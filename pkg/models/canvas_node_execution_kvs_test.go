@@ -2,6 +2,7 @@ package models
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -83,12 +84,35 @@ type CanvasNodeExecutionKVTestSteps struct {
 }
 
 func (s *CanvasNodeExecutionKVTestSteps) CreateCanvas() {
+	now := time.Now()
+	canvasID := uuid.New()
+	liveVersionID := uuid.New()
+
 	s.wf = &Canvas{
+		ID:             canvasID,
 		OrganizationID: uuid.New(),
+		LiveVersionID:  &liveVersionID,
 		Name:           "Test Canvas",
 		Description:    "This is a test workflow",
 	}
-	require.NoError(s.t, database.Conn().Create(s.wf).Error)
+
+	liveVersion := &CanvasVersion{
+		ID:          liveVersionID,
+		WorkflowID:  canvasID,
+		Revision:    1,
+		IsPublished: true,
+		PublishedAt: &now,
+		Nodes:       datatypes.NewJSONSlice([]Node{}),
+		Edges:       datatypes.NewJSONSlice([]Edge{}),
+		CreatedAt:   &now,
+		UpdatedAt:   &now,
+	}
+
+	tx := database.Conn().Begin()
+	require.NoError(s.t, tx.Error)
+	require.NoError(s.t, tx.Create(s.wf).Error)
+	require.NoError(s.t, tx.Create(liveVersion).Error)
+	require.NoError(s.t, tx.Commit().Error)
 }
 
 func (s *CanvasNodeExecutionKVTestSteps) CreateCanvasNode() {

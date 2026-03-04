@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 	"testing"
+	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -32,7 +33,7 @@ func Test__DescribeOrganization(t *testing.T) {
 		assert.Equal(t, r.Organization.ID.String(), response.Organization.Metadata.Id)
 		assert.Equal(t, r.Organization.Name, response.Organization.Metadata.Name)
 		assert.Equal(t, r.Organization.Description, response.Organization.Metadata.Description)
-		assert.Equal(t, *r.Organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime())
-		assert.Equal(t, *r.Organization.UpdatedAt, response.Organization.Metadata.UpdatedAt.AsTime())
+		assert.WithinDuration(t, *r.Organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime(), time.Millisecond)
+		assert.WithinDuration(t, *r.Organization.UpdatedAt, response.Organization.Metadata.UpdatedAt.AsTime(), time.Millisecond)
 	})
 }

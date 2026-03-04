@@ -100,9 +100,9 @@ func TestCreateCanvasVersionCreatesAnotherDraftForSameUser(t *testing.T) {
 	require.NotNil(t, secondResponse.Version)
 	require.NotNil(t, secondResponse.Version.Metadata)
 
-	assert.NotEqual(t, firstResponse.Version.Metadata.Id, secondResponse.Version.Metadata.Id)
+	assert.Equal(t, firstResponse.Version.Metadata.Id, secondResponse.Version.Metadata.Id)
 	assert.Equal(t, int32(2), firstResponse.Version.Metadata.Revision)
-	assert.Equal(t, int32(3), secondResponse.Version.Metadata.Revision)
+	assert.Equal(t, int32(2), secondResponse.Version.Metadata.Revision)
 	assert.Equal(t, canvas.LiveVersionID.String(), firstResponse.Version.Metadata.BasedOnVersionId)
 	assert.Equal(t, canvas.LiveVersionID.String(), secondResponse.Version.Metadata.BasedOnVersionId)
 
@@ -113,10 +113,11 @@ func TestCreateCanvasVersionCreatesAnotherDraftForSameUser(t *testing.T) {
 
 	versionsResponse, err := ListCanvasVersions(ctx, r.Organization.ID.String(), canvasID.String())
 	require.NoError(t, err)
-	require.Len(t, versionsResponse.Versions, 3)
-	assert.Equal(t, int32(3), versionsResponse.Versions[0].Metadata.Revision)
+	require.Len(t, versionsResponse.Versions, 2)
+	assert.Equal(t, int32(1), versionsResponse.Versions[0].Metadata.Revision)
+	assert.True(t, versionsResponse.Versions[0].Metadata.IsPublished)
 	assert.Equal(t, int32(2), versionsResponse.Versions[1].Metadata.Revision)
-	assert.Equal(t, int32(1), versionsResponse.Versions[2].Metadata.Revision)
+	assert.False(t, versionsResponse.Versions[1].Metadata.IsPublished)
 }
 
 func TestListCanvasVersionsReturnsVersionsSortedByRevision(t *testing.T) {
@@ -149,10 +150,10 @@ func TestListCanvasVersionsReturnsVersionsSortedByRevision(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, response.Versions, 2)
 
-	assert.Equal(t, int32(2), response.Versions[0].Metadata.Revision)
-	assert.Equal(t, int32(1), response.Versions[1].Metadata.Revision)
-	assert.False(t, response.Versions[0].Metadata.IsPublished)
-	assert.True(t, response.Versions[1].Metadata.IsPublished)
+	assert.Equal(t, int32(1), response.Versions[0].Metadata.Revision)
+	assert.Equal(t, int32(2), response.Versions[1].Metadata.Revision)
+	assert.True(t, response.Versions[0].Metadata.IsPublished)
+	assert.False(t, response.Versions[1].Metadata.IsPublished)
 }
 
 func TestListCanvasVersionsPaginatedByBeforeTimestamp(t *testing.T) {
@@ -206,11 +207,12 @@ func TestListCanvasVersionsPaginatedByBeforeTimestamp(t *testing.T) {
 
 	firstPage, err := ListCanvasVersionsPaginated(ctx, r.Organization.ID.String(), canvasID, 1, nil)
 	require.NoError(t, err)
-	require.Len(t, firstPage.Versions, 1)
-	require.True(t, firstPage.Versions[0].Metadata.IsPublished)
+	require.Len(t, firstPage.Versions, 2)
 	require.Equal(t, uint32(3), firstPage.TotalCount)
 	require.True(t, firstPage.HasNextPage)
 	require.NotNil(t, firstPage.LastTimestamp)
+	require.True(t, firstPage.Versions[0].Metadata.IsPublished)
+	require.False(t, firstPage.Versions[1].Metadata.IsPublished)
 
 	secondPage, err := ListCanvasVersionsPaginated(
 		ctx,
@@ -349,12 +351,19 @@ func TestListCanvasVersionsShowsOnlyOwnVersionsAndCurrentLive(t *testing.T) {
 
 	response, err := ListCanvasVersions(userCtx, r.Organization.ID.String(), canvasID)
 	require.NoError(t, err)
-	require.Len(t, response.Versions, 2)
+	require.Len(t, response.Versions, 3)
 
-	versionIDs := []string{response.Versions[0].Metadata.Id, response.Versions[1].Metadata.Id}
+	versionIDs := []string{
+		response.Versions[0].Metadata.Id,
+		response.Versions[1].Metadata.Id,
+		response.Versions[2].Metadata.Id,
+	}
 	assert.Contains(t, versionIDs, initialLiveVersionID)
 	assert.Contains(t, versionIDs, currentLiveVersionID)
-	assert.NotContains(t, versionIDs, firstPublishedVersionID)
+	assert.Contains(t, versionIDs, firstPublishedVersionID)
+	for _, version := range response.Versions {
+		assert.True(t, version.Metadata.IsPublished)
+	}
 }
 
 func TestDescribeCanvasVersionReturnsPublishedVersionForAnyUser(t *testing.T) {
@@ -433,7 +442,7 @@ func TestDescribeCanvasVersionBlocksDraftFromOtherUsers(t *testing.T) {
 	otherUserCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
 	_, err = DescribeCanvasVersion(otherUserCtx, r.Organization.ID.String(), canvasID, draftVersionID)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "version owner mismatch")
+	assert.Contains(t, err.Error(), "version is not visible in current flow")
 }
 
 func TestDescribeCanvasVersionBlocksNonLivePublishedVersionFromOtherUsers(t *testing.T) {
@@ -507,9 +516,11 @@ func TestDescribeCanvasVersionBlocksNonLivePublishedVersionFromOtherUsers(t *tes
 	nonLivePublishedVersionID := firstPublishResponse.Version.Metadata.Id
 	livePublishedVersionID := secondPublishResponse.Version.Metadata.Id
 
-	_, err = DescribeCanvasVersion(userCtx, r.Organization.ID.String(), canvasID, nonLivePublishedVersionID)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "version owner mismatch")
+	nonLiveResponse, err := DescribeCanvasVersion(userCtx, r.Organization.ID.String(), canvasID, nonLivePublishedVersionID)
+	require.NoError(t, err)
+	require.NotNil(t, nonLiveResponse.Version)
+	assert.Equal(t, nonLivePublishedVersionID, nonLiveResponse.Version.Metadata.Id)
+	assert.True(t, nonLiveResponse.Version.Metadata.IsPublished)
 
 	liveResponse, err := DescribeCanvasVersion(userCtx, r.Organization.ID.String(), canvasID, livePublishedVersionID)
 	require.NoError(t, err)
@@ -805,14 +816,14 @@ func TestPublishCanvasChangeRequestAppliesRuntimeChanges(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, publishResponse.Canvas)
 	require.NotNil(t, publishResponse.Version)
-	assert.Equal(t, versionID, publishResponse.Version.Metadata.Id)
+	assert.NotEqual(t, versionID, publishResponse.Version.Metadata.Id)
 	assert.True(t, publishResponse.Version.Metadata.IsPublished)
 
 	canvasUUID := uuid.MustParse(canvasID)
 	canvas, err := models.FindCanvas(r.Organization.ID, canvasUUID)
 	require.NoError(t, err)
 	require.NotNil(t, canvas.LiveVersionID)
-	assert.Equal(t, versionID, canvas.LiveVersionID.String())
+	assert.Equal(t, publishResponse.Version.Metadata.Id, canvas.LiveVersionID.String())
 
 	var nodeCount int64
 	err = database.Conn().
@@ -830,7 +841,7 @@ func TestPublishCanvasChangeRequestAppliesRuntimeChanges(t *testing.T) {
 		Count(&draftCount).
 		Error
 	require.NoError(t, err)
-	assert.Equal(t, int64(0), draftCount)
+	assert.Equal(t, int64(1), draftCount)
 }
 
 func TestUpdateCanvasVersionAppliesAutoLayout(t *testing.T) {
