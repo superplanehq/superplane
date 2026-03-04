@@ -8,12 +8,13 @@ import (
 func NewCommand(options core.BindOptions) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "index",
-		Short: "Discover available integrations, triggers, and components",
+		Short: "Discover available integrations, triggers, components, and widgets",
 	}
 
 	root.AddCommand(newIntegrationsCommand(options))
 	root.AddCommand(newTriggersCommand(options))
 	root.AddCommand(newComponentsCommand(options))
+	root.AddCommand(newWidgetsCommand(options))
 
 	return root
 }
