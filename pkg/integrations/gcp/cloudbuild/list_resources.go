@@ -55,8 +55,12 @@ type triggerItem struct {
 	Name string `json:"name"`
 }
 
-func ListTriggerResources(ctx context.Context, client Client) ([]core.IntegrationResource, error) {
-	baseURL := fmt.Sprintf("%s/projects/%s/triggers", cloudBuildBaseURL, client.ProjectID())
+func ListTriggerResources(ctx context.Context, client Client, projectID string) ([]core.IntegrationResource, error) {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		projectID = client.ProjectID()
+	}
+	baseURL := fmt.Sprintf("%s/projects/%s/triggers", cloudBuildBaseURL, projectID)
 	url := baseURL
 	var resources []core.IntegrationResource
 

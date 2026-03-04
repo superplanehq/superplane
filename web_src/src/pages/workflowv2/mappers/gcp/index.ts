@@ -9,6 +9,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   createVM: baseMapper,
   "cloudbuild.createBuild": cloudBuildBaseMapper,
   "cloudbuild.getBuild": cloudBuildBaseMapper,
+  "cloudbuild.runTrigger": cloudBuildBaseMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -20,6 +21,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createVM: buildActionStateRegistry("completed"),
   "cloudbuild.createBuild": CLOUD_BUILD_EXECUTION_STATE_REGISTRY,
   "cloudbuild.getBuild": CLOUD_BUILD_EXECUTION_STATE_REGISTRY,
+  "cloudbuild.runTrigger": CLOUD_BUILD_EXECUTION_STATE_REGISTRY,
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};

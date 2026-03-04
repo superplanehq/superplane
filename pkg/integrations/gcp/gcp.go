@@ -148,6 +148,7 @@ func (g *GCP) Components() []core.Component {
 		&compute.CreateVM{},
 		&cloudbuild.CreateBuild{},
 		&cloudbuild.GetBuild{},
+		&cloudbuild.RunTrigger{},
 	}
 }
 
@@ -585,7 +586,7 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	case compute.ResourceTypeFirewall:
 		return compute.ListFirewallResources(reqCtx, client, p["project"])
 	case cloudbuild.ResourceTypeTrigger:
-		return cloudbuild.ListTriggerResources(reqCtx, client)
+		return cloudbuild.ListTriggerResources(reqCtx, client, p["projectId"])
 	case cloudbuild.ResourceTypeBuild:
 		return cloudbuild.ListBuildResources(reqCtx, client, p["projectId"])
 	case cloudbuild.ResourceTypeLocation:
