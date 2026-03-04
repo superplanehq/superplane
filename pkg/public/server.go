@@ -86,6 +86,31 @@ func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
 }
 
+// allowedWebSocketOrigins returns the list of origins allowed for WebSocket connections.
+// In development (isDev true) returns nil (no restriction). Otherwise uses
+// WEBSOCKET_ALLOWED_ORIGINS if set (comma-separated), or the origin derived from baseURL (scheme + host).
+// Returns nil on parse error or when no origins are configured (fallback: allow all for backward compatibility).
+func allowedWebSocketOrigins(baseURL string, isDev bool) []string {
+	if isDev {
+		return nil
+	}
+	if env := os.Getenv("WEBSOCKET_ALLOWED_ORIGINS"); env != "" {
+		var list []string
+		for _, s := range strings.Split(env, ",") {
+			if o := strings.TrimSpace(s); o != "" {
+				list = append(list, o)
+			}
+		}
+		return list
+	}
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return nil
+	}
+	origin := u.Scheme + "://" + u.Host
+	return []string{origin}
+}
+
 func NewServer(
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
@@ -107,6 +132,13 @@ func NewServer(
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
+	isDev := appEnv == "development"
+	allowedOrigins := allowedWebSocketOrigins(baseURL, isDev)
+	allowedOriginsSet := make(map[string]struct{})
+	for _, o := range allowedOrigins {
+		allowedOriginsSet[strings.TrimSpace(o)] = struct{}{}
+	}
+
 	server := &Server{
 		BaseURL:               baseURL,
 		WebhooksBaseURL:       webhooksBaseURL,
@@ -121,10 +153,18 @@ func NewServer(
 		registry:              registry,
 		authService:           authorizationService,
 		upgrader: &websocket.Upgrader{
+			// In development all origins are accepted. Otherwise only WEBSOCKET_ALLOWED_ORIGINS
+			// (if set) or the origin derived from BASE_URL are accepted.
 			CheckOrigin: func(r *http.Request) bool {
-				// Allow all connections - you may want to restrict this in production
-				// TODO: implement origin checking
-				return true
+				if allowedOrigins == nil || len(allowedOriginsSet) == 0 {
+					return true
+				}
+				origin := strings.TrimSpace(r.Header.Get("Origin"))
+				if origin == "" {
+					return false
+				}
+				_, ok := allowedOriginsSet[origin]
+				return ok
 			},
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
