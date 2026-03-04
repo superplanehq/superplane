@@ -312,6 +312,42 @@ func (c *Client) GetChannel(teamID, channelID string) (*Channel, error) {
 	return &channel, nil
 }
 
+// ChannelInfo contains channel information resolved from the Graph API.
+type ChannelInfo struct {
+	ID          string
+	DisplayName string
+	TeamID      string
+	TeamName    string
+}
+
+// FindChannelByID searches all accessible teams for a channel matching the given ID.
+func (c *Client) FindChannelByID(channelID string) (*ChannelInfo, error) {
+	teams, err := c.ListTeams()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list teams: %w", err)
+	}
+
+	for _, team := range teams {
+		channels, err := c.ListTeamChannels(team.ID)
+		if err != nil {
+			continue
+		}
+
+		for _, channel := range channels {
+			if channel.ID == channelID {
+				return &ChannelInfo{
+					ID:          channel.ID,
+					DisplayName: channel.DisplayName,
+					TeamID:      team.ID,
+					TeamName:    team.DisplayName,
+				}, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("channel %s not found in any accessible team", channelID)
+}
+
 func (c *Client) graphRequest(method, endpoint string, body io.Reader, accessToken string) ([]byte, error) {
 	fullURL := graphAPIBase + endpoint
 

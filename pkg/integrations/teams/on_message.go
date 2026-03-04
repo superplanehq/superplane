@@ -116,7 +116,7 @@ func (t *OnMessage) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	channel, err := t.validateChannel(config, metadata)
+	channel, err := t.validateChannel(ctx, config, metadata)
 	if err != nil {
 		return fmt.Errorf("failed to validate channel: %w", err)
 	}
@@ -152,7 +152,7 @@ func (t *OnMessage) subscribe(ctx core.TriggerContext, metadata OnMessageMetadat
 	return &s, nil
 }
 
-func (t *OnMessage) validateChannel(config OnMessageConfiguration, metadata OnMessageMetadata) (*ChannelMetadata, error) {
+func (t *OnMessage) validateChannel(ctx core.TriggerContext, config OnMessageConfiguration, metadata OnMessageMetadata) (*ChannelMetadata, error) {
 	if config.Channel == "" {
 		return nil, nil
 	}
@@ -161,9 +161,19 @@ func (t *OnMessage) validateChannel(config OnMessageConfiguration, metadata OnMe
 		return metadata.Channel, nil
 	}
 
+	client, err := NewClient(ctx.Integration)
+	if err != nil {
+		return &ChannelMetadata{ID: config.Channel, Name: config.Channel}, nil
+	}
+
+	channelInfo, err := client.FindChannelByID(config.Channel)
+	if err != nil {
+		return &ChannelMetadata{ID: config.Channel, Name: config.Channel}, nil
+	}
+
 	return &ChannelMetadata{
-		ID:   config.Channel,
-		Name: config.Channel,
+		ID:   channelInfo.ID,
+		Name: fmt.Sprintf("#%s (%s)", channelInfo.DisplayName, channelInfo.TeamName),
 	}, nil
 }
 

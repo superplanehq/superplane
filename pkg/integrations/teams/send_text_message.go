@@ -106,12 +106,20 @@ func (c *SendTextMessage) Setup(ctx core.SetupContext) error {
 		return errors.New("channel is required")
 	}
 
-	// Store channel metadata
-	// The channel ID from integration resources contains both team and channel info
+	// Look up channel name from the Graph API
+	channelName := config.Channel
+	client, err := NewClient(ctx.Integration)
+	if err == nil {
+		channelInfo, err := client.FindChannelByID(config.Channel)
+		if err == nil {
+			channelName = fmt.Sprintf("#%s (%s)", channelInfo.DisplayName, channelInfo.TeamName)
+		}
+	}
+
 	metadata := SendTextMessageMetadata{
 		Channel: &ChannelMetadata{
 			ID:   config.Channel,
-			Name: config.Channel,
+			Name: channelName,
 		},
 	}
 

@@ -166,12 +166,19 @@ func (t *OnMention) validateChannel(ctx core.TriggerContext, config OnMentionCon
 		return metadata.Channel, nil
 	}
 
-	// For Teams, channel IDs are opaque strings from the Graph API.
-	// We store the ID as-is since validation requires Graph API access
-	// which may not be available at trigger setup time.
+	client, err := NewClient(ctx.Integration)
+	if err != nil {
+		return &ChannelMetadata{ID: config.Channel, Name: config.Channel}, nil
+	}
+
+	channelInfo, err := client.FindChannelByID(config.Channel)
+	if err != nil {
+		return &ChannelMetadata{ID: config.Channel, Name: config.Channel}, nil
+	}
+
 	return &ChannelMetadata{
-		ID:   config.Channel,
-		Name: config.Channel,
+		ID:   channelInfo.ID,
+		Name: fmt.Sprintf("#%s (%s)", channelInfo.DisplayName, channelInfo.TeamName),
 	}, nil
 }
 

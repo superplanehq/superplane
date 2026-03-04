@@ -6,6 +6,7 @@ import teamsIcon from "@/assets/icons/integrations/teams.svg";
 
 interface OnMessageConfiguration {
   channel?: string;
+  contentFilter?: string;
 }
 
 interface OnMessageMetadata {
@@ -68,6 +69,13 @@ export const onMessageTriggerRenderer: TriggerRenderer = {
       metadataItems.push({
         icon: "hash",
         label: channelLabel,
+      });
+    }
+
+    if (configuration?.contentFilter) {
+      metadataItems.push({
+        icon: "funnel",
+        label: `Filter: ${configuration.contentFilter}`,
       });
     }
 

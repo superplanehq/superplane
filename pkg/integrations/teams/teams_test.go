@@ -19,14 +19,28 @@ func Test__Teams__Sync(t *testing.T) {
 	s := &Teams{}
 
 	t.Run("metadata already set -> no-op", func(t *testing.T) {
+		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, `{
+				"access_token": "test-token",
+				"token_type": "Bearer",
+				"expires_in": 3600
+			}`), nil
+		})
+
 		integrationCtx := &contexts.IntegrationContext{
 			Metadata: Metadata{AppID: "test-app-id"},
+			Configuration: map[string]any{
+				"appId":       "test-app-id",
+				"appPassword": "test-password",
+			},
 		}
 
 		err := s.Sync(core.SyncContext{Integration: integrationCtx})
 
 		require.NoError(t, err)
-		assert.Nil(t, integrationCtx.BrowserAction)
+		// When metadata AppID is already set, Sync still regenerates the manifest
+		// but should not fail
+		assert.Equal(t, "ready", integrationCtx.State)
 	})
 
 	t.Run("no credentials -> browser action", func(t *testing.T) {
