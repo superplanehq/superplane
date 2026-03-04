@@ -4,6 +4,8 @@ import {
   Panel,
   ReactFlow,
   ReactFlowProvider,
+  ViewportPortal,
+  useOnSelectionChange,
   useReactFlow,
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
@@ -18,6 +20,9 @@ import {
   ScanLine,
   ScanText,
   ScrollText,
+  Copy,
+  LayoutGrid,
+  Trash2,
   TriangleAlert,
   Workflow,
 } from "lucide-react";
@@ -199,6 +204,9 @@ export interface CanvasPageProps {
   integrations?: OrganizationsIntegration[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
+  onNodesDelete?: (nodeIds: string[]) => void;
+  onDuplicateNodes?: (nodeIds: string[]) => void;
+  onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
   onResolveExecutionErrors?: (executionIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
@@ -322,7 +330,7 @@ const nodeTypes = {
         selected={nodeProps.selected}
         runDisabled={callbacks?.runDisabled}
         runDisabledTooltip={callbacks?.runDisabledTooltip}
-        showHeader={callbacks?.showHeader}
+        showHeader={callbacks?.showHeader && !callbacks?.hasMultiSelection}
         onExpand={callbacks.handleNodeExpand}
         onClick={() => callbacks.handleNodeClick(nodeProps.id)}
         onEdit={() => callbacks.onNodeEdit.current?.(nodeProps.id)}
@@ -889,6 +897,9 @@ function CanvasPage(props: CanvasPageProps) {
                 onSave={props.onSave}
                 onNodeEdit={handleNodeEdit}
                 onNodeDelete={handleNodeDelete}
+                onNodesDelete={props.onNodesDelete}
+                onDuplicateNodes={props.onDuplicateNodes}
+                onAutoLayoutNodes={props.onAutoLayoutNodes}
                 onEdgeCreate={props.onEdgeCreate}
                 hideHeader={true}
                 onToggleView={handleToggleView}
@@ -1385,6 +1396,9 @@ function CanvasContent({
   onSave,
   onNodeEdit,
   onNodeDelete,
+  onNodesDelete,
+  onDuplicateNodes,
+  onAutoLayoutNodes,
   onEdgeCreate,
   hideHeader,
   onRun,
@@ -1437,6 +1451,9 @@ function CanvasContent({
   onSave?: (nodes: CanvasNode[]) => void;
   onNodeEdit: (nodeId: string) => void;
   onNodeDelete?: (nodeId: string) => void;
+  onNodesDelete?: (nodeIds: string[]) => void;
+  onDuplicateNodes?: (nodeIds: string[]) => void;
+  onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   hideHeader?: boolean;
   onRun?: (nodeId: string) => void;
@@ -1528,6 +1545,31 @@ function CanvasContent({
   const [logSidebarHeight, setLogSidebarHeight] = useState(320);
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
   const { isMinimapVisible, setIsMinimapVisible } = useMinimapVisibility(false);
+
+  const [multiSelectedNodes, setMultiSelectedNodes] = useState<ReactFlowNode[]>([]);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const previouslySelectedRef = useRef<Set<string>>(new Set());
+
+  useOnSelectionChange({
+    onChange: useCallback(({ nodes }: { nodes: ReactFlowNode[] }) => {
+      setMultiSelectedNodes(nodes.length >= 2 ? nodes : []);
+    }, []),
+  });
+
+  const selectionToolbarFlowPos = useMemo(() => {
+    if (multiSelectedNodes.length < 2) return null;
+
+    let minY = Infinity;
+    let maxX = -Infinity;
+
+    for (const node of multiSelectedNodes) {
+      const w = node.measured?.width ?? node.width ?? 240;
+      if (node.position.y < minY) minY = node.position.y;
+      if (node.position.x + w > maxX) maxX = node.position.x + w;
+    }
+
+    return { x: maxX, y: minY };
+  }, [multiSelectedNodes]);
 
   useEffect(() => {
     const activeNoteId = getActiveNoteId();
@@ -1724,7 +1766,6 @@ function CanvasContent({
 
   const handleMove = useCallback(
     (_event: any, newViewport: { x: number; y: number; zoom: number }) => {
-      // Store the viewport in the ref (which persists across re-renders)
       viewportRef.current = newViewport;
 
       if (onZoomChange) {
@@ -1789,6 +1830,8 @@ function CanvasContent({
   const handlePaneClick = useCallback(() => {
     // Do not close sidebar or reset state while creating a new component
     if (templateNodeId) return;
+
+    previouslySelectedRef.current = new Set();
 
     // Clear ReactFlow's selection state and close both sidebars
     stateRef.current.setNodes((nodes) =>
@@ -1856,6 +1899,8 @@ function CanvasContent({
 
   const showHeader = !isReadOnly;
 
+  const hasMultiSelection = multiSelectedNodes.length >= 2;
+
   // Store callback handlers in a ref so they can be accessed without being in node data
   const callbacksRef = useRef({
     handleNodeExpand,
@@ -1874,6 +1919,7 @@ function CanvasContent({
     runDisabled,
     runDisabledTooltip,
     showHeader,
+    hasMultiSelection,
   });
   callbacksRef.current = {
     handleNodeExpand,
@@ -1892,6 +1938,7 @@ function CanvasContent({
     runDisabled,
     runDisabledTooltip,
     showHeader,
+    hasMultiSelection,
   };
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes
@@ -1981,7 +2028,7 @@ function CanvasContent({
         _hasHighlightedNodes: hasHighlightedNodes,
       },
     }));
-  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds]);
+  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds, hasMultiSelection]);
 
   const edgeTypes = useMemo(
     () => ({
@@ -2006,6 +2053,16 @@ function CanvasContent({
 
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
+      const prev = previouslySelectedRef.current;
+      if (prev.size > 0) {
+        changes = changes.map((c) => {
+          if (c.type === "select" && !c.selected && prev.has(c.id)) {
+            return { ...c, selected: true };
+          }
+          return c;
+        });
+      }
+
       if (!isReadOnly) {
         state.onNodesChange(changes);
         return;
@@ -2178,6 +2235,15 @@ function CanvasContent({
             onInit={handleInit}
             deleteKeyCode={null}
             onPaneClick={handlePaneClick}
+            onSelectionStart={() => {
+              setIsSelecting(true);
+              const selected = (stateRef.current.nodes || []).filter((n) => n.selected).map((n) => n.id);
+              previouslySelectedRef.current = new Set(selected);
+            }}
+            onSelectionEnd={() => {
+              setIsSelecting(false);
+              previouslySelectedRef.current = new Set();
+            }}
             onEdgeMouseEnter={handleEdgeMouseEnter}
             onEdgeMouseLeave={handleEdgeMouseLeave}
             defaultViewport={viewport}
@@ -2326,6 +2392,75 @@ function CanvasContent({
                 </Tooltip>
               </div>
             </Panel>
+            {selectionToolbarFlowPos &&
+              !isSelecting &&
+              !isReadOnly &&
+              (onNodesDelete || onNodeDelete || onAutoLayoutNodes || onDuplicateNodes) && (
+                <ViewportPortal>
+                  <div
+                    className="nodrag nopan flex items-center gap-2"
+                    style={{
+                      position: "absolute",
+                      left: selectionToolbarFlowPos.x,
+                      top: selectionToolbarFlowPos.y,
+                      transform: "translate(-100%, -100%) translateY(-24px)",
+                      pointerEvents: "all",
+                    }}
+                  >
+                    {onAutoLayoutNodes && (
+                      <button
+                        type="button"
+                        data-testid="multi-select-auto-layout"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onAutoLayoutNodes(multiSelectedNodes.map((n) => n.id));
+                        }}
+                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                      >
+                        <LayoutGrid className="h-4 w-4" />
+                      </button>
+                    )}
+                    {onDuplicateNodes && (
+                      <button
+                        type="button"
+                        data-testid="multi-select-duplicate"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onDuplicateNodes(multiSelectedNodes.map((n) => n.id));
+                        }}
+                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    )}
+                    {(onNodesDelete || onNodeDelete) && (
+                      <button
+                        type="button"
+                        data-testid="multi-select-delete"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const nodeIds = multiSelectedNodes.map((n) => n.id);
+                          if (onNodesDelete) {
+                            onNodesDelete(nodeIds);
+                          } else {
+                            for (const id of nodeIds) {
+                              onNodeDelete?.(id);
+                            }
+                          }
+                          stateRef.current.setNodes((nodes) => nodes.map((node) => ({ ...node, selected: false })));
+                          setMultiSelectedNodes([]);
+                        }}
+                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </ViewportPortal>
+              )}
           </ReactFlow>
         </div>
       </div>

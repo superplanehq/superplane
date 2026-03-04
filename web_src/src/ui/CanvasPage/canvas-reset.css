@@ -37,6 +37,20 @@
   z-index: 1000 !important;
 }
 
+/* Multi-select blue box: add padding so it sits a bit away from the nodes */
+.sp-canvas .react-flow__nodesselection-rect {
+  background: transparent !important;
+  border: none !important;
+}
+.sp-canvas .react-flow__nodesselection-rect::before {
+  content: "";
+  position: absolute;
+  inset: -24px;
+  background: var(--xy-selection-background-color, var(--xy-selection-background-color-default));
+  border: var(--xy-selection-border, var(--xy-selection-border-default));
+  pointer-events: none;
+}
+
 .sp-canvas .react-flow__edge path {
   transition: stroke 0.2s ease-in-out;
 }
