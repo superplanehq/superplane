@@ -4,12 +4,13 @@ import { buildActionStateRegistry } from "../utils";
 import { CLOUD_BUILD_EXECUTION_STATE_REGISTRY } from "./cloudbuild";
 import { onVMInstanceTriggerRenderer } from "./on_vm_instance";
 import { onBuildCompleteTriggerRenderer } from "./on_build_complete";
+import { runTriggerMapper } from "./run_trigger";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createVM: baseMapper,
   "cloudbuild.createBuild": cloudBuildBaseMapper,
   "cloudbuild.getBuild": cloudBuildBaseMapper,
-  "cloudbuild.runTrigger": cloudBuildBaseMapper,
+  "cloudbuild.runTrigger": runTriggerMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {

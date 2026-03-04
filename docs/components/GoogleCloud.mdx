@@ -17,8 +17,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create Build" href="#create-build" description="Create a Cloud Build build and wait for it to finish" />
-  <LinkCard title="Run Trigger" href="#run-trigger" description="Run a Cloud Build trigger and wait for the build to finish" />
   <LinkCard title="Get Build" href="#get-build" description="Retrieve a Cloud Build build by ID" />
+  <LinkCard title="Cloud Build • Run Trigger" href="#cloud-build-•-run-trigger" description="Run a Cloud Build trigger and wait for the build to finish" />
   <LinkCard title="Create Virtual Machine" href="#create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
 </CardGrid>
 
@@ -184,57 +184,6 @@ The terminal Build resource, including `id`, `status`, `logUrl`, `createTime`, `
 }
 ```
 
-<a id="run-trigger"></a>
-
-## Run Trigger
-
-Runs an existing Cloud Build trigger and waits for the resulting build to reach a terminal status.
-
-### Use Cases
-
-- **Reuse existing trigger config**: Fire a preconfigured trigger from a workflow without duplicating build step definitions
-- **Branch or tag overrides**: Run a trigger against a specific branch, tag, or commit SHA that differs from the trigger's default
-- **Pipeline chaining**: Kick off a downstream Cloud Build trigger after another workflow step completes
-
-### Configuration
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| Trigger | Yes | The Cloud Build trigger to run (select from the project's triggers) |
-| Branch Name | No | Override the branch to build from. Mutually exclusive with Tag Name and Commit SHA |
-| Tag Name | No | Override the tag to build from |
-| Commit SHA | No | Override the commit SHA to build from |
-| Project ID Override | No | Override the GCP project from the integration |
-
-### Output Channels
-
-- **Passed**: Emitted when the build finishes with `SUCCESS`
-- **Failed**: Emitted for any other terminal status: `FAILURE`, `INTERNAL_ERROR`, `TIMEOUT`, `CANCELLED`, `EXPIRED`
-
-### Notes
-
-- If no revision override is set, Cloud Build uses the trigger's configured default branch/tag.
-- SuperPlane listens for Pub/Sub notifications and falls back to polling every 5 minutes.
-- Cancelling the execution from the UI sends a Cloud Build cancel request for the active build.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "buildTriggerId": "abcdefgh-1234-5678-abcd-123456789012",
-    "createTime": "2025-01-01T00:00:00Z",
-    "finishTime": "2025-01-01T00:05:00Z",
-    "id": "12345678-abcd-1234-5678-abcdef012345",
-    "logUrl": "https://console.cloud.google.com/cloud-build/builds/12345678-abcd-1234-5678-abcdef012345",
-    "projectId": "my-project",
-    "status": "SUCCESS"
-  },
-  "timestamp": "2025-01-01T00:05:00Z",
-  "type": "gcp.cloudbuild.build"
-}
-```
-
 <a id="get-build"></a>
 
 ## Get Build
@@ -255,6 +204,51 @@ The full Build resource, including `id`, `status` (SUCCESS, FAILURE, WORKING, QU
 ```json
 {
   "data": {
+    "createTime": "2025-01-01T00:00:00Z",
+    "finishTime": "2025-01-01T00:05:00Z",
+    "id": "12345678-abcd-1234-5678-abcdef012345",
+    "logUrl": "https://console.cloud.google.com/cloud-build/builds/12345678-abcd-1234-5678-abcdef012345",
+    "projectId": "my-project",
+    "status": "SUCCESS"
+  },
+  "timestamp": "2025-01-01T00:05:00Z",
+  "type": "gcp.cloudbuild.build"
+}
+```
+
+<a id="cloud-build-•-run-trigger"></a>
+
+## Cloud Build • Run Trigger
+
+Runs an existing Cloud Build trigger and waits for the resulting build to reach a terminal status.
+
+### Configuration
+
+- **Trigger** (required): The Cloud Build trigger to run. Select from triggers in the connected project.
+- **Branch or tag**: Override the branch or tag to build from. Leave empty to use the trigger's configured default. A 40-character hex string is treated as a commit SHA.
+- **Project ID Override**: Optionally run the trigger in a different project than the connected integration.
+
+### Output
+
+The terminal Build resource, including `id`, `status`, `logUrl`, `createTime`, `finishTime`, and more.
+
+### Output Channels
+
+- **Passed**: Emitted when Cloud Build finishes with `SUCCESS`.
+- **Failed**: Emitted when Cloud Build finishes with any other terminal status, including `FAILURE`, `INTERNAL_ERROR`, `TIMEOUT`, `CANCELLED`, or `EXPIRED`.
+
+### Notes
+
+- SuperPlane listens for Cloud Build notifications through the connected GCP integration and falls back to polling if an event does not arrive.
+- SuperPlane automatically creates the shared `cloud-builds` Pub/Sub topic and push subscription when the GCP integration has `roles/pubsub.admin` and both the **Cloud Build** and **Pub/Sub** APIs are enabled.
+- Cancelling the running execution from the UI sends a Cloud Build cancel request for the active build.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "buildTriggerId": "abcdefgh-1234-5678-abcd-123456789012",
     "createTime": "2025-01-01T00:00:00Z",
     "finishTime": "2025-01-01T00:05:00Z",
     "id": "12345678-abcd-1234-5678-abcdef012345",

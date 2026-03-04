@@ -57,6 +57,10 @@ func buildRunTriggerURL(projectID, triggerID string) string {
 	return fmt.Sprintf("%s/projects/%s/triggers/%s:run", cloudBuildBaseURL, projectID, triggerID)
 }
 
+func buildGetTriggerURL(projectID, triggerID string) string {
+	return fmt.Sprintf("%s/projects/%s/triggers/%s", cloudBuildBaseURL, projectID, triggerID)
+}
+
 func buildCancelURL(projectID string, buildID string, buildName string) string {
 	nameProjectID, location, nameBuildID := parseCloudBuildBuildName(buildName)
 	if location != "" && location != "global" {

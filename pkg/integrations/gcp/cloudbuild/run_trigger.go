@@ -16,15 +16,14 @@ import (
 type RunTrigger struct{}
 
 type RunTriggerConfiguration struct {
-	ProjectID  string `json:"projectId" mapstructure:"projectId"`
-	TriggerID  string `json:"trigger" mapstructure:"trigger"`
-	BranchName string `json:"branchName" mapstructure:"branchName"`
-	TagName    string `json:"tagName" mapstructure:"tagName"`
-	CommitSHA  string `json:"commitSha" mapstructure:"commitSha"`
+	ProjectID string `json:"projectId" mapstructure:"projectId"`
+	TriggerID string `json:"trigger" mapstructure:"trigger"`
+	Ref       string `json:"ref" mapstructure:"ref"`
 }
 
 type RunTriggerNodeMetadata struct {
 	SubscriptionID string `json:"subscriptionId,omitempty" mapstructure:"subscriptionId,omitempty"`
+	TriggerName    string `json:"triggerName,omitempty" mapstructure:"triggerName,omitempty"`
 }
 
 func (c *RunTrigger) Name() string {
@@ -45,9 +44,7 @@ func (c *RunTrigger) Documentation() string {
 ## Configuration
 
 - **Trigger** (required): The Cloud Build trigger to run. Select from triggers in the connected project.
-- **Branch Name**: Override the branch to build from. Mutually exclusive with Tag Name and Commit SHA. Leave empty to use the trigger's default.
-- **Tag Name**: Override the tag to build from. Mutually exclusive with Branch Name and Commit SHA.
-- **Commit SHA**: Override the commit SHA to build from. Mutually exclusive with Branch Name and Tag Name.
+- **Branch or tag**: Override the branch or tag to build from. Leave empty to use the trigger's configured default. A 40-character hex string is treated as a commit SHA.
 - **Project ID Override**: Optionally run the trigger in a different project than the connected integration.
 
 ## Output
@@ -102,28 +99,12 @@ func (c *RunTrigger) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "branchName",
-			Label:       "Branch Name",
-			Type:        configuration.FieldTypeString,
+			Name:        "ref",
+			Label:       "Branch or tag",
+			Type:        configuration.FieldTypeGitRef,
 			Required:    false,
-			Description: "Override the branch to build from. Mutually exclusive with Tag Name and Commit SHA. Leave empty to use the trigger's default.",
-			Placeholder: "e.g. main",
-		},
-		{
-			Name:        "tagName",
-			Label:       "Tag Name",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Override the tag to build from. Mutually exclusive with Branch Name and Commit SHA.",
-			Placeholder: "e.g. v1.0.0",
-		},
-		{
-			Name:        "commitSha",
-			Label:       "Commit SHA",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Override the commit SHA to build from. Mutually exclusive with Branch Name and Tag Name.",
-			Placeholder: "e.g. 5d7363a99d19e45830e1bc9622d2e4fa72d7229f",
+			Description: "Override the branch or tag to build from. Leave empty to use the trigger's configured default.",
+			Default:     "main",
 		},
 	}
 }
@@ -135,10 +116,33 @@ func decodeRunTriggerConfiguration(raw any) (RunTriggerConfiguration, error) {
 	}
 	config.ProjectID = strings.TrimSpace(config.ProjectID)
 	config.TriggerID = strings.TrimSpace(config.TriggerID)
-	config.BranchName = strings.TrimSpace(config.BranchName)
-	config.TagName = strings.TrimSpace(config.TagName)
-	config.CommitSHA = strings.TrimSpace(config.CommitSHA)
+	config.Ref = strings.TrimSpace(config.Ref)
 	return config, nil
+}
+
+func fetchTriggerName(ctx core.SetupContext, config RunTriggerConfiguration) string {
+	client, err := getClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return ""
+	}
+	projectID := config.ProjectID
+	if projectID == "" {
+		projectID = client.ProjectID()
+	}
+	if projectID == "" {
+		return ""
+	}
+	data, err := client.GetURL(context.Background(), buildGetTriggerURL(projectID, config.TriggerID))
+	if err != nil {
+		return ""
+	}
+	var trigger struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(data, &trigger); err != nil {
+		return ""
+	}
+	return trigger.Name
 }
 
 func (c *RunTrigger) Setup(ctx core.SetupContext) error {
@@ -149,20 +153,6 @@ func (c *RunTrigger) Setup(ctx core.SetupContext) error {
 
 	if config.TriggerID == "" {
 		return fmt.Errorf("trigger is required")
-	}
-
-	set := 0
-	if config.BranchName != "" {
-		set++
-	}
-	if config.TagName != "" {
-		set++
-	}
-	if config.CommitSHA != "" {
-		set++
-	}
-	if set > 1 {
-		return fmt.Errorf("branchName, tagName, and commitSha are mutually exclusive")
 	}
 
 	if ctx.Integration == nil {
@@ -178,8 +168,10 @@ func (c *RunTrigger) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to subscribe to Cloud Build notifications: %w", err)
 	}
 
+	triggerName := fetchTriggerName(ctx, config)
 	return ctx.Metadata.Set(RunTriggerNodeMetadata{
 		SubscriptionID: subscriptionID.String(),
+		TriggerName:    triggerName,
 	})
 }
 
@@ -240,14 +232,30 @@ func (c *RunTrigger) Execute(ctx core.ExecutionContext) error {
 
 func buildRunTriggerBody(config RunTriggerConfiguration) map[string]any {
 	body := map[string]any{}
-	if config.BranchName != "" {
-		body["branchName"] = config.BranchName
-	} else if config.TagName != "" {
-		body["tagName"] = config.TagName
-	} else if config.CommitSHA != "" {
-		body["commitSha"] = config.CommitSHA
+	if config.Ref == "" {
+		return body
+	}
+	if name, ok := strings.CutPrefix(config.Ref, "refs/tags/"); ok {
+		body["tagName"] = name
+	} else if isCommitSHA(config.Ref) {
+		body["commitSha"] = config.Ref
+	} else {
+		branch, _ := strings.CutPrefix(config.Ref, "refs/heads/")
+		body["branchName"] = branch
 	}
 	return body
+}
+
+func isCommitSHA(ref string) bool {
+	if len(ref) != 40 {
+		return false
+	}
+	for _, c := range ref {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *RunTrigger) poll(ctx core.ActionContext) error {

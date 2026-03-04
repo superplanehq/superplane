@@ -364,11 +364,16 @@ func (g *GCP) ensureCloudBuildSetup(
 	webhooksBaseURL string,
 	metadata *gcpcommon.Metadata,
 ) error {
-	if metadata.CloudBuildSubscription != "" {
-		return nil
-	}
-
 	projectID := client.ProjectID()
+
+	if metadata.CloudBuildSubscription != "" {
+		secret, err := g.cloudBuildSecret(integration)
+		if err != nil {
+			return fmt.Errorf("generate cloud build secret: %w", err)
+		}
+		pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/cloud-build-events?token=%s", webhooksBaseURL, integration.ID(), secret)
+		return gcppubsub.UpdatePushEndpoint(reqCtx, client, projectID, metadata.CloudBuildSubscription, pushEndpoint)
+	}
 
 	enabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "pubsub.googleapis.com")
 	if err != nil {

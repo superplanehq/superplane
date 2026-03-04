@@ -2,7 +2,6 @@ package cloudbuild
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -20,10 +19,6 @@ func scheduleCloudBuildSetupIfNeeded(integration core.IntegrationContext) error 
 	var metadata gcpcommon.Metadata
 	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
 		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	if strings.TrimSpace(metadata.CloudBuildSubscription) != "" {
-		return nil
 	}
 
 	if err := integration.ScheduleActionCall(gcpcommon.ActionNameEnsureCloudBuild, nil, ensureCloudBuildSetupDelay); err != nil {
