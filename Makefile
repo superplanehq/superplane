@@ -113,6 +113,11 @@ dev.start:
 	docker compose $(DOCKER_COMPOSE_OPTS) up -d
 	@bash ./scripts/wait-for-app
 
+dev.start.ephemeral:
+	bash ./scripts/ephemeral/start-caddy.sh $(BASE_URL)
+	bash ./scripts/ephemeral/setup-env.sh $(BASE_URL)
+	docker compose $(DOCKER_COMPOSE_OPTS) up -d
+
 dev.logs:
 	docker compose $(DOCKER_COMPOSE_OPTS) logs -f
 

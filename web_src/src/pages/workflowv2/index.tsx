@@ -2213,6 +2213,152 @@ export function WorkflowPageV2() {
     ],
   );
 
+  const handleNodesDelete = useCallback(
+    async (nodeIds: string[]) => {
+      if (!canvas || !organizationId || !canvasId) return;
+
+      saveWorkflowSnapshot(canvas);
+
+      const nodeIdSet = new Set(nodeIds);
+      const updatedNodes = canvas.spec?.nodes?.filter((node) => !nodeIdSet.has(node.id!));
+      const updatedEdges = canvas.spec?.edges?.filter(
+        (edge) => !nodeIdSet.has(edge.sourceId!) && !nodeIdSet.has(edge.targetId!),
+      );
+
+      const updatedWorkflow = {
+        ...canvas,
+        spec: {
+          ...canvas.spec,
+          nodes: updatedNodes,
+          edges: updatedEdges,
+        },
+      };
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+      if (canAutoSave) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      canAutoSave,
+      markUnsavedChange,
+    ],
+  );
+
+  const handleAutoLayoutNodes = useCallback(
+    async (nodeIds: string[]) => {
+      if (!canvas || !organizationId || !canvasId) return;
+
+      saveWorkflowSnapshot(canvas);
+
+      const updatedWorkflow = await applyHorizontalAutoLayout(canvas, {
+        nodeIds,
+        scope: "exact-set",
+      });
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+      if (canAutoSave) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      canAutoSave,
+      markUnsavedChange,
+    ],
+  );
+
+  const handleNodesDuplicate = useCallback(
+    async (nodeIds: string[]) => {
+      if (!canvas || !organizationId || !canvasId) return;
+
+      saveWorkflowSnapshot(canvas);
+
+      const existingNodeNames = (canvas.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
+      const newNodes: ComponentsNode[] = [];
+
+      for (const nodeId of nodeIds) {
+        const nodeToDuplicate = canvas.spec?.nodes?.find((node) => node.id === nodeId);
+        if (!nodeToDuplicate) continue;
+
+        let baseName = nodeToDuplicate.name?.trim() || "";
+        if (!baseName) {
+          if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.trigger?.name) {
+            baseName = nodeToDuplicate.trigger.name;
+          } else if (nodeToDuplicate.type === "TYPE_COMPONENT" && nodeToDuplicate.component?.name) {
+            baseName = nodeToDuplicate.component.name;
+          } else if (nodeToDuplicate.type === "TYPE_BLUEPRINT" && nodeToDuplicate.blueprint?.id) {
+            const blueprintMetadata = blueprints.find((b) => b.id === nodeToDuplicate.blueprint?.id);
+            baseName = blueprintMetadata?.name || "blueprint";
+          } else {
+            baseName = "node";
+          }
+        }
+
+        const allNames = [...existingNodeNames, ...newNodes.map((n) => n.name || "")];
+        const uniqueNodeName = generateUniqueNodeName(baseName, allNames);
+        const newNodeId = generateNodeId(baseName, uniqueNodeName);
+
+        newNodes.push({
+          ...nodeToDuplicate,
+          id: newNodeId,
+          name: uniqueNodeName,
+          position: {
+            x: (nodeToDuplicate.position?.x || 0) + 50,
+            y: (nodeToDuplicate.position?.y || 0) + 50,
+          },
+          isCollapsed: false,
+        });
+      }
+
+      if (newNodes.length === 0) return;
+
+      const updatedWorkflow = {
+        ...canvas,
+        spec: {
+          ...canvas.spec,
+          nodes: [...(canvas.spec?.nodes || []), ...newNodes],
+        },
+      };
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+      if (canAutoSave) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      blueprints,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      canAutoSave,
+      markUnsavedChange,
+    ],
+  );
+
   const handleEdgeDelete = useCallback(
     async (edgeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
@@ -3076,6 +3222,9 @@ export function WorkflowPageV2() {
         onSave={isTemplate ? undefined : handleSave}
         onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
         onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
+        onNodesDelete={!isReadOnly ? handleNodesDelete : undefined}
+        onDuplicateNodes={!isReadOnly ? handleNodesDuplicate : undefined}
+        onAutoLayoutNodes={!isReadOnly ? handleAutoLayoutNodes : undefined}
         onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
         isAutoLayoutOnUpdateEnabled={isAutoLayoutOnUpdateEnabled && !isReadOnly}
         onToggleAutoLayoutOnUpdate={!isReadOnly ? handleToggleAutoLayoutOnUpdate : undefined}
