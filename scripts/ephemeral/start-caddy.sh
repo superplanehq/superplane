@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+base_url="$1"
+
+sudo apt-get install caddy -y
+
+if [ -z "${base_url}" ]; then
+  echo "base-url is required" >&2
+  exit 1
+fi
+
+cat > /home/app/Caddyfile <<EOF
+${base_url} {
+  reverse_proxy 127.0.0.1:8000
+}
+EOF
+
+sudo caddy reload --config /home/app/Caddyfile
