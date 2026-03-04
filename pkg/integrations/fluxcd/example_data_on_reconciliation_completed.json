@@ -1,0 +1,20 @@
+{
+    "involvedObject": {
+        "kind": "Kustomization",
+        "namespace": "flux-system",
+        "name": "my-app",
+        "uid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "apiVersion": "kustomize.toolkit.fluxcd.io/v1",
+        "resourceVersion": "12345"
+    },
+    "severity": "info",
+    "timestamp": "2026-01-15T10:30:00Z",
+    "message": "Reconciliation finished in 5.2s, next run in 10m0s",
+    "reason": "ReconciliationSucceeded",
+    "metadata": {
+        "revision": "main@sha1:abc123def456",
+        "token": ""
+    },
+    "reportingController": "kustomize-controller",
+    "reportingInstance": "kustomize-controller-abc123-xyz"
+}

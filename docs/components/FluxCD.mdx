@@ -1,0 +1,156 @@
+---
+title: "Flux CD"
+---
+
+Build GitOps workflows with Flux CD reconciliation triggers and actions
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Reconciliation Completed" href="#on-reconciliation-completed" description="Trigger when a Flux reconciliation completes successfully" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Reconcile Source" href="#reconcile-source" description="Force reconciliation of a Flux resource" />
+</CardGrid>
+
+## Instructions
+
+To connect FluxCD to SuperPlane:
+
+1. **Kubernetes API Server**: Enter the URL of the Kubernetes API server where FluxCD is running (e.g. `https://kubernetes.example.com:6443`).
+2. **Bearer Token**: Create a ServiceAccount with RBAC permissions for Flux resources, then create a token:
+   - `kubectl create serviceaccount superplane -n flux-system`
+   - `kubectl create clusterrolebinding superplane --clusterrole=cluster-admin --serviceaccount=flux-system:superplane`
+   - `kubectl create token superplane -n flux-system`
+3. **CA Certificate** (optional): If your cluster uses a custom CA, paste the PEM-encoded certificate.
+4. **Namespace**: Default namespace for Flux resources (typically `flux-system`).
+
+For the **On Reconciliation Completed** trigger:
+1. Save the canvas to generate the webhook URL.
+2. Configure a FluxCD [Notification Provider](https://fluxcd.io/flux/components/notification/providers/) of type `generic` pointing to the generated webhook URL.
+3. Create a FluxCD [Alert](https://fluxcd.io/flux/components/notification/alerts/) that references the provider and the resources you want to monitor.
+
+<a id="on-reconciliation-completed"></a>
+
+## On Reconciliation Completed
+
+The On Reconciliation Completed trigger fires when a Flux CD reconciliation finishes successfully.
+
+### Setup
+
+1. Save the canvas to generate the webhook URL.
+2. In your cluster, create a FluxCD Notification Provider of type `generic`:
+   ```yaml
+   apiVersion: notification.toolkit.fluxcd.io/v1beta3
+   kind: Provider
+   metadata:
+     name: superplane
+     namespace: flux-system
+   spec:
+     type: generic
+     address: <webhook-url-from-superplane>
+   ```
+3. Create a FluxCD Alert to send events to the provider:
+   ```yaml
+   apiVersion: notification.toolkit.fluxcd.io/v1beta3
+   kind: Alert
+   metadata:
+     name: superplane-alert
+     namespace: flux-system
+   spec:
+     providerRef:
+       name: superplane
+     eventSources:
+       - kind: Kustomization
+         name: "*"
+       - kind: HelmRelease
+         name: "*"
+     eventSeverity: info
+   ```
+
+### Event Data
+
+The trigger emits the FluxCD notification payload, including:
+- `involvedObject`: The Flux resource (kind, name, namespace)
+- `severity`: Event severity (info, error)
+- `message`: Human-readable reconciliation message
+- `reason`: Reconciliation reason (e.g. ReconciliationSucceeded)
+- `metadata`: Additional data such as revision
+- `timestamp`: When the event occurred
+
+### Example Data
+
+```json
+{
+  "involvedObject": {
+    "apiVersion": "kustomize.toolkit.fluxcd.io/v1",
+    "kind": "Kustomization",
+    "name": "my-app",
+    "namespace": "flux-system",
+    "resourceVersion": "12345",
+    "uid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  },
+  "message": "Reconciliation finished in 5.2s, next run in 10m0s",
+  "metadata": {
+    "revision": "main@sha1:abc123def456",
+    "token": ""
+  },
+  "reason": "ReconciliationSucceeded",
+  "reportingController": "kustomize-controller",
+  "reportingInstance": "kustomize-controller-abc123-xyz",
+  "severity": "info",
+  "timestamp": "2026-01-15T10:30:00Z"
+}
+```
+
+<a id="reconcile-source"></a>
+
+## Reconcile Source
+
+The Reconcile Source component triggers reconciliation of a Flux CD resource by patching the `reconcile.fluxcd.io/requestedAt` annotation.
+
+### Use Cases
+
+- **Manual re-sync**: Force a Flux resource to reconcile on demand
+- **Approval-based deploys**: Trigger reconciliation after manual approval
+- **Cross-cluster sync**: Reconcile resources in response to events from other systems
+
+### Configuration
+
+- **Kind**: The type of Flux resource to reconcile (Kustomization, HelmRelease, GitRepository, etc.)
+- **Namespace**: The Kubernetes namespace of the resource
+- **Name**: The name of the Flux resource
+
+### Outputs
+
+The component emits the updated Kubernetes resource object, including:
+- `kind`: The resource kind
+- `namespace`: The resource namespace
+- `name`: The resource name
+- `annotations`: Updated annotations including the reconciliation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": {
+      "reconcile.fluxcd.io/requestedAt": "2026-01-15T10:30:00Z"
+    },
+    "kind": "Kustomization",
+    "lastAppliedRevision": "main@sha1:abc123def456",
+    "lastAttemptedRevision": "main@sha1:abc123def456",
+    "name": "my-app",
+    "namespace": "flux-system",
+    "resourceVersion": "12346"
+  },
+  "timestamp": "2026-01-15T10:30:00Z",
+  "type": "fluxcd.reconciliation"
+}
+```
+

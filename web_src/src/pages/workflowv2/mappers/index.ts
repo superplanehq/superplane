@@ -96,6 +96,12 @@ import {
   eventStateRegistry as firehydrantEventStateRegistry,
 } from "./firehydrant/index";
 import {
+  componentMappers as fluxcdComponentMappers,
+  customFieldRenderers as fluxcdCustomFieldRenderers,
+  triggerRenderers as fluxcdTriggerRenderers,
+  eventStateRegistry as fluxcdEventStateRegistry,
+} from "./fluxcd/index";
+import {
   componentMappers as launchdarklyComponentMappers,
   triggerRenderers as launchdarklyTriggerRenderers,
   eventStateRegistry as launchdarklyEventStateRegistry,
@@ -253,6 +259,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   rootly: rootlyComponentMappers,
   incident: incidentComponentMappers,
   firehydrant: firehydrantComponentMappers,
+  fluxcd: fluxcdComponentMappers,
   launchdarkly: launchdarklyComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
@@ -290,6 +297,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   rootly: rootlyTriggerRenderers,
   incident: incidentTriggerRenderers,
   firehydrant: firehydrantTriggerRenderers,
+  fluxcd: fluxcdTriggerRenderers,
   launchdarkly: launchdarklyTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
@@ -330,6 +338,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   incident: incidentEventStateRegistry,
   octopus: octopusEventStateRegistry,
   firehydrant: firehydrantEventStateRegistry,
+  fluxcd: fluxcdEventStateRegistry,
   launchdarkly: launchdarklyEventStateRegistry,
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
@@ -371,6 +380,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  fluxcd: fluxcdCustomFieldRenderers,
   grafana: grafanaCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,

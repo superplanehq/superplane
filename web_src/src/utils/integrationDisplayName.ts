@@ -18,6 +18,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   rootly: "Rootly",
   incident: "Incident",
   firehydrant: "FireHydrant",
+  fluxcd: "Flux CD",
   statuspage: "Statuspage",
   daytona: "Daytona",
   dash0: "Dash0",
