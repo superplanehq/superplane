@@ -1,28 +1,19 @@
 import { CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useInfiniteCanvasChangeRequests } from "@/hooks/useCanvasData";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import Editor from "@monaco-editor/react";
 import ReactMarkdown from "react-markdown";
 import type { Monaco } from "@monaco-editor/react";
-import {
-  AlertTriangle,
-  ArrowLeft,
-  Check,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  GitPullRequest,
-  RefreshCw,
-  Rocket,
-} from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, CheckCircle2, GitPullRequest, RefreshCw, Rocket } from "lucide-react";
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
 import * as yaml from "js-yaml";
 import type { editor as MonacoEditor } from "monaco-editor";
 
-const PAGE_SIZE = 8;
+const CHANGE_REQUEST_PAGE_SIZE = 10;
 
 type DiffLine = {
   kind: "add" | "remove";
@@ -36,6 +27,8 @@ type DiffGroup = {
 };
 
 interface CanvasVersioningViewProps {
+  organizationId: string;
+  canvasId: string;
   liveCanvasVersion?: CanvasesCanvasVersion;
   liveVersions: CanvasesCanvasVersion[];
   liveVersionsTotalCount?: number;
@@ -48,8 +41,6 @@ interface CanvasVersioningViewProps {
   canvasDescription?: string;
   changeRequests: CanvasesCanvasChangeRequest[];
   selectedChangeRequestId?: string;
-  currentUserId?: string;
-  onUseVersion: (versionID: string) => void;
   onSelectChangeRequest: (changeRequestID: string) => void;
   onPublishChangeRequest: () => void;
   onCloseChangeRequest: (changeRequestID: string) => void;
@@ -94,14 +85,14 @@ function formatVersionLabel(version?: CanvasesCanvasVersion): string {
   return readable ? `Revision ${revision} · ${readable}` : `Revision ${revision}`;
 }
 
-type ChangeRequestStatus = "open" | "merged" | "rejected" | "unknown";
+type ChangeRequestStatus = "open" | "conflicted" | "merged" | "rejected" | "unknown";
 type ChangeRequestFilter = "open" | "rejected" | "merged" | "conflicted" | "all";
 
 function normalizeChangeRequestStatus(status?: string | number): ChangeRequestStatus {
   if (typeof status === "number") {
     if (status === 1) return "open";
     if (status === 2) return "merged";
-    if (status === 3) return "open";
+    if (status === 3) return "conflicted";
     if (status === 4) return "rejected";
     return "unknown";
   }
@@ -110,31 +101,8 @@ function normalizeChangeRequestStatus(status?: string | number): ChangeRequestSt
   if (value.includes("open")) return "open";
   if (value.includes("publish") || value.includes("merge")) return "merged";
   if (value.includes("close") || value.includes("reject")) return "rejected";
-  if (value.includes("conflict")) return "open";
+  if (value.includes("conflict")) return "conflicted";
   return "unknown";
-}
-
-function matchesChangeRequestFilter(
-  status: ChangeRequestStatus,
-  filter: ChangeRequestFilter,
-  hasConflicts: boolean,
-): boolean {
-  if (filter === "all") {
-    return true;
-  }
-  if (filter === "open") {
-    return status === "open";
-  }
-  if (filter === "merged") {
-    return status === "merged";
-  }
-  if (filter === "rejected") {
-    return status === "rejected";
-  }
-  if (filter === "conflicted") {
-    return status === "open" && hasConflicts;
-  }
-  return true;
 }
 
 function normalizeForCompare(value: unknown): unknown {
@@ -519,6 +487,8 @@ function buildNodeDiffGroups(lines: DiffLine[]): DiffGroup[] {
 }
 
 export function CanvasVersioningView({
+  organizationId,
+  canvasId,
   liveCanvasVersion,
   liveVersions,
   liveVersionsTotalCount,
@@ -531,8 +501,6 @@ export function CanvasVersioningView({
   canvasDescription,
   changeRequests,
   selectedChangeRequestId,
-  currentUserId,
-  onUseVersion,
   onSelectChangeRequest,
   onPublishChangeRequest,
   onCloseChangeRequest,
@@ -551,9 +519,10 @@ export function CanvasVersioningView({
 }: CanvasVersioningViewProps) {
   const [changeRequestFilter, setChangeRequestFilter] = useState<ChangeRequestFilter>("open");
   const [onlyMine, setOnlyMine] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [page, setPage] = useState(1);
   const [resolvingChangeRequestID, setResolvingChangeRequestID] = useState("");
+  const [selectedLiveHistoryVersionId, setSelectedLiveHistoryVersionId] = useState(activeCanvasVersionId || "");
   const [createChangeRequestTitle, setCreateChangeRequestTitle] = useState("");
   const [createChangeRequestDescription, setCreateChangeRequestDescription] = useState("");
   const [createChangeRequestDescriptionMode, setCreateChangeRequestDescriptionMode] = useState<"write" | "preview">(
@@ -583,59 +552,33 @@ export function CanvasVersioningView({
     setCreateChangeRequestDescriptionMode("write");
   }, [createChangeRequestMode, createChangeRequestVersion?.metadata?.revision, canvasName]);
 
-  const visibleChangeRequests = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    return changeRequests.filter((changeRequest) => {
-      const status = normalizeChangeRequestStatus(changeRequest.metadata?.status as string | number | undefined);
-      const hasConflicts = (changeRequest.diff?.conflictingNodeIds?.length || 0) > 0;
-      if (!matchesChangeRequestFilter(status, changeRequestFilter, hasConflicts)) {
-        return false;
-      }
-
-      if (onlyMine) {
-        if (!currentUserId) {
-          return false;
-        }
-        if ((changeRequest.metadata?.owner?.id || "").toLowerCase() !== currentUserId.toLowerCase()) {
-          return false;
-        }
-      }
-
-      if (!query) {
-        return true;
-      }
-
-      const ownerName = (changeRequest.metadata?.owner?.name || "").toLowerCase();
-      const ownerID = (changeRequest.metadata?.owner?.id || "").toLowerCase();
-      const title = (changeRequest.metadata?.title || "").toLowerCase();
-      const revision = String(changeRequest.version?.metadata?.revision || "").toLowerCase();
-      const statusText = status.toLowerCase();
-      return (
-        ownerName.includes(query) ||
-        ownerID.includes(query) ||
-        title.includes(query) ||
-        revision.includes(query) ||
-        statusText.includes(query)
-      );
-    });
-  }, [changeRequests, changeRequestFilter, onlyMine, currentUserId, searchQuery]);
-
-  const pageCount = Math.max(1, Math.ceil(visibleChangeRequests.length / PAGE_SIZE));
-
   useEffect(() => {
-    if (page > pageCount) {
-      setPage(pageCount);
-    }
-  }, [page, pageCount]);
+    const timeout = window.setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [searchInput]);
 
-  const paginatedChangeRequests = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return visibleChangeRequests.slice(start, start + PAGE_SIZE);
-  }, [visibleChangeRequests, page]);
+  const canvasChangeRequestsQuery = useInfiniteCanvasChangeRequests(organizationId, canvasId, {
+    enabled: true,
+    limit: CHANGE_REQUEST_PAGE_SIZE,
+    statusFilter: changeRequestFilter,
+    onlyMine,
+    searchQuery,
+  });
+
+  const visibleChangeRequests = useMemo(
+    () => (canvasChangeRequestsQuery.data?.pages || []).flatMap((page) => page?.changeRequests || []),
+    [canvasChangeRequestsQuery.data?.pages],
+  );
+  const isLoadingChangeRequests =
+    (canvasChangeRequestsQuery.isPending || canvasChangeRequestsQuery.isFetching) && visibleChangeRequests.length === 0;
 
   const selectedChangeRequest = useMemo(
-    () => visibleChangeRequests.find((changeRequest) => changeRequest.metadata?.id === selectedChangeRequestId),
-    [visibleChangeRequests, selectedChangeRequestId],
+    () =>
+      visibleChangeRequests.find((changeRequest) => changeRequest.metadata?.id === selectedChangeRequestId) ||
+      changeRequests.find((changeRequest) => changeRequest.metadata?.id === selectedChangeRequestId),
+    [visibleChangeRequests, changeRequests, selectedChangeRequestId],
   );
 
   useEffect(() => {
@@ -663,8 +606,8 @@ export function CanvasVersioningView({
   }, [changeRequests, resolvingChangeRequestID]);
 
   const resolvingChangeRequest = useMemo(
-    () => changeRequests.find((changeRequest) => changeRequest.metadata?.id === resolvingChangeRequestID),
-    [changeRequests, resolvingChangeRequestID],
+    () => visibleChangeRequests.find((changeRequest) => changeRequest.metadata?.id === resolvingChangeRequestID),
+    [visibleChangeRequests, resolvingChangeRequestID],
   );
 
   const selectedChangeNodeDiffs = useMemo(() => {
@@ -762,6 +705,96 @@ export function CanvasVersioningView({
           Boolean(item),
       );
   }, [createChangeRequestVersion, liveCanvasVersion?.spec?.nodes]);
+
+  useEffect(() => {
+    const nextVersionID = activeCanvasVersionId || liveCanvasVersion?.metadata?.id || "";
+    if (!nextVersionID) {
+      return;
+    }
+    if (selectedLiveHistoryVersionId) {
+      const stillVisible = liveVersions.some((version) => version.metadata?.id === selectedLiveHistoryVersionId);
+      if (stillVisible) {
+        return;
+      }
+    }
+    setSelectedLiveHistoryVersionId(nextVersionID);
+  }, [activeCanvasVersionId, liveCanvasVersion?.metadata?.id, liveVersions, selectedLiveHistoryVersionId]);
+
+  const selectedLiveHistoryVersion = useMemo(
+    () => liveVersions.find((version) => version.metadata?.id === selectedLiveHistoryVersionId),
+    [liveVersions, selectedLiveHistoryVersionId],
+  );
+
+  const selectedLiveHistoryBaseVersion = useMemo(() => {
+    if (!selectedLiveHistoryVersion) {
+      return undefined;
+    }
+
+    const basedOnVersionID = selectedLiveHistoryVersion.metadata?.basedOnVersionId || "";
+    if (basedOnVersionID) {
+      return liveVersions.find((version) => version.metadata?.id === basedOnVersionID);
+    }
+
+    const index = liveVersions.findIndex((version) => version.metadata?.id === selectedLiveHistoryVersion.metadata?.id);
+    if (index >= 0 && index + 1 < liveVersions.length) {
+      return liveVersions[index + 1];
+    }
+
+    return undefined;
+  }, [liveVersions, selectedLiveHistoryVersion]);
+
+  const selectedLiveHistoryNodeDiffs = useMemo(() => {
+    if (!selectedLiveHistoryVersion) {
+      return [];
+    }
+
+    const baseNodes = (selectedLiveHistoryBaseVersion?.spec?.nodes || []) as Record<string, unknown>[];
+    const targetNodes = (selectedLiveHistoryVersion.spec?.nodes || []) as Record<string, unknown>[];
+
+    const baseNodeByID = new Map<string, Record<string, unknown>>();
+    baseNodes.forEach((node) => {
+      const nodeID = (node.id as string) || "";
+      if (nodeID) {
+        baseNodeByID.set(nodeID, node);
+      }
+    });
+
+    const targetNodeByID = new Map<string, Record<string, unknown>>();
+    targetNodes.forEach((node) => {
+      const nodeID = (node.id as string) || "";
+      if (nodeID) {
+        targetNodeByID.set(nodeID, node);
+      }
+    });
+
+    const allNodeIDs = Array.from(new Set([...baseNodeByID.keys(), ...targetNodeByID.keys()])).sort((left, right) =>
+      left.localeCompare(right),
+    );
+
+    return allNodeIDs
+      .map((nodeID) => {
+        const oldNode = baseNodeByID.get(nodeID);
+        const newNode = targetNodeByID.get(nodeID);
+        const lines = buildNodeDiffLines(oldNode, newNode);
+        if (lines.length === 0) {
+          return null;
+        }
+
+        const kind = !oldNode && newNode ? "added" : oldNode && !newNode ? "removed" : "updated";
+        return {
+          nodeID,
+          kind,
+          lines,
+          groups: buildNodeDiffGroups(lines),
+        };
+      })
+      .filter(
+        (
+          item,
+        ): item is { nodeID: string; kind: "added" | "removed" | "updated"; lines: DiffLine[]; groups: DiffGroup[] } =>
+          Boolean(item),
+      );
+  }, [selectedLiveHistoryBaseVersion?.spec?.nodes, selectedLiveHistoryVersion]);
 
   const handleSubmitCreateChangeRequest = useCallback(async () => {
     await onSubmitCreateChangeRequest({
@@ -987,15 +1020,22 @@ export function CanvasVersioningView({
                 {liveVersions.map((version) => {
                   const versionID = version.metadata?.id || "";
                   const isActive = versionID !== "" && versionID === activeCanvasVersionId;
+                  const isSelected = versionID !== "" && versionID === selectedLiveHistoryVersionId;
 
                   return (
                     <button
                       key={versionID}
                       type="button"
-                      onClick={() => onUseVersion(versionID)}
+                      onClick={() => {
+                        setSelectedLiveHistoryVersionId(versionID);
+                      }}
                       className={cn(
                         "w-full rounded-md border px-3 py-2 text-left",
-                        isActive ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white hover:bg-slate-50",
+                        isSelected
+                          ? "border-sky-300 bg-sky-50"
+                          : isActive
+                            ? "border-sky-200 bg-sky-50/50"
+                            : "border-slate-200 bg-white hover:bg-slate-50",
                       )}
                     >
                       <p className="text-sm font-medium text-slate-900">{formatVersionLabel(version)}</p>
@@ -1013,6 +1053,78 @@ export function CanvasVersioningView({
                 >
                   {loadMoreLiveVersionsPending ? "Loading..." : "Load older revisions"}
                 </Button>
+              ) : null}
+              {selectedLiveHistoryVersion ? (
+                <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Selected Revision Diff · {formatVersionLabel(selectedLiveHistoryVersion)}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Showing changes applied against{" "}
+                    {selectedLiveHistoryBaseVersion
+                      ? formatVersionLabel(selectedLiveHistoryBaseVersion)
+                      : "an empty baseline (first live revision)"}
+                    .
+                  </p>
+                  {selectedLiveHistoryNodeDiffs.length === 0 ? (
+                    <p className="mt-2 text-xs text-slate-600">No node-level changes detected for this revision.</p>
+                  ) : (
+                    <Accordion type="multiple" className="mt-2 rounded-md border border-slate-200 bg-white px-3">
+                      {selectedLiveHistoryNodeDiffs.map((nodeDiff) => (
+                        <AccordionItem
+                          key={`history-${nodeDiff.nodeID}`}
+                          value={`history-${nodeDiff.nodeID}`}
+                          className="border-slate-200"
+                        >
+                          <AccordionTrigger className="py-3 text-xs hover:no-underline">
+                            <div className="min-w-0 flex-1 text-left">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-semibold text-slate-900 break-all">{nodeDiff.nodeID}</span>
+                                <span
+                                  className={cn(
+                                    "rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide",
+                                    nodeDiff.kind === "added" && "bg-emerald-100 text-emerald-700",
+                                    nodeDiff.kind === "removed" && "bg-red-100 text-red-700",
+                                    nodeDiff.kind === "updated" && "bg-blue-100 text-blue-700",
+                                  )}
+                                >
+                                  {nodeDiff.kind}
+                                </span>
+                              </div>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="pb-3">
+                            <div className="space-y-3">
+                              {nodeDiff.groups.map((group) => (
+                                <div
+                                  key={`history-${nodeDiff.nodeID}-${group.section}`}
+                                  className="rounded-md border border-slate-200 bg-slate-50"
+                                >
+                                  <div className="border-b border-slate-200 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                                    {group.section}
+                                  </div>
+                                  <div className="px-3 py-2 font-mono text-xs">
+                                    {group.lines.map((line, index) => (
+                                      <p
+                                        key={`history-${nodeDiff.nodeID}-${group.section}-${line.kind}-${line.path}-${index}`}
+                                        className={cn(
+                                          "break-all",
+                                          line.kind === "add" ? "text-emerald-700" : "text-red-700",
+                                        )}
+                                      >
+                                        {line.kind === "add" ? "+" : "-"} {line.path}: {line.value}
+                                      </p>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  )}
+                </div>
               ) : null}
             </>
           )}
@@ -1055,26 +1167,29 @@ export function CanvasVersioningView({
             </div>
             <input
               type="text"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
               placeholder="Search by title, owner, revision, or status"
               className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm text-slate-900 focus:border-sky-400 focus:outline-none"
             />
           </div>
 
-          {visibleChangeRequests.length === 0 ? (
+          {isLoadingChangeRequests ? (
+            <p className="mt-3 text-xs text-slate-600">Loading change requests...</p>
+          ) : visibleChangeRequests.length === 0 ? (
             <p className="mt-3 text-xs text-slate-600">No change requests found for this filter.</p>
           ) : (
             <div className="mt-3 space-y-2">
-              {paginatedChangeRequests.map((changeRequest) => {
+              {visibleChangeRequests.map((changeRequest) => {
                 const changeRequestID = changeRequest.metadata?.id || "";
                 const status = normalizeChangeRequestStatus(
                   changeRequest.metadata?.status as string | number | undefined,
                 );
                 const changedCount = changeRequest.diff?.changedNodeIds?.length || 0;
                 const conflictCount = changeRequest.diff?.conflictingNodeIds?.length || 0;
-                const canResolve = status === "open" && conflictCount > 0 && changeRequestID !== "";
-                const canClose = status === "open" && changeRequestID !== "";
+                const canResolve =
+                  (status === "open" || status === "conflicted") && conflictCount > 0 && changeRequestID !== "";
+                const canClose = (status === "open" || status === "conflicted") && changeRequestID !== "";
                 const versioningActionDisabled = sandboxModeEnabled;
 
                 return (
@@ -1099,6 +1214,7 @@ export function CanvasVersioningView({
                           className={cn(
                             "rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                             status === "open" && "bg-blue-100 text-blue-800",
+                            status === "conflicted" && "bg-red-100 text-red-700",
                             status === "merged" && "bg-emerald-100 text-emerald-700",
                             status === "rejected" && "bg-slate-200 text-slate-700",
                             status === "unknown" && "bg-slate-100 text-slate-700",
@@ -1157,28 +1273,15 @@ export function CanvasVersioningView({
             </div>
           )}
 
-          {visibleChangeRequests.length > PAGE_SIZE ? (
-            <div className="mt-4 flex items-center justify-end gap-2">
+          {canvasChangeRequestsQuery.hasNextPage ? (
+            <div className="mt-4 flex items-center justify-end">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-                disabled={page <= 1}
+                onClick={() => canvasChangeRequestsQuery.fetchNextPage()}
+                disabled={canvasChangeRequestsQuery.isFetchingNextPage}
               >
-                <ChevronLeft className="h-4 w-4" />
-                Prev
-              </Button>
-              <span className="text-xs text-slate-600">
-                Page {page} / {pageCount}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
-                disabled={page >= pageCount}
-              >
-                Next
-                <ChevronRight className="h-4 w-4" />
+                {canvasChangeRequestsQuery.isFetchingNextPage ? "Loading..." : "Load more change requests"}
               </Button>
             </div>
           ) : null}
@@ -1198,9 +1301,11 @@ export function CanvasVersioningView({
                         size="sm"
                         disabled={
                           sandboxModeEnabled ||
-                          normalizeChangeRequestStatus(
-                            selectedChangeRequest.metadata?.status as string | number | undefined,
-                          ) !== "open"
+                          !["open", "conflicted"].includes(
+                            normalizeChangeRequestStatus(
+                              selectedChangeRequest.metadata?.status as string | number | undefined,
+                            ),
+                          )
                         }
                         onClick={() => setResolvingChangeRequestID(selectedChangeRequest.metadata?.id || "")}
                       >
@@ -1241,7 +1346,9 @@ export function CanvasVersioningView({
                     const selectedStatus = normalizeChangeRequestStatus(
                       selectedChangeRequest.metadata?.status as string | number | undefined,
                     );
-                    const canCloseSelected = selectedStatus === "open" && !!selectedChangeRequest.metadata?.id;
+                    const canCloseSelected =
+                      (selectedStatus === "open" || selectedStatus === "conflicted") &&
+                      !!selectedChangeRequest.metadata?.id;
                     if (!canCloseSelected) {
                       return null;
                     }

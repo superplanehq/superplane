@@ -356,6 +356,9 @@ export type CanvasesInvokeNodeTriggerActionResponse = {
 
 export type CanvasesListCanvasChangeRequestsResponse = {
   changeRequests?: Array<CanvasesCanvasChangeRequest>;
+  totalCount?: number;
+  hasNextPage?: boolean;
+  lastTimestamp?: string;
 };
 
 export type CanvasesListCanvasEventsResponse = {
@@ -1580,7 +1583,13 @@ export type CanvasesListCanvasChangeRequestsData = {
   path: {
     canvasId: string;
   };
-  query?: never;
+  query?: {
+    limit?: number;
+    before?: string;
+    statusFilter?: string;
+    onlyMine?: boolean;
+    query?: string;
+  };
   url: "/api/v1/canvases/{canvasId}/change-requests";
 };
 

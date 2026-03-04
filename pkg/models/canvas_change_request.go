@@ -1,6 +1,8 @@
 package models
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,6 +32,14 @@ type CanvasChangeRequest struct {
 	PublishedAt        *time.Time
 	CreatedAt          *time.Time
 	UpdatedAt          *time.Time
+}
+
+type CanvasChangeRequestListOptions struct {
+	Limit    int
+	Before   *time.Time
+	OwnerID  *uuid.UUID
+	Statuses []string
+	Query    string
 }
 
 func (c *CanvasChangeRequest) TableName() string {
@@ -73,10 +83,23 @@ func ListCanvasChangeRequests(workflowID uuid.UUID) ([]CanvasChangeRequest, erro
 }
 
 func ListCanvasChangeRequestsInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]CanvasChangeRequest, error) {
+	return ListCanvasChangeRequestsFilteredInTransaction(tx, workflowID, CanvasChangeRequestListOptions{})
+}
+
+func ListCanvasChangeRequestsFilteredInTransaction(
+	tx *gorm.DB,
+	workflowID uuid.UUID,
+	options CanvasChangeRequestListOptions,
+) ([]CanvasChangeRequest, error) {
 	var requests []CanvasChangeRequest
-	err := tx.
-		Where("workflow_id = ?", workflowID).
-		Order("created_at DESC").
+	query := applyCanvasChangeRequestListFilters(tx, workflowID, options, true).
+		Order("workflow_change_requests.created_at DESC, workflow_change_requests.id DESC")
+
+	if options.Limit > 0 {
+		query = query.Limit(options.Limit)
+	}
+
+	err := query.
 		Find(&requests).
 		Error
 	if err != nil {
@@ -84,4 +107,65 @@ func ListCanvasChangeRequestsInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([
 	}
 
 	return requests, nil
+}
+
+func CountCanvasChangeRequestsFilteredInTransaction(
+	tx *gorm.DB,
+	workflowID uuid.UUID,
+	options CanvasChangeRequestListOptions,
+) (int64, error) {
+	var count int64
+	err := applyCanvasChangeRequestListFilters(tx, workflowID, options, false).
+		Model(&CanvasChangeRequest{}).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func applyCanvasChangeRequestListFilters(
+	tx *gorm.DB,
+	workflowID uuid.UUID,
+	options CanvasChangeRequestListOptions,
+	includeBefore bool,
+) *gorm.DB {
+	query := tx.Where("workflow_change_requests.workflow_id = ?", workflowID)
+
+	if options.OwnerID != nil {
+		query = query.Where("workflow_change_requests.owner_id = ?", *options.OwnerID)
+	}
+
+	if len(options.Statuses) > 0 {
+		query = query.Where("workflow_change_requests.status IN ?", options.Statuses)
+	}
+
+	if includeBefore && options.Before != nil {
+		query = query.Where("workflow_change_requests.created_at < ?", *options.Before)
+	}
+
+	trimmedQuery := strings.TrimSpace(options.Query)
+	if trimmedQuery == "" {
+		return query
+	}
+
+	like := "%" + strings.ToLower(trimmedQuery) + "%"
+	revisionLike := strings.ReplaceAll(trimmedQuery, "%", "")
+	revisionLike = fmt.Sprintf("%%%s%%", revisionLike)
+	query = query.Joins("LEFT JOIN workflow_versions wv ON wv.id = workflow_change_requests.version_id")
+	query = query.Where(
+		`LOWER(COALESCE(workflow_change_requests.title, '')) LIKE ?
+		OR LOWER(COALESCE(workflow_change_requests.description, '')) LIKE ?
+		OR LOWER(COALESCE(workflow_change_requests.status, '')) LIKE ?
+		OR COALESCE(CAST(workflow_change_requests.owner_id AS TEXT), '') LIKE ?
+		OR CAST(COALESCE(wv.revision, 0) AS TEXT) LIKE ?`,
+		like,
+		like,
+		like,
+		like,
+		revisionLike,
+	)
+	return query
 }

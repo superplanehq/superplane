@@ -13,6 +13,7 @@ package openapi_client
 
 import (
 	"encoding/json"
+	"time"
 )
 
 // checks if the CanvasesListCanvasChangeRequestsResponse type satisfies the MappedNullable interface at compile time
@@ -21,6 +22,9 @@ var _ MappedNullable = &CanvasesListCanvasChangeRequestsResponse{}
 // CanvasesListCanvasChangeRequestsResponse struct for CanvasesListCanvasChangeRequestsResponse
 type CanvasesListCanvasChangeRequestsResponse struct {
 	ChangeRequests []CanvasesCanvasChangeRequest `json:"changeRequests,omitempty"`
+	TotalCount     *int64                        `json:"totalCount,omitempty"`
+	HasNextPage    *bool                         `json:"hasNextPage,omitempty"`
+	LastTimestamp  *time.Time                    `json:"lastTimestamp,omitempty"`
 }
 
 // NewCanvasesListCanvasChangeRequestsResponse instantiates a new CanvasesListCanvasChangeRequestsResponse object
@@ -72,6 +76,102 @@ func (o *CanvasesListCanvasChangeRequestsResponse) SetChangeRequests(v []Canvase
 	o.ChangeRequests = v
 }
 
+// GetTotalCount returns the TotalCount field value if set, zero value otherwise.
+func (o *CanvasesListCanvasChangeRequestsResponse) GetTotalCount() int64 {
+	if o == nil || IsNil(o.TotalCount) {
+		var ret int64
+		return ret
+	}
+	return *o.TotalCount
+}
+
+// GetTotalCountOk returns a tuple with the TotalCount field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesListCanvasChangeRequestsResponse) GetTotalCountOk() (*int64, bool) {
+	if o == nil || IsNil(o.TotalCount) {
+		return nil, false
+	}
+	return o.TotalCount, true
+}
+
+// HasTotalCount returns a boolean if a field has been set.
+func (o *CanvasesListCanvasChangeRequestsResponse) HasTotalCount() bool {
+	if o != nil && !IsNil(o.TotalCount) {
+		return true
+	}
+
+	return false
+}
+
+// SetTotalCount gets a reference to the given int64 and assigns it to the TotalCount field.
+func (o *CanvasesListCanvasChangeRequestsResponse) SetTotalCount(v int64) {
+	o.TotalCount = &v
+}
+
+// GetHasNextPage returns the HasNextPage field value if set, zero value otherwise.
+func (o *CanvasesListCanvasChangeRequestsResponse) GetHasNextPage() bool {
+	if o == nil || IsNil(o.HasNextPage) {
+		var ret bool
+		return ret
+	}
+	return *o.HasNextPage
+}
+
+// GetHasNextPageOk returns a tuple with the HasNextPage field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesListCanvasChangeRequestsResponse) GetHasNextPageOk() (*bool, bool) {
+	if o == nil || IsNil(o.HasNextPage) {
+		return nil, false
+	}
+	return o.HasNextPage, true
+}
+
+// HasHasNextPage returns a boolean if a field has been set.
+func (o *CanvasesListCanvasChangeRequestsResponse) HasHasNextPage() bool {
+	if o != nil && !IsNil(o.HasNextPage) {
+		return true
+	}
+
+	return false
+}
+
+// SetHasNextPage gets a reference to the given bool and assigns it to the HasNextPage field.
+func (o *CanvasesListCanvasChangeRequestsResponse) SetHasNextPage(v bool) {
+	o.HasNextPage = &v
+}
+
+// GetLastTimestamp returns the LastTimestamp field value if set, zero value otherwise.
+func (o *CanvasesListCanvasChangeRequestsResponse) GetLastTimestamp() time.Time {
+	if o == nil || IsNil(o.LastTimestamp) {
+		var ret time.Time
+		return ret
+	}
+	return *o.LastTimestamp
+}
+
+// GetLastTimestampOk returns a tuple with the LastTimestamp field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesListCanvasChangeRequestsResponse) GetLastTimestampOk() (*time.Time, bool) {
+	if o == nil || IsNil(o.LastTimestamp) {
+		return nil, false
+	}
+	return o.LastTimestamp, true
+}
+
+// HasLastTimestamp returns a boolean if a field has been set.
+func (o *CanvasesListCanvasChangeRequestsResponse) HasLastTimestamp() bool {
+	if o != nil && !IsNil(o.LastTimestamp) {
+		return true
+	}
+
+	return false
+}
+
+// SetLastTimestamp gets a reference to the given time.Time and assigns it to the LastTimestamp field.
+func (o *CanvasesListCanvasChangeRequestsResponse) SetLastTimestamp(v time.Time) {
+	o.LastTimestamp = &v
+}
+
 func (o CanvasesListCanvasChangeRequestsResponse) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -84,6 +184,15 @@ func (o CanvasesListCanvasChangeRequestsResponse) ToMap() (map[string]interface{
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.ChangeRequests) {
 		toSerialize["changeRequests"] = o.ChangeRequests
+	}
+	if !IsNil(o.TotalCount) {
+		toSerialize["totalCount"] = o.TotalCount
+	}
+	if !IsNil(o.HasNextPage) {
+		toSerialize["hasNextPage"] = o.HasNextPage
+	}
+	if !IsNil(o.LastTimestamp) {
+		toSerialize["lastTimestamp"] = o.LastTimestamp
 	}
 	return toSerialize, nil
 }

@@ -100,7 +100,16 @@ func (s *CanvasService) CreateCanvasChangeRequest(ctx context.Context, req *pb.C
 
 func (s *CanvasService) ListCanvasChangeRequests(ctx context.Context, req *pb.ListCanvasChangeRequestsRequest) (*pb.ListCanvasChangeRequestsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.ListCanvasChangeRequests(ctx, organizationID, req.CanvasId)
+	return canvases.ListCanvasChangeRequests(
+		ctx,
+		organizationID,
+		req.CanvasId,
+		req.Limit,
+		req.Before,
+		req.StatusFilter,
+		req.OnlyMine,
+		req.Query,
+	)
 }
 
 func (s *CanvasService) DescribeCanvasChangeRequest(ctx context.Context, req *pb.DescribeCanvasChangeRequestRequest) (*pb.DescribeCanvasChangeRequestResponse, error) {

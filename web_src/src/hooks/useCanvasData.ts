@@ -50,6 +50,21 @@ export const canvasKeys = {
     [...canvasKeys.versionDetails(), canvasId, versionId] as const,
   changeRequests: () => [...canvasKeys.all, "changeRequests"] as const,
   changeRequestList: (canvasId: string) => [...canvasKeys.changeRequests(), canvasId] as const,
+  changeRequestHistory: (
+    canvasId: string,
+    statusFilter: string,
+    onlyMine: boolean,
+    searchQuery: string,
+    limit: number,
+  ) =>
+    [
+      ...canvasKeys.changeRequestList(canvasId),
+      "history",
+      statusFilter,
+      onlyMine ? "mine" : "all",
+      searchQuery,
+      limit,
+    ] as const,
   changeRequestDetails: () => [...canvasKeys.changeRequests(), "detail"] as const,
   changeRequestDetail: (canvasId: string, changeRequestId: string) =>
     [...canvasKeys.changeRequestDetails(), canvasId, changeRequestId] as const,
@@ -215,11 +230,61 @@ export const useCanvasChangeRequests = (organizationId: string, canvasId: string
       const response = await canvasesListCanvasChangeRequests(
         withOrganizationHeader({
           path: { canvasId },
+          query: { limit: 100, statusFilter: "all" },
         }),
       );
       return response.data?.changeRequests || [];
     },
     enabled: !!organizationId && !!canvasId,
+  });
+};
+
+type CanvasChangeRequestFilter = "open" | "conflicted" | "rejected" | "merged" | "all";
+
+export const useInfiniteCanvasChangeRequests = (
+  organizationId: string,
+  canvasId: string,
+  options?: {
+    enabled?: boolean;
+    limit?: number;
+    statusFilter?: CanvasChangeRequestFilter;
+    onlyMine?: boolean;
+    searchQuery?: string;
+  },
+) => {
+  const limit = options?.limit || 10;
+  const statusFilter = options?.statusFilter || "open";
+  const onlyMine = options?.onlyMine || false;
+  const searchQuery = options?.searchQuery || "";
+  const enabled = options?.enabled ?? true;
+
+  return useInfiniteQuery({
+    queryKey: canvasKeys.changeRequestHistory(canvasId, statusFilter, onlyMine, searchQuery, limit),
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      const response = await canvasesListCanvasChangeRequests(
+        withOrganizationHeader({
+          path: { canvasId },
+          query: {
+            limit,
+            statusFilter,
+            onlyMine,
+            ...(searchQuery ? { query: searchQuery } : {}),
+            ...(pageParam ? { before: pageParam } : {}),
+          },
+        }),
+      );
+      return response.data;
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const loadedCount = allPages.reduce((acc, page) => acc + (page?.changeRequests?.length || 0), 0);
+      const totalCount = lastPage?.totalCount || 0;
+      if (loadedCount >= totalCount) return undefined;
+      if (!lastPage?.hasNextPage) return undefined;
+      return lastPage?.lastTimestamp || undefined;
+    },
+    initialPageParam: undefined as string | undefined,
+    enabled: enabled && !!organizationId && !!canvasId,
+    refetchOnWindowFocus: false,
   });
 };
 

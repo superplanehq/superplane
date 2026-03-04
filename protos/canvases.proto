@@ -514,10 +514,18 @@ message CreateCanvasChangeRequestResponse {
 
 message ListCanvasChangeRequestsRequest {
   string canvas_id = 1;
+  uint32 limit = 2;
+  google.protobuf.Timestamp before = 3;
+  string status_filter = 4;
+  bool only_mine = 5;
+  string query = 6;
 }
 
 message ListCanvasChangeRequestsResponse {
   repeated CanvasChangeRequest change_requests = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
 }
 
 message DescribeCanvasChangeRequestRequest {

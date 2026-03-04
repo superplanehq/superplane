@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // CanvasChangeRequestAPIService CanvasChangeRequestAPI service
@@ -390,9 +391,39 @@ func (a *CanvasChangeRequestAPIService) CanvasesDescribeCanvasChangeRequestExecu
 }
 
 type ApiCanvasesListCanvasChangeRequestsRequest struct {
-	ctx        context.Context
-	ApiService *CanvasChangeRequestAPIService
-	canvasId   string
+	ctx          context.Context
+	ApiService   *CanvasChangeRequestAPIService
+	canvasId     string
+	limit        *int64
+	before       *time.Time
+	statusFilter *string
+	onlyMine     *bool
+	query        *string
+}
+
+func (r ApiCanvasesListCanvasChangeRequestsRequest) Limit(limit int64) ApiCanvasesListCanvasChangeRequestsRequest {
+	r.limit = &limit
+	return r
+}
+
+func (r ApiCanvasesListCanvasChangeRequestsRequest) Before(before time.Time) ApiCanvasesListCanvasChangeRequestsRequest {
+	r.before = &before
+	return r
+}
+
+func (r ApiCanvasesListCanvasChangeRequestsRequest) StatusFilter(statusFilter string) ApiCanvasesListCanvasChangeRequestsRequest {
+	r.statusFilter = &statusFilter
+	return r
+}
+
+func (r ApiCanvasesListCanvasChangeRequestsRequest) OnlyMine(onlyMine bool) ApiCanvasesListCanvasChangeRequestsRequest {
+	r.onlyMine = &onlyMine
+	return r
+}
+
+func (r ApiCanvasesListCanvasChangeRequestsRequest) Query(query string) ApiCanvasesListCanvasChangeRequestsRequest {
+	r.query = &query
+	return r
 }
 
 func (r ApiCanvasesListCanvasChangeRequestsRequest) Execute() (*CanvasesListCanvasChangeRequestsResponse, *http.Response, error) {
@@ -439,6 +470,21 @@ func (a *CanvasChangeRequestAPIService) CanvasesListCanvasChangeRequestsExecute(
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.limit != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "", "")
+	}
+	if r.before != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "before", r.before, "", "")
+	}
+	if r.statusFilter != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "statusFilter", r.statusFilter, "", "")
+	}
+	if r.onlyMine != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "onlyMine", r.onlyMine, "", "")
+	}
+	if r.query != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "query", r.query, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 

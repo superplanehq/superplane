@@ -3382,7 +3382,7 @@ export function WorkflowPageV2() {
   );
 
   const handlePublishChangeRequest = useCallback(async () => {
-    if (!organizationId || !canvasId || !selectedChangeRequest?.metadata?.id) {
+    if (!organizationId || !canvasId || !selectedChangeRequestId) {
       return;
     }
 
@@ -3391,7 +3391,7 @@ export function WorkflowPageV2() {
       return;
     }
 
-    const selectedRequestVersionID = selectedChangeRequest.metadata?.versionId || "";
+    const selectedRequestVersionID = selectedChangeRequest?.metadata?.versionId || "";
     if (hasUnsavedChanges && selectedRequestVersionID === activeCanvasVersionId) {
       showErrorToast("Save your version changes before publishing this change request");
       return;
@@ -3399,7 +3399,7 @@ export function WorkflowPageV2() {
 
     try {
       const response = await publishCanvasChangeRequestMutation.mutateAsync({
-        changeRequestId: selectedChangeRequest.metadata.id,
+        changeRequestId: selectedChangeRequestId,
       });
 
       if (response?.data?.canvas) {
@@ -3450,6 +3450,7 @@ export function WorkflowPageV2() {
     organizationId,
     canvasId,
     selectedChangeRequest,
+    selectedChangeRequestId,
     hasUnsavedChanges,
     activeCanvasVersionId,
     publishCanvasChangeRequestMutation,
@@ -4276,7 +4277,7 @@ export function WorkflowPageV2() {
   })();
   const publishChangeRequestDisabled =
     isSandboxModeEnabled ||
-    !selectedChangeRequest ||
+    !selectedChangeRequestId ||
     selectedChangeRequestIsPublished ||
     selectedChangeRequestIsClosed ||
     selectedChangeRequestHasConflicts ||
@@ -4287,7 +4288,7 @@ export function WorkflowPageV2() {
     ? sandboxModeVersioningTooltip
     : canvasDeletedRemotely
       ? "This canvas was deleted in another session."
-      : !selectedChangeRequest
+      : !selectedChangeRequestId
         ? "Select a change request to publish."
         : selectedChangeRequestIsPublished
           ? "This change request is already published."
@@ -4333,6 +4334,8 @@ export function WorkflowPageV2() {
       />
     ) : showVersioningUI ? (
       <CanvasVersioningView
+        organizationId={organizationId || ""}
+        canvasId={canvasId || ""}
         liveCanvasVersion={liveCanvasVersion}
         liveVersions={liveVersions}
         liveVersionsTotalCount={liveVersionsTotalCount}
@@ -4345,8 +4348,6 @@ export function WorkflowPageV2() {
         canvasDescription={canvas?.metadata?.description}
         changeRequests={canvasChangeRequests}
         selectedChangeRequestId={selectedChangeRequestId}
-        currentUserId={currentUserId}
-        onUseVersion={handleUseVersion}
         onSelectChangeRequest={handleSelectChangeRequest}
         onPublishChangeRequest={handlePublishChangeRequest}
         onCloseChangeRequest={handleCloseChangeRequest}
