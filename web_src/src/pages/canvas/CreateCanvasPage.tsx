@@ -1,15 +1,18 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Upload } from "lucide-react";
 import { Field, Label } from "../../components/Fieldset/fieldset";
 import { Heading } from "../../components/Heading/heading";
 import { Input } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
 import { Textarea } from "../../components/ui/textarea";
 import { Button } from "../../components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { useCreateCanvas, useCanvasTemplates } from "../../hooks/useCanvasData";
 import { showErrorToast } from "../../utils/toast";
+import { parseCanvasYaml, readFileAsText, type ParsedCanvas } from "../../utils/parseCanvasYaml";
 import type { ComponentsEdge, ComponentsNode } from "@/api-client";
 import { Rainbow } from "lucide-react";
 
@@ -24,9 +27,65 @@ export function CreateCanvasPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [nameError, setNameError] = useState("");
+  const [activeTab, setActiveTab] = useState<string>("manual");
+
+  // YAML import state
+  const [yamlText, setYamlText] = useState("");
+  const [yamlError, setYamlError] = useState("");
+  const [importedSpec, setImportedSpec] = useState<{ nodes: ComponentsNode[]; edges: ComponentsEdge[] } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const createMutation = useCreateCanvas(organizationId || "");
   const { data: workflowTemplates = [] } = useCanvasTemplates(organizationId || "");
+
+  const applyParsedYaml = useCallback((parsed: ParsedCanvas) => {
+    setName(parsed.name.slice(0, MAX_CANVAS_NAME_LENGTH));
+    setDescription((parsed.description ?? "").slice(0, MAX_CANVAS_DESCRIPTION_LENGTH));
+    setImportedSpec({ nodes: parsed.nodes, edges: parsed.edges });
+    setYamlError("");
+    setNameError("");
+  }, []);
+
+  const handleYamlParse = useCallback(() => {
+    if (!yamlText.trim()) {
+      setYamlError("Paste or upload a YAML file first.");
+      setImportedSpec(null);
+      return;
+    }
+
+    try {
+      const parsed = parseCanvasYaml(yamlText);
+      applyParsedYaml(parsed);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setYamlError(message);
+      setImportedSpec(null);
+    }
+  }, [yamlText, applyParsedYaml]);
+
+  const handleFileUpload = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await readFileAsText(file);
+        setYamlText(text);
+
+        const parsed = parseCanvasYaml(text);
+        applyParsedYaml(parsed);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setYamlError(message);
+        setImportedSpec(null);
+      }
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    },
+    [applyParsedYaml],
+  );
 
   const handleSubmit = async () => {
     setNameError("");
@@ -50,6 +109,8 @@ export function CreateCanvasPage() {
       const result = await createMutation.mutateAsync({
         name: name.trim(),
         description: description.trim() || undefined,
+        nodes: importedSpec?.nodes,
+        edges: importedSpec?.edges,
       });
 
       if (result?.data?.canvas?.metadata?.id) {
@@ -70,6 +131,9 @@ export function CreateCanvasPage() {
     navigate(`/${organizationId}`);
   };
 
+  const isSubmitDisabled =
+    !name.trim() || createMutation.isPending || !!nameError || (activeTab === "yaml" && !importedSpec);
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-gray-900">
       <header className="bg-white border-b border-slate-950/15 px-4 h-12 flex items-center">
@@ -83,68 +147,193 @@ export function CreateCanvasPage() {
                 Create New Canvas
               </Heading>
               <Text className="text-gray-800 dark:text-gray-400">
-                Create a new canvas to orchestrate your DevOps work.
+                Create a new canvas or import one from a YAML file.
               </Text>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
-              <Field>
-                <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Canvas name *</Label>
-                <Input
-                  data-testid="canvas-name-input"
-                  type="text"
-                  autoComplete="off"
-                  value={name}
-                  onChange={(e) => {
-                    if (e.target.value.length <= MAX_CANVAS_NAME_LENGTH) {
-                      setName(e.target.value);
-                    }
-                    if (nameError) {
-                      setNameError("");
-                    }
-                  }}
-                  placeholder=""
-                  className={`w-full ${nameError ? "border-red-500" : ""}`}
-                  autoFocus
-                  maxLength={MAX_CANVAS_NAME_LENGTH}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSubmit();
-                    }
-                  }}
-                />
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {name.length}/{MAX_CANVAS_NAME_LENGTH} characters
-                </div>
-                {nameError && <div className="text-xs text-red-600 mt-1">{nameError}</div>}
-              </Field>
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+              <Tabs
+                value={activeTab}
+                onValueChange={(value: string) => {
+                  setActiveTab(value);
+                  // Reset import state when switching back to manual
+                  if (value === "manual") {
+                    setYamlText("");
+                    setYamlError("");
+                    setImportedSpec(null);
+                  }
+                }}
+              >
+                <TabsList className="mb-6">
+                  <TabsTrigger value="manual">Create manually</TabsTrigger>
+                  <TabsTrigger value="yaml">Import from YAML</TabsTrigger>
+                </TabsList>
 
-              <Field>
-                <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</Label>
-                <Textarea
-                  value={description}
-                  onChange={(e) => {
-                    if (e.target.value.length <= MAX_CANVAS_DESCRIPTION_LENGTH) {
-                      setDescription(e.target.value);
-                    }
-                  }}
-                  placeholder="Describe what it does (optional)"
-                  rows={3}
-                  className="w-full"
-                  maxLength={MAX_CANVAS_DESCRIPTION_LENGTH}
-                />
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {description.length}/{MAX_CANVAS_DESCRIPTION_LENGTH} characters
-                </div>
-              </Field>
+                <TabsContent value="manual">
+                  <div className="space-y-6">
+                    <Field>
+                      <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Canvas name *
+                      </Label>
+                      <Input
+                        data-testid="canvas-name-input"
+                        type="text"
+                        autoComplete="off"
+                        value={name}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          if (e.target.value.length <= MAX_CANVAS_NAME_LENGTH) {
+                            setName(e.target.value);
+                          }
+                          if (nameError) {
+                            setNameError("");
+                          }
+                        }}
+                        placeholder=""
+                        className={`w-full ${nameError ? "border-red-500" : ""}`}
+                        autoFocus
+                        maxLength={MAX_CANVAS_NAME_LENGTH}
+                        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSubmit();
+                          }
+                        }}
+                      />
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {name.length}/{MAX_CANVAS_NAME_LENGTH} characters
+                      </div>
+                      {nameError && <div className="text-xs text-red-600 mt-1">{nameError}</div>}
+                    </Field>
 
-              <div className="flex justify-start gap-3">
-                <Button
-                  onClick={handleSubmit}
-                  disabled={!name.trim() || createMutation.isPending || !!nameError}
-                  data-testid="create-canvas-button"
-                >
+                    <Field>
+                      <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Description
+                      </Label>
+                      <Textarea
+                        value={description}
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                          if (e.target.value.length <= MAX_CANVAS_DESCRIPTION_LENGTH) {
+                            setDescription(e.target.value);
+                          }
+                        }}
+                        placeholder="Describe what it does (optional)"
+                        rows={3}
+                        className="w-full"
+                        maxLength={MAX_CANVAS_DESCRIPTION_LENGTH}
+                      />
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {description.length}/{MAX_CANVAS_DESCRIPTION_LENGTH} characters
+                      </div>
+                    </Field>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="yaml">
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        YAML content
+                      </Label>
+                      <Textarea
+                        data-testid="yaml-import-textarea"
+                        value={yamlText}
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                          setYamlText(e.target.value);
+                          if (yamlError) setYamlError("");
+                        }}
+                        placeholder={`metadata:\n  name: My Canvas\n  description: Optional description\nspec:\n  nodes: []\n  edges: []`}
+                        rows={10}
+                        className="w-full font-mono text-sm"
+                      />
+                      {yamlError && <div className="text-xs text-red-600 mt-1">{yamlError}</div>}
+                      {importedSpec && (
+                        <div className="text-xs text-green-700 mt-1">
+                          Parsed successfully: {importedSpec.nodes.length} node(s), {importedSpec.edges.length} edge(s).
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <Button type="button" variant="outline" size="sm" onClick={handleYamlParse}>
+                        Parse YAML
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".yaml,.yml"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        data-testid="yaml-file-input"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-1.5"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Upload file
+                      </Button>
+                    </div>
+
+                    {importedSpec && (
+                      <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-6">
+                        <Field>
+                          <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Canvas name *
+                          </Label>
+                          <Input
+                            data-testid="canvas-name-input-yaml"
+                            type="text"
+                            autoComplete="off"
+                            value={name}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                              if (e.target.value.length <= MAX_CANVAS_NAME_LENGTH) {
+                                setName(e.target.value);
+                              }
+                              if (nameError) {
+                                setNameError("");
+                              }
+                            }}
+                            placeholder=""
+                            className={`w-full ${nameError ? "border-red-500" : ""}`}
+                            maxLength={MAX_CANVAS_NAME_LENGTH}
+                          />
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {name.length}/{MAX_CANVAS_NAME_LENGTH} characters
+                          </div>
+                          {nameError && <div className="text-xs text-red-600 mt-1">{nameError}</div>}
+                        </Field>
+
+                        <Field>
+                          <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Description
+                          </Label>
+                          <Textarea
+                            value={description}
+                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                              if (e.target.value.length <= MAX_CANVAS_DESCRIPTION_LENGTH) {
+                                setDescription(e.target.value);
+                              }
+                            }}
+                            placeholder="Describe what it does (optional)"
+                            rows={3}
+                            className="w-full"
+                            maxLength={MAX_CANVAS_DESCRIPTION_LENGTH}
+                          />
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {description.length}/{MAX_CANVAS_DESCRIPTION_LENGTH} characters
+                          </div>
+                        </Field>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+
+              <div className="flex justify-start gap-3 mt-6">
+                <Button onClick={handleSubmit} disabled={isSubmitDisabled} data-testid="create-canvas-button">
                   {createMutation.isPending ? "Creating Canvas..." : "Create Canvas"}
                 </Button>
                 <Button variant="outline" onClick={handleCancel}>
