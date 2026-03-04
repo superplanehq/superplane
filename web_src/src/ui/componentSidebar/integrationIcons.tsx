@@ -45,6 +45,7 @@ import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
 import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
+import opencostIcon from "@/assets/icons/integrations/opencost.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
 
@@ -70,6 +71,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   octopus: octopusIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
+  opencost: opencostIcon,
   claude: claudeIcon,
   cursor: cursorIcon,
   pagerduty: pagerDutyIcon,
@@ -111,6 +113,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   octopus: octopusIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
+  opencost: opencostIcon,
   claude: claudeIcon,
   cursor: cursorIcon,
   pagerduty: pagerDutyIcon,

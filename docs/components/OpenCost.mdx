@@ -1,0 +1,151 @@
+---
+title: "OpenCost"
+---
+
+Monitor and query Kubernetes cost allocation data from OpenCost
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="Cost Exceeds Threshold" href="#cost-exceeds-threshold" description="Trigger when OpenCost allocation costs exceed a configured threshold" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Get Cost Allocation" href="#get-cost-allocation" description="Fetch cost allocation data from OpenCost" />
+</CardGrid>
+
+## Instructions
+
+### Connection
+
+Configure this integration with:
+- **OpenCost Base URL**: URL of your OpenCost API (e.g., `http://opencost.opencost.svc.cluster.local:9003`)
+- **API Auth**: `none`, `basic`, or `bearer` for OpenCost API requests
+
+### OpenCost Setup
+
+OpenCost exposes a REST API on port 9003 by default.
+If your OpenCost instance is not publicly reachable, expose it through a Kubernetes Service or Ingress.
+
+<a id="cost-exceeds-threshold"></a>
+
+## Cost Exceeds Threshold
+
+The Cost Exceeds Threshold trigger polls OpenCost and fires when any allocation's total cost exceeds the configured threshold.
+
+### How it works
+
+SuperPlane polls the OpenCost `/allocation/compute` API every 5 minutes. When any allocation entry's `totalCost` exceeds the configured threshold, it emits an event with the cost data.
+
+### Configuration
+
+- **Window**: Time window to query (e.g., `1d`, `7d`, `today`)
+- **Aggregate By**: Field to aggregate costs by (e.g., `namespace`, `cluster`)
+- **Threshold**: Cost threshold in dollars. Any allocation above this value triggers an event.
+
+### Event Data
+
+Each event includes:
+- **name**: The allocation name (e.g., namespace name)
+- **totalCost**: The total cost that exceeded the threshold
+- **cpuCost**, **ramCost**, **gpuCost**, etc.: Cost breakdown
+- **window**: The queried time window
+- **threshold**: The configured threshold value
+
+### Example Data
+
+```json
+{
+  "data": {
+    "aggregate": "namespace",
+    "cpuCost": 45.23,
+    "cpuEfficiency": 0.42,
+    "end": "2026-02-22T00:00:00Z",
+    "gpuCost": 0,
+    "name": "production",
+    "networkCost": 12.5,
+    "properties": {
+      "namespace": "production"
+    },
+    "pvCost": 8.75,
+    "ramCost": 38.92,
+    "ramEfficiency": 0.61,
+    "start": "2026-02-21T00:00:00Z",
+    "threshold": 100,
+    "totalCost": 105.4,
+    "totalEfficiency": 0.51,
+    "window": "1d"
+  },
+  "timestamp": "2026-02-22T12:00:00.000000000Z",
+  "type": "opencost.costThreshold"
+}
+```
+
+<a id="get-cost-allocation"></a>
+
+## Get Cost Allocation
+
+The Get Cost Allocation component queries the OpenCost `/allocation/compute` API and returns cost data.
+
+### Configuration
+
+- **Window**: Time window to query (e.g., `1d`, `7d`, `today`, `lastweek`)
+- **Aggregate By**: Field to aggregate costs by (e.g., `namespace`, `cluster`, `controller`, `pod`)
+- **Step** (optional): Duration for each allocation set (e.g., `1d`)
+
+### Output
+
+Emits one `opencost.costAllocation` payload with allocations grouped by the selected aggregate field.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "aggregate": "namespace",
+    "allocations": [
+      {
+        "cpuCost": 45.23,
+        "cpuEfficiency": 0.42,
+        "end": "2026-02-22T00:00:00Z",
+        "gpuCost": 0,
+        "name": "production",
+        "networkCost": 12.5,
+        "properties": {
+          "namespace": "production"
+        },
+        "pvCost": 8.75,
+        "ramCost": 38.92,
+        "ramEfficiency": 0.61,
+        "start": "2026-02-21T00:00:00Z",
+        "totalCost": 105.4,
+        "totalEfficiency": 0.51
+      },
+      {
+        "cpuCost": 12.1,
+        "cpuEfficiency": 0.35,
+        "end": "2026-02-22T00:00:00Z",
+        "gpuCost": 0,
+        "name": "kube-system",
+        "networkCost": 3.2,
+        "properties": {
+          "namespace": "kube-system"
+        },
+        "pvCost": 0,
+        "ramCost": 8.45,
+        "ramEfficiency": 0.28,
+        "start": "2026-02-21T00:00:00Z",
+        "totalCost": 23.75,
+        "totalEfficiency": 0.31
+      }
+    ],
+    "window": "1d"
+  },
+  "timestamp": "2026-02-22T12:00:00.000000000Z",
+  "type": "opencost.costAllocation"
+}
+```
