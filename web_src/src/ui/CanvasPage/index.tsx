@@ -20,6 +20,8 @@ import {
   ScanLine,
   ScanText,
   ScrollText,
+  Copy,
+  LayoutGrid,
   Trash2,
   TriangleAlert,
   Workflow,
@@ -203,6 +205,8 @@ export interface CanvasPageProps {
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
   onNodesDelete?: (nodeIds: string[]) => void;
+  onDuplicateNodes?: (nodeIds: string[]) => void;
+  onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
   onResolveExecutionErrors?: (executionIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
@@ -894,6 +898,8 @@ function CanvasPage(props: CanvasPageProps) {
                 onNodeEdit={handleNodeEdit}
                 onNodeDelete={handleNodeDelete}
                 onNodesDelete={props.onNodesDelete}
+                onDuplicateNodes={props.onDuplicateNodes}
+                onAutoLayoutNodes={props.onAutoLayoutNodes}
                 onEdgeCreate={props.onEdgeCreate}
                 hideHeader={true}
                 onToggleView={handleToggleView}
@@ -1391,6 +1397,8 @@ function CanvasContent({
   onNodeEdit,
   onNodeDelete,
   onNodesDelete,
+  onDuplicateNodes,
+  onAutoLayoutNodes,
   onEdgeCreate,
   hideHeader,
   onRun,
@@ -1444,6 +1452,8 @@ function CanvasContent({
   onNodeEdit: (nodeId: string) => void;
   onNodeDelete?: (nodeId: string) => void;
   onNodesDelete?: (nodeIds: string[]) => void;
+  onDuplicateNodes?: (nodeIds: string[]) => void;
+  onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   hideHeader?: boolean;
   onRun?: (nodeId: string) => void;
@@ -2382,42 +2392,75 @@ function CanvasContent({
                 </Tooltip>
               </div>
             </Panel>
-            {selectionToolbarFlowPos && !isSelecting && !isReadOnly && (onNodesDelete || onNodeDelete) && (
-              <ViewportPortal>
-                <div
-                  className="nodrag nopan flex items-center gap-2"
-                  style={{
-                    position: "absolute",
-                    left: selectionToolbarFlowPos.x,
-                    top: selectionToolbarFlowPos.y,
-                    transform: "translate(-100%, -100%) translateY(-24px)",
-                    pointerEvents: "all",
-                  }}
-                >
-                  <button
-                    type="button"
-                    data-testid="multi-select-delete"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      const nodeIds = multiSelectedNodes.map((n) => n.id);
-                      if (onNodesDelete) {
-                        onNodesDelete(nodeIds);
-                      } else {
-                        for (const id of nodeIds) {
-                          onNodeDelete?.(id);
-                        }
-                      }
-                      stateRef.current.setNodes((nodes) => nodes.map((node) => ({ ...node, selected: false })));
-                      setMultiSelectedNodes([]);
+            {selectionToolbarFlowPos &&
+              !isSelecting &&
+              !isReadOnly &&
+              (onNodesDelete || onNodeDelete || onAutoLayoutNodes || onDuplicateNodes) && (
+                <ViewportPortal>
+                  <div
+                    className="nodrag nopan flex items-center gap-2"
+                    style={{
+                      position: "absolute",
+                      left: selectionToolbarFlowPos.x,
+                      top: selectionToolbarFlowPos.y,
+                      transform: "translate(-100%, -100%) translateY(-24px)",
+                      pointerEvents: "all",
                     }}
-                    className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </ViewportPortal>
-            )}
+                    {onAutoLayoutNodes && (
+                      <button
+                        type="button"
+                        data-testid="multi-select-auto-layout"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onAutoLayoutNodes(multiSelectedNodes.map((n) => n.id));
+                        }}
+                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                      >
+                        <LayoutGrid className="h-4 w-4" />
+                      </button>
+                    )}
+                    {onDuplicateNodes && (
+                      <button
+                        type="button"
+                        data-testid="multi-select-duplicate"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onDuplicateNodes(multiSelectedNodes.map((n) => n.id));
+                        }}
+                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    )}
+                    {(onNodesDelete || onNodeDelete) && (
+                      <button
+                        type="button"
+                        data-testid="multi-select-delete"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const nodeIds = multiSelectedNodes.map((n) => n.id);
+                          if (onNodesDelete) {
+                            onNodesDelete(nodeIds);
+                          } else {
+                            for (const id of nodeIds) {
+                              onNodeDelete?.(id);
+                            }
+                          }
+                          stateRef.current.setNodes((nodes) => nodes.map((node) => ({ ...node, selected: false })));
+                          setMultiSelectedNodes([]);
+                        }}
+                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </ViewportPortal>
+              )}
           </ReactFlow>
         </div>
       </div>
