@@ -428,9 +428,21 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	p := ctx.Parameters
 
 	switch resourceType {
-	case cloudfunctions.ResourceTypeLocation:
-		return cloudfunctions.ListLocationResources(reqCtx, client, p["projectId"])
-	case cloudfunctions.ResourceTypeFunction:
+	case cloudfunctions.ResourceTypeLocation, cloudfunctions.ResourceTypeFunction:
+		projectID := p["projectId"]
+		if projectID == "" {
+			projectID = client.ProjectID()
+		}
+		enabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "cloudfunctions.googleapis.com")
+		if err != nil {
+			return nil, fmt.Errorf("failed to check Cloud Functions API status: %w", err)
+		}
+		if !enabled {
+			return nil, fmt.Errorf("Cloud Functions API is not enabled in project %s. Enable it at https://console.cloud.google.com/apis/library/cloudfunctions.googleapis.com?project=%s", projectID, projectID)
+		}
+		if resourceType == cloudfunctions.ResourceTypeLocation {
+			return cloudfunctions.ListLocationResources(reqCtx, client, p["projectId"])
+		}
 		return cloudfunctions.ListFunctionResources(reqCtx, client, p["projectId"], p["location"])
 	case compute.ResourceTypeRegion:
 		return compute.ListRegionResources(reqCtx, client)
