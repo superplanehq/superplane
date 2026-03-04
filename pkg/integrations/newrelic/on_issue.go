@@ -66,7 +66,7 @@ func (t *OnIssue) Documentation() string {
 
 ## Webhook Setup
 
-SuperPlane automatically creates a Webhook Notification Channel named "SuperPlane" in your New Relic account. Just attach it to your alert workflow to start receiving alerts.
+SuperPlane automatically creates a Webhook Notification Channel in your New Relic account. Just attach it to your alert workflow to start receiving alerts.
 `
 }
 

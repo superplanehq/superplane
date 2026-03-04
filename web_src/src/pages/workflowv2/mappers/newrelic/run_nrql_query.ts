@@ -95,16 +95,17 @@ function getDetailsForNRQLResult(result: NewRelicNRQLResultPayload): Record<stri
   }
 
   const keys = Object.keys(firstResult);
-  let hasZeroValue = false;
+  let allValuesNullish = keys.length > 0;
   for (const key of keys.slice(0, 5)) {
     details[key] = String(firstResult[key]);
-    if (firstResult[key] === 0 || firstResult[key] === null) {
-      hasZeroValue = true;
+    if (firstResult[key] !== 0 && firstResult[key] !== null && firstResult[key] !== undefined) {
+      allValuesNullish = false;
     }
   }
 
-  if (hasZeroValue) {
-    details["Tip"] = "New Relic ingestion can take up to 60 seconds. Try running the workflow again in a minute.";
+  if (allValuesNullish) {
+    details["Tip"] =
+      "New Relic ingestion can take up to 60 seconds. If you expected data, try running the workflow again in a minute.";
   }
 
   return details;

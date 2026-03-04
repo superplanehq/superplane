@@ -6,6 +6,7 @@ import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
 import { NewRelicIssuePayload, OnIssueConfiguration } from "./types";
 
 const stateLabels: Record<string, string> = {
+  CREATED: "Created",
   ACTIVATED: "Activated",
   ACKNOWLEDGED: "Acknowledged",
   CLOSED: "Closed",

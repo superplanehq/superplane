@@ -177,6 +177,24 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		assert.Len(t, eventsCtx.Payloads, 0)
 	})
 
+	t.Run("null webhookSecret -> no auth required", func(t *testing.T) {
+		eventsCtx := &contexts.EventContext{}
+
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          payload,
+			Headers:       http.Header{},
+			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"webhookSecret": nil},
+			},
+			Events: eventsCtx,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Len(t, eventsCtx.Payloads, 1)
+	})
+
 	t.Run("valid bearer token -> emits event", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 		headers := http.Header{}

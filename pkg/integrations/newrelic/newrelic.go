@@ -29,7 +29,7 @@ const installationInstructions = `### Getting your credentials
 
 ### Webhook Setup
 
-SuperPlane automatically creates a Webhook Notification Channel named "SuperPlane" in your New Relic account when you add the **On Issue** trigger to your canvas. Just attach it to your alert workflow in New Relic to start receiving alerts.
+SuperPlane automatically creates a Webhook Notification Channel in your New Relic account when you add the **On Issue** trigger to your canvas. Just attach it to your alert workflow in New Relic to start receiving alerts.
 `
 
 func init() {
