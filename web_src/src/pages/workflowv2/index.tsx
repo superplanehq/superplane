@@ -18,6 +18,7 @@ import {
   CanvasesListEventExecutionsResponse,
   CanvasesCanvas,
   CanvasesCanvasVersion,
+  CanvasesCanvasChangeRequest,
   CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
@@ -86,7 +87,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Diff, Hunk, parseDiff } from "react-diff-view";
+import "react-diff-view/style/index.css";
 import {
   getComponentAdditionalDataBuilder,
   getComponentBaseMapper,
@@ -188,20 +192,33 @@ function versionSortValue(raw?: string): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-type DraftDiffSummary = {
-  addedNodeIDs: string[];
-  removedNodeIDs: string[];
-  updatedNodeIDs: string[];
+type DraftDiffLine = {
+  prefix: "meta" | "context" | "+" | "-";
+  text: string;
 };
 
-function buildDraftDiffSummary(
+type DraftNodeDiffItem = {
+  id: string;
+  name: string;
+  changeType: "added" | "updated" | "removed";
+  lines: DraftDiffLine[];
+};
+
+type DraftNodeDiffSummary = {
+  items: DraftNodeDiffItem[];
+  addedCount: number;
+  updatedCount: number;
+  removedCount: number;
+};
+
+function buildDraftNodeDiffSummary(
   liveVersion?: CanvasesCanvasVersion,
   draftVersion?: CanvasesCanvasVersion,
-): DraftDiffSummary {
+): DraftNodeDiffSummary {
   const liveNodes = (liveVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
   const draftNodes = (draftVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
 
-  const byID = (nodes: Array<Record<string, unknown>>) => {
+  const byID = (nodes: Array<Record<string, unknown>>): Map<string, Record<string, unknown>> => {
     const map = new Map<string, Record<string, unknown>>();
     nodes.forEach((node) => {
       const nodeID = String(node.id || "");
@@ -222,41 +239,174 @@ function buildDraftDiffSummary(
     integrationId: node.integrationId || null,
   });
 
+  const formatDiffValueLines = (value: unknown): string[] => {
+    const normalizedValue = value === undefined ? null : value;
+    return yaml
+      .dump(normalizedValue, {
+        lineWidth: -1,
+        noRefs: true,
+        sortKeys: true,
+      })
+      .trimEnd()
+      .split("\n");
+  };
+
+  const buildYamlFieldLines = (prefix: "+" | "-", key: string, value: unknown): DraftDiffLine[] => {
+    const valueLines = formatDiffValueLines(value);
+    if (valueLines.length === 1) {
+      return [{ prefix, text: `${key}: ${valueLines[0]}` }];
+    }
+
+    return [{ prefix, text: `${key}:` }, ...valueLines.map((line) => ({ prefix, text: `  ${line}` }))];
+  };
+
+  const buildNodeLines = (prefix: "+" | "-", node: Record<string, unknown>): DraftDiffLine[] => {
+    const nodeComparable = comparableNode(node) as Record<string, unknown>;
+    const keys = ["id", ...Object.keys(nodeComparable).sort((left, right) => left.localeCompare(right))];
+    const nodeFilePath = `nodes/${String(node.id || "unknown")}.yaml`;
+    const header: DraftDiffLine[] = [
+      { prefix: "meta", text: `diff --git a/${nodeFilePath} b/${nodeFilePath}` },
+      { prefix: "meta", text: `--- ${prefix === "-" ? `a/${nodeFilePath}` : "/dev/null"}` },
+      { prefix: "meta", text: `+++ ${prefix === "+" ? `b/${nodeFilePath}` : "/dev/null"}` },
+      { prefix: "context", text: "@@ -1,0 +1,0 @@" },
+    ];
+
+    return keys.flatMap((key) => {
+      const value = key === "id" ? node.id : nodeComparable[key];
+      return [...(key === "id" ? header : []), ...buildYamlFieldLines(prefix, key, value)];
+    });
+  };
+
+  const buildUpdatedLines = (
+    previousNode: Record<string, unknown>,
+    currentNode: Record<string, unknown>,
+  ): DraftDiffLine[] => {
+    const previousComparable = comparableNode(previousNode) as Record<string, unknown>;
+    const currentComparable = comparableNode(currentNode) as Record<string, unknown>;
+    const allKeys = ["id", ...Object.keys({ ...previousComparable, ...currentComparable })].sort((left, right) =>
+      left.localeCompare(right),
+    );
+
+    const nodeFilePath = `nodes/${String(currentNode.id || previousNode.id || "unknown")}.yaml`;
+    const lines: DraftDiffLine[] = [
+      { prefix: "meta", text: `diff --git a/${nodeFilePath} b/${nodeFilePath}` },
+      { prefix: "meta", text: `--- a/${nodeFilePath}` },
+      { prefix: "meta", text: `+++ b/${nodeFilePath}` },
+      { prefix: "context", text: "@@ -1,0 +1,0 @@" },
+    ];
+
+    allKeys.forEach((key) => {
+      const previousValue = key === "id" ? previousNode.id : previousComparable[key];
+      const currentValue = key === "id" ? currentNode.id : currentComparable[key];
+      if (JSON.stringify(previousValue) === JSON.stringify(currentValue)) {
+        return;
+      }
+
+      lines.push(...buildYamlFieldLines("-", key, previousValue));
+      lines.push(...buildYamlFieldLines("+", key, currentValue));
+    });
+
+    return lines;
+  };
+
   const liveByID = byID(liveNodes);
   const draftByID = byID(draftNodes);
   const allNodeIDs = Array.from(new Set([...liveByID.keys(), ...draftByID.keys()])).sort((left, right) =>
     left.localeCompare(right),
   );
 
-  const addedNodeIDs: string[] = [];
-  const removedNodeIDs: string[] = [];
-  const updatedNodeIDs: string[] = [];
+  const items: DraftNodeDiffItem[] = [];
+  let addedCount = 0;
+  let removedCount = 0;
+  let updatedCount = 0;
 
   allNodeIDs.forEach((nodeID) => {
     const liveNode = liveByID.get(nodeID);
     const draftNode = draftByID.get(nodeID);
+
     if (!liveNode && draftNode) {
-      addedNodeIDs.push(nodeID);
+      items.push({
+        id: nodeID,
+        name: String(draftNode.name || "Unnamed node"),
+        changeType: "added",
+        lines: buildNodeLines("+", draftNode),
+      });
+      addedCount += 1;
       return;
     }
+
     if (liveNode && !draftNode) {
-      removedNodeIDs.push(nodeID);
+      items.push({
+        id: nodeID,
+        name: String(liveNode.name || "Unnamed node"),
+        changeType: "removed",
+        lines: buildNodeLines("-", liveNode),
+      });
+      removedCount += 1;
       return;
     }
+
     if (!liveNode || !draftNode) {
       return;
     }
 
     if (JSON.stringify(comparableNode(liveNode)) !== JSON.stringify(comparableNode(draftNode))) {
-      updatedNodeIDs.push(nodeID);
+      items.push({
+        id: nodeID,
+        name: String(draftNode.name || liveNode.name || "Unnamed node"),
+        changeType: "updated",
+        lines: buildUpdatedLines(liveNode, draftNode),
+      });
+      updatedCount += 1;
     }
   });
 
-  return {
-    addedNodeIDs,
-    removedNodeIDs,
-    updatedNodeIDs,
-  };
+  return { items, addedCount, updatedCount, removedCount };
+}
+
+function toUnifiedDiffText(lines: DraftDiffLine[]): string {
+  return lines
+    .map((line) => {
+      if (line.prefix === "meta") {
+        return line.text;
+      }
+
+      if (line.prefix === "context") {
+        if (line.text.startsWith("@@")) {
+          return line.text;
+        }
+
+        return ` ${line.text}`;
+      }
+
+      return `${line.prefix}${line.text}`;
+    })
+    .join("\n");
+}
+
+function DraftNodeDiffView({ nodeID, lines }: { nodeID: string; lines: DraftDiffLine[] }) {
+  const files = useMemo(() => parseDiff(toUnifiedDiffText(lines), { nearbySequences: "zip" }), [lines]);
+
+  if (!files.length) {
+    return <p className="text-xs text-slate-600">No diff available for this node.</p>;
+  }
+
+  return (
+    <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+      <div className="max-h-96 overflow-auto">
+        {files.map((file) => (
+          <Diff
+            key={`${nodeID}-${file.oldRevision}-${file.newRevision}`}
+            viewType="split"
+            diffType={file.type}
+            hunks={file.hunks}
+          >
+            {(hunks) => hunks.map((hunk) => <Hunk key={`${nodeID}-${hunk.content}`} hunk={hunk} />)}
+          </Diff>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function WorkflowPageV2() {
@@ -346,6 +496,80 @@ export function WorkflowPageV2() {
         ),
     [visibleCanvasVersions],
   );
+  const liveVersionChangeRequestsByVersionId = useMemo(() => {
+    const publishedChangeRequests = canvasChangeRequests.filter(
+      (changeRequest) => changeRequest.metadata?.status === "STATUS_PUBLISHED",
+    );
+
+    const pickNewestChangeRequest = (items: CanvasesCanvasChangeRequest[]): CanvasesCanvasChangeRequest | undefined => {
+      return items
+        .slice()
+        .sort(
+          (left, right) =>
+            versionSortValue(right.metadata?.publishedAt || right.metadata?.updatedAt || right.metadata?.createdAt) -
+            versionSortValue(left.metadata?.publishedAt || left.metadata?.updatedAt || left.metadata?.createdAt),
+        )[0];
+    };
+
+    const indexedByVersionID = new Map<string, CanvasesCanvasChangeRequest[]>();
+    const pushIndexed = (versionID: string | undefined, changeRequest: CanvasesCanvasChangeRequest) => {
+      if (!versionID) {
+        return;
+      }
+
+      const current = indexedByVersionID.get(versionID) || [];
+      current.push(changeRequest);
+      indexedByVersionID.set(versionID, current);
+    };
+
+    publishedChangeRequests.forEach((changeRequest) => {
+      pushIndexed(changeRequest.metadata?.versionId, changeRequest);
+      pushIndexed(changeRequest.version?.metadata?.id, changeRequest);
+    });
+
+    const result = new Map<string, CanvasesCanvasChangeRequest>();
+    liveVersions.forEach((version) => {
+      const versionID = version.metadata?.id;
+      if (!versionID) {
+        return;
+      }
+
+      const directMatch = pickNewestChangeRequest(indexedByVersionID.get(versionID) || []);
+      if (directMatch) {
+        result.set(versionID, directMatch);
+        return;
+      }
+
+      const versionPublishedAt = versionSortValue(version.metadata?.publishedAt || version.metadata?.updatedAt);
+      if (!versionPublishedAt) {
+        return;
+      }
+
+      const timestampFallback = publishedChangeRequests
+        .map((changeRequest) => {
+          const requestPublishedAt = versionSortValue(changeRequest.metadata?.publishedAt);
+          if (!requestPublishedAt) {
+            return null;
+          }
+          return {
+            changeRequest,
+            distance: Math.abs(requestPublishedAt - versionPublishedAt),
+            score: requestPublishedAt,
+          };
+        })
+        .filter(
+          (item): item is { changeRequest: CanvasesCanvasChangeRequest; distance: number; score: number } => !!item,
+        )
+        .filter((item) => item.distance <= 3_000)
+        .sort((left, right) => left.distance - right.distance || right.score - left.score)[0];
+
+      if (timestampFallback) {
+        result.set(versionID, timestampFallback.changeRequest);
+      }
+    });
+
+    return result;
+  }, [canvasChangeRequests, liveVersions]);
   const draftVersions = useMemo(
     () =>
       visibleCanvasVersions
@@ -381,8 +605,8 @@ export function WorkflowPageV2() {
 
     return draftVersions[0];
   }, [activeCanvasVersionId, selectedCanvasVersion, draftVersions]);
-  const createChangeRequestDiffSummary = useMemo(
-    () => buildDraftDiffSummary(liveCanvasVersion, createChangeRequestVersion),
+  const createChangeRequestNodeDiffSummary = useMemo(
+    () => buildDraftNodeDiffSummary(liveCanvasVersion, createChangeRequestVersion),
     [liveCanvasVersion, createChangeRequestVersion],
   );
   const isViewingDraftVersion = !!selectedCanvasVersion && !selectedCanvasVersion.metadata?.isPublished;
@@ -3605,8 +3829,32 @@ export function WorkflowPageV2() {
         };
       });
 
-      const versionLabel = formatVersionLabelWithTimestamp(version);
-      showSuccessToast(isCurrentLive ? `Viewing live ${versionLabel}` : `Editing ${versionLabel}`);
+      if (isCurrentLive) {
+        // Refresh live data in background to pick up latest status/events.
+        void Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: canvasKeys.detail(organizationId, canvasId),
+            refetchType: "all",
+          }),
+          queryClient.invalidateQueries({
+            queryKey: canvasKeys.eventList(canvasId, 50),
+            refetchType: "all",
+          }),
+        ]).then(() => {
+          const refreshedLiveCanvas = queryClient.getQueryData<CanvasesCanvas>(
+            canvasKeys.detail(organizationId, canvasId),
+          );
+          if (!refreshedLiveCanvas) {
+            return;
+          }
+
+          if (activeCanvasVersionIdRef.current !== "") {
+            return;
+          }
+
+          initializeFromWorkflow(refreshedLiveCanvas);
+        });
+      }
     },
     [
       organizationId,
@@ -3621,6 +3869,7 @@ export function WorkflowPageV2() {
       queryClient,
       setSearchParams,
       canvasChangeRequests,
+      initializeFromWorkflow,
     ],
   );
 
@@ -4398,6 +4647,7 @@ export function WorkflowPageV2() {
               liveCanvasVersionId={liveCanvasVersionId}
               selectedCanvasVersion={selectedCanvasVersion}
               liveVersions={liveVersions}
+              liveVersionChangeRequestsByVersionId={liveVersionChangeRequestsByVersionId}
               liveVersionsTotalCount={liveVersionsTotalCount}
               canUpdateCanvas={canUpdateCanvas}
               isTemplate={isTemplate}
@@ -4450,7 +4700,7 @@ export function WorkflowPageV2() {
           }
         }}
       >
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="min-w-[70vw] max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create and Publish Change Request</DialogTitle>
             <DialogDescription>
@@ -4513,37 +4763,49 @@ export function WorkflowPageV2() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Draft Diff Summary</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
                   <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700">
-                    +{createChangeRequestDiffSummary.addedNodeIDs.length} added
+                    +{createChangeRequestNodeDiffSummary.addedCount} added
                   </span>
                   <span className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700">
-                    ~{createChangeRequestDiffSummary.updatedNodeIDs.length} updated
+                    ~{createChangeRequestNodeDiffSummary.updatedCount} updated
                   </span>
                   <span className="rounded border border-red-200 bg-red-50 px-2 py-0.5 text-red-700">
-                    -{createChangeRequestDiffSummary.removedNodeIDs.length} removed
+                    -{createChangeRequestNodeDiffSummary.removedCount} removed
                   </span>
                 </div>
-                {(() => {
-                  const changedNodeIDs = [
-                    ...createChangeRequestDiffSummary.addedNodeIDs,
-                    ...createChangeRequestDiffSummary.updatedNodeIDs,
-                    ...createChangeRequestDiffSummary.removedNodeIDs,
-                  ];
-                  if (changedNodeIDs.length === 0) {
-                    return <p className="mt-2 text-xs text-slate-600">No node-level changes detected.</p>;
-                  }
-
-                  const previewNodeIDs = changedNodeIDs.slice(0, 12);
-                  const hiddenCount = changedNodeIDs.length - previewNodeIDs.length;
-                  return (
-                    <div className="mt-2">
-                      <p className="text-xs text-slate-700">{changedNodeIDs.length} changed node(s).</p>
-                      <p className="mt-1 break-all text-xs text-slate-600">{previewNodeIDs.join(", ")}</p>
-                      {hiddenCount > 0 ? (
-                        <p className="mt-1 text-xs text-slate-500">and {hiddenCount} more...</p>
-                      ) : null}
-                    </div>
-                  );
-                })()}
+                {createChangeRequestNodeDiffSummary.items.length === 0 ? (
+                  <p className="mt-2 text-xs text-slate-600">No node-level changes detected.</p>
+                ) : (
+                  <Accordion type="multiple" className="mt-2 w-full rounded-md border border-slate-200 px-3">
+                    {createChangeRequestNodeDiffSummary.items.map((item, index) => (
+                      <AccordionItem
+                        key={`${item.id}-${item.changeType}-${index}`}
+                        value={`${item.id}-${item.changeType}-${index}`}
+                        className="border-slate-200"
+                      >
+                        <AccordionTrigger className="py-3 hover:no-underline">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className={`inline-flex min-w-8 justify-center rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                                item.changeType === "removed"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : item.changeType === "added"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-sky-100 text-sky-700"
+                              }`}
+                            >
+                              {item.changeType === "updated" ? "+/-" : item.changeType === "removed" ? "-" : "+"}
+                            </span>
+                            <span className="truncate text-sm text-slate-900">{item.name}</span>
+                            <span className="truncate text-xs text-slate-500">{item.id}</span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <DraftNodeDiffView nodeID={item.id} lines={item.lines} />
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                )}
               </section>
             </div>
           )}

@@ -1,4 +1,4 @@
-import { CanvasesCanvasVersion } from "@/api-client";
+import { CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -8,6 +8,9 @@ import { cn } from "@/lib/utils";
 import { ChevronLeft, Eye, GitBranch, GitCompareArrows, GitPullRequest, RotateCcw } from "lucide-react";
 import { MouseEvent as ReactMouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as yaml from "js-yaml";
+import ReactMarkdown from "react-markdown";
+import { Diff, Hunk, parseDiff } from "react-diff-view";
+import "react-diff-view/style/index.css";
 
 const CANVAS_VERSION_CONTROL_WIDTH_STORAGE_KEY = "canvasVersionControlSidebarWidth";
 const DEFAULT_CANVAS_VERSION_CONTROL_WIDTH = 460;
@@ -21,6 +24,7 @@ interface CanvasVersionControlSidebarProps {
   liveCanvasVersionId?: string;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
   liveVersions: CanvasesCanvasVersion[];
+  liveVersionChangeRequestsByVersionId?: Map<string, CanvasesCanvasChangeRequest>;
   liveVersionsTotalCount?: number;
   canUpdateCanvas: boolean;
   isTemplate: boolean;
@@ -263,12 +267,58 @@ function withTooltip(disabled: boolean, message: string | undefined, element: Re
   );
 }
 
+function toUnifiedDiffText(lines: DiffLine[]): string {
+  return lines
+    .map((line) => {
+      if (line.prefix === "meta") {
+        return line.text;
+      }
+
+      if (line.prefix === "context") {
+        if (line.text.startsWith("@@")) {
+          return line.text;
+        }
+
+        return ` ${line.text}`;
+      }
+
+      return `${line.prefix}${line.text}`;
+    })
+    .join("\n");
+}
+
+function NodeGitDiff({ lines, nodeID }: { lines: DiffLine[]; nodeID: string }) {
+  const files = useMemo(() => parseDiff(toUnifiedDiffText(lines), { nearbySequences: "zip" }), [lines]);
+
+  if (files.length === 0) {
+    return <p className="text-xs text-slate-600">No diff available for this node.</p>;
+  }
+
+  return (
+    <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+      <div className="max-h-96 overflow-auto">
+        {files.map((file) => (
+          <Diff
+            key={`${nodeID}-${file.oldRevision}-${file.newRevision}`}
+            viewType="split"
+            diffType={file.type}
+            hunks={file.hunks}
+          >
+            {(hunks) => hunks.map((hunk) => <Hunk key={`${nodeID}-${hunk.content}`} hunk={hunk} />)}
+          </Diff>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function CanvasVersionControlSidebar({
   isOpen,
   onToggle,
   liveCanvasVersionId,
   selectedCanvasVersion,
   liveVersions,
+  liveVersionChangeRequestsByVersionId,
   liveVersionsTotalCount,
   canUpdateCanvas,
   isTemplate,
@@ -316,6 +366,7 @@ export function CanvasVersionControlSidebar({
   const [diffContext, setDiffContext] = useState<{
     version: CanvasesCanvasVersion;
     previousVersion: CanvasesCanvasVersion;
+    changeRequest?: CanvasesCanvasChangeRequest;
   } | null>(null);
 
   const diffSummary = useMemo(() => {
@@ -488,7 +539,7 @@ export function CanvasVersionControlSidebar({
             </div>
           </section>
 
-          <section className="mt-3 rounded-md border border-slate-200 p-3">
+          <section className="mt-3 rounded-md">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               Live History ({liveVersionsTotalCount ?? liveVersions.length})
             </p>
@@ -502,19 +553,22 @@ export function CanvasVersionControlSidebar({
                     const isActive = versionID === selectedVersionId;
                     const isCurrentLive = liveCanvasVersionId === versionID;
                     const previousVersion = liveVersions[index + 1];
+                    const changeRequest = versionID ? liveVersionChangeRequestsByVersionId?.get(versionID) : undefined;
 
                     return (
                       <VersionRow
                         key={versionID}
                         version={version}
+                        changeRequest={changeRequest}
                         isActive={isActive}
                         subtitle={isCurrentLive ? "Current live" : "Live history"}
                         previousVersion={previousVersion}
                         onUseVersion={onUseVersion}
-                        onViewDiff={(selectedVersion, selectedPreviousVersion) =>
+                        onViewDiff={(selectedVersion, selectedPreviousVersion, selectedChangeRequest) =>
                           setDiffContext({
                             version: selectedVersion,
                             previousVersion: selectedPreviousVersion,
+                            changeRequest: selectedChangeRequest,
                           })
                         }
                       />
@@ -539,9 +593,9 @@ export function CanvasVersionControlSidebar({
       </div>
 
       <Dialog open={!!diffContext} onOpenChange={(open) => !open && setDiffContext(null)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="min-w-[60vw] max-w-5xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Version Node Diff</DialogTitle>
+            <DialogTitle>{diffContext?.changeRequest?.metadata?.title?.trim() || "Version Node Diff"}</DialogTitle>
             <DialogDescription>
               Comparing {formatVersionLabelWithTimestamp(diffContext?.version)} against the previous published version.
             </DialogDescription>
@@ -549,6 +603,14 @@ export function CanvasVersionControlSidebar({
 
           {!diffSummary ? null : (
             <div className="space-y-3">
+              {diffContext?.changeRequest?.metadata?.description?.trim() ? (
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Description</p>
+                  <div className="prose prose-sm max-w-none text-slate-800 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-headings:my-2">
+                    <ReactMarkdown>{diffContext.changeRequest.metadata?.description?.trim() || ""}</ReactMarkdown>
+                  </div>
+                </div>
+              ) : null}
               <p className="text-sm text-slate-700">
                 Added: {diffSummary.addedCount} · Updated: {diffSummary.updatedCount} · Removed:{" "}
                 {diffSummary.removedCount}
@@ -582,39 +644,7 @@ export function CanvasVersionControlSidebar({
                         </div>
                       </AccordionTrigger>
                       <AccordionContent>
-                        <div className="rounded-md bg-slate-950 px-3 py-2 font-mono text-xs">
-                          {item.lines.map((line, lineIndex) => (
-                            <div key={`${item.id}-${lineIndex}`} className="flex gap-2 py-0.5">
-                              <span
-                                className={cn(
-                                  line.prefix === "+"
-                                    ? "text-emerald-300"
-                                    : line.prefix === "-"
-                                      ? "text-rose-300"
-                                      : line.prefix === "meta"
-                                        ? "text-sky-300"
-                                        : "text-slate-400",
-                                )}
-                              >
-                                {line.prefix === "meta" || line.prefix === "context" ? " " : line.prefix}
-                              </span>
-                              <span
-                                className={cn(
-                                  "break-all",
-                                  line.prefix === "+"
-                                    ? "text-emerald-200"
-                                    : line.prefix === "-"
-                                      ? "text-rose-200"
-                                      : line.prefix === "meta"
-                                        ? "text-sky-200"
-                                        : "text-slate-100",
-                                )}
-                              >
-                                {line.text}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
+                        <NodeGitDiff lines={item.lines} nodeID={item.id} />
                       </AccordionContent>
                     </AccordionItem>
                   ))}
@@ -630,6 +660,7 @@ export function CanvasVersionControlSidebar({
 
 function VersionRow({
   version,
+  changeRequest,
   previousVersion,
   isActive = false,
   subtitle,
@@ -637,15 +668,25 @@ function VersionRow({
   onViewDiff,
 }: {
   version: CanvasesCanvasVersion;
+  changeRequest?: CanvasesCanvasChangeRequest;
   previousVersion?: CanvasesCanvasVersion;
   isActive?: boolean;
   subtitle?: string;
   onUseVersion: (versionID: string) => void;
-  onViewDiff: (version: CanvasesCanvasVersion, previousVersion: CanvasesCanvasVersion) => void;
+  onViewDiff: (
+    version: CanvasesCanvasVersion,
+    previousVersion: CanvasesCanvasVersion,
+    changeRequest?: CanvasesCanvasChangeRequest,
+  ) => void;
 }) {
   const versionID = version.metadata?.id;
   const ownerName = version.metadata?.owner?.name || "Unknown owner";
-  const versionLabel = formatVersionLabelWithTimestamp(version);
+  const changeRequestTitle = changeRequest?.metadata?.title?.trim();
+  const versionLabel = changeRequestTitle || formatVersionLabelWithTimestamp(version);
+  const versionTimestamp = formatVersionTimestamp(version);
+  const versionSubtitle = changeRequestTitle
+    ? [subtitle || ownerName, versionTimestamp].filter(Boolean).join(" · ")
+    : subtitle || ownerName;
 
   if (!versionID) {
     return null;
@@ -662,7 +703,7 @@ function VersionRow({
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-slate-900 truncate">{versionLabel}</p>
-          <p className="mt-0.5 text-xs text-slate-600 truncate">{subtitle || ownerName}</p>
+          <p className="mt-0.5 text-xs text-slate-600 truncate">{versionSubtitle}</p>
         </div>
         <div className="flex items-center gap-1.5">
           {isActive ? (
@@ -678,12 +719,12 @@ function VersionRow({
                 size="icon-sm"
                 className="h-7 w-7"
                 onClick={() => onUseVersion(versionID)}
-                aria-label="Use version"
+                aria-label="Visualize version"
               >
                 <Eye className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">Use this version</TooltipContent>
+            <TooltipContent side="top">Visualize this version</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -698,7 +739,7 @@ function VersionRow({
                     if (!previousVersion) {
                       return;
                     }
-                    onViewDiff(version, previousVersion);
+                    onViewDiff(version, previousVersion, changeRequest);
                   }}
                   aria-label="View diff with previous version"
                 >
