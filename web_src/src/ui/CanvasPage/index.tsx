@@ -166,6 +166,7 @@ export interface CanvasPageProps {
   canUpdateIntegrations?: boolean;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
+  onRenameCanvas?: (name: string) => Promise<void>;
   // Undo functionality
   onUndo?: () => void;
   canUndo?: boolean;
@@ -845,6 +846,7 @@ function CanvasPage(props: CanvasPageProps) {
           memoryItemCount={props.memoryItemCount}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
+          onRenameCanvas={props.onRenameCanvas}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1306,6 +1308,7 @@ function CanvasContentHeader({
   memoryItemCount,
   onExportYamlCopy,
   onExportYamlDownload,
+  onRenameCanvas,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1326,6 +1329,7 @@ function CanvasContentHeader({
   memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
+  onRenameCanvas?: (name: string) => Promise<void>;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1376,6 +1380,7 @@ function CanvasContentHeader({
       memoryItemCount={memoryItemCount}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
+      onRenameCanvas={onRenameCanvas}
     />
   );
 }

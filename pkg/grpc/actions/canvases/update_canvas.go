@@ -90,6 +90,15 @@ func UpdateCanvasWithAutoLayout(
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
+		// If updated name comes
+		//
+		var count int64
+		tx.Model(&models.Canvas{}).Where("name = ? AND organization_id = ? AND id != ?", pbCanvas.Metadata.Name, organizationID, canvasID).Count(&count)
+		if count > 0 {
+			return status.Error(codes.AlreadyExists, "canvas with the same name already exists")
+		}
+
+		//
 		// Update the canvas node records
 		//
 		existingNodes, err := models.FindCanvasNodesInTransaction(tx, existingCanvas.ID)
