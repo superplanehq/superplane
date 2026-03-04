@@ -6,7 +6,7 @@ export interface NewRelicIssuePayload {
   state?: string;
   policyName?: string;
   conditionName?: string;
-  accountId?: number;
+  accountId?: number | string;
   createdAt?: number;
   updatedAt?: number;
   sources?: string[];

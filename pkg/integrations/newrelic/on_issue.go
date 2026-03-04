@@ -31,7 +31,7 @@ type NewRelicIssuePayload struct {
 	State         string   `json:"state"`
 	PolicyName    string   `json:"policyName"`
 	ConditionName string   `json:"conditionName"`
-	AccountID     int      `json:"accountId"`
+	AccountID     any      `json:"accountId"`
 	CreatedAt     int64    `json:"createdAt"`
 	UpdatedAt     int64    `json:"updatedAt"`
 	Sources       []string `json:"sources"`

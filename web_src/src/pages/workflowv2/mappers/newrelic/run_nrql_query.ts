@@ -95,15 +95,15 @@ function getDetailsForNRQLResult(result: NewRelicNRQLResultPayload): Record<stri
   }
 
   const keys = Object.keys(firstResult);
-  let allValuesNullish = keys.length > 0;
+  let allValuesEmpty = keys.length > 0;
   for (const key of keys.slice(0, 5)) {
     details[key] = String(firstResult[key]);
-    if (firstResult[key] !== 0 && firstResult[key] !== null && firstResult[key] !== undefined) {
-      allValuesNullish = false;
+    if (firstResult[key] !== null && firstResult[key] !== undefined) {
+      allValuesEmpty = false;
     }
   }
 
-  if (allValuesNullish) {
+  if (allValuesEmpty) {
     details["Tip"] =
       "New Relic ingestion can take up to 60 seconds. If you expected data, try running the workflow again in a minute.";
   }
