@@ -7,7 +7,8 @@ import { createHttpSyntheticCheckMapper } from "./create_http_synthetic_check";
 import { updateHttpSyntheticCheckMapper } from "./update_http_synthetic_check";
 import { deleteHttpSyntheticCheckMapper } from "./delete_http_synthetic_check";
 import { buildActionStateRegistry } from "../utils";
-import { onNotificationTriggerRenderer } from "./on_notification";
+import { onAlertNotificationTriggerRenderer } from "./on_alert_notification";
+import { onSyntheticCheckNotificationTriggerRenderer } from "./on_synthetic_check_notification";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   queryPrometheus: queryPrometheusMapper,
@@ -18,7 +19,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
-  onNotification: onNotificationTriggerRenderer,
+  onAlertNotification: onAlertNotificationTriggerRenderer,
+  onSyntheticCheckNotification: onSyntheticCheckNotificationTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
