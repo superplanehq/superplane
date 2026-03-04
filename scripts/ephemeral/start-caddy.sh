@@ -4,8 +4,6 @@ set -euo pipefail
 
 base_url="$1"
 
-sudo apt-get install caddy -y
-
 if [ -z "${base_url}" ]; then
   echo "base-url is required" >&2
   exit 1
