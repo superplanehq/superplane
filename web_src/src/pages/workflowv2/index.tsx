@@ -364,7 +364,7 @@ export function WorkflowPageV2() {
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
   const liveCanvasVersionId = liveCanvasVersion?.metadata?.id;
   const activeCanvasVersionId = activeCanvasVersion?.metadata?.id || "";
-  const { data: loadedCanvasVersion, isLoading: canvasVersionLoading } = useCanvasVersion(
+  const { data: loadedCanvasVersion } = useCanvasVersion(
     organizationId!,
     canvasId!,
     activeCanvasVersionId,
@@ -4080,16 +4080,9 @@ export function WorkflowPageV2() {
     </div>
   ) : null;
 
-  const versionLoadingBanner =
-    canvasVersionLoading && activeCanvasVersionId ? (
-      <div className="bg-slate-100 px-4 py-2.5 flex items-center gap-2">
-        <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
-        <p className="text-[13px] text-slate-700">Loading selected version...</p>
-      </div>
-    ) : null;
   const selectedVersionForLabel = selectedCanvasVersion || liveCanvasVersion;
   const canvasViewKey = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "live";
-  const headerBanners = [versionLoadingBanner, remoteUpdateBanner, templateBanner].filter(Boolean);
+  const headerBanners = [remoteUpdateBanner, templateBanner].filter(Boolean);
   const headerBanner = headerBanners.length > 0 ? <div className="flex flex-col">{headerBanners}</div> : null;
   const saveDisabled = !canUpdateCanvas || !hasEditableVersion;
   const saveDisabledTooltip = !canUpdateCanvas
