@@ -421,7 +421,7 @@ export function Header({
                 </TooltipTrigger>
                 <TooltipContent side="top">
                   {sandboxModeTooltip ||
-                    "Sandbox mode is enabled. Versioning is disabled and all changes are applied directly to live."}
+                    "Versioning is disabled. Turn off sandbox mode in organization settings."}
                 </TooltipContent>
               </Tooltip>
             ) : null}
@@ -563,7 +563,7 @@ export function Header({
                     {showPendingDraftBadge ? (
                       <div className="flex items-center">
                         <span className="rounded border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900">
-                          Pending Draft
+                          Unpublished Changes
                         </span>
                         <span
                           aria-hidden="true"

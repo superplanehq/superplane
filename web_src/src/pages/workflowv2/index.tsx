@@ -913,7 +913,7 @@ export function WorkflowPageV2() {
     }
 
     if (isSandboxModeEnabled) {
-      showErrorToast("Versioning is disabled while sandbox mode is enabled");
+      showErrorToast("Versioning is disabled. Turn off sandbox mode in organization settings.");
       return;
     }
 
@@ -3538,7 +3538,7 @@ export function WorkflowPageV2() {
     }
 
     if (isSandboxModeEnabled) {
-      showErrorToast("Versioning is disabled while sandbox mode is enabled");
+      showErrorToast("Versioning is disabled. Turn off sandbox mode in organization settings.");
       return;
     }
 
@@ -3582,7 +3582,7 @@ export function WorkflowPageV2() {
       }
 
       if (isSandboxModeEnabled) {
-        showErrorToast("Versioning is disabled while sandbox mode is enabled");
+        showErrorToast("Versioning is disabled. Turn off sandbox mode in organization settings.");
         return;
       }
 
@@ -3786,7 +3786,7 @@ export function WorkflowPageV2() {
     }
 
     if (isSandboxModeEnabled) {
-      showErrorToast("Versioning is disabled while sandbox mode is enabled");
+      showErrorToast("Versioning is disabled. Turn off sandbox mode in organization settings.");
       return;
     }
 
@@ -3835,7 +3835,7 @@ export function WorkflowPageV2() {
     }
 
     if (isSandboxModeEnabled) {
-      showErrorToast("Versioning is disabled while sandbox mode is enabled");
+      showErrorToast("Versioning is disabled. Turn off sandbox mode in organization settings.");
       return;
     }
 
@@ -4245,7 +4245,7 @@ export function WorkflowPageV2() {
   const saveButtonHidden = isTemplate || !canUpdateCanvas || !hasEditableVersion || !hasUnsavedChanges;
   const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas;
   const canUndo = !isTemplate && canUpdateCanvas && hasEditableVersion && initialWorkflowSnapshot !== null;
-  const sandboxModeVersioningTooltip = "Versioning is disabled while sandbox mode is enabled";
+  const sandboxModeVersioningTooltip = "Versioning is disabled. Turn off sandbox mode in organization settings.";
   const toggleEditModeDisabled =
     isSandboxModeEnabled ||
     !canUpdateCanvas ||

@@ -643,11 +643,6 @@ function VersionRow({
           <p className="mt-0.5 text-xs text-slate-600 truncate">{versionSubtitle}</p>
         </div>
         <div className="flex items-center gap-1.5">
-          {isActive ? (
-            <span className="rounded bg-sky-600 px-1.5 py-0.5 text-[10px] font-medium text-white max-w-[72px] truncate whitespace-nowrap">
-              Active
-            </span>
-          ) : null}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -661,7 +656,7 @@ function VersionRow({
                 <Eye className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">Visualize this version</TooltipContent>
+            <TooltipContent side="top">Preview this version</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
