@@ -196,8 +196,8 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 			if cResp.StatusCode >= 400 {
 				bodyBytes, _ := io.ReadAll(cResp.Body)
 				createErr = fmt.Errorf("bad status code: %d, body: %s", cResp.StatusCode, string(bodyBytes))
+				cResp.Body.Close()
 				if cResp.StatusCode < 500 && cResp.StatusCode != 429 {
-					_ = cResp.Body.Close()
 					break
 				}
 			} else {
@@ -212,11 +212,9 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 					ncID = createPayload.Data.ID
 					createErr = nil
 				}
+				cResp.Body.Close()
 			}
-			err := cResp.Body.Close()
-			if err != nil {
-				return nil, err
-			}
+
 			if createErr == nil {
 				break
 			}
