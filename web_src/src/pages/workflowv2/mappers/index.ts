@@ -199,6 +199,11 @@ import {
   triggerRenderers as servicenowTriggerRenderers,
   eventStateRegistry as servicenowEventStateRegistry,
 } from "./servicenow/index";
+import {
+  componentMappers as terraformComponentMappers,
+  triggerRenderers as terraformTriggerRenderers,
+  eventStateRegistry as terraformEventStateRegistry,
+} from "./terraform/index";
 
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
@@ -271,6 +276,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   honeycomb: honeycombComponentMappers,
   harness: harnessComponentMappers,
   servicenow: servicenowComponentMappers,
+  terraform: terraformComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -309,6 +315,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   honeycomb: honeycombTriggerRenderers,
   harness: harnessTriggerRenderers,
   servicenow: servicenowTriggerRenderers,
+  terraform: terraformTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -346,6 +353,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   honeycomb: honeycombEventStateRegistry,
   harness: harnessEventStateRegistry,
   servicenow: servicenowEventStateRegistry,
+  terraform: terraformEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {

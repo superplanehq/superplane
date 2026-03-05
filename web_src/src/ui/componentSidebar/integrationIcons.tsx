@@ -47,6 +47,7 @@ import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
+import terraformIcon from "@/assets/icons/integrations/terraform.svg";
 
 /** Integration type name (e.g. "github") → logo src. Used for Settings tab and header. */
 export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
@@ -88,6 +89,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
   launchdarkly: launchdarklyIcon,
+  terraform: terraformIcon,
 };
 
 /** Block name first part (e.g. "github") or compound (e.g. aws.lambda) → logo src for header. */
@@ -127,6 +129,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
   launchdarkly: launchdarklyIcon,
+  terraform: terraformIcon,
   aws: {
     cloudwatch: awsCloudwatchIcon,
     codeArtifact: awsCodeArtifactIcon,
