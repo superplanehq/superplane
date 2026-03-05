@@ -2,14 +2,15 @@ package workers
 
 import (
 	"testing"
-	"time"
 
+	"github.com/renderedtext/go-tackle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	protos "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/proto"
 )
 
 func Test__InvitationEmailConsumer(t *testing.T) {
@@ -20,11 +21,6 @@ func Test__InvitationEmailConsumer(t *testing.T) {
 	baseURL := "https://app.superplane.com"
 
 	consumer := NewInvitationEmailConsumer(amqpURL, testEmailService, baseURL)
-
-	go consumer.Start()
-	defer consumer.Stop()
-
-	time.Sleep(100 * time.Millisecond)
 
 	t.Run("should send email for pending invitation", func(t *testing.T) {
 		testEmailService.Reset()
@@ -37,13 +33,11 @@ func Test__InvitationEmailConsumer(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		message := messages.NewInvitationCreatedMessage(invitation)
-		err = message.Publish()
+		payload, err := proto.Marshal(&protos.InvitationCreated{InvitationId: invitation.ID.String()})
 		require.NoError(t, err)
 
-		require.Eventually(t, func() bool {
-			return len(testEmailService.SentInvitationEmails()) > 0
-		}, time.Second*5, 100*time.Millisecond)
+		err = consumer.Consume(tackle.NewFakeDelivery(payload))
+		require.NoError(t, err)
 
 		sentEmails := testEmailService.SentInvitationEmails()
 		require.Len(t, sentEmails, 1)
@@ -66,13 +60,12 @@ func Test__InvitationEmailConsumer(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		message := messages.NewInvitationCreatedMessage(invitation)
-		err = message.Publish()
+		payload, err := proto.Marshal(&protos.InvitationCreated{InvitationId: invitation.ID.String()})
 		require.NoError(t, err)
 
-		require.Never(t, func() bool {
-			return len(testEmailService.SentInvitationEmails()) > 0
-		}, time.Second*2, 100*time.Millisecond)
+		err = consumer.Consume(tackle.NewFakeDelivery(payload))
+		require.NoError(t, err)
+		assert.Len(t, testEmailService.SentInvitationEmails(), 0)
 	})
 }
 

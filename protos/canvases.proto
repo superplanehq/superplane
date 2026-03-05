@@ -61,15 +61,87 @@ service Canvases {
     };
   }
 
-  rpc UpdateCanvas(UpdateCanvasRequest) returns (UpdateCanvasResponse) {
+  rpc CreateCanvasVersion(CreateCanvasVersionRequest) returns (CreateCanvasVersionResponse) {
     option (google.api.http) = {
-      put: "/api/v1/canvases/{id}"
+      post: "/api/v1/canvases/{canvas_id}/versions"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update canvas";
-      description: "Updates an existing canvas";
-      tags: "Canvas";
+      summary: "Create canvas version";
+      description: "Creates a user-owned canvas version from the current live canvas";
+      tags: "CanvasVersion";
+    };
+  }
+
+  rpc ListCanvasVersions(ListCanvasVersionsRequest) returns (ListCanvasVersionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/versions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List canvas versions";
+      description: "Lists all versions for a canvas";
+      tags: "CanvasVersion";
+    };
+  }
+
+  rpc DescribeCanvasVersion(DescribeCanvasVersionRequest) returns (DescribeCanvasVersionResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe canvas version";
+      description: "Returns one canvas version by ID";
+      tags: "CanvasVersion";
+    };
+  }
+
+  rpc UpdateCanvasVersion(UpdateCanvasVersionRequest) returns (UpdateCanvasVersionResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
+      body: "*"
+      additional_bindings {
+        put: "/api/v1/canvases/{canvas_id}/versions"
+        body: "*"
+      }
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas version";
+      description: "Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode";
+      tags: "CanvasVersion";
+    };
+  }
+
+  rpc CreateCanvasChangeRequest(CreateCanvasChangeRequestRequest) returns (CreateCanvasChangeRequestResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/change-requests"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create canvas change request";
+      description: "Creates a change request for a draft canvas version";
+      tags: "CanvasChangeRequest";
+    };
+  }
+
+  rpc ListCanvasChangeRequests(ListCanvasChangeRequestsRequest) returns (ListCanvasChangeRequestsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/change-requests"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List canvas change requests";
+      description: "Lists change requests for a canvas";
+      tags: "CanvasChangeRequest";
+    };
+  }
+
+  rpc DescribeCanvasChangeRequest(DescribeCanvasChangeRequestRequest) returns (DescribeCanvasChangeRequestResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe canvas change request";
+      description: "Returns one canvas change request by ID";
+      tags: "CanvasChangeRequest";
     };
   }
 
@@ -311,14 +383,81 @@ message CanvasAutoLayout {
   Scope scope = 3;
 }
 
-message UpdateCanvasRequest {
-  string id = 1;
-  Canvas canvas = 2;
-  CanvasAutoLayout auto_layout = 3;
+message CreateCanvasVersionRequest {
+  string canvas_id = 1;
 }
 
-message UpdateCanvasResponse {
-  Canvas canvas = 1;
+message CreateCanvasVersionResponse {
+  CanvasVersion version = 1;
+}
+
+message ListCanvasVersionsRequest {
+  string canvas_id = 1;
+  uint32 limit = 2;
+  google.protobuf.Timestamp before = 3;
+}
+
+message ListCanvasVersionsResponse {
+  repeated CanvasVersion versions = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
+}
+
+message DescribeCanvasVersionRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+}
+
+message DescribeCanvasVersionResponse {
+  CanvasVersion version = 1;
+}
+
+message UpdateCanvasVersionRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+  Canvas canvas = 3;
+  CanvasAutoLayout auto_layout = 4;
+}
+
+message UpdateCanvasVersionResponse {
+  CanvasVersion version = 1;
+}
+
+message CreateCanvasChangeRequestRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+  string title = 3;
+  string description = 4;
+}
+
+message CreateCanvasChangeRequestResponse {
+  CanvasChangeRequest change_request = 1;
+}
+
+message ListCanvasChangeRequestsRequest {
+  string canvas_id = 1;
+  uint32 limit = 2;
+  google.protobuf.Timestamp before = 3;
+  string status_filter = 4;
+  bool only_mine = 5;
+  string query = 6;
+}
+
+message ListCanvasChangeRequestsResponse {
+  repeated CanvasChangeRequest change_requests = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
+}
+
+message DescribeCanvasChangeRequestRequest {
+  string canvas_id = 1;
+  string change_request_id = 2;
+}
+
+message DescribeCanvasChangeRequestResponse {
+  CanvasChangeRequest change_request = 1;
 }
 
 message DeleteCanvasRequest {
@@ -358,6 +497,50 @@ message Canvas {
   Metadata metadata = 1;
   Spec spec = 2;
   Status status = 3;
+}
+
+message CanvasVersion {
+  message Metadata {
+    string id = 1;
+    string canvas_id = 2;
+    UserRef owner = 4;
+    bool is_published = 6;
+    google.protobuf.Timestamp published_at = 7;
+    google.protobuf.Timestamp created_at = 8;
+    google.protobuf.Timestamp updated_at = 9;
+  }
+
+  Metadata metadata = 1;
+  Canvas.Spec spec = 2;
+}
+
+message CanvasChangeRequestDiff {
+  repeated string changed_node_ids = 1;
+}
+
+message CanvasChangeRequest {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_OPEN = 1;
+    STATUS_PUBLISHED = 2;
+  }
+
+  message Metadata {
+    string id = 1;
+    string canvas_id = 2;
+    string version_id = 3;
+    UserRef owner = 4;
+    Status status = 6;
+    google.protobuf.Timestamp published_at = 7;
+    google.protobuf.Timestamp created_at = 8;
+    google.protobuf.Timestamp updated_at = 9;
+    string title = 10;
+    string description = 11;
+  }
+
+  Metadata metadata = 1;
+  CanvasVersion version = 2;
+  CanvasChangeRequestDiff diff = 3;
 }
 
 message ListNodeEventsRequest {
@@ -606,8 +789,6 @@ message CanvasAiBlockContext {
 message CanvasAiContext {
   repeated CanvasAiNodeContext nodes = 1;
   repeated CanvasAiBlockContext available_blocks = 2;
-  Canvas canvas = 3;
-  repeated string selected_node_ids = 4;
 }
 
 message SendAiMessageRequest {
@@ -649,5 +830,11 @@ message CanvasNodeQueueItemMessage {
 message CanvasMessage {
   string id = 1;
   string canvas_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message CanvasVersionMessage {
+  string canvas_id = 1;
+  string version_id = 2;
   google.protobuf.Timestamp timestamp = 3;
 }

@@ -192,9 +192,13 @@ func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *model
 		if err != nil {
 			return 0, err
 		}
+		_, liveEdges, err := models.FindLiveCanvasSpecInTransaction(tx, wf.ID)
+		if err != nil {
+			return 0, err
+		}
 
 		uniq := map[string]struct{}{}
-		for _, edge := range wf.Edges {
+		for _, edge := range liveEdges {
 			if edge.TargetID == node.NodeID {
 				uniq[edge.SourceID] = struct{}{}
 			}

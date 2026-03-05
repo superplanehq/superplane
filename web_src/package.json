@@ -69,6 +69,7 @@
     "lucide-react": "^0.545.0",
     "react": "^19.1.0",
     "react-day-picker": "^9.11.0",
+    "react-diff-view": "^3.3.2",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^3.0.6",

@@ -21,11 +21,12 @@ var _ MappedNullable = &OrganizationsOrganizationMetadata{}
 
 // OrganizationsOrganizationMetadata struct for OrganizationsOrganizationMetadata
 type OrganizationsOrganizationMetadata struct {
-	Id          *string    `json:"id,omitempty"`
-	Name        *string    `json:"name,omitempty"`
-	Description *string    `json:"description,omitempty"`
-	CreatedAt   *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`
+	Id                       *string    `json:"id,omitempty"`
+	Name                     *string    `json:"name,omitempty"`
+	Description              *string    `json:"description,omitempty"`
+	CreatedAt                *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt                *time.Time `json:"updatedAt,omitempty"`
+	CanvasSandboxModeEnabled *bool      `json:"canvasSandboxModeEnabled,omitempty"`
 }
 
 // NewOrganizationsOrganizationMetadata instantiates a new OrganizationsOrganizationMetadata object
@@ -205,6 +206,38 @@ func (o *OrganizationsOrganizationMetadata) SetUpdatedAt(v time.Time) {
 	o.UpdatedAt = &v
 }
 
+// GetCanvasSandboxModeEnabled returns the CanvasSandboxModeEnabled field value if set, zero value otherwise.
+func (o *OrganizationsOrganizationMetadata) GetCanvasSandboxModeEnabled() bool {
+	if o == nil || IsNil(o.CanvasSandboxModeEnabled) {
+		var ret bool
+		return ret
+	}
+	return *o.CanvasSandboxModeEnabled
+}
+
+// GetCanvasSandboxModeEnabledOk returns a tuple with the CanvasSandboxModeEnabled field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *OrganizationsOrganizationMetadata) GetCanvasSandboxModeEnabledOk() (*bool, bool) {
+	if o == nil || IsNil(o.CanvasSandboxModeEnabled) {
+		return nil, false
+	}
+	return o.CanvasSandboxModeEnabled, true
+}
+
+// HasCanvasSandboxModeEnabled returns a boolean if a field has been set.
+func (o *OrganizationsOrganizationMetadata) HasCanvasSandboxModeEnabled() bool {
+	if o != nil && !IsNil(o.CanvasSandboxModeEnabled) {
+		return true
+	}
+
+	return false
+}
+
+// SetCanvasSandboxModeEnabled gets a reference to the given bool and assigns it to the CanvasSandboxModeEnabled field.
+func (o *OrganizationsOrganizationMetadata) SetCanvasSandboxModeEnabled(v bool) {
+	o.CanvasSandboxModeEnabled = &v
+}
+
 func (o OrganizationsOrganizationMetadata) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -229,6 +262,9 @@ func (o OrganizationsOrganizationMetadata) ToMap() (map[string]interface{}, erro
 	}
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updatedAt"] = o.UpdatedAt
+	}
+	if !IsNil(o.CanvasSandboxModeEnabled) {
+		toSerialize["canvasSandboxModeEnabled"] = o.CanvasSandboxModeEnabled
 	}
 	return toSerialize, nil
 }

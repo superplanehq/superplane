@@ -22,8 +22,6 @@ var _ MappedNullable = &CanvasesCanvasAiContext{}
 type CanvasesCanvasAiContext struct {
 	Nodes           []CanvasesCanvasAiNodeContext  `json:"nodes,omitempty"`
 	AvailableBlocks []CanvasesCanvasAiBlockContext `json:"availableBlocks,omitempty"`
-	Canvas          *CanvasesCanvas                `json:"canvas,omitempty"`
-	SelectedNodeIds []string                       `json:"selectedNodeIds,omitempty"`
 }
 
 // NewCanvasesCanvasAiContext instantiates a new CanvasesCanvasAiContext object
@@ -107,70 +105,6 @@ func (o *CanvasesCanvasAiContext) SetAvailableBlocks(v []CanvasesCanvasAiBlockCo
 	o.AvailableBlocks = v
 }
 
-// GetCanvas returns the Canvas field value if set, zero value otherwise.
-func (o *CanvasesCanvasAiContext) GetCanvas() CanvasesCanvas {
-	if o == nil || IsNil(o.Canvas) {
-		var ret CanvasesCanvas
-		return ret
-	}
-	return *o.Canvas
-}
-
-// GetCanvasOk returns a tuple with the Canvas field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *CanvasesCanvasAiContext) GetCanvasOk() (*CanvasesCanvas, bool) {
-	if o == nil || IsNil(o.Canvas) {
-		return nil, false
-	}
-	return o.Canvas, true
-}
-
-// HasCanvas returns a boolean if a field has been set.
-func (o *CanvasesCanvasAiContext) HasCanvas() bool {
-	if o != nil && !IsNil(o.Canvas) {
-		return true
-	}
-
-	return false
-}
-
-// SetCanvas gets a reference to the given CanvasesCanvas and assigns it to the Canvas field.
-func (o *CanvasesCanvasAiContext) SetCanvas(v CanvasesCanvas) {
-	o.Canvas = &v
-}
-
-// GetSelectedNodeIds returns the SelectedNodeIds field value if set, zero value otherwise.
-func (o *CanvasesCanvasAiContext) GetSelectedNodeIds() []string {
-	if o == nil || IsNil(o.SelectedNodeIds) {
-		var ret []string
-		return ret
-	}
-	return o.SelectedNodeIds
-}
-
-// GetSelectedNodeIdsOk returns a tuple with the SelectedNodeIds field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *CanvasesCanvasAiContext) GetSelectedNodeIdsOk() ([]string, bool) {
-	if o == nil || IsNil(o.SelectedNodeIds) {
-		return nil, false
-	}
-	return o.SelectedNodeIds, true
-}
-
-// HasSelectedNodeIds returns a boolean if a field has been set.
-func (o *CanvasesCanvasAiContext) HasSelectedNodeIds() bool {
-	if o != nil && !IsNil(o.SelectedNodeIds) {
-		return true
-	}
-
-	return false
-}
-
-// SetSelectedNodeIds gets a reference to the given []string and assigns it to the SelectedNodeIds field.
-func (o *CanvasesCanvasAiContext) SetSelectedNodeIds(v []string) {
-	o.SelectedNodeIds = v
-}
-
 func (o CanvasesCanvasAiContext) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -186,12 +120,6 @@ func (o CanvasesCanvasAiContext) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.AvailableBlocks) {
 		toSerialize["availableBlocks"] = o.AvailableBlocks
-	}
-	if !IsNil(o.Canvas) {
-		toSerialize["canvas"] = o.Canvas
-	}
-	if !IsNil(o.SelectedNodeIds) {
-		toSerialize["selectedNodeIds"] = o.SelectedNodeIds
 	}
 	return toSerialize, nil
 }

@@ -53,11 +53,15 @@ type APIClient struct {
 
 	CanvasAPI *CanvasAPIService
 
+	CanvasChangeRequestAPI *CanvasChangeRequestAPIService
+
 	CanvasEventAPI *CanvasEventAPIService
 
 	CanvasNodeAPI *CanvasNodeAPIService
 
 	CanvasNodeExecutionAPI *CanvasNodeExecutionAPIService
+
+	CanvasVersionAPI *CanvasVersionAPIService
 
 	ComponentAPI *ComponentAPIService
 
@@ -100,9 +104,11 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	// API Services
 	c.BlueprintAPI = (*BlueprintAPIService)(&c.common)
 	c.CanvasAPI = (*CanvasAPIService)(&c.common)
+	c.CanvasChangeRequestAPI = (*CanvasChangeRequestAPIService)(&c.common)
 	c.CanvasEventAPI = (*CanvasEventAPIService)(&c.common)
 	c.CanvasNodeAPI = (*CanvasNodeAPIService)(&c.common)
 	c.CanvasNodeExecutionAPI = (*CanvasNodeExecutionAPIService)(&c.common)
+	c.CanvasVersionAPI = (*CanvasVersionAPIService)(&c.common)
 	c.ComponentAPI = (*ComponentAPIService)(&c.common)
 	c.GroupsAPI = (*GroupsAPIService)(&c.common)
 	c.IntegrationAPI = (*IntegrationAPIService)(&c.common)

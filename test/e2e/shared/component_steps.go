@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -34,16 +35,36 @@ func (s *ComponentSteps) Create() {
 }
 
 func (s *ComponentSteps) OpenBuildingBlocksSidebar() {
-	// Try to open the sidebar if it's not already open
-	// The button only appears when sidebar is closed
-	openButton := q.TestID("open-sidebar-button")
-	loc := openButton.Run(s.session)
-
-	// Check if the button is visible (sidebar is closed)
-	if isVisible, _ := loc.IsVisible(); isVisible {
-		s.session.Click(openButton)
-		s.session.Sleep(300)
+	sidebar := q.TestID("building-blocks-sidebar").Run(s.session)
+	if isVisible, _ := sidebar.IsVisible(); isVisible {
+		return
 	}
+
+	openButton := q.TestID("open-sidebar-button").Run(s.session)
+	editButton := q.Locator(`button:has-text("Edit")`).Run(s.session)
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if isVisible, _ := sidebar.IsVisible(); isVisible {
+			return
+		}
+
+		if isVisible, _ := editButton.IsVisible(); isVisible {
+			if err := editButton.Click(); err == nil {
+				s.session.Sleep(250)
+			}
+		}
+
+		if isVisible, _ := openButton.IsVisible(); isVisible {
+			if err := openButton.Click(); err == nil {
+				s.session.Sleep(250)
+			}
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	s.session.AssertVisible(q.TestID("building-blocks-sidebar"))
 }
 
 func (s *ComponentSteps) AddNoop(name string, pos models.Position) {
