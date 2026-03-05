@@ -8,4 +8,7 @@ export interface TerraformEventData {
   workspaceName: string;
   organizationName: string;
   runCreatedBy: string;
+  additions?: number;
+  changes?: number;
+  destructions?: number;
 }

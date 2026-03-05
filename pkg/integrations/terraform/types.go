@@ -5,7 +5,8 @@ import (
 )
 
 type WebhookConfiguration struct {
-	WorkspaceID string `json:"workspaceId"`
+	WorkspaceID string   `json:"workspaceId"`
+	Events      []string `json:"events"`
 }
 
 type PayloadVersion1 struct {

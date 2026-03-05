@@ -38,9 +38,10 @@ func (i *Integration) Instructions() string {
 
 To use the Terraform integration, you need an HCP Terraform API Token.
 
-1. Go to the [Team API Tokens page](https://app.terraform.io/app/<YOUR_ORG>/settings/authentication-tokens?tabIndex=1) in HCP Terraform, replacing "<YOUR_ORG>" with your actual organization name.
-2. Click **Create a team token** and provide a description.
-3. Once generated, paste the token in the API Token field below.`
+1. Go to your organization's settings in HCP Terraform.
+2. Navigate to the **API Tokens** page.
+3. Click **Create a team token** and provide a description.
+4. Once generated, paste the token in the API Token field below.`
 }
 
 func (i *Integration) Configuration() []configuration.Field {

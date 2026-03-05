@@ -1,6 +1,7 @@
 package terraform
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"slices"
@@ -41,18 +42,34 @@ func (t *RunEvent) Configuration() []configuration.Field {
 			Label:    "Run States",
 			Type:     configuration.FieldTypeMultiSelect,
 			Required: true,
-			Default:  []string{"run:created", "run:completed", "run:errored"},
+			Default:  []string{"run:created", "run:planning", "run:needs_attention", "run:applying", "run:completed", "run:errored"},
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
-						{Label: "Run Created", Value: "run:created"},
-						{Label: "Run Planning", Value: "run:planning"},
-						{Label: "Run Needs Attention", Value: "run:needs_attention"},
-						{Label: "Run Applying", Value: "run:applying"},
-						{Label: "Run Completed", Value: "run:completed"},
-						{Label: "Run Errored", Value: "run:errored"},
-						{Label: "Assessment Drifted", Value: "assessment:drifted"},
-						{Label: "Assessment Failed", Value: "assessment:failed"},
+						{
+							Label: "Created",
+							Value: "run:created",
+						},
+						{
+							Label: "Planning",
+							Value: "run:planning",
+						},
+						{
+							Label: "Needs Attention",
+							Value: "run:needs_attention",
+						},
+						{
+							Label: "Applying",
+							Value: "run:applying",
+						},
+						{
+							Label: "Completed",
+							Value: "run:completed",
+						},
+						{
+							Label: "Errored",
+							Value: "run:errored",
+						},
 					},
 				},
 			},
@@ -83,6 +100,7 @@ func (t *RunEvent) Setup(ctx core.TriggerContext) error {
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		WorkspaceID: config.WorkspaceID,
+		Events:      config.Events,
 	})
 }
 
@@ -110,7 +128,10 @@ func (t *RunEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	}
 
 	action, ok := data["action"].(string)
-	if !ok || !slices.Contains(config.Events, action) {
+	if !ok {
+		return http.StatusOK, nil
+	}
+	if len(config.Events) > 0 && !slices.Contains(config.Events, action) {
 		return http.StatusOK, nil
 	}
 
@@ -124,13 +145,12 @@ func (t *RunEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	}
 
 	runMessage, _ := data["runMessage"].(string)
-
 	runID, _ := data["runId"].(string)
 	runStatus, _ := data["runStatus"].(string)
 	runURL, _ := data["runUrl"].(string)
 	runCreatedBy, _ := data["runCreatedBy"].(string)
 
-	if err := ctx.Events.Emit("terraform.runEvent", map[string]any{
+	emittedEvent := map[string]any{
 		"runId":            runID,
 		"workspaceId":      workspaceID,
 		"action":           action,
@@ -140,7 +160,24 @@ func (t *RunEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		"workspaceName":    wsName,
 		"organizationName": orgName,
 		"runCreatedBy":     runCreatedBy,
-	}); err != nil {
+	}
+
+	if runID != "" {
+		client, err := getClientFromIntegration(ctx.Integration)
+		if err == nil {
+			run, err := client.ReadRun(context.Background(), runID)
+			if err == nil && run != nil && run.Plan != nil && run.Plan.ID != "" {
+				plan, err := client.ReadPlan(context.Background(), run.Plan.ID)
+				if err == nil && plan != nil {
+					emittedEvent["additions"] = plan.Attributes.ResourceAdditions
+					emittedEvent["changes"] = plan.Attributes.ResourceChanges
+					emittedEvent["destructions"] = plan.Attributes.ResourceDestructions
+				}
+			}
+		}
+	}
+
+	if err := ctx.Events.Emit("terraform.runEvent", emittedEvent); err != nil {
 		return http.StatusInternalServerError, err
 	}
 
