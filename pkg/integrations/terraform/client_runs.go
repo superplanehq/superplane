@@ -192,7 +192,10 @@ func (c *Client) ReadPlan(ctx context.Context, planID string) (*PlanPayload, err
 		return nil, fmt.Errorf("failed to read plan: bad status %d", resp.StatusCode)
 	}
 
-	bodyBytes, _ := io.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read plan body: %w", err)
+	}
 	var payload struct {
 		Data PlanPayload `json:"data"`
 	}
