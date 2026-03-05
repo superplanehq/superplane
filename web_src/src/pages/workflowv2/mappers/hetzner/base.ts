@@ -16,6 +16,7 @@ type HetznerConfiguration = {
   snapshot?: unknown;
   description?: unknown;
   location?: unknown;
+  firewall?: unknown;
   server?: unknown;
   loadBalancer?: unknown;
   loadBalancerType?: unknown;
@@ -68,6 +69,7 @@ function metadataList(node: NodeInfo, execution?: ExecutionInfo): MetadataItem[]
   const snapshot = getConfigValue(configuration.snapshot);
   const description = getConfigValue(configuration.description);
   const location = getConfigValue(configuration.location);
+  const firewall = getConfigValue(configuration.firewall);
   const server = getConfigValue(configuration.server);
   const loadBalancer = getConfigValue(configuration.loadBalancer);
   const loadBalancerType = getConfigValue(configuration.loadBalancerType);
@@ -90,6 +92,9 @@ function metadataList(node: NodeInfo, execution?: ExecutionInfo): MetadataItem[]
   }
   if (location) {
     metadata.push({ icon: "map-pin", label: `Location: ${location}` });
+  }
+  if (firewall) {
+    metadata.push({ icon: "shield", label: `Firewall: ${firewall}` });
   }
   if (server) {
     metadata.push({ icon: "server", label: `Server: ${server}` });
