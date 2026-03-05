@@ -180,7 +180,19 @@ func (c *Plan) poll(ctx core.ActionContext) error {
 		}
 		if metadata.RunURL == "" && run.Workspace.Relationships.Organization.Data.ID != "" && client.BaseURL != "" {
 			orgID := run.Workspace.Relationships.Organization.Data.ID
-			metadata.RunURL = fmt.Sprintf("%s/app/%s/workspaces/%s/runs/%s", client.BaseURL, orgID, run.Workspace.Attributes.Name, run.ID)
+			orgName := orgID
+
+			orgs, listErr := client.ListOrganizations(context.Background())
+			if listErr == nil {
+				for _, o := range orgs {
+					if o.ID == orgID || o.Name == orgID {
+						orgName = o.Name
+						break
+					}
+				}
+			}
+
+			metadata.RunURL = fmt.Sprintf("%s/app/%s/workspaces/%s/runs/%s", client.BaseURL, orgName, run.Workspace.Attributes.Name, run.ID)
 			metadataChanged = true
 		}
 	}
