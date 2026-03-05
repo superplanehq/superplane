@@ -5,8 +5,8 @@ import (
 )
 
 type Configuration struct {
-	Address  string `json:"address"`
-	APIToken string `json:"apiToken"`
+	Address  string `json:"address" mapstructure:"address"`
+	APIToken string `json:"apiToken" mapstructure:"apiToken"`
 }
 
 func getConfigurationFields() []configuration.Field {
