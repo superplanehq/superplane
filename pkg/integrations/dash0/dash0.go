@@ -82,7 +82,8 @@ func (d *Dash0) Components() []core.Component {
 
 func (d *Dash0) Triggers() []core.Trigger {
 	return []core.Trigger{
-		&OnNotification{},
+		&OnAlertNotification{},
+		&OnSyntheticCheckNotification{},
 	}
 }
 
