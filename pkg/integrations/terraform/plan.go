@@ -179,7 +179,8 @@ func (c *Plan) poll(ctx core.ActionContext) error {
 			metadataChanged = true
 		}
 		if metadata.RunURL == "" && run.Workspace.Relationships.Organization.Data.ID != "" && client.BaseURL != "" {
-			metadata.RunURL = fmt.Sprintf("%s/app/%s/workspaces/%s/runs/%s", client.BaseURL, run.Workspace.Relationships.Organization.Data.ID, run.Workspace.Attributes.Name, run.ID)
+			orgID := run.Workspace.Relationships.Organization.Data.ID
+			metadata.RunURL = fmt.Sprintf("%s/app/%s/workspaces/%s/runs/%s", client.BaseURL, orgID, run.Workspace.Attributes.Name, run.ID)
 			metadataChanged = true
 		}
 	}
@@ -250,7 +251,8 @@ func (c *Plan) emitFinalState(ctx core.ActionContext, metadata ExecutionMetadata
 					}
 				}
 
-				if err := ctx.Metadata.Set(metadata); err == nil {
+				if err := ctx.Metadata.Set(metadata); err != nil {
+					return fmt.Errorf("failed to save final metadata: %w", err)
 				}
 			}
 		}
