@@ -17,7 +17,7 @@ export const onRunEventTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as TerraformEventData;
 
-    return {
+    const values: Record<string, string> = {
       "Run ID": eventData?.runId || "",
       Workspace: eventData?.workspaceName || "",
       Action: eventData?.action || "",
@@ -25,6 +25,18 @@ export const onRunEventTriggerRenderer: TriggerRenderer = {
       "Created By": eventData?.runCreatedBy || "",
       URL: eventData?.runUrl || "",
     };
+
+    if (
+      eventData?.additions !== undefined ||
+      eventData?.changes !== undefined ||
+      eventData?.destructions !== undefined
+    ) {
+      values["Resources Added"] = String(eventData?.additions ?? 0);
+      values["Resources Changed"] = String(eventData?.changes ?? 0);
+      values["Resources Destroyed"] = String(eventData?.destructions ?? 0);
+    }
+
+    return values;
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {
@@ -47,9 +59,14 @@ export const onRunEventTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as TerraformEventData;
+      const hasDiff =
+        eventData?.additions !== undefined || eventData?.changes !== undefined || eventData?.destructions !== undefined;
+      const diffSummary = hasDiff
+        ? ` | +${eventData?.additions ?? 0} ~${eventData?.changes ?? 0} -${eventData?.destructions ?? 0}`
+        : "";
       props.lastEventData = {
         title: eventData?.runMessage || "Terraform Run",
-        subtitle: `Action: ${eventData?.action || "Unknown"} | Workspace: ${eventData?.workspaceName || "Unknown"}`,
+        subtitle: `Action: ${eventData?.action || "Unknown"} | Workspace: ${eventData?.workspaceName || "Unknown"}${diffSummary}`,
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id!,
