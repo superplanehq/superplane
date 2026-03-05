@@ -9,7 +9,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Triggers
 
 <CardGrid>
-  <LinkCard title="On Notification" href="#on-notification" description="Listen to Dash0 notification webhook events" />
+  <LinkCard title="On Alert Notification" href="#on-alert-notification" description="Listen to Dash0 alert notification webhook events" />
+  <LinkCard title="On Synthetic Check Notification" href="#on-synthetic-check-notification" description="Listen to Dash0 synthetic check notification webhook events" />
 </CardGrid>
 
 ## Actions
@@ -23,21 +24,21 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Update HTTP Synthetic Check" href="#update-http-synthetic-check" description="Update an existing HTTP synthetic check in Dash0 by ID" />
 </CardGrid>
 
-<a id="on-notification"></a>
+<a id="on-alert-notification"></a>
 
-## On Notification
+## On Alert Notification
 
-The On Notification trigger starts a workflow execution when Dash0 sends a notification webhook.
+The On Alert Notification trigger starts a workflow execution when Dash0 sends an alert notification webhook.
 
 ### Setup
 
 1. Configure the Dash0 integration in SuperPlane.
 2. Copy the webhook URL shown in the integration configuration.
-3. In Dash0, configure notifications to send HTTP POST requests to that URL.
+3. In Dash0, configure alert notifications to send HTTP POST requests to that URL.
 
 ### Event Data
 
-The trigger emits the full JSON payload received from Dash0 as `dash0.notification`.
+The trigger emits the full JSON payload received from Dash0 as `dash0.alertNotification`.
 
 ### Example Data
 
@@ -93,7 +94,117 @@ The trigger emits the full JSON payload received from Dash0 as `dash0.notificati
     }
   },
   "timestamp": "2026-02-20T12:00:00Z",
-  "type": "dash0.notification"
+  "type": "dash0.alertNotification"
+}
+```
+
+<a id="on-synthetic-check-notification"></a>
+
+## On Synthetic Check Notification
+
+The On Synthetic Check Notification trigger starts a workflow execution when Dash0 sends a synthetic check notification webhook.
+
+### Setup
+
+1. Configure the Dash0 integration in SuperPlane.
+2. Copy the webhook URL shown in the integration configuration.
+3. In Dash0, configure synthetic check notifications to send HTTP POST requests to that URL.
+
+### Event Data
+
+The trigger emits the full JSON payload received from Dash0 as `dash0.syntheticCheckNotification`.
+
+### Labels Format
+
+Synthetic check notifications use a tuple-based label format where each label is an array of `[index, {key, value}]`.
+The trigger normalizes these labels into a flat `{key: value}` map in the emitted payload for easier downstream consumption.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "issue": {
+      "checkrules": [
+        {
+          "annotations": {
+            "summary": "API health check failure detected"
+          },
+          "description": "Monitor API health endpoint availability",
+          "expression": "",
+          "for": "5m",
+          "id": "check_101",
+          "interval": "1m",
+          "keepFiringFor": "10m",
+          "labels": {
+            "env": "prod",
+            "service": "api"
+          },
+          "name": "API Health Check",
+          "thresholds": {},
+          "url": "https://app.dash0.com/check-rules/check_101"
+        }
+      ],
+      "dataset": "default",
+      "description": "Synthetic check detected failures for API health endpoint.",
+      "end": "",
+      "id": "issue_789",
+      "issueIdentifier": "synthetic-check-api-health",
+      "labels": [
+        [
+          "0",
+          {
+            "key": "dash0.resource.type",
+            "value": {
+              "stringValue": "synthetic"
+            }
+          }
+        ],
+        [
+          "1",
+          {
+            "key": "dash0.synthetic_check.attempt_id",
+            "value": {
+              "stringValue": "73768e2c"
+            }
+          }
+        ],
+        [
+          "2",
+          {
+            "key": "dash0.synthetic_check.failed_critical_assertions",
+            "value": {
+              "stringValue": "{\"be-brussels\":[{\"actualValue\":\"503\",\"assertion\":{\"kind\":\"status_code\",\"spec\":{\"operator\":\"is\",\"value\":\"200\"}},\"explanation\":\"Expected value to be 200, but got 503\"}]}"
+            }
+          }
+        ],
+        [
+          "3",
+          {
+            "key": "dash0.synthetic_check.id",
+            "value": {
+              "stringValue": "api-health-check"
+            }
+          }
+        ],
+        [
+          "4",
+          {
+            "key": "dash0.synthetic_check.name",
+            "value": {
+              "stringValue": "API Health Check"
+            }
+          }
+        ]
+      ],
+      "start": "2026-02-20T12:00:00Z",
+      "status": "critical",
+      "summary": "Synthetic check failed: API Health Check",
+      "url": "https://app.dash0.com/issues/issue_789"
+    }
+  },
+  "timestamp": "2026-02-20T12:00:00Z",
+  "type": "dash0.syntheticCheckNotification"
 }
 ```
 
