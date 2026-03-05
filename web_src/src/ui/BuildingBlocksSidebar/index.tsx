@@ -80,6 +80,7 @@ import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import octopusIcon from "@/assets/icons/integrations/octopus.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
+import teamsIcon from "@/assets/icons/integrations/teams.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -1126,6 +1127,7 @@ function CategorySection({
     octopus: octopusIcon,
     servicenow: servicenowIcon,
     statuspage: statuspageIcon,
+    teams: teamsIcon,
     aws: {
       ec2: awsEc2Icon,
       codeArtifact: awsIcon,
@@ -1257,6 +1259,7 @@ function CategorySection({
             octopus: octopusIcon,
             servicenow: servicenowIcon,
             statuspage: statuspageIcon,
+            teams: teamsIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
               codepipeline: awsCodePipelineIcon,
