@@ -497,6 +497,37 @@ func (c *Client) GetSyntheticCheck(checkID string, dataset string) (*SyntheticCh
 	return &response, nil
 }
 
+// SendLogRecord sends a log record to Dash0 via OTLP HTTP ingestion (POST).
+// The body should contain an OTLP ExportLogsServiceRequest formatted payload.
+func (c *Client) SendLogRecord(dataset string, body map[string]any) (map[string]any, error) {
+	apiURL := fmt.Sprintf("%s/v1/logs", c.BaseURL)
+	if dataset != "" {
+		apiURL = fmt.Sprintf("%s?dataset=%s", apiURL, url.QueryEscape(dataset))
+	}
+
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling log body: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, apiURL, bytes.NewReader(jsonBody), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	// OTLP may return 200 OK with empty body or a success response
+	if len(responseBody) == 0 {
+		return map[string]any{"sent": true}, nil
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
+}
+
 // UpdateSyntheticCheck updates an existing synthetic check by ID (PUT).
 // The check ID is typically from metadata.labels["dash0.com/id"] in a create response.
 func (c *Client) UpdateSyntheticCheck(checkID string, request SyntheticCheckRequest, dataset string) (map[string]any, error) {
