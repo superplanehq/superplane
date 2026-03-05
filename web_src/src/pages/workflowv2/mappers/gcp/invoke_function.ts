@@ -21,6 +21,10 @@ export const invokeFunctionMapper: ComponentBaseMapper = {
 
     const details: Record<string, string> = {};
 
+    if (payload?.timestamp) {
+      details["Invoked At"] = new Date(payload.timestamp).toLocaleString();
+    }
+
     if (data?.functionName) {
       const parts = String(data.functionName).split("/");
       details["Function"] = parts[parts.length - 1] ?? data.functionName;
@@ -30,8 +34,10 @@ export const invokeFunctionMapper: ComponentBaseMapper = {
       details["Execution ID"] = String(data.executionId);
     }
 
-    if (payload?.timestamp) {
-      details["Invoked At"] = new Date(payload.timestamp).toLocaleString();
+    if (data?.resultRaw !== undefined) {
+      details["Result"] = String(data.resultRaw);
+    } else if (data?.result !== undefined) {
+      details["Result"] = typeof data.result === "string" ? data.result : JSON.stringify(data.result);
     }
 
     return details;

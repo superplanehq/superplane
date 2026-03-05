@@ -6,7 +6,7 @@ import { invokeFunctionMapper } from "./invoke_function";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createVM: baseMapper,
-  invokeFunction: invokeFunctionMapper,
+  "cloudfunctions.invokeFunction": invokeFunctionMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -15,7 +15,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createVM: buildActionStateRegistry("completed"),
-  invokeFunction: buildActionStateRegistry("completed"),
+  "cloudfunctions.invokeFunction": buildActionStateRegistry("completed"),
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};

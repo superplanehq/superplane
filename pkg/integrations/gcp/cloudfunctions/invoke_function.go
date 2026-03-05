@@ -21,10 +21,9 @@ const (
 type InvokeFunction struct{}
 
 type InvokeFunctionConfiguration struct {
-	ProjectID string `json:"projectId" mapstructure:"projectId"`
-	Location  string `json:"location" mapstructure:"location"`
-	Function  string `json:"function" mapstructure:"function"`
-	Payload   any    `json:"payload" mapstructure:"payload"`
+	Location string `json:"location" mapstructure:"location"`
+	Function string `json:"function" mapstructure:"function"`
+	Payload  any    `json:"payload" mapstructure:"payload"`
 }
 
 type InvokeFunctionMetadata struct {
@@ -82,13 +81,6 @@ func (c *InvokeFunction) OutputChannels(_ any) []core.OutputChannel {
 func (c *InvokeFunction) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "projectId",
-			Label:       "Project ID Override",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Override the GCP project ID from the integration. Leave empty to use the integration's project.",
-		},
-		{
 			Name:        "location",
 			Label:       "Location",
 			Type:        configuration.FieldTypeIntegrationResource,
@@ -96,10 +88,8 @@ func (c *InvokeFunction) Configuration() []configuration.Field {
 			Description: "Select the GCP region where your Cloud Function is deployed.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: ResourceTypeLocation,
-					Parameters: []configuration.ParameterRef{
-						{Name: "projectId", ValueFrom: &configuration.ParameterValueFrom{Field: "projectId"}},
-					},
+					Type:       ResourceTypeLocation,
+					Parameters: []configuration.ParameterRef{},
 				},
 			},
 		},
@@ -120,7 +110,6 @@ func (c *InvokeFunction) Configuration() []configuration.Field {
 				Resource: &configuration.ResourceTypeOptions{
 					Type: ResourceTypeFunction,
 					Parameters: []configuration.ParameterRef{
-						{Name: "projectId", ValueFrom: &configuration.ParameterValueFrom{Field: "projectId"}},
 						{Name: "location", ValueFrom: &configuration.ParameterValueFrom{Field: "location"}},
 					},
 				},
@@ -141,7 +130,6 @@ func decodeInvokeFunctionConfiguration(raw any) (InvokeFunctionConfiguration, er
 	if err := mapstructure.Decode(raw, &config); err != nil {
 		return InvokeFunctionConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	config.ProjectID = strings.TrimSpace(config.ProjectID)
 	config.Location = strings.TrimSpace(config.Location)
 	config.Function = strings.TrimSpace(config.Function)
 	return config, nil
