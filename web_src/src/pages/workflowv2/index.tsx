@@ -224,6 +224,7 @@ export function WorkflowPageV2() {
   const canUpdateIntegrations = canAct("integrations", "update");
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const { data: liveCanvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId!, canvasId!);
+  const { data: organizationUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true, 10);
   const { data: canvasChangeRequests = [] } = useCanvasChangeRequests(organizationId!, canvasId!);
@@ -348,6 +349,21 @@ export function WorkflowPageV2() {
 
     return result;
   }, [canvasChangeRequests, liveVersions]);
+  const liveVersionOwnerProfilesById = useMemo(() => {
+    const profilesByID = new Map<string, { name: string; avatarUrl?: string }>();
+    organizationUsers.forEach((user) => {
+      const userID = user.metadata?.id;
+      if (!userID) {
+        return;
+      }
+
+      profilesByID.set(userID, {
+        name: user.spec?.displayName || user.metadata?.email || userID,
+        avatarUrl: user.spec?.accountProviders?.[0]?.avatarUrl || undefined,
+      });
+    });
+    return profilesByID;
+  }, [organizationUsers]);
   const draftVersions = useMemo(
     () =>
       visibleCanvasVersions
@@ -469,7 +485,6 @@ export function WorkflowPageV2() {
   // user IDs as emails and role names as display names.
   // We don't use the values directly here; loading them populates the
   // react-query cache which prepareApprovalNode reads from.
-  const { isLoading: usersLoading } = useOrganizationUsers(organizationId!);
   const { isLoading: rolesLoading } = useOrganizationRoles(organizationId!);
   const { isLoading: groupsLoading } = useOrganizationGroups(organizationId!);
 
@@ -4440,6 +4455,9 @@ export function WorkflowPageV2() {
         saveButtonHidden={saveButtonHidden}
         saveDisabled={saveDisabled}
         saveDisabledTooltip={saveDisabledTooltip}
+        onPublishVersion={showVersioningUI ? handleCreateChangeRequest : undefined}
+        publishVersionDisabled={createChangeRequestDisabled}
+        publishVersionDisabledTooltip={createChangeRequestDisabledTooltip}
         onDiscardVersion={showVersioningUI ? handleResetDraftChanges : undefined}
         discardVersionDisabled={resetDraftDisabled}
         discardVersionDisabledTooltip={resetDraftDisabledTooltip}
@@ -4506,17 +4524,14 @@ export function WorkflowPageV2() {
               selectedCanvasVersion={selectedCanvasVersion}
               liveVersions={liveVersions}
               liveVersionChangeRequestsByVersionId={liveVersionChangeRequestsByVersionId}
+              liveVersionOwnerProfilesById={liveVersionOwnerProfilesById}
               liveVersionsTotalCount={liveVersionsTotalCount}
               canUpdateCanvas={canUpdateCanvas}
               isTemplate={isTemplate}
               canvasDeletedRemotely={canvasDeletedRemotely}
               onUseVersion={handleUseVersion}
-              onCreateChangeRequest={handleCreateChangeRequest}
               onLoadMoreLiveVersions={hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined}
-              createChangeRequestDisabled={createChangeRequestDisabled}
-              createChangeRequestDisabledTooltip={createChangeRequestDisabledTooltip}
               loadMoreLiveVersionsDisabled={!hasMoreLiveVersions || isLoadingMoreLiveVersions}
-              createChangeRequestPending={createCanvasChangeRequestMutation.isPending}
               loadMoreLiveVersionsPending={isLoadingMoreLiveVersions}
             />
           ) : undefined

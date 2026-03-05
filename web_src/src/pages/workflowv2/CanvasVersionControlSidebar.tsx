@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, Eye, GitBranch, GitCompareArrows, GitPullRequest } from "lucide-react";
-import { MouseEvent as ReactMouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, Eye, GitBranch, GitCompareArrows } from "lucide-react";
+import { MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as yaml from "js-yaml";
 import ReactMarkdown from "react-markdown";
 import { Diff, Hunk, parseDiff } from "react-diff-view";
@@ -24,18 +25,29 @@ interface CanvasVersionControlSidebarProps {
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
   liveVersions: CanvasesCanvasVersion[];
   liveVersionChangeRequestsByVersionId?: Map<string, CanvasesCanvasChangeRequest>;
+  liveVersionOwnerProfilesById?: Map<string, { name: string; avatarUrl?: string }>;
   liveVersionsTotalCount?: number;
   canUpdateCanvas: boolean;
   isTemplate: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
-  onCreateChangeRequest: () => void;
   onLoadMoreLiveVersions?: () => void;
-  createChangeRequestDisabled: boolean;
-  createChangeRequestDisabledTooltip?: string;
   loadMoreLiveVersionsDisabled?: boolean;
-  createChangeRequestPending: boolean;
   loadMoreLiveVersionsPending?: boolean;
+}
+
+function buildInitials(name?: string): string {
+  const safeName = (name || "").trim();
+  if (!safeName) {
+    return "U";
+  }
+
+  return safeName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 }
 
 function formatVersionTimestamp(version?: CanvasesCanvasVersion): string | undefined {
@@ -68,6 +80,19 @@ function formatVersionLabelWithTimestamp(version?: CanvasesCanvasVersion): strin
   }
 
   return `${label} · ${timestamp}`;
+}
+
+function formatTimestamp(raw?: string): string | undefined {
+  if (!raw) {
+    return undefined;
+  }
+
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+
+  return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
 type DiffLine = {
@@ -241,21 +266,6 @@ function summarizeNodeDiff(
   return { items, addedCount, removedCount, updatedCount };
 }
 
-function withTooltip(disabled: boolean, message: string | undefined, element: ReactNode): ReactNode {
-  if (!disabled || !message) {
-    return element;
-  }
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div className="w-full">{element}</div>
-      </TooltipTrigger>
-      <TooltipContent side="right">{message}</TooltipContent>
-    </Tooltip>
-  );
-}
-
 function toUnifiedDiffText(lines: DiffLine[]): string {
   return lines
     .map((line) => {
@@ -308,17 +318,14 @@ export function CanvasVersionControlSidebar({
   selectedCanvasVersion,
   liveVersions,
   liveVersionChangeRequestsByVersionId,
+  liveVersionOwnerProfilesById,
   liveVersionsTotalCount,
   canUpdateCanvas,
   isTemplate,
   canvasDeletedRemotely,
   onUseVersion,
-  onCreateChangeRequest,
   onLoadMoreLiveVersions,
-  createChangeRequestDisabled,
-  createChangeRequestDisabledTooltip,
   loadMoreLiveVersionsDisabled,
-  createChangeRequestPending,
   loadMoreLiveVersionsPending,
 }: CanvasVersionControlSidebarProps) {
   const selectedVersionId = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "";
@@ -354,6 +361,28 @@ export function CanvasVersionControlSidebar({
     }
     return summarizeNodeDiff(diffContext.version, diffContext.previousVersion);
   }, [diffContext]);
+  const diffOwner = useMemo(() => {
+    const changeRequestOwner = diffContext?.changeRequest?.metadata?.owner;
+    if (!changeRequestOwner) {
+      return null;
+    }
+
+    const profile = changeRequestOwner.id ? liveVersionOwnerProfilesById?.get(changeRequestOwner.id) : undefined;
+    const name = changeRequestOwner.name || profile?.name || "Unknown user";
+
+    return {
+      name,
+      avatarUrl: profile?.avatarUrl,
+      initials: buildInitials(name),
+    };
+  }, [diffContext, liveVersionOwnerProfilesById]);
+  const diffCommentTimestamp = useMemo(
+    () =>
+      formatTimestamp(
+        diffContext?.changeRequest?.metadata?.updatedAt || diffContext?.changeRequest?.metadata?.createdAt,
+      ),
+    [diffContext],
+  );
 
   const handleMouseDown = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -448,33 +477,13 @@ export function CanvasVersionControlSidebar({
         </div>
 
         <div className="flex-1 overflow-auto p-3">
-          <section className="rounded-md ">
-            <div className="flex flex-col gap-2">
-              {withTooltip(
-                createChangeRequestDisabled,
-                createChangeRequestDisabledTooltip,
-                <Button
-                  onClick={onCreateChangeRequest}
-                  disabled={createChangeRequestDisabled}
-                  className="w-full justify-start min-w-0"
-                  variant="outline"
-                >
-                  <GitPullRequest className="h-4 w-4" />
-                  <span className="truncate min-w-0">
-                    {createChangeRequestPending ? "Publishing..." : "Publish to Live"}
-                  </span>
-                </Button>,
-              )}
-
-              {!canUpdateCanvas && !canvasDeletedRemotely ? (
-                <p className="text-xs text-slate-600">You do not have permission to edit this canvas.</p>
-              ) : null}
-              {canvasDeletedRemotely ? (
-                <p className="text-xs text-red-700">This canvas was deleted from another session.</p>
-              ) : null}
-              {isTemplate ? <p className="text-xs text-slate-600">Template canvases are read-only.</p> : null}
-            </div>
-          </section>
+          {!canUpdateCanvas && !canvasDeletedRemotely ? (
+            <p className="text-xs text-slate-600">You do not have permission to edit this canvas.</p>
+          ) : null}
+          {canvasDeletedRemotely ? (
+            <p className="text-xs text-red-700">This canvas was deleted from another session.</p>
+          ) : null}
+          {isTemplate ? <p className="text-xs text-slate-600">Template canvases are read-only.</p> : null}
 
           <section className="mt-3 rounded-md">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
@@ -541,52 +550,75 @@ export function CanvasVersionControlSidebar({
           {!diffSummary ? null : (
             <div className="space-y-3">
               {diffContext?.changeRequest?.metadata?.description?.trim() ? (
-                <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Description</p>
-                  <div className="prose prose-sm max-w-none text-slate-800 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-headings:my-2">
-                    <ReactMarkdown>{diffContext.changeRequest.metadata?.description?.trim() || ""}</ReactMarkdown>
+                <div className="flex items-start gap-3">
+                  {diffOwner ? (
+                    <Avatar className="h-8 w-8 mt-1">
+                      <AvatarImage src={diffOwner.avatarUrl} alt={diffOwner.name} />
+                      <AvatarFallback className="text-[10px] font-medium">{diffOwner.initials}</AvatarFallback>
+                    </Avatar>
+                  ) : null}
+                  <div className="relative min-w-0 flex-1">
+                    <div className="rounded-md border border-slate-200 bg-white">
+                      <div className="relative border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                        <span className="pointer-events-none absolute -left-2 top-1/2 z-10 h-0 w-0 -translate-y-1/2 border-y-[8px] border-y-transparent border-r-[8px] border-r-slate-200" />
+                        <span className="pointer-events-none absolute -left-[7px] top-1/2 z-10 h-0 w-0 -translate-y-1/2 border-y-[7px] border-y-transparent border-r-[7px] border-r-slate-50" />
+                        <span className="font-semibold text-slate-900">{diffOwner?.name || "Unknown user"}</span>
+                        <span>
+                          {" "}
+                          commented
+                          {diffCommentTimestamp ? ` on ${diffCommentTimestamp}` : ""}
+                        </span>
+                      </div>
+                      <div className="p-3">
+                        <div className="prose prose-sm max-w-none text-slate-800 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-headings:my-2">
+                          <ReactMarkdown>{diffContext.changeRequest.metadata?.description?.trim() || ""}</ReactMarkdown>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : null}
-              <p className="text-sm text-slate-700">
-                Added: {diffSummary.addedCount} · Updated: {diffSummary.updatedCount} · Removed:{" "}
-                {diffSummary.removedCount}
-              </p>
-              {diffSummary.items.length === 0 ? (
-                <p className="text-xs text-slate-600">No node changes found between these versions.</p>
-              ) : (
-                <Accordion type="multiple" className="w-full rounded-md border border-slate-200 px-3">
-                  {diffSummary.items.map((item, index) => (
-                    <AccordionItem
-                      key={`${item.id}-${item.changeType}-${index}`}
-                      value={`${item.id}-${item.changeType}-${index}`}
-                      className="border-slate-200"
-                    >
-                      <AccordionTrigger className="py-3 hover:no-underline">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span
-                            className={cn(
-                              "inline-flex min-w-8 justify-center rounded px-1.5 py-0.5 text-[11px] font-semibold",
-                              item.changeType === "removed"
-                                ? "bg-amber-100 text-amber-700"
-                                : item.changeType === "added"
-                                  ? "bg-emerald-100 text-emerald-700"
-                                  : "bg-sky-100 text-sky-700",
-                            )}
-                          >
-                            {item.changeType === "updated" ? "+/-" : item.changeType === "removed" ? "-" : "+"}
-                          </span>
-                          <span className="truncate text-sm text-slate-900">{item.name}</span>
-                          <span className="truncate text-xs text-slate-500">{item.id}</span>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <NodeGitDiff lines={item.lines} nodeID={item.id} />
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              )}
+              <div className="ml-11 flex flex-col gap-2">
+                <p className="text-sm text-slate-700">
+                  Added: {diffSummary.addedCount} · Updated: {diffSummary.updatedCount} · Removed:{" "}
+                  {diffSummary.removedCount}
+                </p>
+                {diffSummary.items.length === 0 ? (
+                  <p className="text-xs text-slate-600">No node changes found between these versions.</p>
+                ) : (
+                  <Accordion type="multiple" className="w-full rounded-md border border-slate-200 px-3">
+                    {diffSummary.items.map((item, index) => (
+                      <AccordionItem
+                        key={`${item.id}-${item.changeType}-${index}`}
+                        value={`${item.id}-${item.changeType}-${index}`}
+                        className="border-slate-200"
+                      >
+                        <AccordionTrigger className="py-3 hover:no-underline">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className={cn(
+                                "inline-flex min-w-8 justify-center rounded px-1.5 py-0.5 text-[11px] font-semibold",
+                                item.changeType === "removed"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : item.changeType === "added"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-sky-100 text-sky-700",
+                              )}
+                            >
+                              {item.changeType === "updated" ? "+/-" : item.changeType === "removed" ? "-" : "+"}
+                            </span>
+                            <span className="truncate text-sm text-slate-900">{item.name}</span>
+                            <span className="truncate text-xs text-slate-500">{item.id}</span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <NodeGitDiff lines={item.lines} nodeID={item.id} />
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>

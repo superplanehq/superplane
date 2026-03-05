@@ -11,6 +11,7 @@ import {
   Undo2,
   SquarePen,
   Pencil,
+  Rocket,
 } from "lucide-react";
 import { Button } from "../button";
 import { Switch } from "../switch";
@@ -80,6 +81,7 @@ interface HeaderProps {
 export function Header({
   breadcrumbs,
   onSave,
+  onPublishVersion,
   onDiscardVersion,
   onUndo,
   canUndo,
@@ -90,6 +92,8 @@ export function Header({
   saveButtonHidden,
   saveDisabled,
   saveDisabledTooltip,
+  publishVersionDisabled,
+  publishVersionDisabledTooltip,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
   isAutoSaveEnabled,
@@ -382,7 +386,12 @@ export function Header({
                         <Switch
                           id="auto-save-toggle"
                           checked={isAutoSaveEnabled}
-                          onCheckedChange={onToggleAutoSave}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              onSave?.();
+                            }
+                            onToggleAutoSave?.();
+                          }}
                           disabled={autoSaveDisabled}
                         />
                       </div>,
@@ -420,8 +429,7 @@ export function Header({
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  {sandboxModeTooltip ||
-                    "Versioning is disabled. Turn off sandbox mode in organization settings."}
+                  {sandboxModeTooltip || "Versioning is disabled. Turn off sandbox mode in organization settings."}
                 </TooltipContent>
               </Tooltip>
             ) : null}
@@ -436,6 +444,33 @@ export function Header({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-33 p-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="w-full">
+                        {wrapWithTooltip(
+                          publishVersionDisabled,
+                          publishVersionDisabledTooltip,
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start"
+                            onClick={() => {
+                              onPublishVersion?.();
+                              setIsEditingMenuOpen(false);
+                            }}
+                            disabled={publishVersionDisabled || !onPublishVersion}
+                          >
+                            <Rocket className="h-4 w-4" />
+                            Publish
+                          </Button>,
+                        )}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="left">
+                      Create and publish a change request from your current draft.
+                    </TooltipContent>
+                  </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="w-full">
@@ -509,7 +544,12 @@ export function Header({
                       autoSaveDisabledTooltip,
                       <Switch
                         checked={!!isAutoSaveEnabled}
-                        onCheckedChange={() => onToggleAutoSave?.()}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            onSave?.();
+                          }
+                          onToggleAutoSave?.();
+                        }}
                         disabled={autoSaveToggleDisabled}
                       />,
                     )}
