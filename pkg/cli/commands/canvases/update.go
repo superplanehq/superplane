@@ -13,6 +13,7 @@ import (
 
 type updateCommand struct {
 	file            *string
+	draft           *bool
 	autoLayout      *string
 	autoLayoutScope *string
 	autoLayoutNodes *[]string
@@ -36,6 +37,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	if c.autoLayoutNodes != nil {
 		autoLayoutNodeIDs = append(autoLayoutNodeIDs, *c.autoLayoutNodes...)
 	}
+	draftMode := c.draft != nil && *c.draft
 
 	var (
 		canvasID string
@@ -57,8 +59,32 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		current = &canvas
 	}
 
+	versioningContext, err := resolveCanvasVersioningContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	targetVersionID := ""
+	if versioningContext.sandboxModeEnabled {
+		if draftMode {
+			return fmt.Errorf("--draft cannot be used when canvas sandbox mode is enabled")
+		}
+	} else {
+		if !draftMode {
+			return fmt.Errorf("canvas versioning is enabled for this organization; use --draft to update your edit version")
+		}
+
+		targetVersionID, err = ensureCurrentUserDraftVersionID(ctx, canvasID)
+		if err != nil {
+			return err
+		}
+	}
+
 	body := openapi_client.CanvasesUpdateCanvasVersionBody{}
 	body.SetCanvas(canvas)
+	if targetVersionID != "" {
+		body.SetVersionId(targetVersionID)
+	}
 
 	if autoLayoutFlagsWereSet(ctx) {
 		if autoLayoutValue == "" && (autoLayoutScopeValue != "" || len(autoLayoutNodeIDs) > 0) {
@@ -74,11 +100,21 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		}
 	} else {
 		if current == nil {
-			existingCanvas, describeErr := describeCanvasByID(ctx, canvasID)
-			if describeErr != nil {
-				return describeErr
+			if targetVersionID != "" {
+				version, describeErr := describeCanvasVersionByID(ctx, canvasID, targetVersionID)
+				if describeErr != nil {
+					return describeErr
+				}
+
+				versionCanvas := canvasFromVersion(version)
+				current = &versionCanvas
+			} else {
+				existingCanvas, describeErr := describeCanvasByID(ctx, canvasID)
+				if describeErr != nil {
+					return describeErr
+				}
+				current = &existingCanvas
 			}
-			current = &existingCanvas
 		}
 
 		body.SetAutoLayout(buildDefaultAutoLayout(*current, canvas))
