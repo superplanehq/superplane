@@ -136,7 +136,7 @@ func (c *GetHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
 	var nodeMetadata GetHTTPSyntheticCheckNodeMetadata
 	err = mapstructure.Decode(ctx.Metadata.Get(), &nodeMetadata)
 	if err != nil {
-		return fmt.Errorf("error decoding  metadata: %v", err)
+		return fmt.Errorf("error decoding metadata: %v", err)
 	}
 	if nodeMetadata.CheckName != "" {
 		return nil
@@ -199,7 +199,6 @@ func (c *GetHTTPSyntheticCheck) Execute(ctx core.ExecutionContext) error {
 	output := map[string]any{
 		"configuration": checkConfig,
 		"metrics":       metrics,
-		"status":        channel,
 	}
 
 	return ctx.ExecutionState.Emit(

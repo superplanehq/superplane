@@ -74,14 +74,15 @@
       }
     },
     "metrics": {
-      "healthyRuns24h": 58,
-      "criticalRuns24h": 3,
-      "totalRuns24h": 61,
-      "avgDuration24hMs": 540,
-      "healthyRuns7d": 390,
-      "criticalRuns7d": 12,
-      "totalRuns7d": 402,
-      "avgDuration7dMs": 520
+      "avgDuration24hMs": 1004,
+      "avgDuration7dMs": 1004,
+      "criticalRuns24h": 2275,
+      "criticalRuns7d": 2438,
+      "healthyRuns24h": 6,
+      "healthyRuns7d": 37,
+      "lastOutcome": "Healthy",
+      "totalRuns24h": 2281,
+      "totalRuns7d": 2475
     }
   },
   "timestamp": "2026-03-03T11:00:00Z",
