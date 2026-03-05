@@ -61,12 +61,14 @@ func (i *Integration) Sync(ctx core.SyncContext) error {
 	// Auto-generate a webhook secret if one does not exist
 	var webhookSecret []byte
 	secrets, err := ctx.Integration.GetSecrets()
-	if err == nil {
-		for _, s := range secrets {
-			if s.Name == "webhookSecret" {
-				webhookSecret = s.Value
-				break
-			}
+	if err != nil {
+		return fmt.Errorf("failed to fetch secrets: %w", err)
+	}
+
+	for _, s := range secrets {
+		if s.Name == "webhookSecret" {
+			webhookSecret = s.Value
+			break
 		}
 	}
 	if len(webhookSecret) == 0 {
