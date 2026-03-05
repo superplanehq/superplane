@@ -69,6 +69,21 @@ func CreatePushSubscription(ctx context.Context, client *common.Client, projectI
 	return nil
 }
 
+func UpdatePushEndpoint(ctx context.Context, client *common.Client, projectID, subscriptionID, pushEndpoint string) error {
+	url := fmt.Sprintf("%s/projects/%s/subscriptions/%s:modifyPushConfig", pubsubBaseURL, projectID, subscriptionID)
+	body := map[string]any{
+		"pushConfig": map[string]string{
+			"pushEndpoint": pushEndpoint,
+		},
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("marshal modifyPushConfig body: %w", err)
+	}
+	_, err = client.ExecRequest(ctx, "POST", url, strings.NewReader(string(raw)))
+	return err
+}
+
 func DeleteSubscription(ctx context.Context, client *common.Client, projectID, subscriptionID string) error {
 	url := fmt.Sprintf("%s/projects/%s/subscriptions/%s", pubsubBaseURL, projectID, subscriptionID)
 	_, err := client.ExecRequest(ctx, "DELETE", url, nil)
