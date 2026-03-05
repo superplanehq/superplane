@@ -78,7 +78,7 @@ func ListLocationResources(ctx context.Context, client Client, projectID string)
 	return resources, nil
 }
 
-// Functions
+// Functions (Cloud Functions v2 + Cloud Run services)
 
 type functionListResponse struct {
 	Functions     []functionItem `json:"functions"`
@@ -90,6 +90,19 @@ type functionItem struct {
 	State string `json:"state"`
 }
 
+type serviceListResponse struct {
+	Services      []serviceItem `json:"services"`
+	NextPageToken string        `json:"nextPageToken"`
+}
+
+type serviceItem struct {
+	Name string `json:"name"`
+	URI  string `json:"uri"`
+}
+
+// ListFunctionResources lists Cloud Functions v2 and Cloud Run services for a given location.
+// Both are shown because Gen 2 Cloud Functions ("Cloud Run functions") may be deployed
+// directly as Cloud Run services and won't appear in the Cloud Functions API.
 func ListFunctionResources(ctx context.Context, client Client, projectID string, location string) ([]core.IntegrationResource, error) {
 	projectID = strings.TrimSpace(projectID)
 	if projectID == "" {
@@ -100,6 +113,26 @@ func ListFunctionResources(ctx context.Context, client Client, projectID string,
 		return nil, nil
 	}
 
+	var resources []core.IntegrationResource
+
+	// Cloud Functions v2
+	cfResources, err := listCloudFunctions(ctx, client, projectID, location)
+	if err != nil {
+		return nil, err
+	}
+	resources = append(resources, cfResources...)
+
+	// Cloud Run services
+	crResources, err := listCloudRunServices(ctx, client, projectID, location)
+	if err != nil {
+		return nil, err
+	}
+	resources = append(resources, crResources...)
+
+	return resources, nil
+}
+
+func listCloudFunctions(ctx context.Context, client Client, projectID, location string) ([]core.IntegrationResource, error) {
 	baseURL := fmt.Sprintf("%s/v2/projects/%s/locations/%s/functions?pageSize=100", cloudFunctionsBaseURL, projectID, location)
 	pageURL := baseURL
 	var resources []core.IntegrationResource
@@ -116,14 +149,49 @@ func ListFunctionResources(ctx context.Context, client Client, projectID string,
 		}
 
 		for _, fn := range resp.Functions {
-			name := fn.Name
-			if name == "" {
+			if fn.Name == "" {
 				continue
 			}
 			resources = append(resources, core.IntegrationResource{
 				Type: ResourceTypeFunction,
-				ID:   name,
-				Name: functionShortName(name),
+				ID:   fn.Name,
+				Name: functionShortName(fn.Name),
+			})
+		}
+
+		if resp.NextPageToken == "" {
+			break
+		}
+		pageURL = baseURL + "&pageToken=" + url.QueryEscape(resp.NextPageToken)
+	}
+
+	return resources, nil
+}
+
+func listCloudRunServices(ctx context.Context, client Client, projectID, location string) ([]core.IntegrationResource, error) {
+	baseURL := fmt.Sprintf("%s/v2/projects/%s/locations/%s/services?pageSize=100", cloudRunBaseURL, projectID, location)
+	pageURL := baseURL
+	var resources []core.IntegrationResource
+
+	for {
+		data, err := client.GetURL(ctx, pageURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list Cloud Run services: %w", err)
+		}
+
+		var resp serviceListResponse
+		if err := json.Unmarshal(data, &resp); err != nil {
+			return nil, fmt.Errorf("failed to parse Cloud Run services response: %w", err)
+		}
+
+		for _, svc := range resp.Services {
+			if svc.Name == "" {
+				continue
+			}
+			resources = append(resources, core.IntegrationResource{
+				Type: ResourceTypeFunction,
+				ID:   svc.Name,
+				Name: functionShortName(svc.Name),
 			})
 		}
 

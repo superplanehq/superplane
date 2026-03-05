@@ -83,33 +83,48 @@ func TestListLocationResources(t *testing.T) {
 func TestListFunctionResources(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("returns parsed function resources", func(t *testing.T) {
+	t.Run("returns Cloud Functions and Cloud Run services combined", func(t *testing.T) {
 		client := &mockClient{
 			projectID: "my-project",
 			getURL: func(_ context.Context, fullURL string) ([]byte, error) {
-				assert.Equal(t,
-					"https://cloudfunctions.googleapis.com/v2/projects/my-project/locations/us-central1/functions?pageSize=100",
-					fullURL,
-				)
-				return []byte(`{
-					"functions": [
-						{
-							"name": "projects/my-project/locations/us-central1/functions/hello-world",
-							"state": "ACTIVE"
-						}
-					]
-				}`), nil
+				if fullURL == "https://cloudfunctions.googleapis.com/v2/projects/my-project/locations/us-central1/functions?pageSize=100" {
+					return []byte(`{
+						"functions": [
+							{
+								"name": "projects/my-project/locations/us-central1/functions/hello-world",
+								"state": "ACTIVE"
+							}
+						]
+					}`), nil
+				}
+				if fullURL == "https://run.googleapis.com/v2/projects/my-project/locations/us-central1/services?pageSize=100" {
+					return []byte(`{
+						"services": [
+							{
+								"name": "projects/my-project/locations/us-central1/services/my-service",
+								"uri": "https://my-service-abc123-uc.a.run.app"
+							}
+						]
+					}`), nil
+				}
+				t.Errorf("unexpected URL: %s", fullURL)
+				return nil, nil
 			},
 		}
 
 		resources, err := ListFunctionResources(ctx, client, "", "us-central1")
 		require.NoError(t, err)
-		require.Len(t, resources, 1)
+		require.Len(t, resources, 2)
 		assert.Equal(t, core.IntegrationResource{
 			Type: ResourceTypeFunction,
 			ID:   "projects/my-project/locations/us-central1/functions/hello-world",
 			Name: "hello-world",
 		}, resources[0])
+		assert.Equal(t, core.IntegrationResource{
+			Type: ResourceTypeFunction,
+			ID:   "projects/my-project/locations/us-central1/services/my-service",
+			Name: "my-service",
+		}, resources[1])
 	})
 
 	t.Run("returns nil when location is empty", func(t *testing.T) {

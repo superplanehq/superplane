@@ -14,8 +14,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudfunctions"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/compute"
 	gcppubsub "github.com/superplanehq/superplane/pkg/integrations/gcp/pubsub"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -433,12 +433,16 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		if projectID == "" {
 			projectID = client.ProjectID()
 		}
-		enabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "cloudfunctions.googleapis.com")
+		cfEnabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "cloudfunctions.googleapis.com")
 		if err != nil {
 			return nil, fmt.Errorf("failed to check Cloud Functions API status: %w", err)
 		}
-		if !enabled {
-			return nil, fmt.Errorf("Cloud Functions API is not enabled in project %s. Enable it at https://console.cloud.google.com/apis/library/cloudfunctions.googleapis.com?project=%s", projectID, projectID)
+		crEnabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "run.googleapis.com")
+		if err != nil {
+			return nil, fmt.Errorf("failed to check Cloud Run API status: %w", err)
+		}
+		if !cfEnabled && !crEnabled {
+			return nil, fmt.Errorf("Neither Cloud Functions nor Cloud Run API is enabled in project %s", projectID)
 		}
 		if resourceType == cloudfunctions.ResourceTypeLocation {
 			return cloudfunctions.ListLocationResources(reqCtx, client, p["projectId"])

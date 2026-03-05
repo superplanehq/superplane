@@ -70,7 +70,7 @@ func TestInvokeFunction_Setup(t *testing.T) {
 }
 
 func TestInvokeFunction_Execute(t *testing.T) {
-	t.Run("invokes function and emits parsed JSON result", func(t *testing.T) {
+	t.Run("invokes gen1 function via :call API and emits parsed JSON result", func(t *testing.T) {
 		functionName := "projects/my-project/locations/us-central1/functions/hello-world"
 		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
@@ -94,6 +94,7 @@ func TestInvokeFunction_Execute(t *testing.T) {
 		err := (&InvokeFunction{}).Execute(core.ExecutionContext{
 			Configuration:  map[string]any{"location": "us-central1", "function": functionName},
 			ExecutionState: state,
+			NodeMetadata:   &testcontexts.MetadataContext{Metadata: InvokeFunctionMetadata{FunctionName: functionName}},
 		})
 
 		require.NoError(t, err)
@@ -109,7 +110,44 @@ func TestInvokeFunction_Execute(t *testing.T) {
 		assert.Equal(t, "hello", result["message"])
 	})
 
+	t.Run("invokes gen2 function via HTTP trigger URI", func(t *testing.T) {
+		functionName := "projects/my-project/locations/us-central1/functions/hello-world"
+		triggerURI := "https://hello-world-abc123-uc.a.run.app"
+		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+			return &mockClient{
+				projectID: "my-project",
+				postURL: func(_ context.Context, fullURL string, body any) ([]byte, error) {
+					assert.Equal(t, triggerURI, fullURL)
+					return json.Marshal(map[string]any{"message": "hello gen2"})
+				},
+			}, nil
+		})
+
+		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := (&InvokeFunction{}).Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"location": "us-central1", "function": functionName},
+			ExecutionState: state,
+			NodeMetadata: &testcontexts.MetadataContext{Metadata: InvokeFunctionMetadata{
+				FunctionName: functionName,
+				Environment:  "GEN_2",
+				FunctionURI:  triggerURI,
+			}},
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Finished)
+		assert.True(t, state.Passed)
+		require.Len(t, state.Payloads, 1)
+		wrapper := state.Payloads[0].(map[string]any)
+		data := wrapper["data"].(map[string]any)
+		assert.Equal(t, functionName, data["functionName"])
+		result, ok := data["result"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "hello gen2", result["message"])
+	})
+
 	t.Run("stores raw string when result is not JSON", func(t *testing.T) {
+		functionName := "projects/p/locations/l/functions/f"
 		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
@@ -124,8 +162,9 @@ func TestInvokeFunction_Execute(t *testing.T) {
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := (&InvokeFunction{}).Execute(core.ExecutionContext{
-			Configuration:  map[string]any{"location": "us-central1", "function": "projects/p/locations/l/functions/f"},
+			Configuration:  map[string]any{"location": "us-central1", "function": functionName},
 			ExecutionState: state,
+			NodeMetadata:   &testcontexts.MetadataContext{Metadata: InvokeFunctionMetadata{FunctionName: functionName}},
 		})
 
 		require.NoError(t, err)
@@ -137,6 +176,7 @@ func TestInvokeFunction_Execute(t *testing.T) {
 	})
 
 	t.Run("fails when function returns an error field", func(t *testing.T) {
+		functionName := "projects/p/locations/l/functions/broken"
 		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
@@ -151,8 +191,9 @@ func TestInvokeFunction_Execute(t *testing.T) {
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := (&InvokeFunction{}).Execute(core.ExecutionContext{
-			Configuration:  map[string]any{"location": "us-central1", "function": "projects/p/locations/l/functions/broken"},
+			Configuration:  map[string]any{"location": "us-central1", "function": functionName},
 			ExecutionState: state,
+			NodeMetadata:   &testcontexts.MetadataContext{Metadata: InvokeFunctionMetadata{FunctionName: functionName}},
 		})
 
 		require.NoError(t, err)

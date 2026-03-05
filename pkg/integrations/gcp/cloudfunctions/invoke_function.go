@@ -29,6 +29,8 @@ type InvokeFunctionConfiguration struct {
 
 type InvokeFunctionMetadata struct {
 	FunctionName string `json:"functionName" mapstructure:"functionName"`
+	FunctionURI  string `json:"functionUri,omitempty" mapstructure:"functionUri,omitempty"`
+	Environment  string `json:"environment,omitempty" mapstructure:"environment,omitempty"`
 }
 
 func (c *InvokeFunction) Name() string {
@@ -156,9 +158,19 @@ func (c *InvokeFunction) Setup(ctx core.SetupContext) error {
 	if config.Function == "" {
 		return fmt.Errorf("function is required")
 	}
-	return ctx.Metadata.Set(InvokeFunctionMetadata{
-		FunctionName: config.Function,
-	})
+
+	metadata := InvokeFunctionMetadata{FunctionName: config.Function}
+	if ctx.Integration != nil {
+		client, err := getClient(ctx.HTTP, ctx.Integration)
+		if err == nil {
+			if details, err := GetFunctionDetails(context.Background(), client, config.Function); err == nil {
+				metadata.FunctionURI = details.URI
+				metadata.Environment = details.Environment
+			}
+		}
+	}
+
+	return ctx.Metadata.Set(metadata)
 }
 
 func (c *InvokeFunction) Execute(ctx core.ExecutionContext) error {
@@ -172,39 +184,56 @@ func (c *InvokeFunction) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
 	}
 
-	// Serialize payload to JSON string as required by the Cloud Functions call API.
-	payloadBytes, err := json.Marshal(config.Payload)
-	if err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to marshal payload: %v", err))
+	var metadata InvokeFunctionMetadata
+	if err := mapstructure.Decode(ctx.NodeMetadata.Get(), &metadata); err != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode metadata: %v", err))
 	}
 
-	callURL := functionCallURL(config.Function)
-	responseBody, err := client.PostURL(context.Background(), callURL, map[string]any{
-		"data": string(payloadBytes),
-	})
-	if err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to invoke function: %v", err))
-	}
+	output := map[string]any{"functionName": config.Function}
 
-	var callResp callFunctionResponse
-	if err := json.Unmarshal(responseBody, &callResp); err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse invocation response: %v", err))
-	}
+	if metadata.Environment == "GEN_2" || metadata.FunctionURI != "" {
+		// Gen 2: invoke via HTTP trigger URL, payload sent directly as JSON body.
+		responseBody, err := client.PostURL(context.Background(), metadata.FunctionURI, config.Payload)
+		if err != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to invoke function: %v", err))
+		}
 
-	if callResp.Error != "" {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("function returned error: %s", callResp.Error))
-	}
-
-	output := map[string]any{
-		"functionName": config.Function,
-		"executionId":  callResp.ExecutionId,
-	}
-
-	var parsed any
-	if json.Unmarshal([]byte(callResp.Result), &parsed) == nil {
-		output["result"] = parsed
+		var parsed any
+		if json.Unmarshal(responseBody, &parsed) == nil {
+			output["result"] = parsed
+		} else {
+			output["resultRaw"] = string(responseBody)
+		}
 	} else {
-		output["resultRaw"] = callResp.Result
+		// Gen 1: use the v1 :call API, payload wrapped as a JSON string in "data".
+		payloadBytes, err := json.Marshal(config.Payload)
+		if err != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to marshal payload: %v", err))
+		}
+
+		responseBody, err := client.PostURL(context.Background(), functionCallURL(config.Function), map[string]any{
+			"data": string(payloadBytes),
+		})
+		if err != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to invoke function: %v", err))
+		}
+
+		var callResp callFunctionResponse
+		if err := json.Unmarshal(responseBody, &callResp); err != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse invocation response: %v", err))
+		}
+
+		if callResp.Error != "" {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("function returned error: %s", callResp.Error))
+		}
+
+		output["executionId"] = callResp.ExecutionId
+		var parsed any
+		if json.Unmarshal([]byte(callResp.Result), &parsed) == nil {
+			output["result"] = parsed
+		} else {
+			output["resultRaw"] = callResp.Result
+		}
 	}
 
 	return ctx.ExecutionState.Emit(invokeFunctionOutputChannel, invokeFunctionPayloadType, []any{output})
