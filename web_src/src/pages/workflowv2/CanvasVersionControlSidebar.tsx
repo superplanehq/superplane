@@ -1,11 +1,10 @@
 import { CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, Eye, GitBranch, GitCompareArrows, GitPullRequest, RotateCcw } from "lucide-react";
+import { ChevronLeft, Eye, GitBranch, GitCompareArrows, GitPullRequest } from "lucide-react";
 import { MouseEvent as ReactMouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as yaml from "js-yaml";
 import ReactMarkdown from "react-markdown";
@@ -28,23 +27,13 @@ interface CanvasVersionControlSidebarProps {
   liveVersionsTotalCount?: number;
   canUpdateCanvas: boolean;
   isTemplate: boolean;
-  hasEditableVersion: boolean;
-  isEditModeEnabled: boolean;
   canvasDeletedRemotely: boolean;
-  onToggleEditMode: () => void;
-  onResetDraft: () => void;
   onUseVersion: (versionID: string) => void;
   onCreateChangeRequest: () => void;
   onLoadMoreLiveVersions?: () => void;
-  toggleEditModeDisabled: boolean;
-  toggleEditModeDisabledTooltip?: string;
-  resetDraftDisabled: boolean;
-  resetDraftDisabledTooltip?: string;
   createChangeRequestDisabled: boolean;
   createChangeRequestDisabledTooltip?: string;
   loadMoreLiveVersionsDisabled?: boolean;
-  toggleEditModePending: boolean;
-  resetDraftPending: boolean;
   createChangeRequestPending: boolean;
   loadMoreLiveVersionsPending?: boolean;
 }
@@ -322,23 +311,13 @@ export function CanvasVersionControlSidebar({
   liveVersionsTotalCount,
   canUpdateCanvas,
   isTemplate,
-  hasEditableVersion,
-  isEditModeEnabled,
   canvasDeletedRemotely,
-  onToggleEditMode,
-  onResetDraft,
   onUseVersion,
   onCreateChangeRequest,
   onLoadMoreLiveVersions,
-  toggleEditModeDisabled,
-  toggleEditModeDisabledTooltip,
-  resetDraftDisabled,
-  resetDraftDisabledTooltip,
   createChangeRequestDisabled,
   createChangeRequestDisabledTooltip,
   loadMoreLiveVersionsDisabled,
-  toggleEditModePending,
-  resetDraftPending,
   createChangeRequestPending,
   loadMoreLiveVersionsPending,
 }: CanvasVersionControlSidebarProps) {
@@ -469,65 +448,23 @@ export function CanvasVersionControlSidebar({
         </div>
 
         <div className="flex-1 overflow-auto p-3">
-          <section className="rounded-md border border-slate-200 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Actions</p>
-            <div className="mt-2 flex flex-col gap-2">
+          <section className="rounded-md ">
+            <div className="flex flex-col gap-2">
               {withTooltip(
-                toggleEditModeDisabled,
-                toggleEditModeDisabledTooltip,
-                <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-900">Edit mode</p>
-                    <p className="text-xs text-slate-600">
-                      {toggleEditModePending
-                        ? "Updating..."
-                        : isEditModeEnabled
-                          ? "Enabled"
-                          : "Enable to create or use your draft"}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={isEditModeEnabled}
-                    onCheckedChange={() => onToggleEditMode()}
-                    disabled={toggleEditModeDisabled || toggleEditModePending}
-                  />
-                </div>,
+                createChangeRequestDisabled,
+                createChangeRequestDisabledTooltip,
+                <Button
+                  onClick={onCreateChangeRequest}
+                  disabled={createChangeRequestDisabled}
+                  className="w-full justify-start min-w-0"
+                  variant="outline"
+                >
+                  <GitPullRequest className="h-4 w-4" />
+                  <span className="truncate min-w-0">
+                    {createChangeRequestPending ? "Publishing..." : "Publish Draft   Version"}
+                  </span>
+                </Button>,
               )}
-
-              {isEditModeEnabled
-                ? withTooltip(
-                    resetDraftDisabled,
-                    resetDraftDisabledTooltip,
-                    <Button
-                      onClick={onResetDraft}
-                      disabled={resetDraftDisabled}
-                      className="w-full justify-start min-w-0"
-                      variant="outline"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      <span className="truncate min-w-0">
-                        {resetDraftPending ? "Resetting draft..." : "Reset Draft Changes"}
-                      </span>
-                    </Button>,
-                  )
-                : null}
-
-              {hasEditableVersion &&
-                withTooltip(
-                  createChangeRequestDisabled,
-                  createChangeRequestDisabledTooltip,
-                  <Button
-                    onClick={onCreateChangeRequest}
-                    disabled={createChangeRequestDisabled}
-                    className="w-full justify-start min-w-0"
-                    variant="outline"
-                  >
-                    <GitPullRequest className="h-4 w-4" />
-                    <span className="truncate min-w-0">
-                      {createChangeRequestPending ? "Publishing change request..." : "Create change request"}
-                    </span>
-                  </Button>,
-                )}
 
               {!canUpdateCanvas && !canvasDeletedRemotely ? (
                 <p className="text-xs text-slate-600">You do not have permission to edit this canvas.</p>

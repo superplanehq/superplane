@@ -424,8 +424,6 @@ export function WorkflowPageV2() {
   const { canAct } = usePermissions();
   const [activeCanvasVersion, setActiveCanvasVersion] = useState<CanvasesCanvasVersion | null>(null);
   const [selectedChangeRequestId, setSelectedChangeRequestId] = useState("");
-  const [editingChangeRequestId, setEditingChangeRequestId] = useState("");
-  const [editingChangeRequestName, setEditingChangeRequestName] = useState("");
   const [isCreateChangeRequestMode, setIsCreateChangeRequestMode] = useState(false);
   const [createChangeRequestTitle, setCreateChangeRequestTitle] = useState("");
   const [createChangeRequestDescription, setCreateChangeRequestDescription] = useState("");
@@ -586,11 +584,6 @@ export function WorkflowPageV2() {
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
   const liveCanvasVersionId = liveCanvasVersion?.metadata?.id;
   const activeCanvasVersionId = activeCanvasVersion?.metadata?.id || "";
-  const editingChangeRequest = useMemo(
-    () => canvasChangeRequests.find((changeRequest) => changeRequest.metadata?.id === editingChangeRequestId),
-    [canvasChangeRequests, editingChangeRequestId],
-  );
-  const isEditingChangeRequest = !!editingChangeRequestId;
   const { data: loadedCanvasVersion, isLoading: canvasVersionLoading } = useCanvasVersion(
     organizationId!,
     canvasId!,
@@ -605,9 +598,14 @@ export function WorkflowPageV2() {
 
     return draftVersions[0];
   }, [activeCanvasVersionId, selectedCanvasVersion, draftVersions]);
+  const latestDraftVersion = draftVersions[0];
   const createChangeRequestNodeDiffSummary = useMemo(
     () => buildDraftNodeDiffSummary(liveCanvasVersion, createChangeRequestVersion),
     [liveCanvasVersion, createChangeRequestVersion],
+  );
+  const pendingDraftDiffSummary = useMemo(
+    () => buildDraftNodeDiffSummary(liveCanvasVersion, latestDraftVersion),
+    [liveCanvasVersion, latestDraftVersion],
   );
   const isViewingDraftVersion = !!selectedCanvasVersion && !selectedCanvasVersion.metadata?.isPublished;
   const isViewingCurrentLiveVersion =
@@ -660,10 +658,6 @@ export function WorkflowPageV2() {
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
   const isDev = import.meta.env.DEV;
   const [topViewMode, setTopViewMode] = useState<"canvas" | "memory" | "versioning">("canvas");
-  const changeRequestEditReturnRef = useRef<{
-    topViewMode: "canvas" | "memory" | "versioning";
-    versionId: string;
-  }>({ topViewMode: "versioning", versionId: "" });
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
@@ -792,10 +786,6 @@ export function WorkflowPageV2() {
     if (selectedChangeRequestId) {
       setSelectedChangeRequestId("");
     }
-    if (editingChangeRequestId) {
-      setEditingChangeRequestId("");
-      setEditingChangeRequestName("");
-    }
     if (isCreateChangeRequestMode) {
       setIsCreateChangeRequestMode(false);
     }
@@ -814,7 +804,6 @@ export function WorkflowPageV2() {
     topViewMode,
     isVersionControlOpen,
     selectedChangeRequestId,
-    editingChangeRequestId,
     isCreateChangeRequestMode,
     activeCanvasVersionId,
     searchParams,
@@ -885,8 +874,6 @@ export function WorkflowPageV2() {
     setInitialWorkflowSnapshot(null);
     setActiveCanvasVersion(null);
     setSelectedChangeRequestId("");
-    setEditingChangeRequestId("");
-    setEditingChangeRequestName("");
     hasSyncedVersionFromURLRef.current = false;
     lastSavedWorkflowRef.current = null;
     lastLocalCanvasSaveAtRef.current = 0;
@@ -989,29 +976,6 @@ export function WorkflowPageV2() {
       setSelectedChangeRequestId("");
     }
   }, [canvasChangeRequests, selectedChangeRequestId]);
-
-  useEffect(() => {
-    if (!editingChangeRequestId) {
-      return;
-    }
-
-    const hasEditingChangeRequest = canvasChangeRequests.some(
-      (changeRequest) => changeRequest.metadata?.id === editingChangeRequestId,
-    );
-    if (!hasEditingChangeRequest) {
-      setEditingChangeRequestId("");
-      setEditingChangeRequestName("");
-    }
-  }, [canvasChangeRequests, editingChangeRequestId]);
-
-  useEffect(() => {
-    if (!editingChangeRequestId || topViewMode === "canvas") {
-      return;
-    }
-
-    setEditingChangeRequestId("");
-    setEditingChangeRequestName("");
-  }, [editingChangeRequestId, topViewMode]);
 
   useEffect(() => {
     if (!organizationId || !canvasId || !activeCanvasVersionId || !loadedCanvasVersion?.spec) {
@@ -3691,12 +3655,12 @@ export function WorkflowPageV2() {
       const editVersionID = createChangeRequestVersion?.metadata?.id || "";
 
       if (!editVersionID) {
-        showErrorToast("Enable edit mode before creating a change request");
+        showErrorToast("Enable edit mode before publishing");
         return;
       }
 
       if (hasUnsavedChanges && editVersionID === activeCanvasVersionId) {
-        showErrorToast("Save your version before creating a change request");
+        showErrorToast("Save your version before publishing");
         return;
       }
 
@@ -3730,11 +3694,11 @@ export function WorkflowPageV2() {
           return next;
         });
         setIsCreateChangeRequestMode(false);
-        showSuccessToast("Change request published");
+        showSuccessToast("Version published");
       } catch (error) {
         const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
         const errorMessage =
-          responseMessage || (error as { message?: string })?.message || "Failed to publish change request";
+          responseMessage || (error as { message?: string })?.message || "Failed to publish draft version";
         showErrorToast(errorMessage);
       }
     },
@@ -3872,19 +3836,6 @@ export function WorkflowPageV2() {
       initializeFromWorkflow,
     ],
   );
-
-  const handleExitChangeRequestEditing = useCallback(() => {
-    const returnTopViewMode = changeRequestEditReturnRef.current.topViewMode;
-    const returnVersionId = changeRequestEditReturnRef.current.versionId;
-
-    setEditingChangeRequestId("");
-    setEditingChangeRequestName("");
-    setTopViewMode(returnTopViewMode);
-
-    if (returnVersionId && returnVersionId !== (activeCanvasVersionId || liveCanvasVersionId || "")) {
-      handleUseVersion(returnVersionId);
-    }
-  }, [activeCanvasVersionId, liveCanvasVersionId, handleUseVersion]);
 
   const handleToggleEditMode = useCallback(async () => {
     if (!organizationId || !canvasId) {
@@ -4363,28 +4314,7 @@ export function WorkflowPageV2() {
       </Button>
     </div>
   ) : null;
-  const editingChangeRequestLabel =
-    editingChangeRequest?.metadata?.title?.trim() || editingChangeRequestName || "Untitled change request";
-  const changeRequestEditBanner = isEditingChangeRequest ? (
-    <div className="bg-amber-100 px-4 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="inline-flex shrink-0 rounded border border-amber-300 bg-amber-200/60 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-900">
-          CR Edit Mode
-        </span>
-        <p className="text-sm font-medium text-amber-900 truncate">
-          Editing change request: {editingChangeRequestLabel}
-        </p>
-      </div>
-      <Button
-        size="sm"
-        variant="outline"
-        className="border-amber-400 text-amber-900"
-        onClick={handleExitChangeRequestEditing}
-      >
-        Exit
-      </Button>
-    </div>
-  ) : null;
+
   const versionLoadingBanner =
     canvasVersionLoading && activeCanvasVersionId ? (
       <div className="bg-slate-100 px-4 py-2.5 flex items-center gap-2">
@@ -4394,9 +4324,7 @@ export function WorkflowPageV2() {
     ) : null;
   const selectedVersionForLabel = selectedCanvasVersion || liveCanvasVersion;
   const canvasViewKey = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "live";
-  const headerBanners = [changeRequestEditBanner, versionLoadingBanner, remoteUpdateBanner, templateBanner].filter(
-    Boolean,
-  );
+  const headerBanners = [versionLoadingBanner, remoteUpdateBanner, templateBanner].filter(Boolean);
   const headerBanner = headerBanners.length > 0 ? <div className="flex flex-col">{headerBanners}</div> : null;
   const saveDisabled = !canUpdateCanvas || !hasEditableVersion;
   const saveDisabledTooltip = !canUpdateCanvas
@@ -4412,8 +4340,7 @@ export function WorkflowPageV2() {
       : undefined;
   const saveButtonHidden = isTemplate || !canUpdateCanvas || !hasEditableVersion || !hasUnsavedChanges;
   const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas;
-  const canUndo =
-    !isTemplate && canUpdateCanvas && hasEditableVersion && !isAutoSaveEnabled && initialWorkflowSnapshot !== null;
+  const canUndo = !isTemplate && canUpdateCanvas && hasEditableVersion && initialWorkflowSnapshot !== null;
   const sandboxModeVersioningTooltip = "Versioning is disabled while sandbox mode is enabled";
   const toggleEditModeDisabled =
     isSandboxModeEnabled ||
@@ -4464,10 +4391,23 @@ export function WorkflowPageV2() {
     : isSandboxModeEnabled
       ? sandboxModeVersioningTooltip
       : !hasEditableVersion
-        ? "Only a working version can create a change request."
+        ? "Enable edit mode before publishing."
         : hasUnsavedChanges
-          ? "Save your version before creating a change request."
+          ? "Save your version before publishing."
           : undefined;
+  const headerMode = isSandboxModeEnabled ? "sandbox" : hasEditableVersion ? "version-edit" : "version-live";
+  const headerSaveState = updateCanvasVersionMutation.isPending ? "saving" : hasUnsavedChanges ? "unsaved" : "saved";
+  const showPendingDraftBadge =
+    !isSandboxModeEnabled && !hasEditableVersion && !!latestDraftVersion && pendingDraftDiffSummary.items.length > 0;
+  const exitEditModeDisabled =
+    !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion || createCanvasVersionMutation.isPending;
+  const exitEditModeDisabledTooltip = !canUpdateCanvas
+    ? "You don't have permission to edit this canvas."
+    : canvasDeletedRemotely
+      ? "This canvas was deleted in another session."
+      : !hasEditableVersion
+        ? "Edit mode is not enabled."
+        : undefined;
   const runDisabled =
     hasRunBlockingChanges ||
     isTemplate ||
@@ -4533,16 +4473,14 @@ export function WorkflowPageV2() {
         }}
         showVersioningTab={false}
         isVersionControlOpen={showVersioningUI ? isVersionControlOpen : false}
-        onOpenVersionControl={
-          showVersioningUI && !isEditingChangeRequest ? () => setIsVersionControlOpen(true) : undefined
-        }
+        onOpenVersionControl={showVersioningUI ? () => setIsVersionControlOpen(true) : undefined}
         versionControlButtonLabel={
           hasEditableVersion
             ? `Draft ${formatVersionLabelWithTimestamp(selectedVersionForLabel)}`
             : `Live ${formatVersionLabelWithTimestamp(selectedVersionForLabel)}`
         }
         versionControlButtonTooltip="Open version control"
-        showBottomStatusControls={!isEditingChangeRequest}
+        showBottomStatusControls={true}
         memoryItemCount={canvasMemoryEntries.length}
         versioningItemCount={undefined}
         dataViewContent={dataViewContent}
@@ -4595,12 +4533,25 @@ export function WorkflowPageV2() {
         saveButtonHidden={saveButtonHidden}
         saveDisabled={saveDisabled}
         saveDisabledTooltip={saveDisabledTooltip}
+        onDiscardVersion={showVersioningUI ? handleResetDraftChanges : undefined}
+        discardVersionDisabled={resetDraftDisabled}
+        discardVersionDisabledTooltip={resetDraftDisabledTooltip}
         onUndo={!isReadOnly ? handleRevert : undefined}
         canUndo={canUndo}
         isAutoSaveEnabled={isAutoSaveEnabled && !isTemplate}
         onToggleAutoSave={isTemplate ? undefined : handleToggleAutoSave}
         autoSaveDisabled={autoSaveDisabled}
         autoSaveDisabledTooltip={autoSaveDisabledTooltip}
+        headerMode={headerMode}
+        saveState={headerSaveState}
+        onEnterEditMode={showVersioningUI ? handleToggleEditMode : undefined}
+        enterEditModeDisabled={toggleEditModeDisabled}
+        enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
+        onExitEditMode={showVersioningUI ? handleToggleEditMode : undefined}
+        exitEditModeDisabled={exitEditModeDisabled}
+        exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+        sandboxModeTooltip={sandboxModeVersioningTooltip}
+        showPendingDraftBadge={showPendingDraftBadge}
         autoLayoutOnUpdateDisabled={isReadOnly}
         autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
         onExportYamlCopy={isDev ? handleExportYamlCopy : undefined}
@@ -4640,7 +4591,7 @@ export function WorkflowPageV2() {
           },
         ]}
         versionControlSidebar={
-          showVersioningUI && !isEditingChangeRequest ? (
+          showVersioningUI ? (
             <CanvasVersionControlSidebar
               isOpen={isVersionControlOpen}
               onToggle={setIsVersionControlOpen}
@@ -4651,23 +4602,13 @@ export function WorkflowPageV2() {
               liveVersionsTotalCount={liveVersionsTotalCount}
               canUpdateCanvas={canUpdateCanvas}
               isTemplate={isTemplate}
-              hasEditableVersion={hasEditableVersion}
-              isEditModeEnabled={hasEditableVersion}
               canvasDeletedRemotely={canvasDeletedRemotely}
-              onToggleEditMode={handleToggleEditMode}
-              onResetDraft={handleResetDraftChanges}
               onUseVersion={handleUseVersion}
               onCreateChangeRequest={handleCreateChangeRequest}
               onLoadMoreLiveVersions={hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined}
-              toggleEditModeDisabled={toggleEditModeDisabled}
-              toggleEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
-              resetDraftDisabled={resetDraftDisabled}
-              resetDraftDisabledTooltip={resetDraftDisabledTooltip}
               createChangeRequestDisabled={createChangeRequestDisabled}
               createChangeRequestDisabledTooltip={createChangeRequestDisabledTooltip}
               loadMoreLiveVersionsDisabled={!hasMoreLiveVersions || isLoadingMoreLiveVersions}
-              toggleEditModePending={createCanvasVersionMutation.isPending}
-              resetDraftPending={isResetDraftPending}
               createChangeRequestPending={createCanvasChangeRequestMutation.isPending}
               loadMoreLiveVersionsPending={isLoadingMoreLiveVersions}
             />
@@ -4702,7 +4643,7 @@ export function WorkflowPageV2() {
       >
         <DialogContent className="min-w-[70vw] max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create and Publish Change Request</DialogTitle>
+            <DialogTitle>Publish Draft Version</DialogTitle>
             <DialogDescription>
               Add a title and summary. Publishing will create a snapshot from your current draft and set it as live.
             </DialogDescription>
@@ -4710,7 +4651,7 @@ export function WorkflowPageV2() {
 
           {!createChangeRequestVersion ? (
             <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-              Enable edit mode and save your draft before creating a change request.
+              Enable edit mode and save your draft before publishing.
             </div>
           ) : (
             <div className="space-y-4">
@@ -4831,7 +4772,7 @@ export function WorkflowPageV2() {
                 !createChangeRequestTitle.trim()
               }
             >
-              {createCanvasChangeRequestMutation.isPending ? "Publishing..." : "Publish change request"}
+              {createCanvasChangeRequestMutation.isPending ? "Publishing..." : "Publish Draft Version"}
             </Button>
           </DialogFooter>
         </DialogContent>
