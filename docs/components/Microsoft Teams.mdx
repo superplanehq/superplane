@@ -4,14 +4,14 @@ title: "Microsoft Teams"
 
 Send and receive messages in Microsoft Teams channels
 
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
 ## Triggers
 
 <CardGrid>
   <LinkCard title="On Mention" href="#on-mention" description="Listen to messages mentioning the Teams bot" />
   <LinkCard title="On Message" href="#on-message" description="Listen to all messages in a Teams channel" />
 </CardGrid>
-
-import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
 
@@ -21,7 +21,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-## Setup
+### Setup
 
 1. **Create an Azure App Registration**:
    - Go to **Azure Portal** → **App registrations** → **New registration**
@@ -63,6 +63,7 @@ The On Mention trigger starts a workflow execution when the Teams bot is @mentio
 ### Configuration
 
 - **Channel**: Optional channel filter — if specified, only mentions in this channel will trigger (leave empty to listen to all channels)
+- **Content Filter**: Optional regex pattern to filter mentions by content (e.g., `/deploy` to only trigger on mentions containing "/deploy")
 
 ### Event Data
 
@@ -140,6 +141,7 @@ The On Message trigger starts a workflow execution when any message is posted in
 ### Configuration
 
 - **Channel**: Optional channel filter — if specified, only messages in this channel will trigger (leave empty to listen to all channels)
+- **Content Filter**: Optional regex pattern to filter messages by content (e.g., `/ci` to only trigger on messages containing "/ci")
 
 ### Event Data
 
@@ -236,4 +238,3 @@ Returns metadata about the sent message including the message ID and timestamp.
   "type": "teams.message.sent"
 }
 ```
-

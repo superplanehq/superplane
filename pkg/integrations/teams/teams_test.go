@@ -18,17 +18,9 @@ import (
 func Test__Teams__Sync(t *testing.T) {
 	s := &Teams{}
 
-	t.Run("metadata already set -> no-op", func(t *testing.T) {
-		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, `{
-				"access_token": "test-token",
-				"token_type": "Bearer",
-				"expires_in": 3600
-			}`), nil
-		})
-
+	t.Run("metadata already set and installed -> ready", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
-			Metadata: Metadata{AppID: "test-app-id"},
+			Metadata: Metadata{AppID: "test-app-id", Installed: true},
 			Configuration: map[string]any{
 				"appId":       "test-app-id",
 				"appPassword": "test-password",
@@ -38,8 +30,6 @@ func Test__Teams__Sync(t *testing.T) {
 		err := s.Sync(core.SyncContext{Integration: integrationCtx})
 
 		require.NoError(t, err)
-		// When metadata AppID is already set, Sync still regenerates the manifest
-		// but should not fail
 		assert.Equal(t, "ready", integrationCtx.State)
 	})
 
@@ -53,7 +43,7 @@ func Test__Teams__Sync(t *testing.T) {
 		assert.Contains(t, integrationCtx.BrowserAction.URL, "portal.azure.com")
 	})
 
-	t.Run("valid credentials -> ready with manifest download", func(t *testing.T) {
+	t.Run("valid credentials -> pending with manifest download", func(t *testing.T) {
 		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
 			assert.Contains(t, req.URL.String(), "oauth2/v2.0/token")
 			return jsonResponse(http.StatusOK, `{
@@ -68,15 +58,16 @@ func Test__Teams__Sync(t *testing.T) {
 				"appId":       "test-app-id",
 				"appPassword": "test-password",
 			},
-			BrowserAction: &core.BrowserAction{URL: "https://example.com"},
 		}
 
 		err := s.Sync(core.SyncContext{Integration: integrationCtx})
 
 		require.NoError(t, err)
-		assert.Equal(t, "ready", integrationCtx.State)
 
-		// After validation, a BrowserAction with the manifest ZIP download should be set
+		// Not ready yet — user hasn't installed the Teams app (installed=false)
+		assert.NotEqual(t, "ready", integrationCtx.State)
+
+		// A BrowserAction with the manifest ZIP download should be set
 		require.NotNil(t, integrationCtx.BrowserAction)
 		assert.Contains(t, integrationCtx.BrowserAction.URL, "data:application/zip;base64,")
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "Finish Azure Setup")
@@ -85,6 +76,7 @@ func Test__Teams__Sync(t *testing.T) {
 		metadata, ok := integrationCtx.Metadata.(Metadata)
 		require.True(t, ok)
 		assert.Equal(t, "test-app-id", metadata.AppID)
+		assert.False(t, metadata.Installed)
 	})
 
 	t.Run("invalid credentials -> error", func(t *testing.T) {
@@ -183,7 +175,6 @@ func Test__Teams__HasBotMention(t *testing.T) {
 		assert.False(t, hasBotMention(activity))
 	})
 }
-
 
 func Test__Teams__SubscriptionApplies(t *testing.T) {
 	t.Run("mention subscription matches mention event", func(t *testing.T) {

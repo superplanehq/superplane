@@ -18,7 +18,7 @@ import (
 
 const (
 	botFrameworkOpenIDURL = "https://login.botframework.com/v1/.well-known/openidconfiguration"
-	graphAPIBase         = "https://graph.microsoft.com/v1.0"
+	graphAPIBase          = "https://graph.microsoft.com/v1.0"
 )
 
 // Client handles Bot Framework REST API and Graph API interactions.
@@ -146,28 +146,28 @@ func (c *Client) GetGraphToken() (*TokenResponse, error) {
 
 // Activity represents a Bot Framework Activity object.
 type Activity struct {
-	Type            string           `json:"type"`
-	ID              string           `json:"id,omitempty"`
-	Timestamp       string           `json:"timestamp,omitempty"`
-	ChannelID       string           `json:"channelId,omitempty"`
-	ServiceURL      string           `json:"serviceUrl,omitempty"`
-	From            ChannelAccount   `json:"from,omitempty"`
-	Conversation    ConversationInfo `json:"conversation,omitempty"`
-	Recipient       ChannelAccount   `json:"recipient,omitempty"`
-	Text            string           `json:"text,omitempty"`
-	Entities        []Entity         `json:"entities,omitempty"`
-	ChannelData     map[string]any   `json:"channelData,omitempty"`
-	MembersAdded    []ChannelAccount `json:"membersAdded,omitempty"`
-	MembersRemoved  []ChannelAccount `json:"membersRemoved,omitempty"`
-	ReplyToID       string           `json:"replyToId,omitempty"`
-	TextFormat      string           `json:"textFormat,omitempty"`
-	AttachmentLayout string          `json:"attachmentLayout,omitempty"`
+	Type             string           `json:"type"`
+	ID               string           `json:"id,omitempty"`
+	Timestamp        string           `json:"timestamp,omitempty"`
+	ChannelID        string           `json:"channelId,omitempty"`
+	ServiceURL       string           `json:"serviceUrl,omitempty"`
+	From             ChannelAccount   `json:"from,omitempty"`
+	Conversation     ConversationInfo `json:"conversation,omitempty"`
+	Recipient        ChannelAccount   `json:"recipient,omitempty"`
+	Text             string           `json:"text,omitempty"`
+	Entities         []Entity         `json:"entities,omitempty"`
+	ChannelData      map[string]any   `json:"channelData,omitempty"`
+	MembersAdded     []ChannelAccount `json:"membersAdded,omitempty"`
+	MembersRemoved   []ChannelAccount `json:"membersRemoved,omitempty"`
+	ReplyToID        string           `json:"replyToId,omitempty"`
+	TextFormat       string           `json:"textFormat,omitempty"`
+	AttachmentLayout string           `json:"attachmentLayout,omitempty"`
 }
 
 // ChannelAccount represents a user or bot account.
 type ChannelAccount struct {
-	ID   string `json:"id"`
-	Name string `json:"name,omitempty"`
+	ID          string `json:"id"`
+	Name        string `json:"name,omitempty"`
 	AADObjectID string `json:"aadObjectId,omitempty"`
 }
 
@@ -411,9 +411,9 @@ func normalizeServiceURL(serviceURL string) string {
 
 // JWTValidator validates Bot Framework JWT tokens.
 type JWTValidator struct {
-	appID  string
-	mu     sync.RWMutex
-	keys   map[string]*rsa.PublicKey
+	appID     string
+	mu        sync.RWMutex
+	keys      map[string]*rsa.PublicKey
 	lastFetch time.Time
 }
 

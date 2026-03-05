@@ -36,10 +36,7 @@ export const onMessageTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     const eventData = context.event?.data as MessageEventData | undefined;
     const title = eventData?.text?.trim() ? eventData.text : "Channel message";
-    const subtitle = buildSubtitle(
-      eventData?.from?.name || eventData?.from?.id || "",
-      context.event?.createdAt,
-    );
+    const subtitle = buildSubtitle(eventData?.from?.name || eventData?.from?.id || "", context.event?.createdAt);
 
     return {
       title,
@@ -91,10 +88,7 @@ export const onMessageTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       const eventData = lastEvent.data as MessageEventData | undefined;
       const title = eventData?.text?.trim() ? eventData.text : "Channel message";
-      const subtitle = buildSubtitle(
-        eventData?.from?.name || eventData?.from?.id || "",
-        lastEvent.createdAt,
-      );
+      const subtitle = buildSubtitle(eventData?.from?.name || eventData?.from?.id || "", lastEvent.createdAt);
 
       props.lastEventData = {
         title,

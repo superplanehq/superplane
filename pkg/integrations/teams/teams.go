@@ -50,15 +50,22 @@ Your webhook URL:
 
 1. Go to **Azure Portal** → **Create a resource** → search **Azure Bot**
 2. Link it to the App Registration from the previous step
-3. Set the **Messaging endpoint** to the webhook URL above
-4. Under **Channels**, click **Microsoft Teams** to enable it
+
+### Configure the Bot
+
+Open the Bot resource and go to **Settings** on the left sidebar:
+
+1. **Configuration** → set the **Messaging endpoint** to the webhook URL above
+2. **Channels** → click **Microsoft Teams** to enable it
 
 ### Install the Teams App
 
-Click **Continue** to download the auto-generated Teams app manifest ZIP.
-Then upload it to **Teams Admin Center** → **Manage apps** → **Upload new app**, or sideload to specific teams.
+Click **Continue** to download the auto-generated Teams app manifest ZIP, then:
 
-This step is required for the bot to receive messages in Teams channels.
+1. Upload it to **Teams Admin Center** → **Manage apps** → **Upload new app**, or sideload it directly
+2. In the Teams app, open the target team → **Manage team** → **Apps** tab → **Get more apps** and add the newly uploaded app to the desired channel
+
+> **Note:** Messages won't flow until all the steps above are completed.
 `
 )
 
@@ -71,9 +78,10 @@ type Teams struct{}
 
 // Metadata stores integration metadata after successful authentication.
 type Metadata struct {
-	AppID    string `json:"appId" mapstructure:"appId"`
-	TenantID string `json:"tenantId,omitempty" mapstructure:"tenantId,omitempty"`
-	BotName  string `json:"botName,omitempty" mapstructure:"botName,omitempty"`
+	AppID     string `json:"appId" mapstructure:"appId"`
+	TenantID  string `json:"tenantId,omitempty" mapstructure:"tenantId,omitempty"`
+	BotName   string `json:"botName,omitempty" mapstructure:"botName,omitempty"`
+	Installed bool   `json:"installed,omitempty" mapstructure:"installed,omitempty"`
 }
 
 func (t *Teams) Name() string {
@@ -180,10 +188,23 @@ func (t *Teams) Sync(ctx core.SyncContext) error {
 		}
 	}
 
+	// Check if the user signalled installation by setting "installed" in config.
+	// We read from the raw configuration map directly because "installed" is not
+	// a declared configuration field.
+	installed := metadata.Installed
+	if !installed {
+		if cfgMap, ok := ctx.Configuration.(map[string]any); ok {
+			if v, exists := cfgMap["installed"]; exists {
+				installed = fmt.Sprintf("%v", v) == "true"
+			}
+		}
+	}
+
 	ctx.Integration.SetMetadata(Metadata{
-		AppID:    string(appID),
-		TenantID: tenantID,
-		BotName:  botName,
+		AppID:     string(appID),
+		TenantID:  tenantID,
+		BotName:   botName,
+		Installed: installed,
 	})
 
 	// Always regenerate manifest ZIP so config changes (e.g. bot name) take effect
@@ -201,7 +222,12 @@ func (t *Teams) Sync(ctx core.SyncContext) error {
 		})
 	}
 
-	ctx.Integration.Ready()
+	// Only transition to ready once the user has downloaded the manifest
+	// (signalled by setting installed=true via the Continue button).
+	if installed {
+		ctx.Integration.Ready()
+	}
+
 	return nil
 }
 
@@ -289,10 +315,10 @@ func (t *Teams) handleMessage(ctx core.HTTPRequestContext, activity Activity) {
 	ctx.Logger.Infof("is bot mention: %v", isMention)
 
 	eventData := map[string]any{
-		"type":      activity.Type,
-		"id":        activity.ID,
-		"timestamp": activity.Timestamp,
-		"channelId": activity.ChannelID,
+		"type":       activity.Type,
+		"id":         activity.ID,
+		"timestamp":  activity.Timestamp,
+		"channelId":  activity.ChannelID,
 		"serviceUrl": activity.ServiceURL,
 		"from": map[string]any{
 			"id":          activity.From.ID,

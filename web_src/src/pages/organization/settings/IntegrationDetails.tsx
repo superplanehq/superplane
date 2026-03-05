@@ -152,7 +152,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     }
   };
 
-  const handleBrowserAction = () => {
+  const handleBrowserAction = async () => {
     if (!integration?.status?.browserAction) return;
 
     const { url, method, formFields } = integration.status.browserAction;
@@ -182,6 +182,13 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
       if (url) {
         window.open(url, "_blank");
       }
+    }
+
+    // Trigger a resync with installed=true so the backend transitions to ready
+    try {
+      await updateMutation.mutateAsync({ configuration: { ...configValues, installed: "true" } });
+    } catch {
+      // Resync is best-effort
     }
   };
 
