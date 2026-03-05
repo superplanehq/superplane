@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -73,6 +74,87 @@ func DeleteSubscription(ctx context.Context, client *common.Client, projectID, s
 	url := fmt.Sprintf("%s/projects/%s/subscriptions/%s", pubsubBaseURL, projectID, subscriptionID)
 	_, err := client.ExecRequest(ctx, "DELETE", url, nil)
 	return err
+}
+
+// --- Pub/Sub Publish ---
+
+type publishRequest struct {
+	Messages []publishMessage `json:"messages"`
+}
+
+type publishMessage struct {
+	Data string `json:"data"`
+}
+
+type publishResponse struct {
+	MessageIDs []string `json:"messageIds"`
+}
+
+func Publish(ctx context.Context, client *common.Client, projectID, topicID, data string) (string, error) {
+	encoded := base64Encode(data)
+	url := fmt.Sprintf("%s/projects/%s/topics/%s:publish", pubsubBaseURL, projectID, topicID)
+	req := publishRequest{
+		Messages: []publishMessage{
+			{Data: encoded},
+		},
+	}
+	raw, err := json.Marshal(req)
+	if err != nil {
+		return "", fmt.Errorf("marshal publish body: %w", err)
+	}
+	resp, err := client.ExecRequest(ctx, "POST", url, strings.NewReader(string(raw)))
+	if err != nil {
+		return "", err
+	}
+
+	var pr publishResponse
+	if err := json.Unmarshal(resp, &pr); err != nil {
+		return "", fmt.Errorf("parse publish response: %w", err)
+	}
+	if len(pr.MessageIDs) == 0 {
+		return "", fmt.Errorf("no message IDs returned from publish")
+	}
+	return pr.MessageIDs[0], nil
+}
+
+func base64Encode(s string) string {
+	return base64.StdEncoding.EncodeToString([]byte(s))
+}
+
+// --- Pub/Sub List Topics ---
+
+type topicListResponse struct {
+	Topics        []TopicItem `json:"topics"`
+	NextPageToken string      `json:"nextPageToken"`
+}
+
+type TopicItem struct {
+	Name string `json:"name"`
+}
+
+func ListTopics(ctx context.Context, client *common.Client, projectID string) ([]TopicItem, error) {
+	var all []TopicItem
+	pageToken := ""
+	for {
+		url := fmt.Sprintf("%s/projects/%s/topics?pageSize=100", pubsubBaseURL, projectID)
+		if pageToken != "" {
+			url += "&pageToken=" + pageToken
+		}
+		resp, err := client.ExecRequest(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		var lr topicListResponse
+		if err := json.Unmarshal(resp, &lr); err != nil {
+			return nil, fmt.Errorf("parse topics list: %w", err)
+		}
+		all = append(all, lr.Topics...)
+		if lr.NextPageToken == "" {
+			break
+		}
+		pageToken = lr.NextPageToken
+	}
+	return all, nil
 }
 
 // --- Cloud Logging Sink ---

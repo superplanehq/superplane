@@ -20,4 +20,5 @@ type Metadata struct {
 	AccessTokenExpiresAt string `json:"accessTokenExpiresAt"`
 	PubSubTopic          string `json:"pubsubTopic,omitempty"`
 	PubSubSubscription   string `json:"pubsubSubscription,omitempty"`
+	EventsBaseURL        string `json:"eventsBaseUrl,omitempty"`
 }

@@ -140,12 +140,14 @@ func (g *GCP) Configuration() []configuration.Field {
 func (g *GCP) Components() []core.Component {
 	return []core.Component{
 		&compute.CreateVM{},
+		&gcppubsub.PublishMessage{},
 	}
 }
 
 func (g *GCP) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&compute.OnVMInstance{},
+		&gcppubsub.OnTopicMessage{},
 	}
 }
 
@@ -202,6 +204,7 @@ func (g *GCP) syncWIF(ctx core.SyncContext, config Configuration) error {
 		ClientEmail:          "",
 		AuthMethod:           gcpcommon.AuthMethodWIF,
 		AccessTokenExpiresAt: expiresAt.Format(time.RFC3339),
+		EventsBaseURL:        ctx.WebhooksBaseURL,
 	}
 	ctx.Integration.SetMetadata(metadata)
 
@@ -241,6 +244,7 @@ func (g *GCP) syncServiceAccountKey(ctx core.SyncContext, config Configuration) 
 		return fmt.Errorf("invalid service account key: %w", err)
 	}
 	metadata.AuthMethod = gcpcommon.AuthMethodServiceAccountKey
+	metadata.EventsBaseURL = ctx.WebhooksBaseURL
 
 	if err := ctx.Integration.SetSecret(gcpcommon.SecretNameServiceAccountKey, keyJSON); err != nil {
 		return fmt.Errorf("failed to store service account key: %w", err)
@@ -423,6 +427,8 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	p := ctx.Parameters
 
 	switch resourceType {
+	case ResourceTypePubSubTopic:
+		return listPubSubTopicResources(reqCtx, client)
 	case compute.ResourceTypeRegion:
 		return compute.ListRegionResources(reqCtx, client)
 	case compute.ResourceTypeZone:
@@ -457,12 +463,38 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 }
 
 func (g *GCP) HandleRequest(ctx core.HTTPRequestContext) {
+	if strings.HasSuffix(ctx.Request.URL.Path, "/events/pubsub") {
+		g.handlePubSubTopicEvent(ctx)
+		return
+	}
+
 	if strings.HasSuffix(ctx.Request.URL.Path, "/events") {
 		g.handleEvent(ctx)
 		return
 	}
 
 	ctx.Response.WriteHeader(http.StatusNotFound)
+}
+
+const ResourceTypePubSubTopic = "pubsubTopic"
+
+func listPubSubTopicResources(ctx context.Context, client *gcpcommon.Client) ([]core.IntegrationResource, error) {
+	topics, err := gcppubsub.ListTopics(ctx, client, client.ProjectID())
+	if err != nil {
+		return nil, fmt.Errorf("list Pub/Sub topics: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(topics))
+	for _, t := range topics {
+		parts := strings.Split(t.Name, "/")
+		shortName := parts[len(parts)-1]
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypePubSubTopic,
+			Name: shortName,
+			ID:   shortName,
+		})
+	}
+	return resources, nil
 }
 
 // AuditLogEvent is the normalized event structure extracted from a Cloud Logging
@@ -606,6 +638,114 @@ func (g *GCP) subscriptionApplies(subscription core.IntegrationSubscriptionConte
 	}
 
 	return true
+}
+
+// PubSubTopicEvent represents a message received from a user-specified Pub/Sub topic.
+type PubSubTopicEvent struct {
+	Topic     string `json:"topic" mapstructure:"topic"`
+	MessageID string `json:"messageId" mapstructure:"messageId"`
+	Data      any    `json:"data" mapstructure:"data"`
+}
+
+// PubSubTopicSubscriptionPattern is the subscription pattern for user-specified topics.
+type PubSubTopicSubscriptionPattern struct {
+	Type  string `json:"type" mapstructure:"type"`
+	Topic string `json:"topic" mapstructure:"topic"`
+}
+
+func (g *GCP) handlePubSubTopicEvent(ctx core.HTTPRequestContext) {
+	token := ctx.Request.URL.Query().Get("token")
+	if token == "" {
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	secrets, err := ctx.Integration.GetSecrets()
+	if err != nil {
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var secret string
+	for _, s := range secrets {
+		if s.Name == PubSubSecretName {
+			secret = string(s.Value)
+			break
+		}
+	}
+
+	if token != secret {
+		ctx.Response.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	topic := ctx.Request.URL.Query().Get("topic")
+	if topic == "" {
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var pushMsg pubsubPushMessage
+	if err := json.Unmarshal(body, &pushMsg); err != nil {
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	decoded, err := base64Decode(pushMsg.Message.Data)
+	if err != nil {
+		ctx.Logger.Warnf("failed to decode Pub/Sub message data: %v", err)
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
+	}
+
+	var data any
+	if err := json.Unmarshal(decoded, &data); err != nil {
+		data = string(decoded)
+	}
+
+	event := PubSubTopicEvent{
+		Topic:     topic,
+		MessageID: pushMsg.Message.MessageID,
+		Data:      data,
+	}
+
+	subscriptions, err := ctx.Integration.ListSubscriptions()
+	if err != nil {
+		ctx.Logger.Errorf("error listing subscriptions: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	for _, subscription := range subscriptions {
+		if !g.topicSubscriptionApplies(subscription, topic) {
+			continue
+		}
+
+		if err := subscription.SendMessage(event); err != nil {
+			ctx.Logger.Errorf("error sending message to subscription: %v", err)
+		}
+	}
+
+	ctx.Response.WriteHeader(http.StatusOK)
+}
+
+func (g *GCP) topicSubscriptionApplies(subscription core.IntegrationSubscriptionContext, topic string) bool {
+	var pattern PubSubTopicSubscriptionPattern
+	if err := mapstructure.Decode(subscription.Configuration(), &pattern); err != nil {
+		return false
+	}
+
+	if pattern.Type != "pubsub.topic" {
+		return false
+	}
+
+	return pattern.Topic == topic
 }
 
 func base64Decode(s string) ([]byte, error) {
