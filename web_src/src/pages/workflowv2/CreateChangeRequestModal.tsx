@@ -11,6 +11,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
 import ReactMarkdown from "react-markdown";
+import { TriangleAlert } from "lucide-react";
 import { DraftNodeDiffSummary, DraftNodeDiffView } from "./draftNodeDiff";
 
 interface CreateChangeRequestModalProps {
@@ -25,6 +26,7 @@ interface CreateChangeRequestModalProps {
   onDescriptionChange: (value: string) => void;
   onDescriptionModeChange: (mode: "write" | "preview") => void;
   diffSummary: DraftNodeDiffSummary;
+  isDraftOutdated?: boolean;
   onPublish: () => void;
 }
 
@@ -40,8 +42,22 @@ export function CreateChangeRequestModal({
   onDescriptionChange,
   onDescriptionModeChange,
   diffSummary,
+  isDraftOutdated = false,
   onPublish,
 }: CreateChangeRequestModalProps) {
+  const handlePublish = () => {
+    if (isDraftOutdated) {
+      const confirmed = window.confirm(
+        "This draft is outdated because the live version was updated after this draft was created. Publish anyway?",
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    onPublish();
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="min-w-[70vw] max-w-6xl max-h-[90vh] overflow-y-auto">
@@ -158,7 +174,16 @@ export function CreateChangeRequestModal({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
             Cancel
           </Button>
-          <Button onClick={onPublish} disabled={!version || pending || !title.trim()}>
+          {isDraftOutdated ? (
+            <div
+              className="inline-flex items-center gap-1.5 rounded border border-amber-300 bg-amber-100 px-2 py-1 text-xs text-amber-900"
+              title="Current draft is outdated because the live version is newer."
+            >
+              <TriangleAlert className="h-3.5 w-3.5" />
+              Outdated draft
+            </div>
+          ) : null}
+          <Button onClick={handlePublish} disabled={!version || pending || !title.trim()}>
             {pending ? "Publishing..." : "Publish"}
           </Button>
         </DialogFooter>

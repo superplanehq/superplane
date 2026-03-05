@@ -383,6 +383,14 @@ export function WorkflowPageV2() {
     () => buildDraftNodeDiffSummary(liveCanvasVersion, createChangeRequestVersion),
     [liveCanvasVersion, createChangeRequestVersion],
   );
+  const isCreateChangeRequestDraftOutdated = useMemo(() => {
+    const liveCreatedAt = versionSortValue(liveCanvasVersion?.metadata?.createdAt);
+    const draftCreatedAt = versionSortValue(createChangeRequestVersion?.metadata?.createdAt);
+    if (!liveCreatedAt || !draftCreatedAt) {
+      return false;
+    }
+    return liveCreatedAt > draftCreatedAt;
+  }, [liveCanvasVersion?.metadata?.createdAt, createChangeRequestVersion?.metadata?.createdAt]);
   const pendingDraftDiffSummary = useMemo(
     () => buildDraftNodeDiffSummary(liveCanvasVersion, latestDraftVersion),
     [liveCanvasVersion, latestDraftVersion],
@@ -3705,26 +3713,8 @@ export function WorkflowPageV2() {
     pendingAnnotationUpdatesRef.current.clear();
 
     try {
-      const draftVersionID = activeCanvasVersionId;
-      if (!draftVersionID) {
-        showErrorToast("Draft version not found");
-        return;
-      }
-
-      const liveSpec = liveCanvasVersion?.spec;
-      if (!liveSpec) {
-        showErrorToast("No live version available");
-        return;
-      }
-
       setIsResetDraftPending(true);
-      const response = await updateCanvasVersionMutation.mutateAsync({
-        versionId: draftVersionID,
-        name: liveCanvas?.metadata?.name || "Canvas",
-        description: liveCanvas?.metadata?.description || "",
-        nodes: liveSpec.nodes || [],
-        edges: liveSpec.edges || [],
-      });
+      const response = await createCanvasVersionMutation.mutateAsync();
       const version = response?.data?.version;
       if (!version) {
         showErrorToast("Failed to reset draft");
@@ -3775,13 +3765,9 @@ export function WorkflowPageV2() {
     isSandboxModeEnabled,
     hasEditableVersion,
     hasUnsavedChanges,
-    activeCanvasVersionId,
-    liveCanvasVersion?.spec,
-    liveCanvas?.metadata?.name,
-    liveCanvas?.metadata?.description,
     debouncedAutoSave,
     debouncedAnnotationAutoSave,
-    updateCanvasVersionMutation,
+    createCanvasVersionMutation,
     queryClient,
     setSearchParams,
   ]);
@@ -4428,6 +4414,7 @@ export function WorkflowPageV2() {
         onDescriptionChange={setCreateChangeRequestDescription}
         onDescriptionModeChange={setCreateChangeRequestDescriptionMode}
         diffSummary={createChangeRequestNodeDiffSummary}
+        isDraftOutdated={isCreateChangeRequestDraftOutdated}
         onPublish={() =>
           handleSubmitCreateChangeRequest({
             title: createChangeRequestTitle.trim(),

@@ -64,6 +64,7 @@ func PublishCanvasChangeRequest(
 	var version *models.CanvasVersion
 	var request *models.CanvasChangeRequest
 	var liveVersion *models.CanvasVersion
+	var renewedDraftVersion *models.CanvasVersion
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		canvasForUpdate, canvasErr := models.FindCanvasInTransaction(tx, organizationUUID, canvasUUID)
@@ -188,6 +189,19 @@ func PublishCanvasChangeRequest(
 			return saveErr
 		}
 
+		if request.OwnerID != nil {
+			renewedDraftVersion, err = models.SaveCanvasDraftInTransaction(
+				tx,
+				canvasUUID,
+				*request.OwnerID,
+				liveVersion.Nodes,
+				liveVersion.Edges,
+			)
+			if err != nil {
+				return err
+			}
+		}
+
 		canvas = canvasForUpdate
 		return nil
 	})
@@ -208,6 +222,11 @@ func PublishCanvasChangeRequest(
 	}
 	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {
 		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
+	}
+	if renewedDraftVersion != nil {
+		if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), renewedDraftVersion.ID.String()).PublishVersionUpdated(); err != nil {
+			log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
+		}
 	}
 
 	return request, version, nil
