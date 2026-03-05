@@ -10,9 +10,9 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
-import ReactMarkdown from "react-markdown";
 import { TriangleAlert } from "lucide-react";
 import { DraftNodeDiffSummary, DraftNodeDiffView } from "./draftNodeDiff";
+import { WorkflowMarkdownPreview } from "./WorkflowMarkdownPreview";
 
 interface CreateChangeRequestModalProps {
   open: boolean;
@@ -110,7 +110,7 @@ export function CreateChangeRequestModal({
                 <TabsContent value="preview" className="mt-0">
                   <div className="min-h-[172px] rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900">
                     {description.trim() ? (
-                      <ReactMarkdown>{description}</ReactMarkdown>
+                      <WorkflowMarkdownPreview content={description} />
                     ) : (
                       <p className="text-xs text-slate-500">Nothing to preview.</p>
                     )}

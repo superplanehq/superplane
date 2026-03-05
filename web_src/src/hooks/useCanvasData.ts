@@ -517,14 +517,14 @@ export const useCreateCanvasChangeRequest = (_organizationId: string, canvasId: 
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { versionId: string; title?: string; description?: string }) => {
+    mutationFn: async (data: { versionId?: string; title?: string; description?: string }) => {
       return await canvasesCreateCanvasChangeRequest(
         withOrganizationHeader({
           path: { canvasId },
           body: {
-            versionId: data.versionId,
             title: data.title,
             description: data.description,
+            ...(data.versionId ? { versionId: data.versionId } : {}),
           },
         }),
       );
