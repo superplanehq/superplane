@@ -242,6 +242,21 @@ func (h *Hetzner) ListResources(resourceType string, ctx core.ListResourcesConte
 			resources = append(resources, core.IntegrationResource{Type: "location", Name: displayName, ID: id})
 		}
 		return resources, nil
+	case "firewall":
+		firewalls, err := client.ListFirewalls()
+		if err != nil {
+			return nil, err
+		}
+		resources := make([]core.IntegrationResource, 0, len(firewalls))
+		for _, firewall := range firewalls {
+			id := fmt.Sprintf("%d", firewall.ID)
+			name := strings.TrimSpace(firewall.Name)
+			if name == "" {
+				name = id
+			}
+			resources = append(resources, core.IntegrationResource{Type: "firewall", Name: name, ID: id})
+		}
+		return resources, nil
 	case "load_balancing_algorithm":
 		return []core.IntegrationResource{
 			{

@@ -2,12 +2,14 @@ package telemetry
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestCountStuckQueueNodes_NodeWithQueueAndNoExecutionsIsCounted(t *testing.T) {
@@ -110,13 +112,34 @@ type stuckQueueItemsTestSteps struct {
 }
 
 func (s *stuckQueueItemsTestSteps) CreateWorkflow() {
-	s.workflow = &models.Canvas{
+	now := time.Now()
+	liveVersionID := uuid.New()
+	workflow := &models.Canvas{
 		OrganizationID: uuid.New(),
+		LiveVersionID:  &liveVersionID,
 		Name:           "Test Workflow",
 		Description:    "This is a test workflow",
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
 	}
 
-	require.NoError(s.t, database.Conn().Create(s.workflow).Error)
+	require.NoError(s.t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(workflow).Error; err != nil {
+			return err
+		}
+		return tx.Create(&models.CanvasVersion{
+			ID:          liveVersionID,
+			WorkflowID:  workflow.ID,
+			IsPublished: true,
+			PublishedAt: &now,
+			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
+			Edges:       datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt:   &now,
+			UpdatedAt:   &now,
+		}).Error
+	}))
+
+	s.workflow = workflow
 }
 
 func (s *stuckQueueItemsTestSteps) CreateWorkflowNode() {

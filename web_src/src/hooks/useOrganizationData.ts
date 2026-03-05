@@ -46,7 +46,7 @@ export const organizationKeys = {
 };
 
 // Hooks for fetching data
-export const useOrganization = (organizationId: string) => {
+export const useOrganization = (organizationId: string, enabled = true) => {
   return useQuery({
     queryKey: organizationKeys.details(organizationId),
     queryFn: async () => {
@@ -59,7 +59,7 @@ export const useOrganization = (organizationId: string) => {
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
-    enabled: !!organizationId,
+    enabled: !!organizationId && enabled,
   });
 };
 
@@ -595,7 +595,7 @@ export const useUpdateOrganization = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { name?: string; description?: string }) => {
+    mutationFn: async (params: { name?: string; description?: string; canvasSandboxModeEnabled?: boolean }) => {
       return await organizationsUpdateOrganization(
         withOrganizationHeader({
           path: { id: organizationId },
@@ -604,6 +604,7 @@ export const useUpdateOrganization = (organizationId: string) => {
               metadata: {
                 name: params.name,
                 description: params.description,
+                canvasSandboxModeEnabled: params.canvasSandboxModeEnabled,
               },
             },
           },

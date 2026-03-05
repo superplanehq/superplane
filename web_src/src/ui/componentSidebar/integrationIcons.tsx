@@ -29,6 +29,8 @@ import octopusIcon from "@/assets/icons/integrations/octopus.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
+import cloudBuildIcon from "@/assets/icons/integrations/cloud_build.svg";
+import gcpCloudRunIcon from "@/assets/icons/integrations/gcp.cloudrun.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
@@ -140,7 +142,10 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
     sns: awsSnsIcon,
   },
   honeycomb: honeycombIcon,
-  gcp: gcpIcon,
+  gcp: {
+    cloudbuild: cloudBuildIcon,
+    cloudfunctions: gcpCloudRunIcon,
+  },
 };
 
 /**
@@ -168,8 +173,9 @@ export function getHeaderIconSrc(blockName: string | undefined): string | undefi
     const nested = appLogo[nameParts[1]];
     if (nested) return nested;
   }
-  // Use main AWS icon for aws.* components without a dedicated sub-icon mapping.
+  // Use main AWS/GCP icon for components without a dedicated sub-icon mapping.
   if (first === "aws") return getIntegrationIconSrc("aws");
+  if (first === "gcp") return getIntegrationIconSrc("gcp");
   return undefined;
 }
 

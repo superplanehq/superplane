@@ -40,6 +40,12 @@ var exampleOutputDeleteHTTPSyntheticCheck map[string]any
 //go:embed example_data_on_alert_notification.json
 var exampleDataOnAlertNotificationBytes []byte
 
+//go:embed example_output_get_http_synthetic_check.json
+var exampleOutputGetHTTPSyntheticCheckBytes []byte
+
+var exampleOutputGetHTTPSyntheticCheckOnce sync.Once
+var exampleOutputGetHTTPSyntheticCheck map[string]any
+
 var exampleDataOnAlertNotificationOnce sync.Once
 var exampleDataOnAlertNotification map[string]any
 
@@ -67,6 +73,10 @@ func (c *UpdateHTTPSyntheticCheck) ExampleOutput() map[string]any {
 
 func (c *DeleteHTTPSyntheticCheck) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteHTTPSyntheticCheckOnce, exampleOutputDeleteHTTPSyntheticCheckBytes, &exampleOutputDeleteHTTPSyntheticCheck)
+}
+
+func (c *GetHTTPSyntheticCheck) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetHTTPSyntheticCheckOnce, exampleOutputGetHTTPSyntheticCheckBytes, &exampleOutputGetHTTPSyntheticCheck)
 }
 
 func onAlertNotificationExampleData() map[string]any {
