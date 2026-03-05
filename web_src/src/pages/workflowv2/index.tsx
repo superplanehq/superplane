@@ -4,7 +4,6 @@ import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { Loader2, Puzzle } from "lucide-react";
 import * as yaml from "js-yaml";
-import ReactMarkdown from "react-markdown";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -87,10 +86,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Diff, Hunk, parseDiff } from "react-diff-view";
-import "react-diff-view/style/index.css";
 import {
   getComponentAdditionalDataBuilder,
   getComponentBaseMapper,
@@ -133,6 +128,8 @@ import {
 import { SidebarEvent } from "@/ui/componentSidebar/types";
 import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
+import { buildDraftNodeDiffSummary } from "./draftNodeDiff";
+import { CreateChangeRequestModal } from "./CreateChangeRequestModal";
 
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
@@ -190,223 +187,6 @@ function versionSortValue(raw?: string): number {
 
   const parsed = Date.parse(raw);
   return Number.isNaN(parsed) ? 0 : parsed;
-}
-
-type DraftDiffLine = {
-  prefix: "meta" | "context" | "+" | "-";
-  text: string;
-};
-
-type DraftNodeDiffItem = {
-  id: string;
-  name: string;
-  changeType: "added" | "updated" | "removed";
-  lines: DraftDiffLine[];
-};
-
-type DraftNodeDiffSummary = {
-  items: DraftNodeDiffItem[];
-  addedCount: number;
-  updatedCount: number;
-  removedCount: number;
-};
-
-function buildDraftNodeDiffSummary(
-  liveVersion?: CanvasesCanvasVersion,
-  draftVersion?: CanvasesCanvasVersion,
-): DraftNodeDiffSummary {
-  const liveNodes = (liveVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
-  const draftNodes = (draftVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
-
-  const byID = (nodes: Array<Record<string, unknown>>): Map<string, Record<string, unknown>> => {
-    const map = new Map<string, Record<string, unknown>>();
-    nodes.forEach((node) => {
-      const nodeID = String(node.id || "");
-      if (nodeID) {
-        map.set(nodeID, node);
-      }
-    });
-    return map;
-  };
-
-  const comparableNode = (node: Record<string, unknown>) => ({
-    name: node.name || null,
-    type: node.type || null,
-    ref: node.ref || null,
-    configuration: node.configuration || null,
-    position: node.position || null,
-    isCollapsed: node.isCollapsed || false,
-    integrationId: node.integrationId || null,
-  });
-
-  const formatDiffValueLines = (value: unknown): string[] => {
-    const normalizedValue = value === undefined ? null : value;
-    return yaml
-      .dump(normalizedValue, {
-        lineWidth: -1,
-        noRefs: true,
-        sortKeys: true,
-      })
-      .trimEnd()
-      .split("\n");
-  };
-
-  const buildYamlFieldLines = (prefix: "+" | "-", key: string, value: unknown): DraftDiffLine[] => {
-    const valueLines = formatDiffValueLines(value);
-    if (valueLines.length === 1) {
-      return [{ prefix, text: `${key}: ${valueLines[0]}` }];
-    }
-
-    return [{ prefix, text: `${key}:` }, ...valueLines.map((line) => ({ prefix, text: `  ${line}` }))];
-  };
-
-  const buildNodeLines = (prefix: "+" | "-", node: Record<string, unknown>): DraftDiffLine[] => {
-    const nodeComparable = comparableNode(node) as Record<string, unknown>;
-    const keys = ["id", ...Object.keys(nodeComparable).sort((left, right) => left.localeCompare(right))];
-    const nodeFilePath = `nodes/${String(node.id || "unknown")}.yaml`;
-    const header: DraftDiffLine[] = [
-      { prefix: "meta", text: `diff --git a/${nodeFilePath} b/${nodeFilePath}` },
-      { prefix: "meta", text: `--- ${prefix === "-" ? `a/${nodeFilePath}` : "/dev/null"}` },
-      { prefix: "meta", text: `+++ ${prefix === "+" ? `b/${nodeFilePath}` : "/dev/null"}` },
-      { prefix: "context", text: "@@ -1,0 +1,0 @@" },
-    ];
-
-    return keys.flatMap((key) => {
-      const value = key === "id" ? node.id : nodeComparable[key];
-      return [...(key === "id" ? header : []), ...buildYamlFieldLines(prefix, key, value)];
-    });
-  };
-
-  const buildUpdatedLines = (
-    previousNode: Record<string, unknown>,
-    currentNode: Record<string, unknown>,
-  ): DraftDiffLine[] => {
-    const previousComparable = comparableNode(previousNode) as Record<string, unknown>;
-    const currentComparable = comparableNode(currentNode) as Record<string, unknown>;
-    const allKeys = ["id", ...Object.keys({ ...previousComparable, ...currentComparable })].sort((left, right) =>
-      left.localeCompare(right),
-    );
-
-    const nodeFilePath = `nodes/${String(currentNode.id || previousNode.id || "unknown")}.yaml`;
-    const lines: DraftDiffLine[] = [
-      { prefix: "meta", text: `diff --git a/${nodeFilePath} b/${nodeFilePath}` },
-      { prefix: "meta", text: `--- a/${nodeFilePath}` },
-      { prefix: "meta", text: `+++ b/${nodeFilePath}` },
-      { prefix: "context", text: "@@ -1,0 +1,0 @@" },
-    ];
-
-    allKeys.forEach((key) => {
-      const previousValue = key === "id" ? previousNode.id : previousComparable[key];
-      const currentValue = key === "id" ? currentNode.id : currentComparable[key];
-      if (JSON.stringify(previousValue) === JSON.stringify(currentValue)) {
-        return;
-      }
-
-      lines.push(...buildYamlFieldLines("-", key, previousValue));
-      lines.push(...buildYamlFieldLines("+", key, currentValue));
-    });
-
-    return lines;
-  };
-
-  const liveByID = byID(liveNodes);
-  const draftByID = byID(draftNodes);
-  const allNodeIDs = Array.from(new Set([...liveByID.keys(), ...draftByID.keys()])).sort((left, right) =>
-    left.localeCompare(right),
-  );
-
-  const items: DraftNodeDiffItem[] = [];
-  let addedCount = 0;
-  let removedCount = 0;
-  let updatedCount = 0;
-
-  allNodeIDs.forEach((nodeID) => {
-    const liveNode = liveByID.get(nodeID);
-    const draftNode = draftByID.get(nodeID);
-
-    if (!liveNode && draftNode) {
-      items.push({
-        id: nodeID,
-        name: String(draftNode.name || "Unnamed node"),
-        changeType: "added",
-        lines: buildNodeLines("+", draftNode),
-      });
-      addedCount += 1;
-      return;
-    }
-
-    if (liveNode && !draftNode) {
-      items.push({
-        id: nodeID,
-        name: String(liveNode.name || "Unnamed node"),
-        changeType: "removed",
-        lines: buildNodeLines("-", liveNode),
-      });
-      removedCount += 1;
-      return;
-    }
-
-    if (!liveNode || !draftNode) {
-      return;
-    }
-
-    if (JSON.stringify(comparableNode(liveNode)) !== JSON.stringify(comparableNode(draftNode))) {
-      items.push({
-        id: nodeID,
-        name: String(draftNode.name || liveNode.name || "Unnamed node"),
-        changeType: "updated",
-        lines: buildUpdatedLines(liveNode, draftNode),
-      });
-      updatedCount += 1;
-    }
-  });
-
-  return { items, addedCount, updatedCount, removedCount };
-}
-
-function toUnifiedDiffText(lines: DraftDiffLine[]): string {
-  return lines
-    .map((line) => {
-      if (line.prefix === "meta") {
-        return line.text;
-      }
-
-      if (line.prefix === "context") {
-        if (line.text.startsWith("@@")) {
-          return line.text;
-        }
-
-        return ` ${line.text}`;
-      }
-
-      return `${line.prefix}${line.text}`;
-    })
-    .join("\n");
-}
-
-function DraftNodeDiffView({ nodeID, lines }: { nodeID: string; lines: DraftDiffLine[] }) {
-  const files = useMemo(() => parseDiff(toUnifiedDiffText(lines), { nearbySequences: "zip" }), [lines]);
-
-  if (!files.length) {
-    return <p className="text-xs text-slate-600">No diff available for this node.</p>;
-  }
-
-  return (
-    <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
-      <div className="max-h-96 overflow-auto">
-        {files.map((file) => (
-          <Diff
-            key={`${nodeID}-${file.oldRevision}-${file.newRevision}`}
-            viewType="split"
-            diffType={file.type}
-            hunks={file.hunks}
-          >
-            {(hunks) => hunks.map((hunk) => <Hunk key={`${nodeID}-${hunk.content}`} hunk={hunk} />)}
-          </Diff>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 export function WorkflowPageV2() {
@@ -3697,8 +3477,7 @@ export function WorkflowPageV2() {
         showSuccessToast("Version published");
       } catch (error) {
         const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        const errorMessage =
-          responseMessage || (error as { message?: string })?.message || "Failed to publish draft version";
+        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to Publish to Live";
         showErrorToast(errorMessage);
       }
     },
@@ -4633,150 +4412,29 @@ export function WorkflowPageV2() {
           fromTemplate
         />
       ) : null}
-      <Dialog
+      <CreateChangeRequestModal
         open={isCreateChangeRequestMode}
         onOpenChange={(open) => {
           if (!createCanvasChangeRequestMutation.isPending) {
             setIsCreateChangeRequestMode(open);
           }
         }}
-      >
-        <DialogContent className="min-w-[70vw] max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Publish Draft Version</DialogTitle>
-            <DialogDescription>
-              Add a title and summary. Publishing will create a snapshot from your current draft and set it as live.
-            </DialogDescription>
-          </DialogHeader>
-
-          {!createChangeRequestVersion ? (
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-              Enable edit mode and save your draft before publishing.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">Title</label>
-                <input
-                  value={createChangeRequestTitle}
-                  onChange={(event) => setCreateChangeRequestTitle(event.target.value)}
-                  placeholder="Title"
-                  className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm text-slate-900 focus:border-sky-400 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">Description</label>
-                <Tabs
-                  value={createChangeRequestDescriptionMode}
-                  onValueChange={(value) => setCreateChangeRequestDescriptionMode(value as "write" | "preview")}
-                >
-                  <TabsList className="mb-2 h-9 gap-1 rounded-md border border-slate-200 bg-slate-50 p-0.5">
-                    <TabsTrigger value="write" className="px-3 text-xs">
-                      Write
-                    </TabsTrigger>
-                    <TabsTrigger value="preview" className="px-3 text-xs">
-                      Preview
-                    </TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="write" className="mt-0">
-                    <textarea
-                      value={createChangeRequestDescription}
-                      onChange={(event) => setCreateChangeRequestDescription(event.target.value)}
-                      rows={8}
-                      placeholder="Describe what changed and why."
-                      className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-sky-400 focus:outline-none"
-                    />
-                  </TabsContent>
-                  <TabsContent value="preview" className="mt-0">
-                    <div className="min-h-[172px] rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900">
-                      {createChangeRequestDescription.trim() ? (
-                        <ReactMarkdown>{createChangeRequestDescription}</ReactMarkdown>
-                      ) : (
-                        <p className="text-xs text-slate-500">Nothing to preview.</p>
-                      )}
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </div>
-
-              <section className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Draft Diff Summary</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-                  <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700">
-                    +{createChangeRequestNodeDiffSummary.addedCount} added
-                  </span>
-                  <span className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700">
-                    ~{createChangeRequestNodeDiffSummary.updatedCount} updated
-                  </span>
-                  <span className="rounded border border-red-200 bg-red-50 px-2 py-0.5 text-red-700">
-                    -{createChangeRequestNodeDiffSummary.removedCount} removed
-                  </span>
-                </div>
-                {createChangeRequestNodeDiffSummary.items.length === 0 ? (
-                  <p className="mt-2 text-xs text-slate-600">No node-level changes detected.</p>
-                ) : (
-                  <Accordion type="multiple" className="mt-2 w-full rounded-md border border-slate-200 px-3">
-                    {createChangeRequestNodeDiffSummary.items.map((item, index) => (
-                      <AccordionItem
-                        key={`${item.id}-${item.changeType}-${index}`}
-                        value={`${item.id}-${item.changeType}-${index}`}
-                        className="border-slate-200"
-                      >
-                        <AccordionTrigger className="py-3 hover:no-underline">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span
-                              className={`inline-flex min-w-8 justify-center rounded px-1.5 py-0.5 text-[11px] font-semibold ${
-                                item.changeType === "removed"
-                                  ? "bg-amber-100 text-amber-700"
-                                  : item.changeType === "added"
-                                    ? "bg-emerald-100 text-emerald-700"
-                                    : "bg-sky-100 text-sky-700"
-                              }`}
-                            >
-                              {item.changeType === "updated" ? "+/-" : item.changeType === "removed" ? "-" : "+"}
-                            </span>
-                            <span className="truncate text-sm text-slate-900">{item.name}</span>
-                            <span className="truncate text-xs text-slate-500">{item.id}</span>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <DraftNodeDiffView nodeID={item.id} lines={item.lines} />
-                        </AccordionContent>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
-                )}
-              </section>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsCreateChangeRequestMode(false)}
-              disabled={createCanvasChangeRequestMutation.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() =>
-                handleSubmitCreateChangeRequest({
-                  title: createChangeRequestTitle.trim(),
-                  description: createChangeRequestDescription,
-                })
-              }
-              disabled={
-                !createChangeRequestVersion ||
-                createCanvasChangeRequestMutation.isPending ||
-                !createChangeRequestTitle.trim()
-              }
-            >
-              {createCanvasChangeRequestMutation.isPending ? "Publishing..." : "Publish Draft Version"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        pending={createCanvasChangeRequestMutation.isPending}
+        version={createChangeRequestVersion}
+        title={createChangeRequestTitle}
+        description={createChangeRequestDescription}
+        descriptionMode={createChangeRequestDescriptionMode}
+        onTitleChange={setCreateChangeRequestTitle}
+        onDescriptionChange={setCreateChangeRequestDescription}
+        onDescriptionModeChange={setCreateChangeRequestDescriptionMode}
+        diffSummary={createChangeRequestNodeDiffSummary}
+        onPublish={() =>
+          handleSubmitCreateChangeRequest({
+            title: createChangeRequestTitle.trim(),
+            description: createChangeRequestDescription,
+          })
+        }
+      />
       <Dialog open={canvasDeletedRemotely} onOpenChange={() => {}}>
         <DialogContent showCloseButton={false}>
           <DialogHeader>

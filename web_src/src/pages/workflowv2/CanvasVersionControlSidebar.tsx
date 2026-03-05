@@ -461,7 +461,7 @@ export function CanvasVersionControlSidebar({
                 >
                   <GitPullRequest className="h-4 w-4" />
                   <span className="truncate min-w-0">
-                    {createChangeRequestPending ? "Publishing..." : "Publish Draft   Version"}
+                    {createChangeRequestPending ? "Publishing..." : "Publish to Live"}
                   </span>
                 </Button>,
               )}
