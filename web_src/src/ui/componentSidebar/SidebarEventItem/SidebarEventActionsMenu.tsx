@@ -29,15 +29,13 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   kind,
   onOpenChange,
 }) => {
-  const isProcessed = eventState === "triggered";
-  const isDiscarded = eventState === "discarded";
   const isWaiting = eventState === "waiting";
   const isQueued = eventState === "queued";
   const isRunning = eventState === "running";
 
   const showPushThrough = supportsPushThrough && !!executionId && (isRunning || isWaiting);
   const showCancel = (kind === "queue" && isQueued) || (kind === "execution" && (isRunning || isWaiting));
-  const showReEmit = (isProcessed || isDiscarded) && kind === "trigger" && !!onReEmit;
+  const showReEmit = kind === "trigger" && !!onReEmit;
   const showDropdown = showPushThrough || showCancel || showReEmit;
 
   const handleReEmit = React.useCallback(
