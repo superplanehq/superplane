@@ -231,6 +231,14 @@ func (s *TestSession) DragAndDrop(source queries.Query, target queries.Query, of
 	srcEl := source.Run(s)
 	tgtEl := target.Run(s)
 
+	if err := srcEl.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(s.timeoutMs)}); err != nil {
+		s.t.Fatalf("waiting for source %q to be visible: %v", source.Describe(), err)
+	}
+
+	if err := tgtEl.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(s.timeoutMs)}); err != nil {
+		s.t.Fatalf("waiting for target %q to be visible: %v", target.Describe(), err)
+	}
+
 	srcBox, err := srcEl.BoundingBox()
 	if err != nil || srcBox == nil {
 		s.t.Fatalf("getting bounding box of source %q: %v", source.Describe(), err)
