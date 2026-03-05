@@ -96,6 +96,8 @@ format.js.check:
 
 dev.setup:
 	docker compose $(DOCKER_COMPOSE_OPTS) build
+	docker compose $(DOCKER_COMPOSE_OPTS) pull
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go mod download
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 
