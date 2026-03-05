@@ -15,6 +15,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Cloud Functions • Invoke Function" href="#cloud-functions-•-invoke-function" description="Invoke a Google Cloud Function and return the response" />
   <LinkCard title="Create Virtual Machine" href="#create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
 </CardGrid>
 
@@ -82,6 +83,52 @@ Each event includes the audit log entry with resourceName (e.g. projects/my-proj
   "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
   "serviceName": "compute.googleapis.com",
   "timestamp": "2025-02-14T12:00:00Z"
+}
+```
+
+<a id="cloud-functions-•-invoke-function"></a>
+
+## Cloud Functions • Invoke Function
+
+Invokes a Google Cloud Function and waits for the response.
+
+### Configuration
+
+- **Location** (required): The GCP region where the function is deployed (e.g. `us-central1`).
+- **Function** (required): The Cloud Function to invoke. Select from the list of deployed functions.
+- **Payload**: Optional JSON object sent as the function's input data.
+- **Project ID Override**: Override the GCP project ID from the integration. Leave empty to use the integration's project.
+
+### Required IAM roles
+
+The service account used by the integration must have `roles/cloudfunctions.developer` (or `roles/cloudfunctions.viewer` + `roles/cloudfunctions.invoker`) on the project.
+
+- `roles/cloudfunctions.viewer` — list locations and functions (required for dropdowns)
+- `roles/cloudfunctions.invoker` — invoke the function
+- `roles/cloudfunctions.developer` — covers both of the above
+
+### Output
+
+The invocation result, including:
+- `functionName`: Full resource name of the invoked function.
+- `executionId`: Unique ID assigned to this invocation.
+- `result`: The function's response, parsed as JSON when possible.
+- `resultRaw`: The raw string response (only present when the response is not valid JSON).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "executionId": "h7g2k9qw3x",
+    "functionName": "projects/my-project/locations/us-central1/functions/my-function",
+    "result": {
+      "message": "Hello, World!",
+      "status": "ok"
+    }
+  },
+  "timestamp": "2025-01-01T00:00:05Z",
+  "type": "gcp.cloudfunctions.invoke"
 }
 ```
 
