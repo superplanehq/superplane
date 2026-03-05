@@ -1,0 +1,38 @@
+{
+  "type": "teams.bot.mention",
+  "data": {
+    "type": "message",
+    "id": "1700000000000",
+    "timestamp": "2026-01-16T12:00:00.000Z",
+    "channelId": "msteams",
+    "serviceUrl": "https://smba.trafficmanager.net/teams/",
+    "from": {
+      "id": "29:1abc2def3ghi4jkl5mno6pqr7stu8vwx",
+      "name": "John Doe",
+      "aadObjectId": "00000000-0000-0000-0000-000000000001"
+    },
+    "conversation": {
+      "id": "19:abc123def456@thread.tacv2",
+      "name": "General",
+      "isGroup": true,
+      "conversationType": "channel",
+      "tenantId": "00000000-0000-0000-0000-000000000000"
+    },
+    "recipient": {
+      "id": "28:bot-id-here",
+      "name": "SuperPlane Bot"
+    },
+    "text": "<at>SuperPlane Bot</at> deploy the latest build to staging",
+    "entities": [
+      {
+        "type": "mention",
+        "mentioned": {
+          "id": "28:bot-id-here",
+          "name": "SuperPlane Bot"
+        },
+        "text": "<at>SuperPlane Bot</at>"
+      }
+    ]
+  },
+  "timestamp": "2026-01-16T12:00:00Z"
+}
