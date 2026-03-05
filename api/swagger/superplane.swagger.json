@@ -321,6 +321,146 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasId}/change-requests": {
+      "get": {
+        "summary": "List canvas change requests",
+        "description": "Lists change requests for a canvas",
+        "operationId": "Canvases_ListCanvasChangeRequests",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesListCanvasChangeRequestsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          },
+          {
+            "name": "statusFilter",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "onlyMine",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "CanvasChangeRequest"
+        ]
+      },
+      "post": {
+        "summary": "Create canvas change request",
+        "description": "Creates a change request for a draft canvas version",
+        "operationId": "Canvases_CreateCanvasChangeRequest",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesCreateCanvasChangeRequestResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesCreateCanvasChangeRequestBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasChangeRequest"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}": {
+      "get": {
+        "summary": "Describe canvas change request",
+        "description": "Returns one canvas change request by ID",
+        "operationId": "Canvases_DescribeCanvasChangeRequest",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesDescribeCanvasChangeRequestResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "changeRequestId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "CanvasChangeRequest"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasId}/events": {
       "get": {
         "summary": "List canvas events",
@@ -1033,6 +1173,210 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasId}/versions": {
+      "get": {
+        "summary": "List canvas versions",
+        "description": "Lists all versions for a canvas",
+        "operationId": "Canvases_ListCanvasVersions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesListCanvasVersionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
+      },
+      "post": {
+        "summary": "Create canvas version",
+        "description": "Creates a user-owned canvas version from the current live canvas",
+        "operationId": "Canvases_CreateCanvasVersion",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesCreateCanvasVersionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesCreateCanvasVersionBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
+      },
+      "put": {
+        "summary": "Update canvas version",
+        "description": "Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode",
+        "operationId": "Canvases_UpdateCanvasVersion2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateCanvasVersionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateCanvasVersionBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/versions/{versionId}": {
+      "get": {
+        "summary": "Describe canvas version",
+        "description": "Returns one canvas version by ID",
+        "operationId": "Canvases_DescribeCanvasVersion",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesDescribeCanvasVersionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
+      },
+      "put": {
+        "summary": "Update canvas version",
+        "description": "Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode",
+        "operationId": "Canvases_UpdateCanvasVersion",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateCanvasVersionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateCanvasVersionBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
+      }
+    },
     "/api/v1/canvases/{id}": {
       "get": {
         "summary": "Describe canvas",
@@ -1088,44 +1432,6 @@
             "in": "path",
             "required": true,
             "type": "string"
-          }
-        ],
-        "tags": [
-          "Canvas"
-        ]
-      },
-      "put": {
-        "summary": "Update canvas",
-        "description": "Updates an existing canvas",
-        "operationId": "Canvases_UpdateCanvas",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/CanvasesUpdateCanvasResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/CanvasesUpdateCanvasBody"
-            }
           }
         ],
         "tags": [
@@ -3705,15 +4011,6 @@
             "type": "object",
             "$ref": "#/definitions/CanvasesCanvasAiBlockContext"
           }
-        },
-        "canvas": {
-          "$ref": "#/definitions/CanvasesCanvas"
-        },
-        "selectedNodeIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
         }
       }
     },
@@ -3750,6 +4047,78 @@
           "$ref": "#/definitions/CanvasAutoLayoutScope"
         }
       }
+    },
+    "CanvasesCanvasChangeRequest": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequestMetadata"
+        },
+        "version": {
+          "$ref": "#/definitions/CanvasesCanvasVersion"
+        },
+        "diff": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequestDiff"
+        }
+      }
+    },
+    "CanvasesCanvasChangeRequestDiff": {
+      "type": "object",
+      "properties": {
+        "changedNodeIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "CanvasesCanvasChangeRequestMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "canvasId": {
+          "type": "string"
+        },
+        "versionId": {
+          "type": "string"
+        },
+        "owner": {
+          "$ref": "#/definitions/SuperplaneCanvasesUserRef"
+        },
+        "status": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequestStatus"
+        },
+        "publishedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "CanvasesCanvasChangeRequestStatus": {
+      "type": "string",
+      "enum": [
+        "STATUS_UNSPECIFIED",
+        "STATUS_OPEN",
+        "STATUS_PUBLISHED"
+      ],
+      "default": "STATUS_UNSPECIFIED"
     },
     "CanvasesCanvasEvent": {
       "type": "object",
@@ -3989,6 +4358,68 @@
         }
       }
     },
+    "CanvasesCanvasVersion": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/CanvasesCanvasVersionMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/CanvasesCanvasSpec"
+        }
+      }
+    },
+    "CanvasesCanvasVersionMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "canvasId": {
+          "type": "string"
+        },
+        "owner": {
+          "$ref": "#/definitions/SuperplaneCanvasesUserRef"
+        },
+        "isPublished": {
+          "type": "boolean"
+        },
+        "publishedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "CanvasesCreateCanvasChangeRequestBody": {
+      "type": "object",
+      "properties": {
+        "versionId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "CanvasesCreateCanvasChangeRequestResponse": {
+      "type": "object",
+      "properties": {
+        "changeRequest": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequest"
+        }
+      }
+    },
     "CanvasesCreateCanvasRequest": {
       "type": "object",
       "properties": {
@@ -4005,6 +4436,17 @@
         }
       }
     },
+    "CanvasesCreateCanvasVersionBody": {
+      "type": "object"
+    },
+    "CanvasesCreateCanvasVersionResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "$ref": "#/definitions/CanvasesCanvasVersion"
+        }
+      }
+    },
     "CanvasesDeleteCanvasMemoryResponse": {
       "type": "object"
     },
@@ -4014,11 +4456,27 @@
     "CanvasesDeleteNodeQueueItemResponse": {
       "type": "object"
     },
+    "CanvasesDescribeCanvasChangeRequestResponse": {
+      "type": "object",
+      "properties": {
+        "changeRequest": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequest"
+        }
+      }
+    },
     "CanvasesDescribeCanvasResponse": {
       "type": "object",
       "properties": {
         "canvas": {
           "$ref": "#/definitions/CanvasesCanvas"
+        }
+      }
+    },
+    "CanvasesDescribeCanvasVersionResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "$ref": "#/definitions/CanvasesCanvasVersion"
         }
       }
     },
@@ -4068,6 +4526,29 @@
         }
       }
     },
+    "CanvasesListCanvasChangeRequestsResponse": {
+      "type": "object",
+      "properties": {
+        "changeRequests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasChangeRequest"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
     "CanvasesListCanvasEventsResponse": {
       "type": "object",
       "properties": {
@@ -4100,6 +4581,29 @@
             "type": "object",
             "$ref": "#/definitions/CanvasesCanvasMemory"
           }
+        }
+      }
+    },
+    "CanvasesListCanvasVersionsResponse": {
+      "type": "object",
+      "properties": {
+        "versions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasVersion"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -4250,9 +4754,12 @@
         }
       }
     },
-    "CanvasesUpdateCanvasBody": {
+    "CanvasesUpdateCanvasVersionBody": {
       "type": "object",
       "properties": {
+        "versionId": {
+          "type": "string"
+        },
         "canvas": {
           "$ref": "#/definitions/CanvasesCanvas"
         },
@@ -4261,11 +4768,11 @@
         }
       }
     },
-    "CanvasesUpdateCanvasResponse": {
+    "CanvasesUpdateCanvasVersionResponse": {
       "type": "object",
       "properties": {
-        "canvas": {
-          "$ref": "#/definitions/CanvasesCanvas"
+        "version": {
+          "$ref": "#/definitions/CanvasesCanvasVersion"
         }
       }
     },
@@ -5430,6 +5937,9 @@
         "updatedAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "canvasSandboxModeEnabled": {
+          "type": "boolean"
         }
       }
     },

@@ -7,6 +7,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -32,10 +33,13 @@ func Test__UpdateOrganization(t *testing.T) {
 	})
 
 	t.Run("update organization by ID -> success", func(t *testing.T) {
+		canvasSandboxModeEnabled := false
+
 		updatedOrg := &protos.Organization{
 			Metadata: &protos.Organization_Metadata{
-				Name:        "updated-org",
-				Description: "Updated description",
+				Name:                     "updated-org",
+				Description:              "Updated description",
+				CanvasSandboxModeEnabled: &canvasSandboxModeEnabled,
 			},
 		}
 
@@ -49,6 +53,12 @@ func Test__UpdateOrganization(t *testing.T) {
 		assert.Equal(t, "Updated description", response.Organization.Metadata.Description)
 		assert.Equal(t, *r.Organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime())
 		assert.True(t, response.Organization.Metadata.UpdatedAt.AsTime().After(*r.Organization.UpdatedAt))
+		require.NotNil(t, response.Organization.Metadata.CanvasSandboxModeEnabled)
+		assert.Equal(t, canvasSandboxModeEnabled, response.Organization.Metadata.GetCanvasSandboxModeEnabled())
+
+		organization, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.Equal(t, canvasSandboxModeEnabled, organization.CanvasSandboxModeEnabled)
 	})
 
 	t.Run("nil organization -> error", func(t *testing.T) {

@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__ListCanvases__ReturnsEmptyListWhenNoCanvasesExist(t *testing.T) {
@@ -316,18 +317,33 @@ func Test__ListCanvases__DoesNotReturnSoftDeletedCanvasesWhenIncludingTemplates(
 	require.NoError(t, deletedCanvas.SoftDelete())
 
 	now := time.Now()
+	templateLiveVersionID := uuid.New()
 	templateCanvas := &models.Canvas{
 		ID:             uuid.New(),
 		OrganizationID: models.TemplateOrganizationID,
+		LiveVersionID:  &templateLiveVersionID,
 		IsTemplate:     true,
 		Name:           support.RandomName("template"),
 		Description:    "Template workflow",
-		Nodes:          datatypes.NewJSONSlice([]models.Node{}),
-		Edges:          datatypes.NewJSONSlice([]models.Edge{}),
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
 	}
-	require.NoError(t, database.Conn().Create(templateCanvas).Error)
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(templateCanvas).Error; err != nil {
+			return err
+		}
+
+		return tx.Create(&models.CanvasVersion{
+			ID:          templateLiveVersionID,
+			WorkflowID:  templateCanvas.ID,
+			IsPublished: true,
+			PublishedAt: &now,
+			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
+			Edges:       datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt:   &now,
+			UpdatedAt:   &now,
+		}).Error
+	}))
 
 	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), true)
 	require.NoError(t, err)

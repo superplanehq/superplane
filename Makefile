@@ -96,6 +96,9 @@ format.js.check:
 
 dev.setup:
 	docker compose $(DOCKER_COMPOSE_OPTS) build
+	docker compose $(DOCKER_COMPOSE_OPTS) pull
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go mod download
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go build cmd/server/main.go
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 
@@ -112,6 +115,11 @@ dev.start.fg:
 dev.start:
 	docker compose $(DOCKER_COMPOSE_OPTS) up -d
 	@bash ./scripts/wait-for-app
+
+dev.start.ephemeral:
+	bash ./scripts/ephemeral/start-caddy.sh $(BASE_URL)
+	bash ./scripts/ephemeral/setup-env.sh $(BASE_URL)
+	docker compose $(DOCKER_COMPOSE_OPTS) up -d
 
 dev.logs:
 	docker compose $(DOCKER_COMPOSE_OPTS) logs -f

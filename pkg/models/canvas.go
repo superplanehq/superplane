@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -14,6 +13,7 @@ import (
 type Canvas struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
+	LiveVersionID  *uuid.UUID
 	IsTemplate     bool
 	Name           string
 	Description    string
@@ -21,8 +21,6 @@ type Canvas struct {
 	CreatedAt      *time.Time
 	UpdatedAt      *time.Time
 	DeletedAt      gorm.DeletedAt `gorm:"index"`
-	Nodes          datatypes.JSONSlice[Node]
-	Edges          datatypes.JSONSlice[Edge]
 }
 
 func (c *Canvas) TableName() string {
@@ -79,18 +77,6 @@ func FindCanvasNodesUnscopedInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]
 	}
 
 	return nodes, nil
-}
-
-func (c *Canvas) FindEdges(sourceID string, channel string) []Edge {
-	edges := []Edge{}
-
-	for _, edge := range c.Edges {
-		if edge.SourceID == sourceID && edge.Channel == channel {
-			edges = append(edges, edge)
-		}
-	}
-
-	return edges
 }
 
 func (c *Canvas) SoftDelete() error {
