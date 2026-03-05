@@ -276,12 +276,13 @@ func (h *WebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 func ParseAndValidateWebhook(ctx core.WebhookRequestContext) (map[string]any, int, error) {
 	var webhookSecretBytes []byte
 	secrets, err := ctx.Integration.GetSecrets()
-	if err == nil {
-		for _, s := range secrets {
-			if s.Name == "webhookSecret" {
-				webhookSecretBytes = s.Value
-				break
-			}
+	if err != nil {
+		return nil, http.StatusInternalServerError, fmt.Errorf("failed to fetch secrets: %w", err)
+	}
+	for _, s := range secrets {
+		if s.Name == "webhookSecret" {
+			webhookSecretBytes = s.Value
+			break
 		}
 	}
 	if len(webhookSecretBytes) == 0 {

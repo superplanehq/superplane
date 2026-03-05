@@ -332,7 +332,7 @@ func (c *Plan) ExampleOutput() map[string]any {
 
 func isTerminalStatePlanTarget(status string) bool {
 	switch status {
-	case "planned_and_finished", "discarded", "errored", "canceled", "policy_soft_failed", "force_canceled", "applied":
+	case "planned", "planned_and_finished", "discarded", "errored", "canceled", "policy_soft_failed", "force_canceled", "applied":
 		return true
 	}
 	return false
