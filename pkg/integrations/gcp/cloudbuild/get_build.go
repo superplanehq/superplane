@@ -30,7 +30,7 @@ func (c *GetBuild) Name() string {
 }
 
 func (c *GetBuild) Label() string {
-	return "Get Build"
+	return "Cloud Build • Get Build"
 }
 
 func (c *GetBuild) Description() string {

@@ -65,7 +65,7 @@ func (c *CreateBuild) Name() string {
 }
 
 func (c *CreateBuild) Label() string {
-	return "Create Build"
+	return "Cloud Build • Create Build"
 }
 
 func (c *CreateBuild) Description() string {
