@@ -47,6 +47,10 @@ export interface GetHttpSyntheticCheckConfiguration {
   dataset: string;
 }
 
+export interface GetHttpSyntheticCheckNodeMetadata {
+  checkName?: string;
+}
+
 export interface UpdateHttpSyntheticCheckConfiguration {
   checkId: string;
   name: string;

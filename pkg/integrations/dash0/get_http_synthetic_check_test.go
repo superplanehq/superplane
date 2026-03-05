@@ -55,10 +55,12 @@ func Test__GetHTTPSyntheticCheck__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "dataset is required")
 	})
 
-	t.Run("valid setup with checkId", func(t *testing.T) {
+	t.Run("valid setup skips API when metadata already set", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration: &contexts.IntegrationContext{},
-			Metadata:    &contexts.MetadataContext{},
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{"checkName": "Already Set"},
+			},
 			Configuration: map[string]any{
 				"checkId": "64617368-3073-796e-7468-73599f287bf4",
 				"dataset": "default",
@@ -68,10 +70,38 @@ func Test__GetHTTPSyntheticCheck__Setup(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("valid setup with checkId and dataset", func(t *testing.T) {
+	t.Run("valid setup fetches check name from API", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
-			Integration: &contexts.IntegrationContext{},
-			Metadata:    &contexts.MetadataContext{},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`
+							{
+								"kind": "Dash0SyntheticCheck",
+								"metadata": {"name": "My Health Check"},
+								"spec": {
+									"display": {"name": "My Health Check"},
+									"enabled": true,
+									"labels": {},
+									"notifications": {"channels": [], "onlyCriticalChannels": []},
+									"plugin": {"kind": "http", "spec": {"assertions": {}, "request": {"url": "https://example.com", "method": "get"}}},
+									"retries": {"kind": "off", "spec": {}},
+									"schedule": {"interval": "1m", "locations": ["us-east-1"], "strategy": "all_locations"}
+								}
+							}
+						`)),
+					},
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "token123",
+					"baseURL":  "https://api.us-west-2.aws.dash0.com",
+				},
+			},
+			Metadata: metadata,
 			Configuration: map[string]any{
 				"checkId": "64617368-3073-796e-7468-73599f287bf4",
 				"dataset": "production",
@@ -79,6 +109,8 @@ func Test__GetHTTPSyntheticCheck__Setup(t *testing.T) {
 		})
 
 		require.NoError(t, err)
+		storedMetadata := metadata.Metadata.(GetHTTPSyntheticCheckNodeMetadata)
+		assert.Equal(t, "My Health Check", storedMetadata.CheckName)
 	})
 }
 
@@ -302,6 +334,24 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 						}
 					`)),
 				},
+				// lastOutcome
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"status": "success",
+							"data": {
+								"resultType": "vector",
+								"result": [
+									{
+										"metric": {"dash0_synthetic_check_outcome": "Healthy"},
+										"value": [1234567890, "1234567890"]
+									}
+								]
+							}
+						}
+					`)),
+				},
 			},
 		}
 
@@ -324,6 +374,7 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, execCtx.Finished)
 		assert.True(t, execCtx.Passed)
+		assert.Equal(t, ChannelNameHealthy, execCtx.Channel)
 		assert.Equal(t, "dash0.syntheticCheck.fetched", execCtx.Type)
 		require.Len(t, execCtx.Payloads, 1)
 
@@ -490,6 +541,19 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 						}
 					`)),
 				},
+				// lastOutcome - returns empty result
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"status": "success",
+							"data": {
+								"resultType": "vector",
+								"result": []
+							}
+						}
+					`)),
+				},
 			},
 		}
 
@@ -513,19 +577,9 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 		assert.True(t, execCtx.Finished)
 		assert.True(t, execCtx.Passed)
 
-		wrappedPayload := execCtx.Payloads[0].(map[string]any)
-		payload := wrappedPayload["data"].(map[string]any)
-		metrics := payload["metrics"].(*SyntheticCheckMetrics)
-
-		// All metrics should be 0 when no data is available
-		assert.Equal(t, 0, metrics.TotalRuns24h)
-		assert.Equal(t, 0, metrics.HealthyRuns24h)
-		assert.Equal(t, 0, metrics.CriticalRuns24h)
-		assert.Equal(t, 0.0, metrics.AvgDuration24h)
-		assert.Equal(t, 0, metrics.TotalRuns7d)
-		assert.Equal(t, 0, metrics.HealthyRuns7d)
-		assert.Equal(t, 0, metrics.CriticalRuns7d)
-		assert.Equal(t, 0.0, metrics.AvgDuration7d)
+		// Empty outcome means Pass() is called — no payloads emitted
+		assert.Empty(t, execCtx.Payloads)
+		assert.Empty(t, execCtx.Channel)
 	})
 
 	t.Run("uses default dataset when not provided", func(t *testing.T) {
@@ -561,7 +615,8 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 						}
 					`)),
 				},
-				// Metrics responses (8 total)
+				// Metrics responses (8 scalar + 1 outcome = 9 total)
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
@@ -640,5 +695,87 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "error creating client")
+	})
+
+	t.Run("emits on critical channel when outcome is Critical", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// GetSyntheticCheck response
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"kind": "Dash0SyntheticCheck",
+							"metadata": {"name": "Failing Check"},
+							"spec": {
+								"display": {"name": "Failing Check"},
+								"enabled": true,
+								"labels": {},
+								"notifications": {"channels": [], "onlyCriticalChannels": []},
+								"plugin": {
+									"kind": "http",
+									"spec": {
+										"assertions": {"criticalAssertions": [], "degradedAssertions": []},
+										"request": {"url": "https://down.example.com", "method": "get"}
+									}
+								},
+								"retries": {"kind": "off", "spec": {}},
+								"schedule": {"interval": "1m", "locations": ["us-east-1"], "strategy": "all_locations"}
+							}
+						}
+					`)),
+				},
+				// 8 scalar metric responses (empty)
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				// lastOutcome - Critical
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"status": "success",
+							"data": {
+								"resultType": "vector",
+								"result": [
+									{
+										"metric": {"dash0_synthetic_check_outcome": "Critical"},
+										"value": [1234567890, "1234567890"]
+									}
+								]
+							}
+						}
+					`)),
+				},
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"checkId": "failing-check-id",
+				"dataset": "default",
+			},
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "token123",
+					"baseURL":  "https://api.us-west-2.aws.dash0.com",
+				},
+			},
+			ExecutionState: execCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+		assert.Equal(t, ChannelNameCritical, execCtx.Channel)
+		assert.Equal(t, "dash0.syntheticCheck.fetched", execCtx.Type)
+		require.Len(t, execCtx.Payloads, 1)
 	})
 }

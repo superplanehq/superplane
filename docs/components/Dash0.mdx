@@ -282,6 +282,11 @@ The Get HTTP Synthetic Check component retrieves the full configuration and oper
 - **Check ID**: The ID of the synthetic check to retrieve (from Dash0)
 - **Dataset**: The Dash0 dataset the check belongs to (defaults to "default")
 
+### Output Channels
+
+- **Healthy**: The check is passing — the most recent run outcome is "Healthy"
+- **Critical**: The check is failing — the most recent run outcome is "Critical"
+
 ### Output
 
 Returns a combined payload with:
@@ -299,6 +304,7 @@ Operational metrics from the Dash0 Prometheus API:
 - **Critical Runs (24h/7d)**: Number of failed check runs
 - **Total Runs (24h/7d)**: Total number of check runs
 - **Avg Duration (24h/7d)**: Mean end-to-end response time (in milliseconds)
+- **Last Outcome**: Most recent run outcome (Healthy or Critical)
 
 Note: Metrics are fetched on a best-effort basis. If Prometheus metrics are unavailable for a check, the configuration is still returned with null metric values.
 

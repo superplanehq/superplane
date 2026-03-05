@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 // SyntheticCheckMetrics contains operational metrics for a synthetic check.
@@ -16,11 +18,12 @@ type SyntheticCheckMetrics struct {
 	CriticalRuns7d  int     `json:"criticalRuns7d"`
 	TotalRuns7d     int     `json:"totalRuns7d"`
 	AvgDuration7d   float64 `json:"avgDuration7dMs"` // Milliseconds
+	LastOutcome     string  `json:"lastOutcome"`     // Most recent run outcome: Healthy or Critical
 }
 
 // FetchSyntheticCheckMetrics queries the Dash0 Prometheus API for operational metrics
 // of a synthetic check identified by its dash0_check_id.
-func FetchSyntheticCheckMetrics(client *Client, dataset, checkID string) *SyntheticCheckMetrics {
+func FetchSyntheticCheckMetrics(ctx core.ExecutionContext, client *Client, dataset, checkID string) *SyntheticCheckMetrics {
 	metrics := &SyntheticCheckMetrics{}
 
 	totalRuns24h := queryInstantScalar(client, dataset, fmt.Sprintf(
@@ -87,7 +90,33 @@ func FetchSyntheticCheckMetrics(client *Client, dataset, checkID string) *Synthe
 		metrics.AvgDuration7d = math.Round(*totalDuration7d / *totalRuns7d * 1000)
 	}
 
+	// Fetch the most recent run outcome.
+	metrics.LastOutcome = fetchLastSyntheticCheckOutcome(ctx, client, dataset, checkID)
+
 	return metrics
+}
+
+func fetchLastSyntheticCheckOutcome(ctx core.ExecutionContext, client *Client, dataset, checkID string) string {
+	query := fmt.Sprintf(
+		`topk(1, max by (dash0_synthetic_check_outcome) (timestamp({otel_metric_name="dash0.synthetic_check.runs", dash0_check_id="%s"})))`,
+		checkID,
+	)
+
+	result, err := client.ExecutePrometheusInstantQuery(query, dataset)
+	if err != nil {
+		return ""
+	}
+
+	data, ok := result["data"].(PrometheusResponseData)
+	if !ok || len(data.Result) == 0 {
+		return ""
+	}
+	outcome := data.Result[0].Metric["dash0_synthetic_check_outcome"]
+	if outcome != "Healthy" && outcome != "Critical" {
+		return ""
+	}
+
+	return outcome
 }
 
 // queryInstantScalar executes a Prometheus instant query and returns the scalar result value.
