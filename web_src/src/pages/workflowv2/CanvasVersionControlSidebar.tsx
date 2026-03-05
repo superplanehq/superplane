@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils";
 import { ChevronLeft, Eye, GitBranch, GitCompareArrows } from "lucide-react";
 import { MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as yaml from "js-yaml";
-import ReactMarkdown from "react-markdown";
 import { Diff, Hunk, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
+import { WorkflowMarkdownPreview } from "./WorkflowMarkdownPreview";
 
 const CANVAS_VERSION_CONTROL_WIDTH_STORAGE_KEY = "canvasVersionControlSidebarWidth";
 const DEFAULT_CANVAS_VERSION_CONTROL_WIDTH = 460;
@@ -570,9 +570,9 @@ export function CanvasVersionControlSidebar({
                         </span>
                       </div>
                       <div className="p-3">
-                        <div className="prose prose-sm max-w-none text-slate-800 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-headings:my-2">
-                          <ReactMarkdown>{diffContext.changeRequest.metadata?.description?.trim() || ""}</ReactMarkdown>
-                        </div>
+                        <WorkflowMarkdownPreview
+                          content={diffContext.changeRequest.metadata?.description?.trim() || ""}
+                        />
                       </div>
                     </div>
                   </div>

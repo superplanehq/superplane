@@ -3615,7 +3615,6 @@ export function WorkflowPageV2() {
 
       try {
         const response = await createCanvasChangeRequestMutation.mutateAsync({
-          versionId: editVersionID,
           title,
           description,
         });
