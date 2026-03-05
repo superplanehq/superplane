@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudfunctions"
 	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/compute"
 	gcppubsub "github.com/superplanehq/superplane/pkg/integrations/gcp/pubsub"
@@ -24,6 +25,9 @@ func init() {
 	registry.RegisterIntegration("gcp", &GCP{})
 	compute.SetClientFactory(func(ctx core.ExecutionContext) (compute.Client, error) {
 		return gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
+	})
+	cloudfunctions.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (cloudfunctions.Client, error) {
+		return gcpcommon.NewClient(httpCtx, integration)
 	})
 }
 
@@ -140,6 +144,7 @@ func (g *GCP) Configuration() []configuration.Field {
 func (g *GCP) Components() []core.Component {
 	return []core.Component{
 		&compute.CreateVM{},
+		&cloudfunctions.InvokeFunction{},
 	}
 }
 
@@ -423,6 +428,26 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	p := ctx.Parameters
 
 	switch resourceType {
+	case cloudfunctions.ResourceTypeLocation, cloudfunctions.ResourceTypeFunction:
+		projectID := p["projectId"]
+		if projectID == "" {
+			projectID = client.ProjectID()
+		}
+		cfEnabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "cloudfunctions.googleapis.com")
+		if err != nil {
+			return nil, fmt.Errorf("failed to check Cloud Functions API status: %w", err)
+		}
+		crEnabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "run.googleapis.com")
+		if err != nil {
+			return nil, fmt.Errorf("failed to check Cloud Run API status: %w", err)
+		}
+		if !cfEnabled && !crEnabled {
+			return nil, fmt.Errorf("Neither Cloud Functions nor Cloud Run API is enabled in project %s", projectID)
+		}
+		if resourceType == cloudfunctions.ResourceTypeLocation {
+			return cloudfunctions.ListLocationResources(reqCtx, client, p["projectId"])
+		}
+		return cloudfunctions.ListFunctionResources(reqCtx, client, p["projectId"], p["location"])
 	case compute.ResourceTypeRegion:
 		return compute.ListRegionResources(reqCtx, client)
 	case compute.ResourceTypeZone:
