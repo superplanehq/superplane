@@ -24,6 +24,7 @@ type CreateServerSpec struct {
 	Image      string   `json:"image" mapstructure:"image"`
 	Location   string   `json:"location" mapstructure:"location"`
 	SSHKeys    []string `json:"sshKeys" mapstructure:"sshKeys"`
+	Firewall   string   `json:"firewall" mapstructure:"firewall"`
 	UserData   string   `json:"userData" mapstructure:"userData"`
 }
 
@@ -60,6 +61,7 @@ func (c *CreateServer) Documentation() string {
 - **Image**: System image or snapshot image ID
 - **Location** (optional): e.g. fsn1, nbg1, hel1
 - **SSH keys** (optional): List of SSH key names or IDs
+- **Firewall** (optional): Attach an existing firewall to the server
 - **User data** (optional): Cloud-init user data
 `
 }
@@ -136,6 +138,19 @@ func (c *CreateServer) Configuration() []configuration.Field {
 			Description: "Location (optional, omit for auto). Only locations that support the selected server type are shown.",
 		},
 		{
+			Name:        "firewall",
+			Label:       "Firewall",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Placeholder: "Select firewall",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "firewall",
+				},
+			},
+			Description: "Firewall (optional): attach a firewall to this server",
+		},
+		{
 			Name:        "sshKeys",
 			Label:       "SSH keys",
 			Type:        configuration.FieldTypeList,
@@ -190,13 +205,14 @@ func (c *CreateServer) Execute(ctx core.ExecutionContext) error {
 	serverType := strings.TrimSpace(spec.ServerType)
 	image := strings.TrimSpace(spec.Image)
 	location := strings.TrimSpace(spec.Location)
+	firewall := strings.TrimSpace(spec.Firewall)
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
 
-	server, action, err := client.CreateServer(name, serverType, image, location, spec.SSHKeys, spec.UserData)
+	server, action, err := client.CreateServer(name, serverType, image, location, spec.SSHKeys, firewall, spec.UserData)
 	if err != nil {
 		return fmt.Errorf("create server: %w", err)
 	}

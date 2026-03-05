@@ -34,13 +34,18 @@ func (e *APIError) Error() string {
 }
 
 type createServerRequest struct {
-	Name             string   `json:"name"`
-	ServerType       string   `json:"server_type"`
-	Image            string   `json:"image"`
-	Location         string   `json:"location,omitempty"`
-	SSHKeys          []string `json:"ssh_keys,omitempty"`
-	UserData         string   `json:"user_data,omitempty"`
-	StartAfterCreate *bool    `json:"start_after_create,omitempty"`
+	Name             string                 `json:"name"`
+	ServerType       string                 `json:"server_type"`
+	Image            string                 `json:"image"`
+	Location         string                 `json:"location,omitempty"`
+	SSHKeys          []string               `json:"ssh_keys,omitempty"`
+	Firewalls        []createServerFirewall `json:"firewalls,omitempty"`
+	UserData         string                 `json:"user_data,omitempty"`
+	StartAfterCreate *bool                  `json:"start_after_create,omitempty"`
+}
+
+type createServerFirewall struct {
+	Firewall string `json:"firewall"`
 }
 
 type createServerResponse struct {
@@ -200,7 +205,7 @@ func (c *Client) parseError(resp *http.Response) error {
 
 // server actions
 
-func (c *Client) CreateServer(name, serverType, image, location string, sshKeys []string, userData string) (*ServerResponse, *ActionResponse, error) {
+func (c *Client) CreateServer(name, serverType, image, location string, sshKeys []string, firewall, userData string) (*ServerResponse, *ActionResponse, error) {
 	req := createServerRequest{
 		Name:       name,
 		ServerType: serverType,
@@ -208,6 +213,11 @@ func (c *Client) CreateServer(name, serverType, image, location string, sshKeys 
 		Location:   location,
 		SSHKeys:    sshKeys,
 		UserData:   userData,
+	}
+	if strings.TrimSpace(firewall) != "" {
+		req.Firewalls = []createServerFirewall{
+			{Firewall: firewall},
+		}
 	}
 	startAfter := true
 	req.StartAfterCreate = &startAfter
@@ -574,6 +584,11 @@ type LocationResponse struct {
 	Country     string `json:"country"`
 }
 
+type FirewallResponse struct {
+	Name string `json:"name"`
+	ID   int    `json:"id"`
+}
+
 // LocationDisplayName returns a label for the location (e.g. "Nuremberg, DE (nbg1)").
 func (l *LocationResponse) LocationDisplayName() string {
 	if l.Name == "" {
@@ -609,6 +624,26 @@ func (c *Client) ListLocations() ([]LocationResponse, error) {
 		return nil, fmt.Errorf("decode list locations response: %w", err)
 	}
 	return out.Locations, nil
+}
+
+func (c *Client) ListFirewalls() ([]FirewallResponse, error) {
+	resp, err := c.do("GET", "/firewalls?per_page=50", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var out struct {
+		Firewalls []FirewallResponse `json:"firewalls"`
+	}
+	if err := decodeJSON(resp.Body, &out); err != nil {
+		return nil, fmt.Errorf("decode list firewalls response: %w", err)
+	}
+	return out.Firewalls, nil
 }
 
 func (c *Client) Verify() error {
