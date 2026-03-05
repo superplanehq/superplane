@@ -122,6 +122,49 @@ export const CLOUD_BUILD_EXECUTION_STATE_REGISTRY: EventStateRegistry = {
 
 export const CLOUD_BUILD_CREATE_STATE_REGISTRY = CLOUD_BUILD_EXECUTION_STATE_REGISTRY;
 
+export function buildCloudBuildSummaryDetails({
+  build,
+  timestamp,
+  receivedAt,
+}: {
+  build?: CloudBuildData;
+  timestamp?: string;
+  receivedAt?: string;
+}): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  const ts = receivedAt ?? timestamp;
+  if (ts) {
+    const label = receivedAt ? "Received At" : "Built At";
+    const formatted = formatDateTime(ts);
+    if (formatted) details[label] = formatted;
+  }
+
+  if (build?.status) {
+    details["Status"] = build.status;
+  }
+
+  if (build?.id) {
+    details["Build ID"] = build.id;
+  }
+
+  const branch = build?.substitutions?.["BRANCH_NAME"];
+  if (branch) {
+    details["Branch"] = branch;
+  }
+
+  const repo = build?.substitutions?.["REPO_FULL_NAME"];
+  if (repo) {
+    details["Repository"] = repo;
+  }
+
+  if (build?.logUrl) {
+    details["Log URL"] = build.logUrl;
+  }
+
+  return details;
+}
+
 export function buildCloudBuildDetails({
   build,
   receivedAt,
@@ -180,7 +223,7 @@ function cloudBuildStatusToExecutionState(status?: string): EventState | undefin
   switch (status?.toUpperCase()) {
     case "PENDING":
     case "QUEUED":
-      return "queued";
+      return "running";
     case "WORKING":
       return "running";
     case "SUCCESS":

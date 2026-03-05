@@ -12,7 +12,7 @@ import {
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import cloudBuildIcon from "@/assets/icons/integrations/cloud_build.svg";
 import { formatTimeAgo } from "@/utils/date";
-import { buildCloudBuildDetails, getCloudBuildData, getCloudBuildOutputPayload } from "./cloudbuild";
+import { buildCloudBuildSummaryDetails, getCloudBuildData, getCloudBuildOutputPayload } from "./cloudbuild";
 
 export const baseMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -69,11 +69,8 @@ export const cloudBuildBaseMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const payload = getCloudBuildOutputPayload(context.execution);
     const build = getCloudBuildData(context.execution);
-    return buildCloudBuildDetails({
-      build,
-      timestamp: payload?.timestamp ?? context.execution.updatedAt ?? context.execution.createdAt,
-      type: payload?.type,
-    });
+    const timestamp = payload?.timestamp ?? context.execution.updatedAt ?? context.execution.createdAt;
+    return buildCloudBuildSummaryDetails({ build, timestamp });
   },
 };
 

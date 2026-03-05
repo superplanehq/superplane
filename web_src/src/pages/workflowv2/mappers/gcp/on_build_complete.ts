@@ -3,7 +3,7 @@ import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "..
 import { TriggerProps } from "@/ui/trigger";
 import { formatTimeAgo } from "@/utils/date";
 import cloudBuildIcon from "@/assets/icons/integrations/cloud_build.svg";
-import { buildCloudBuildDetails, cloudBuildStatusToTriggerState, type CloudBuildData } from "./cloudbuild";
+import { buildCloudBuildSummaryDetails, cloudBuildStatusToTriggerState, type CloudBuildData } from "./cloudbuild";
 
 export const onBuildCompleteTriggerRenderer: TriggerRenderer = {
   getEventState: (context: TriggerEventContext) => {
@@ -17,10 +17,9 @@ export const onBuildCompleteTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    return buildCloudBuildDetails({
+    return buildCloudBuildSummaryDetails({
       build: context.event?.data as CloudBuildData | undefined,
       receivedAt: context.event?.createdAt,
-      type: context.event?.type,
     });
   },
 

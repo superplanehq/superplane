@@ -60,13 +60,6 @@ func (c *GetBuild) OutputChannels(_ any) []core.OutputChannel {
 func (c *GetBuild) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "projectId",
-			Label:       "Project ID Override",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Override the GCP project ID from the integration. Leave empty to use the integration's project.",
-		},
-		{
 			Name:        "buildId",
 			Label:       "Build ID",
 			Type:        configuration.FieldTypeIntegrationResource,
@@ -75,10 +68,8 @@ func (c *GetBuild) Configuration() []configuration.Field {
 			Placeholder: "Select a build",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: ResourceTypeBuild,
-					Parameters: []configuration.ParameterRef{
-						{Name: "projectId", ValueFrom: &configuration.ParameterValueFrom{Field: "projectId"}},
-					},
+					Type:       ResourceTypeBuild,
+					Parameters: []configuration.ParameterRef{},
 				},
 			},
 		},

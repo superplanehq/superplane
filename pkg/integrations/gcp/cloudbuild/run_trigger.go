@@ -76,13 +76,6 @@ func (c *RunTrigger) OutputChannels(_ any) []core.OutputChannel {
 func (c *RunTrigger) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "projectId",
-			Label:       "Project ID Override",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Override the GCP project ID from the integration. Leave empty to use the integration's project.",
-		},
-		{
 			Name:        "trigger",
 			Label:       "Trigger",
 			Type:        configuration.FieldTypeIntegrationResource,
@@ -91,10 +84,8 @@ func (c *RunTrigger) Configuration() []configuration.Field {
 			Placeholder: "Select a trigger",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: ResourceTypeTrigger,
-					Parameters: []configuration.ParameterRef{
-						{Name: "projectId", ValueFrom: &configuration.ParameterValueFrom{Field: "projectId"}},
-					},
+					Type:       ResourceTypeTrigger,
+					Parameters: []configuration.ParameterRef{},
 				},
 			},
 		},

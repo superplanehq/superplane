@@ -121,13 +121,6 @@ func (c *CreateBuild) OutputChannels(_ any) []core.OutputChannel {
 func (c *CreateBuild) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "projectId",
-			Label:       "Project ID Override",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Override the GCP project ID from the integration. Leave empty to use the integration's project.",
-		},
-		{
 			Name:        "steps",
 			Label:       "Steps",
 			Type:        configuration.FieldTypeText,
@@ -168,10 +161,8 @@ func (c *CreateBuild) Configuration() []configuration.Field {
 			},
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: ResourceTypeLocation,
-					Parameters: []configuration.ParameterRef{
-						{Name: "projectId", ValueFrom: &configuration.ParameterValueFrom{Field: "projectId"}},
-					},
+					Type:       ResourceTypeLocation,
+					Parameters: []configuration.ParameterRef{},
 				},
 			},
 		},
@@ -192,7 +183,6 @@ func (c *CreateBuild) Configuration() []configuration.Field {
 				Resource: &configuration.ResourceTypeOptions{
 					Type: ResourceTypeConnection,
 					Parameters: []configuration.ParameterRef{
-						{Name: "projectId", ValueFrom: &configuration.ParameterValueFrom{Field: "projectId"}},
 						{Name: "location", ValueFrom: &configuration.ParameterValueFrom{Field: "connectionLocation"}},
 					},
 				},
