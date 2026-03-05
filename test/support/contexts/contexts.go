@@ -166,11 +166,17 @@ func (c *IntegrationContext) RemoveBrowserAction() {
 }
 
 func (c *IntegrationContext) SetSecret(name string, value []byte) error {
+	if c.Secrets == nil {
+		c.Secrets = make(map[string]core.IntegrationSecret)
+	}
 	c.Secrets[name] = core.IntegrationSecret{Name: name, Value: value}
 	return nil
 }
 
 func (c *IntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
+	if c.Secrets == nil {
+		return []core.IntegrationSecret{}, nil
+	}
 	secrets := make([]core.IntegrationSecret, 0, len(c.Secrets))
 	for _, secret := range c.Secrets {
 		secrets = append(secrets, secret)
