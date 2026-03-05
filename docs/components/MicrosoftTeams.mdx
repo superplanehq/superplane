@@ -21,15 +21,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-### Setup
+## Setup
 
 1. **Create an Azure App Registration**:
    - Go to **Azure Portal** → **App registrations** → **New registration**
    - Name: "SuperPlane Bot" (or your preference)
    - Supported account types: **Accounts in any organizational directory** (multi-tenant) or single-tenant
-   - Note the **Application (client) ID** — this is the **App ID**
-   - Note the **Directory (tenant) ID** — this is the **Tenant ID**
-   - Go to **Certificates & secrets** → **New client secret** → copy the **Value** — this is the **App Password**
+   - Note the **Application (client) ID** — this is the **App ID** below
+   - Go to **Certificates & secrets** → **New client secret** → copy the **Value** — this is the **App Password** below
 
 2. **Add Graph API permissions** (required for channel listing):
    - Go to your **App Registration** → **API permissions** → **Add a permission**
@@ -37,15 +36,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
    - Add: **Team.ReadBasic.All** and **Channel.ReadBasic.All**
    - Click **Grant admin consent**
 
-3. **Enter credentials in SuperPlane** and click Connect. SuperPlane will verify your credentials and show your webhook URL.
-
-4. **Create an Azure Bot**:
-   - Go to **Azure Portal** → **Create a resource** → search **Azure Bot**
-   - Link it to the App Registration from step 1
-   - Set the **Messaging endpoint** to the webhook URL shown by SuperPlane
-   - Under **Channels**, click **Microsoft Teams** to enable it
-
-5. **Install the Teams App**: Download the manifest ZIP from SuperPlane and upload it to **Teams Admin Center** → **Manage apps** → **Upload new app**, or sideload to specific teams
+3. **Enter credentials** in the fields below and save
 
 <a id="on-mention"></a>
 
@@ -63,7 +54,7 @@ The On Mention trigger starts a workflow execution when the Teams bot is @mentio
 ### Configuration
 
 - **Channel**: Optional channel filter — if specified, only mentions in this channel will trigger (leave empty to listen to all channels)
-- **Content Filter**: Optional regex pattern to filter mentions by content (e.g., `/deploy` to only trigger on mentions containing "/deploy")
+- **Content Filter**: Optional regex pattern to filter messages by content (e.g., `/deploy` to only trigger on mentions containing "/deploy")
 
 ### Event Data
 
@@ -238,3 +229,4 @@ Returns metadata about the sent message including the message ID and timestamp.
   "type": "teams.message.sent"
 }
 ```
+
