@@ -104,6 +104,18 @@ func (c *Client) GetURL(ctx context.Context, fullURL string) ([]byte, error) {
 	return c.ExecRequest(ctx, http.MethodGet, fullURL, nil)
 }
 
+func (c *Client) PostURL(ctx context.Context, fullURL string, body any) ([]byte, error) {
+	var bodyReader io.Reader
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request body: %w", err)
+		}
+		bodyReader = bytes.NewReader(b)
+	}
+	return c.ExecRequest(ctx, http.MethodPost, fullURL, bodyReader)
+}
+
 func (c *Client) Post(ctx context.Context, path string, body any) ([]byte, error) {
 	path = strings.TrimPrefix(path, "/")
 	url := strings.TrimSuffix(c.baseURL, "/") + "/" + path
