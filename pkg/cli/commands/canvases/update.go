@@ -57,7 +57,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		current = &canvas
 	}
 
-	body := openapi_client.CanvasesUpdateCanvasBody{}
+	body := openapi_client.CanvasesUpdateCanvasVersionBody{}
 	body.SetCanvas(canvas)
 
 	if autoLayoutFlagsWereSet(ctx) {
@@ -84,8 +84,8 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		body.SetAutoLayout(buildDefaultAutoLayout(*current, canvas))
 	}
 
-	_, _, err = ctx.API.CanvasAPI.
-		CanvasesUpdateCanvas(ctx.Context, canvasID).
+	_, _, err = ctx.API.CanvasVersionAPI.
+		CanvasesUpdateCanvasVersion2(ctx.Context, canvasID).
 		Body(body).
 		Execute()
 	return err
