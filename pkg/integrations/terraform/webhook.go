@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -31,7 +32,22 @@ func (h *WebhookHandler) CompareConfig(a, b any) (bool, error) {
 }
 
 func (h *WebhookHandler) Merge(current, requested any) (any, bool, error) {
-	return requested, false, nil
+	currentConfig := WebhookConfiguration{}
+	if err := mapstructure.Decode(current, &currentConfig); err != nil {
+		return nil, false, err
+	}
+
+	requestedConfig := WebhookConfiguration{}
+	if err := mapstructure.Decode(requested, &requestedConfig); err != nil {
+		return nil, false, err
+	}
+
+	mergedConfig := WebhookConfiguration{
+		WorkspaceID: currentConfig.WorkspaceID,
+		Events:      requestedConfig.Events,
+	}
+
+	return mergedConfig, true, nil
 }
 
 func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
@@ -74,8 +90,6 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 		"run:applying",
 		"run:completed",
 		"run:errored",
-		"assessment:drifted",
-		"assessment:failed",
 	}
 
 	listPath := fmt.Sprintf("/api/v2/workspaces/%s/notification-configurations", resolvedWsId)
@@ -180,7 +194,8 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 			}
 		} else {
 			if cResp.StatusCode >= 400 {
-				createErr = fmt.Errorf("bad status code: %d", cResp.StatusCode)
+				bodyBytes, _ := io.ReadAll(cResp.Body)
+				createErr = fmt.Errorf("bad status code: %d, body: %s", cResp.StatusCode, string(bodyBytes))
 				if cResp.StatusCode < 500 && cResp.StatusCode != 429 {
 					_ = cResp.Body.Close()
 					break

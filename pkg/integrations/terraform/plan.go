@@ -35,6 +35,11 @@ type ExecutionMetadata struct {
 	FinishedAt    string          `json:"finishedAt,omitempty" mapstructure:"finishedAt"`
 	RunURL        string          `json:"runUrl,omitempty" mapstructure:"runUrl"`
 	StateHistory  []RunStateEntry `json:"stateHistory" mapstructure:"stateHistory"`
+	Additions     *int            `json:"additions,omitempty" mapstructure:"additions"`
+	Changes       *int            `json:"changes,omitempty" mapstructure:"changes"`
+	Destructions  *int            `json:"destructions,omitempty" mapstructure:"destructions"`
+	PlanLog       string          `json:"planLog,omitempty" mapstructure:"planLog"`
+	PlanJSON      string          `json:"planJson,omitempty" mapstructure:"planJson"`
 }
 
 func (c *Plan) Name() string        { return "terraform.plan" }
@@ -214,6 +219,43 @@ func (c *Plan) emitFinalState(ctx core.ActionContext, metadata ExecutionMetadata
 		"runUrl":       metadata.RunURL,
 	}
 
+	if run != nil && run.Plan != nil && run.Plan.ID != "" {
+		client, err := getClientFromIntegration(ctx.Integration)
+		if err == nil {
+			plan, err := client.ReadPlan(context.Background(), run.Plan.ID)
+			if err == nil && plan != nil {
+				additions := plan.Attributes.ResourceAdditions
+				changes := plan.Attributes.ResourceChanges
+				destructions := plan.Attributes.ResourceDestructions
+				payload["additions"] = additions
+				payload["changes"] = changes
+				payload["destructions"] = destructions
+				metadata.Additions = &additions
+				metadata.Changes = &changes
+				metadata.Destructions = &destructions
+
+				if plan.Attributes.LogReadURL != "" {
+					logText, err := client.DownloadLog(context.Background(), plan.Attributes.LogReadURL)
+					if err == nil {
+						payload["planLog"] = logText
+						metadata.PlanLog = logText
+					}
+				}
+
+				if plan.Links.JSONOutput != "" {
+					jsonText, err := client.DownloadJSONOutput(context.Background(), plan.Links.JSONOutput)
+					if err == nil {
+						payload["planJson"] = jsonText
+						metadata.PlanJSON = jsonText
+					}
+				}
+
+				if err := ctx.Metadata.Set(metadata); err == nil {
+				}
+			}
+		}
+	}
+
 	channel := "passed"
 
 	if isFailedState(metadata.CurrentStatus) {
@@ -275,10 +317,8 @@ func (c *Plan) ExampleOutput() map[string]any {
 }
 
 func isTerminalStatePlanTarget(status string) bool {
-	// Plan expects to pause and finish if it's planned, or if it hit failure early
 	switch status {
-	case "planned", "cost_estimated", "policy_checked", "policy_override", "planned_and_saved", "planned_and_finished",
-		"discarded", "errored", "canceled", "policy_soft_failed", "force_canceled", "applied":
+	case "planned_and_finished", "discarded", "errored", "canceled", "policy_soft_failed", "force_canceled", "applied":
 		return true
 	}
 	return false
