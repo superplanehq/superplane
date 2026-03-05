@@ -2,7 +2,7 @@ import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
-import { Loader2, Puzzle } from "lucide-react";
+import { GitBranch, Loader2, Puzzle } from "lucide-react";
 import * as yaml from "js-yaml";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -4241,7 +4241,6 @@ export function WorkflowPageV2() {
     </div>
   ) : null;
 
-  const selectedVersionForLabel = selectedCanvasVersion || liveCanvasVersion;
   const canvasViewKey = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "live";
   const headerBanners = [remoteUpdateBanner, templateBanner].filter(Boolean);
   const headerBanner = headerBanners.length > 0 ? <div className="flex flex-col">{headerBanners}</div> : null;
@@ -4364,179 +4363,187 @@ export function WorkflowPageV2() {
 
   return (
     <>
-      <CanvasPage
-        key={canvasViewKey}
-        // Persist right sidebar in query params
-        initialSidebar={{
-          isOpen: searchParams.get("sidebar") === "1",
-          nodeId: searchParams.get("node") || null,
-        }}
-        onSidebarChange={handleSidebarChange}
-        onNodeExpand={(nodeId) => {
-          if (isViewingDraftVersion) {
-            return;
-          }
+      <div className="relative h-full w-full">
+        {showVersioningUI && topViewMode === "canvas" && !isVersionControlOpen ? (
+          <div className="absolute left-4 top-16 z-20">
+            <Button
+              variant="outline"
+              onClick={() => setIsVersionControlOpen(true)}
+              aria-label="Open versions"
+              data-testid="open-versions-button"
+            >
+              <GitBranch size={16} />
+              Versions
+            </Button>
+          </div>
+        ) : null}
+        <CanvasPage
+          key={canvasViewKey}
+          // Persist right sidebar in query params
+          initialSidebar={{
+            isOpen: searchParams.get("sidebar") === "1",
+            nodeId: searchParams.get("node") || null,
+          }}
+          onSidebarChange={handleSidebarChange}
+          onNodeExpand={(nodeId) => {
+            if (isViewingDraftVersion) {
+              return;
+            }
 
-          const latestExecution = visibleNodeExecutionsMap[nodeId]?.[0];
-          const executionId = latestExecution?.id;
-          if (executionId) {
-            navigate(`/${organizationId}/canvases/${canvasId}/nodes/${nodeId}/${executionId}`);
+            const latestExecution = visibleNodeExecutionsMap[nodeId]?.[0];
+            const executionId = latestExecution?.id;
+            if (executionId) {
+              navigate(`/${organizationId}/canvases/${canvasId}/nodes/${nodeId}/${executionId}`);
+            }
+          }}
+          title={canvas?.metadata?.name || "Canvas"}
+          headerBanner={headerBanner}
+          topViewMode={showVersioningUI || topViewMode !== "versioning" ? topViewMode : "canvas"}
+          onTopViewModeChange={(mode) => {
+            setIsCreateChangeRequestMode(false);
+            setTopViewMode(mode);
+          }}
+          showVersioningTab={false}
+          isVersionControlOpen={showVersioningUI ? isVersionControlOpen : false}
+          showBottomStatusControls={true}
+          memoryItemCount={canvasMemoryEntries.length}
+          versioningItemCount={undefined}
+          dataViewContent={dataViewContent}
+          nodes={nodes}
+          edges={edges}
+          organizationId={organizationId}
+          canvasId={canvasId}
+          onDirty={!isReadOnly ? () => markUnsavedChange("structural") : undefined}
+          getSidebarData={getSidebarData}
+          loadSidebarData={loadSidebarData}
+          getTabData={getTabData}
+          getNodeEditData={getNodeEditData}
+          getAutocompleteExampleObj={getAutocompleteExampleObj}
+          getCustomField={getCustomField}
+          onNodeConfigurationSave={!isReadOnly ? handleNodeConfigurationSave : undefined}
+          onAnnotationUpdate={!isReadOnly ? handleAnnotationUpdate : undefined}
+          onAnnotationBlur={!isReadOnly ? handleAnnotationBlur : undefined}
+          onSave={isTemplate ? undefined : handleSave}
+          onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
+          onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
+          onNodesDelete={!isReadOnly ? handleNodesDelete : undefined}
+          onDuplicateNodes={!isReadOnly ? handleNodesDuplicate : undefined}
+          onAutoLayoutNodes={!isReadOnly ? handleAutoLayoutNodes : undefined}
+          onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
+          isAutoLayoutOnUpdateEnabled={isAutoLayoutOnUpdateEnabled && !isReadOnly}
+          onToggleAutoLayoutOnUpdate={!isReadOnly ? handleToggleAutoLayoutOnUpdate : undefined}
+          onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
+          onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
+          onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
+          onToggleCollapse={!isReadOnly ? () => markUnsavedChange("structural") : undefined}
+          onRun={isViewingLiveVersion ? handleRun : undefined}
+          onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
+          onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
+          onConfigure={!isReadOnly ? handleConfigure : undefined}
+          buildingBlocks={buildingBlocks}
+          showAiBuilderTab={showAiBuilderTab}
+          onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
+          onApplyAiOperations={!isReadOnly ? handleApplyAiOperations : undefined}
+          onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
+          onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
+          integrations={canReadIntegrations ? integrations : []}
+          canReadIntegrations={canReadIntegrations}
+          canCreateIntegrations={canCreateIntegrations}
+          canUpdateIntegrations={canUpdateIntegrations}
+          readOnly={isReadOnly}
+          hasFitToViewRef={hasFitToViewRef}
+          hasUserToggledSidebarRef={hasUserToggledSidebarRef}
+          isSidebarOpenRef={isSidebarOpenRef}
+          viewportRef={viewportRef}
+          initialFocusNodeId={initialFocusNodeIdRef.current}
+          unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
+          saveIsPrimary={saveIsPrimary}
+          saveButtonHidden={saveButtonHidden}
+          saveDisabled={saveDisabled}
+          saveDisabledTooltip={saveDisabledTooltip}
+          onPublishVersion={showVersioningUI ? handleCreateChangeRequest : undefined}
+          publishVersionDisabled={createChangeRequestDisabled}
+          publishVersionDisabledTooltip={createChangeRequestDisabledTooltip}
+          onDiscardVersion={showVersioningUI ? handleResetDraftChanges : undefined}
+          discardVersionDisabled={resetDraftDisabled}
+          discardVersionDisabledTooltip={resetDraftDisabledTooltip}
+          onUndo={!isReadOnly ? handleRevert : undefined}
+          canUndo={canUndo}
+          isAutoSaveEnabled={isAutoSaveEnabled && !isTemplate}
+          onToggleAutoSave={isTemplate ? undefined : handleToggleAutoSave}
+          autoSaveDisabled={autoSaveDisabled}
+          autoSaveDisabledTooltip={autoSaveDisabledTooltip}
+          headerMode={headerMode}
+          saveState={headerSaveState}
+          onEnterEditMode={showVersioningUI ? handleToggleEditMode : undefined}
+          enterEditModeDisabled={toggleEditModeDisabled}
+          enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
+          onExitEditMode={showVersioningUI ? handleToggleEditMode : undefined}
+          exitEditModeDisabled={exitEditModeDisabled}
+          exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+          sandboxModeTooltip={sandboxModeVersioningTooltip}
+          showPendingDraftBadge={showPendingDraftBadge}
+          autoLayoutOnUpdateDisabled={isReadOnly}
+          autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
+          onExportYamlCopy={isDev ? handleExportYamlCopy : undefined}
+          onExportYamlDownload={isDev ? handleExportYamlDownload : undefined}
+          runDisabled={runDisabled}
+          runDisabledTooltip={runDisabledTooltip}
+          onCancelQueueItem={onCancelQueueItem}
+          onPushThrough={isViewingLiveVersion ? onPushThrough : undefined}
+          supportsPushThrough={isViewingLiveVersion ? supportsPushThrough : undefined}
+          onCancelExecution={isViewingLiveVersion ? onCancelExecution : undefined}
+          getAllHistoryEvents={getAllHistoryEvents}
+          onLoadMoreHistory={handleLoadMoreHistory}
+          getHasMoreHistory={getHasMoreHistory}
+          getLoadingMoreHistory={getLoadingMoreHistory}
+          onLoadMoreQueue={onLoadMoreQueue}
+          getAllQueueEvents={getAllQueueEvents}
+          getHasMoreQueue={getHasMoreQueue}
+          getLoadingMoreQueue={getLoadingMoreQueue}
+          onReEmit={canUpdateCanvas && isViewingLiveVersion ? handleReEmit : undefined}
+          loadExecutionChain={loadExecutionChain}
+          getExecutionState={getExecutionState}
+          workflowNodes={canvas?.spec?.nodes}
+          components={components}
+          triggers={triggers}
+          blueprints={blueprints}
+          logEntries={logEntries}
+          onResolveExecutionErrors={canUpdateCanvas && isViewingLiveVersion ? handleResolveExecutionErrors : undefined}
+          focusRequest={focusRequest}
+          onExecutionChainHandled={handleExecutionChainHandled}
+          breadcrumbs={[
+            {
+              label: isTemplate ? "Templates" : "Canvases",
+              href: `/${organizationId}`,
+            },
+            {
+              label: canvas?.metadata?.name || (isTemplate ? "Template" : "Canvas"),
+            },
+          ]}
+          versionControlSidebar={
+            showVersioningUI ? (
+              <CanvasVersionControlSidebar
+                isOpen={isVersionControlOpen}
+                onToggle={setIsVersionControlOpen}
+                liveCanvasVersionId={liveCanvasVersionId}
+                selectedCanvasVersion={selectedCanvasVersion}
+                liveVersions={liveVersions}
+                liveVersionChangeRequestsByVersionId={liveVersionChangeRequestsByVersionId}
+                liveVersionOwnerProfilesById={liveVersionOwnerProfilesById}
+                liveVersionsTotalCount={liveVersionsTotalCount}
+                canUpdateCanvas={canUpdateCanvas}
+                isTemplate={isTemplate}
+                canvasDeletedRemotely={canvasDeletedRemotely}
+                onUseVersion={handleUseVersion}
+                onLoadMoreLiveVersions={hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined}
+                loadMoreLiveVersionsDisabled={!hasMoreLiveVersions || isLoadingMoreLiveVersions}
+                loadMoreLiveVersionsPending={isLoadingMoreLiveVersions}
+              />
+            ) : undefined
           }
-        }}
-        title={canvas?.metadata?.name || "Canvas"}
-        headerBanner={headerBanner}
-        topViewMode={showVersioningUI || topViewMode !== "versioning" ? topViewMode : "canvas"}
-        onTopViewModeChange={(mode) => {
-          setIsCreateChangeRequestMode(false);
-          setTopViewMode(mode);
-        }}
-        showVersioningTab={false}
-        isVersionControlOpen={showVersioningUI ? isVersionControlOpen : false}
-        onOpenVersionControl={showVersioningUI ? () => setIsVersionControlOpen(true) : undefined}
-        versionControlButtonLabel={
-          hasEditableVersion
-            ? `Draft ${formatVersionLabelWithTimestamp(selectedVersionForLabel)}`
-            : `Live ${formatVersionLabelWithTimestamp(selectedVersionForLabel)}`
-        }
-        versionControlButtonTooltip="Open version control"
-        showBottomStatusControls={true}
-        memoryItemCount={canvasMemoryEntries.length}
-        versioningItemCount={undefined}
-        dataViewContent={dataViewContent}
-        nodes={nodes}
-        edges={edges}
-        organizationId={organizationId}
-        canvasId={canvasId}
-        onDirty={!isReadOnly ? () => markUnsavedChange("structural") : undefined}
-        getSidebarData={getSidebarData}
-        loadSidebarData={loadSidebarData}
-        getTabData={getTabData}
-        getNodeEditData={getNodeEditData}
-        getAutocompleteExampleObj={getAutocompleteExampleObj}
-        getCustomField={getCustomField}
-        onNodeConfigurationSave={!isReadOnly ? handleNodeConfigurationSave : undefined}
-        onAnnotationUpdate={!isReadOnly ? handleAnnotationUpdate : undefined}
-        onAnnotationBlur={!isReadOnly ? handleAnnotationBlur : undefined}
-        onSave={isTemplate ? undefined : handleSave}
-        onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
-        onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
-        onNodesDelete={!isReadOnly ? handleNodesDelete : undefined}
-        onDuplicateNodes={!isReadOnly ? handleNodesDuplicate : undefined}
-        onAutoLayoutNodes={!isReadOnly ? handleAutoLayoutNodes : undefined}
-        onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
-        isAutoLayoutOnUpdateEnabled={isAutoLayoutOnUpdateEnabled && !isReadOnly}
-        onToggleAutoLayoutOnUpdate={!isReadOnly ? handleToggleAutoLayoutOnUpdate : undefined}
-        onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
-        onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
-        onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
-        onToggleCollapse={!isReadOnly ? () => markUnsavedChange("structural") : undefined}
-        onRun={isViewingLiveVersion ? handleRun : undefined}
-        onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
-        onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
-        onConfigure={!isReadOnly ? handleConfigure : undefined}
-        buildingBlocks={buildingBlocks}
-        showAiBuilderTab={showAiBuilderTab}
-        onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
-        onApplyAiOperations={!isReadOnly ? handleApplyAiOperations : undefined}
-        onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
-        onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
-        integrations={canReadIntegrations ? integrations : []}
-        canReadIntegrations={canReadIntegrations}
-        canCreateIntegrations={canCreateIntegrations}
-        canUpdateIntegrations={canUpdateIntegrations}
-        readOnly={isReadOnly}
-        hasFitToViewRef={hasFitToViewRef}
-        hasUserToggledSidebarRef={hasUserToggledSidebarRef}
-        isSidebarOpenRef={isSidebarOpenRef}
-        viewportRef={viewportRef}
-        initialFocusNodeId={initialFocusNodeIdRef.current}
-        unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
-        saveIsPrimary={saveIsPrimary}
-        saveButtonHidden={saveButtonHidden}
-        saveDisabled={saveDisabled}
-        saveDisabledTooltip={saveDisabledTooltip}
-        onPublishVersion={showVersioningUI ? handleCreateChangeRequest : undefined}
-        publishVersionDisabled={createChangeRequestDisabled}
-        publishVersionDisabledTooltip={createChangeRequestDisabledTooltip}
-        onDiscardVersion={showVersioningUI ? handleResetDraftChanges : undefined}
-        discardVersionDisabled={resetDraftDisabled}
-        discardVersionDisabledTooltip={resetDraftDisabledTooltip}
-        onUndo={!isReadOnly ? handleRevert : undefined}
-        canUndo={canUndo}
-        isAutoSaveEnabled={isAutoSaveEnabled && !isTemplate}
-        onToggleAutoSave={isTemplate ? undefined : handleToggleAutoSave}
-        autoSaveDisabled={autoSaveDisabled}
-        autoSaveDisabledTooltip={autoSaveDisabledTooltip}
-        headerMode={headerMode}
-        saveState={headerSaveState}
-        onEnterEditMode={showVersioningUI ? handleToggleEditMode : undefined}
-        enterEditModeDisabled={toggleEditModeDisabled}
-        enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
-        onExitEditMode={showVersioningUI ? handleToggleEditMode : undefined}
-        exitEditModeDisabled={exitEditModeDisabled}
-        exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-        sandboxModeTooltip={sandboxModeVersioningTooltip}
-        showPendingDraftBadge={showPendingDraftBadge}
-        autoLayoutOnUpdateDisabled={isReadOnly}
-        autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
-        onExportYamlCopy={isDev ? handleExportYamlCopy : undefined}
-        onExportYamlDownload={isDev ? handleExportYamlDownload : undefined}
-        runDisabled={runDisabled}
-        runDisabledTooltip={runDisabledTooltip}
-        onCancelQueueItem={onCancelQueueItem}
-        onPushThrough={isViewingLiveVersion ? onPushThrough : undefined}
-        supportsPushThrough={isViewingLiveVersion ? supportsPushThrough : undefined}
-        onCancelExecution={isViewingLiveVersion ? onCancelExecution : undefined}
-        getAllHistoryEvents={getAllHistoryEvents}
-        onLoadMoreHistory={handleLoadMoreHistory}
-        getHasMoreHistory={getHasMoreHistory}
-        getLoadingMoreHistory={getLoadingMoreHistory}
-        onLoadMoreQueue={onLoadMoreQueue}
-        getAllQueueEvents={getAllQueueEvents}
-        getHasMoreQueue={getHasMoreQueue}
-        getLoadingMoreQueue={getLoadingMoreQueue}
-        onReEmit={canUpdateCanvas && isViewingLiveVersion ? handleReEmit : undefined}
-        loadExecutionChain={loadExecutionChain}
-        getExecutionState={getExecutionState}
-        workflowNodes={canvas?.spec?.nodes}
-        components={components}
-        triggers={triggers}
-        blueprints={blueprints}
-        logEntries={logEntries}
-        onResolveExecutionErrors={canUpdateCanvas && isViewingLiveVersion ? handleResolveExecutionErrors : undefined}
-        focusRequest={focusRequest}
-        onExecutionChainHandled={handleExecutionChainHandled}
-        breadcrumbs={[
-          {
-            label: isTemplate ? "Templates" : "Canvases",
-            href: `/${organizationId}`,
-          },
-          {
-            label: canvas?.metadata?.name || (isTemplate ? "Template" : "Canvas"),
-          },
-        ]}
-        versionControlSidebar={
-          showVersioningUI ? (
-            <CanvasVersionControlSidebar
-              isOpen={isVersionControlOpen}
-              onToggle={setIsVersionControlOpen}
-              liveCanvasVersionId={liveCanvasVersionId}
-              selectedCanvasVersion={selectedCanvasVersion}
-              liveVersions={liveVersions}
-              liveVersionChangeRequestsByVersionId={liveVersionChangeRequestsByVersionId}
-              liveVersionOwnerProfilesById={liveVersionOwnerProfilesById}
-              liveVersionsTotalCount={liveVersionsTotalCount}
-              canUpdateCanvas={canUpdateCanvas}
-              isTemplate={isTemplate}
-              canvasDeletedRemotely={canvasDeletedRemotely}
-              onUseVersion={handleUseVersion}
-              onLoadMoreLiveVersions={hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined}
-              loadMoreLiveVersionsDisabled={!hasMoreLiveVersions || isLoadingMoreLiveVersions}
-              loadMoreLiveVersionsPending={isLoadingMoreLiveVersions}
-            />
-          ) : undefined
-        }
-      />
+        />
+      </div>
       {canvas ? (
         <CreateCanvasModal
           isOpen={isUseTemplateOpen}
