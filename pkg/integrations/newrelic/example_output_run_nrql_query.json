@@ -1,0 +1,12 @@
+{
+    "type": "newrelic.nrqlResult",
+    "data": {
+        "query": "SELECT count(*) FROM Transaction SINCE 1 hour ago",
+        "results": [
+            {
+                "count": 42567
+            }
+        ]
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}
