@@ -4,9 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -19,6 +17,8 @@ type SendLogEvent struct{}
 type SendLogEventSpec struct {
 	Body         string            `json:"body" mapstructure:"body"`
 	SeverityText *string           `json:"severityText,omitempty" mapstructure:"severityText"`
+	EventName    string            `json:"eventName,omitempty" mapstructure:"eventName"`
+	ServiceName  string            `json:"serviceName,omitempty" mapstructure:"serviceName"`
 	Dataset      *string           `json:"dataset,omitempty" mapstructure:"dataset"`
 	Attributes   map[string]string `json:"attributes,omitempty" mapstructure:"attributes"`
 }
@@ -47,10 +47,12 @@ func (s *SendLogEvent) Documentation() string {
 
 ## Configuration
 
-- **Body**: The log message content (plain text or JSON string)
 - **Severity**: Log severity level (TRACE, DEBUG, INFO, WARN, ERROR, FATAL)
-- **Dataset**: Optional dataset name for log organization (defaults to "default")
+- **Event Name**: Optional name for this log event (e.g. deployment.completed)
+- **Service Name**: Optional service identifier (becomes OTLP resource attribute 'service.name')
+- **Body**: The log message content (plain text or JSON string)
 - **Attributes**: Optional key-value pairs for additional log metadata
+- **Dataset**: Optional dataset name for log organization (defaults to "default")
 
 ## Output
 
@@ -80,14 +82,6 @@ func (s *SendLogEvent) OutputChannels(configuration any) []core.OutputChannel {
 func (s *SendLogEvent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "body",
-			Label:       "Body",
-			Type:        configuration.FieldTypeText,
-			Required:    true,
-			Description: "The log message content (plain text or JSON string)",
-			Placeholder: "Deployment completed for service 'api-gateway' version 1.2.3",
-		},
-		{
 			Name:     "severityText",
 			Label:    "Severity",
 			Type:     configuration.FieldTypeSelect,
@@ -108,12 +102,28 @@ func (s *SendLogEvent) Configuration() []configuration.Field {
 			Description: "Log severity level",
 		},
 		{
-			Name:        "dataset",
-			Label:       "Dataset",
+			Name:        "eventName",
+			Label:       "Event Name",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Default:     "default",
-			Description: "Dataset name for log organization",
+			Description: "A name for this log event (e.g. deployment.completed, approval.granted)",
+			Placeholder: "deployment.completed",
+		},
+		{
+			Name:        "serviceName",
+			Label:       "Service Name",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "The name of the service generating this log (OTLP resource attribute 'service.name')",
+			Placeholder: "api-gateway",
+		},
+		{
+			Name:        "body",
+			Label:       "Body",
+			Type:        configuration.FieldTypeText,
+			Required:    true,
+			Description: "The log message content (plain text or JSON string)",
+			Placeholder: "Deployment completed for service 'api-gateway' version 1.2.3",
 		},
 		{
 			Name:        "attributes",
@@ -121,6 +131,14 @@ func (s *SendLogEvent) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeObject,
 			Required:    false,
 			Description: "Additional key-value metadata for the log record",
+		},
+		{
+			Name:        "dataset",
+			Label:       "Dataset",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Default:     "default",
+			Description: "Dataset name for log organization",
 		},
 	}
 }
@@ -155,50 +173,17 @@ func (s *SendLogEvent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	// Build OTLP log payload
-	timestamp := time.Now().UnixNano()
-
-	// Map severity text to OTLP severity number
-	severityNumber := s.getSeverityNumber(spec.SeverityText)
 	severityText := "INFO"
 	if spec.SeverityText != nil {
 		severityText = *spec.SeverityText
 	}
 
-	// Build attributes array
-	attributes := []map[string]any{}
-	if spec.Attributes != nil {
-		for key, value := range spec.Attributes {
-			attributes = append(attributes, map[string]any{
-				"key": key,
-				"value": map[string]any{
-					"stringValue": value,
-				},
-			})
-		}
-	}
-
-	// Build the OTLP ExportLogsServiceRequest payload
-	otlpPayload := map[string]any{
-		"resourceLogs": []map[string]any{
-			{
-				"scopeLogs": []map[string]any{
-					{
-						"logRecords": []map[string]any{
-							{
-								"timeUnixNano":   strconv.FormatInt(timestamp, 10),
-								"severityNumber": severityNumber,
-								"severityText":   severityText,
-								"body": map[string]any{
-									"stringValue": spec.Body,
-								},
-								"attributes": attributes,
-							},
-						},
-					},
-				},
-			},
-		},
+	record := LogRecord{
+		SeverityText: severityText,
+		Body:         spec.Body,
+		EventName:    spec.EventName,
+		ServiceName:  spec.ServiceName,
+		Attributes:   spec.Attributes,
 	}
 
 	dataset := "default"
@@ -206,7 +191,7 @@ func (s *SendLogEvent) Execute(ctx core.ExecutionContext) error {
 		dataset = *spec.Dataset
 	}
 
-	result, err := client.SendLogRecord(dataset, otlpPayload)
+	result, err := client.SendLogRecord(dataset, record)
 	if err != nil {
 		return fmt.Errorf("failed to send log event: %v", err)
 	}
@@ -216,30 +201,6 @@ func (s *SendLogEvent) Execute(ctx core.ExecutionContext) error {
 		"dash0.log.sent",
 		[]any{result},
 	)
-}
-
-// getSeverityNumber maps OTLP severity text to severity number according to OTLP spec
-func (s *SendLogEvent) getSeverityNumber(severityText *string) int {
-	if severityText == nil {
-		return 9 // INFO
-	}
-
-	switch strings.ToUpper(*severityText) {
-	case "TRACE":
-		return 1
-	case "DEBUG":
-		return 5
-	case "INFO":
-		return 9
-	case "WARN":
-		return 13
-	case "ERROR":
-		return 17
-	case "FATAL":
-		return 21
-	default:
-		return 9 // INFO
-	}
 }
 
 func (s *SendLogEvent) Cancel(ctx core.ExecutionContext) error {

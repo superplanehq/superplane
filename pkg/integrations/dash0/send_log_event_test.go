@@ -97,6 +97,15 @@ func Test__SendLogEvent__Execute(t *testing.T) {
 		assert.True(t, execCtx.Passed)
 		assert.Equal(t, "dash0.log.sent", execCtx.Type)
 		require.Len(t, execCtx.Payloads, 1)
+
+		// Verify the request was sent to the correct OTLP ingress endpoint
+		require.Len(t, httpContext.Requests, 1)
+		req := httpContext.Requests[0]
+		assert.Equal(t, "https://ingress.us-west-2.aws.dash0.com:4318/v1/logs", req.URL.String())
+		assert.Equal(t, "Bearer token123", req.Header.Get("Authorization"))
+		assert.Equal(t, "application/json", req.Header.Get("Content-Type"))
+		// Default dataset should not set Dash0-Dataset header
+		assert.Empty(t, req.Header.Get("Dash0-Dataset"))
 	})
 
 	t.Run("successful log send with all fields", func(t *testing.T) {
@@ -137,6 +146,13 @@ func Test__SendLogEvent__Execute(t *testing.T) {
 		assert.True(t, execCtx.Passed)
 		assert.Equal(t, "dash0.log.sent", execCtx.Type)
 		require.Len(t, execCtx.Payloads, 1)
+
+		// Verify the request includes the Dash0-Dataset header for non-default dataset
+		require.Len(t, httpContext.Requests, 1)
+		req := httpContext.Requests[0]
+		assert.Equal(t, "https://ingress.us-west-2.aws.dash0.com:4318/v1/logs", req.URL.String())
+		assert.Equal(t, "Bearer token123", req.Header.Get("Authorization"))
+		assert.Equal(t, "production", req.Header.Get("Dash0-Dataset"))
 	})
 
 	t.Run("successful log send with empty response body", func(t *testing.T) {
@@ -218,9 +234,7 @@ func Test__SendLogEvent__Execute(t *testing.T) {
 	})
 }
 
-func Test__SendLogEvent__getSeverityNumber(t *testing.T) {
-	component := SendLogEvent{}
-
+func Test__severityTextToNumber(t *testing.T) {
 	tests := []struct {
 		severity string
 		expected int
@@ -238,13 +252,44 @@ func Test__SendLogEvent__getSeverityNumber(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.severity, func(t *testing.T) {
-			result := component.getSeverityNumber(&tt.severity)
+			result := severityTextToNumber(tt.severity)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 
-	t.Run("nil severity -> defaults to INFO", func(t *testing.T) {
-		result := component.getSeverityNumber(nil)
+	t.Run("empty string -> defaults to INFO", func(t *testing.T) {
+		result := severityTextToNumber("")
 		assert.Equal(t, 9, result)
+	})
+}
+
+func Test__deriveOTLPEndpoint(t *testing.T) {
+	t.Run("derives ingress endpoint from API base URL", func(t *testing.T) {
+		result, err := deriveOTLPEndpoint("https://api.us-west-2.aws.dash0.com")
+		require.NoError(t, err)
+		assert.Equal(t, "https://ingress.us-west-2.aws.dash0.com:4318", result)
+	})
+
+	t.Run("derives ingress endpoint from EU region", func(t *testing.T) {
+		result, err := deriveOTLPEndpoint("https://api.eu-west-1.aws.dash0.com")
+		require.NoError(t, err)
+		assert.Equal(t, "https://ingress.eu-west-1.aws.dash0.com:4318", result)
+	})
+
+	t.Run("handles trailing slash in API base URL", func(t *testing.T) {
+		result, err := deriveOTLPEndpoint("https://api.us-west-2.aws.dash0.com/")
+		require.NoError(t, err)
+		assert.Equal(t, "https://ingress.us-west-2.aws.dash0.com:4318", result)
+	})
+
+	t.Run("returns error for non-api hostname", func(t *testing.T) {
+		_, err := deriveOTLPEndpoint("https://custom.dash0.com")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "does not start with 'api.'")
+	})
+
+	t.Run("returns error for empty URL", func(t *testing.T) {
+		_, err := deriveOTLPEndpoint("")
+		require.Error(t, err)
 	})
 }
