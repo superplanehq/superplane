@@ -23,12 +23,12 @@ type WebhookProvisioningMetadata struct {
 const defaultPayloadTemplate = `{
   "issueId": {{json issueId}},
   "issueUrl": {{json issueUrl}},
-  "title": {{json title.[0]}},
+  "title": {{#if title.[0]}}{{json title.[0]}}{{else}}null{{/if}},
   "priority": {{json priority}},
   "state": {{json state}},
   "policyName": {{#if policyName.[0]}}{{json policyName.[0]}}{{else}}null{{/if}},
   "conditionName": {{#if conditionName.[0]}}{{json conditionName.[0]}}{{else}}null{{/if}},
-  "accountId": {{json accumulations.tag.account.[0]}},
+  "accountId": {{#if accumulations.tag.account.[0]}}{{json accumulations.tag.account.[0]}}{{else}}null{{/if}},
   "createdAt": {{json createdAt}},
   "updatedAt": {{json updatedAt}},
   "sources": {{json sources}}
