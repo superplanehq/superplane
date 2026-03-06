@@ -63,6 +63,7 @@ import { CustomEdge } from "./CustomEdge";
 import { Header, type BreadcrumbItem } from "./Header";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
+import { useMinimapVisibility } from "./useMinimapVisibility";
 import { SidebarEvent } from "../componentSidebar/types";
 import { CanvasLogSidebar, type LogEntry, type LogScopeFilter, type LogTypeFilter } from "../CanvasLogSidebar";
 
@@ -1748,7 +1749,7 @@ function CanvasContent({
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set());
   const [logSidebarHeight, setLogSidebarHeight] = useState(320);
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
-  const [isMinimapVisible, setIsMinimapVisible] = useState(true);
+  const { isMinimapVisible, setIsMinimapVisible } = useMinimapVisibility(false);
 
   useEffect(() => {
     if (!showBottomStatusControls) {
@@ -2497,7 +2498,7 @@ function CanvasContent({
                             ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                             : "text-slate-600 hover:text-slate-900"
                         }`}
-                        onClick={() => setIsMinimapVisible((prev) => !prev)}
+                        onClick={() => setIsMinimapVisible((prev: boolean) => !prev)}
                         aria-pressed={isMinimapVisible}
                       >
                         <MapIcon className="h-3 w-3" />
