@@ -14,21 +14,21 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-// TestOnVMCreatedTrigger_Metadata verifies the trigger's metadata methods
-func TestOnVMCreatedTrigger_Metadata(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_Metadata verifies the trigger's metadata methods
+func TestOnVMWriteTrigger_Metadata(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 
-	assert.Equal(t, "azure.onVirtualMachineCreated", trigger.Name())
-	assert.Equal(t, "Azure • On VM Created", trigger.Label())
+	assert.Equal(t, "azure.onVirtualMachineWrite", trigger.Name())
+	assert.Equal(t, "Azure • On VM Write", trigger.Label())
 	assert.Equal(t, "azure", trigger.Icon())
 	assert.Equal(t, "blue", trigger.Color())
 	assert.NotEmpty(t, trigger.Description())
 	assert.NotEmpty(t, trigger.Documentation())
 }
 
-// TestOnVMCreatedTrigger_Configuration verifies the trigger's configuration fields
-func TestOnVMCreatedTrigger_Configuration(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_Configuration verifies the trigger's configuration fields
+func TestOnVMWriteTrigger_Configuration(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 	config := trigger.Configuration()
 
 	require.Len(t, config, 2)
@@ -40,22 +40,21 @@ func TestOnVMCreatedTrigger_Configuration(t *testing.T) {
 	assert.False(t, config[1].Required)
 }
 
-// TestOnVMCreatedTrigger_ExampleData verifies the trigger's example output
-func TestOnVMCreatedTrigger_ExampleData(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_ExampleData verifies the trigger's example output
+func TestOnVMWriteTrigger_ExampleData(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 	example := trigger.ExampleData()
 
 	require.NotNil(t, example)
-	assert.Contains(t, example, "vmName")
-	assert.Contains(t, example, "vmId")
-	assert.Contains(t, example, "resourceGroup")
-	assert.Contains(t, example, "subscriptionId")
-	assert.Contains(t, example, "status")
+	assert.Contains(t, example, "id")
+	assert.Contains(t, example, "eventType")
+	assert.Contains(t, example, "subject")
+	assert.Contains(t, example, "data")
 }
 
-// TestOnVMCreatedTrigger_Setup verifies the trigger setup method
-func TestOnVMCreatedTrigger_Setup(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_Setup verifies the trigger setup method
+func TestOnVMWriteTrigger_Setup(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 
 	t.Run("setup with no resource group filter", func(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
@@ -88,9 +87,9 @@ func TestOnVMCreatedTrigger_Setup(t *testing.T) {
 	})
 }
 
-// TestOnVMCreatedTrigger_Cleanup verifies the trigger cleanup method
-func TestOnVMCreatedTrigger_Cleanup(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_Cleanup verifies the trigger cleanup method
+func TestOnVMWriteTrigger_Cleanup(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 	metadataCtx := &contexts.MetadataContext{}
 	logger := logrus.NewEntry(logrus.New())
 
@@ -104,16 +103,16 @@ func TestOnVMCreatedTrigger_Cleanup(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// TestOnVMCreatedTrigger_Actions verifies the trigger has no actions
-func TestOnVMCreatedTrigger_Actions(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_Actions verifies the trigger has no actions
+func TestOnVMWriteTrigger_Actions(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 	actions := trigger.Actions()
 	assert.Empty(t, actions)
 }
 
-// TestOnVMCreatedTrigger_HandleAction verifies the trigger's action handler
-func TestOnVMCreatedTrigger_HandleAction(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_HandleAction verifies the trigger's action handler
+func TestOnVMWriteTrigger_HandleAction(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 	logger := logrus.NewEntry(logrus.New())
 
 	ctx := core.TriggerActionContext{
@@ -128,9 +127,9 @@ func TestOnVMCreatedTrigger_HandleAction(t *testing.T) {
 	assert.Nil(t, result)
 }
 
-// TestOnVMCreatedTrigger_HandleWebhook_SubscriptionValidation verifies subscription validation handling
-func TestOnVMCreatedTrigger_HandleWebhook_SubscriptionValidation(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_HandleWebhook_SubscriptionValidation verifies subscription validation handling
+func TestOnVMWriteTrigger_HandleWebhook_SubscriptionValidation(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 
 	// Create a test server to serve as the validation URL
 	validationServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -179,11 +178,11 @@ func TestOnVMCreatedTrigger_HandleWebhook_SubscriptionValidation(t *testing.T) {
 	assert.Equal(t, 0, eventsCtx.Count())
 }
 
-// TestOnVMCreatedTrigger_HandleWebhook_VMCreatedSuccess verifies VM creation event handling
-func TestOnVMCreatedTrigger_HandleWebhook_VMCreatedSuccess(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_HandleWebhook_VMWriteSuccess verifies VM write event handling
+func TestOnVMWriteTrigger_HandleWebhook_VMWriteSuccess(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 
-	t.Run("VM created with no filter", func(t *testing.T) {
+	t.Run("VM write with no filter", func(t *testing.T) {
 		events := []EventGridEvent{
 			{
 				ID:        "vm-event-1",
@@ -222,17 +221,22 @@ func TestOnVMCreatedTrigger_HandleWebhook_VMCreatedSuccess(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 
 		require.Equal(t, 1, eventsCtx.Count())
-		assert.Equal(t, "azure.vm.created", eventsCtx.Payloads[0].Type)
+		assert.Equal(t, "azure.vm.write", eventsCtx.Payloads[0].Type)
 
+		// The emitted payload is the full, raw Event Grid event
 		payload, ok := eventsCtx.Payloads[0].Data.(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, "test-vm", payload["vmName"])
-		assert.Equal(t, "test-rg", payload["resourceGroup"])
-		assert.Equal(t, "test-sub", payload["subscriptionId"])
-		assert.Equal(t, ProvisioningStateSucceeded, payload["status"])
+		assert.Equal(t, "vm-event-1", payload["id"])
+		assert.Equal(t, EventTypeResourceWriteSuccess, payload["eventType"])
+		assert.Equal(t, "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachines/test-vm", payload["subject"])
+
+		data, ok := payload["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "Succeeded", data["status"])
+		assert.Equal(t, "Microsoft.Compute/virtualMachines/write", data["operationName"])
 	})
 
-	t.Run("VM created with matching resource group filter", func(t *testing.T) {
+	t.Run("VM write with matching resource group filter", func(t *testing.T) {
 		events := []EventGridEvent{
 			{
 				ID:        "vm-event-2",
@@ -273,17 +277,17 @@ func TestOnVMCreatedTrigger_HandleWebhook_VMCreatedSuccess(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 
 		require.Equal(t, 1, eventsCtx.Count())
-		assert.Equal(t, "azure.vm.created", eventsCtx.Payloads[0].Type)
+		assert.Equal(t, "azure.vm.write", eventsCtx.Payloads[0].Type)
 
 		payload, ok := eventsCtx.Payloads[0].Data.(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, "my-target-rg", payload["resourceGroup"])
+		assert.Contains(t, payload["subject"], "my-target-rg")
 	})
 }
 
-// TestOnVMCreatedTrigger_HandleWebhook_FilterMismatch verifies resource group filtering
-func TestOnVMCreatedTrigger_HandleWebhook_FilterMismatch(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_HandleWebhook_FilterMismatch verifies resource group filtering
+func TestOnVMWriteTrigger_HandleWebhook_FilterMismatch(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 
 	events := []EventGridEvent{
 		{
@@ -327,9 +331,9 @@ func TestOnVMCreatedTrigger_HandleWebhook_FilterMismatch(t *testing.T) {
 	assert.Equal(t, 0, eventsCtx.Count())
 }
 
-// TestOnVMCreatedTrigger_HandleWebhook_NameFilter verifies VM name regex filtering
-func TestOnVMCreatedTrigger_HandleWebhook_NameFilter(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_HandleWebhook_NameFilter verifies VM name regex filtering
+func TestOnVMWriteTrigger_HandleWebhook_NameFilter(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 
 	t.Run("matching name filter", func(t *testing.T) {
 		events := []EventGridEvent{
@@ -374,7 +378,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_NameFilter(t *testing.T) {
 		require.Equal(t, 1, eventsCtx.Count())
 		payload, ok := eventsCtx.Payloads[0].Data.(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, "prod-web-01", payload["vmName"])
+		assert.Contains(t, payload["subject"], "prod-web-01")
 	})
 
 	t.Run("non-matching name filter", func(t *testing.T) {
@@ -462,9 +466,9 @@ func TestOnVMCreatedTrigger_HandleWebhook_NameFilter(t *testing.T) {
 	})
 }
 
-// TestOnVMCreatedTrigger_HandleWebhook_NonVMResource verifies non-VM resource filtering
-func TestOnVMCreatedTrigger_HandleWebhook_NonVMResource(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_HandleWebhook_NonVMResource verifies non-VM resource filtering
+func TestOnVMWriteTrigger_HandleWebhook_NonVMResource(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 
 	t.Run("storage account creation", func(t *testing.T) {
 		events := []EventGridEvent{
@@ -549,9 +553,9 @@ func TestOnVMCreatedTrigger_HandleWebhook_NonVMResource(t *testing.T) {
 	})
 }
 
-// TestOnVMCreatedTrigger_HandleWebhook_ProvisioningStateFailed verifies failed VM creation handling
-func TestOnVMCreatedTrigger_HandleWebhook_ProvisioningStateFailed(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_HandleWebhook_FailedStatus verifies failed VM operation handling
+func TestOnVMWriteTrigger_HandleWebhook_FailedStatus(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 
 	events := []EventGridEvent{
 		{
@@ -593,9 +597,9 @@ func TestOnVMCreatedTrigger_HandleWebhook_ProvisioningStateFailed(t *testing.T) 
 	assert.Equal(t, 0, eventsCtx.Count())
 }
 
-// TestOnVMCreatedTrigger_HandleWebhook_MultipleEvents verifies handling multiple events in one batch
-func TestOnVMCreatedTrigger_HandleWebhook_MultipleEvents(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_HandleWebhook_MultipleEvents verifies handling multiple events in one batch
+func TestOnVMWriteTrigger_HandleWebhook_MultipleEvents(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 
 	events := []EventGridEvent{
 		{
@@ -660,13 +664,13 @@ func TestOnVMCreatedTrigger_HandleWebhook_MultipleEvents(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 
 	assert.Equal(t, 2, eventsCtx.Count())
-	assert.Equal(t, "azure.vm.created", eventsCtx.Payloads[0].Type)
-	assert.Equal(t, "azure.vm.created", eventsCtx.Payloads[1].Type)
+	assert.Equal(t, "azure.vm.write", eventsCtx.Payloads[0].Type)
+	assert.Equal(t, "azure.vm.write", eventsCtx.Payloads[1].Type)
 }
 
-// TestOnVMCreatedTrigger_HandleWebhook_InvalidJSON verifies error handling for invalid JSON
-func TestOnVMCreatedTrigger_HandleWebhook_InvalidJSON(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_HandleWebhook_InvalidJSON verifies error handling for invalid JSON
+func TestOnVMWriteTrigger_HandleWebhook_InvalidJSON(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 
 	eventsCtx := &contexts.EventContext{}
 	webhookCtx := &contexts.WebhookContext{}
@@ -687,9 +691,9 @@ func TestOnVMCreatedTrigger_HandleWebhook_InvalidJSON(t *testing.T) {
 	assert.Equal(t, 0, eventsCtx.Count())
 }
 
-// TestOnVMCreatedTrigger_HandleWebhook_InvalidConfiguration verifies error handling for invalid configuration
-func TestOnVMCreatedTrigger_HandleWebhook_InvalidConfiguration(t *testing.T) {
-	trigger := &OnVMCreatedTrigger{}
+// TestOnVMWriteTrigger_HandleWebhook_InvalidConfiguration verifies error handling for invalid configuration
+func TestOnVMWriteTrigger_HandleWebhook_InvalidConfiguration(t *testing.T) {
+	trigger := &OnVMWriteTrigger{}
 
 	events := []EventGridEvent{
 		{
@@ -729,7 +733,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_InvalidConfiguration(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, code)
 }
 
-// Tests for helper functions (moved from webhook_events_test.go)
+// Tests for helper functions
 
 func TestExtractVMName(t *testing.T) {
 	tests := []struct {
@@ -771,6 +775,11 @@ func TestExtractResourceGroup(t *testing.T) {
 		{
 			name:       "valid resource ID",
 			resourceID: "/subscriptions/test-sub/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+			expected:   "my-rg",
+		},
+		{
+			name:       "lowercase resourcegroups from Azure Event Grid",
+			resourceID: "/subscriptions/test-sub/resourcegroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
 			expected:   "my-rg",
 		},
 		{

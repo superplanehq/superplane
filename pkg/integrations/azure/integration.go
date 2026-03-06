@@ -117,7 +117,7 @@ func (a *AzureIntegration) Components() []core.Component {
 
 func (a *AzureIntegration) Triggers() []core.Trigger {
 	return []core.Trigger{
-		&OnVMCreatedTrigger{},
+		&OnVMWriteTrigger{integration: a},
 	}
 }
 

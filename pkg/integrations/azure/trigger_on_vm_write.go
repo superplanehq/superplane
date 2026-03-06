@@ -13,61 +13,67 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-type OnVMCreatedTrigger struct{}
+type OnVMWriteTrigger struct {
+	integration *AzureIntegration
+}
 
-type OnVMCreatedConfiguration struct {
+type OnVMWriteConfiguration struct {
 	ResourceGroup string `json:"resourceGroup" mapstructure:"resourceGroup"`
 	NameFilter    string `json:"nameFilter" mapstructure:"nameFilter"`
 }
 
-func (t *OnVMCreatedTrigger) Name() string {
-	return "azure.onVirtualMachineCreated"
+func (t *OnVMWriteTrigger) Name() string {
+	return "azure.onVirtualMachineWrite"
 }
 
-func (t *OnVMCreatedTrigger) Label() string {
-	return "Azure • On VM Created"
+func (t *OnVMWriteTrigger) Label() string {
+	return "Azure • On VM Write"
 }
 
-func (t *OnVMCreatedTrigger) Description() string {
-	return "Triggers when a new Virtual Machine is successfully provisioned in Azure"
+func (t *OnVMWriteTrigger) Description() string {
+	return "Triggers when a Virtual Machine write operation succeeds in Azure (create, update, or delete)"
 }
 
-func (t *OnVMCreatedTrigger) Documentation() string {
+func (t *OnVMWriteTrigger) Documentation() string {
 	return `
-The On VM Created trigger starts a workflow execution when a new Azure Virtual Machine is successfully provisioned.
+The On VM Write trigger starts a workflow execution when an Azure Virtual Machine write operation succeeds.
+This includes VM creation, updates, and state changes during deletion.
 
 ## Use Cases
 
 - **Automated configuration**: Run configuration scripts on newly created VMs
-- **Compliance checks**: Verify that new VMs meet security and compliance requirements
-- **Inventory tracking**: Update external inventory systems when VMs are created
-- **Notification workflows**: Send notifications to teams when new VMs are provisioned
-- **Cost tracking**: Log VM creation events for cost analysis and reporting
+- **Compliance checks**: Verify that VMs meet security and compliance requirements after changes
+- **Inventory tracking**: Update external inventory systems when VMs are created, modified, or deleted
+- **Notification workflows**: Send notifications to teams when VM changes occur
+- **Cost tracking**: Log VM write events for cost analysis and reporting
+- **Cleanup workflows**: Trigger cleanup tasks when VMs are deleted
 
 ## How It Works
 
 This trigger listens to Azure Event Grid events for Virtual Machine resource write operations.
-When a VM is successfully created (` + "`provisioningState: Succeeded`" + `), the trigger fires and
-provides detailed information about the new VM.
+When a VM write operation succeeds (` + "`status: Succeeded`" + `), the trigger fires and
+provides the full Azure Event Grid event payload.
+
+Azure fires ` + "`Microsoft.Resources.ResourceWriteSuccess`" + ` for all successful ARM write
+operations on a VM, including creation, updates, and state changes during deletion.
 
 ## Configuration
 
-- **Resource Group** (optional): Filter events to only trigger for VMs created in a specific
+- **Resource Group** (optional): Filter events to only trigger for VMs in a specific
   resource group. Leave empty to trigger for all resource groups in the subscription.
 - **VM Name Filter** (optional): A regex pattern to filter VMs by name. Only VMs whose name
   matches the pattern will trigger the workflow. Leave empty to trigger for all VM names.
 
 ## Event Data
 
-Each VM creation event includes:
+Each VM write event includes the full Azure Event Grid event:
 
-- **vmName**: The name of the created virtual machine
-- **vmId**: The full Azure resource ID of the VM
-- **resourceGroup**: The resource group containing the VM
-- **subscriptionId**: The Azure subscription ID
-- **location**: The Azure region where the VM was created
-- **status**: The status of the operation (typically "Succeeded")
-- **timestamp**: The timestamp when the event occurred
+- **id**: Unique event ID
+- **topic**: The Azure subscription topic
+- **subject**: The full ARM resource ID of the VM
+- **eventType**: The event type (typically ` + "`Microsoft.Resources.ResourceWriteSuccess`" + `)
+- **eventTime**: The timestamp when the event occurred
+- **data**: The event data including operationName, status, resourceProvider, resourceUri, subscriptionId, tenantId
 
 ## Azure Event Grid Setup
 
@@ -82,35 +88,42 @@ No manual setup is required.
 
 ## Notes
 
-- The trigger only fires for successfully provisioned VMs (` + "`provisioningState: Succeeded`" + `)
-- Failed VM creations do not trigger the workflow
+- The trigger fires for all successful VM write operations (create, update, delete)
+- Failed operations do not trigger the workflow
 - The trigger processes events from Azure Event Grid in real-time
 - Multiple triggers can share the same Event Grid subscription if configured correctly
 `
 }
 
-func (t *OnVMCreatedTrigger) Icon() string {
+func (t *OnVMWriteTrigger) Icon() string {
 	return "azure"
 }
 
-func (t *OnVMCreatedTrigger) Color() string {
+func (t *OnVMWriteTrigger) Color() string {
 	return "blue"
 }
 
-func (t *OnVMCreatedTrigger) ExampleData() map[string]any {
+func (t *OnVMWriteTrigger) ExampleData() map[string]any {
 	return map[string]any{
-		"vmName":         "my-vm-01",
-		"vmId":           "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-		"resourceGroup":  "my-rg",
-		"subscriptionId": "12345678-1234-1234-1234-123456789abc",
-		"location":       "eastus",
-		"timestamp":      "2026-02-11T10:30:00Z",
-		"operationName":  "Microsoft.Compute/virtualMachines/write",
-		"status":         "Succeeded",
+		"id":              "96257b6d-17d3-49e2-8369-fb185b29e1b5",
+		"topic":           "/subscriptions/12345678-1234-1234-1234-123456789abc",
+		"subject":         "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+		"eventType":       "Microsoft.Resources.ResourceWriteSuccess",
+		"eventTime":       "2026-02-11T10:30:00Z",
+		"dataVersion":     "2",
+		"metadataVersion": "1",
+		"data": map[string]any{
+			"operationName":    "Microsoft.Compute/virtualMachines/write",
+			"status":           "Succeeded",
+			"resourceProvider": "Microsoft.Compute",
+			"resourceUri":      "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+			"subscriptionId":   "12345678-1234-1234-1234-123456789abc",
+			"tenantId":         "12345678-1234-1234-1234-123456789abc",
+		},
 	}
 }
 
-func (t *OnVMCreatedTrigger) Configuration() []configuration.Field {
+func (t *OnVMWriteTrigger) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "resourceGroup",
@@ -137,8 +150,8 @@ func (t *OnVMCreatedTrigger) Configuration() []configuration.Field {
 }
 
 // Setup configures trigger webhooks.
-func (t *OnVMCreatedTrigger) Setup(ctx core.TriggerContext) error {
-	config := OnVMCreatedConfiguration{}
+func (t *OnVMWriteTrigger) Setup(ctx core.TriggerContext) error {
+	config := OnVMWriteConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -156,37 +169,46 @@ func (t *OnVMCreatedTrigger) Setup(ctx core.TriggerContext) error {
 		ctx.Logger.Warn("Integration context missing; skipping webhook request")
 	}
 
-	ctx.Logger.Info("Azure VM Created trigger configured successfully")
+	ctx.Logger.Info("Azure VM Write trigger configured successfully")
 	if config.ResourceGroup != "" {
 		ctx.Logger.Infof("Filtering events for resource group: %s", config.ResourceGroup)
 	} else {
-		ctx.Logger.Info("Listening for VM creation events in all resource groups")
+		ctx.Logger.Info("Listening for VM write events in all resource groups")
 	}
 
 	return nil
 }
 
 // HandleWebhook processes Event Grid webhook requests.
-func (t *OnVMCreatedTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnVMWriteTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	if err := t.authenticateWebhook(ctx); err != nil {
 		ctx.Logger.Warnf("Webhook authentication failed: %v", err)
 		return http.StatusUnauthorized, err
 	}
 
-	config := OnVMCreatedConfiguration{}
+	config := OnVMWriteConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	// Parse as typed structs for filtering logic.
 	var events []EventGridEvent
 	if err := json.Unmarshal(ctx.Body, &events); err != nil {
 		ctx.Logger.Errorf("Failed to parse Event Grid events: %v", err)
 		return http.StatusBadRequest, fmt.Errorf("failed to parse events: %w", err)
 	}
 
-	ctx.Logger.Infof("Received %d Event Grid event(s)", len(events))
+	// Also parse as raw maps so we can emit the full, unmodified event data.
+	var rawEvents []map[string]any
+	if err := json.Unmarshal(ctx.Body, &rawEvents); err != nil {
+		return http.StatusBadRequest, fmt.Errorf("failed to parse raw events: %w", err)
+	}
 
-	for _, event := range events {
+	ctx.Logger.Infof("Received %d Event Grid event(s), raw body length: %d bytes", len(events), len(ctx.Body))
+
+	for i, event := range events {
+		ctx.Logger.Infof("Event[%d]: id=%s type=%s subject=%s", i, event.ID, event.EventType, event.Subject)
+
 		if event.EventType == EventTypeSubscriptionValidation {
 			if err := t.handleSubscriptionValidation(ctx, event); err != nil {
 				return http.StatusInternalServerError, err
@@ -195,8 +217,8 @@ func (t *OnVMCreatedTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int,
 		}
 
 		if event.EventType == EventTypeResourceWriteSuccess {
-			if err := t.handleVMCreationEvent(ctx, event, config); err != nil {
-				ctx.Logger.Errorf("Failed to process VM creation event: %v", err)
+			if err := t.handleVMWriteEvent(ctx, event, rawEvents[i], config); err != nil {
+				ctx.Logger.Errorf("Failed to process VM write event: %v", err)
 				continue
 			}
 		}
@@ -207,7 +229,7 @@ func (t *OnVMCreatedTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int,
 
 // handleSubscriptionValidation validates Event Grid subscription using the
 // synchronous handshake: return the validationCode in the HTTP response body.
-func (t *OnVMCreatedTrigger) handleSubscriptionValidation(ctx core.WebhookRequestContext, event EventGridEvent) error {
+func (t *OnVMWriteTrigger) handleSubscriptionValidation(ctx core.WebhookRequestContext, event EventGridEvent) error {
 	var validationData SubscriptionValidationEventData
 	if err := mapstructure.Decode(event.Data, &validationData); err != nil {
 		return fmt.Errorf("failed to parse validation data: %w", err)
@@ -235,13 +257,17 @@ func (t *OnVMCreatedTrigger) handleSubscriptionValidation(ctx core.WebhookReques
 	return nil
 }
 
-// handleVMCreationEvent processes VM creation events.
-func (t *OnVMCreatedTrigger) handleVMCreationEvent(
+// handleVMWriteEvent processes VM write events.
+func (t *OnVMWriteTrigger) handleVMWriteEvent(
 	ctx core.WebhookRequestContext,
 	event EventGridEvent,
-	config OnVMCreatedConfiguration,
+	rawEvent map[string]any,
+	config OnVMWriteConfiguration,
 ) error {
+	ctx.Logger.Infof("Processing event: type=%s subject=%s", event.EventType, event.Subject)
+
 	if !isVirtualMachineEvent(event.Subject) {
+		ctx.Logger.Infof("Skipping non-VM event with subject: %s", event.Subject)
 		return nil
 	}
 
@@ -250,10 +276,12 @@ func (t *OnVMCreatedTrigger) handleVMCreationEvent(
 		return fmt.Errorf("failed to parse event data: %w", err)
 	}
 
+	ctx.Logger.Infof("VM event data: status=%s operationName=%s resourceURI=%s", eventData.Status, eventData.OperationName, eventData.ResourceURI)
+
 	// Azure Event Grid ResourceWriteSuccess events use the "status" field
 	// (not "provisioningState") to indicate the outcome of the operation.
 	if !isSuccessfulStatus(eventData.Status) {
-		ctx.Logger.Infof("Skipping VM event with status: %s", eventData.Status)
+		ctx.Logger.Infof("Skipping VM event with non-successful status: %s", eventData.Status)
 		return nil
 	}
 
@@ -262,7 +290,7 @@ func (t *OnVMCreatedTrigger) handleVMCreationEvent(
 		ctx.Logger.Warnf("Could not extract resource group from subject: %s", event.Subject)
 	}
 
-	if config.ResourceGroup != "" && resourceGroup != config.ResourceGroup {
+	if config.ResourceGroup != "" && !strings.EqualFold(resourceGroup, config.ResourceGroup) {
 		ctx.Logger.Debugf("Skipping VM event for resource group %s (filter: %s)", resourceGroup, config.ResourceGroup)
 		return nil
 	}
@@ -282,28 +310,19 @@ func (t *OnVMCreatedTrigger) handleVMCreationEvent(
 		}
 	}
 
-	payload := map[string]any{
-		"vmName":         vmName,
-		"vmId":           event.Subject,
-		"resourceGroup":  resourceGroup,
-		"subscriptionId": extractSubscriptionID(event.Subject),
-		"location":       "",
-		"timestamp":      event.EventTime,
-		"operationName":  eventData.OperationName,
-		"status":         eventData.Status,
-	}
+	ctx.Logger.Infof("VM write event: %s in resource group %s", vmName, resourceGroup)
 
-	ctx.Logger.Infof("VM created: %s in resource group %s", vmName, resourceGroup)
-
-	if err := ctx.Events.Emit("azure.vm.created", payload); err != nil {
+	// Emit the full, unmodified Azure Event Grid event — same pattern as GitHub, GitLab, etc.
+	if err := ctx.Events.Emit("azure.vm.write", rawEvent); err != nil {
 		return fmt.Errorf("failed to emit event: %w", err)
 	}
 
+	ctx.Logger.Infof("Successfully emitted azure.vm.write event for VM: %s", vmName)
 	return nil
 }
 
 // authenticateWebhook verifies the webhook secret if one is configured.
-func (t *OnVMCreatedTrigger) authenticateWebhook(ctx core.WebhookRequestContext) error {
+func (t *OnVMWriteTrigger) authenticateWebhook(ctx core.WebhookRequestContext) error {
 	if ctx.Webhook == nil {
 		return nil
 	}
@@ -340,17 +359,17 @@ func (t *OnVMCreatedTrigger) authenticateWebhook(ctx core.WebhookRequestContext)
 	return fmt.Errorf("webhook secret required but not provided in Authorization or X-Webhook-Secret header")
 }
 
-func (t *OnVMCreatedTrigger) Actions() []core.Action {
+func (t *OnVMWriteTrigger) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (t *OnVMCreatedTrigger) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnVMWriteTrigger) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
 	return nil, nil
 }
 
 // Cleanup is called when the trigger is removed.
-func (t *OnVMCreatedTrigger) Cleanup(ctx core.TriggerContext) error {
-	ctx.Logger.Info("Cleaning up Azure VM Created trigger")
+func (t *OnVMWriteTrigger) Cleanup(ctx core.TriggerContext) error {
+	ctx.Logger.Info("Cleaning up Azure VM Write trigger")
 	return nil
 }
 
@@ -367,7 +386,7 @@ func extractVMName(resourceID string) string {
 func extractResourceGroup(resourceID string) string {
 	parts := strings.Split(resourceID, "/")
 	for i, part := range parts {
-		if part == "resourceGroups" && i+1 < len(parts) {
+		if strings.EqualFold(part, "resourceGroups") && i+1 < len(parts) {
 			return parts[i+1]
 		}
 	}
@@ -378,7 +397,7 @@ func extractResourceGroup(resourceID string) string {
 func extractSubscriptionID(resourceID string) string {
 	parts := strings.Split(resourceID, "/")
 	for i, part := range parts {
-		if part == "subscriptions" && i+1 < len(parts) {
+		if strings.EqualFold(part, "subscriptions") && i+1 < len(parts) {
 			return parts[i+1]
 		}
 	}
@@ -387,7 +406,7 @@ func extractSubscriptionID(resourceID string) string {
 
 // isVirtualMachineEvent reports whether an event subject targets a VM.
 func isVirtualMachineEvent(subject string) bool {
-	return strings.Contains(subject, ResourceTypeVirtualMachine)
+	return strings.Contains(strings.ToLower(subject), strings.ToLower(ResourceTypeVirtualMachine))
 }
 
 // isSuccessfulStatus reports whether the event status indicates success.
