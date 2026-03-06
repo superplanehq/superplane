@@ -28,7 +28,24 @@ func (h *WebhookHandler) CompareConfig(a, b any) (bool, error) {
 		return false, err
 	}
 
-	return configA.WorkspaceID == configB.WorkspaceID, nil
+	if configA.WorkspaceID != configB.WorkspaceID {
+		return false, nil
+	}
+
+	if len(configA.Events) != len(configB.Events) {
+		return false, nil
+	}
+	eventsA := make(map[string]bool)
+	for _, e := range configA.Events {
+		eventsA[e] = true
+	}
+	for _, e := range configB.Events {
+		if !eventsA[e] {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 func (h *WebhookHandler) Merge(current, requested any) (any, bool, error) {
