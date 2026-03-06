@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "cloudsmith.package",
+  "data": {
+    "name": "my-library",
+    "version": "1.2.3",
+    "format": "python",
+    "size": 45678,
+    "checksum_sha256": "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
+    "cdn_url": "https://dl.cloudsmith.io/basic/my-org/my-repo/python/simple/my-library/",
+    "status_str": "Synchronised"
+  }
+}
