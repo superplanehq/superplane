@@ -2,6 +2,7 @@ package models
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -83,12 +84,32 @@ type CanvasNodeExecutionKVTestSteps struct {
 }
 
 func (s *CanvasNodeExecutionKVTestSteps) CreateCanvas() {
-	s.wf = &Canvas{
+	now := time.Now()
+	liveVersionID := uuid.New()
+	wf := &Canvas{
 		OrganizationID: uuid.New(),
+		LiveVersionID:  &liveVersionID,
 		Name:           "Test Canvas",
 		Description:    "This is a test workflow",
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
 	}
-	require.NoError(s.t, database.Conn().Create(s.wf).Error)
+	require.NoError(s.t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(wf).Error; err != nil {
+			return err
+		}
+		return tx.Create(&CanvasVersion{
+			ID:          liveVersionID,
+			WorkflowID:  wf.ID,
+			IsPublished: true,
+			PublishedAt: &now,
+			Nodes:       datatypes.NewJSONSlice([]Node{}),
+			Edges:       datatypes.NewJSONSlice([]Edge{}),
+			CreatedAt:   &now,
+			UpdatedAt:   &now,
+		}).Error
+	}))
+	s.wf = wf
 }
 
 func (s *CanvasNodeExecutionKVTestSteps) CreateCanvasNode() {

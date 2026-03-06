@@ -303,6 +303,7 @@ func CreateNextNodeExecution(
 
 func CreateCanvas(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
+	liveVersionID := uuid.New()
 
 	inputNodes := make([]models.Node, len(nodes))
 	for i, node := range nodes {
@@ -324,16 +325,13 @@ func CreateCanvas(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []model
 	workflow := &models.Canvas{
 		ID:             uuid.New(),
 		OrganizationID: orgID,
+		LiveVersionID:  &liveVersionID,
 		Name:           RandomName("canvas"),
 		Description:    "Test canvas",
-		Nodes:          datatypes.NewJSONSlice(inputNodes),
-		Edges:          datatypes.NewJSONSlice(edges),
 		CreatedBy:      &userID,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
 	}
-
-	require.NoError(t, database.Conn().Create(workflow).Error)
 
 	//
 	// Expand blueprint nodes (convert WorkflowNode to Node, expand, then back to WorkflowNode)
@@ -342,32 +340,54 @@ func CreateCanvas(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []model
 	require.NoError(t, err)
 
 	var createdNodes []models.CanvasNode
-	for _, node := range expandedNodes {
-		var parentNodeID *string
-		if idx := strings.Index(node.ID, ":"); idx != -1 {
-			parent := node.ID[:idx]
-			parentNodeID = &parent
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(workflow).Error; err != nil {
+			return err
 		}
 
-		canvasNode := models.CanvasNode{
-			WorkflowID:    workflow.ID,
-			NodeID:        node.ID,
-			ParentNodeID:  parentNodeID,
-			Name:          node.Name,
-			State:         models.CanvasNodeStateReady,
-			Type:          node.Type,
-			Ref:           datatypes.NewJSONType(node.Ref),
-			Configuration: datatypes.NewJSONType(node.Configuration),
-			Position:      datatypes.NewJSONType(node.Position),
-			Metadata:      datatypes.NewJSONType(node.Metadata),
-			IsCollapsed:   node.IsCollapsed,
-			CreatedAt:     &now,
-			UpdatedAt:     &now,
+		for _, node := range expandedNodes {
+			var parentNodeID *string
+			if idx := strings.Index(node.ID, ":"); idx != -1 {
+				parent := node.ID[:idx]
+				parentNodeID = &parent
+			}
+
+			canvasNode := models.CanvasNode{
+				WorkflowID:    workflow.ID,
+				NodeID:        node.ID,
+				ParentNodeID:  parentNodeID,
+				Name:          node.Name,
+				State:         models.CanvasNodeStateReady,
+				Type:          node.Type,
+				Ref:           datatypes.NewJSONType(node.Ref),
+				Configuration: datatypes.NewJSONType(node.Configuration),
+				Position:      datatypes.NewJSONType(node.Position),
+				Metadata:      datatypes.NewJSONType(node.Metadata),
+				IsCollapsed:   node.IsCollapsed,
+				CreatedAt:     &now,
+				UpdatedAt:     &now,
+			}
+
+			if err := tx.Clauses(clause.Returning{}).Create(&canvasNode).Error; err != nil {
+				return err
+			}
+			createdNodes = append(createdNodes, canvasNode)
 		}
 
-		require.NoError(t, database.Conn().Clauses(clause.Returning{}).Create(&canvasNode).Error)
-		createdNodes = append(createdNodes, canvasNode)
-	}
+		version := models.CanvasVersion{
+			ID:          liveVersionID,
+			WorkflowID:  workflow.ID,
+			OwnerID:     &userID,
+			IsPublished: true,
+			PublishedAt: &now,
+			Nodes:       datatypes.NewJSONSlice(expandedNodes),
+			Edges:       datatypes.NewJSONSlice(edges),
+			CreatedAt:   &now,
+			UpdatedAt:   &now,
+		}
+
+		return tx.Create(&version).Error
+	}))
 
 	return workflow, createdNodes
 }

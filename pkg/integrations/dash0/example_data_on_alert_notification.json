@@ -1,5 +1,5 @@
 {
-  "type": "dash0.notification",
+  "type": "dash0.alertNotification",
   "timestamp": "2026-02-20T12:00:00Z",
   "data": {
     "issue": {

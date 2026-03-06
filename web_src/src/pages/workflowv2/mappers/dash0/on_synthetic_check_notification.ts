@@ -5,7 +5,7 @@ import { TriggerProps } from "@/ui/trigger";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import { stringOrDash } from "../utils";
 
-interface Dash0NotificationIssue {
+interface SyntheticCheckNotificationIssue {
   id?: string;
   issueIdentifier?: string;
   status?: string;
@@ -15,31 +15,53 @@ interface Dash0NotificationIssue {
   url?: string;
   dataset?: string;
   description?: string;
-  labels?: IssueLabel[];
+  labels?: SyntheticCheckLabelTuple[];
 }
 
-interface IssueLabel {
+type SyntheticCheckLabelTuple = [string, SyntheticCheckLabelEntry];
+
+interface SyntheticCheckLabelEntry {
   key?: string;
-  value?: IssueLabelValue;
+  value?: SyntheticCheckLabelValue;
 }
 
-interface IssueLabelValue {
+interface SyntheticCheckLabelValue {
   stringValue?: string;
 }
 
-interface Dash0NotificationEventData {
-  issue?: Dash0NotificationIssue;
+interface SyntheticCheckNotificationEventData {
+  issue?: SyntheticCheckNotificationIssue;
 }
 
-interface OnNotificationConfiguration {
+interface OnSyntheticCheckNotificationConfiguration {
   statuses?: string[];
 }
 
-export const onNotificationTriggerRenderer: TriggerRenderer = {
+function formatSyntheticCheckLabels(labels?: SyntheticCheckLabelTuple[]): string | undefined {
+  if (!labels?.length) {
+    return undefined;
+  }
+
+  return labels
+    .map((tuple) => {
+      if (!Array.isArray(tuple) || tuple.length < 2) {
+        return undefined;
+      }
+
+      const entry = tuple[1];
+      const key = entry?.key;
+      const value = entry?.value?.stringValue;
+      return key ? `${key}: ${value ?? ""}` : undefined;
+    })
+    .filter(Boolean)
+    .join(", ");
+}
+
+export const onSyntheticCheckNotificationTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event?.data as Dash0NotificationEventData | undefined;
+    const eventData = context.event?.data as SyntheticCheckNotificationEventData | undefined;
     const issue = eventData?.issue;
-    const title = issue?.summary || issue?.issueIdentifier || issue?.id || "Dash0 notification";
+    const title = issue?.summary || issue?.issueIdentifier || issue?.id || "Dash0 synthetic check notification";
     const subtitleParts = [issue?.status].filter(Boolean).join(" · ");
     const timeAgo = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
     const subtitle = subtitleParts && timeAgo ? `${subtitleParts} · ${timeAgo}` : subtitleParts || timeAgo;
@@ -51,7 +73,7 @@ export const onNotificationTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as Dash0NotificationEventData | undefined;
+    const eventData = context.event?.data as SyntheticCheckNotificationEventData | undefined;
 
     return {
       "Issue ID": stringOrDash(eventData?.issue?.id),
@@ -61,15 +83,13 @@ export const onNotificationTriggerRenderer: TriggerRenderer = {
       Summary: stringOrDash(eventData?.issue?.summary),
       Dataset: stringOrDash(eventData?.issue?.dataset),
       Start: stringOrDash(eventData?.issue?.start),
-      Labels: stringOrDash(
-        eventData?.issue?.labels?.map((label) => `${label.key}: ${label.value?.stringValue}`).join(", "),
-      ),
+      Labels: stringOrDash(formatSyntheticCheckLabels(eventData?.issue?.labels)),
     };
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const configuration = node.configuration as OnNotificationConfiguration | undefined;
+    const configuration = node.configuration as OnSyntheticCheckNotificationConfiguration | undefined;
     const metadataItems = [];
 
     if (configuration?.statuses?.length) {
@@ -87,7 +107,9 @@ export const onNotificationTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onNotificationTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const { title, subtitle } = onSyntheticCheckNotificationTriggerRenderer.getTitleAndSubtitle({
+        event: lastEvent,
+      });
       props.lastEventData = {
         title,
         subtitle,

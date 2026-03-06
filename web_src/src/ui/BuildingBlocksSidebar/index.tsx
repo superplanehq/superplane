@@ -33,6 +33,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
+import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
 import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
@@ -1146,8 +1147,7 @@ function CategorySection({
   // Get integration name from first block if available, or match category name
   const firstBlock = allBlocks[0];
   const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
-  const appLogo = appLogoMap[integrationName];
-  const categoryIconSrc = typeof appLogo === "string" ? appLogo : integrationName === "aws" ? awsIcon : undefined;
+  const categoryIconSrc = integrationName === "smtp" ? undefined : getIntegrationIconSrc(integrationName);
 
   // Mirror org/integrations colors: ready=green, pending=amber, error=red, default=gray.
   const normalizedIntegrationName = normalizeIntegrationName(firstBlock?.integrationName);
@@ -1277,6 +1277,7 @@ function CategorySection({
           };
           const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;
           const appIconSrc = typeof appLogo === "string" ? appLogo : nameParts[1] ? appLogo?.[nameParts[1]] : undefined;
+          const appIconSrc = getHeaderIconSrc(block.name);
           const IconComponent = resolveIcon(iconSlug);
 
           const isLive = !!block.isLive;

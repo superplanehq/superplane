@@ -27,6 +27,7 @@ export function ZoomSlider({
   screenshotName,
   isSnapToGridEnabled,
   onSnapToGridToggle,
+  usePanel = true,
   ...props
 }: Omit<PanelProps, "children"> & {
   orientation?: "horizontal" | "vertical";
@@ -35,6 +36,7 @@ export function ZoomSlider({
   screenshotName?: string;
   isSnapToGridEnabled?: boolean;
   onSnapToGridToggle?: () => void;
+  usePanel?: boolean;
 }) {
   const { zoom } = useViewport();
   const { zoomTo, zoomIn, zoomOut, fitView, getNodes } = useReactFlow();
@@ -129,96 +131,103 @@ export function ZoomSlider({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [zoomIn, zoomOut, zoomTo, fitView, handleScreenshot]);
 
+  const baseClassName = cn(
+    "bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8",
+    orientation === "horizontal" ? "flex-row" : "flex-col",
+    className,
+  );
+
+  const content = (
+    <>
+      <div className={cn("flex items-center gap-1", orientation === "horizontal" ? "flex-row" : "flex-col-reverse")}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => zoomOut({ duration: 300 })}>
+              <Minus className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Zoom out (Ctrl/Cmd + -)</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className={cn("hidden", orientation === "horizontal" ? "w-[100px]" : "h-[100px]")}>
+              <Slider
+                className="w-full h-full"
+                orientation={orientation}
+                value={[zoom]}
+                min={minZoom}
+                max={maxZoom}
+                step={0.01}
+                onValueChange={(values) => zoomTo(values[0])}
+              />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>Zoom level</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => zoomIn({ duration: 300 })}>
+              <Plus className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Zoom in (Ctrl/Cmd + +)</TooltipContent>
+        </Tooltip>
+      </div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            className={cn(
+              "tabular-nums text-xs",
+              orientation === "horizontal" ? "w-[50px] min-w-[50px] h-8" : "h-[40px] w-[40px]",
+            )}
+            variant="ghost"
+            onClick={() => zoomTo(1, { duration: 300 })}
+          >
+            {(100 * zoom).toFixed(0)}%
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Reset zoom to 100% (Ctrl/Cmd + 0)</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => fitView({ duration: 300 })}>
+            <Maximize className="h-3 w-3" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Fit all components in view (Ctrl/Cmd + 1)</TooltipContent>
+      </Tooltip>
+      {leadingContent}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={handleScreenshot}>
+            <Camera className="h-3 w-3" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Download screenshot (Ctrl/Cmd + Shift + S)</TooltipContent>
+      </Tooltip>
+      {onSnapToGridToggle && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={onSnapToGridToggle}>
+              {isSnapToGridEnabled ? <SquareDot className="h-3 w-3" /> : <Grid3X3 className="h-3 w-3" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{isSnapToGridEnabled ? "Disable snap to grid" : "Enable snap to grid"}</TooltipContent>
+        </Tooltip>
+      )}
+      {children}
+    </>
+  );
+
   return (
     <TooltipProvider delayDuration={300}>
-      <Panel
-        className={cn("flex items-center gap-2 p-0", orientation === "horizontal" ? "flex-row" : "flex-col", className)}
-        {...props}
-      >
-        <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
-          <div
-            className={cn("flex items-center gap-1", orientation === "horizontal" ? "flex-row" : "flex-col-reverse")}
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => zoomOut({ duration: 300 })}>
-                  <Minus className="h-3 w-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Zoom out (Ctrl/Cmd + -)</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className={cn("hidden", orientation === "horizontal" ? "w-[100px]" : "h-[100px]")}>
-                  <Slider
-                    className="w-full h-full"
-                    orientation={orientation}
-                    value={[zoom]}
-                    min={minZoom}
-                    max={maxZoom}
-                    step={0.01}
-                    onValueChange={(values) => zoomTo(values[0])}
-                  />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>Zoom level</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => zoomIn({ duration: 300 })}>
-                  <Plus className="h-3 w-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Zoom in (Ctrl/Cmd + +)</TooltipContent>
-            </Tooltip>
-          </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                className={cn(
-                  "tabular-nums text-xs",
-                  orientation === "horizontal" ? "w-[50px] min-w-[50px] h-8" : "h-[40px] w-[40px]",
-                )}
-                variant="ghost"
-                onClick={() => zoomTo(1, { duration: 300 })}
-              >
-                {(100 * zoom).toFixed(0)}%
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Reset zoom to 100% (Ctrl/Cmd + 0)</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => fitView({ duration: 300 })}>
-                <Maximize className="h-3 w-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Fit all components in view (Ctrl/Cmd + 1)</TooltipContent>
-          </Tooltip>
-          {leadingContent}
-        </div>
-        <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={handleScreenshot}>
-                <Camera className="h-3 w-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Download screenshot (Ctrl/Cmd + Shift + S)</TooltipContent>
-          </Tooltip>
-          {onSnapToGridToggle && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={onSnapToGridToggle}>
-                  {isSnapToGridEnabled ? <SquareDot className="h-3 w-3" /> : <Grid3X3 className="h-3 w-3" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{isSnapToGridEnabled ? "Disable snap to grid" : "Enable snap to grid"}</TooltipContent>
-            </Tooltip>
-          )}
-          {children}
-        </div>
-      </Panel>
+      {usePanel ? (
+        <Panel className={baseClassName} {...props}>
+          {content}
+        </Panel>
+      ) : (
+        <div className={baseClassName}>{content}</div>
+      )}
     </TooltipProvider>
   );
 }

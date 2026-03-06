@@ -27,11 +27,12 @@ func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrgani
 	response := &pb.DescribeOrganizationResponse{
 		Organization: &pb.Organization{
 			Metadata: &pb.Organization_Metadata{
-				Id:          organization.ID.String(),
-				Name:        organization.Name,
-				Description: organization.Description,
-				CreatedAt:   timestamppb.New(*organization.CreatedAt),
-				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
+				Id:                       organization.ID.String(),
+				Name:                     organization.Name,
+				Description:              organization.Description,
+				CreatedAt:                timestamppb.New(*organization.CreatedAt),
+				UpdatedAt:                timestamppb.New(*organization.UpdatedAt),
+				CanvasSandboxModeEnabled: &organization.CanvasSandboxModeEnabled,
 			},
 		},
 	}

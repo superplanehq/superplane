@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -341,7 +341,8 @@ CREATE TABLE public.organizations (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     deleted_at timestamp without time zone,
-    description text DEFAULT ''::text
+    description text DEFAULT ''::text,
+    canvas_sandbox_mode_enabled boolean DEFAULT true NOT NULL
 );
 
 
@@ -424,6 +425,25 @@ CREATE TABLE public.webhooks (
     retry_count integer DEFAULT 0 NOT NULL,
     max_retries integer DEFAULT 3 NOT NULL,
     app_installation_id uuid
+);
+
+
+--
+-- Name: workflow_change_requests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_change_requests (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    workflow_id uuid NOT NULL,
+    version_id uuid NOT NULL,
+    owner_id uuid,
+    status character varying(32) NOT NULL,
+    changed_node_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    title text DEFAULT ''::text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    published_at timestamp without time zone,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
 );
 
 
@@ -541,6 +561,36 @@ CREATE TABLE public.workflow_nodes (
 
 
 --
+-- Name: workflow_user_drafts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_user_drafts (
+    workflow_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    version_id uuid NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: workflow_versions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_versions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    workflow_id uuid NOT NULL,
+    owner_id uuid,
+    is_published boolean DEFAULT false NOT NULL,
+    published_at timestamp without time zone,
+    nodes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    edges jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: workflows; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -551,11 +601,10 @@ CREATE TABLE public.workflows (
     description text,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_by uuid,
     deleted_at timestamp without time zone,
-    nodes jsonb DEFAULT '[]'::jsonb NOT NULL,
-    is_template boolean DEFAULT false NOT NULL
+    is_template boolean DEFAULT false NOT NULL,
+    live_version_id uuid NOT NULL
 );
 
 
@@ -863,6 +912,22 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
+-- Name: workflow_change_requests workflow_change_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_requests
+    ADD CONSTRAINT workflow_change_requests_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_change_requests workflow_change_requests_workflow_version_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_requests
+    ADD CONSTRAINT workflow_change_requests_workflow_version_key UNIQUE (workflow_id, version_id);
+
+
+--
 -- Name: workflow_events workflow_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -908,6 +973,30 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 
 ALTER TABLE ONLY public.workflow_nodes
     ADD CONSTRAINT workflow_nodes_pkey PRIMARY KEY (workflow_id, node_id);
+
+
+--
+-- Name: workflow_user_drafts workflow_user_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_user_drafts
+    ADD CONSTRAINT workflow_user_drafts_pkey PRIMARY KEY (workflow_id, user_id);
+
+
+--
+-- Name: workflow_user_drafts workflow_user_drafts_version_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_user_drafts
+    ADD CONSTRAINT workflow_user_drafts_version_id_key UNIQUE (version_id);
+
+
+--
+-- Name: workflow_versions workflow_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_versions
+    ADD CONSTRAINT workflow_versions_pkey PRIMARY KEY (id);
 
 
 --
@@ -1109,6 +1198,27 @@ CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at)
 
 
 --
+-- Name: idx_workflow_change_requests_owner; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_change_requests_owner ON public.workflow_change_requests USING btree (owner_id);
+
+
+--
+-- Name: idx_workflow_change_requests_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_change_requests_status ON public.workflow_change_requests USING btree (workflow_id, status, created_at DESC);
+
+
+--
+-- Name: idx_workflow_change_requests_workflow_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_change_requests_workflow_id ON public.workflow_change_requests USING btree (workflow_id);
+
+
+--
 -- Name: idx_workflow_events_execution_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1235,6 +1345,34 @@ CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (stat
 
 
 --
+-- Name: idx_workflow_user_drafts_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_user_drafts_user_id ON public.workflow_user_drafts USING btree (user_id);
+
+
+--
+-- Name: idx_workflow_versions_owner; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_versions_owner ON public.workflow_versions USING btree (owner_id);
+
+
+--
+-- Name: idx_workflow_versions_published; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_versions_published ON public.workflow_versions USING btree (workflow_id, is_published, created_at DESC);
+
+
+--
+-- Name: idx_workflow_versions_workflow_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_versions_workflow_id ON public.workflow_versions USING btree (workflow_id);
+
+
+--
 -- Name: idx_workflows_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1246,6 +1384,13 @@ CREATE INDEX idx_workflows_deleted_at ON public.workflows USING btree (deleted_a
 --
 
 CREATE INDEX idx_workflows_is_template ON public.workflows USING btree (is_template);
+
+
+--
+-- Name: idx_workflows_live_version_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflows_live_version_id ON public.workflows USING btree (live_version_id);
 
 
 --
@@ -1470,6 +1615,30 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
+-- Name: workflow_change_requests workflow_change_requests_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_requests
+    ADD CONSTRAINT workflow_change_requests_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: workflow_change_requests workflow_change_requests_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_requests
+    ADD CONSTRAINT workflow_change_requests_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.workflow_versions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_change_requests workflow_change_requests_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_requests
+    ADD CONSTRAINT workflow_change_requests_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
 -- Name: workflow_events workflow_events_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1598,6 +1767,54 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
+-- Name: workflow_user_drafts workflow_user_drafts_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_user_drafts
+    ADD CONSTRAINT workflow_user_drafts_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_user_drafts workflow_user_drafts_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_user_drafts
+    ADD CONSTRAINT workflow_user_drafts_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.workflow_versions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_user_drafts workflow_user_drafts_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_user_drafts
+    ADD CONSTRAINT workflow_user_drafts_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_versions workflow_versions_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_versions
+    ADD CONSTRAINT workflow_versions_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: workflow_versions workflow_versions_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_versions
+    ADD CONSTRAINT workflow_versions_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflows workflows_live_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflows
+    ADD CONSTRAINT workflows_live_version_id_fkey FOREIGN KEY (live_version_id) REFERENCES public.workflow_versions(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+
+
+--
 -- PostgreSQL database dump complete
 --
 
@@ -1610,7 +1827,7 @@ ALTER TABLE ONLY public.workflow_nodes
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1629,7 +1846,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260227135919	f
+20260304110100	f
 \.
 
 
@@ -1646,7 +1863,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;

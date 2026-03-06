@@ -998,11 +998,9 @@ func sanitizeCanvasOperations(
 
 func buildCanvasContextJSON(ctx *pb.CanvasAiContext) ([]byte, error) {
 	if ctx == nil {
-		return json.Marshal(map[string]any{
+		return json.Marshal(map[string]interface{}{
 			"nodes":           []map[string]string{},
 			"availableBlocks": []map[string]string{},
-			"canvas":          map[string]any{},
-			"selectedNodeIds": []string{},
 		})
 	}
 
@@ -1025,28 +1023,9 @@ func buildCanvasContextJSON(ctx *pb.CanvasAiContext) ([]byte, error) {
 		})
 	}
 
-	canvas := map[string]any{}
-	if rawCanvas := ctx.GetCanvas(); rawCanvas != nil {
-		encoded, err := json.Marshal(rawCanvas)
-		if err == nil {
-			_ = json.Unmarshal(encoded, &canvas)
-		}
-	}
-
-	selectedNodeIDs := make([]string, 0, len(ctx.GetSelectedNodeIds()))
-	for _, nodeID := range ctx.GetSelectedNodeIds() {
-		nodeID = strings.TrimSpace(nodeID)
-		if nodeID == "" {
-			continue
-		}
-		selectedNodeIDs = append(selectedNodeIDs, nodeID)
-	}
-
-	return json.Marshal(map[string]any{
+	return json.Marshal(map[string]interface{}{
 		"nodes":           nodes,
 		"availableBlocks": blocks,
-		"canvas":          canvas,
-		"selectedNodeIds": selectedNodeIDs,
 	})
 }
 

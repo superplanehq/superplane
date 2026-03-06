@@ -381,12 +381,14 @@ func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName 
 	deadline := time.Now().Add(2 * time.Second)
 
 	for {
-		workflows := s.canvas.GetWorkflowFromDB()
+		workflow := s.canvas.GetWorkflowFromDB()
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.Conn(), workflow)
+		require.NoError(s.t, err)
 		sourceNode := s.canvas.GetNodeFromDB(sourceName)
 		targetNode := s.canvas.GetNodeFromDB(targetName)
 
 		connected := false
-		for _, conn := range workflows.Edges {
+		for _, conn := range liveVersion.Edges {
 			if conn.SourceID == sourceNode.NodeID && conn.TargetID == targetNode.NodeID {
 				connected = true
 				break
