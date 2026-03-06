@@ -1,7 +1,6 @@
 package terraform
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -18,8 +17,8 @@ type Workspace struct {
 	Name string `json:"name"`
 }
 
-func (c *Client) ListOrganizations(ctx context.Context) ([]Organization, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, "/api/v2/organizations", nil)
+func (c *Client) ListOrganizations() ([]Organization, error) {
+	req, err := c.newRequest(http.MethodGet, "/api/v2/organizations", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create organizations request: %w", err)
 	}
@@ -57,9 +56,9 @@ func (c *Client) ListOrganizations(ctx context.Context) ([]Organization, error) 
 	return orgs, nil
 }
 
-func (c *Client) ListWorkspaces(ctx context.Context, organizationName string) ([]Workspace, error) {
+func (c *Client) ListWorkspaces(organizationName string) ([]Workspace, error) {
 	path := fmt.Sprintf("/api/v2/organizations/%s/workspaces", url.PathEscape(organizationName))
-	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	req, err := c.newRequest(http.MethodGet, path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create workspaces request: %w", err)
 	}
@@ -97,9 +96,9 @@ func (c *Client) ListWorkspaces(ctx context.Context, organizationName string) ([
 	return workspaces, nil
 }
 
-func (c *Client) ReadWorkspace(ctx context.Context, id string) (*WorkspacePayload, error) {
+func (c *Client) ReadWorkspace(id string) (*WorkspacePayload, error) {
 	path := fmt.Sprintf("/api/v2/workspaces/%s", url.PathEscape(id))
-	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	req, err := c.newRequest(http.MethodGet, path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create read workspace request: %w", err)
 	}

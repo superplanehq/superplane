@@ -1,7 +1,6 @@
 package terraform
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -64,7 +63,7 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 		}
 	}
 
-	resolvedWsId, err := client.ResolveWorkspaceID(context.Background(), config.WorkspaceID)
+	resolvedWsId, err := client.ResolveWorkspaceID(config.WorkspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve workspace: %w", err)
 	}
@@ -93,7 +92,7 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	}
 
 	listPath := fmt.Sprintf("/api/v2/workspaces/%s/notification-configurations", resolvedWsId)
-	req, err := client.newRequest(context.Background(), http.MethodGet, listPath, nil)
+	req, err := client.newRequest(http.MethodGet, listPath, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create list request: %w", err)
 	}
@@ -133,7 +132,7 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 					}
 
 					updatePath := fmt.Sprintf("/api/v2/notification-configurations/%s", hook.ID)
-					uReq, err := client.newRequest(context.Background(), http.MethodPatch, updatePath, updateOpts)
+					uReq, err := client.newRequest(http.MethodPatch, updatePath, updateOpts)
 					if err != nil {
 						return nil, fmt.Errorf("failed to create update request: %w", err)
 					}
@@ -180,7 +179,7 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 
 	for i := 0; i < maxRetries; i++ {
 		attempts++
-		cReq, err := client.newRequest(context.Background(), http.MethodPost, listPath, createOpts)
+		cReq, err := client.newRequest(http.MethodPost, listPath, createOpts)
 		if err != nil {
 			createErr = err
 			break
@@ -255,7 +254,7 @@ func (h *WebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 		return fmt.Errorf("notification_configuration_id is not a string")
 	}
 	deletePath := fmt.Sprintf("/api/v2/notification-configurations/%s", id)
-	req, err := client.newRequest(context.Background(), http.MethodDelete, deletePath, nil)
+	req, err := client.newRequest(http.MethodDelete, deletePath, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create delete request: %w", err)
 	}

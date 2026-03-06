@@ -1,7 +1,6 @@
 package terraform
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"slices"
@@ -165,9 +164,9 @@ func (t *RunEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	if runID != "" {
 		client, err := getClientFromIntegration(ctx.Integration)
 		if err == nil {
-			run, err := client.ReadRun(context.Background(), runID)
+			run, err := client.ReadRun(runID)
 			if err == nil && run != nil && run.Plan != nil && run.Plan.ID != "" {
-				plan, err := client.ReadPlan(context.Background(), run.Plan.ID)
+				plan, err := client.ReadPlan(run.Plan.ID)
 				if err == nil && plan != nil {
 					emittedEvent["additions"] = plan.Attributes.ResourceAdditions
 					emittedEvent["changes"] = plan.Attributes.ResourceChanges

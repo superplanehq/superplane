@@ -1,7 +1,6 @@
 package terraform
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -90,14 +89,14 @@ func (c *Plan) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	resolvedWsID, err := client.ResolveWorkspaceID(context.Background(), spec.WorkspaceID)
+	resolvedWsID, err := client.ResolveWorkspaceID(spec.WorkspaceID)
 	if err != nil {
 		return fmt.Errorf("failed to resolve workspace: %w", err)
 	}
 
 	msg := fmt.Sprintf("⚙ %s", spec.Message)
 
-	run, err := client.CreateRun(context.Background(), resolvedWsID, msg, true)
+	run, err := client.CreateRun(resolvedWsID, msg, true)
 	if err != nil {
 		return fmt.Errorf("failed to queue run: %w", err)
 	}
@@ -163,7 +162,7 @@ func (c *Plan) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	run, err := client.ReadRun(context.Background(), metadata.RunID)
+	run, err := client.ReadRun(metadata.RunID)
 	if err != nil {
 		return fmt.Errorf("failed to read run %s: %w", metadata.RunID, err)
 	}
@@ -182,7 +181,7 @@ func (c *Plan) poll(ctx core.ActionContext) error {
 			orgID := run.Workspace.Relationships.Organization.Data.ID
 			orgName := orgID
 
-			orgs, listErr := client.ListOrganizations(context.Background())
+			orgs, listErr := client.ListOrganizations()
 			if listErr == nil {
 				for _, o := range orgs {
 					if o.ID == orgID || o.Name == orgID {
@@ -235,7 +234,7 @@ func (c *Plan) emitFinalState(ctx core.ActionContext, metadata ExecutionMetadata
 	if run != nil && run.Plan != nil && run.Plan.ID != "" {
 		client, err := getClientFromIntegration(ctx.Integration)
 		if err == nil {
-			plan, err := client.ReadPlan(context.Background(), run.Plan.ID)
+			plan, err := client.ReadPlan(run.Plan.ID)
 			if err == nil && plan != nil {
 				additions := plan.Attributes.ResourceAdditions
 				changes := plan.Attributes.ResourceChanges
@@ -248,7 +247,7 @@ func (c *Plan) emitFinalState(ctx core.ActionContext, metadata ExecutionMetadata
 				metadata.Destructions = &destructions
 
 				if plan.Attributes.LogReadURL != "" {
-					logText, err := client.DownloadLog(context.Background(), plan.Attributes.LogReadURL)
+					logText, err := client.DownloadLog(plan.Attributes.LogReadURL)
 					if err == nil {
 						payload["planLog"] = logText
 						metadata.PlanLog = logText
@@ -256,7 +255,7 @@ func (c *Plan) emitFinalState(ctx core.ActionContext, metadata ExecutionMetadata
 				}
 
 				if plan.Links.JSONOutput != "" {
-					jsonText, err := client.DownloadJSONOutput(context.Background(), plan.Links.JSONOutput)
+					jsonText, err := client.DownloadJSONOutput(plan.Links.JSONOutput)
 					if err == nil {
 						payload["planJson"] = jsonText
 						metadata.PlanJSON = jsonText
@@ -295,7 +294,7 @@ func (c *Plan) Cancel(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	err = client.CancelRun(context.Background(), metadata.RunID, "Cancelled via SuperPlane Workflow")
+	err = client.CancelRun(metadata.RunID, "Cancelled via SuperPlane Workflow")
 	if err != nil {
 		return fmt.Errorf("failed to cancel terraform run: %w", err)
 	}

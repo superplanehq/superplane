@@ -1,7 +1,6 @@
 package terraform
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/mitchellh/mapstructure"
@@ -111,7 +110,7 @@ func (i *Integration) ListResources(resourceType string, ctx core.ListResourcesC
 		return nil, fmt.Errorf("failed to get client: %w", err)
 	}
 
-	orgs, err := client.ListOrganizations(context.Background())
+	orgs, err := client.ListOrganizations()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list organizations: %w", err)
 	}
@@ -119,7 +118,7 @@ func (i *Integration) ListResources(resourceType string, ctx core.ListResourcesC
 	var results []core.IntegrationResource
 
 	for _, org := range orgs {
-		workspaces, err := client.ListWorkspaces(context.Background(), org.Name)
+		workspaces, err := client.ListWorkspaces(org.Name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list workspaces for org %s: %w", org.Name, err)
 		}
@@ -177,12 +176,12 @@ func ensureWorkspaceInMetadata(ctx core.MetadataContext, integration core.Integr
 		return err
 	}
 
-	resolvedID, err := client.ResolveWorkspaceID(context.Background(), wsID)
+	resolvedID, err := client.ResolveWorkspaceID(wsID)
 	if err != nil {
 		return fmt.Errorf("failed to resolve workspace id: %w", err)
 	}
 
-	ws, err := client.ReadWorkspace(context.Background(), resolvedID)
+	ws, err := client.ReadWorkspace(resolvedID)
 	if err != nil {
 		return fmt.Errorf("failed to read workspace: %w", err)
 	}
