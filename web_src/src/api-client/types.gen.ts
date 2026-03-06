@@ -415,6 +415,15 @@ export type CanvasesSendAiMessageResponse = {
   }>;
 };
 
+export type CanvasesUpdateCanvasBody = {
+  name?: string;
+  description?: string;
+};
+
+export type CanvasesUpdateCanvasResponse = {
+  canvas?: CanvasesCanvas;
+};
+
 export type CanvasesUpdateCanvasVersionBody = {
   versionId?: string;
   canvas?: CanvasesCanvas;
@@ -2276,6 +2285,33 @@ export type CanvasesDescribeCanvasResponses = {
 };
 
 export type CanvasesDescribeCanvasResponse2 = CanvasesDescribeCanvasResponses[keyof CanvasesDescribeCanvasResponses];
+
+export type CanvasesUpdateCanvasData = {
+  body: CanvasesUpdateCanvasBody;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{id}";
+};
+
+export type CanvasesUpdateCanvasErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesUpdateCanvasError = CanvasesUpdateCanvasErrors[keyof CanvasesUpdateCanvasErrors];
+
+export type CanvasesUpdateCanvasResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesUpdateCanvasResponse;
+};
+
+export type CanvasesUpdateCanvasResponse2 = CanvasesUpdateCanvasResponses[keyof CanvasesUpdateCanvasResponses];
 
 export type ComponentsListComponentsData = {
   body?: never;

@@ -1437,6 +1437,44 @@
         "tags": [
           "Canvas"
         ]
+      },
+      "put": {
+        "summary": "Update canvas",
+        "description": "Updates canvas metadata",
+        "operationId": "Canvases_UpdateCanvas",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateCanvasResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateCanvasBody"
+            }
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
       }
     },
     "/api/v1/components": {
@@ -4751,6 +4789,25 @@
           "items": {
             "type": "object"
           }
+        }
+      }
+    },
+    "CanvasesUpdateCanvasBody": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "CanvasesUpdateCanvasResponse": {
+      "type": "object",
+      "properties": {
+        "canvas": {
+          "$ref": "#/definitions/CanvasesCanvas"
         }
       }
     },

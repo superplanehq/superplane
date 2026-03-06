@@ -93,6 +93,9 @@ import type {
   CanvasesSendAiMessageData,
   CanvasesSendAiMessageErrors,
   CanvasesSendAiMessageResponses,
+  CanvasesUpdateCanvasData,
+  CanvasesUpdateCanvasErrors,
+  CanvasesUpdateCanvasResponses,
   CanvasesUpdateCanvasVersion2Data,
   CanvasesUpdateCanvasVersion2Errors,
   CanvasesUpdateCanvasVersion2Responses,
@@ -827,6 +830,23 @@ export const canvasesDescribeCanvas = <ThrowOnError extends boolean = true>(
   (options.client ?? client).get<CanvasesDescribeCanvasResponses, CanvasesDescribeCanvasErrors, ThrowOnError>({
     url: "/api/v1/canvases/{id}",
     ...options,
+  });
+
+/**
+ * Update canvas
+ *
+ * Updates canvas metadata
+ */
+export const canvasesUpdateCanvas = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesUpdateCanvasData, ThrowOnError>,
+) =>
+  (options.client ?? client).put<CanvasesUpdateCanvasResponses, CanvasesUpdateCanvasErrors, ThrowOnError>({
+    url: "/api/v1/canvases/{id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**

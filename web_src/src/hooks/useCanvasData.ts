@@ -4,6 +4,7 @@ import {
   canvasesDescribeCanvas,
   canvasesDescribeCanvasVersion,
   canvasesCreateCanvas,
+  canvasesUpdateCanvas,
   canvasesCreateCanvasVersion,
   canvasesListCanvasVersions,
   canvasesUpdateCanvasVersion,
@@ -352,21 +353,13 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { name: string; description?: string; nodes?: any[]; edges?: any[] }) => {
-      return await canvasesUpdateCanvasVersion2(
+    mutationFn: async (data: { name: string; description?: string }) => {
+      return await canvasesUpdateCanvas(
         withOrganizationHeader({
-          path: { canvasId },
+          path: { id: canvasId },
           body: {
-            canvas: {
-              metadata: {
-                name: data.name,
-                description: data.description || "",
-              },
-              spec: {
-                nodes: data.nodes || [],
-                edges: data.edges || [],
-              },
-            },
+            name: data.name,
+            description: data.description || "",
           },
         }),
       );
@@ -377,8 +370,8 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
 
-      const updatedVersion = response?.data?.version;
-      if (updatedVersion?.spec) {
+      const updatedCanvas = response?.data?.canvas;
+      if (updatedCanvas) {
         queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: any | undefined) => {
           if (!current) {
             return current;
@@ -391,7 +384,6 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
               name: variables.name,
               description: variables.description || "",
             },
-            spec: updatedVersion.spec,
           };
         });
       }

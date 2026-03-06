@@ -61,6 +61,18 @@ service Canvases {
     };
   }
 
+  rpc UpdateCanvas(UpdateCanvasRequest) returns (UpdateCanvasResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/canvases/{id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas";
+      description: "Updates canvas metadata";
+      tags: "Canvas";
+    };
+  }
+
   rpc CreateCanvasVersion(CreateCanvasVersionRequest) returns (CreateCanvasVersionResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id}/versions"
@@ -354,6 +366,16 @@ message DescribeCanvasRequest {
 }
 
 message DescribeCanvasResponse {
+  Canvas canvas = 1;
+}
+
+message UpdateCanvasRequest {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+}
+
+message UpdateCanvasResponse {
   Canvas canvas = 1;
 }
 
