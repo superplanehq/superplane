@@ -271,6 +271,9 @@ openapi.web.client.gen:
 cli.build:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -o build/cli cmd/cli/main.go'
 
+cli.build.m1:
+	$(MAKE) cli.build OS=darwin ARCH=arm64
+
 IMAGE?=superplane
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
 REGISTRY_HOST?=ghcr.io/superplanehq
