@@ -1,0 +1,166 @@
+---
+title: "New Relic"
+---
+
+React to alerts and query telemetry data from New Relic
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Issue" href="#on-issue" description="Trigger when a New Relic alert issue occurs" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Report Metric" href="#report-metric" description="Send custom metric data to New Relic" />
+  <LinkCard title="Run NRQL Query" href="#run-nrql-query" description="Run a NRQL query against New Relic data via NerdGraph" />
+</CardGrid>
+
+## Instructions
+
+### Getting your credentials
+
+1. **Account ID**: Click your name in the bottom-left corner of New Relic. Your Account ID is displayed under the account name.
+
+2. **User API Key**: Go to the **API Keys** page. Click **Create a key**. Select key type **User**. Give it a name (e.g. "SuperPlane") and click **Create a key**. This key is used for NerdGraph/NRQL queries — no additional permissions are needed.
+
+3. **License Key**: On the same **API Keys** page, find the key with type **Ingest - License** and copy it. This key is used for sending metrics. If no license key exists, click **Create a key** and select **Ingest - License**.
+
+4. **Region**: Choose **US** if your New Relic URL is `one.newrelic.com`, or **EU** if it is `one.eu.newrelic.com`.
+
+### Webhook Setup
+
+SuperPlane automatically creates a Webhook Notification Channel in your New Relic account when you add the **On Issue** trigger to your canvas. Just attach it to your alert workflow in New Relic to start receiving alerts.
+
+<a id="on-issue"></a>
+
+## On Issue
+
+The On Issue trigger starts a workflow execution when a New Relic alert issue is received via webhook.
+
+### What this trigger does
+
+- Receives New Relic webhook payloads for alert issues
+- Filters by issue state (CREATED, ACTIVATED, ACKNOWLEDGED, CLOSED)
+- Optionally filters by priority (CRITICAL, HIGH, MEDIUM, LOW)
+- Emits matching issues as `newrelic.issue` events
+
+### Configuration
+
+- **Statuses**: Required list of issue states to listen for
+- **Priorities**: Optional priority filter
+
+### Webhook Setup
+
+SuperPlane automatically creates a Webhook Notification Channel in your New Relic account. Just attach it to your alert workflow to start receiving alerts.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "accountId": 1234567,
+    "conditionName": "CPU usage \u003e 90%",
+    "createdAt": 1704067200000,
+    "issueId": "MXxBSXxJU1NVRXwxMjM0NTY3ODk",
+    "issueUrl": "https://one.newrelic.com/alerts-ai/issues/MXxBSXxJU1NVRXwxMjM0NTY3ODk",
+    "policyName": "Production Infrastructure",
+    "priority": "CRITICAL",
+    "sources": [
+      "newrelic"
+    ],
+    "state": "ACTIVATED",
+    "title": "High CPU usage on production server",
+    "updatedAt": 1704067260000
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "newrelic.issue"
+}
+```
+
+<a id="report-metric"></a>
+
+## Report Metric
+
+The Report Metric component sends custom metric data to New Relic's Metric API.
+
+### Use Cases
+
+- **Deployment metrics**: Track deployment frequency and duration
+- **Business metrics**: Report custom KPIs like revenue, signups, or conversion rates
+- **Pipeline metrics**: Measure workflow execution times and success rates
+
+### Configuration
+
+- `metricName`: The name of the metric (e.g., custom.deployment.count)
+- `metricType`: The type of metric (gauge, count, or summary)
+- `value`: The numeric value for the metric
+- `attributes`: Optional key-value labels for the metric
+- `timestamp`: Optional Unix epoch milliseconds (defaults to now)
+
+### Outputs
+
+The component emits a metric confirmation containing:
+- `metricName`: The name of the reported metric
+- `metricType`: The type of the metric
+- `value`: The reported value
+- `timestamp`: The timestamp used
+
+### Example Output
+
+```json
+{
+  "data": {
+    "metricName": "custom.deployment.count",
+    "metricType": "count",
+    "timestamp": 1704067200000,
+    "value": 1
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "newrelic.metric"
+}
+```
+
+<a id="run-nrql-query"></a>
+
+## Run NRQL Query
+
+The Run NRQL Query component executes a NRQL query against New Relic data via the NerdGraph API.
+
+### Use Cases
+
+- **Health checks**: Query application error rates or response times before deployments
+- **Capacity planning**: Check resource utilization metrics
+- **Incident investigation**: Query telemetry data during incident workflows
+
+### Configuration
+
+- `query`: The NRQL query string to execute
+- `timeout`: Optional query timeout in seconds (default: 30)
+
+### Outputs
+
+The component emits query results containing:
+- `query`: The executed NRQL query
+- `results`: Array of result rows returned by the query
+
+### Example Output
+
+```json
+{
+  "data": {
+    "query": "SELECT count(*) FROM Transaction SINCE 1 hour ago",
+    "results": [
+      {
+        "count": 42567
+      }
+    ]
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "newrelic.nrqlResult"
+}
+```
+
