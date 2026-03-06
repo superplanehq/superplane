@@ -83,6 +83,10 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 }
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+  if (!execution.createdAt || !execution.rootEvent?.id) {
+    return [];
+  }
+
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const triggerComponentName = rootTriggerNode?.componentName ?? "";
   const rootTriggerRenderer = getTriggerRenderer(triggerComponentName);
@@ -90,11 +94,11 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
 
   return [
     {
-      receivedAt: new Date(execution.createdAt!),
+      receivedAt: new Date(execution.createdAt),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: formatTimeAgo(new Date(execution.createdAt)),
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
+      eventId: execution.rootEvent.id,
     },
   ];
 }
