@@ -76,6 +76,18 @@ func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error)
 		}
 	}
 
+	// Build advanced filters to reduce noise at the Azure level.
+	// Filter by subject containing the resource type so Azure only delivers
+	// events for the resource type we care about (e.g., virtualMachines).
+	var advancedFilters []map[string]any
+	if config.ResourceType != "" {
+		advancedFilters = append(advancedFilters, map[string]any{
+			"operatorType": "StringContains",
+			"key":          "subject",
+			"values":       []string{config.ResourceType},
+		})
+	}
+
 	body := map[string]any{
 		"properties": map[string]any{
 			"destination": map[string]any{
@@ -88,6 +100,7 @@ func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error)
 			"filter": map[string]any{
 				"includedEventTypes": config.EventTypes,
 				"subjectBeginsWith":  subjectBeginsWith,
+				"advancedFilters":    advancedFilters,
 			},
 		},
 	}

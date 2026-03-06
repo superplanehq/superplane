@@ -9,7 +9,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Triggers
 
 <CardGrid>
-  <LinkCard title="Azure • On VM Created" href="#azure-•-on-vm-created" description="Triggers when a new Virtual Machine is successfully provisioned in Azure" />
+  <LinkCard title="Azure • On VM Write" href="#azure-•-on-vm-write" description="Triggers when a Virtual Machine write operation succeeds in Azure (create, update, or delete)" />
 </CardGrid>
 
 ## Actions
@@ -41,44 +41,48 @@ After creation, you will be guided through configuring the Federated Identity Cr
 
 SuperPlane will use Workload Identity Federation to authenticate without storing any credentials.
 
-<a id="azure-•-on-vm-created"></a>
+<a id="azure-•-on-vm-write"></a>
 
-## Azure • On VM Created
+## Azure • On VM Write
 
-The On VM Created trigger starts a workflow execution when a new Azure Virtual Machine is successfully provisioned.
+The On VM Write trigger starts a workflow execution when an Azure Virtual Machine write operation succeeds.
+This includes VM creation, updates, and state changes during deletion.
 
 ### Use Cases
 
 - **Automated configuration**: Run configuration scripts on newly created VMs
-- **Compliance checks**: Verify that new VMs meet security and compliance requirements
-- **Inventory tracking**: Update external inventory systems when VMs are created
-- **Notification workflows**: Send notifications to teams when new VMs are provisioned
-- **Cost tracking**: Log VM creation events for cost analysis and reporting
+- **Compliance checks**: Verify that VMs meet security and compliance requirements after changes
+- **Inventory tracking**: Update external inventory systems when VMs are created, modified, or deleted
+- **Notification workflows**: Send notifications to teams when VM changes occur
+- **Cost tracking**: Log VM write events for cost analysis and reporting
+- **Cleanup workflows**: Trigger cleanup tasks when VMs are deleted
 
 ### How It Works
 
 This trigger listens to Azure Event Grid events for Virtual Machine resource write operations.
-When a VM is successfully created (`provisioningState: Succeeded`), the trigger fires and
-provides detailed information about the new VM.
+When a VM write operation succeeds (`status: Succeeded`), the trigger fires and
+provides the full Azure Event Grid event payload.
+
+Azure fires `Microsoft.Resources.ResourceWriteSuccess` for all successful ARM write
+operations on a VM, including creation, updates, and state changes during deletion.
 
 ### Configuration
 
-- **Resource Group** (optional): Filter events to only trigger for VMs created in a specific
+- **Resource Group** (optional): Filter events to only trigger for VMs in a specific
   resource group. Leave empty to trigger for all resource groups in the subscription.
 - **VM Name Filter** (optional): A regex pattern to filter VMs by name. Only VMs whose name
   matches the pattern will trigger the workflow. Leave empty to trigger for all VM names.
 
 ### Event Data
 
-Each VM creation event includes:
+Each VM write event includes the full Azure Event Grid event:
 
-- **vmName**: The name of the created virtual machine
-- **vmId**: The full Azure resource ID of the VM
-- **resourceGroup**: The resource group containing the VM
-- **subscriptionId**: The Azure subscription ID
-- **location**: The Azure region where the VM was created
-- **status**: The status of the operation (typically "Succeeded")
-- **timestamp**: The timestamp when the event occurred
+- **id**: Unique event ID
+- **topic**: The Azure subscription topic
+- **subject**: The full ARM resource ID of the VM
+- **eventType**: The event type (typically `Microsoft.Resources.ResourceWriteSuccess`)
+- **eventTime**: The timestamp when the event occurred
+- **data**: The event data including operationName, status, resourceProvider, resourceUri, subscriptionId, tenantId
 
 ### Azure Event Grid Setup
 
@@ -93,8 +97,8 @@ No manual setup is required.
 
 ### Notes
 
-- The trigger only fires for successfully provisioned VMs (`provisioningState: Succeeded`)
-- Failed VM creations do not trigger the workflow
+- The trigger fires for all successful VM write operations (create, update, delete)
+- Failed operations do not trigger the workflow
 - The trigger processes events from Azure Event Grid in real-time
 - Multiple triggers can share the same Event Grid subscription if configured correctly
 
@@ -102,14 +106,21 @@ No manual setup is required.
 
 ```json
 {
-  "location": "eastus",
-  "operationName": "Microsoft.Compute/virtualMachines/write",
-  "resourceGroup": "my-rg",
-  "status": "Succeeded",
-  "subscriptionId": "12345678-1234-1234-1234-123456789abc",
-  "timestamp": "2026-02-11T10:30:00Z",
-  "vmId": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-  "vmName": "my-vm-01"
+  "id": "96257b6d-17d3-49e2-8369-fb185b29e1b5",
+  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc",
+  "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+  "eventType": "Microsoft.Resources.ResourceWriteSuccess",
+  "eventTime": "2026-02-11T10:30:00Z",
+  "dataVersion": "2",
+  "metadataVersion": "1",
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/write",
+    "status": "Succeeded",
+    "resourceProvider": "Microsoft.Compute",
+    "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+    "subscriptionId": "12345678-1234-1234-1234-123456789abc",
+    "tenantId": "12345678-1234-1234-1234-123456789abc"
+  }
 }
 ```
 
@@ -172,4 +183,3 @@ Returns the created VM information including:
   "size": "Standard_B1s"
 }
 ```
-
