@@ -2659,15 +2659,15 @@ func (x *InvitationCreated) GetTimestamp() *timestamp.Timestamp {
 }
 
 type Organization_Metadata struct {
-	state                    protoimpl.MessageState `protogen:"open.v1"`
-	Id                       string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name                     string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description              string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	CreatedAt                *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt                *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	CanvasSandboxModeEnabled *bool                  `protobuf:"varint,6,opt,name=canvas_sandbox_mode_enabled,json=canvasSandboxModeEnabled,proto3,oneof" json:"canvas_sandbox_mode_enabled,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	Id                      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name                    string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description             string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	CreatedAt               *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt               *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	CanvasVersioningEnabled *bool                  `protobuf:"varint,6,opt,name=canvas_versioning_enabled,json=canvasVersioningEnabled,proto3,oneof" json:"canvas_versioning_enabled,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *Organization_Metadata) Reset() {
@@ -2735,9 +2735,9 @@ func (x *Organization_Metadata) GetUpdatedAt() *timestamp.Timestamp {
 	return nil
 }
 
-func (x *Organization_Metadata) GetCanvasSandboxModeEnabled() bool {
-	if x != nil && x.CanvasSandboxModeEnabled != nil {
-		return *x.CanvasSandboxModeEnabled
+func (x *Organization_Metadata) GetCanvasVersioningEnabled() bool {
+	if x != nil && x.CanvasVersioningEnabled != nil {
+		return *x.CanvasVersioningEnabled
 	}
 	return false
 }
@@ -3010,9 +3010,9 @@ var File_organizations_proto protoreflect.FileDescriptor
 
 const file_organizations_proto_rawDesc = "" +
 	"\n" +
-	"\x13organizations.proto\x12\x18Superplane.Organizations\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x88\x03\n" +
+	"\x13organizations.proto\x12\x18Superplane.Organizations\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x83\x03\n" +
 	"\fOrganization\x12K\n" +
-	"\bmetadata\x18\x01 \x01(\v2/.Superplane.Organizations.Organization.MetadataR\bmetadata\x1a\xaa\x02\n" +
+	"\bmetadata\x18\x01 \x01(\v2/.Superplane.Organizations.Organization.MetadataR\bmetadata\x1a\xa5\x02\n" +
 	"\bMetadata\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -3020,9 +3020,9 @@ const file_organizations_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12B\n" +
-	"\x1bcanvas_sandbox_mode_enabled\x18\x06 \x01(\bH\x00R\x18canvasSandboxModeEnabled\x88\x01\x01B\x1e\n" +
-	"\x1c_canvas_sandbox_mode_enabled\"-\n" +
+	"updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12?\n" +
+	"\x19canvas_versioning_enabled\x18\x06 \x01(\bH\x00R\x17canvasVersioningEnabled\x88\x01\x01B\x1c\n" +
+	"\x1a_canvas_versioning_enabled\"-\n" +
 	"\x1bDescribeOrganizationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"j\n" +
 	"\x1cDescribeOrganizationResponse\x12J\n" +

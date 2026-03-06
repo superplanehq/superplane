@@ -909,7 +909,7 @@ export type OrganizationsOrganizationMetadata = {
   description?: string;
   createdAt?: string;
   updatedAt?: string;
-  canvasSandboxModeEnabled?: boolean;
+  canvasVersioningEnabled?: boolean;
 };
 
 export type OrganizationsRemoveInvitationResponse = {

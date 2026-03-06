@@ -30,7 +30,7 @@ export interface BreadcrumbItem {
   iconColor?: string;
 }
 
-type HeaderMode = "default" | "version-live" | "version-edit" | "sandbox";
+type HeaderMode = "default" | "version-live" | "version-edit" | "versioning-disabled";
 type SaveState = "saved" | "saving" | "unsaved";
 
 interface HeaderProps {
@@ -74,7 +74,7 @@ interface HeaderProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  sandboxModeTooltip?: string;
+  versioningDisabledTooltip?: string;
   showPendingDraftBadge?: boolean;
 }
 
@@ -115,7 +115,7 @@ export function Header({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  sandboxModeTooltip,
+  versioningDisabledTooltip,
   showPendingDraftBadge,
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
@@ -195,8 +195,8 @@ export function Header({
   const isDefaultMode = mode === "default";
   const showEditButton = mode === "version-live";
   const showEditingDropdown = mode === "version-edit";
-  const showSandboxBadge = mode === "sandbox";
-  const showSaveDropdown = mode === "version-edit" || mode === "sandbox";
+  const showVersioningDisabledBadge = mode === "versioning-disabled";
+  const showSaveDropdown = mode === "version-edit" || mode === "versioning-disabled";
   const showSaveUndoActions = showSaveDropdown && !isAutoSaveEnabled && saveState === "unsaved";
   const autoSaveToggleDisabled = autoSaveDisabled || !onToggleAutoSave;
   const saveStatusLabel = saveState === "saving" ? "Saving..." : saveState === "unsaved" ? "Unsaved" : "Saved";
@@ -421,15 +421,16 @@ export function Header({
               </>
             ) : null}
 
-            {showSandboxBadge ? (
+            {showVersioningDisabledBadge ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="rounded border border-amber-300 bg-amber-100 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-900">
-                    SANDBOX
+                    VERSIONING OFF
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  {sandboxModeTooltip || "Versioning is disabled. Turn off sandbox mode in organization settings."}
+                  {versioningDisabledTooltip ||
+                    "Versioning is disabled. Enable canvas versioning in organization settings."}
                 </TooltipContent>
               </Tooltip>
             ) : null}

@@ -118,7 +118,7 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update canvas version";
-      description: "Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode";
+      description: "Updates a user-owned canvas version; if version_id is omitted, updates the live canvas when versioning is disabled";
       tags: "CanvasVersion";
     };
   }

@@ -755,7 +755,7 @@ export const canvasesCreateCanvasVersion = <ThrowOnError extends boolean = true>
 /**
  * Update canvas version
  *
- * Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode
+ * Updates a user-owned canvas version; if version_id is omitted, updates the live canvas when versioning is disabled
  */
 export const canvasesUpdateCanvasVersion2 = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesUpdateCanvasVersion2Data, ThrowOnError>,
@@ -790,7 +790,7 @@ export const canvasesDescribeCanvasVersion = <ThrowOnError extends boolean = tru
 /**
  * Update canvas version
  *
- * Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode
+ * Updates a user-owned canvas version; if version_id is omitted, updates the live canvas when versioning is disabled
  */
 export const canvasesUpdateCanvasVersion = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesUpdateCanvasVersionData, ThrowOnError>,

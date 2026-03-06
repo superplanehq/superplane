@@ -6,20 +6,20 @@ import (
 	"gorm.io/gorm"
 )
 
-func isCanvasSandboxModeEnabled(organizationID string) (bool, error) {
+func isCanvasVersioningEnabled(organizationID string) (bool, error) {
 	orgID, err := uuid.Parse(organizationID)
 	if err != nil {
 		return false, err
 	}
 
-	return models.IsCanvasSandboxModeEnabled(orgID)
+	return models.IsCanvasVersioningEnabled(orgID)
 }
 
-func isCanvasSandboxModeEnabledInTransaction(tx *gorm.DB, organizationID string) (bool, error) {
+func isCanvasVersioningEnabledInTransaction(tx *gorm.DB, organizationID string) (bool, error) {
 	orgID, err := uuid.Parse(organizationID)
 	if err != nil {
 		return false, err
 	}
 
-	return models.IsCanvasSandboxModeEnabledInTransaction(tx, orgID)
+	return models.IsCanvasVersioningEnabledInTransaction(tx, orgID)
 }

@@ -62,18 +62,18 @@ func UpdateCanvasVersion(
 		return nil, err
 	}
 
-	sandboxModeEnabled, err := isCanvasSandboxModeEnabled(organizationID)
+	versioningEnabled, err := isCanvasVersioningEnabled(organizationID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load organization sandbox mode: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to load organization canvas versioning: %v", err)
 	}
 
 	requestedVersionID := strings.TrimSpace(versionID)
 	if requestedVersionID == "" {
-		if !sandboxModeEnabled {
-			return nil, status.Error(codes.FailedPrecondition, "sandbox mode is disabled; version id is required")
+		if versioningEnabled {
+			return nil, status.Error(codes.FailedPrecondition, "canvas versioning is enabled; version id is required")
 		}
 
-		return updateLiveCanvasInSandbox(
+		return updateLiveCanvasWithoutVersioning(
 			ctx,
 			encryptor,
 			registry,
@@ -85,8 +85,8 @@ func UpdateCanvasVersion(
 		)
 	}
 
-	if sandboxModeEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled in sandbox mode")
+	if !versioningEnabled {
+		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this organization")
 	}
 
 	versionUUID, err := uuid.Parse(requestedVersionID)
@@ -151,7 +151,7 @@ func UpdateCanvasVersion(
 	}, nil
 }
 
-func updateLiveCanvasInSandbox(
+func updateLiveCanvasWithoutVersioning(
 	ctx context.Context,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
@@ -265,7 +265,7 @@ func updateLiveCanvasInSandbox(
 		if status.Code(err) != codes.Unknown {
 			return nil, err
 		}
-		return nil, status.Errorf(codes.Internal, "failed to update live canvas in sandbox mode: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to update live canvas without versioning: %v", err)
 	}
 
 	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String()).Publish(true); err != nil {

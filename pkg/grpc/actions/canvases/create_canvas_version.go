@@ -37,12 +37,12 @@ func CreateCanvasVersion(ctx context.Context, organizationID string, canvasID st
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	sandboxModeEnabled, err := isCanvasSandboxModeEnabled(organizationID)
+	versioningEnabled, err := isCanvasVersioningEnabled(organizationID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load organization sandbox mode: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to load organization canvas versioning: %v", err)
 	}
-	if sandboxModeEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled in sandbox mode")
+	if !versioningEnabled {
+		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this organization")
 	}
 
 	userUUID := uuid.MustParse(userID)

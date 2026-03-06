@@ -9,8 +9,8 @@ import (
 )
 
 type canvasVersioningContext struct {
-	currentUserID      string
-	sandboxModeEnabled bool
+	currentUserID     string
+	versioningEnabled bool
 }
 
 func resolveCanvasVersioningContext(ctx core.CommandContext) (*canvasVersioningContext, error) {
@@ -40,8 +40,8 @@ func resolveCanvasVersioningContext(ctx core.CommandContext) (*canvasVersioningC
 	}
 
 	return &canvasVersioningContext{
-		currentUserID:      currentUserID,
-		sandboxModeEnabled: organizationResponse.Organization.Metadata.GetCanvasSandboxModeEnabled(),
+		currentUserID:     currentUserID,
+		versioningEnabled: organizationResponse.Organization.Metadata.GetCanvasVersioningEnabled(),
 	}, nil
 }
 

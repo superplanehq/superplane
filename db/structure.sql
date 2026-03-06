@@ -342,7 +342,7 @@ CREATE TABLE public.organizations (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     deleted_at timestamp without time zone,
     description text DEFAULT ''::text,
-    canvas_sandbox_mode_enabled boolean DEFAULT true NOT NULL
+    canvas_versioning_enabled boolean DEFAULT false NOT NULL
 );
 
 
@@ -1846,7 +1846,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260304110100	f
+20260306193850	f
 \.
 
 

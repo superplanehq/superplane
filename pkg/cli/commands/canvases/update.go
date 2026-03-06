@@ -65,9 +65,9 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	targetVersionID := ""
-	if versioningContext.sandboxModeEnabled {
+	if !versioningContext.versioningEnabled {
 		if draftMode {
-			return fmt.Errorf("--draft cannot be used when canvas sandbox mode is enabled")
+			return fmt.Errorf("--draft cannot be used when canvas versioning is disabled")
 		}
 	} else {
 		if !draftMode {

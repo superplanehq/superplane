@@ -24,8 +24,8 @@ func (c *publishCommand) Execute(ctx core.CommandContext) error {
 	if err != nil {
 		return err
 	}
-	if versioningContext.sandboxModeEnabled {
-		return fmt.Errorf("canvas versioning is disabled while sandbox mode is enabled")
+	if !versioningContext.versioningEnabled {
+		return fmt.Errorf("canvas versioning is disabled for this organization")
 	}
 
 	draftVersionID, err := findCurrentUserDraftVersionID(ctx, canvasID)

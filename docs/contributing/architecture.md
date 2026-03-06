@@ -90,6 +90,8 @@ The database model follows a hierarchical structure that enables multi-tenancy a
 
 - Top-level tenant boundary providing complete data isolation
 - All resources (canvases, integrations, secrets) are scoped to an organization
+- Canvas editing behavior is controlled by organization metadata `canvas_versioning_enabled` (API field `canvasVersioningEnabled`)
+- When canvas versioning is enabled, users edit draft versions and publish via change requests; when disabled, users edit the live canvas directly
 
 **Canvas:**
 
