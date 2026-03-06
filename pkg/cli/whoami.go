@@ -17,34 +17,50 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	organizationLabel := response.GetOrganizationId()
+	var canvasSandboxModeEnabled *bool
 	if response.HasOrganizationId() && response.GetOrganizationId() != "" {
 		orgResponse, _, err := ctx.API.OrganizationAPI.
 			OrganizationsDescribeOrganization(ctx.Context, response.GetOrganizationId()).
 			Execute()
 
-		if err == nil &&
-			orgResponse.Organization.Metadata != nil &&
-			orgResponse.Organization.Metadata.Name != nil &&
-			*orgResponse.Organization.Metadata.Name != "" {
-			organizationLabel = *orgResponse.Organization.Metadata.Name
+		if err == nil && orgResponse != nil && orgResponse.Organization != nil && orgResponse.Organization.Metadata != nil {
+			metadata := orgResponse.Organization.Metadata
+			if metadata.Name != nil && *metadata.Name != "" {
+				organizationLabel = *metadata.Name
+			}
+
+			if enabled, ok := metadata.GetCanvasSandboxModeEnabledOk(); ok {
+				canvasSandboxModeEnabled = enabled
+			}
 		}
 	}
 
 	if ctx.Renderer.IsText() {
 		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+			sandboxModeLabel := "unknown"
+			if canvasSandboxModeEnabled != nil {
+				if *canvasSandboxModeEnabled {
+					sandboxModeLabel = "enabled"
+				} else {
+					sandboxModeLabel = "disabled"
+				}
+			}
+
 			_, _ = fmt.Fprintf(stdout, "ID: %s\n", response.GetId())
 			_, _ = fmt.Fprintf(stdout, "Email: %s\n", response.GetEmail())
 			_, _ = fmt.Fprintf(stdout, "Organization ID: %s\n", response.GetOrganizationId())
 			_, _ = fmt.Fprintf(stdout, "Organization: %s\n", organizationLabel)
+			_, _ = fmt.Fprintf(stdout, "Canvas Sandbox Mode: %s\n", sandboxModeLabel)
 			return nil
 		})
 	}
 
 	return ctx.Renderer.Render(map[string]any{
-		"id":               response.GetId(),
-		"email":            response.GetEmail(),
-		"organizationId":   response.GetOrganizationId(),
-		"organizationName": organizationLabel,
+		"id":                       response.GetId(),
+		"email":                    response.GetEmail(),
+		"organizationId":           response.GetOrganizationId(),
+		"organizationName":         organizationLabel,
+		"canvasSandboxModeEnabled": canvasSandboxModeEnabled,
 	})
 }
 
