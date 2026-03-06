@@ -160,6 +160,11 @@ import {
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
 import {
+  componentMappers as opencostComponentMappers,
+  triggerRenderers as opencostTriggerRenderers,
+  eventStateRegistry as opencostEventStateRegistry,
+} from "./opencost/index";
+import {
   componentMappers as prometheusComponentMappers,
   customFieldRenderers as prometheusCustomFieldRenderers,
   triggerRenderers as prometheusTriggerRenderers,
@@ -259,6 +264,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   telegram: telegramComponentMappers,
   octopus: octopusComponentMappers,
   openai: openaiComponentMappers,
+  opencost: opencostComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
   gcp: gcpComponentMappers,
@@ -296,6 +302,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   telegram: telegramTriggerRenderers,
   octopus: octopusTriggerRenderers,
   openai: openaiTriggerRenderers,
+  opencost: opencostTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
   gcp: gcpTriggerRenderers,
@@ -329,6 +336,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   rootly: rootlyEventStateRegistry,
   incident: incidentEventStateRegistry,
   octopus: octopusEventStateRegistry,
+  opencost: opencostEventStateRegistry,
   firehydrant: firehydrantEventStateRegistry,
   launchdarkly: launchdarklyEventStateRegistry,
   openai: openaiEventStateRegistry,

@@ -1,0 +1,138 @@
+---
+title: "OpenCost"
+---
+
+Monitor and query Kubernetes cost allocation data from OpenCost
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="Cost Exceeds Threshold" href="#cost-exceeds-threshold" description="Trigger when cost data exceeds a configured threshold" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Get Cost Allocation" href="#get-cost-allocation" description="Fetch cost allocation data from OpenCost" />
+</CardGrid>
+
+## Instructions
+
+To configure OpenCost to work with SuperPlane:
+
+1. **Get Base URL**: Determine the URL of your OpenCost instance (default port is 9003, e.g., `http://opencost.example.com:9003`)
+2. **Configure Auth**: If your OpenCost API requires authentication, configure the appropriate auth type (None, Basic, or Bearer)
+3. **Enter Credentials**: Provide the Base URL and authentication details in the integration configuration
+
+<a id="cost-exceeds-threshold"></a>
+
+## Cost Exceeds Threshold
+
+The Cost Exceeds Threshold trigger polls OpenCost and fires when the total cost for the configured window and aggregate dimension exceeds the specified threshold.
+
+### Use Cases
+
+- **Budget alerts**: Notify Slack when namespace costs exceed a daily budget
+- **Cost anomaly detection**: Create tickets when unexpected cost spikes occur
+- **Resource optimization**: Trigger workflows to scale down resources when costs are too high
+
+### Configuration
+
+- **Window**: Time window for the cost query (e.g., `1h`, `24h`, `7d`)
+- **Aggregate By**: Dimension to group costs by (e.g., `namespace`, `pod`, `cluster`)
+- **Cost Threshold ($)**: The cost threshold in dollars. The trigger fires when total cost exceeds this value.
+
+### Event Data
+
+The trigger emits an event containing:
+- `totalCost`: The total cost across all allocations
+- `threshold`: The configured threshold value
+- `window`: The time window queried
+- `aggregate`: The aggregation dimension used
+- `exceedingItems`: Array of individual allocations that exceed the threshold
+
+### Example Data
+
+```json
+{
+  "data": {
+    "totalCost": 125.47,
+    "threshold": 100,
+    "window": "24h",
+    "aggregate": "namespace",
+    "exceedingItems": [
+      {
+        "name": "production",
+        "totalCost": 85.32,
+        "cpuCost": 45.12,
+        "gpuCost": 0,
+        "ramCost": 28.50,
+        "pvCost": 8.20,
+        "networkCost": 3.50
+      }
+    ]
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "opencost.costExceedsThreshold"
+}
+```
+
+<a id="get-cost-allocation"></a>
+
+## Get Cost Allocation
+
+The Get Cost Allocation component fetches cost allocation data from the OpenCost `/allocation/compute` endpoint.
+
+### Use Cases
+
+- **Cost reporting**: Post cost allocation summaries to Slack or email
+- **Budget monitoring**: Fetch cost data to use in downstream workflow steps
+- **Multi-cluster visibility**: Aggregate costs across namespaces, pods, or clusters
+
+### Configuration
+
+- **Window**: Time window for the query (e.g., `1h`, `7d`, `30d`)
+- **Aggregate By**: Dimension to group costs by (e.g., `namespace`, `pod`, `cluster`)
+- **Step**: Optional interval for data points (e.g., `1h`, `1d`)
+- **Resolution**: Optional data granularity (e.g., `1m`, `10m`)
+
+### Output
+
+The component emits a payload containing:
+- `window`: The time window queried
+- `aggregate`: The aggregation dimension used
+- `totalCost`: The total cost across all allocations
+- `allocations`: Array of allocation entries with detailed cost breakdowns including CPU, GPU, RAM, PV, network, and total costs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "window": "24h",
+    "aggregate": "namespace",
+    "allocations": [
+      {
+        "name": "production",
+        "cpuCost": 45.12,
+        "gpuCost": 0,
+        "ramCost": 28.50,
+        "pvCost": 8.20,
+        "networkCost": 3.50,
+        "totalCost": 85.32,
+        "start": "2026-02-11T16:00:00Z",
+        "end": "2026-02-12T16:00:00Z",
+        "minutes": 1440,
+        "properties": {
+          "namespace": "production"
+        }
+      }
+    ],
+    "totalCost": 125.47
+  },
+  "timestamp": "2026-02-12T16:18:05.943610583Z",
+  "type": "opencost.allocation"
+}
+```

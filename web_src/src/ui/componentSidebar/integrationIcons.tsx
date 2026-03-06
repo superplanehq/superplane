@@ -27,6 +27,7 @@ import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import octopusIcon from "@/assets/icons/integrations/octopus.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
+import opencostIcon from "@/assets/icons/integrations/opencost.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import cloudBuildIcon from "@/assets/icons/integrations/cloud_build.svg";
@@ -72,6 +73,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   octopus: octopusIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
+  opencost: opencostIcon,
   claude: claudeIcon,
   cursor: cursorIcon,
   pagerduty: pagerDutyIcon,
@@ -113,6 +115,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   octopus: octopusIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
+  opencost: opencostIcon,
   claude: claudeIcon,
   cursor: cursorIcon,
   pagerduty: pagerDutyIcon,

@@ -1,0 +1,30 @@
+{
+  "data": {
+    "totalCost": 125.47,
+    "threshold": 100,
+    "window": "24h",
+    "aggregate": "namespace",
+    "exceedingItems": [
+      {
+        "name": "production",
+        "totalCost": 85.32,
+        "cpuCost": 45.12,
+        "gpuCost": 0,
+        "ramCost": 28.50,
+        "pvCost": 8.20,
+        "networkCost": 3.50
+      },
+      {
+        "name": "staging",
+        "totalCost": 40.15,
+        "cpuCost": 22.30,
+        "gpuCost": 0,
+        "ramCost": 12.85,
+        "pvCost": 3.00,
+        "networkCost": 2.00
+      }
+    ]
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "opencost.costExceedsThreshold"
+}
