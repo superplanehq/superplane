@@ -72,6 +72,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/slack"
 	_ "github.com/superplanehq/superplane/pkg/integrations/smtp"
 	_ "github.com/superplanehq/superplane/pkg/integrations/statuspage"
+	_ "github.com/superplanehq/superplane/pkg/integrations/teams"
 	_ "github.com/superplanehq/superplane/pkg/integrations/telegram"
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
