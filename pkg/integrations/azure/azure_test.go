@@ -294,3 +294,107 @@ func TestConfiguration_Struct(t *testing.T) {
 	assert.Equal(t, "test-client-id", config.ClientID)
 	assert.Equal(t, "test-subscription-id", config.SubscriptionID)
 }
+
+const testIntegrationID = "00000000-0000-0000-0000-000000000001"
+
+func newTestIntegration(t *testing.T, handler http.HandlerFunc) (*AzureIntegration, *httptest.Server) {
+	t.Helper()
+	server := httptest.NewServer(handler)
+
+	client := &armClient{
+		subscriptionID: "test-sub",
+		baseURL:        server.URL,
+		tokenFunc:      func(_ context.Context) (string, error) { return "mock-token", nil },
+		httpClient:     &http.Client{},
+		logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	provider := &AzureProvider{
+		subscriptionID: "test-sub",
+		client:         client,
+		logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	integration := &AzureIntegration{
+		provider:      provider,
+		integrationID: testIntegrationID,
+	}
+
+	return integration, server
+}
+
+func newTestListCtx() core.ListResourcesContext {
+	return core.ListResourcesContext{
+		Logger: logrus.NewEntry(logrus.New()),
+		Integration: &mockIntegrationContext{
+			id: testIntegrationID,
+		},
+	}
+}
+
+func TestListResourceGroupLocations_EmptyResourceGroup(t *testing.T) {
+	integration := &AzureIntegration{}
+	resources, err := integration.ListResourceGroupLocations(newTestListCtx(), "")
+	assert.NoError(t, err)
+	assert.Empty(t, resources)
+}
+
+func TestListResourceGroupLocations_Success(t *testing.T) {
+	integration, server := newTestIntegration(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"name":     "my-rg",
+			"id":       "/subscriptions/test-sub/resourceGroups/my-rg",
+			"location": "eastus",
+		})
+	})
+	defer server.Close()
+
+	resources, err := integration.ListResourceGroupLocations(newTestListCtx(), "my-rg")
+	require.NoError(t, err)
+	require.Len(t, resources, 1)
+	assert.Equal(t, ResourceTypeResourceGroupLocation, resources[0].Type)
+	assert.Equal(t, "eastus", resources[0].Name)
+	assert.Equal(t, "eastus", resources[0].ID)
+}
+
+func TestListResourceGroupLocations_NotFound(t *testing.T) {
+	integration, server := newTestIntegration(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]any{
+			"error": map[string]any{
+				"code":    "ResourceGroupNotFound",
+				"message": "Resource group 'my-rg' could not be found.",
+			},
+		})
+	})
+	defer server.Close()
+
+	resources, err := integration.ListResourceGroupLocations(newTestListCtx(), "my-rg")
+	assert.NoError(t, err)
+	assert.Empty(t, resources)
+}
+
+func TestCreateVMComponent_LocationField(t *testing.T) {
+	component := &CreateVMComponent{}
+	fields := component.Configuration()
+
+	var locationField *configuration.Field
+	for i := range fields {
+		if fields[i].Name == "location" {
+			locationField = &fields[i]
+			break
+		}
+	}
+
+	require.NotNil(t, locationField, "location field must exist")
+	assert.Equal(t, configuration.FieldTypeIntegrationResource, locationField.Type)
+	require.NotNil(t, locationField.TypeOptions)
+	require.NotNil(t, locationField.TypeOptions.Resource)
+	assert.Equal(t, ResourceTypeResourceGroupLocation, locationField.TypeOptions.Resource.Type)
+	assert.True(t, locationField.TypeOptions.Resource.UseNameAsValue)
+	require.Len(t, locationField.TypeOptions.Resource.Parameters, 1)
+	assert.Equal(t, "resourceGroup", locationField.TypeOptions.Resource.Parameters[0].Name)
+	assert.Equal(t, "resourceGroup", locationField.TypeOptions.Resource.Parameters[0].ValueFrom.Field)
+}
