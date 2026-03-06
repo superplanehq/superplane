@@ -35,6 +35,13 @@ type PlanPayload struct {
 	} `json:"links"`
 }
 
+type OrganizationPayload struct {
+	ID         string `json:"id"`
+	Attributes struct {
+		Name string `json:"name"`
+	} `json:"attributes"`
+}
+
 type WorkspacePayload struct {
 	ID         string `json:"id"`
 	Attributes struct {
@@ -48,10 +55,11 @@ type WorkspacePayload struct {
 			} `json:"data"`
 		} `json:"organization"`
 	} `json:"relationships"`
+	Organization *OrganizationPayload
 }
 
 func (c *Client) ReadRun(runID string) (*RunPayload, error) {
-	path := fmt.Sprintf("/api/v2/runs/%s?include=workspace", runID)
+	path := fmt.Sprintf("/api/v2/runs/%s?include=workspace,workspace.organization", runID)
 	req, err := c.newRequest(http.MethodGet, path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create run read request: %w", err)
@@ -73,8 +81,8 @@ func (c *Client) ReadRun(runID string) (*RunPayload, error) {
 	}
 
 	var payload struct {
-		Data     RunPayload         `json:"data"`
-		Included []WorkspacePayload `json:"included"`
+		Data     RunPayload        `json:"data"`
+		Included []json.RawMessage `json:"included"`
 	}
 	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
 		return nil, fmt.Errorf("failed to decode run: %w", err)
@@ -97,12 +105,39 @@ func (c *Client) ReadRun(runID string) (*RunPayload, error) {
 		payload.Data.Plan = &PlanReference{ID: runDetails.Data.Relationships.Plan.Data.ID}
 	}
 
-	for _, inc := range payload.Included {
-		if inc.Attributes.Name != "" {
-			wk := inc
-			payload.Data.Workspace = &wk
-			break
+	// Parse included resources (workspaces and organizations)
+	var workspace *WorkspacePayload
+	orgs := make(map[string]*OrganizationPayload)
+
+	for _, raw := range payload.Included {
+		var typeCheck struct {
+			Type string `json:"type"`
 		}
+		if err := json.Unmarshal(raw, &typeCheck); err != nil {
+			continue
+		}
+
+		switch typeCheck.Type {
+		case "workspaces":
+			var ws WorkspacePayload
+			if err := json.Unmarshal(raw, &ws); err == nil && ws.Attributes.Name != "" {
+				workspace = &ws
+			}
+		case "organizations":
+			var org OrganizationPayload
+			if err := json.Unmarshal(raw, &org); err == nil {
+				orgs[org.ID] = &org
+			}
+		}
+	}
+
+	if workspace != nil {
+		// Attach organization to workspace if available
+		orgID := workspace.Relationships.Organization.Data.ID
+		if org, ok := orgs[orgID]; ok {
+			workspace.Organization = org
+		}
+		payload.Data.Workspace = workspace
 	}
 
 	return &payload.Data, nil

@@ -177,22 +177,18 @@ func (c *Plan) poll(ctx core.ActionContext) error {
 			metadata.WorkspaceName = run.Workspace.Attributes.Name
 			metadataChanged = true
 		}
-		if metadata.RunURL == "" && run.Workspace.Relationships.Organization.Data.ID != "" && client.BaseURL != "" {
-			orgID := run.Workspace.Relationships.Organization.Data.ID
-			orgName := orgID
-
-			orgs, listErr := client.ListOrganizations()
-			if listErr == nil {
-				for _, o := range orgs {
-					if o.ID == orgID || o.Name == orgID {
-						orgName = o.Name
-						break
-					}
-				}
+		if metadata.RunURL == "" && client.BaseURL != "" {
+			orgName := ""
+			if run.Workspace.Organization != nil {
+				orgName = run.Workspace.Organization.Attributes.Name
 			}
-
-			metadata.RunURL = fmt.Sprintf("%s/app/%s/workspaces/%s/runs/%s", client.BaseURL, orgName, run.Workspace.Attributes.Name, run.ID)
-			metadataChanged = true
+			if orgName == "" {
+				orgName = run.Workspace.Relationships.Organization.Data.ID
+			}
+			if orgName != "" {
+				metadata.RunURL = fmt.Sprintf("%s/app/%s/workspaces/%s/runs/%s", client.BaseURL, orgName, run.Workspace.Attributes.Name, run.ID)
+				metadataChanged = true
+			}
 		}
 	}
 
