@@ -78,11 +78,11 @@ func (c *RunNRQLQuery) Configuration() []configuration.Field {
 			Placeholder: "SELECT count(*) FROM Transaction SINCE 1 hour ago",
 		},
 		{
-			Name:    "timeout",
-			Label:   "Timeout (seconds)",
-			Type:    configuration.FieldTypeNumber,
+			Name:     "timeout",
+			Label:    "Timeout (seconds)",
+			Type:     configuration.FieldTypeNumber,
 			Required: false,
-			Default: 30,
+			Default:  30,
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
 					Min: func() *int { min := 0; return &min }(),
@@ -171,4 +171,3 @@ func (c *RunNRQLQuery) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 func (c *RunNRQLQuery) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
-
