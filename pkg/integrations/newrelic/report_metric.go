@@ -110,7 +110,7 @@ func (c *ReportMetric) Configuration() []configuration.Field {
 		{
 			Name:        "value",
 			Label:       "Value",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Description: "The numeric value for the metric",
 		},

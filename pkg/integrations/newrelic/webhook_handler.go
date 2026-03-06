@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -25,8 +26,8 @@ const defaultPayloadTemplate = `{
   "title": {{json title.[0]}},
   "priority": {{json priority}},
   "state": {{json state}},
-  "policyName": {{json policyName.[0]}},
-  "conditionName": {{json conditionName.[0]}},
+  "policyName": {{#if policyName.[0]}}{{json policyName.[0]}}{{else}}null{{/if}},
+  "conditionName": {{#if conditionName.[0]}}{{json conditionName.[0]}}{{else}}null{{/if}},
   "accountId": {{json accumulations.tag.account.[0]}},
   "createdAt": {{json createdAt}},
   "updatedAt": {{json updatedAt}},
@@ -47,7 +48,12 @@ func (h *NewRelicWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, err
 		return nil, fmt.Errorf("failed to create New Relic client: %w", err)
 	}
 
-	destinationID, err := client.CreateNotificationDestination(context.Background(), ctx.Webhook.GetURL())
+	secret := uuid.New().String()
+	if err := ctx.Webhook.SetSecret([]byte(secret)); err != nil {
+		return nil, fmt.Errorf("failed to persist webhook secret: %w", err)
+	}
+
+	destinationID, err := client.CreateNotificationDestination(context.Background(), ctx.Webhook.GetURL(), secret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create webhook destination: %w", err)
 	}

@@ -237,16 +237,16 @@ func containsIgnoreCase(allowed []string, value string) bool {
 }
 
 func validateWebhookAuth(ctx core.WebhookRequestContext) (int, error) {
-	if ctx.Integration == nil {
+	if ctx.Webhook == nil {
 		return http.StatusOK, nil
 	}
 
-	secret, err := optionalIntegrationConfig(ctx.Integration, "webhookSecret")
+	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to read webhook auth configuration: %v", err)
+		return http.StatusInternalServerError, fmt.Errorf("failed to read webhook secret: %v", err)
 	}
 
-	if secret == "" {
+	if len(secret) == 0 {
 		return http.StatusOK, nil
 	}
 
@@ -256,34 +256,11 @@ func validateWebhookAuth(ctx core.WebhookRequestContext) (int, error) {
 	}
 
 	token := authorization[len("Bearer "):]
-	if subtle.ConstantTimeCompare([]byte(token), []byte(secret)) != 1 {
+	if subtle.ConstantTimeCompare([]byte(token), secret) != 1 {
 		return http.StatusForbidden, fmt.Errorf("invalid bearer token")
 	}
 
 	return http.StatusOK, nil
-}
-
-func optionalIntegrationConfig(integration core.IntegrationContext, name string) (string, error) {
-	if integration == nil {
-		return "", nil
-	}
-
-	value, err := integration.GetConfig(name)
-	if err != nil {
-		errText := strings.ToLower(err.Error())
-		if strings.Contains(errText, "not found") {
-			return "", nil
-		}
-
-		// Optional fields can be stored as null in configuration.
-		if strings.Contains(errText, "not a string") {
-			return "", nil
-		}
-
-		return "", err
-	}
-
-	return string(value), nil
 }
 
 func issueToMap(payload NewRelicIssuePayload) map[string]any {

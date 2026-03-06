@@ -2,7 +2,6 @@ package newrelic
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -73,17 +72,23 @@ func (c *RunNRQLQuery) Configuration() []configuration.Field {
 		{
 			Name:        "query",
 			Label:       "NRQL Query",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeText,
 			Required:    true,
 			Description: "The NRQL query to execute",
 			Placeholder: "SELECT count(*) FROM Transaction SINCE 1 hour ago",
 		},
 		{
-			Name:        "timeout",
-			Label:       "Timeout (seconds)",
-			Type:        configuration.FieldTypeNumber,
-			Required:    false,
-			Default:     30,
+			Name:    "timeout",
+			Label:   "Timeout (seconds)",
+			Type:    configuration.FieldTypeNumber,
+			Required: false,
+			Default: 30,
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: func() *int { min := 0; return &min }(),
+					Max: func() *int { max := maxNRQLTimeout; return &max }(),
+				},
+			},
 			Description: "Query timeout in seconds",
 		},
 	}
@@ -119,10 +124,6 @@ func (c *RunNRQLQuery) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	if !accountIDRegexp.MatchString(client.AccountID) {
-		return fmt.Errorf("invalid account ID: must be numeric")
-	}
-
 	timeout := 30
 	if spec.Timeout > 0 {
 		timeout = spec.Timeout
@@ -132,31 +133,9 @@ func (c *RunNRQLQuery) Execute(ctx core.ExecutionContext) error {
 		timeout = maxNRQLTimeout
 	}
 
-	graphQLQuery := fmt.Sprintf(
-		`{ actor { account(id: %s) { nrql(query: %s, timeout: %d) { results } } } }`,
-		client.AccountID,
-		quoteGraphQL(spec.Query),
-		timeout,
-	)
-
-	responseBody, err := client.NerdGraphQuery(context.Background(), graphQLQuery)
+	results, err := client.RunNRQLQuery(context.Background(), spec.Query, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to execute NRQL query: %v", err)
-	}
-
-	var response NerdGraphNRQLResponse
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return fmt.Errorf("error parsing response: %v", err)
-	}
-
-	if len(response.Errors) > 0 {
-		return fmt.Errorf("GraphQL error: %s", response.Errors[0].Message)
-	}
-
-	results := response.Data.Actor.Account.NRQL.Results
-	if results == nil {
-		results = []any{}
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -193,22 +172,3 @@ func (c *RunNRQLQuery) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-type NerdGraphNRQLResponse struct {
-	Data struct {
-		Actor struct {
-			Account struct {
-				NRQL struct {
-					Results []any `json:"results"`
-				} `json:"nrql"`
-			} `json:"account"`
-		} `json:"actor"`
-	} `json:"data"`
-	Errors []struct {
-		Message string `json:"message"`
-	} `json:"errors"`
-}
-
-func quoteGraphQL(s string) string {
-	b, _ := json.Marshal(s)
-	return string(b)
-}

@@ -61,6 +61,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}},
+			Webhook:       &contexts.NodeWebhookContext{},
 			Integration:   &contexts.IntegrationContext{},
 			Events:        eventsCtx,
 		})
@@ -82,6 +83,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{"CLOSED"}},
+			Webhook:       &contexts.NodeWebhookContext{},
 			Integration:   &contexts.IntegrationContext{},
 			Events:        eventsCtx,
 		})
@@ -98,6 +100,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}, "priorities": []string{"LOW"}},
+			Webhook:       &contexts.NodeWebhookContext{},
 			Integration:   &contexts.IntegrationContext{},
 			Events:        eventsCtx,
 		})
@@ -114,6 +117,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 			Body:          []byte("not-json"),
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}},
+			Webhook:       &contexts.NodeWebhookContext{},
 			Integration:   &contexts.IntegrationContext{},
 			Events:        eventsCtx,
 		})
@@ -130,6 +134,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}, "priorities": []string{"CRITICAL", "HIGH"}},
+			Webhook:       &contexts.NodeWebhookContext{},
 			Integration:   &contexts.IntegrationContext{},
 			Events:        eventsCtx,
 		})
@@ -146,10 +151,9 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}},
-			Integration: &contexts.IntegrationContext{
-				Configuration: map[string]any{"webhookSecret": "my-secret"},
-			},
-			Events: eventsCtx,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "my-secret"},
+			Integration:   &contexts.IntegrationContext{},
+			Events:        eventsCtx,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -166,10 +170,9 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 			Body:          payload,
 			Headers:       headers,
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}},
-			Integration: &contexts.IntegrationContext{
-				Configuration: map[string]any{"webhookSecret": "my-secret"},
-			},
-			Events: eventsCtx,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "my-secret"},
+			Integration:   &contexts.IntegrationContext{},
+			Events:        eventsCtx,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -177,17 +180,16 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		assert.Len(t, eventsCtx.Payloads, 0)
 	})
 
-	t.Run("null webhookSecret -> no auth required", func(t *testing.T) {
+	t.Run("empty secret -> no auth required", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}},
-			Integration: &contexts.IntegrationContext{
-				Configuration: map[string]any{"webhookSecret": nil},
-			},
-			Events: eventsCtx,
+			Webhook:       &contexts.NodeWebhookContext{},
+			Integration:   &contexts.IntegrationContext{},
+			Events:        eventsCtx,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -204,10 +206,9 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 			Body:          payload,
 			Headers:       headers,
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}},
-			Integration: &contexts.IntegrationContext{
-				Configuration: map[string]any{"webhookSecret": "my-secret"},
-			},
-			Events: eventsCtx,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "my-secret"},
+			Integration:   &contexts.IntegrationContext{},
+			Events:        eventsCtx,
 		})
 
 		assert.Equal(t, http.StatusOK, code)

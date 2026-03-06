@@ -237,7 +237,7 @@ func Test__NewRelic__Configuration(t *testing.T) {
 	n := &NewRelic{}
 	config := n.Configuration()
 
-	require.Len(t, config, 5)
+	require.Len(t, config, 4)
 
 	accountIdField := config[0]
 	assert.Equal(t, "accountId", accountIdField.Name)
@@ -256,9 +256,4 @@ func Test__NewRelic__Configuration(t *testing.T) {
 	assert.Equal(t, "licenseKey", licenseKeyField.Name)
 	assert.True(t, licenseKeyField.Required)
 	assert.True(t, licenseKeyField.Sensitive)
-
-	webhookSecretField := config[4]
-	assert.Equal(t, "webhookSecret", webhookSecretField.Name)
-	assert.False(t, webhookSecretField.Required)
-	assert.True(t, webhookSecretField.Sensitive)
 }

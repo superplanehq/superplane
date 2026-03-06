@@ -106,14 +106,6 @@ func (n *NewRelic) Configuration() []configuration.Field {
 			Sensitive:   true,
 			Description: "New Relic License Key for metric ingestion",
 		},
-		{
-			Name:        "webhookSecret",
-			Label:       "Webhook Secret",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Sensitive:   true,
-			Description: "Optional secret for validating incoming webhook requests. If set, New Relic must send an Authorization: Bearer <secret> header.",
-		},
 	}
 }
 

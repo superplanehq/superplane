@@ -130,13 +130,18 @@ func (c *Client) ReportMetric(ctx context.Context, payload []byte) ([]byte, erro
 }
 
 // CreateNotificationDestination creates a webhook destination in New Relic via NerdGraph.
-func (c *Client) CreateNotificationDestination(ctx context.Context, webhookURL string) (string, error) {
+func (c *Client) CreateNotificationDestination(ctx context.Context, webhookURL string, secret string) (string, error) {
 	name := fmt.Sprintf("SuperPlane-%d", time.Now().UnixMilli())
+	authBlock := ""
+	if secret != "" {
+		authBlock = fmt.Sprintf(`, auth: {type: TOKEN, token: {prefix: "Bearer", token: %s}}`,
+			quoteGraphQL(secret))
+	}
 	query := fmt.Sprintf(`mutation {
 		aiNotificationsCreateDestination(accountId: %s, destination: {
 			name: %s,
 			type: WEBHOOK,
-			properties: [{key: "url", value: %s}]
+			properties: [{key: "url", value: %s}]%s
 		}) {
 			destination { id }
 			error {
@@ -145,7 +150,7 @@ func (c *Client) CreateNotificationDestination(ctx context.Context, webhookURL s
 				... on AiNotificationsSuggestionError { description details }
 			}
 		}
-	}`, c.AccountID, quoteGraphQL(name), quoteGraphQL(webhookURL))
+	}`, c.AccountID, quoteGraphQL(name), quoteGraphQL(webhookURL), authBlock)
 
 	body, err := c.NerdGraphQuery(ctx, query)
 	if err != nil {
@@ -347,6 +352,52 @@ func (c *Client) DeleteNotificationDestination(ctx context.Context, destinationI
 	}
 
 	return nil
+}
+
+type NerdGraphNRQLResponse struct {
+	Data struct {
+		Actor struct {
+			Account struct {
+				NRQL struct {
+					Results []any `json:"results"`
+				} `json:"nrql"`
+			} `json:"account"`
+		} `json:"actor"`
+	} `json:"data"`
+	Errors []struct {
+		Message string `json:"message"`
+	} `json:"errors"`
+}
+
+// RunNRQLQuery executes a NRQL query via NerdGraph and returns the result rows.
+func (c *Client) RunNRQLQuery(ctx context.Context, query string, timeout int) ([]any, error) {
+	graphQLQuery := fmt.Sprintf(
+		`{ actor { account(id: %s) { nrql(query: %s, timeout: %d) { results } } } }`,
+		c.AccountID,
+		quoteGraphQL(query),
+		timeout,
+	)
+	body, err := c.NerdGraphQuery(ctx, graphQLQuery)
+	if err != nil {
+		return nil, err
+	}
+	var response NerdGraphNRQLResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+	if len(response.Errors) > 0 {
+		return nil, fmt.Errorf("GraphQL error: %s", response.Errors[0].Message)
+	}
+	results := response.Data.Actor.Account.NRQL.Results
+	if results == nil {
+		results = []any{}
+	}
+	return results, nil
+}
+
+func quoteGraphQL(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
 }
 
 func (c *Client) nerdGraphRequest(ctx context.Context, body []byte) ([]byte, error) {

@@ -165,10 +165,6 @@ function getDetailsForIssue(eventData: NewRelicIssuePayload): Record<string, str
     details["Created At"] = new Date(eventData.createdAt).toLocaleString();
   }
 
-  if (eventData?.updatedAt) {
-    details["Updated At"] = new Date(eventData.updatedAt).toLocaleString();
-  }
-
   if (eventData?.issueUrl) {
     details["Issue URL"] = eventData.issueUrl;
   }
