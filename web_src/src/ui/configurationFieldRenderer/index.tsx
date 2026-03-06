@@ -385,6 +385,7 @@ export const ConfigurationFieldRenderer = ({
             onChange={(v) => onChange(v)}
             organizationId={organizationId ?? domainId}
             placeholder={field.placeholder ?? "Select credential"}
+            allowClear={!isRequired}
           />
         );
 

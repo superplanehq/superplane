@@ -10,6 +10,7 @@ const ANNOTATION_NODE_HEIGHT = 200;
 
 type ApplyHorizontalAutoLayoutOptions = {
   nodeIds?: string[];
+  scope?: "full-canvas" | "connected-component" | "exact-set";
 };
 
 type LayoutPosition = {
@@ -35,20 +36,106 @@ function resolveFlowNodes(nodes: ComponentsNode[]): ComponentsNode[] {
   return nodes.filter((node) => !!node.id && node.type !== "TYPE_WIDGET");
 }
 
-function resolveLayoutNodes(flowNodes: ComponentsNode[], requestedNodeIDs: string[]): ComponentsNode[] {
+function normalizeRequestedNodeIDs(flowNodes: ComponentsNode[], requestedNodeIDs: string[]): string[] {
   const normalizedRequestedNodeIDs = Array.from(
     new Set(requestedNodeIDs.map((nodeId) => nodeId.trim()).filter((nodeId) => nodeId.length > 0)),
   );
-  const flowNodeIDs = new Set(flowNodes.map((node) => node.id as string));
-  const scopedNodeIDs = normalizedRequestedNodeIDs.filter((nodeId) => flowNodeIDs.has(nodeId));
-  const hasScopedSelection = scopedNodeIDs.length > 0;
-  const scopedNodeIDSet = new Set(scopedNodeIDs);
 
-  if (hasScopedSelection) {
-    return flowNodes.filter((node) => scopedNodeIDSet.has(node.id as string));
+  const flowNodeIDs = new Set(flowNodes.map((node) => node.id as string));
+  return normalizedRequestedNodeIDs.filter((nodeID) => flowNodeIDs.has(nodeID));
+}
+
+function resolveLayoutScope(options: ApplyHorizontalAutoLayoutOptions | undefined, hasSeedNodeIDs: boolean) {
+  if (options?.scope) {
+    return options.scope;
   }
 
-  return flowNodes;
+  return hasSeedNodeIDs ? "connected-component" : "full-canvas";
+}
+
+function buildFlowAdjacency(workflow: CanvasesCanvas, flowNodes: ComponentsNode[]) {
+  const flowNodeIDSet = new Set(flowNodes.map((node) => node.id as string));
+  const adjacencyByNodeID = new Map<string, string[]>();
+
+  for (const node of flowNodes) {
+    adjacencyByNodeID.set(node.id as string, []);
+  }
+
+  for (const edge of workflow.spec?.edges || []) {
+    const sourceID = edge.sourceId;
+    const targetID = edge.targetId;
+    if (!sourceID || !targetID) {
+      continue;
+    }
+
+    if (!flowNodeIDSet.has(sourceID) || !flowNodeIDSet.has(targetID)) {
+      continue;
+    }
+
+    adjacencyByNodeID.get(sourceID)?.push(targetID);
+    adjacencyByNodeID.get(targetID)?.push(sourceID);
+  }
+
+  return adjacencyByNodeID;
+}
+
+function resolveConnectedComponentNodeIDs(
+  workflow: CanvasesCanvas,
+  flowNodes: ComponentsNode[],
+  seedNodeIDs: string[],
+): string[] {
+  if (seedNodeIDs.length === 0) {
+    return flowNodes.map((node) => node.id as string);
+  }
+
+  const adjacencyByNodeID = buildFlowAdjacency(workflow, flowNodes);
+  const visitedNodeIDs = new Set<string>();
+  const queue = [...seedNodeIDs];
+
+  while (queue.length > 0) {
+    const currentNodeID = queue.shift();
+    if (!currentNodeID || visitedNodeIDs.has(currentNodeID)) {
+      continue;
+    }
+
+    visitedNodeIDs.add(currentNodeID);
+    const neighbors = adjacencyByNodeID.get(currentNodeID) || [];
+    for (const neighborNodeID of neighbors) {
+      if (!visitedNodeIDs.has(neighborNodeID)) {
+        queue.push(neighborNodeID);
+      }
+    }
+  }
+
+  return flowNodes.map((node) => node.id as string).filter((nodeID) => visitedNodeIDs.has(nodeID));
+}
+
+function resolveScopedNodeIDs(
+  workflow: CanvasesCanvas,
+  flowNodes: ComponentsNode[],
+  options?: ApplyHorizontalAutoLayoutOptions,
+): string[] {
+  const seedNodeIDs = normalizeRequestedNodeIDs(flowNodes, options?.nodeIds || []);
+  const scope = resolveLayoutScope(options, seedNodeIDs.length > 0);
+
+  if (scope === "exact-set") {
+    return seedNodeIDs;
+  }
+
+  if (scope === "connected-component") {
+    return resolveConnectedComponentNodeIDs(workflow, flowNodes, seedNodeIDs);
+  }
+
+  return flowNodes.map((node) => node.id as string);
+}
+
+function resolveLayoutNodes(flowNodes: ComponentsNode[], scopedNodeIDs: string[]): ComponentsNode[] {
+  if (scopedNodeIDs.length === 0) {
+    return [];
+  }
+
+  const scopedNodeIDSet = new Set(scopedNodeIDs);
+  return flowNodes.filter((node) => scopedNodeIDSet.has(node.id as string));
 }
 
 function resolveLayoutEdges(workflow: CanvasesCanvas, layoutNodes: ComponentsNode[]) {
@@ -170,7 +257,8 @@ export async function applyHorizontalAutoLayout(
     return workflow;
   }
 
-  const layoutNodes = resolveLayoutNodes(flowNodes, options?.nodeIds || []);
+  const scopedNodeIDs = resolveScopedNodeIDs(workflow, flowNodes, options);
+  const layoutNodes = resolveLayoutNodes(flowNodes, scopedNodeIDs);
   if (layoutNodes.length === 0) {
     return workflow;
   }

@@ -1,0 +1,90 @@
+{
+  "data": {
+    "configuration": {
+      "kind": "Dash0SyntheticCheck",
+      "metadata": {
+        "annotations": {},
+        "description": "",
+        "labels": {
+          "dash0.com/dataset": "default",
+          "dash0.com/id": "64617368-3073-796e-7468-73599f287bf4",
+          "dash0.com/origin": "",
+          "dash0.com/version": "21"
+        },
+        "name": "New synthetic check"
+      },
+      "spec": {
+        "display": {
+          "name": "New synthetic check"
+        },
+        "enabled": true,
+        "labels": {},
+        "notifications": {
+          "channels": [],
+          "onlyCriticalChannels": []
+        },
+        "plugin": {
+          "kind": "http",
+          "spec": {
+            "assertions": {
+              "criticalAssertions": [
+                {
+                  "kind": "status_code",
+                  "spec": {
+                    "operator": "is",
+                    "value": "200"
+                  }
+                }
+              ],
+              "degradedAssertions": [
+                {
+                  "kind": "timing",
+                  "spec": {
+                    "operator": "lte",
+                    "type": "total",
+                    "value": "2000ms"
+                  }
+                }
+              ]
+            },
+            "request": {
+              "headers": [],
+              "method": "get",
+              "queryParameters": [],
+              "redirects": "follow",
+              "tls": {
+                "allowInsecure": false
+              },
+              "tracing": {
+                "addTracingHeaders": true
+              },
+              "url": "https://example.com/health"
+            }
+          }
+        },
+        "retries": {
+          "kind": "off",
+          "spec": {}
+        },
+        "schedule": {
+          "interval": "1m",
+          "locations": ["be-brussels"],
+          "strategy": "all_locations"
+        }
+      }
+    },
+    "metrics": {
+      "avgDuration24hMs": 1004,
+      "avgDuration7dMs": 1004,
+      "criticalRuns24h": 2275,
+      "criticalRuns7d": 2438,
+      "healthyRuns24h": 6,
+      "healthyRuns7d": 37,
+      "lastOutcome": "Healthy",
+      "totalRuns24h": 2281,
+      "totalRuns7d": 2475
+    }
+  },
+  "timestamp": "2026-03-03T11:00:00Z",
+  "type": "dash0.syntheticCheck.fetched"
+}

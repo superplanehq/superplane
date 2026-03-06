@@ -973,12 +973,17 @@ func (b *NodeConfigurationBuilder) listUpstreamNodeIDs() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(canvas.Edges) == 0 {
+
+	_, liveEdges, err := models.FindLiveCanvasSpecInTransaction(b.tx, canvas.ID)
+	if err != nil {
+		return nil, err
+	}
+	if len(liveEdges) == 0 {
 		return nil, nil
 	}
 
-	incoming := make(map[string][]string, len(canvas.Edges))
-	for _, edge := range canvas.Edges {
+	incoming := make(map[string][]string, len(liveEdges))
+	for _, edge := range liveEdges {
 		incoming[edge.TargetID] = append(incoming[edge.TargetID], edge.SourceID)
 	}
 

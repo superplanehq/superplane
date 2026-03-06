@@ -9,7 +9,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Triggers
 
 <CardGrid>
-  <LinkCard title="On Notification" href="#on-notification" description="Listen to Dash0 notification webhook events" />
+  <LinkCard title="On Alert Notification" href="#on-alert-notification" description="Listen to Dash0 alert notification webhook events" />
+  <LinkCard title="On Synthetic Check Notification" href="#on-synthetic-check-notification" description="Listen to Dash0 synthetic check notification webhook events" />
 </CardGrid>
 
 ## Actions
@@ -17,26 +18,27 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create HTTP Synthetic Check" href="#create-http-synthetic-check" description="Create an HTTP synthetic check in Dash0 to monitor endpoint availability and performance" />
   <LinkCard title="Delete HTTP Synthetic Check" href="#delete-http-synthetic-check" description="Delete an HTTP synthetic check from Dash0 by ID" />
+  <LinkCard title="Get HTTP Synthetic Check" href="#get-http-synthetic-check" description="Retrieve an HTTP synthetic check configuration and operational metrics from Dash0" />
   <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
   <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
   <LinkCard title="Update HTTP Synthetic Check" href="#update-http-synthetic-check" description="Update an existing HTTP synthetic check in Dash0 by ID" />
 </CardGrid>
 
-<a id="on-notification"></a>
+<a id="on-alert-notification"></a>
 
-## On Notification
+## On Alert Notification
 
-The On Notification trigger starts a workflow execution when Dash0 sends a notification webhook.
+The On Alert Notification trigger starts a workflow execution when Dash0 sends an alert notification webhook.
 
 ### Setup
 
 1. Configure the Dash0 integration in SuperPlane.
 2. Copy the webhook URL shown in the integration configuration.
-3. In Dash0, configure notifications to send HTTP POST requests to that URL.
+3. In Dash0, configure alert notifications to send HTTP POST requests to that URL.
 
 ### Event Data
 
-The trigger emits the full JSON payload received from Dash0 as `dash0.notification`.
+The trigger emits the full JSON payload received from Dash0 as `dash0.alertNotification`.
 
 ### Example Data
 
@@ -92,7 +94,117 @@ The trigger emits the full JSON payload received from Dash0 as `dash0.notificati
     }
   },
   "timestamp": "2026-02-20T12:00:00Z",
-  "type": "dash0.notification"
+  "type": "dash0.alertNotification"
+}
+```
+
+<a id="on-synthetic-check-notification"></a>
+
+## On Synthetic Check Notification
+
+The On Synthetic Check Notification trigger starts a workflow execution when Dash0 sends a synthetic check notification webhook.
+
+### Setup
+
+1. Configure the Dash0 integration in SuperPlane.
+2. Copy the webhook URL shown in the integration configuration.
+3. In Dash0, configure synthetic check notifications to send HTTP POST requests to that URL.
+
+### Event Data
+
+The trigger emits the full JSON payload received from Dash0 as `dash0.syntheticCheckNotification`.
+
+### Labels Format
+
+Synthetic check notifications use a tuple-based label format where each label is an array of `[index, {key, value}]`.
+The trigger normalizes these labels into a flat `{key: value}` map in the emitted payload for easier downstream consumption.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "issue": {
+      "checkrules": [
+        {
+          "annotations": {
+            "summary": "API health check failure detected"
+          },
+          "description": "Monitor API health endpoint availability",
+          "expression": "",
+          "for": "5m",
+          "id": "check_101",
+          "interval": "1m",
+          "keepFiringFor": "10m",
+          "labels": {
+            "env": "prod",
+            "service": "api"
+          },
+          "name": "API Health Check",
+          "thresholds": {},
+          "url": "https://app.dash0.com/check-rules/check_101"
+        }
+      ],
+      "dataset": "default",
+      "description": "Synthetic check detected failures for API health endpoint.",
+      "end": "",
+      "id": "issue_789",
+      "issueIdentifier": "synthetic-check-api-health",
+      "labels": [
+        [
+          "0",
+          {
+            "key": "dash0.resource.type",
+            "value": {
+              "stringValue": "synthetic"
+            }
+          }
+        ],
+        [
+          "1",
+          {
+            "key": "dash0.synthetic_check.attempt_id",
+            "value": {
+              "stringValue": "73768e2c"
+            }
+          }
+        ],
+        [
+          "2",
+          {
+            "key": "dash0.synthetic_check.failed_critical_assertions",
+            "value": {
+              "stringValue": "{\"be-brussels\":[{\"actualValue\":\"503\",\"assertion\":{\"kind\":\"status_code\",\"spec\":{\"operator\":\"is\",\"value\":\"200\"}},\"explanation\":\"Expected value to be 200, but got 503\"}]}"
+            }
+          }
+        ],
+        [
+          "3",
+          {
+            "key": "dash0.synthetic_check.id",
+            "value": {
+              "stringValue": "api-health-check"
+            }
+          }
+        ],
+        [
+          "4",
+          {
+            "key": "dash0.synthetic_check.name",
+            "value": {
+              "stringValue": "API Health Check"
+            }
+          }
+        ]
+      ],
+      "start": "2026-02-20T12:00:00Z",
+      "status": "critical",
+      "summary": "Synthetic check failed: API Health Check",
+      "url": "https://app.dash0.com/issues/issue_789"
+    }
+  },
+  "timestamp": "2026-02-20T12:00:00Z",
+  "type": "dash0.syntheticCheckNotification"
 }
 ```
 
@@ -261,6 +373,146 @@ Returns a confirmation payload (e.g. deleted id).
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "dash0.syntheticCheck.deleted"
+}
+```
+
+<a id="get-http-synthetic-check"></a>
+
+## Get HTTP Synthetic Check
+
+The Get HTTP Synthetic Check component retrieves the full configuration and operational metrics of an existing HTTP synthetic check from Dash0.
+
+### Use Cases
+
+- **Health dashboards**: Fetch current uptime and performance metrics for display in workflows
+- **Audit and reporting**: Retrieve check configurations for compliance or documentation
+- **Incident response**: Quickly gather check status and recent performance data during incidents
+
+### Configuration
+
+- **Check ID**: The ID of the synthetic check to retrieve (from Dash0)
+- **Dataset**: The Dash0 dataset the check belongs to (defaults to "default")
+
+### Output Channels
+
+- **Healthy**: The check is passing — the most recent run outcome is "Healthy"
+- **Critical**: The check is failing — the most recent run outcome is "Critical"
+
+### Output
+
+Returns a combined payload with:
+
+#### Configuration
+The full synthetic check configuration from the Dash0 API, including:
+- Name, URL, HTTP method
+- Schedule (interval, locations, strategy)
+- Assertions (critical and degraded thresholds)
+- Retry settings
+
+#### Metrics
+Operational metrics from the Dash0 Prometheus API:
+- **Healthy Runs (24h/7d)**: Number of successful check runs
+- **Critical Runs (24h/7d)**: Number of failed check runs
+- **Total Runs (24h/7d)**: Total number of check runs
+- **Avg Duration (24h/7d)**: Mean end-to-end response time (in milliseconds)
+- **Last Outcome**: Most recent run outcome (Healthy or Critical)
+
+Note: Metrics are fetched on a best-effort basis. If Prometheus metrics are unavailable for a check, the configuration is still returned with null metric values.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "configuration": {
+      "kind": "Dash0SyntheticCheck",
+      "metadata": {
+        "annotations": {},
+        "description": "",
+        "labels": {
+          "dash0.com/dataset": "default",
+          "dash0.com/id": "64617368-3073-796e-7468-73599f287bf4",
+          "dash0.com/origin": "",
+          "dash0.com/version": "21"
+        },
+        "name": "New synthetic check"
+      },
+      "spec": {
+        "display": {
+          "name": "New synthetic check"
+        },
+        "enabled": true,
+        "labels": {},
+        "notifications": {
+          "channels": [],
+          "onlyCriticalChannels": []
+        },
+        "plugin": {
+          "kind": "http",
+          "spec": {
+            "assertions": {
+              "criticalAssertions": [
+                {
+                  "kind": "status_code",
+                  "spec": {
+                    "operator": "is",
+                    "value": "200"
+                  }
+                }
+              ],
+              "degradedAssertions": [
+                {
+                  "kind": "timing",
+                  "spec": {
+                    "operator": "lte",
+                    "type": "total",
+                    "value": "2000ms"
+                  }
+                }
+              ]
+            },
+            "request": {
+              "headers": [],
+              "method": "get",
+              "queryParameters": [],
+              "redirects": "follow",
+              "tls": {
+                "allowInsecure": false
+              },
+              "tracing": {
+                "addTracingHeaders": true
+              },
+              "url": "https://example.com/health"
+            }
+          }
+        },
+        "retries": {
+          "kind": "off",
+          "spec": {}
+        },
+        "schedule": {
+          "interval": "1m",
+          "locations": [
+            "be-brussels"
+          ],
+          "strategy": "all_locations"
+        }
+      }
+    },
+    "metrics": {
+      "avgDuration24hMs": 1004,
+      "avgDuration7dMs": 1004,
+      "criticalRuns24h": 2275,
+      "criticalRuns7d": 2438,
+      "healthyRuns24h": 6,
+      "healthyRuns7d": 37,
+      "lastOutcome": "Healthy",
+      "totalRuns24h": 2281,
+      "totalRuns7d": 2475
+    }
+  },
+  "timestamp": "2026-03-03T11:00:00Z",
+  "type": "dash0.syntheticCheck.fetched"
 }
 ```
 

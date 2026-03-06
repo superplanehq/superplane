@@ -243,7 +243,7 @@ func (c *ReportMetric) Execute(ctx core.ExecutionContext) error {
 		[]any{map[string]any{
 			"metricName": spec.MetricName,
 			"metricType": spec.MetricType,
-			"value":      spec.Value,
+			"value":      numericValue,
 			"timestamp":  timestamp,
 		}},
 	)

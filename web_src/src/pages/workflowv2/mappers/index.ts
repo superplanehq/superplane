@@ -16,6 +16,7 @@ import { addMemoryMapper } from "./addMemory";
 import { deleteMemoryMapper } from "./deleteMemory";
 import { readMemoryMapper } from "./readMemory";
 import { updateMemoryMapper } from "./updateMemory";
+import { upsertMemoryMapper } from "./upsertMemory";
 import { ifMapper, IF_STATE_REGISTRY } from "./if";
 import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
 import {
@@ -140,6 +141,11 @@ import {
   eventStateRegistry as octopusEventStateRegistry,
 } from "./octopus/index";
 import {
+  componentMappers as teamsComponentMappers,
+  triggerRenderers as teamsTriggerRenderers,
+  eventStateRegistry as teamsEventStateRegistry,
+} from "./teams";
+import {
   componentMappers as openaiComponentMappers,
   triggerRenderers as openaiTriggerRenderers,
   eventStateRegistry as openaiEventStateRegistry,
@@ -231,6 +237,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   deleteMemory: deleteMemoryMapper,
   readMemory: readMemoryMapper,
   updateMemory: updateMemoryMapper,
+  upsertMemory: upsertMemoryMapper,
   if: ifMapper,
   http: httpMapper,
   ssh: sshMapper,
@@ -265,6 +272,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   discord: discordComponentMappers,
   telegram: telegramComponentMappers,
   octopus: octopusComponentMappers,
+  teams: teamsComponentMappers,
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
@@ -303,6 +311,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   discord: discordTriggerRenderers,
   telegram: telegramTriggerRenderers,
   octopus: octopusTriggerRenderers,
+  teams: teamsTriggerRenderers,
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
@@ -334,6 +343,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   render: renderEventStateRegistry,
   discord: discordEventStateRegistry,
   telegram: telegramEventStateRegistry,
+  teams: teamsEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   incident: incidentEventStateRegistry,
   newrelic: newrelicEventStateRegistry,

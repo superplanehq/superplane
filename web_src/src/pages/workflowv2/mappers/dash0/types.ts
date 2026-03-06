@@ -42,6 +42,15 @@ export interface DeleteHttpSyntheticCheckConfiguration {
   dataset: string;
 }
 
+export interface GetHttpSyntheticCheckConfiguration {
+  checkId: string;
+  dataset: string;
+}
+
+export interface GetHttpSyntheticCheckNodeMetadata {
+  checkName?: string;
+}
+
 export interface UpdateHttpSyntheticCheckConfiguration {
   checkId: string;
   name: string;

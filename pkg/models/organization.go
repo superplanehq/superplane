@@ -13,13 +13,14 @@ import (
 )
 
 type Organization struct {
-	ID               uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Name             string    `gorm:"uniqueIndex"`
-	Description      string
-	AllowedProviders datatypes.JSONSlice[string]
-	CreatedAt        *time.Time
-	UpdatedAt        *time.Time
-	DeletedAt        gorm.DeletedAt `gorm:"index"`
+	ID                       uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Name                     string    `gorm:"uniqueIndex"`
+	Description              string
+	AllowedProviders         datatypes.JSONSlice[string]
+	CanvasSandboxModeEnabled bool
+	CreatedAt                *time.Time
+	UpdatedAt                *time.Time
+	DeletedAt                gorm.DeletedAt `gorm:"index"`
 }
 
 func (o *Organization) IsProviderAllowed(provider string) bool {
@@ -43,9 +44,13 @@ func ListOrganizationsByIDs(ids []string) ([]Organization, error) {
 }
 
 func FindOrganizationByID(id string) (*Organization, error) {
+	return FindOrganizationByIDInTransaction(database.Conn(), id)
+}
+
+func FindOrganizationByIDInTransaction(tx *gorm.DB, id string) (*Organization, error) {
 	organization := Organization{}
 
-	err := database.Conn().
+	err := tx.
 		Where("id = ?", id).
 		First(&organization).
 		Error
@@ -79,11 +84,12 @@ func CreateOrganization(name, description string) (*Organization, error) {
 func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Organization, error) {
 	now := time.Now()
 	organization := Organization{
-		Name:             name,
-		Description:      description,
-		AllowedProviders: datatypes.JSONSlice[string]{ProviderGitHub},
-		CreatedAt:        &now,
-		UpdatedAt:        &now,
+		Name:                     name,
+		Description:              description,
+		AllowedProviders:         datatypes.JSONSlice[string]{ProviderGitHub},
+		CanvasSandboxModeEnabled: true,
+		CreatedAt:                &now,
+		UpdatedAt:                &now,
 	}
 
 	err := tx.
@@ -138,4 +144,22 @@ func GetActiveOrganizationIDs() ([]string, error) {
 	}
 
 	return orgIDs, nil
+}
+
+func IsCanvasSandboxModeEnabled(organizationID uuid.UUID) (bool, error) {
+	return IsCanvasSandboxModeEnabledInTransaction(database.Conn(), organizationID)
+}
+
+func IsCanvasSandboxModeEnabledInTransaction(tx *gorm.DB, organizationID uuid.UUID) (bool, error) {
+	var organization Organization
+	err := tx.
+		Select("canvas_sandbox_mode_enabled").
+		Where("id = ?", organizationID).
+		First(&organization).
+		Error
+	if err != nil {
+		return false, err
+	}
+
+	return organization.CanvasSandboxModeEnabled, nil
 }
