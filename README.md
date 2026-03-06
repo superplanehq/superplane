@@ -1,4 +1,4 @@
-# SuperPlane
+# SuperPlane Example
 
 SuperPlane is an **open source DevOps control plane** for defining and running
 event-based workflows. It works across the tools you already use such as
