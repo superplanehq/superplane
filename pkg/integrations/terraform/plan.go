@@ -178,15 +178,10 @@ func (c *Plan) poll(ctx core.ActionContext) error {
 			metadataChanged = true
 		}
 		if metadata.RunURL == "" && client.BaseURL != "" {
-			orgName := ""
-			if run.Workspace.Organization != nil {
-				orgName = run.Workspace.Organization.Attributes.Name
-			}
-			if orgName == "" {
-				orgName = run.Workspace.Relationships.Organization.Data.ID
-			}
-			if orgName != "" {
-				metadata.RunURL = fmt.Sprintf("%s/app/%s/workspaces/%s/runs/%s", client.BaseURL, orgName, run.Workspace.Attributes.Name, run.ID)
+			// Only set RunURL if we have the organization name (not just the ID)
+			// The Terraform Cloud UI requires the human-readable org name in the URL
+			if run.Workspace.Organization != nil && run.Workspace.Organization.Attributes.Name != "" {
+				metadata.RunURL = fmt.Sprintf("%s/app/%s/workspaces/%s/runs/%s", client.BaseURL, run.Workspace.Organization.Attributes.Name, run.Workspace.Attributes.Name, run.ID)
 				metadataChanged = true
 			}
 		}

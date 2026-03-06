@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -46,7 +47,10 @@ func (h *WebhookHandler) Merge(current, requested any) (any, bool, error) {
 		Events:      requestedConfig.Events,
 	}
 
-	return mergedConfig, true, nil
+	// Check if the configuration actually changed
+	changed, _ := h.CompareConfig(currentConfig, mergedConfig)
+	// CompareConfig returns true if configs are equal, so we invert it
+	return mergedConfig, !changed, nil
 }
 
 func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
@@ -131,7 +135,7 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 						updateOpts["data"].(map[string]any)["attributes"].(map[string]any)["token"] = webhookSecret
 					}
 
-					updatePath := fmt.Sprintf("/api/v2/notification-configurations/%s", hook.ID)
+					updatePath := fmt.Sprintf("/api/v2/notification-configurations/%s", url.PathEscape(hook.ID))
 					uReq, err := client.newRequest(http.MethodPatch, updatePath, updateOpts)
 					if err != nil {
 						return nil, fmt.Errorf("failed to create update request: %w", err)
@@ -253,7 +257,7 @@ func (h *WebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	if !ok {
 		return fmt.Errorf("notification_configuration_id is not a string")
 	}
-	deletePath := fmt.Sprintf("/api/v2/notification-configurations/%s", id)
+	deletePath := fmt.Sprintf("/api/v2/notification-configurations/%s", url.PathEscape(id))
 	req, err := client.newRequest(http.MethodDelete, deletePath, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create delete request: %w", err)

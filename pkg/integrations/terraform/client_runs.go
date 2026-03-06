@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 )
 
 type RunPayload struct {
@@ -59,7 +60,7 @@ type WorkspacePayload struct {
 }
 
 func (c *Client) ReadRun(runID string) (*RunPayload, error) {
-	path := fmt.Sprintf("/api/v2/runs/%s?include=workspace,workspace.organization", runID)
+	path := fmt.Sprintf("/api/v2/runs/%s?include=workspace,workspace.organization", url.PathEscape(runID))
 	req, err := c.newRequest(http.MethodGet, path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create run read request: %w", err)
@@ -191,7 +192,7 @@ func (c *Client) CancelRun(runID, comment string) error {
 	if comment != "" {
 		opts = map[string]any{"comment": comment}
 	}
-	path := fmt.Sprintf("/api/v2/runs/%s/actions/cancel", runID)
+	path := fmt.Sprintf("/api/v2/runs/%s/actions/cancel", url.PathEscape(runID))
 	req, err := c.newRequest(http.MethodPost, path, opts)
 	if err != nil {
 		return fmt.Errorf("failed to create cancel request: %w", err)
@@ -210,7 +211,7 @@ func (c *Client) CancelRun(runID, comment string) error {
 }
 
 func (c *Client) ReadPlan(planID string) (*PlanPayload, error) {
-	path := fmt.Sprintf("/api/v2/plans/%s", planID)
+	path := fmt.Sprintf("/api/v2/plans/%s", url.PathEscape(planID))
 	req, err := c.newRequest(http.MethodGet, path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create plan read request: %w", err)
