@@ -616,6 +616,7 @@ export function BuildingBlocksSidebar({
   const sortedCategories = useMemo(() => {
     const categoryOrder: Record<string, number> = {
       Core: 0,
+      Memory: 1,
       Bundles: 2,
     };
 
@@ -1061,7 +1062,7 @@ function CategorySection({
     : [];
 
   const integrationState =
-    category.name === "Core"
+    category.name === "Core" || category.name === "Memory"
       ? "ready"
       : matchingIntegrationStates.includes("ready")
         ? "ready"
@@ -1084,6 +1085,8 @@ function CategorySection({
   let CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null = null;
   if (category.name === "Core") {
     CategoryIcon = resolveIcon("zap");
+  } else if (category.name === "Memory") {
+    CategoryIcon = resolveIcon("database");
   } else if (category.name === "Bundles") {
     CategoryIcon = resolveIcon("package");
   } else if (integrationName === "smtp") {
