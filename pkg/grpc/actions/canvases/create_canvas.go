@@ -44,18 +44,18 @@ func CreateCanvas(ctx context.Context, registry *registry.Registry, organization
 	if isTemplate {
 		targetOrganizationID = models.TemplateOrganizationID
 	}
+	liveVersionID := uuid.New()
 
 	canvas := models.Canvas{
 		ID:             uuid.New(),
 		OrganizationID: targetOrganizationID,
+		LiveVersionID:  &liveVersionID,
 		IsTemplate:     isTemplate,
 		Name:           pbCanvas.Metadata.Name,
 		Description:    pbCanvas.Metadata.Description,
 		CreatedBy:      &createdBy,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
-		Edges:          datatypes.NewJSONSlice(edges),
-		Nodes:          datatypes.NewJSONSlice(expandedNodes),
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -100,6 +100,18 @@ func CreateCanvas(ctx context.Context, registry *registry.Registry, organization
 				return err
 			}
 		}
+
+		version, err := models.CreatePublishedCanvasVersionInTransaction(
+			tx,
+			canvas.ID,
+			&createdBy,
+			expandedNodes,
+			edges,
+		)
+		if err != nil {
+			return err
+		}
+		canvas.LiveVersionID = &version.ID
 
 		return nil
 	})

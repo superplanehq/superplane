@@ -12,8 +12,10 @@ import (
 )
 
 const (
-	ExecuteCodePayloadType  = "daytona.execute.response"
-	ExecuteCodePollInterval = 5 * time.Second
+	ExecuteCodePayloadType          = "daytona.execute.response"
+	ExecuteCodePollInterval         = 5 * time.Second
+	ExecuteCodeOutputChannelSuccess = "success"
+	ExecuteCodeOutputChannelFailed  = "failed"
 )
 
 type ExecuteCode struct{}
@@ -84,7 +86,10 @@ func (e *ExecuteCode) Color() string {
 }
 
 func (e *ExecuteCode) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{core.DefaultOutputChannel}
+	return []core.OutputChannel{
+		{Name: ExecuteCodeOutputChannelSuccess, Label: "Success"},
+		{Name: ExecuteCodeOutputChannelFailed, Label: "Failed"},
+	}
 }
 
 func (e *ExecuteCode) Configuration() []configuration.Field {
@@ -178,17 +183,7 @@ func (e *ExecuteCode) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %v", err)
 	}
 
-	var command string
-	switch spec.Language {
-	case "python":
-		command = fmt.Sprintf("python3 -c %q", spec.Code)
-	case "javascript":
-		command = fmt.Sprintf("node -e %q", spec.Code)
-	case "typescript":
-		command = fmt.Sprintf("npx ts-node -e %q", spec.Code)
-	default:
-		command = fmt.Sprintf("python3 -c %q", spec.Code)
-	}
+	command := buildExecuteCodeCommand(spec.Language, spec.Code)
 	command = wrapCommandWithSandboxSecretEnv(command)
 
 	sessionID := uuid.New().String()
@@ -281,8 +276,13 @@ func (e *ExecuteCode) poll(ctx core.ActionContext) error {
 		Result:   logs,
 	}
 
+	channel := ExecuteCodeOutputChannelFailed
+	if *cmd.ExitCode == 0 {
+		channel = ExecuteCodeOutputChannelSuccess
+	}
+
 	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
+		channel,
 		ExecuteCodePayloadType,
 		[]any{result},
 	)
@@ -294,4 +294,19 @@ func (e *ExecuteCode) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 
 func (e *ExecuteCode) Cleanup(ctx core.SetupContext) error {
 	return nil
+}
+
+func buildExecuteCodeCommand(language, code string) string {
+	quotedCode := shellQuote(code)
+
+	switch language {
+	case "python":
+		return fmt.Sprintf("python3 -c %s", quotedCode)
+	case "javascript":
+		return fmt.Sprintf("node -e %s", quotedCode)
+	case "typescript":
+		return fmt.Sprintf("npx ts-node -e %s", quotedCode)
+	default:
+		return fmt.Sprintf("python3 -c %s", quotedCode)
+	}
 }

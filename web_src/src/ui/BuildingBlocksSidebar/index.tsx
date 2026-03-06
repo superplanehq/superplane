@@ -1,4 +1,6 @@
 import type {
+  ComponentsEdge,
+  ComponentsNode,
   OrganizationsIntegration,
   SuperplaneBlueprintsOutputChannel,
   SuperplaneComponentsOutputChannel,
@@ -31,53 +33,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
+import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
 import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
-import circleciIcon from "@/assets/icons/integrations/circleci.svg";
-import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
-import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
-import datadogIcon from "@/assets/icons/integrations/datadog.svg";
-import digitaloceanIcon from "@/assets/icons/integrations/digitalocean.svg";
-import discordIcon from "@/assets/icons/integrations/discord.svg";
-import telegramIcon from "@/assets/icons/integrations/telegram.svg";
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
-import jiraIcon from "@/assets/icons/integrations/jira.svg";
-import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
-import openAiIcon from "@/assets/icons/integrations/openai.svg";
-import claudeIcon from "@/assets/icons/integrations/claude.svg";
-import gcpIcon from "@/assets/icons/integrations/gcp.svg";
-import cursorIcon from "@/assets/icons/integrations/cursor.svg";
-import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import slackIcon from "@/assets/icons/integrations/slack.svg";
-import awsIcon from "@/assets/icons/integrations/aws.svg";
-import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
-import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
-import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
-import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
-import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
-import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
-import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
-import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.svg";
-import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
-import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
-import incidentIcon from "@/assets/icons/integrations/incident.svg";
-import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
-import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
-import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
-import renderIcon from "@/assets/icons/integrations/render.svg";
-import dockerIcon from "@/assets/icons/integrations/docker.svg";
-import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
-import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
-import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
-import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
-import harnessIcon from "@/assets/icons/integrations/harness.svg";
-import octopusIcon from "@/assets/icons/integrations/octopus.svg";
-import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
-import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
-import teamsIcon from "@/assets/icons/integrations/teams.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -112,6 +69,13 @@ export interface BuildingBlocksSidebarProps {
     label?: string;
     type?: string;
   }>;
+  aiCanvas?: {
+    name?: string;
+    description?: string;
+    nodes?: ComponentsNode[];
+    edges?: ComponentsEdge[];
+  };
+  selectedNodeIds?: string[];
   onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
   integrations?: OrganizationsIntegration[];
   canvasZoom?: number;
@@ -138,6 +102,11 @@ export type AiCanvasOperation =
     }
   | {
       type: "connect_nodes";
+      source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null };
+      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
+    }
+  | {
+      type: "disconnect_nodes";
       source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null };
       target: { nodeKey?: string; nodeId?: string; nodeName?: string };
     }
@@ -219,6 +188,8 @@ export function BuildingBlocksSidebar({
   showAiBuilderTab = false,
   canvasId,
   canvasNodes = [],
+  aiCanvas,
+  selectedNodeIds = [],
   onApplyAiOperations,
   integrations = [],
   canvasZoom = 1,
@@ -313,6 +284,14 @@ export function BuildingBlocksSidebar({
     persistedAiState?.pendingProposal || null,
   );
   const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
+  const applyShortcutHint = useMemo(() => {
+    if (typeof navigator === "undefined") {
+      return "Ctrl+Enter";
+    }
+
+    const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
+    return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
+  }, []);
 
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
@@ -367,6 +346,17 @@ export function BuildingBlocksSidebar({
               canvasContext: {
                 nodes: canvasNodes,
                 availableBlocks,
+                canvas: {
+                  metadata: {
+                    name: aiCanvas?.name || "",
+                    description: aiCanvas?.description || "",
+                  },
+                  spec: {
+                    nodes: aiCanvas?.nodes || [],
+                    edges: aiCanvas?.edges || [],
+                  },
+                },
+                selectedNodeIds,
               },
             },
           }),
@@ -436,6 +426,8 @@ export function BuildingBlocksSidebar({
         return `Add node ${operation.nodeName || operation.blockName} (${operation.blockName})`;
       case "connect_nodes":
         return `Connect ${resolveRefLabel(operation.source)} -> ${resolveRefLabel(operation.target)}`;
+      case "disconnect_nodes":
+        return `Disconnect ${resolveRefLabel(operation.source)} -> ${resolveRefLabel(operation.target)}`;
       case "update_node_config":
         return `Update configuration for ${operation.nodeName || operation.target.nodeName || "node"}`;
       case "delete_node":
@@ -503,6 +495,34 @@ export function BuildingBlocksSidebar({
       setIsApplyingProposal(false);
     }
   }, [onApplyAiOperations, pendingProposal]);
+
+  useEffect(() => {
+    if (activeTab !== "ai" || !pendingProposal || pendingProposal.operations.length === 0) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing || event.key !== "Enter") {
+        return;
+      }
+
+      if (!(event.metaKey || event.ctrlKey)) {
+        return;
+      }
+
+      if (disabled || isApplyingProposal) {
+        return;
+      }
+
+      event.preventDefault();
+      void handleApplyProposal();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeTab, disabled, handleApplyProposal, isApplyingProposal, pendingProposal]);
 
   // Save sidebar width to localStorage whenever it changes
   useEffect(() => {
@@ -596,6 +616,7 @@ export function BuildingBlocksSidebar({
   const sortedCategories = useMemo(() => {
     const categoryOrder: Record<string, number> = {
       Core: 0,
+      Memory: 1,
       Bundles: 2,
     };
 
@@ -866,7 +887,10 @@ export function BuildingBlocksSidebar({
                 )}
 
                 {pendingProposal && (
-                  <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-3 space-y-2">
+                  <div className="relative rounded-md border border-blue-200 bg-blue-50 px-3 py-3 space-y-2">
+                    <span className="absolute right-2 top-2 text-[10px] text-blue-800">
+                      {`${applyShortcutHint} to accept`}
+                    </span>
                     <ul className="text-sm text-blue-900 list-disc pl-5 space-y-1">
                       {pendingProposal.operations
                         .filter((operation) => operation.type !== "connect_nodes")
@@ -1022,62 +1046,10 @@ function CategorySection({
     return aName.localeCompare(bName);
   });
 
-  // Determine category icon
-  const appLogoMap: Record<string, string | Record<string, string>> = {
-    bitbucket: bitbucketIcon,
-    circleci: circleciIcon,
-    cloudflare: cloudflareIcon,
-    dash0: dash0Icon,
-    datadog: datadogIcon,
-    daytona: daytonaIcon,
-    digitalocean: digitaloceanIcon,
-    discord: discordIcon,
-    github: githubIcon,
-    gitlab: gitlabIcon,
-    hetzner: hetznerIcon,
-    jfrogArtifactory: jfrogArtifactoryIcon,
-    grafana: grafanaIcon,
-    jira: jiraIcon,
-    openai: openAiIcon,
-    "open-ai": openAiIcon,
-    claude: claudeIcon,
-    cursor: cursorIcon,
-    pagerduty: pagerDutyIcon,
-    rootly: rootlyIcon,
-    incident: incidentIcon,
-    launchdarkly: launchdarklyIcon,
-    semaphore: SemaphoreLogo,
-    slack: slackIcon,
-    telegram: telegramIcon,
-    sendgrid: sendgridIcon,
-    prometheus: prometheusIcon,
-    render: renderIcon,
-    dockerhub: dockerIcon,
-    harness: harnessIcon,
-    octopus: octopusIcon,
-    servicenow: servicenowIcon,
-    statuspage: statuspageIcon,
-    teams: teamsIcon,
-    aws: {
-      ec2: awsEc2Icon,
-      codeArtifact: awsIcon,
-      cloudwatch: awsCloudwatchIcon,
-      lambda: awsLambdaIcon,
-      ecr: awsEcrIcon,
-      sqs: awsSqsIcon,
-      route53: awsRoute53Icon,
-      ecs: awsEcsIcon,
-      sns: awsSnsIcon,
-    },
-    honeycomb: honeycombIcon,
-    gcp: gcpIcon,
-  };
-
   // Get integration name from first block if available, or match category name
   const firstBlock = allBlocks[0];
   const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
-  const appLogo = appLogoMap[integrationName];
-  const categoryIconSrc = typeof appLogo === "string" ? appLogo : integrationName === "aws" ? awsIcon : undefined;
+  const categoryIconSrc = integrationName === "smtp" ? undefined : getIntegrationIconSrc(integrationName);
 
   // Mirror org/integrations colors: ready=green, pending=amber, error=red, default=gray.
   const normalizedIntegrationName = normalizeIntegrationName(firstBlock?.integrationName);
@@ -1090,7 +1062,7 @@ function CategorySection({
     : [];
 
   const integrationState =
-    category.name === "Core"
+    category.name === "Core" || category.name === "Memory"
       ? "ready"
       : matchingIntegrationStates.includes("ready")
         ? "ready"
@@ -1113,6 +1085,8 @@ function CategorySection({
   let CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null = null;
   if (category.name === "Core") {
     CategoryIcon = resolveIcon("zap");
+  } else if (category.name === "Memory") {
+    CategoryIcon = resolveIcon("database");
   } else if (category.name === "Bundles") {
     CategoryIcon = resolveIcon("package");
   } else if (integrationName === "smtp") {
@@ -1154,58 +1128,7 @@ function CategorySection({
           const iconSlug =
             block.type === "blueprint" ? "component" : nameParts[0] === "smtp" ? "mail" : block.icon || "zap";
 
-          // Use SVG icons for application components/triggers (SMTP uses resolveIcon("mail"), same as core)
-          const appLogoMap: Record<string, string | Record<string, string>> = {
-            bitbucket: bitbucketIcon,
-            circleci: circleciIcon,
-            cloudflare: cloudflareIcon,
-            dash0: dash0Icon,
-            daytona: daytonaIcon,
-            datadog: datadogIcon,
-            digitalocean: digitaloceanIcon,
-            discord: discordIcon,
-            github: githubIcon,
-            gitlab: gitlabIcon,
-            hetzner: hetznerIcon,
-            jfrogArtifactory: jfrogArtifactoryIcon,
-            grafana: grafanaIcon,
-            openai: openAiIcon,
-            "open-ai": openAiIcon,
-            claude: claudeIcon,
-            cursor: cursorIcon,
-            pagerduty: pagerDutyIcon,
-            rootly: rootlyIcon,
-            incident: incidentIcon,
-            launchdarkly: launchdarklyIcon,
-            semaphore: SemaphoreLogo,
-            slack: slackIcon,
-            telegram: telegramIcon,
-            sendgrid: sendgridIcon,
-            prometheus: prometheusIcon,
-            render: renderIcon,
-            dockerhub: dockerIcon,
-            harness: harnessIcon,
-            octopus: octopusIcon,
-            servicenow: servicenowIcon,
-            statuspage: statuspageIcon,
-            teams: teamsIcon,
-            aws: {
-              codeArtifact: awsCodeArtifactIcon,
-              codepipeline: awsCodePipelineIcon,
-              cloudwatch: awsCloudwatchIcon,
-              ecr: awsEcrIcon,
-              ec2: awsEc2Icon,
-              lambda: awsLambdaIcon,
-              sqs: awsSqsIcon,
-              route53: awsRoute53Icon,
-              ecs: awsEcsIcon,
-              sns: awsSnsIcon,
-            },
-            honeycomb: honeycombIcon,
-            gcp: gcpIcon,
-          };
-          const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;
-          const appIconSrc = typeof appLogo === "string" ? appLogo : nameParts[1] ? appLogo?.[nameParts[1]] : undefined;
+          const appIconSrc = getHeaderIconSrc(block.name);
           const IconComponent = resolveIcon(iconSlug);
 
           const isLive = !!block.isLive;

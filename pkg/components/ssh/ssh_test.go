@@ -9,6 +9,19 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+type testMetadataContext struct {
+	value any
+}
+
+func (m *testMetadataContext) Get() any {
+	return m.value
+}
+
+func (m *testMetadataContext) Set(value any) error {
+	m.value = value
+	return nil
+}
+
 func authConfig(method string, privateKey, password any) map[string]any {
 	m := map[string]any{"authMethod": method}
 	if privateKey != nil {
@@ -114,5 +127,83 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
+	})
+
+	t.Run("invalid environment variable name", func(t *testing.T) {
+		err := c.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"host":           "example.com",
+				"username":       "root",
+				"authentication": authWithPass,
+				"command":        "whoami",
+				"timeout":        60,
+				"environment": []map[string]any{
+					{
+						"name":  "BAD-NAME",
+						"value": "x",
+					},
+				},
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid environment variable name")
+	})
+}
+
+func TestSSHCommand_Execute_DoesNotPanicWithoutConnectionRetry(t *testing.T) {
+	c := &SSHCommand{}
+	metadata := &testMetadataContext{}
+
+	err := c.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"host":     "example.com",
+			"port":     22,
+			"username": "root",
+			"command":  "ls -la",
+			"timeout":  60,
+			"authentication": map[string]any{
+				"authMethod": "invalid",
+			},
+		},
+		Metadata: metadata,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported authentication method")
+
+	saved, ok := metadata.Get().(ExecutionMetadata)
+	require.True(t, ok)
+	assert.Nil(t, saved.ConnectionRetry)
+	assert.Equal(t, 0, saved.MaxRetries)
+	assert.Equal(t, 0, saved.IntervalSeconds)
+}
+
+func TestSSHCommand_BuildRemoteCommand(t *testing.T) {
+	c := &SSHCommand{}
+
+	t.Run("command only", func(t *testing.T) {
+		command := c.buildRemoteCommand("", nil, "echo hello")
+		assert.Equal(t, "echo hello", command)
+	})
+
+	t.Run("working directory is shell quoted", func(t *testing.T) {
+		command := c.buildRemoteCommand("/opt/app's hardening", nil, "bash run.sh")
+		assert.Equal(t, "cd '/opt/app'\"'\"'s hardening' && bash run.sh", command)
+	})
+
+	t.Run("environment values are shell quoted and command wrapped", func(t *testing.T) {
+		command := c.buildRemoteCommand(
+			"",
+			[]EnvironmentVariable{
+				{Name: "PLAIN", Value: "ok"},
+				{Name: "SPECIAL", Value: "a'b;$PATH $(whoami)"},
+			},
+			"echo \"$SPECIAL\"",
+		)
+		assert.Equal(
+			t,
+			"env PLAIN='ok' SPECIAL='a'\"'\"'b;$PATH $(whoami)' sh -lc 'echo \"$SPECIAL\"'",
+			command,
+		)
 	})
 }

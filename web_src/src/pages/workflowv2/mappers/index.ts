@@ -91,6 +91,11 @@ import {
   customFieldRenderers as incidentCustomFieldRenderers,
 } from "./incident/index";
 import {
+  componentMappers as firehydrantComponentMappers,
+  triggerRenderers as firehydrantTriggerRenderers,
+  eventStateRegistry as firehydrantEventStateRegistry,
+} from "./firehydrant/index";
+import {
   componentMappers as launchdarklyComponentMappers,
   triggerRenderers as launchdarklyTriggerRenderers,
   eventStateRegistry as launchdarklyEventStateRegistry,
@@ -252,6 +257,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   render: renderComponentMappers,
   rootly: rootlyComponentMappers,
   incident: incidentComponentMappers,
+  firehydrant: firehydrantComponentMappers,
   launchdarkly: launchdarklyComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
@@ -289,6 +295,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   render: renderTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   incident: incidentTriggerRenderers,
+  firehydrant: firehydrantTriggerRenderers,
   launchdarkly: launchdarklyTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
@@ -330,6 +337,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   rootly: rootlyEventStateRegistry,
   incident: incidentEventStateRegistry,
   octopus: octopusEventStateRegistry,
+  firehydrant: firehydrantEventStateRegistry,
   launchdarkly: launchdarklyEventStateRegistry,
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,

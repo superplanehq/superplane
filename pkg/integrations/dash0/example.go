@@ -37,11 +37,23 @@ var exampleOutputDeleteHTTPSyntheticCheckBytes []byte
 var exampleOutputDeleteHTTPSyntheticCheckOnce sync.Once
 var exampleOutputDeleteHTTPSyntheticCheck map[string]any
 
-//go:embed example_data_on_notification.json
-var exampleDataOnNotificationBytes []byte
+//go:embed example_data_on_alert_notification.json
+var exampleDataOnAlertNotificationBytes []byte
 
-var exampleDataOnNotificationOnce sync.Once
-var exampleDataOnNotification map[string]any
+//go:embed example_output_get_http_synthetic_check.json
+var exampleOutputGetHTTPSyntheticCheckBytes []byte
+
+var exampleOutputGetHTTPSyntheticCheckOnce sync.Once
+var exampleOutputGetHTTPSyntheticCheck map[string]any
+
+var exampleDataOnAlertNotificationOnce sync.Once
+var exampleDataOnAlertNotification map[string]any
+
+//go:embed example_data_on_synthetic_check_notification.json
+var exampleDataOnSyntheticCheckNotificationBytes []byte
+
+var exampleDataOnSyntheticCheckNotificationOnce sync.Once
+var exampleDataOnSyntheticCheckNotification map[string]any
 
 func (c *QueryPrometheus) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryPrometheusOnce, exampleOutputQueryPrometheusBytes, &exampleOutputQueryPrometheus)
@@ -63,6 +75,14 @@ func (c *DeleteHTTPSyntheticCheck) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteHTTPSyntheticCheckOnce, exampleOutputDeleteHTTPSyntheticCheckBytes, &exampleOutputDeleteHTTPSyntheticCheck)
 }
 
-func onNotificationExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnNotificationOnce, exampleDataOnNotificationBytes, &exampleDataOnNotification)
+func (c *GetHTTPSyntheticCheck) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetHTTPSyntheticCheckOnce, exampleOutputGetHTTPSyntheticCheckBytes, &exampleOutputGetHTTPSyntheticCheck)
+}
+
+func onAlertNotificationExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlertNotificationOnce, exampleDataOnAlertNotificationBytes, &exampleDataOnAlertNotification)
+}
+
+func onSyntheticCheckNotificationExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnSyntheticCheckNotificationOnce, exampleDataOnSyntheticCheckNotificationBytes, &exampleDataOnSyntheticCheckNotification)
 }

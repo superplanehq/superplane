@@ -44,6 +44,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	core.Bind(createCmd, &createCommand{file: &createFile}, options)
 
 	var updateFile string
+	var updateDraft bool
 	var updateAutoLayout string
 	var updateAutoLayoutScope string
 	var updateAutoLayoutNodes []string
@@ -53,14 +54,30 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 	}
 	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
+	updateCmd.Flags().BoolVar(&updateDraft, "draft", false, "update your draft version (required when versioning is enabled)")
 	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal)")
 	updateCmd.Flags().StringVar(&updateAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component, exact-set)")
 	updateCmd.Flags().StringArrayVar(&updateAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
 	core.Bind(updateCmd, &updateCommand{
 		file:            &updateFile,
+		draft:           &updateDraft,
 		autoLayout:      &updateAutoLayout,
 		autoLayoutScope: &updateAutoLayoutScope,
 		autoLayoutNodes: &updateAutoLayoutNodes,
+	}, options)
+
+	var publishTitle string
+	var publishDescription string
+	publishCmd := &cobra.Command{
+		Use:   "publish [name-or-id]",
+		Short: "Publish the current draft version as live",
+		Args:  cobra.MaximumNArgs(1),
+	}
+	publishCmd.Flags().StringVar(&publishTitle, "title", "", "change request title")
+	publishCmd.Flags().StringVar(&publishDescription, "description", "", "change request description")
+	core.Bind(publishCmd, &publishCommand{
+		title:       &publishTitle,
+		description: &publishDescription,
 	}, options)
 
 	root.AddCommand(listCmd)
@@ -68,6 +85,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	root.AddCommand(activeCmd)
 	root.AddCommand(createCmd)
 	root.AddCommand(updateCmd)
+	root.AddCommand(publishCmd)
 
 	return root
 }

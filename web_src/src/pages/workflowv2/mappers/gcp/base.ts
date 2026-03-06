@@ -9,8 +9,10 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import claudeIcon from "@/assets/icons/integrations/gcp.svg";
+import gcpIcon from "@/assets/icons/integrations/gcp.svg";
+import cloudBuildIcon from "@/assets/icons/integrations/cloud_build.svg";
 import { formatTimeAgo } from "@/utils/date";
+import { buildCloudBuildSummaryDetails, getCloudBuildData, getCloudBuildOutputPayload } from "./cloudbuild";
 
 export const baseMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -18,7 +20,7 @@ export const baseMapper: ComponentBaseMapper = {
     const componentName = context.componentDefinition.name ?? "gcp";
 
     return {
-      iconSrc: claudeIcon,
+      iconSrc: gcpIcon,
       iconSlug: context.componentDefinition?.icon ?? "cloud",
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
@@ -48,6 +50,27 @@ export const baseMapper: ComponentBaseMapper = {
   subtitle(context: SubtitleContext): string {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
     return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+  },
+};
+
+export const cloudBuildBaseMapper: ComponentBaseMapper = {
+  ...baseMapper,
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const baseProps = baseMapper.props(context);
+    return {
+      ...baseProps,
+      iconSrc: cloudBuildIcon,
+      eventSections: baseProps.eventSections?.map((section) => ({
+        ...section,
+        showAutomaticTime: true,
+      })),
+    };
+  },
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const payload = getCloudBuildOutputPayload(context.execution);
+    const build = getCloudBuildData(context.execution);
+    const timestamp = payload?.timestamp ?? context.execution.updatedAt ?? context.execution.createdAt;
+    return buildCloudBuildSummaryDetails({ build, timestamp });
   },
 };
 
