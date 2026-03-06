@@ -7,6 +7,7 @@ import { createHttpSyntheticCheckMapper } from "./create_http_synthetic_check";
 import { updateHttpSyntheticCheckMapper } from "./update_http_synthetic_check";
 import { deleteHttpSyntheticCheckMapper } from "./delete_http_synthetic_check";
 import { getHttpSyntheticCheckMapper, GET_HTTP_SYNTHETIC_CHECK_STATE_REGISTRY } from "./get_http_synthetic_check";
+import { sendLogEventMapper } from "./send_log_event";
 import { buildActionStateRegistry } from "../utils";
 import { onAlertNotificationTriggerRenderer } from "./on_alert_notification";
 import { onSyntheticCheckNotificationTriggerRenderer } from "./on_synthetic_check_notification";
@@ -18,6 +19,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   updateHttpSyntheticCheck: updateHttpSyntheticCheckMapper,
   deleteHttpSyntheticCheck: deleteHttpSyntheticCheckMapper,
   getHttpSyntheticCheck: getHttpSyntheticCheckMapper,
+  sendLogEvent: sendLogEventMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -32,6 +34,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   updateHttpSyntheticCheck: buildActionStateRegistry("updated"),
   deleteHttpSyntheticCheck: buildActionStateRegistry("deleted"),
   getHttpSyntheticCheck: GET_HTTP_SYNTHETIC_CHECK_STATE_REGISTRY,
+  sendLogEvent: buildActionStateRegistry("sent"),
 };
 
 export async function resolveExecutionErrors(canvasId: string, executionIds: string[]) {
