@@ -9,7 +9,7 @@ import { mockBuildingBlockCategories } from "@/ui/CanvasPage/storybooks/building
 
 // Flow control components that control workflow execution flow
 const FLOW_COMPONENT_NAMES = new Set(["if", "filter", "approval", "wait", "timeGate"]);
-const MEMORY_COMPONENT_NAMES = new Set(["addmemory", "readmemory", "updatememory", "deletememory"]);
+const MEMORY_COMPONENT_NAMES = new Set(["addmemory", "readmemory", "updatememory", "deletememory", "upsertmemory"]);
 
 function isMemoryBlock(block: BuildingBlock): boolean {
   return MEMORY_COMPONENT_NAMES.has((block.name || "").toLowerCase());
