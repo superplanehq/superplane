@@ -46,6 +46,7 @@ import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
 import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
+import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
@@ -88,6 +89,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   honeycomb: honeycombIcon,
   gcp: gcpIcon,
   harness: harnessIcon,
+  newrelic: newrelicIcon,
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
   launchdarkly: launchdarklyIcon,
@@ -128,6 +130,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   render: renderIcon,
   dockerhub: dockerIcon,
   harness: harnessIcon,
+  newrelic: newrelicIcon,
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
   launchdarkly: launchdarklyIcon,

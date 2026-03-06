@@ -47,9 +47,11 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   const deleteMutation = useDeleteIntegration(organizationId, integrationId || "");
 
   // Initialize config values when installation loads
+  const [configLoaded, setConfigLoaded] = useState(false);
   useEffect(() => {
     if (integration?.spec?.configuration) {
       setConfigValues(integration.spec.configuration);
+      setConfigLoaded(true);
     }
   }, [integration]);
 
@@ -329,19 +331,20 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
                   </div>
 
-                  {integrationDef.configuration.map((field: ConfigurationField) => (
-                    <ConfigurationFieldRenderer
-                      key={field.name}
-                      field={field}
-                      value={configValues[field.name!]}
-                      onChange={(value) => setConfigValues({ ...configValues, [field.name!]: value })}
-                      allValues={configValues}
-                      domainId={organizationId}
-                      domainType="DOMAIN_TYPE_ORGANIZATION"
-                      organizationId={organizationId}
-                      appInstallationId={integration?.metadata?.id}
-                    />
-                  ))}
+                  {configLoaded &&
+                    integrationDef.configuration.map((field: ConfigurationField) => (
+                      <ConfigurationFieldRenderer
+                        key={field.name}
+                        field={field}
+                        value={configValues[field.name!]}
+                        onChange={(value) => setConfigValues({ ...configValues, [field.name!]: value })}
+                        allValues={configValues}
+                        domainId={organizationId}
+                        domainType="DOMAIN_TYPE_ORGANIZATION"
+                        organizationId={organizationId}
+                        appInstallationId={integration?.metadata?.id}
+                      />
+                    ))}
 
                   <div className="flex items-center gap-3 pt-4">
                     <Button
