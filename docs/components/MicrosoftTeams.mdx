@@ -1,0 +1,232 @@
+---
+title: "Microsoft Teams"
+---
+
+Send and receive messages in Microsoft Teams channels
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Mention" href="#on-mention" description="Listen to messages mentioning the Teams bot" />
+  <LinkCard title="On Message" href="#on-message" description="Listen to all messages in a Teams channel" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Send Text Message" href="#send-text-message" description="Send a text message to a Microsoft Teams channel" />
+</CardGrid>
+
+## Instructions
+
+## Setup
+
+1. **Create an Azure App Registration**:
+   - Go to **Azure Portal** → **App registrations** → **New registration**
+   - Name: "SuperPlane Bot" (or your preference)
+   - Supported account types: **Accounts in any organizational directory** (multi-tenant) or single-tenant
+   - Note the **Application (client) ID** — this is the **App ID** below
+   - Go to **Certificates & secrets** → **New client secret** → copy the **Value** — this is the **App Password** below
+
+2. **Add Graph API permissions** (required for channel listing):
+   - Go to your **App Registration** → **API permissions** → **Add a permission**
+   - Select **Microsoft Graph** → **Application permissions**
+   - Add: **Team.ReadBasic.All** and **Channel.ReadBasic.All**
+   - Click **Grant admin consent**
+
+3. **Enter credentials** in the fields below and save
+
+<a id="on-mention"></a>
+
+## On Mention
+
+The On Mention trigger starts a workflow execution when the Teams bot is @mentioned in a channel message.
+
+### Use Cases
+
+- **Bot commands**: Process commands from Teams messages
+- **Bot interactions**: Create interactive Teams bots
+- **Team workflows**: Trigger workflows from Teams conversations
+- **Notification processing**: Process and respond to mentions
+
+### Configuration
+
+- **Channel**: Optional channel filter — if specified, only mentions in this channel will trigger (leave empty to listen to all channels)
+- **Content Filter**: Optional regex pattern to filter messages by content (e.g., `/deploy` to only trigger on mentions containing "/deploy")
+
+### Event Data
+
+Each mention event includes:
+- **text**: The message text containing the mention
+- **from**: User who mentioned the bot (ID and name)
+- **conversation**: Channel and team information
+- **timestamp**: When the mention occurred
+- **serviceUrl**: Bot Framework service URL for sending replies
+
+### Setup
+
+This trigger automatically sets up a subscription for bot mention events when configured. The subscription is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Note
+
+This trigger works with the default Bot Framework behavior — the bot receives messages where it is @mentioned without any additional permissions.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "channelId": "msteams",
+    "conversation": {
+      "conversationType": "channel",
+      "id": "19:abc123def456@thread.tacv2",
+      "isGroup": true,
+      "name": "General",
+      "tenantId": "00000000-0000-0000-0000-000000000000"
+    },
+    "entities": [
+      {
+        "mentioned": {
+          "id": "28:bot-id-here",
+          "name": "SuperPlane Bot"
+        },
+        "text": "\u003cat\u003eSuperPlane Bot\u003c/at\u003e",
+        "type": "mention"
+      }
+    ],
+    "from": {
+      "aadObjectId": "00000000-0000-0000-0000-000000000001",
+      "id": "29:1abc2def3ghi4jkl5mno6pqr7stu8vwx",
+      "name": "John Doe"
+    },
+    "id": "1700000000000",
+    "recipient": {
+      "id": "28:bot-id-here",
+      "name": "SuperPlane Bot"
+    },
+    "serviceUrl": "https://smba.trafficmanager.net/teams/",
+    "text": "\u003cat\u003eSuperPlane Bot\u003c/at\u003e deploy the latest build to staging",
+    "timestamp": "2026-01-16T12:00:00.000Z",
+    "type": "message"
+  },
+  "timestamp": "2026-01-16T12:00:00Z",
+  "type": "teams.bot.mention"
+}
+```
+
+<a id="on-message"></a>
+
+## On Message
+
+The On Message trigger starts a workflow execution when any message is posted in a Teams channel.
+
+### Use Cases
+
+- **Message monitoring**: React to any message in a channel
+- **Keyword detection**: Process messages looking for specific content
+- **Activity tracking**: Track channel activity for analytics
+- **Auto-responses**: Automatically respond to specific message patterns
+
+### Configuration
+
+- **Channel**: Optional channel filter — if specified, only messages in this channel will trigger (leave empty to listen to all channels)
+- **Content Filter**: Optional regex pattern to filter messages by content (e.g., `/ci` to only trigger on messages containing "/ci")
+
+### Event Data
+
+Each message event includes:
+- **text**: The message text
+- **from**: User who sent the message (ID and name)
+- **conversation**: Channel and team information
+- **timestamp**: When the message was sent
+- **serviceUrl**: Bot Framework service URL for sending replies
+
+### Setup
+
+This trigger automatically sets up a subscription for channel message events when configured.
+
+### Important
+
+This trigger requires **Resource-Specific Consent (RSC)** permissions in the Teams app manifest. Specifically, the app must include the `ChannelMessage.Read.Group` permission. Without this permission, the bot will only receive messages where it is @mentioned.
+
+The generated Teams app manifest includes this permission by default. If you created the manifest manually, ensure this RSC permission is included.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "channelId": "msteams",
+    "conversation": {
+      "conversationType": "channel",
+      "id": "19:abc123def456@thread.tacv2",
+      "isGroup": true,
+      "name": "General",
+      "tenantId": "00000000-0000-0000-0000-000000000000"
+    },
+    "entities": [],
+    "from": {
+      "aadObjectId": "00000000-0000-0000-0000-000000000002",
+      "id": "29:1abc2def3ghi4jkl5mno6pqr7stu8vwx",
+      "name": "Jane Smith"
+    },
+    "id": "1700000000001",
+    "recipient": {
+      "id": "28:bot-id-here",
+      "name": "SuperPlane Bot"
+    },
+    "serviceUrl": "https://smba.trafficmanager.net/teams/",
+    "text": "The deployment to staging is complete. All tests passed.",
+    "timestamp": "2026-01-16T12:05:00.000Z",
+    "type": "message"
+  },
+  "timestamp": "2026-01-16T12:05:00Z",
+  "type": "teams.channel.message"
+}
+```
+
+<a id="send-text-message"></a>
+
+## Send Text Message
+
+The Send Text Message component sends a text message to a Microsoft Teams channel.
+
+### Use Cases
+
+- **Notifications**: Send notifications about workflow events or system status
+- **Alerts**: Alert teams about important events or errors
+- **Updates**: Provide status updates on long-running processes
+- **Team communication**: Automate team communications from workflows
+
+### Configuration
+
+- **Channel**: Select the Teams channel to send the message to
+- **Text**: The message text to send (supports expressions)
+
+### Output
+
+Returns metadata about the sent message including the message ID and timestamp.
+
+### Notes
+
+- The Teams bot must be installed in the team containing the target channel
+- Messages are sent as the configured bot user
+- The bot requires the appropriate permissions to post to the selected channel
+
+### Example Output
+
+```json
+{
+  "data": {
+    "conversationId": "19:abc123def456@thread.tacv2",
+    "id": "1700000000002",
+    "text": "Hello from SuperPlane",
+    "timestamp": "2026-01-16T12:10:00.000Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "teams.message.sent"
+}
+```
+
