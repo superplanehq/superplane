@@ -43,7 +43,7 @@ func NewAzureProvider(ctx context.Context, tenantID, clientID, subscriptionID st
 	provider := &AzureProvider{
 		credential:     credential,
 		subscriptionID: subscriptionID,
-		client:         newARMClient(credential, subscriptionID),
+		client:         newARMClient(credential, subscriptionID, logger),
 		logger:         logger,
 	}
 
