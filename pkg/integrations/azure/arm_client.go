@@ -11,6 +11,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -30,18 +31,29 @@ type armClient struct {
 	credential     azcore.TokenCredential
 	subscriptionID string
 	httpClient     *http.Client
+	logger         *logrus.Entry
+
+	// baseURL overrides armBaseURL when set (used in tests).
+	baseURL string
+
+	// tokenFunc overrides credential-based token fetching when set (used in tests).
+	tokenFunc func(context.Context) (string, error)
 }
 
-func newARMClient(credential azcore.TokenCredential, subscriptionID string) *armClient {
+func newARMClient(credential azcore.TokenCredential, subscriptionID string, logger *logrus.Entry) *armClient {
 	return &armClient{
 		credential:     credential,
 		subscriptionID: subscriptionID,
-		httpClient:     &http.Client{Timeout: 60 * time.Second},
+		httpClient:     &http.Client{Timeout: 120 * time.Second},
+		logger:         logger,
 	}
 }
 
 // bearerToken obtains an OAuth2 token for the ARM management plane.
 func (c *armClient) bearerToken(ctx context.Context) (string, error) {
+	if c.tokenFunc != nil {
+		return c.tokenFunc(ctx)
+	}
 	token, err := c.credential.GetToken(ctx, policy.TokenRequestOptions{
 		Scopes: []string{"https://management.azure.com/.default"},
 	})
@@ -49,6 +61,13 @@ func (c *armClient) bearerToken(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to get ARM token: %w", err)
 	}
 	return token.Token, nil
+}
+
+func (c *armClient) getBaseURL() string {
+	if c.baseURL != "" {
+		return c.baseURL
+	}
+	return armBaseURL
 }
 
 // doRequest executes an authenticated ARM request and returns the response.
@@ -66,7 +85,16 @@ func (c *armClient) doRequest(ctx context.Context, method, url string, body io.R
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	return c.httpClient.Do(req)
+	start := time.Now()
+	resp, err := c.httpClient.Do(req)
+	elapsed := time.Since(start)
+	if err != nil {
+		c.logger.WithError(err).Errorf("ARM %s %s failed after %s", method, url, elapsed)
+		return nil, err
+	}
+
+	c.logger.Debugf("ARM %s %s -> %d (%s)", method, url, resp.StatusCode, elapsed)
+	return resp, nil
 }
 
 // get performs a GET request and unmarshals the response JSON into dest.
@@ -269,21 +297,29 @@ func (c *armClient) pollLRO(ctx context.Context, pollURL, resourceURL string) (j
 func (c *armClient) listAll(ctx context.Context, url string) ([]json.RawMessage, error) {
 	var all []json.RawMessage
 	currentURL := url
+	page := 0
+
+	c.logger.Debugf("ARM listAll: %s", url)
 
 	for currentURL != "" {
-		var page struct {
+		page++
+
+		var pageResp struct {
 			Value    []json.RawMessage `json:"value"`
 			NextLink string            `json:"nextLink"`
 		}
 
-		if err := c.get(ctx, currentURL, &page); err != nil {
+		if err := c.get(ctx, currentURL, &pageResp); err != nil {
+			c.logger.WithError(err).Errorf("ARM listAll failed on page %d", page)
 			return nil, err
 		}
 
-		all = append(all, page.Value...)
-		currentURL = page.NextLink
+		c.logger.Debugf("ARM listAll page %d: %d items, hasNextLink=%v", page, len(pageResp.Value), pageResp.NextLink != "")
+		all = append(all, pageResp.Value...)
+		currentURL = pageResp.NextLink
 	}
 
+	c.logger.Debugf("ARM listAll complete: %d total items across %d page(s)", len(all), page)
 	return all, nil
 }
 

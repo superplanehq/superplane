@@ -14,20 +14,20 @@ import (
 
 const (
 	ResourceTypeResourceGroupDropdown  = "azure.resourceGroup"
+	ResourceTypeResourceGroupLocation  = "azure.resourceGroupLocation"
 	ResourceTypeVMSizeDropdown         = "azure.vmSize"
 	ResourceTypeVirtualNetworkDropdown = "azure.virtualNetwork"
 	ResourceTypeSubnetDropdown         = "azure.subnet"
 )
 
 type armResourceGroup struct {
-	Name string `json:"name"`
-	ID   string `json:"id"`
+	Name     string `json:"name"`
+	ID       string `json:"id"`
+	Location string `json:"location"`
 }
 
-type armSKU struct {
-	Name         string   `json:"name"`
-	ResourceType string   `json:"resourceType"`
-	Locations    []string `json:"locations"`
+type armVMSize struct {
+	Name string `json:"name"`
 }
 
 type armVirtualNetwork struct {
@@ -41,6 +41,8 @@ type armSubnet struct {
 }
 
 func (a *AzureIntegration) ListResourceGroups(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	ctx.Logger.Info("listing Azure resource groups")
+
 	provider, err := a.ensureProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
@@ -80,10 +82,49 @@ func (a *AzureIntegration) ListResourceGroups(ctx core.ListResourcesContext) ([]
 		return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
 	})
 
+	ctx.Logger.Infof("found %d resource groups", len(resources))
 	return resources, nil
 }
 
+func (a *AzureIntegration) ListResourceGroupLocations(ctx core.ListResourcesContext, resourceGroup string) ([]core.IntegrationResource, error) {
+	if resourceGroup == "" {
+		return []core.IntegrationResource{}, nil
+	}
+	resourceGroup = azureResourceName(resourceGroup)
+
+	provider, err := a.ensureProvider(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	getURL := fmt.Sprintf("%s/subscriptions/%s/resourcegroups/%s?api-version=%s",
+		provider.GetClient().getBaseURL(), provider.GetSubscriptionID(), resourceGroup, armAPIVersionResources)
+
+	var group armResourceGroup
+	if err := provider.GetClient().get(context.Background(), getURL, &group); err != nil {
+		if isARMNotFound(err) {
+			ctx.Logger.Warnf("resource group %s not found, returning empty location", resourceGroup)
+			return []core.IntegrationResource{}, nil
+		}
+		return nil, fmt.Errorf("failed to get resource group: %w", err)
+	}
+
+	if group.Location == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	return []core.IntegrationResource{
+		{
+			Type: ResourceTypeResourceGroupLocation,
+			Name: group.Location,
+			ID:   group.Location,
+		},
+	}, nil
+}
+
 func (a *AzureIntegration) ListVMSizes(ctx core.ListResourcesContext, location string) ([]core.IntegrationResource, error) {
+	ctx.Logger.Infof("listing Azure VM sizes for location=%s", location)
+
 	if location == "" {
 		return []core.IntegrationResource{}, nil
 	}
@@ -93,45 +134,40 @@ func (a *AzureIntegration) ListVMSizes(ctx core.ListResourcesContext, location s
 		return nil, err
 	}
 
-	listURL := fmt.Sprintf("%s/subscriptions/%s/providers/Microsoft.Compute/skus?api-version=%s&$filter=location eq '%s'",
-		armBaseURL, provider.GetSubscriptionID(), armAPIVersionCompute, strings.ToLower(location))
+	listURL := fmt.Sprintf("%s/subscriptions/%s/providers/Microsoft.Compute/locations/%s/vmSizes?api-version=%s",
+		armBaseURL, provider.GetSubscriptionID(), strings.ToLower(location), armAPIVersionCompute)
 
 	items, err := provider.GetClient().listAll(context.Background(), listURL)
 	if err != nil {
+		ctx.Logger.WithError(err).Errorf("failed to list VM sizes for location=%s", location)
 		return nil, fmt.Errorf("failed to list VM sizes: %w", err)
 	}
 
-	resourcesByID := map[string]core.IntegrationResource{}
+	resources := make([]core.IntegrationResource, 0, len(items))
 	for _, raw := range items {
-		var sku armSKU
-		if err := json.Unmarshal(raw, &sku); err != nil {
+		var vmSize armVMSize
+		if err := json.Unmarshal(raw, &vmSize); err != nil || vmSize.Name == "" {
 			continue
 		}
 
-		if !isVirtualMachineSKU(sku) || !isSKUAvailableInLocation(sku, location) || sku.Name == "" {
-			continue
-		}
-
-		resourcesByID[sku.Name] = core.IntegrationResource{
+		resources = append(resources, core.IntegrationResource{
 			Type: ResourceTypeVMSizeDropdown,
-			Name: sku.Name,
-			ID:   sku.Name,
-		}
-	}
-
-	resources := make([]core.IntegrationResource, 0, len(resourcesByID))
-	for _, item := range resourcesByID {
-		resources = append(resources, item)
+			Name: vmSize.Name,
+			ID:   vmSize.Name,
+		})
 	}
 
 	sort.Slice(resources, func(i, j int) bool {
 		return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
 	})
 
+	ctx.Logger.Infof("found %d VM sizes for location=%s", len(resources), location)
 	return resources, nil
 }
 
 func (a *AzureIntegration) ListVirtualNetworks(ctx core.ListResourcesContext, resourceGroup string) ([]core.IntegrationResource, error) {
+	ctx.Logger.Infof("listing Azure virtual networks for resourceGroup=%s", resourceGroup)
+
 	if resourceGroup == "" {
 		return []core.IntegrationResource{}, nil
 	}
@@ -147,6 +183,11 @@ func (a *AzureIntegration) ListVirtualNetworks(ctx core.ListResourcesContext, re
 
 	items, err := provider.GetClient().listAll(context.Background(), listURL)
 	if err != nil {
+		if isARMNotFound(err) {
+			ctx.Logger.Warnf("resource group %s not found, returning empty virtual networks list", resourceGroup)
+			return []core.IntegrationResource{}, nil
+		}
+		ctx.Logger.WithError(err).Errorf("failed to list virtual networks for resourceGroup=%s", resourceGroup)
 		return nil, fmt.Errorf("failed to list virtual networks: %w", err)
 	}
 
@@ -176,10 +217,13 @@ func (a *AzureIntegration) ListVirtualNetworks(ctx core.ListResourcesContext, re
 		return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
 	})
 
+	ctx.Logger.Infof("found %d virtual networks for resourceGroup=%s", len(resources), resourceGroup)
 	return resources, nil
 }
 
 func (a *AzureIntegration) ListSubnets(ctx core.ListResourcesContext, resourceGroup, vnetName string) ([]core.IntegrationResource, error) {
+	ctx.Logger.Infof("listing Azure subnets for resourceGroup=%s vnet=%s", resourceGroup, vnetName)
+
 	if resourceGroup == "" || vnetName == "" {
 		return []core.IntegrationResource{}, nil
 	}
@@ -196,6 +240,11 @@ func (a *AzureIntegration) ListSubnets(ctx core.ListResourcesContext, resourceGr
 
 	items, err := provider.GetClient().listAll(context.Background(), listURL)
 	if err != nil {
+		if isARMNotFound(err) {
+			ctx.Logger.Warnf("resource group %s or vnet %s not found, returning empty subnets list", resourceGroup, vnetName)
+			return []core.IntegrationResource{}, nil
+		}
+		ctx.Logger.WithError(err).Errorf("failed to list subnets for resourceGroup=%s vnet=%s", resourceGroup, vnetName)
 		return nil, fmt.Errorf("failed to list subnets: %w", err)
 	}
 
@@ -225,20 +274,8 @@ func (a *AzureIntegration) ListSubnets(ctx core.ListResourcesContext, resourceGr
 		return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
 	})
 
+	ctx.Logger.Infof("found %d subnets for resourceGroup=%s vnet=%s", len(resources), resourceGroup, vnetName)
 	return resources, nil
-}
-
-func isVirtualMachineSKU(sku armSKU) bool {
-	return strings.EqualFold(sku.ResourceType, "virtualMachines")
-}
-
-func isSKUAvailableInLocation(sku armSKU, location string) bool {
-	for _, skuLocation := range sku.Locations {
-		if strings.EqualFold(skuLocation, location) {
-			return true
-		}
-	}
-	return false
 }
 
 // azureResourceName extracts the final resource name segment from an Azure resource ID.

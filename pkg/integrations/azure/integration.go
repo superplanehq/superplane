@@ -239,6 +239,9 @@ func (a *AzureIntegration) ListResources(resourceType string, ctx core.ListResou
 	case ResourceTypeResourceGroupDropdown:
 		return a.ListResourceGroups(ctx)
 
+	case ResourceTypeResourceGroupLocation:
+		return a.ListResourceGroupLocations(ctx, firstNonEmptyParameter(ctx.Parameters, "resourceGroup"))
+
 	case ResourceTypeVMSizeDropdown:
 		return a.ListVMSizes(ctx, firstNonEmptyParameter(ctx.Parameters, "location"))
 

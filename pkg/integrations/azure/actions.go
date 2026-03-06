@@ -234,6 +234,8 @@ func ensureNetworkInterface(ctx context.Context, provider *AzureProvider, req Cr
 	subnetURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks/%s/subnets/%s?api-version=%s",
 		armBaseURL, provider.GetSubscriptionID(), req.ResourceGroup, virtualNetworkName, subnetName, armAPIVersionNetwork)
 
+	logger.Infof("resolving subnet: resourceGroup=%s vnet=%s subnet=%s", req.ResourceGroup, virtualNetworkName, subnetName)
+
 	var subnet armSubnetResponse
 	if err := provider.GetClient().get(ctx, subnetURL, &subnet); err != nil {
 		return "", fmt.Errorf("failed to resolve subnet %s in virtual network %s: %w", subnetName, virtualNetworkName, err)
@@ -241,6 +243,8 @@ func ensureNetworkInterface(ctx context.Context, provider *AzureProvider, req Cr
 	if subnet.ID == "" {
 		return "", fmt.Errorf("resolved subnet %s in virtual network %s has no resource ID", subnetName, virtualNetworkName)
 	}
+
+	logger.Infof("resolved subnet ID: %s", subnet.ID)
 
 	// Optionally create public IP
 	var publicIPAddress map[string]any
