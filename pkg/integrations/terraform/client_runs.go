@@ -1,7 +1,6 @@
 package terraform
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -51,9 +50,9 @@ type WorkspacePayload struct {
 	} `json:"relationships"`
 }
 
-func (c *Client) ReadRun(ctx context.Context, runID string) (*RunPayload, error) {
+func (c *Client) ReadRun(runID string) (*RunPayload, error) {
 	path := fmt.Sprintf("/api/v2/runs/%s?include=workspace", runID)
-	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	req, err := c.newRequest(http.MethodGet, path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create run read request: %w", err)
 	}
@@ -109,7 +108,7 @@ func (c *Client) ReadRun(ctx context.Context, runID string) (*RunPayload, error)
 	return &payload.Data, nil
 }
 
-func (c *Client) CreateRun(ctx context.Context, workspaceID, message string, isPlanOnly bool) (*RunPayload, error) {
+func (c *Client) CreateRun(workspaceID, message string, isPlanOnly bool) (*RunPayload, error) {
 	opts := map[string]any{
 		"data": map[string]any{
 			"type": "runs",
@@ -127,7 +126,7 @@ func (c *Client) CreateRun(ctx context.Context, workspaceID, message string, isP
 			},
 		},
 	}
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v2/runs", opts)
+	req, err := c.newRequest(http.MethodPost, "/api/v2/runs", opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create run create request: %w", err)
 	}
@@ -152,13 +151,13 @@ func (c *Client) CreateRun(ctx context.Context, workspaceID, message string, isP
 	return &payload.Data, nil
 }
 
-func (c *Client) CancelRun(ctx context.Context, runID, comment string) error {
+func (c *Client) CancelRun(runID, comment string) error {
 	opts := map[string]any{}
 	if comment != "" {
 		opts = map[string]any{"comment": comment}
 	}
 	path := fmt.Sprintf("/api/v2/runs/%s/actions/cancel", runID)
-	req, err := c.newRequest(ctx, http.MethodPost, path, opts)
+	req, err := c.newRequest(http.MethodPost, path, opts)
 	if err != nil {
 		return fmt.Errorf("failed to create cancel request: %w", err)
 	}
@@ -175,9 +174,9 @@ func (c *Client) CancelRun(ctx context.Context, runID, comment string) error {
 	return nil
 }
 
-func (c *Client) ReadPlan(ctx context.Context, planID string) (*PlanPayload, error) {
+func (c *Client) ReadPlan(planID string) (*PlanPayload, error) {
 	path := fmt.Sprintf("/api/v2/plans/%s", planID)
-	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	req, err := c.newRequest(http.MethodGet, path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create plan read request: %w", err)
 	}
@@ -206,8 +205,8 @@ func (c *Client) ReadPlan(ctx context.Context, planID string) (*PlanPayload, err
 	return &payload.Data, nil
 }
 
-func (c *Client) DownloadLog(ctx context.Context, logURL string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, logURL, nil)
+func (c *Client) DownloadLog(logURL string) (string, error) {
+	req, err := http.NewRequest(http.MethodGet, logURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create log download request: %w", err)
 	}
@@ -230,8 +229,8 @@ func (c *Client) DownloadLog(ctx context.Context, logURL string) (string, error)
 	return string(bodyBytes), nil
 }
 
-func (c *Client) DownloadJSONOutput(ctx context.Context, apiPath string) (string, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, apiPath, nil)
+func (c *Client) DownloadJSONOutput(apiPath string) (string, error) {
+	req, err := c.newRequest(http.MethodGet, apiPath, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create json output request: %w", err)
 	}

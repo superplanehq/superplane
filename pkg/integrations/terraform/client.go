@@ -2,7 +2,6 @@ package terraform
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -43,7 +42,7 @@ func NewClient(configuration map[string]any) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) newRequest(ctx context.Context, method, path string, body any) (*http.Request, error) {
+func (c *Client) newRequest(method, path string, body any) (*http.Request, error) {
 	var bodyReader io.Reader
 	if body != nil {
 		bodyBytes, err := json.Marshal(body)
@@ -60,7 +59,7 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body any) 
 	}
 	reqURL := baseURL + reqPath
 
-	req, err := http.NewRequestWithContext(ctx, method, reqURL, bodyReader)
+	req, err := http.NewRequest(method, reqURL, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -71,7 +70,7 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body any) 
 }
 
 func (c *Client) Validate() error {
-	req, err := c.newRequest(context.TODO(), http.MethodGet, "/api/v2/account/details", nil)
+	req, err := c.newRequest(http.MethodGet, "/api/v2/account/details", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create validation request: %w", err)
 	}
@@ -92,7 +91,7 @@ func (c *Client) Validate() error {
 	return nil
 }
 
-func (c *Client) ResolveWorkspaceID(ctx context.Context, identifier string) (string, error) {
+func (c *Client) ResolveWorkspaceID(identifier string) (string, error) {
 	if strings.HasPrefix(identifier, "ws-") {
 		return identifier, nil
 	}
@@ -102,7 +101,7 @@ func (c *Client) ResolveWorkspaceID(ctx context.Context, identifier string) (str
 		wsName := parts[1]
 
 		path := fmt.Sprintf("/api/v2/organizations/%s/workspaces/%s", url.PathEscape(orgName), url.PathEscape(wsName))
-		req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+		req, err := c.newRequest(http.MethodGet, path, nil)
 		if err != nil {
 			return "", fmt.Errorf("failed to create resolve workspace request: %w", err)
 		}
