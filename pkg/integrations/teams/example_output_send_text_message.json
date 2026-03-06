@@ -1,0 +1,10 @@
+{
+  "data": {
+    "id": "1700000000002",
+    "conversationId": "19:abc123def456@thread.tacv2",
+    "text": "Hello from SuperPlane",
+    "timestamp": "2026-01-16T12:10:00.000Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "teams.message.sent"
+}
