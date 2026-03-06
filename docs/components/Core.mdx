@@ -31,6 +31,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="SSH Command" href="#ssh-command" description="Run a command on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
   <LinkCard title="Update Memory" href="#update-memory" description="Update values in canvas memory by namespace and field matches" />
+  <LinkCard title="Upsert Memory" href="#upsert-memory" description="Update matching memory rows, or create one when no match exists" />
   <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
 </CardGrid>
 
@@ -755,6 +756,64 @@ The Update Memory component updates matching rows in canvas-level memory storage
   },
   "timestamp": "2026-02-28T00:00:00Z",
   "type": "memory.updated"
+}
+```
+
+<a id="upsert-memory"></a>
+
+## Upsert Memory
+
+The Upsert Memory component updates matching rows in canvas-level memory storage, and creates a new row when no matches are found.
+
+### Use Cases
+
+- Keep one record per identifier (for example environment or pull request)
+- Replace ad-hoc update-then-add branching with one component
+- Persist latest status snapshots with stable matching keys
+
+### How It Works
+
+1. Reads `namespace`, `matchList`, and `valueList` from configuration
+2. Attempts to update all matching memory rows
+3. If no rows were updated, inserts a new memory row with the values
+4. Emits `memory.upserted` to the default channel with `operation` set to `updated` or `created`
+
+### Simplified Matching
+
+If `matchList` is empty, the component treats the namespace as a singleton record and upserts at namespace level.
+This lets you store just one field (for example `value`) without extra marker fields.
+
+### Output
+
+Always emits to the default channel. Check `data.operation` to know whether the component updated existing rows or created a new row.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "count": 1,
+    "matches": {
+      "environment": "production",
+      "latest_deployment_source": "manual_run"
+    },
+    "namespace": "deployments",
+    "operation": "updated",
+    "records": [
+      {
+        "environment": "production",
+        "latest_deployment": "v1.0.1",
+        "latest_deployment_source": "manual_run"
+      }
+    ],
+    "values": {
+      "environment": "production",
+      "latest_deployment": "v1.0.1",
+      "latest_deployment_source": "manual_run"
+    }
+  },
+  "timestamp": "2026-02-28T00:00:00Z",
+  "type": "memory.upserted"
 }
 ```
 

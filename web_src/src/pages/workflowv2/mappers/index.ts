@@ -16,6 +16,7 @@ import { addMemoryMapper } from "./addMemory";
 import { deleteMemoryMapper } from "./deleteMemory";
 import { readMemoryMapper } from "./readMemory";
 import { updateMemoryMapper } from "./updateMemory";
+import { upsertMemoryMapper } from "./upsertMemory";
 import { ifMapper, IF_STATE_REGISTRY } from "./if";
 import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
 import {
@@ -230,6 +231,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   deleteMemory: deleteMemoryMapper,
   readMemory: readMemoryMapper,
   updateMemory: updateMemoryMapper,
+  upsertMemory: upsertMemoryMapper,
   if: ifMapper,
   http: httpMapper,
   ssh: sshMapper,
