@@ -165,7 +165,7 @@ function buildMachineControlPreset(workflowNodes: ComponentsNode[]): ControlConf
       variant: "default",
       payload: {
         action: "spin_up",
-        machineId: "ephemeral-{{memoryCount}}",
+        machineId: "ephemeral-{{runTs}}",
         projectId: "my-project",
         zone: "us-central1-a",
         machineType: "e2-medium",
@@ -375,6 +375,13 @@ function collectColumns(rows: Array<Record<string, unknown>>): string[] {
   return Array.from(uniqueColumns);
 }
 
+function generateRunId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function RunningIndicator({ label }: { label: string }) {
   return (
     <span className="inline-flex items-center gap-2">
@@ -435,7 +442,14 @@ export function CanvasControlView({
       return;
     }
 
-    const resolvedConfirm = action.confirm ? resolveTemplateString(action.confirm, actionContext) : undefined;
+    const runtimeContext = {
+      ...actionContext,
+      runId: generateRunId(),
+      runTs: Date.now(),
+      nowIso: new Date().toISOString(),
+    };
+
+    const resolvedConfirm = action.confirm ? resolveTemplateString(action.confirm, runtimeContext) : undefined;
     if (resolvedConfirm) {
       const confirmed = window.confirm(resolvedConfirm);
       if (!confirmed) {
@@ -446,9 +460,9 @@ export function CanvasControlView({
     setRunError(null);
     setRunningActionId(actionId);
     try {
-      const resolvedPayload = resolveTemplate(action.payload ?? {}, actionContext);
-      const resolvedNodeId = resolveTemplateString(action.nodeId, actionContext).trim();
-      const resolvedChannel = resolveTemplateString(action.channel || "default", actionContext).trim() || "default";
+      const resolvedPayload = resolveTemplate(action.payload ?? {}, runtimeContext);
+      const resolvedNodeId = resolveTemplateString(action.nodeId, runtimeContext).trim();
+      const resolvedChannel = resolveTemplateString(action.channel || "default", runtimeContext).trim() || "default";
       if (!resolvedNodeId) {
         setRunError("Action is missing a valid nodeId.");
         return;
