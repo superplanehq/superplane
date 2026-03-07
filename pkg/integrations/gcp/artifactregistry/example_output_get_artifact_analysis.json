@@ -1,0 +1,38 @@
+{
+  "type": "gcp.artifactregistry.artifactAnalysis",
+  "timestamp": "2025-06-15T12:05:00Z",
+  "data": {
+    "occurrences": [
+      {
+        "name": "projects/my-project/occurrences/occ-001",
+        "resourceUri": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123def456",
+        "kind": "VULNERABILITY",
+        "createTime": "2025-06-15T12:01:00Z",
+        "updateTime": "2025-06-15T12:01:00Z",
+        "vulnerability": {
+          "severity": "HIGH",
+          "cvssScore": 7.5,
+          "packageIssue": [
+            {
+              "affectedPackage": "openssl",
+              "affectedVersion": {
+                "name": "1.1.1",
+                "kind": "NORMAL"
+              },
+              "fixedVersion": {
+                "name": "1.1.1k",
+                "kind": "NORMAL"
+              }
+            }
+          ],
+          "shortDescription": "CVE-2021-3449",
+          "relatedUrls": [
+            {
+              "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-3449"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "type": "gcp.artifactregistry.artifactAnalysis",
+  "timestamp": "2025-06-15T12:01:00Z",
+  "data": {
+    "serviceName": "containeranalysis.googleapis.com",
+    "methodName": "google.devtools.containeranalysis.v1.Grafeas.CreateOccurrence",
+    "resourceName": "projects/my-project/occurrences/occ-001",
+    "logName": "projects/my-project/logs/cloudaudit.googleapis.com%2Factivity",
+    "timestamp": "2025-06-15T12:01:00Z",
+    "insertId": "def456"
+  }
+}
