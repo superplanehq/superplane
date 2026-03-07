@@ -9,22 +9,74 @@ spec:
       - id: "rollout-intro"
         type: "markdown"
         content: |
-          # Deployment Rollouts
+          # Production Release Control
 
-          Manage staged rollouts safely with placeholder deployment steps.
+          This control plane sits **on top of CD**.
 
-          Start at 10%, promote to 50% and 100%, or roll back when needed.
-      - id: "rollouts-table"
+          CD ships artifacts. Operators use this page to:
+          - pick a specific release
+          - start canary rollout
+          - promote traffic in stages
+          - hold or roll back when needed
+      - id: "simulate-cd-release"
+        type: "button"
+        label: "Simulate CD release"
+        nodeId: "start-simulate-cd"
+        channel: "default"
+        variant: "secondary"
+        payload:
+          releaseId: "rel-{{runTs}}"
+          service: "checkout"
+          environment: "prod"
+          version: "2026.03.07"
+          buildId: "build-{{runTs}}"
+          createdAt: "2026-03-07T08:00:00Z"
+      - id: "pending-releases-table"
+        type: "table"
+        title: "Pending Releases (from CD)"
+        source:
+          type: "memory"
+          namespace: "pending_releases"
+        columns:
+          - key: "releaseId"
+            label: "Release"
+          - key: "service"
+            label: "Service"
+          - key: "environment"
+            label: "Env"
+          - key: "version"
+            label: "Version"
+          - key: "buildId"
+            label: "Build"
+          - key: "createdAt"
+            label: "Published At"
+        actions:
+          - id: "start-rollout"
+            label: "Start rollout (10%)"
+            nodeId: "start-begin-rollout"
+            channel: "default"
+            variant: "default"
+            payload:
+              action: "begin_rollout"
+              releaseId: "{{row.releaseId}}"
+              service: "{{row.service}}"
+              environment: "{{row.environment}}"
+              version: "{{row.version}}"
+              buildId: "{{row.buildId}}"
+              targetPercent: 10
+      - id: "active-rollouts-table"
         type: "table"
         title: "Active Rollouts"
         source:
           type: "memory"
           namespace: "deployments"
         columns:
-          - key: "rolloutId"
-            label: "Rollout ID"
+          - key: "releaseId"
+            label: "Release"
           - key: "service"
             label: "Service"
+          - key: "environment"
+            label: "Env"
           - key: "currentPercent"
             label: "Traffic %"
           - key: "status"
@@ -34,13 +86,39 @@ spec:
                 color: "#16a34a"
               - when: 'row.status == "ROLLING_OUT"'
                 color: "#2563eb"
-              - when: 'row.status == "ROLLING_BACK"'
+              - when: 'row.status == "HELD"'
                 color: "#d97706"
+              - when: 'row.status == "ROLLING_BACK"'
+                color: "#ea580c"
               - when: 'row.status == "ROLLED_BACK"'
                 color: "#475569"
+          - key: "gateStatus"
+            label: "Gate"
+            colorRules:
+              - when: 'row.gateStatus == "PASSED"'
+                color: "#16a34a"
+              - when: 'row.gateStatus == "PENDING"'
+                color: "#2563eb"
+              - when: 'row.gateStatus == "BLOCKED"'
+                color: "#dc2626"
+          - key: "stage"
+            label: "Stage"
           - key: "lastAction"
             label: "Last Action"
         actions:
+          - id: "promote-25"
+            label: "Promote 25%"
+            nodeId: "start-promote"
+            channel: "default"
+            variant: "outline"
+            payload:
+              action: "promote"
+              releaseId: "{{row.releaseId}}"
+              service: "{{row.service}}"
+              environment: "{{row.environment}}"
+              version: "{{row.version}}"
+              buildId: "{{row.buildId}}"
+              targetPercent: 25
           - id: "promote-50"
             label: "Promote 50%"
             nodeId: "start-promote"
@@ -48,8 +126,11 @@ spec:
             variant: "outline"
             payload:
               action: "promote"
-              rolloutId: "{{row.rolloutId}}"
+              releaseId: "{{row.releaseId}}"
               service: "{{row.service}}"
+              environment: "{{row.environment}}"
+              version: "{{row.version}}"
+              buildId: "{{row.buildId}}"
               targetPercent: 50
           - id: "promote-100"
             label: "Promote 100%"
@@ -58,62 +139,168 @@ spec:
             variant: "outline"
             payload:
               action: "promote"
-              rolloutId: "{{row.rolloutId}}"
+              releaseId: "{{row.releaseId}}"
               service: "{{row.service}}"
+              environment: "{{row.environment}}"
+              version: "{{row.version}}"
+              buildId: "{{row.buildId}}"
               targetPercent: 100
+          - id: "hold"
+            label: "Hold"
+            nodeId: "start-hold"
+            channel: "default"
+            variant: "secondary"
+            payload:
+              action: "hold"
+              releaseId: "{{row.releaseId}}"
+              service: "{{row.service}}"
+              environment: "{{row.environment}}"
+              version: "{{row.version}}"
+              buildId: "{{row.buildId}}"
+              currentPercent: "{{row.currentPercent}}"
           - id: "rollback"
             label: "Rollback"
             nodeId: "start-rollback"
             channel: "default"
             variant: "destructive"
-            confirm: "Rollback rollout {{row.rolloutId}}?"
+            confirm: "Rollback {{row.releaseId}} for {{row.service}}?"
             payload:
               action: "rollback"
-              rolloutId: "{{row.rolloutId}}"
+              releaseId: "{{row.releaseId}}"
               service: "{{row.service}}"
-      - id: "start-new-rollout"
-        type: "button"
-        label: "Start new rollout (10%)"
-        nodeId: "start-rollout"
-        channel: "default"
-        variant: "default"
-        payload:
-          action: "start_rollout"
-          rolloutId: "rollout-{{runTs}}"
-          service: "checkout"
-          targetPercent: 10
+              environment: "{{row.environment}}"
+              version: "{{row.version}}"
+              buildId: "{{row.buildId}}"
   nodes:
-    - id: "start-rollout"
-      name: "Start rollout"
+    - id: "start-simulate-cd"
+      name: "Simulate CD release published"
       type: "TYPE_TRIGGER"
       trigger:
         name: "start"
-      configuration: {}
+      configuration:
+        templates:
+          - name: "CD published release"
+            payload:
+              releaseId: "rel-{{runTs}}"
+              service: "checkout"
+              environment: "prod"
+              version: "2026.03.07"
+              buildId: "build-{{runTs}}"
+              createdAt: "2026-03-07T08:00:00Z"
       position:
         x: 120
-        y: 320
+        y: 620
+      paused: false
+      isCollapsed: false
+    - id: "start-begin-rollout"
+      name: "Begin rollout for release"
+      type: "TYPE_TRIGGER"
+      trigger:
+        name: "start"
+      configuration:
+        templates:
+          - name: "Begin rollout at 10%"
+            payload:
+              action: "begin_rollout"
+              releaseId: "rel-2026-03-07-checkout"
+              service: "checkout"
+              environment: "prod"
+              version: "2026.03.07"
+              buildId: "build-20260307-1"
+              targetPercent: 10
+      position:
+        x: 120
+        y: 420
       paused: false
       isCollapsed: false
     - id: "start-promote"
-      name: "Promote rollout"
+      name: "Promote rollout stage"
       type: "TYPE_TRIGGER"
       trigger:
         name: "start"
-      configuration: {}
+      configuration:
+        templates:
+          - name: "Promote to 25%"
+            payload:
+              action: "promote"
+              releaseId: "rel-2026-03-07-checkout"
+              service: "checkout"
+              environment: "prod"
+              version: "2026.03.07"
+              buildId: "build-20260307-1"
+              targetPercent: 25
       position:
         x: 120
-        y: 520
+        y: 220
+      paused: false
+      isCollapsed: false
+    - id: "start-hold"
+      name: "Hold rollout"
+      type: "TYPE_TRIGGER"
+      trigger:
+        name: "start"
+      configuration:
+        templates:
+          - name: "Hold rollout"
+            payload:
+              action: "hold"
+              releaseId: "rel-2026-03-07-checkout"
+              service: "checkout"
+              environment: "prod"
+              version: "2026.03.07"
+              buildId: "build-20260307-1"
+              currentPercent: 25
+      position:
+        x: 120
+        y: 20
       paused: false
       isCollapsed: false
     - id: "start-rollback"
-      name: "Rollback rollout"
+      name: "Rollback release"
       type: "TYPE_TRIGGER"
       trigger:
         name: "start"
-      configuration: {}
+      configuration:
+        templates:
+          - name: "Rollback release"
+            payload:
+              action: "rollback"
+              releaseId: "rel-2026-03-07-checkout"
+              service: "checkout"
+              environment: "prod"
+              version: "2026.03.07"
+              buildId: "build-20260307-1"
       position:
         x: 120
-        y: 80
+        y: 820
+      paused: false
+      isCollapsed: false
+    - id: "upsert-pending-release"
+      name: "Upsert pending release from CD"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "pending_releases"
+        matchList:
+          - name: "releaseId"
+            value: "{{ root().releaseId }}"
+        valueList:
+          - name: "releaseId"
+            value: "{{ root().releaseId }}"
+          - name: "service"
+            value: "{{ root().service }}"
+          - name: "environment"
+            value: "{{ root().environment }}"
+          - name: "version"
+            value: "{{ root().version }}"
+          - name: "buildId"
+            value: "{{ root().buildId }}"
+          - name: "createdAt"
+            value: "{{ root().createdAt }}"
+      position:
+        x: 620
+        y: 620
       paused: false
       isCollapsed: false
     - id: "upsert-rollout-progress"
@@ -124,49 +311,83 @@ spec:
       configuration:
         namespace: "deployments"
         matchList:
-          - name: "rolloutId"
-            value: "{{ root().rolloutId }}"
+          - name: "releaseId"
+            value: "{{ root().releaseId }}"
         valueList:
-          - name: "rolloutId"
-            value: "{{ root().rolloutId }}"
+          - name: "releaseId"
+            value: "{{ root().releaseId }}"
           - name: "service"
             value: "{{ root().service }}"
+          - name: "environment"
+            value: "{{ root().environment }}"
+          - name: "version"
+            value: "{{ root().version }}"
+          - name: "buildId"
+            value: "{{ root().buildId }}"
           - name: "currentPercent"
-            value: "{{ root().targetPercent }}"
-          - name: "desiredPercent"
             value: "{{ root().targetPercent }}"
           - name: "status"
             value: "ROLLING_OUT"
+          - name: "gateStatus"
+            value: "PENDING"
+          - name: "stage"
+            value: "{{ root().targetPercent }}%"
           - name: "lastAction"
             value: "{{ root().action }}"
       position:
-        x: 520
+        x: 620
+        y: 320
+      paused: false
+      isCollapsed: false
+    - id: "delete-pending-release"
+      name: "Delete pending release entry"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "deleteMemory"
+      configuration:
+        namespace: "pending_releases"
+        matchList:
+          - name: "releaseId"
+            value: "{{ root().releaseId }}"
+      position:
+        x: 980
         y: 420
       paused: false
       isCollapsed: false
-    - id: "noop-deploy-step"
-      name: "Placeholder deploy step (noop)"
+    - id: "noop-shift-traffic"
+      name: "Placeholder traffic shift (noop)"
       type: "TYPE_COMPONENT"
       component:
         name: "noop"
       configuration: {}
       position:
-        x: 920
-        y: 420
+        x: 1320
+        y: 320
       paused: false
       isCollapsed: false
-    - id: "wait-rollout-step"
-      name: "Wait for rollout stabilization"
+    - id: "wait-observe-rollout"
+      name: "Observe rollout window"
       type: "TYPE_COMPONENT"
       component:
         name: "wait"
       configuration:
         mode: "interval"
         unit: "seconds"
-        waitFor: "3"
+        waitFor: "4"
       position:
-        x: 1280
-        y: 420
+        x: 1660
+        y: 320
+      paused: false
+      isCollapsed: false
+    - id: "noop-evaluate-gates"
+      name: "Placeholder health gate check (noop)"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "noop"
+      configuration: {}
+      position:
+        x: 2000
+        y: 320
       paused: false
       isCollapsed: false
     - id: "upsert-rollout-healthy"
@@ -177,28 +398,68 @@ spec:
       configuration:
         namespace: "deployments"
         matchList:
-          - name: "rolloutId"
-            value: "{{ root().rolloutId }}"
+          - name: "releaseId"
+            value: "{{ root().releaseId }}"
         valueList:
-          - name: "rolloutId"
-            value: "{{ root().rolloutId }}"
+          - name: "releaseId"
+            value: "{{ root().releaseId }}"
           - name: "service"
             value: "{{ root().service }}"
+          - name: "environment"
+            value: "{{ root().environment }}"
+          - name: "version"
+            value: "{{ root().version }}"
+          - name: "buildId"
+            value: "{{ root().buildId }}"
           - name: "currentPercent"
-            value: "{{ root().targetPercent }}"
-          - name: "desiredPercent"
             value: "{{ root().targetPercent }}"
           - name: "status"
             value: "HEALTHY"
+          - name: "gateStatus"
+            value: "PASSED"
+          - name: "stage"
+            value: "{{ root().targetPercent }}%"
           - name: "lastAction"
-            value: "rollout_stable"
-          - name: "simulatedResult"
-            value: "{{ $['Wait for rollout stabilization'].data.result }}"
-          - name: "simulatedReason"
-            value: "{{ $['Wait for rollout stabilization'].data.reason }}"
+            value: "promoted"
       position:
-        x: 1640
-        y: 420
+        x: 2340
+        y: 320
+      paused: false
+      isCollapsed: false
+    - id: "upsert-rollout-held"
+      name: "Mark rollout as HELD"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "deployments"
+        matchList:
+          - name: "releaseId"
+            value: "{{ root().releaseId }}"
+        valueList:
+          - name: "releaseId"
+            value: "{{ root().releaseId }}"
+          - name: "service"
+            value: "{{ root().service }}"
+          - name: "environment"
+            value: "{{ root().environment }}"
+          - name: "version"
+            value: "{{ root().version }}"
+          - name: "buildId"
+            value: "{{ root().buildId }}"
+          - name: "currentPercent"
+            value: "{{ root().currentPercent }}"
+          - name: "status"
+            value: "HELD"
+          - name: "gateStatus"
+            value: "BLOCKED"
+          - name: "stage"
+            value: "ON_HOLD"
+          - name: "lastAction"
+            value: "manual_hold"
+      position:
+        x: 620
+        y: 20
       paused: false
       isCollapsed: false
     - id: "upsert-rollout-rolling-back"
@@ -209,39 +470,47 @@ spec:
       configuration:
         namespace: "deployments"
         matchList:
-          - name: "rolloutId"
-            value: "{{ root().rolloutId }}"
+          - name: "releaseId"
+            value: "{{ root().releaseId }}"
         valueList:
-          - name: "rolloutId"
-            value: "{{ root().rolloutId }}"
+          - name: "releaseId"
+            value: "{{ root().releaseId }}"
           - name: "service"
             value: "{{ root().service }}"
+          - name: "environment"
+            value: "{{ root().environment }}"
+          - name: "version"
+            value: "{{ root().version }}"
+          - name: "buildId"
+            value: "{{ root().buildId }}"
           - name: "currentPercent"
-            value: "0"
-          - name: "desiredPercent"
             value: "0"
           - name: "status"
             value: "ROLLING_BACK"
+          - name: "gateStatus"
+            value: "BLOCKED"
+          - name: "stage"
+            value: "ROLLBACK"
           - name: "lastAction"
             value: "{{ root().action }}"
       position:
-        x: 520
-        y: 80
+        x: 620
+        y: 820
       paused: false
       isCollapsed: false
     - id: "noop-rollback-step"
-      name: "Placeholder rollback step (noop)"
+      name: "Placeholder rollback execution (noop)"
       type: "TYPE_COMPONENT"
       component:
         name: "noop"
       configuration: {}
       position:
-        x: 920
-        y: 80
+        x: 980
+        y: 820
       paused: false
       isCollapsed: false
     - id: "wait-rollback-step"
-      name: "Wait for rollback stabilization"
+      name: "Observe rollback window"
       type: "TYPE_COMPONENT"
       component:
         name: "wait"
@@ -250,8 +519,8 @@ spec:
         unit: "seconds"
         waitFor: "2"
       position:
-        x: 1280
-        y: 80
+        x: 1320
+        y: 820
       paused: false
       isCollapsed: false
     - id: "upsert-rollout-rolled-back"
@@ -262,45 +531,61 @@ spec:
       configuration:
         namespace: "deployments"
         matchList:
-          - name: "rolloutId"
-            value: "{{ root().rolloutId }}"
+          - name: "releaseId"
+            value: "{{ root().releaseId }}"
         valueList:
-          - name: "rolloutId"
-            value: "{{ root().rolloutId }}"
+          - name: "releaseId"
+            value: "{{ root().releaseId }}"
           - name: "service"
             value: "{{ root().service }}"
+          - name: "environment"
+            value: "{{ root().environment }}"
+          - name: "version"
+            value: "{{ root().version }}"
+          - name: "buildId"
+            value: "{{ root().buildId }}"
           - name: "currentPercent"
-            value: "0"
-          - name: "desiredPercent"
             value: "0"
           - name: "status"
             value: "ROLLED_BACK"
+          - name: "gateStatus"
+            value: "BLOCKED"
+          - name: "stage"
+            value: "ROLLED_BACK"
           - name: "lastAction"
             value: "rollback_completed"
-          - name: "simulatedResult"
-            value: "{{ $['Wait for rollback stabilization'].data.result }}"
-          - name: "simulatedReason"
-            value: "{{ $['Wait for rollback stabilization'].data.reason }}"
       position:
-        x: 1640
-        y: 80
+        x: 1660
+        y: 820
       paused: false
       isCollapsed: false
   edges:
-    - sourceId: "start-rollout"
+    - sourceId: "start-simulate-cd"
+      targetId: "upsert-pending-release"
+      channel: "default"
+    - sourceId: "start-begin-rollout"
       targetId: "upsert-rollout-progress"
+      channel: "default"
+    - sourceId: "upsert-rollout-progress"
+      targetId: "delete-pending-release"
+      channel: "default"
+    - sourceId: "delete-pending-release"
+      targetId: "noop-shift-traffic"
+      channel: "default"
+    - sourceId: "noop-shift-traffic"
+      targetId: "wait-observe-rollout"
+      channel: "default"
+    - sourceId: "wait-observe-rollout"
+      targetId: "noop-evaluate-gates"
+      channel: "default"
+    - sourceId: "noop-evaluate-gates"
+      targetId: "upsert-rollout-healthy"
       channel: "default"
     - sourceId: "start-promote"
       targetId: "upsert-rollout-progress"
       channel: "default"
-    - sourceId: "upsert-rollout-progress"
-      targetId: "noop-deploy-step"
-      channel: "default"
-    - sourceId: "noop-deploy-step"
-      targetId: "wait-rollout-step"
-      channel: "default"
-    - sourceId: "wait-rollout-step"
-      targetId: "upsert-rollout-healthy"
+    - sourceId: "start-hold"
+      targetId: "upsert-rollout-held"
       channel: "default"
     - sourceId: "start-rollback"
       targetId: "upsert-rollout-rolling-back"
