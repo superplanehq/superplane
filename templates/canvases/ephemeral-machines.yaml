@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Canvas
 metadata:
   id: 602c0b3e-d6a6-44aa-92de-670b65daea8f
-  name: Upsert
+  name: Ephemeral Machines
 spec:
   control:
     blocks:
