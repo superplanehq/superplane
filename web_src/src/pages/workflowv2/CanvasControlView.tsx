@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 import { WorkflowMarkdownPreview } from "./WorkflowMarkdownPreview";
-import { ComponentsNode } from "@/api-client";
 
 type ControlBlock = ControlMarkdownBlock | ControlTableBlock | ControlButtonBlock;
 type ControlButtonVariant = "default" | "secondary" | "destructive" | "outline";
@@ -75,105 +74,10 @@ interface RunButtonRequest {
 
 interface CanvasControlViewProps {
   memoryEntries: CanvasMemoryEntry[];
-  workflowNodes: ComponentsNode[];
   controlConfig?: Record<string, unknown>;
   canRunButtons: boolean;
   runDisabledTooltip?: string;
   onRunButton: (request: RunButtonRequest) => Promise<void>;
-}
-
-function findStartTriggerId(workflowNodes: ComponentsNode[], matcher: (name: string) => boolean): string | null {
-  for (const node of workflowNodes) {
-    const isStartTrigger = node.type === "TYPE_TRIGGER" && node.trigger?.name === "start";
-    if (!isStartTrigger) {
-      continue;
-    }
-    const nodeName = (node.name || "").trim().toLowerCase();
-    if (node.id && matcher(nodeName)) {
-      return node.id;
-    }
-  }
-  return null;
-}
-
-function buildMachineControlPreset(workflowNodes: ComponentsNode[]): ControlConfig {
-  const spinUpStartId = findStartTriggerId(workflowNodes, (name) => name.includes("spin"));
-  const shutdownStartId = findStartTriggerId(workflowNodes, (name) => name.includes("shut"));
-
-  const tableActions: ControlTableAction[] = [];
-  if (shutdownStartId) {
-    tableActions.push({
-      id: "table-shutdown",
-      label: "Shutdown",
-      nodeId: shutdownStartId,
-      channel: "default",
-      payload: {
-        action: "shutdown",
-        machineId: "{{row.machineId}}",
-        projectId: "{{row.projectId}}",
-        zone: "{{row.zone}}",
-      },
-      confirm: "Shut down machine {{row.machineId}}?",
-      variant: "destructive",
-    });
-  }
-
-  const blocks: ControlBlock[] = [
-    {
-      id: "machines-intro",
-      type: "markdown",
-      content: [
-        "# Ephemeral Machines",
-        "",
-        "Provision, operate, and retire temporary machines for short-lived tasks.",
-        "",
-        "Use this app to manage machine lifecycle for testing, debugging, and one-off workloads.",
-      ].join("\n"),
-    },
-    {
-      id: "machines-table",
-      type: "table",
-      title: "Ephemeral Machines",
-      source: {
-        type: "memory",
-        namespace: "machines",
-      },
-      columns: [
-        { key: "machineId", label: "Machine ID" },
-        {
-          key: "status",
-          label: "Status",
-          colorRules: [
-            { when: 'row.status == "ONLINE"', color: "#16a34a" },
-            { when: 'row.status == "BOOTING_UP"', color: "#2563eb" },
-          ],
-        },
-        { key: "zone", label: "Zone" },
-        { key: "machineType", label: "Type" },
-      ],
-      actions: tableActions,
-    },
-  ];
-
-  if (spinUpStartId) {
-    blocks.push({
-      id: "start-new-machine",
-      type: "button",
-      label: "Start new machine",
-      nodeId: spinUpStartId,
-      channel: "default",
-      variant: "default",
-      payload: {
-        action: "spin_up",
-        machineId: "ephemeral-{{runTs}}",
-        projectId: "my-project",
-        zone: "us-central1-a",
-        machineType: "e2-medium",
-      },
-    });
-  }
-
-  return { blocks };
 }
 
 function isControlConfig(value: unknown): value is ControlConfig {
@@ -393,17 +297,12 @@ function RunningIndicator({ label }: { label: string }) {
 
 export function CanvasControlView({
   memoryEntries,
-  workflowNodes,
   controlConfig,
   canRunButtons,
   runDisabledTooltip,
   onRunButton,
 }: CanvasControlViewProps) {
-  const yamlDerivedConfig = useMemo(() => buildMachineControlPreset(workflowNodes), [workflowNodes]);
-  const config = useMemo(
-    () => (isControlConfig(controlConfig) ? controlConfig : yamlDerivedConfig),
-    [controlConfig, yamlDerivedConfig],
-  );
+  const config = useMemo(() => (isControlConfig(controlConfig) ? controlConfig : null), [controlConfig]);
   const [runError, setRunError] = useState<string | null>(null);
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
 
@@ -595,51 +494,60 @@ export function CanvasControlView({
       <section className="mx-auto min-h-0 max-w-[900px] overflow-auto rounded-2xl border border-slate-200 bg-white p-10">
         {runError ? <div className="mb-8 text-xs text-red-600">{runError}</div> : null}
 
-        <div className="space-y-10">
-          {config.blocks.map((block) => {
-            if (block.type === "markdown") {
-              const resolvedContent = resolveTemplateString(block.content, templateContext);
+        {!config ? (
+          <div className="rounded-md border border-dashed border-slate-200 p-6 text-sm text-slate-600">
+            No Control configuration found in canvas YAML.
+            <div className="mt-1 text-xs text-slate-500">
+              Add `spec.control.blocks` to your canvas definition to render this panel.
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-10">
+            {config.blocks.map((block) => {
+              if (block.type === "markdown") {
+                const resolvedContent = resolveTemplateString(block.content, templateContext);
+                return (
+                  <div key={block.id}>
+                    <WorkflowMarkdownPreview
+                      content={resolvedContent}
+                      className="[&_h1]:!mt-0 [&_h1]:!mb-4 [&_h1]:!border-b [&_h1]:!border-slate-200 [&_h1]:!pb-2 [&_h1]:!text-[2em] [&_h1]:!font-semibold [&_h1]:!leading-[1.25] [&_h2]:!mt-6 [&_h2]:!mb-3 [&_h2]:!border-b [&_h2]:!border-slate-200 [&_h2]:!pb-1.5 [&_h2]:!text-2xl [&_h2]:!font-semibold [&_h2]:!leading-[1.25] [&_h3]:!mt-6 [&_h3]:!mb-2 [&_h3]:!text-xl [&_h3]:!font-semibold [&_p]:!my-4 [&_p]:!leading-[1.6] [&_ul]:!my-4 [&_ul]:!pl-8 [&_ol]:!my-4 [&_ol]:!pl-8 [&_li]:!my-1 [&_blockquote]:!my-4 [&_blockquote]:!border-l-4 [&_blockquote]:!border-slate-300 [&_blockquote]:!pl-4 [&_code]:!rounded-md [&_code]:!bg-slate-100 [&_code]:!px-1.5 [&_code]:!py-0.5 [&_code]:!text-[85%] [&_pre]:!my-4 [&_pre]:!rounded-md [&_pre]:!border [&_pre]:!border-slate-200 [&_pre]:!bg-slate-50 [&_pre]:!p-4 [&_pre_code]:!bg-transparent [&_pre_code]:!p-0"
+                    />
+                  </div>
+                );
+              }
+
+              if (block.type === "table") {
+                return (
+                  <div key={block.id} className="space-y-2">
+                    {block.title ? <h3 className="text-sm font-semibold text-slate-900">{block.title}</h3> : null}
+                    {renderTableBlock(block)}
+                  </div>
+                );
+              }
+
               return (
                 <div key={block.id}>
-                  <WorkflowMarkdownPreview
-                    content={resolvedContent}
-                    className="[&_h1]:!mt-0 [&_h1]:!mb-4 [&_h1]:!border-b [&_h1]:!border-slate-200 [&_h1]:!pb-2 [&_h1]:!text-[2em] [&_h1]:!font-semibold [&_h1]:!leading-[1.25] [&_h2]:!mt-6 [&_h2]:!mb-3 [&_h2]:!border-b [&_h2]:!border-slate-200 [&_h2]:!pb-1.5 [&_h2]:!text-2xl [&_h2]:!font-semibold [&_h2]:!leading-[1.25] [&_h3]:!mt-6 [&_h3]:!mb-2 [&_h3]:!text-xl [&_h3]:!font-semibold [&_p]:!my-4 [&_p]:!leading-[1.6] [&_ul]:!my-4 [&_ul]:!pl-8 [&_ol]:!my-4 [&_ol]:!pl-8 [&_li]:!my-1 [&_blockquote]:!my-4 [&_blockquote]:!border-l-4 [&_blockquote]:!border-slate-300 [&_blockquote]:!pl-4 [&_code]:!rounded-md [&_code]:!bg-slate-100 [&_code]:!px-1.5 [&_code]:!py-0.5 [&_code]:!text-[85%] [&_pre]:!my-4 [&_pre]:!rounded-md [&_pre]:!border [&_pre]:!border-slate-200 [&_pre]:!bg-slate-50 [&_pre]:!p-4 [&_pre_code]:!bg-transparent [&_pre_code]:!p-0"
-                  />
+                  <Button
+                    type="button"
+                    variant={block.variant || "default"}
+                    className={runningActionId === block.id ? "!opacity-100" : undefined}
+                    onClick={() => {
+                      void handleRunBlock(block);
+                    }}
+                    disabled={!canRunButtons || runningActionId === block.id}
+                  >
+                    {runningActionId === block.id ? <RunningIndicator label={block.label} /> : block.label}
+                  </Button>
+                  {!canRunButtons ? (
+                    <div className="mt-2 text-xs text-slate-500">
+                      {runDisabledTooltip || "Buttons are disabled because this canvas cannot run right now."}
+                    </div>
+                  ) : null}
                 </div>
               );
-            }
-
-            if (block.type === "table") {
-              return (
-                <div key={block.id} className="space-y-2">
-                  {block.title ? <h3 className="text-sm font-semibold text-slate-900">{block.title}</h3> : null}
-                  {renderTableBlock(block)}
-                </div>
-              );
-            }
-
-            return (
-              <div key={block.id}>
-                <Button
-                  type="button"
-                  variant={block.variant || "default"}
-                  className={runningActionId === block.id ? "!opacity-100" : undefined}
-                  onClick={() => {
-                    void handleRunBlock(block);
-                  }}
-                  disabled={!canRunButtons || runningActionId === block.id}
-                >
-                  {runningActionId === block.id ? <RunningIndicator label={block.label} /> : block.label}
-                </Button>
-                {!canRunButtons ? (
-                  <div className="mt-2 text-xs text-slate-500">
-                    {runDisabledTooltip || "Buttons are disabled because this canvas cannot run right now."}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
+            })}
+          </div>
+        )}
       </section>
     </div>
   );

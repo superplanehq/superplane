@@ -4349,8 +4349,12 @@ export function WorkflowPageV2() {
             : hasRunBlockingChanges
               ? "Save canvas changes before running"
               : undefined;
+  const hasControlTab = Array.isArray((canvas?.spec?.control as { blocks?: unknown } | undefined)?.blocks);
+
+  const effectiveTopViewMode = topViewMode === "control" && !hasControlTab ? "canvas" : topViewMode;
+
   const dataViewContent =
-    topViewMode === "memory" ? (
+    effectiveTopViewMode === "memory" ? (
       <CanvasMemoryView
         entries={isViewingDraftVersion ? [] : canvasMemoryEntries}
         isLoading={isViewingDraftVersion ? false : canvasMemoryLoading}
@@ -4362,10 +4366,9 @@ export function WorkflowPageV2() {
         }
         deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
       />
-    ) : topViewMode === "control" ? (
+    ) : effectiveTopViewMode === "control" ? (
       <CanvasControlView
         memoryEntries={isViewingDraftVersion ? [] : canvasMemoryEntries}
-        workflowNodes={canvas?.spec?.nodes || []}
         controlConfig={(canvas?.spec?.control as Record<string, unknown> | undefined) || undefined}
         canRunButtons={canUpdateCanvas && isViewingLiveVersion && !runDisabled}
         runDisabledTooltip={runDisabledTooltip}
@@ -4378,7 +4381,7 @@ export function WorkflowPageV2() {
   return (
     <>
       <div className="relative h-full w-full">
-        {showVersioningUI && topViewMode === "canvas" && !isVersionControlOpen ? (
+        {showVersioningUI && effectiveTopViewMode === "canvas" && !isVersionControlOpen ? (
           <div className="absolute left-4 top-16 z-20">
             <Button
               variant="outline"
@@ -4412,11 +4415,12 @@ export function WorkflowPageV2() {
           }}
           title={canvas?.metadata?.name || "Canvas"}
           headerBanner={headerBanner}
-          topViewMode={showVersioningUI || topViewMode !== "versioning" ? topViewMode : "canvas"}
+          topViewMode={showVersioningUI || effectiveTopViewMode !== "versioning" ? effectiveTopViewMode : "canvas"}
           onTopViewModeChange={(mode) => {
             setIsCreateChangeRequestMode(false);
             setTopViewMode(mode);
           }}
+          showControlTab={hasControlTab}
           showVersioningTab={false}
           isVersionControlOpen={showVersioningUI ? isVersionControlOpen : false}
           showBottomStatusControls={true}

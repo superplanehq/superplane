@@ -1,0 +1,316 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  id: b224aeef-eeab-4e21-bbb4-1a99a84f4a89
+  name: Deployment Gradual Rollout
+spec:
+  control:
+    blocks:
+      - id: "rollout-intro"
+        type: "markdown"
+        content: |
+          # Deployment Rollouts
+
+          Manage staged rollouts safely with placeholder deployment steps.
+
+          Start at 10%, promote to 50% and 100%, or roll back when needed.
+      - id: "rollouts-table"
+        type: "table"
+        title: "Active Rollouts"
+        source:
+          type: "memory"
+          namespace: "deployments"
+        columns:
+          - key: "rolloutId"
+            label: "Rollout ID"
+          - key: "service"
+            label: "Service"
+          - key: "currentPercent"
+            label: "Traffic %"
+          - key: "status"
+            label: "Status"
+            colorRules:
+              - when: 'row.status == "HEALTHY"'
+                color: "#16a34a"
+              - when: 'row.status == "ROLLING_OUT"'
+                color: "#2563eb"
+              - when: 'row.status == "ROLLING_BACK"'
+                color: "#d97706"
+              - when: 'row.status == "ROLLED_BACK"'
+                color: "#475569"
+          - key: "lastAction"
+            label: "Last Action"
+        actions:
+          - id: "promote-50"
+            label: "Promote 50%"
+            nodeId: "start-promote"
+            channel: "default"
+            variant: "outline"
+            payload:
+              action: "promote"
+              rolloutId: "{{row.rolloutId}}"
+              service: "{{row.service}}"
+              targetPercent: 50
+          - id: "promote-100"
+            label: "Promote 100%"
+            nodeId: "start-promote"
+            channel: "default"
+            variant: "outline"
+            payload:
+              action: "promote"
+              rolloutId: "{{row.rolloutId}}"
+              service: "{{row.service}}"
+              targetPercent: 100
+          - id: "rollback"
+            label: "Rollback"
+            nodeId: "start-rollback"
+            channel: "default"
+            variant: "destructive"
+            confirm: "Rollback rollout {{row.rolloutId}}?"
+            payload:
+              action: "rollback"
+              rolloutId: "{{row.rolloutId}}"
+              service: "{{row.service}}"
+      - id: "start-new-rollout"
+        type: "button"
+        label: "Start new rollout (10%)"
+        nodeId: "start-rollout"
+        channel: "default"
+        variant: "default"
+        payload:
+          action: "start_rollout"
+          rolloutId: "rollout-{{runTs}}"
+          service: "checkout"
+          targetPercent: 10
+  nodes:
+    - id: "start-rollout"
+      name: "Start rollout"
+      type: "TYPE_TRIGGER"
+      trigger:
+        name: "start"
+      configuration: {}
+      position:
+        x: 120
+        y: 320
+      paused: false
+      isCollapsed: false
+    - id: "start-promote"
+      name: "Promote rollout"
+      type: "TYPE_TRIGGER"
+      trigger:
+        name: "start"
+      configuration: {}
+      position:
+        x: 120
+        y: 520
+      paused: false
+      isCollapsed: false
+    - id: "start-rollback"
+      name: "Rollback rollout"
+      type: "TYPE_TRIGGER"
+      trigger:
+        name: "start"
+      configuration: {}
+      position:
+        x: 120
+        y: 80
+      paused: false
+      isCollapsed: false
+    - id: "upsert-rollout-progress"
+      name: "Mark rollout as ROLLING_OUT"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "deployments"
+        matchList:
+          - name: "rolloutId"
+            value: "{{ root().rolloutId }}"
+        valueList:
+          - name: "rolloutId"
+            value: "{{ root().rolloutId }}"
+          - name: "service"
+            value: "{{ root().service }}"
+          - name: "currentPercent"
+            value: "{{ root().targetPercent }}"
+          - name: "desiredPercent"
+            value: "{{ root().targetPercent }}"
+          - name: "status"
+            value: "ROLLING_OUT"
+          - name: "lastAction"
+            value: "{{ root().action }}"
+      position:
+        x: 520
+        y: 420
+      paused: false
+      isCollapsed: false
+    - id: "noop-deploy-step"
+      name: "Placeholder deploy step (noop)"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "noop"
+      configuration: {}
+      position:
+        x: 920
+        y: 420
+      paused: false
+      isCollapsed: false
+    - id: "wait-rollout-step"
+      name: "Wait for rollout stabilization"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "wait"
+      configuration:
+        mode: "interval"
+        unit: "seconds"
+        waitFor: "3"
+      position:
+        x: 1280
+        y: 420
+      paused: false
+      isCollapsed: false
+    - id: "upsert-rollout-healthy"
+      name: "Mark rollout as HEALTHY"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "deployments"
+        matchList:
+          - name: "rolloutId"
+            value: "{{ root().rolloutId }}"
+        valueList:
+          - name: "rolloutId"
+            value: "{{ root().rolloutId }}"
+          - name: "service"
+            value: "{{ root().service }}"
+          - name: "currentPercent"
+            value: "{{ root().targetPercent }}"
+          - name: "desiredPercent"
+            value: "{{ root().targetPercent }}"
+          - name: "status"
+            value: "HEALTHY"
+          - name: "lastAction"
+            value: "rollout_stable"
+          - name: "simulatedResult"
+            value: "{{ $['Wait for rollout stabilization'].data.result }}"
+          - name: "simulatedReason"
+            value: "{{ $['Wait for rollout stabilization'].data.reason }}"
+      position:
+        x: 1640
+        y: 420
+      paused: false
+      isCollapsed: false
+    - id: "upsert-rollout-rolling-back"
+      name: "Mark rollout as ROLLING_BACK"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "deployments"
+        matchList:
+          - name: "rolloutId"
+            value: "{{ root().rolloutId }}"
+        valueList:
+          - name: "rolloutId"
+            value: "{{ root().rolloutId }}"
+          - name: "service"
+            value: "{{ root().service }}"
+          - name: "currentPercent"
+            value: "0"
+          - name: "desiredPercent"
+            value: "0"
+          - name: "status"
+            value: "ROLLING_BACK"
+          - name: "lastAction"
+            value: "{{ root().action }}"
+      position:
+        x: 520
+        y: 80
+      paused: false
+      isCollapsed: false
+    - id: "noop-rollback-step"
+      name: "Placeholder rollback step (noop)"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "noop"
+      configuration: {}
+      position:
+        x: 920
+        y: 80
+      paused: false
+      isCollapsed: false
+    - id: "wait-rollback-step"
+      name: "Wait for rollback stabilization"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "wait"
+      configuration:
+        mode: "interval"
+        unit: "seconds"
+        waitFor: "2"
+      position:
+        x: 1280
+        y: 80
+      paused: false
+      isCollapsed: false
+    - id: "upsert-rollout-rolled-back"
+      name: "Mark rollout as ROLLED_BACK"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "deployments"
+        matchList:
+          - name: "rolloutId"
+            value: "{{ root().rolloutId }}"
+        valueList:
+          - name: "rolloutId"
+            value: "{{ root().rolloutId }}"
+          - name: "service"
+            value: "{{ root().service }}"
+          - name: "currentPercent"
+            value: "0"
+          - name: "desiredPercent"
+            value: "0"
+          - name: "status"
+            value: "ROLLED_BACK"
+          - name: "lastAction"
+            value: "rollback_completed"
+          - name: "simulatedResult"
+            value: "{{ $['Wait for rollback stabilization'].data.result }}"
+          - name: "simulatedReason"
+            value: "{{ $['Wait for rollback stabilization'].data.reason }}"
+      position:
+        x: 1640
+        y: 80
+      paused: false
+      isCollapsed: false
+  edges:
+    - sourceId: "start-rollout"
+      targetId: "upsert-rollout-progress"
+      channel: "default"
+    - sourceId: "start-promote"
+      targetId: "upsert-rollout-progress"
+      channel: "default"
+    - sourceId: "upsert-rollout-progress"
+      targetId: "noop-deploy-step"
+      channel: "default"
+    - sourceId: "noop-deploy-step"
+      targetId: "wait-rollout-step"
+      channel: "default"
+    - sourceId: "wait-rollout-step"
+      targetId: "upsert-rollout-healthy"
+      channel: "default"
+    - sourceId: "start-rollback"
+      targetId: "upsert-rollout-rolling-back"
+      channel: "default"
+    - sourceId: "upsert-rollout-rolling-back"
+      targetId: "noop-rollback-step"
+      channel: "default"
+    - sourceId: "noop-rollback-step"
+      targetId: "wait-rollback-step"
+      channel: "default"
+    - sourceId: "wait-rollback-step"
+      targetId: "upsert-rollout-rolled-back"
+      channel: "default"

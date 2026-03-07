@@ -63,6 +63,7 @@ interface HeaderProps {
   onExportYamlDownload?: () => void;
   topViewMode?: "canvas" | "memory" | "control" | "versioning";
   onTopViewModeChange?: (mode: "canvas" | "memory" | "control" | "versioning") => void;
+  showControlTab?: boolean;
   showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;
@@ -104,6 +105,7 @@ export function Header({
   onExportYamlDownload,
   topViewMode,
   onTopViewModeChange,
+  showControlTab = true,
   showVersioningTab = true,
   memoryItemCount,
   versioningItemCount,
@@ -285,15 +287,17 @@ export function Header({
           <div className="justify-self-center">
             {topViewMode && onTopViewModeChange && (
               <div className="flex items-center rounded-md border border-gray-300 p-0.5">
-                <button
-                  type="button"
-                  onClick={() => onTopViewModeChange("control")}
-                  className={`rounded px-2 py-1 text-xs font-medium ${
-                    topViewMode === "control" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  Control
-                </button>
+                {showControlTab ? (
+                  <button
+                    type="button"
+                    onClick={() => onTopViewModeChange("control")}
+                    className={`rounded px-2 py-1 text-xs font-medium ${
+                      topViewMode === "control" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    Control
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => onTopViewModeChange("canvas")}

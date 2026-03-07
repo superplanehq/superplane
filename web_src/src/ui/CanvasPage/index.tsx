@@ -183,6 +183,7 @@ export interface CanvasPageProps {
   autoLayoutOnUpdateDisabledTooltip?: string;
   topViewMode?: "canvas" | "memory" | "control" | "versioning";
   onTopViewModeChange?: (mode: "canvas" | "memory" | "control" | "versioning") => void;
+  showControlTab?: boolean;
   showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;
@@ -905,6 +906,7 @@ function CanvasPage(props: CanvasPageProps) {
           showPendingDraftBadge={props.showPendingDraftBadge}
           topViewMode={props.topViewMode}
           onTopViewModeChange={props.onTopViewModeChange}
+          showControlTab={props.showControlTab}
           showVersioningTab={props.showVersioningTab}
           memoryItemCount={props.memoryItemCount}
           versioningItemCount={props.versioningItemCount}
@@ -1408,6 +1410,7 @@ function CanvasContentHeader({
   showPendingDraftBadge,
   topViewMode,
   onTopViewModeChange,
+  showControlTab,
   showVersioningTab,
   memoryItemCount,
   versioningItemCount,
@@ -1450,6 +1453,7 @@ function CanvasContentHeader({
   showPendingDraftBadge?: boolean;
   topViewMode?: "canvas" | "memory" | "control" | "versioning";
   onTopViewModeChange?: (mode: "canvas" | "memory" | "control" | "versioning") => void;
+  showControlTab?: boolean;
   showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;
@@ -1522,6 +1526,7 @@ function CanvasContentHeader({
       showPendingDraftBadge={showPendingDraftBadge}
       topViewMode={topViewMode}
       onTopViewModeChange={onTopViewModeChange}
+      showControlTab={showControlTab}
       showVersioningTab={showVersioningTab}
       memoryItemCount={memoryItemCount}
       versioningItemCount={versioningItemCount}
