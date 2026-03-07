@@ -20,8 +20,9 @@ var _ MappedNullable = &CanvasesCanvasSpec{}
 
 // CanvasesCanvasSpec struct for CanvasesCanvasSpec
 type CanvasesCanvasSpec struct {
-	Nodes []ComponentsNode `json:"nodes,omitempty"`
-	Edges []ComponentsEdge `json:"edges,omitempty"`
+	Nodes   []ComponentsNode       `json:"nodes,omitempty"`
+	Edges   []ComponentsEdge       `json:"edges,omitempty"`
+	Control map[string]interface{} `json:"control,omitempty"`
 }
 
 // NewCanvasesCanvasSpec instantiates a new CanvasesCanvasSpec object
@@ -105,6 +106,38 @@ func (o *CanvasesCanvasSpec) SetEdges(v []ComponentsEdge) {
 	o.Edges = v
 }
 
+// GetControl returns the Control field value if set, zero value otherwise.
+func (o *CanvasesCanvasSpec) GetControl() map[string]interface{} {
+	if o == nil || IsNil(o.Control) {
+		var ret map[string]interface{}
+		return ret
+	}
+	return o.Control
+}
+
+// GetControlOk returns a tuple with the Control field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasSpec) GetControlOk() (map[string]interface{}, bool) {
+	if o == nil || IsNil(o.Control) {
+		return map[string]interface{}{}, false
+	}
+	return o.Control, true
+}
+
+// HasControl returns a boolean if a field has been set.
+func (o *CanvasesCanvasSpec) HasControl() bool {
+	if o != nil && !IsNil(o.Control) {
+		return true
+	}
+
+	return false
+}
+
+// SetControl gets a reference to the given map[string]interface{} and assigns it to the Control field.
+func (o *CanvasesCanvasSpec) SetControl(v map[string]interface{}) {
+	o.Control = v
+}
+
 func (o CanvasesCanvasSpec) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -120,6 +153,9 @@ func (o CanvasesCanvasSpec) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Edges) {
 		toSerialize["edges"] = o.Edges
+	}
+	if !IsNil(o.Control) {
+		toSerialize["control"] = o.Control
 	}
 	return toSerialize, nil
 }

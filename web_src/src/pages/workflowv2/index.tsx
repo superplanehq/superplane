@@ -96,6 +96,7 @@ import {
 } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
 import { CanvasMemoryView } from "./CanvasMemoryView";
+import { CanvasControlView } from "./CanvasControlView";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
@@ -461,7 +462,7 @@ export function WorkflowPageV2() {
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
   const isDev = import.meta.env.DEV;
-  const [topViewMode, setTopViewMode] = useState<"canvas" | "memory" | "versioning">("canvas");
+  const [topViewMode, setTopViewMode] = useState<"canvas" | "memory" | "control" | "versioning">("control");
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
@@ -1134,6 +1135,7 @@ export function WorkflowPageV2() {
               description: latestWorkflow.metadata?.description,
               nodes: updatedNodes,
               edges: latestWorkflow.spec?.edges,
+              control: latestWorkflow.spec?.control as Record<string, unknown> | undefined,
             });
             if (
               updateResponse?.data?.version &&
@@ -2076,6 +2078,7 @@ export function WorkflowPageV2() {
           description: targetWorkflow.metadata?.description,
           nodes: targetWorkflow.spec?.nodes,
           edges: targetWorkflow.spec?.edges,
+          control: targetWorkflow.spec?.control as Record<string, unknown> | undefined,
         });
         if (updateResponse?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
           setActiveCanvasVersion(updateResponse.data.version);
@@ -3501,6 +3504,7 @@ export function WorkflowPageV2() {
           description: canvas.metadata?.description,
           nodes: updatedNodes,
           edges: canvas.spec?.edges,
+          control: canvas.spec?.control as Record<string, unknown> | undefined,
         });
         if (updateResponse?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
           setActiveCanvasVersion(updateResponse.data.version);
@@ -4357,6 +4361,17 @@ export function WorkflowPageV2() {
           canUpdateCanvas && isViewingLiveVersion ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined
         }
         deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
+      />
+    ) : topViewMode === "control" ? (
+      <CanvasControlView
+        memoryEntries={isViewingDraftVersion ? [] : canvasMemoryEntries}
+        workflowNodes={canvas?.spec?.nodes || []}
+        controlConfig={(canvas?.spec?.control as Record<string, unknown> | undefined) || undefined}
+        canRunButtons={canUpdateCanvas && isViewingLiveVersion && !runDisabled}
+        runDisabledTooltip={runDisabledTooltip}
+        onRunButton={async ({ nodeId, channel, payload }) => {
+          await handleRun(nodeId, channel, payload);
+        }}
       />
     ) : null;
 

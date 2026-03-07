@@ -175,6 +175,7 @@ func PublishCanvasChangeRequest(
 			request.OwnerID,
 			mergedNodes,
 			mergedEdges,
+			version.Control.Data(),
 		)
 		if err != nil {
 			return err
@@ -196,6 +197,7 @@ func PublishCanvasChangeRequest(
 				*request.OwnerID,
 				liveVersion.Nodes,
 				liveVersion.Edges,
+				liveVersion.Control.Data(),
 			)
 			if err != nil {
 				return err

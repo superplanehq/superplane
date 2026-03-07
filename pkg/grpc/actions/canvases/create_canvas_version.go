@@ -63,6 +63,7 @@ func CreateCanvasVersion(ctx context.Context, organizationID string, canvasID st
 			userUUID,
 			liveVersion.Nodes,
 			liveVersion.Edges,
+			liveVersion.Control.Data(),
 		)
 
 		return err

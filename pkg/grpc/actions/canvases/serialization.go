@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -40,6 +41,11 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 	}
 
 	if !includeStatus {
+		control, err := mapToStruct(liveVersion.Control.Data())
+		if err != nil {
+			return nil, err
+		}
+
 		return &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{
 				Id:             canvas.ID.String(),
@@ -52,8 +58,9 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 				IsTemplate:     canvas.IsTemplate,
 			},
 			Spec: &pb.Canvas_Spec{
-				Nodes: serializedNodes,
-				Edges: actions.EdgesToProto(liveVersion.Edges),
+				Nodes:   serializedNodes,
+				Edges:   actions.EdgesToProto(liveVersion.Edges),
+				Control: control,
 			},
 			Status: nil,
 		}, nil
@@ -102,6 +109,11 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 		return nil, err
 	}
 
+	control, err := mapToStruct(liveVersion.Control.Data())
+	if err != nil {
+		return nil, err
+	}
+
 	return &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
 			Id:             canvas.ID.String(),
@@ -114,8 +126,9 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 			IsTemplate:     canvas.IsTemplate,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: serializedNodes,
-			Edges: actions.EdgesToProto(liveVersion.Edges),
+			Nodes:   serializedNodes,
+			Edges:   actions.EdgesToProto(liveVersion.Edges),
+			Control: control,
 		},
 		Status: &pb.Canvas_Status{
 			LastExecutions: serializedExecutions,
@@ -150,22 +163,24 @@ func serializeCanvasNodes(canvasID uuid.UUID, nodes []models.Node) ([]*compb.Nod
 	return serialized, nil
 }
 
-func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) ([]models.Node, []models.Edge, error) {
+func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) ([]models.Node, []models.Edge, map[string]any, error) {
 	if canvas.Metadata == nil {
-		return nil, nil, status.Error(codes.InvalidArgument, "canvas metadata is required")
+		return nil, nil, nil, status.Error(codes.InvalidArgument, "canvas metadata is required")
 	}
 
 	if canvas.Metadata.Name == "" {
-		return nil, nil, status.Error(codes.InvalidArgument, "canvas name is required")
+		return nil, nil, nil, status.Error(codes.InvalidArgument, "canvas name is required")
 	}
 
 	if canvas.Spec == nil {
-		return nil, nil, status.Error(codes.InvalidArgument, "canvas spec is required")
+		return nil, nil, nil, status.Error(codes.InvalidArgument, "canvas spec is required")
 	}
+
+	control := structToMap(canvas.Spec.Control)
 
 	// Allow empty canvases
 	if len(canvas.Spec.Nodes) == 0 {
-		return []models.Node{}, []models.Edge{}, nil
+		return []models.Node{}, []models.Edge{}, control, nil
 	}
 
 	nodeIDs := make(map[string]bool)
@@ -174,15 +189,15 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 
 	for i, node := range canvas.Spec.Nodes {
 		if node.Id == "" {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "node %d: id is required", i)
+			return nil, nil, nil, status.Errorf(codes.InvalidArgument, "node %d: id is required", i)
 		}
 
 		if node.Name == "" {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "node %s: name is required", node.Id)
+			return nil, nil, nil, status.Errorf(codes.InvalidArgument, "node %s: name is required", node.Id)
 		}
 
 		if nodeIDs[node.Id] {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "node %s: duplicate node id", node.Id)
+			return nil, nil, nil, status.Errorf(codes.InvalidArgument, "node %s: duplicate node id", node.Id)
 		}
 
 		nodeIDs[node.Id] = true
@@ -198,28 +213,28 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 
 	for i, edge := range canvas.Spec.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source_id and target_id are required", i)
+			return nil, nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source_id and target_id are required", i)
 		}
 
 		if !nodeIDs[edge.SourceId] {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source node %s not found", i, edge.SourceId)
+			return nil, nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source node %s not found", i, edge.SourceId)
 		}
 
 		if !nodeIDs[edge.TargetId] {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
+			return nil, nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
 		}
 
 		if nodeTypeByID[edge.SourceId] == compb.Node_TYPE_WIDGET {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as source nodes", i)
+			return nil, nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as source nodes", i)
 		}
 
 		if nodeTypeByID[edge.TargetId] == compb.Node_TYPE_WIDGET {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
+			return nil, nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
 		}
 	}
 
 	if err := actions.CheckForCycles(canvas.Spec.Nodes, canvas.Spec.Edges); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Convert proto nodes to models, adding validation errors and warnings where applicable
@@ -238,7 +253,21 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 		}
 	}
 
-	return nodes, actions.ProtoToEdges(canvas.Spec.Edges), nil
+	return nodes, actions.ProtoToEdges(canvas.Spec.Edges), control, nil
+}
+
+func mapToStruct(data map[string]any) (*structpb.Struct, error) {
+	if data == nil {
+		return nil, nil
+	}
+	return structpb.NewStruct(data)
+}
+
+func structToMap(value *structpb.Struct) map[string]any {
+	if value == nil {
+		return nil
+	}
+	return value.AsMap()
 }
 
 func validateNodeRef(registry *registry.Registry, organizationID string, node *compb.Node) error {

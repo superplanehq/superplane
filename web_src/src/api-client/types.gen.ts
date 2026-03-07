@@ -227,6 +227,9 @@ export type CanvasesCanvasNodeQueueItem = {
 export type CanvasesCanvasSpec = {
   nodes?: Array<ComponentsNode>;
   edges?: Array<ComponentsEdge>;
+  control?: {
+    [key: string]: unknown;
+  };
 };
 
 export type CanvasesCanvasStatus = {

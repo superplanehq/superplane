@@ -26,7 +26,7 @@ func CreateCanvas(ctx context.Context, registry *registry.Registry, organization
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
+	nodes, edges, control, err := ParseCanvas(registry, organizationID, pbCanvas)
 	if err != nil {
 		return nil, err
 	}
@@ -107,6 +107,7 @@ func CreateCanvas(ctx context.Context, registry *registry.Registry, organization
 			&createdBy,
 			expandedNodes,
 			edges,
+			control,
 		)
 		if err != nil {
 			return err

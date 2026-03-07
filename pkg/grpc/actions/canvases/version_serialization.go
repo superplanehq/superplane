@@ -35,11 +35,17 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 		metadata.UpdatedAt = timestamppb.New(*version.UpdatedAt)
 	}
 
+	control, err := mapToStruct(version.Control.Data())
+	if err != nil {
+		control = nil
+	}
+
 	return &pb.CanvasVersion{
 		Metadata: metadata,
 		Spec: &pb.Canvas_Spec{
-			Nodes: actions.NodesToProto(version.Nodes),
-			Edges: actions.EdgesToProto(version.Edges),
+			Nodes:   actions.NodesToProto(version.Nodes),
+			Edges:   actions.EdgesToProto(version.Edges),
+			Control: control,
 		},
 	}
 }

@@ -52,7 +52,7 @@ func UpdateCanvasVersion(
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
+	nodes, edges, control, err := ParseCanvas(registry, organizationID, pbCanvas)
 	if err != nil {
 		return nil, err
 	}
@@ -81,6 +81,7 @@ func UpdateCanvasVersion(
 			canvas,
 			nodes,
 			edges,
+			control,
 			webhookBaseURL,
 		)
 	}
@@ -124,6 +125,7 @@ func UpdateCanvasVersion(
 		now := time.Now()
 		version.Nodes = datatypes.NewJSONSlice(nodes)
 		version.Edges = datatypes.NewJSONSlice(edges)
+		version.Control = datatypes.NewJSONType(control)
 		version.UpdatedAt = &now
 
 		if err := tx.Save(version).Error; err != nil {
@@ -159,6 +161,7 @@ func updateLiveCanvasInSandbox(
 	canvas *models.Canvas,
 	nodes []models.Node,
 	edges []models.Edge,
+	control map[string]any,
 	webhookBaseURL string,
 ) (*pb.UpdateCanvasVersionResponse, error) {
 	organizationID := organizationUUID.String()
@@ -247,6 +250,7 @@ func updateLiveCanvasInSandbox(
 
 		liveVersion.Nodes = datatypes.NewJSONSlice(nodes)
 		liveVersion.Edges = datatypes.NewJSONSlice(edges)
+		liveVersion.Control = datatypes.NewJSONType(control)
 		liveVersion.UpdatedAt = &now
 		if saveErr := tx.Save(liveVersion).Error; saveErr != nil {
 			return saveErr

@@ -61,8 +61,8 @@ interface HeaderProps {
   autoSaveDisabledTooltip?: string;
   onExportYamlCopy?: () => void;
   onExportYamlDownload?: () => void;
-  topViewMode?: "canvas" | "memory" | "versioning";
-  onTopViewModeChange?: (mode: "canvas" | "memory" | "versioning") => void;
+  topViewMode?: "canvas" | "memory" | "control" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "memory" | "control" | "versioning") => void;
   showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;
@@ -285,6 +285,15 @@ export function Header({
           <div className="justify-self-center">
             {topViewMode && onTopViewModeChange && (
               <div className="flex items-center rounded-md border border-gray-300 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => onTopViewModeChange("control")}
+                  className={`rounded px-2 py-1 text-xs font-medium ${
+                    topViewMode === "control" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  Control
+                </button>
                 <button
                   type="button"
                   onClick={() => onTopViewModeChange("canvas")}

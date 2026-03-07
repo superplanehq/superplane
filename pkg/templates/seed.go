@@ -139,7 +139,7 @@ func deleteAllTemplateWorkflows(tx *gorm.DB) error {
 
 func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb.Canvas) error {
 	organizationID := models.TemplateOrganizationID.String()
-	nodes, edges, err := canvases.ParseCanvas(registry, organizationID, template)
+	nodes, edges, control, err := canvases.ParseCanvas(registry, organizationID, template)
 	if err != nil {
 		return err
 	}
@@ -199,6 +199,7 @@ func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb
 		PublishedAt: &now,
 		Nodes:       datatypes.NewJSONSlice(expandedNodes),
 		Edges:       datatypes.NewJSONSlice(edges),
+		Control:     datatypes.NewJSONType(control),
 		CreatedAt:   &now,
 		UpdatedAt:   &now,
 	}

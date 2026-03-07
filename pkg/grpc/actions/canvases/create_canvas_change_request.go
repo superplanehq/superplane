@@ -127,6 +127,7 @@ func CreateCanvasChangeRequestWithMetadata(
 			userUUID,
 			draftVersion.Nodes,
 			draftVersion.Edges,
+			draftVersion.Control.Data(),
 		)
 		if err != nil {
 			return err

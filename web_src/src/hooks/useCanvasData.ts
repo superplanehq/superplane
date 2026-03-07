@@ -429,6 +429,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       description?: string;
       nodes?: any[];
       edges?: any[];
+      control?: Record<string, unknown>;
       autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
     }) => {
       const body = {
@@ -440,6 +441,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
           spec: {
             nodes: data.nodes || [],
             edges: data.edges || [],
+            control: data.control || {},
           },
         },
         autoLayout: data.autoLayout,
@@ -638,7 +640,6 @@ export const useCanvasMemoryEntries = (canvasId: string, enabled = true) => {
       }));
     },
     refetchOnWindowFocus: false,
-    refetchInterval: 3000,
     enabled: !!canvasId && enabled,
   });
 };

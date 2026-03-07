@@ -21,6 +21,7 @@ type CanvasVersion struct {
 	PublishedAt *time.Time
 	Nodes       datatypes.JSONSlice[Node]
 	Edges       datatypes.JSONSlice[Edge]
+	Control     datatypes.JSONType[map[string]any]
 	CreatedAt   *time.Time
 	UpdatedAt   *time.Time
 }
@@ -172,6 +173,7 @@ func CreatePublishedCanvasVersionInTransaction(
 	ownerID *uuid.UUID,
 	nodes []Node,
 	edges []Edge,
+	control map[string]any,
 ) (*CanvasVersion, error) {
 	canvas, err := lockCanvasForVersioningInTransaction(tx, workflowID)
 	if err != nil {
@@ -187,6 +189,7 @@ func CreatePublishedCanvasVersionInTransaction(
 		PublishedAt: &now,
 		Nodes:       datatypes.NewJSONSlice(nodes),
 		Edges:       datatypes.NewJSONSlice(edges),
+		Control:     datatypes.NewJSONType(control),
 		CreatedAt:   &now,
 		UpdatedAt:   &now,
 	}
@@ -211,6 +214,7 @@ func SaveCanvasDraftInTransaction(
 	userID uuid.UUID,
 	nodes []Node,
 	edges []Edge,
+	control map[string]any,
 ) (*CanvasVersion, error) {
 	_, err := lockCanvasForVersioningInTransaction(tx, workflowID)
 	if err != nil {
@@ -225,6 +229,7 @@ func SaveCanvasDraftInTransaction(
 		IsPublished: false,
 		Nodes:       datatypes.NewJSONSlice(nodes),
 		Edges:       datatypes.NewJSONSlice(edges),
+		Control:     datatypes.NewJSONType(control),
 		CreatedAt:   &now,
 		UpdatedAt:   &now,
 	}
@@ -260,6 +265,7 @@ func CreateOrResetCanvasDraftInTransaction(
 	userID uuid.UUID,
 	nodes []Node,
 	edges []Edge,
+	control map[string]any,
 ) (*CanvasVersion, error) {
 	canvas, err := lockCanvasForVersioningInTransaction(tx, workflowID)
 	if err != nil {
@@ -281,6 +287,7 @@ func CreateOrResetCanvasDraftInTransaction(
 		version.OwnerID = &userID
 		version.Nodes = datatypes.NewJSONSlice(nodes)
 		version.Edges = datatypes.NewJSONSlice(edges)
+		version.Control = datatypes.NewJSONType(control)
 		version.IsPublished = false
 		version.PublishedAt = nil
 		version.UpdatedAt = &now
@@ -308,6 +315,7 @@ func CreateOrResetCanvasDraftInTransaction(
 		IsPublished: false,
 		Nodes:       datatypes.NewJSONSlice(nodes),
 		Edges:       datatypes.NewJSONSlice(edges),
+		Control:     datatypes.NewJSONType(control),
 		CreatedAt:   &now,
 		UpdatedAt:   &now,
 	}
@@ -335,6 +343,7 @@ func CreateCanvasSnapshotVersionInTransaction(
 	ownerID uuid.UUID,
 	nodes []Node,
 	edges []Edge,
+	control map[string]any,
 ) (*CanvasVersion, error) {
 	if _, err := lockCanvasForVersioningInTransaction(tx, workflowID); err != nil {
 		return nil, err
@@ -348,6 +357,7 @@ func CreateCanvasSnapshotVersionInTransaction(
 		IsPublished: false,
 		Nodes:       datatypes.NewJSONSlice(nodes),
 		Edges:       datatypes.NewJSONSlice(edges),
+		Control:     datatypes.NewJSONType(control),
 		CreatedAt:   &now,
 		UpdatedAt:   &now,
 	}

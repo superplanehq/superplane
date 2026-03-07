@@ -486,6 +486,7 @@ message Canvas {
   message Spec {
     repeated Components.Node nodes = 1;
     repeated Components.Edge edges = 2;
+    google.protobuf.Struct control = 3;
   }
 
   message Status {

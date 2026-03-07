@@ -4329,6 +4329,9 @@
             "type": "object",
             "$ref": "#/definitions/ComponentsEdge"
           }
+        },
+        "control": {
+          "type": "object"
         }
       }
     },

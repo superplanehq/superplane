@@ -83,6 +83,11 @@ export function useCanvasWebsocket(
                   queryKey: canvasKeys.eventExecution(canvasId, execution.rootEvent.id),
                 });
               }
+              if (data.event === "execution_finished") {
+                queryClient.invalidateQueries({
+                  queryKey: canvasKeys.canvasMemoryEntries(canvasId),
+                });
+              }
               onNodeEvent?.(execution.nodeId!, data.event);
               onExecutionEvent?.(execution, data.event);
             }
