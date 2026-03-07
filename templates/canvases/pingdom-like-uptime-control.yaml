@@ -1,0 +1,842 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  id: 36c565b2-0ff4-45f6-b709-1c765a50d188
+  name: Synthetic Uptime Control
+spec:
+  control:
+    blocks:
+      - id: "uptime-intro"
+        type: "markdown"
+        content: |
+          # Synthetic Monitoring Control
+
+          A Pingdom-like operator panel for uptime checks and incident handling.
+      - id: "add-check"
+        type: "button"
+        label: "Add check"
+        nodeId: "start-add-check"
+        channel: "default"
+        variant: "secondary"
+        form:
+          title: "Add uptime check"
+          description: "Create a new synthetic check."
+          submitLabel: "Add check"
+          fields:
+            - id: "checkId"
+              label: "Check ID"
+              type: "text"
+              required: true
+              placeholder: "check-payment-api"
+              defaultValue: "check-{{runTs}}"
+            - id: "name"
+              label: "Name"
+              type: "text"
+              required: true
+              placeholder: "Payment API"
+            - id: "url"
+              label: "Target URL"
+              type: "url"
+              required: true
+              placeholder: "https://api.example.com/health"
+            - id: "region"
+              label: "Region"
+              type: "select"
+              required: true
+              defaultValue: "us-east-1"
+              options:
+                - value: "us-east-1"
+                  label: "us-east-1"
+                - value: "us-west-2"
+                  label: "us-west-2"
+                - value: "eu-west-1"
+                  label: "eu-west-1"
+                - value: "ap-southeast-1"
+                  label: "ap-southeast-1"
+        payload:
+          checkId: "{{form.checkId}}"
+          name: "{{form.name}}"
+          url: "{{form.url}}"
+          region: "{{form.region}}"
+          latencyMs: 120
+          checkedAt: "{{nowIso}}"
+      - id: "checks-table"
+        type: "table"
+        title: "Checks"
+        source:
+          type: "memory"
+          namespace: "checks"
+        columns:
+          - key: "checkId"
+            label: "Check"
+          - key: "name"
+            label: "Name"
+          - key: "url"
+            label: "Target URL"
+          - key: "region"
+            label: "Region"
+          - key: "status"
+            label: "Status"
+            colorRules:
+              - when: 'row.status == "UP"'
+                color: "#16a34a"
+              - when: 'row.status == "DOWN"'
+                color: "#dc2626"
+              - when: 'row.status == "PAUSED"'
+                color: "#d97706"
+          - key: "latencyMs"
+            label: "Latency (ms)"
+          - key: "consecutiveFailures"
+            label: "Failures"
+          - key: "lastCheckedAt"
+            label: "Last Probe"
+        actions:
+          - id: "probe-now"
+            label: "Probe now"
+            nodeId: "start-run-probe"
+            channel: "default"
+            variant: "outline"
+            payload:
+              checkId: "{{row.checkId}}"
+              name: "{{row.name}}"
+              url: "{{row.url}}"
+              region: "{{row.region}}"
+              latencyMs: 148
+              checkedAt: "{{nowIso}}"
+          - id: "pause-check"
+            label: "Pause"
+            nodeId: "start-pause-check"
+            channel: "default"
+            variant: "secondary"
+            payload:
+              checkId: "{{row.checkId}}"
+              name: "{{row.name}}"
+              url: "{{row.url}}"
+              region: "{{row.region}}"
+              checkedAt: "{{nowIso}}"
+          - id: "resume-check"
+            label: "Resume"
+            nodeId: "start-resume-check"
+            channel: "default"
+            variant: "default"
+            payload:
+              checkId: "{{row.checkId}}"
+              name: "{{row.name}}"
+              url: "{{row.url}}"
+              region: "{{row.region}}"
+              latencyMs: 133
+              checkedAt: "{{nowIso}}"
+      - id: "incidents-table"
+        type: "table"
+        title: "Active Incidents"
+        source:
+          type: "memory"
+          namespace: "incidents"
+        columns:
+          - key: "incidentId"
+            label: "Incident"
+          - key: "checkId"
+            label: "Check"
+          - key: "name"
+            label: "Name"
+          - key: "severity"
+            label: "Severity"
+            colorRules:
+              - when: 'row.severity == "critical"'
+                color: "#b91c1c"
+              - when: 'row.severity == "high"'
+                color: "#dc2626"
+              - when: 'row.severity == "medium"'
+                color: "#ea580c"
+              - when: 'row.severity == "low"'
+                color: "#d97706"
+          - key: "status"
+            label: "Status"
+            colorRules:
+              - when: 'row.status == "OPEN"'
+                color: "#dc2626"
+              - when: 'row.status == "ACKED"'
+                color: "#d97706"
+              - when: 'row.status == "RESOLVED"'
+                color: "#16a34a"
+          - key: "failingRegion"
+            label: "Region"
+          - key: "startedAt"
+            label: "Started At"
+          - key: "lastProbeAt"
+            label: "Last Probe"
+        actions:
+          - id: "ack-incident"
+            label: "Acknowledge"
+            nodeId: "start-ack-incident"
+            channel: "default"
+            variant: "secondary"
+            payload:
+              incidentId: "{{row.incidentId}}"
+              checkId: "{{row.checkId}}"
+              name: "{{row.name}}"
+              severity: "{{row.severity}}"
+              failingRegion: "{{row.failingRegion}}"
+              startedAt: "{{row.startedAt}}"
+              lastProbeAt: "{{row.lastProbeAt}}"
+          - id: "resolve-incident"
+            label: "Resolve"
+            nodeId: "start-resolve-incident"
+            channel: "default"
+            variant: "default"
+            payload:
+              incidentId: "{{row.incidentId}}"
+              checkId: "{{row.checkId}}"
+              name: "{{row.name}}"
+              severity: "{{row.severity}}"
+              failingRegion: "{{row.failingRegion}}"
+              startedAt: "{{row.startedAt}}"
+              lastProbeAt: "{{row.lastProbeAt}}"
+              resolvedAt: "{{nowIso}}"
+      - id: "simulate-outage-global"
+        type: "button"
+        label: "Simulate outage"
+        nodeId: "start-simulate-outage"
+        channel: "default"
+        variant: "destructive"
+        payload:
+          checkId: "check-checkout-api"
+          name: "Checkout API"
+          url: "https://api.example.com/health"
+          region: "us-east-1"
+          severity: "critical"
+          failCount: 3
+          latencyMs: 0
+          startedAt: "{{nowIso}}"
+          lastProbeAt: "{{nowIso}}"
+  nodes:
+    - id: "start-seed-checks"
+      name: "Seed demo checks"
+      type: "TYPE_TRIGGER"
+      trigger:
+        name: "start"
+      configuration:
+        templates:
+          - name: "Seed checks"
+            payload:
+              action: "seed_checks"
+      position:
+        x: 120
+        y: 120
+      paused: false
+      isCollapsed: false
+    - id: "start-run-probe"
+      name: "Run manual probe"
+      type: "TYPE_TRIGGER"
+      trigger:
+        name: "start"
+      configuration:
+        templates:
+          - name: "Probe checkout API"
+            payload:
+              checkId: "check-checkout-api"
+              name: "Checkout API"
+              url: "https://api.example.com/health"
+              region: "us-east-1"
+              latencyMs: 148
+              checkedAt: "2026-03-06T18:00:00Z"
+      position:
+        x: 120
+        y: 320
+      paused: false
+      isCollapsed: false
+    - id: "start-add-check"
+      name: "Add check"
+      type: "TYPE_TRIGGER"
+      trigger:
+        name: "start"
+      configuration:
+        templates:
+          - name: "Add checkout check"
+            payload:
+              checkId: "check-checkout-api"
+              name: "Checkout API"
+              url: "https://api.example.com/health"
+              region: "us-east-1"
+              latencyMs: 120
+              checkedAt: "2026-03-07T10:00:00Z"
+      position:
+        x: 120
+        y: 520
+      paused: false
+      isCollapsed: false
+    - id: "start-simulate-outage"
+      name: "Simulate outage on check"
+      type: "TYPE_TRIGGER"
+      trigger:
+        name: "start"
+      configuration:
+        templates:
+          - name: "Checkout API outage"
+            payload:
+              checkId: "check-checkout-api"
+              name: "Checkout API"
+              url: "https://api.example.com/health"
+              region: "us-east-1"
+              severity: "critical"
+              failCount: 3
+              latencyMs: 0
+              startedAt: "2026-03-06T18:00:00Z"
+              lastProbeAt: "2026-03-06T18:00:00Z"
+      position:
+        x: 120
+        y: 720
+      paused: false
+      isCollapsed: false
+    - id: "start-pause-check"
+      name: "Pause check"
+      type: "TYPE_TRIGGER"
+      trigger:
+        name: "start"
+      configuration:
+        templates:
+          - name: "Pause checkout API"
+            payload:
+              checkId: "check-checkout-api"
+              name: "Checkout API"
+              url: "https://api.example.com/health"
+              region: "us-east-1"
+              checkedAt: "2026-03-06T18:01:00Z"
+      position:
+        x: 120
+        y: 920
+      paused: false
+      isCollapsed: false
+    - id: "start-resume-check"
+      name: "Resume check"
+      type: "TYPE_TRIGGER"
+      trigger:
+        name: "start"
+      configuration:
+        templates:
+          - name: "Resume checkout API"
+            payload:
+              checkId: "check-checkout-api"
+              name: "Checkout API"
+              url: "https://api.example.com/health"
+              region: "us-east-1"
+              latencyMs: 133
+              checkedAt: "2026-03-06T18:02:00Z"
+      position:
+        x: 120
+        y: 1120
+      paused: false
+      isCollapsed: false
+    - id: "start-ack-incident"
+      name: "Acknowledge incident"
+      type: "TYPE_TRIGGER"
+      trigger:
+        name: "start"
+      configuration:
+        templates:
+          - name: "Acknowledge sample incident"
+            payload:
+              incidentId: "inc-checkout-api"
+              checkId: "check-checkout-api"
+              name: "Checkout API"
+              severity: "critical"
+              failingRegion: "us-east-1"
+              startedAt: "2026-03-06T17:55:00Z"
+              lastProbeAt: "2026-03-06T18:00:00Z"
+      position:
+        x: 120
+        y: 1320
+      paused: false
+      isCollapsed: false
+    - id: "start-resolve-incident"
+      name: "Resolve incident"
+      type: "TYPE_TRIGGER"
+      trigger:
+        name: "start"
+      configuration:
+        templates:
+          - name: "Resolve sample incident"
+            payload:
+              incidentId: "inc-checkout-api"
+              checkId: "check-checkout-api"
+              name: "Checkout API"
+              severity: "critical"
+              failingRegion: "us-east-1"
+              startedAt: "2026-03-06T17:55:00Z"
+              lastProbeAt: "2026-03-06T18:00:00Z"
+              resolvedAt: "2026-03-06T18:03:00Z"
+      position:
+        x: 120
+        y: 1520
+      paused: false
+      isCollapsed: false
+    - id: "upsert-check-checkout-api"
+      name: "Upsert check: Checkout API"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "checks"
+        matchList:
+          - name: "checkId"
+            value: "check-checkout-api"
+        valueList:
+          - name: "checkId"
+            value: "check-checkout-api"
+          - name: "name"
+            value: "Checkout API"
+          - name: "url"
+            value: "https://api.example.com/health"
+          - name: "region"
+            value: "us-east-1"
+          - name: "status"
+            value: "UP"
+          - name: "latencyMs"
+            value: "132"
+          - name: "consecutiveFailures"
+            value: "0"
+          - name: "lastCheckedAt"
+            value: "2026-03-06T17:50:00Z"
+      position:
+        x: 620
+        y: 80
+      paused: false
+      isCollapsed: false
+    - id: "upsert-check-checkout-web"
+      name: "Upsert check: Checkout Web"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "checks"
+        matchList:
+          - name: "checkId"
+            value: "check-checkout-web"
+        valueList:
+          - name: "checkId"
+            value: "check-checkout-web"
+          - name: "name"
+            value: "Checkout Web"
+          - name: "url"
+            value: "https://app.example.com/checkout"
+          - name: "region"
+            value: "eu-west-1"
+          - name: "status"
+            value: "UP"
+          - name: "latencyMs"
+            value: "214"
+          - name: "consecutiveFailures"
+            value: "0"
+          - name: "lastCheckedAt"
+            value: "2026-03-06T17:50:00Z"
+      position:
+        x: 980
+        y: 80
+      paused: false
+      isCollapsed: false
+    - id: "upsert-check-auth-api"
+      name: "Upsert check: Auth API"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "checks"
+        matchList:
+          - name: "checkId"
+            value: "check-auth-api"
+        valueList:
+          - name: "checkId"
+            value: "check-auth-api"
+          - name: "name"
+            value: "Auth API"
+          - name: "url"
+            value: "https://auth.example.com/health"
+          - name: "region"
+            value: "us-west-2"
+          - name: "status"
+            value: "UP"
+          - name: "latencyMs"
+            value: "176"
+          - name: "consecutiveFailures"
+            value: "0"
+          - name: "lastCheckedAt"
+            value: "2026-03-06T17:50:00Z"
+      position:
+        x: 1340
+        y: 80
+      paused: false
+      isCollapsed: false
+    - id: "noop-probe-execution"
+      name: "Placeholder probe execution (noop)"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "noop"
+      configuration: {}
+      position:
+        x: 620
+        y: 320
+      paused: false
+      isCollapsed: false
+    - id: "wait-probe-finish"
+      name: "Wait for probe result"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "wait"
+      configuration:
+        mode: "interval"
+        unit: "seconds"
+        waitFor: "2"
+      position:
+        x: 980
+        y: 320
+      paused: false
+      isCollapsed: false
+    - id: "upsert-check-up"
+      name: "Mark check as UP"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "checks"
+        matchList:
+          - name: "checkId"
+            value: "{{ root().checkId }}"
+        valueList:
+          - name: "checkId"
+            value: "{{ root().checkId }}"
+          - name: "name"
+            value: "{{ root().name }}"
+          - name: "url"
+            value: "{{ root().url }}"
+          - name: "region"
+            value: "{{ root().region }}"
+          - name: "status"
+            value: "UP"
+          - name: "latencyMs"
+            value: "{{ root().latencyMs }}"
+          - name: "consecutiveFailures"
+            value: "0"
+          - name: "lastCheckedAt"
+            value: "{{ root().checkedAt }}"
+      position:
+        x: 1340
+        y: 320
+      paused: false
+      isCollapsed: false
+    - id: "upsert-check-from-form"
+      name: "Create or update check from form"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "checks"
+        matchList:
+          - name: "checkId"
+            value: "{{ root().checkId }}"
+        valueList:
+          - name: "checkId"
+            value: "{{ root().checkId }}"
+          - name: "name"
+            value: "{{ root().name }}"
+          - name: "url"
+            value: "{{ root().url }}"
+          - name: "region"
+            value: "{{ root().region }}"
+          - name: "status"
+            value: "UP"
+          - name: "latencyMs"
+            value: "{{ root().latencyMs }}"
+          - name: "consecutiveFailures"
+            value: "0"
+          - name: "lastCheckedAt"
+            value: "{{ root().checkedAt }}"
+      position:
+        x: 620
+        y: 520
+      paused: false
+      isCollapsed: false
+    - id: "delete-incidents-for-check"
+      name: "Clear incidents for check"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "deleteMemory"
+      configuration:
+        namespace: "incidents"
+        matchList:
+          - name: "checkId"
+            value: "{{ root().checkId }}"
+      position:
+        x: 1700
+        y: 320
+      paused: false
+      isCollapsed: false
+    - id: "upsert-check-down"
+      name: "Mark check as DOWN"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "checks"
+        matchList:
+          - name: "checkId"
+            value: "{{ root().checkId }}"
+        valueList:
+          - name: "checkId"
+            value: "{{ root().checkId }}"
+          - name: "name"
+            value: "{{ root().name }}"
+          - name: "url"
+            value: "{{ root().url }}"
+          - name: "region"
+            value: "{{ root().region }}"
+          - name: "status"
+            value: "DOWN"
+          - name: "latencyMs"
+            value: "{{ root().latencyMs }}"
+          - name: "consecutiveFailures"
+            value: "{{ root().failCount }}"
+          - name: "lastCheckedAt"
+            value: "{{ root().lastProbeAt }}"
+      position:
+        x: 620
+        y: 520
+      paused: false
+      isCollapsed: false
+    - id: "upsert-incident-open"
+      name: "Create or update OPEN incident"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "incidents"
+        matchList:
+          - name: "incidentId"
+            value: "inc-{{ root().checkId }}"
+        valueList:
+          - name: "incidentId"
+            value: "inc-{{ root().checkId }}"
+          - name: "checkId"
+            value: "{{ root().checkId }}"
+          - name: "name"
+            value: "{{ root().name }}"
+          - name: "severity"
+            value: "{{ root().severity }}"
+          - name: "status"
+            value: "OPEN"
+          - name: "failingRegion"
+            value: "{{ root().region }}"
+          - name: "startedAt"
+            value: "{{ root().startedAt }}"
+          - name: "lastProbeAt"
+            value: "{{ root().lastProbeAt }}"
+      position:
+        x: 980
+        y: 520
+      paused: false
+      isCollapsed: false
+    - id: "upsert-check-paused"
+      name: "Mark check as PAUSED"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "checks"
+        matchList:
+          - name: "checkId"
+            value: "{{ root().checkId }}"
+        valueList:
+          - name: "checkId"
+            value: "{{ root().checkId }}"
+          - name: "name"
+            value: "{{ root().name }}"
+          - name: "url"
+            value: "{{ root().url }}"
+          - name: "region"
+            value: "{{ root().region }}"
+          - name: "status"
+            value: "PAUSED"
+          - name: "latencyMs"
+            value: "-"
+          - name: "consecutiveFailures"
+            value: "0"
+          - name: "lastCheckedAt"
+            value: "{{ root().checkedAt }}"
+      position:
+        x: 620
+        y: 720
+      paused: false
+      isCollapsed: false
+    - id: "upsert-check-resumed"
+      name: "Mark check as UP after resume"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "checks"
+        matchList:
+          - name: "checkId"
+            value: "{{ root().checkId }}"
+        valueList:
+          - name: "checkId"
+            value: "{{ root().checkId }}"
+          - name: "name"
+            value: "{{ root().name }}"
+          - name: "url"
+            value: "{{ root().url }}"
+          - name: "region"
+            value: "{{ root().region }}"
+          - name: "status"
+            value: "UP"
+          - name: "latencyMs"
+            value: "{{ root().latencyMs }}"
+          - name: "consecutiveFailures"
+            value: "0"
+          - name: "lastCheckedAt"
+            value: "{{ root().checkedAt }}"
+      position:
+        x: 620
+        y: 920
+      paused: false
+      isCollapsed: false
+    - id: "upsert-incident-acked"
+      name: "Mark incident as ACKED"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "incidents"
+        matchList:
+          - name: "incidentId"
+            value: "{{ root().incidentId }}"
+        valueList:
+          - name: "incidentId"
+            value: "{{ root().incidentId }}"
+          - name: "checkId"
+            value: "{{ root().checkId }}"
+          - name: "name"
+            value: "{{ root().name }}"
+          - name: "severity"
+            value: "{{ root().severity }}"
+          - name: "status"
+            value: "ACKED"
+          - name: "failingRegion"
+            value: "{{ root().failingRegion }}"
+          - name: "startedAt"
+            value: "{{ root().startedAt }}"
+          - name: "lastProbeAt"
+            value: "{{ root().lastProbeAt }}"
+      position:
+        x: 620
+        y: 1120
+      paused: false
+      isCollapsed: false
+    - id: "upsert-incident-resolved"
+      name: "Mark incident as RESOLVED"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "incidents"
+        matchList:
+          - name: "incidentId"
+            value: "{{ root().incidentId }}"
+        valueList:
+          - name: "incidentId"
+            value: "{{ root().incidentId }}"
+          - name: "checkId"
+            value: "{{ root().checkId }}"
+          - name: "name"
+            value: "{{ root().name }}"
+          - name: "severity"
+            value: "{{ root().severity }}"
+          - name: "status"
+            value: "RESOLVED"
+          - name: "failingRegion"
+            value: "{{ root().failingRegion }}"
+          - name: "startedAt"
+            value: "{{ root().startedAt }}"
+          - name: "lastProbeAt"
+            value: "{{ root().resolvedAt }}"
+      position:
+        x: 620
+        y: 1320
+      paused: false
+      isCollapsed: false
+    - id: "wait-retain-resolved-incident"
+      name: "Keep resolved incident briefly"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "wait"
+      configuration:
+        mode: "interval"
+        unit: "seconds"
+        waitFor: "10"
+      position:
+        x: 980
+        y: 1320
+      paused: false
+      isCollapsed: false
+    - id: "delete-resolved-incident"
+      name: "Delete resolved incident"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "deleteMemory"
+      configuration:
+        namespace: "incidents"
+        matchList:
+          - name: "incidentId"
+            value: "{{ root().incidentId }}"
+      position:
+        x: 1340
+        y: 1320
+      paused: false
+      isCollapsed: false
+  edges:
+    - sourceId: "start-seed-checks"
+      targetId: "upsert-check-checkout-api"
+      channel: "default"
+    - sourceId: "upsert-check-checkout-api"
+      targetId: "upsert-check-checkout-web"
+      channel: "default"
+    - sourceId: "upsert-check-checkout-web"
+      targetId: "upsert-check-auth-api"
+      channel: "default"
+    - sourceId: "start-run-probe"
+      targetId: "noop-probe-execution"
+      channel: "default"
+    - sourceId: "start-add-check"
+      targetId: "upsert-check-from-form"
+      channel: "default"
+    - sourceId: "noop-probe-execution"
+      targetId: "wait-probe-finish"
+      channel: "default"
+    - sourceId: "wait-probe-finish"
+      targetId: "upsert-check-up"
+      channel: "default"
+    - sourceId: "upsert-check-up"
+      targetId: "delete-incidents-for-check"
+      channel: "default"
+    - sourceId: "start-simulate-outage"
+      targetId: "upsert-check-down"
+      channel: "default"
+    - sourceId: "upsert-check-down"
+      targetId: "upsert-incident-open"
+      channel: "default"
+    - sourceId: "start-pause-check"
+      targetId: "upsert-check-paused"
+      channel: "default"
+    - sourceId: "start-resume-check"
+      targetId: "upsert-check-resumed"
+      channel: "default"
+    - sourceId: "start-ack-incident"
+      targetId: "upsert-incident-acked"
+      channel: "default"
+    - sourceId: "start-resolve-incident"
+      targetId: "upsert-incident-resolved"
+      channel: "default"
+    - sourceId: "upsert-incident-resolved"
+      targetId: "wait-retain-resolved-incident"
+      channel: "default"
+    - sourceId: "wait-retain-resolved-incident"
+      targetId: "delete-resolved-incident"
+      channel: "default"

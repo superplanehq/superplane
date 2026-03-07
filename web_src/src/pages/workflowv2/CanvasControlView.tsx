@@ -1,5 +1,16 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 import { WorkflowMarkdownPreview } from "./WorkflowMarkdownPreview";
 
@@ -60,6 +71,32 @@ interface ControlButtonBlock {
   payload?: unknown;
   confirm?: string;
   variant?: ControlButtonVariant;
+  form?: ControlButtonForm;
+}
+
+type ControlFormFieldType = "text" | "textarea" | "number" | "url" | "select";
+
+interface ControlFormOption {
+  value: string | number;
+  label: string;
+}
+
+interface ControlFormField {
+  id: string;
+  label: string;
+  type?: ControlFormFieldType;
+  placeholder?: string;
+  required?: boolean;
+  defaultValue?: unknown;
+  helpText?: string;
+  options?: ControlFormOption[];
+}
+
+interface ControlButtonForm {
+  title: string;
+  description?: string;
+  submitLabel?: string;
+  fields: ControlFormField[];
 }
 
 interface ControlConfig {
@@ -97,11 +134,61 @@ function formatJson(value: unknown): string {
   }
 }
 
+function tryParseIsoDateString(value: string): Date | null {
+  // Only treat ISO-like timestamps as dates to avoid accidental parsing.
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed;
+}
+
+function formatRelativeTime(value: Date, now: Date): string {
+  const diffSeconds = Math.round((value.getTime() - now.getTime()) / 1000);
+  const absSeconds = Math.abs(diffSeconds);
+  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+  if (absSeconds < 60) {
+    return rtf.format(diffSeconds, "second");
+  }
+
+  const diffMinutes = Math.round(diffSeconds / 60);
+  if (Math.abs(diffMinutes) < 60) {
+    return rtf.format(diffMinutes, "minute");
+  }
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (Math.abs(diffHours) < 24) {
+    return rtf.format(diffHours, "hour");
+  }
+
+  const diffDays = Math.round(diffHours / 24);
+  if (Math.abs(diffDays) < 30) {
+    return rtf.format(diffDays, "day");
+  }
+
+  const diffMonths = Math.round(diffDays / 30);
+  if (Math.abs(diffMonths) < 12) {
+    return rtf.format(diffMonths, "month");
+  }
+
+  const diffYears = Math.round(diffMonths / 12);
+  return rtf.format(diffYears, "year");
+}
+
 function formatTableCellValue(value: unknown): string {
   if (value === null || value === undefined) {
     return "";
   }
   if (typeof value === "string") {
+    const maybeDate = tryParseIsoDateString(value);
+    if (maybeDate) {
+      return formatRelativeTime(maybeDate, new Date());
+    }
     return value;
   }
   if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
@@ -286,6 +373,25 @@ function generateRunId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function buildInitialFormValues(
+  form: ControlButtonForm,
+  context: Record<string, unknown>,
+): Record<string, string | number> {
+  return form.fields.reduce(
+    (acc, field) => {
+      const defaultValue = resolveTemplate(field.defaultValue ?? "", context);
+      if (field.type === "number") {
+        const numeric = Number(defaultValue);
+        acc[field.id] = Number.isFinite(numeric) ? numeric : 0;
+        return acc;
+      }
+      acc[field.id] = String(defaultValue ?? "");
+      return acc;
+    },
+    {} as Record<string, string | number>,
+  );
+}
+
 function RunningIndicator({ label }: { label: string }) {
   return (
     <span className="inline-flex items-center gap-2">
@@ -305,6 +411,9 @@ export function CanvasControlView({
   const config = useMemo(() => (isControlConfig(controlConfig) ? controlConfig : null), [controlConfig]);
   const [runError, setRunError] = useState<string | null>(null);
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
+  const [activeFormBlock, setActiveFormBlock] = useState<ControlButtonBlock | null>(null);
+  const [formValues, setFormValues] = useState<Record<string, string | number>>({});
+  const [formError, setFormError] = useState<string | null>(null);
 
   const memoryByNamespace = useMemo(() => {
     const grouped: Record<string, unknown[]> = {};
@@ -336,9 +445,9 @@ export function CanvasControlView({
     },
     actionId: string,
     actionContext: Record<string, unknown>,
-  ) => {
+  ): Promise<boolean> => {
     if (!canRunButtons) {
-      return;
+      return false;
     }
 
     const runtimeContext = {
@@ -352,7 +461,7 @@ export function CanvasControlView({
     if (resolvedConfirm) {
       const confirmed = window.confirm(resolvedConfirm);
       if (!confirmed) {
-        return;
+        return false;
       }
     }
 
@@ -364,23 +473,63 @@ export function CanvasControlView({
       const resolvedChannel = resolveTemplateString(action.channel || "default", runtimeContext).trim() || "default";
       if (!resolvedNodeId) {
         setRunError("Action is missing a valid nodeId.");
-        return;
+        return false;
       }
       await onRunButton({
         nodeId: resolvedNodeId,
         channel: resolvedChannel,
         payload: resolvedPayload,
       });
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to run button action.";
       setRunError(message);
+      return false;
     } finally {
       setRunningActionId(null);
     }
   };
 
   const handleRunBlock = async (block: ControlButtonBlock) => {
+    if (block.form?.fields?.length) {
+      setRunError(null);
+      setFormError(null);
+      setFormValues(buildInitialFormValues(block.form, templateContext));
+      setActiveFormBlock(block);
+      return;
+    }
     await runConfiguredAction(block, block.id, templateContext);
+  };
+
+  const handleSubmitForm = async () => {
+    if (!activeFormBlock?.form) {
+      return;
+    }
+
+    const missingFields = activeFormBlock.form.fields.filter((field) => {
+      if (!field.required) {
+        return false;
+      }
+      const value = formValues[field.id];
+      return value === undefined || value === null || String(value).trim() === "";
+    });
+
+    if (missingFields.length > 0) {
+      setFormError(`Please fill in: ${missingFields.map((field) => field.label).join(", ")}.`);
+      return;
+    }
+
+    setFormError(null);
+    const formContext: Record<string, unknown> = {
+      ...templateContext,
+      ...formValues,
+      form: formValues,
+    };
+    const ok = await runConfiguredAction(activeFormBlock, activeFormBlock.id, formContext);
+    if (ok) {
+      setActiveFormBlock(null);
+      setFormValues({});
+    }
   };
 
   const renderTableBlock = (block: ControlTableBlock) => {
@@ -490,8 +639,8 @@ export function CanvasControlView({
   };
 
   return (
-    <div className="h-full overflow-hidden p-10">
-      <section className="mx-auto min-h-0 max-w-[900px] overflow-auto rounded-2xl border border-slate-200 bg-white p-10">
+    <div className="min-h-full p-[50px]">
+      <section className="mx-auto w-full max-w-none rounded-2xl border border-slate-200 bg-white p-10">
         {runError ? <div className="mb-8 text-xs text-red-600">{runError}</div> : null}
 
         {!config ? (
@@ -549,6 +698,119 @@ export function CanvasControlView({
           </div>
         )}
       </section>
+
+      <Dialog
+        open={Boolean(activeFormBlock?.form)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setActiveFormBlock(null);
+            setFormValues({});
+            setFormError(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{activeFormBlock?.form?.title || "Run action"}</DialogTitle>
+            {activeFormBlock?.form?.description ? (
+              <DialogDescription>{activeFormBlock.form.description}</DialogDescription>
+            ) : null}
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {activeFormBlock?.form?.fields.map((field) => {
+              const fieldType = field.type || "text";
+              const currentValue = formValues[field.id];
+              const valueAsString = currentValue === undefined || currentValue === null ? "" : String(currentValue);
+              return (
+                <div key={field.id} className="space-y-2">
+                  <Label htmlFor={`control-form-${field.id}`}>
+                    {field.label}
+                    {field.required ? <span className="ml-1 text-red-600">*</span> : null}
+                  </Label>
+
+                  {fieldType === "textarea" ? (
+                    <Textarea
+                      id={`control-form-${field.id}`}
+                      placeholder={field.placeholder}
+                      value={valueAsString}
+                      onChange={(event) => {
+                        setFormValues((prev) => ({ ...prev, [field.id]: event.target.value }));
+                      }}
+                    />
+                  ) : fieldType === "select" ? (
+                    <select
+                      id={`control-form-${field.id}`}
+                      value={valueAsString}
+                      onChange={(event) => {
+                        setFormValues((prev) => ({ ...prev, [field.id]: event.target.value }));
+                      }}
+                      className="h-8 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm text-[rgba(10,10,10,1)]"
+                    >
+                      {(field.options || []).map((option) => (
+                        <option key={`${field.id}-${option.value}`} value={String(option.value)}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Input
+                      id={`control-form-${field.id}`}
+                      type={fieldType === "number" ? "number" : fieldType === "url" ? "url" : "text"}
+                      placeholder={field.placeholder}
+                      value={valueAsString}
+                      onChange={(event) => {
+                        if (fieldType === "number") {
+                          const nextValue = event.target.value;
+                          setFormValues((prev) => ({
+                            ...prev,
+                            [field.id]: nextValue === "" ? "" : Number(nextValue),
+                          }));
+                          return;
+                        }
+                        setFormValues((prev) => ({ ...prev, [field.id]: event.target.value }));
+                      }}
+                    />
+                  )}
+
+                  {field.helpText ? <p className="text-xs text-slate-500">{field.helpText}</p> : null}
+                </div>
+              );
+            })}
+
+            {formError ? <p className="text-xs text-red-600">{formError}</p> : null}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setActiveFormBlock(null);
+                setFormValues({});
+                setFormError(null);
+              }}
+              disabled={runningActionId === activeFormBlock?.id}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                void handleSubmitForm();
+              }}
+              disabled={!canRunButtons || runningActionId === activeFormBlock?.id}
+              className={runningActionId === activeFormBlock?.id ? "!opacity-100" : undefined}
+            >
+              {runningActionId === activeFormBlock?.id ? (
+                <RunningIndicator label={activeFormBlock?.form?.submitLabel || "Run"} />
+              ) : (
+                activeFormBlock?.form?.submitLabel || "Run"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

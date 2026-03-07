@@ -352,7 +352,25 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { name: string; description?: string; nodes?: any[]; edges?: any[] }) => {
+    mutationFn: async (data: {
+      name: string;
+      description?: string;
+      nodes?: any[];
+      edges?: any[];
+      control?: Record<string, unknown>;
+    }) => {
+      const spec: {
+        nodes: any[];
+        edges: any[];
+        control?: Record<string, unknown>;
+      } = {
+        nodes: data.nodes || [],
+        edges: data.edges || [],
+      };
+      if (data.control !== undefined) {
+        spec.control = data.control;
+      }
+
       return await canvasesUpdateCanvasVersion2(
         withOrganizationHeader({
           path: { canvasId },
@@ -362,10 +380,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
                 name: data.name,
                 description: data.description || "",
               },
-              spec: {
-                nodes: data.nodes || [],
-                edges: data.edges || [],
-              },
+              spec,
             },
           },
         }),
@@ -432,17 +447,25 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       control?: Record<string, unknown>;
       autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
     }) => {
+      const spec: {
+        nodes: any[];
+        edges: any[];
+        control?: Record<string, unknown>;
+      } = {
+        nodes: data.nodes || [],
+        edges: data.edges || [],
+      };
+      if (data.control !== undefined) {
+        spec.control = data.control;
+      }
+
       const body = {
         canvas: {
           metadata: {
             name: data.name,
             description: data.description || "",
           },
-          spec: {
-            nodes: data.nodes || [],
-            edges: data.edges || [],
-            control: data.control || {},
-          },
+          spec,
         },
         autoLayout: data.autoLayout,
       };
