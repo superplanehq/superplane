@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations/gcp/artifactregistry"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudbuild"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudfunctions"
 	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
@@ -31,6 +32,9 @@ func init() {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 	cloudfunctions.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (cloudfunctions.Client, error) {
+		return gcpcommon.NewClient(httpCtx, integration)
+	})
+	artifactregistry.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (artifactregistry.Client, error) {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 }
@@ -154,6 +158,9 @@ func (g *GCP) Components() []core.Component {
 		&cloudbuild.GetBuild{},
 		&cloudbuild.RunTrigger{},
 		&cloudfunctions.InvokeFunction{},
+		&artifactregistry.GetArtifact{},
+		&artifactregistry.AnalyzeArtifact{},
+		&artifactregistry.GetArtifactAnalysis{},
 	}
 }
 
@@ -161,6 +168,8 @@ func (g *GCP) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&compute.OnVMInstance{},
 		&cloudbuild.OnBuildComplete{},
+		&artifactregistry.OnArtifactPush{},
+		&artifactregistry.OnArtifactAnalysis{},
 	}
 }
 
@@ -629,6 +638,10 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return cloudbuild.ListBranchResources(reqCtx, client, p["repository"])
 	case cloudbuild.ResourceTypeTag:
 		return cloudbuild.ListTagResources(reqCtx, client, p["repository"])
+	case artifactregistry.ResourceTypeLocation:
+		return artifactregistry.ListLocationResources(reqCtx, client)
+	case artifactregistry.ResourceTypeRepository:
+		return artifactregistry.ListRepositoryResources(reqCtx, client, p["location"])
 	default:
 		return nil, nil
 	}

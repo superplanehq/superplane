@@ -1,0 +1,12 @@
+{
+  "type": "gcp.artifactregistry.artifactPush",
+  "timestamp": "2025-06-15T12:00:00Z",
+  "data": {
+    "serviceName": "artifactregistry.googleapis.com",
+    "methodName": "google.devtools.artifactregistry.v1.ArtifactRegistry.CreateDockerImage",
+    "resourceName": "projects/my-project/locations/us-central1/repositories/my-repo/dockerImages/my-image@sha256:abc123def456",
+    "logName": "projects/my-project/logs/cloudaudit.googleapis.com%2Factivity",
+    "timestamp": "2025-06-15T12:00:00Z",
+    "insertId": "abc123"
+  }
+}

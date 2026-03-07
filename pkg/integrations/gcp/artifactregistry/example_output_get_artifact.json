@@ -1,0 +1,14 @@
+{
+  "type": "gcp.artifactregistry.dockerImage",
+  "timestamp": "2025-06-15T12:00:00Z",
+  "data": {
+    "name": "projects/my-project/locations/us-central1/repositories/my-repo/dockerImages/my-image@sha256:abc123def456",
+    "uri": "us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123def456",
+    "tags": ["latest", "v1.0.0"],
+    "imageSizeBytes": "52428800",
+    "uploadTime": "2025-06-15T12:00:00Z",
+    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+    "buildTime": "2025-06-15T11:55:00Z",
+    "updateTime": "2025-06-15T12:00:00Z"
+  }
+}
