@@ -353,13 +353,14 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { name: string; description?: string }) => {
+    mutationFn: async (data: { name?: string; description?: string; canvasVersioningEnabled?: boolean }) => {
       return await canvasesUpdateCanvas(
         withOrganizationHeader({
           path: { id: canvasId },
           body: {
             name: data.name,
-            description: data.description || "",
+            description: data.description,
+            canvasVersioningEnabled: data.canvasVersioningEnabled,
           },
         }),
       );
@@ -377,12 +378,18 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
             return current;
           }
 
+          const updatedMetadata = updatedCanvas.metadata;
+
           return {
             ...current,
             metadata: {
               ...current.metadata,
-              name: variables.name,
-              description: variables.description || "",
+              name: updatedMetadata?.name ?? variables.name ?? current.metadata?.name,
+              description: updatedMetadata?.description ?? variables.description ?? current.metadata?.description,
+              canvasVersioningEnabled:
+                updatedMetadata?.canvasVersioningEnabled ??
+                variables.canvasVersioningEnabled ??
+                current.metadata?.canvasVersioningEnabled,
             },
           };
         });

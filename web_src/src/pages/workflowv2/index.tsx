@@ -27,9 +27,9 @@ import {
 } from "@/api-client";
 import {
   useOrganizationAgentSettings,
+  useOrganization,
   useOrganizationGroups,
   useOrganizationRoles,
-  useOrganization,
   useOrganizationUsers,
 } from "@/hooks/useOrganizationData";
 
@@ -42,6 +42,7 @@ import { useAvailableIntegrations, useConnectedIntegrations } from "@/hooks/useI
 import {
   eventExecutionsQueryOptions,
   useCreateCanvas,
+  useUpdateCanvas,
   useCreateCanvasVersion,
   useCreateCanvasChangeRequest,
   useUpdateCanvasVersion,
@@ -130,6 +131,7 @@ import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
 import { buildDraftNodeDiffSummary } from "./draftNodeDiff";
 import { CreateChangeRequestModal } from "./CreateChangeRequestModal";
+import { CanvasSettingsView } from "./CanvasSettingsView";
 
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
@@ -437,8 +439,7 @@ export function WorkflowPageV2() {
     };
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion]);
   const canReadOrg = canAct("org", "read");
-  const { data: organization } = useOrganization(organizationId || "", !!organizationId && canReadOrg);
-  const isVersioningDisabled = !(organization?.metadata?.canvasVersioningEnabled ?? false);
+  const isVersioningDisabled = !(liveCanvas?.metadata?.canvasVersioningEnabled ?? false);
   const showVersioningUI = !isVersioningDisabled;
   const hasEditableVersion =
     (!!activeCanvasVersionId && !selectedCanvasVersion?.metadata?.isPublished) ||
@@ -451,7 +452,10 @@ export function WorkflowPageV2() {
   } = useCanvasMemoryEntries(canvasId!, isViewingLiveVersion);
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
   const { data: agentSettings } = useOrganizationAgentSettings(organizationId || "", !!organizationId && canReadOrg);
+  const { data: organization } = useOrganization(organizationId || "", !!organizationId && canReadOrg);
+  const isOrgVersioningEnabled = organization?.metadata?.canvasVersioningEnabled;
   const canUpdateCanvas = canAct("canvases", "update");
+  const updateCanvasMutation = useUpdateCanvas(organizationId || "", canvasId || "");
   const showAiBuilderTab = agentSettings?.agentModeEnabled ?? false;
 
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
@@ -461,7 +465,7 @@ export function WorkflowPageV2() {
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
   const isDev = import.meta.env.DEV;
-  const [topViewMode, setTopViewMode] = useState<"canvas" | "memory" | "versioning">("canvas");
+  const [topViewMode, setTopViewMode] = useState<"canvas" | "memory" | "settings" | "versioning">("canvas");
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
@@ -928,7 +932,11 @@ export function WorkflowPageV2() {
     }
 
     if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in organization settings.");
+      showErrorToast(
+        isOrgVersioningEnabled === false
+          ? "Versioning is disabled by organization settings."
+          : "Versioning is disabled. Enable canvas versioning in canvas settings.",
+      );
       return;
     }
 
@@ -3553,7 +3561,11 @@ export function WorkflowPageV2() {
     }
 
     if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in organization settings.");
+      showErrorToast(
+        isOrgVersioningEnabled === false
+          ? "Versioning is disabled by organization settings."
+          : "Versioning is disabled. Enable canvas versioning in canvas settings.",
+      );
       return;
     }
 
@@ -3597,7 +3609,11 @@ export function WorkflowPageV2() {
       }
 
       if (isVersioningDisabled) {
-        showErrorToast("Versioning is disabled. Enable canvas versioning in organization settings.");
+        showErrorToast(
+          isOrgVersioningEnabled === false
+            ? "Versioning is disabled by organization settings."
+            : "Versioning is disabled. Enable canvas versioning in canvas settings.",
+        );
         return;
       }
 
@@ -3800,7 +3816,11 @@ export function WorkflowPageV2() {
     }
 
     if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in organization settings.");
+      showErrorToast(
+        isOrgVersioningEnabled === false
+          ? "Versioning is disabled by organization settings."
+          : "Versioning is disabled. Enable canvas versioning in canvas settings.",
+      );
       return;
     }
 
@@ -3849,7 +3869,11 @@ export function WorkflowPageV2() {
     }
 
     if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in organization settings.");
+      showErrorToast(
+        isOrgVersioningEnabled === false
+          ? "Versioning is disabled by organization settings."
+          : "Versioning is disabled. Enable canvas versioning in canvas settings.",
+      );
       return;
     }
 
@@ -4147,6 +4171,29 @@ export function WorkflowPageV2() {
     [canvas],
   );
 
+  const canvasSettingsInitialValues = useMemo(
+    () => ({
+      name: liveCanvas?.metadata?.name || "",
+      description: liveCanvas?.metadata?.description || "",
+      canvasVersioningEnabled: liveCanvas?.metadata?.canvasVersioningEnabled ?? false,
+    }),
+    [liveCanvas?.metadata?.canvasVersioningEnabled, liveCanvas?.metadata?.description, liveCanvas?.metadata?.name],
+  );
+  const handleSaveCanvasSettings = useCallback(
+    async (values: { name: string; description: string; canvasVersioningEnabled?: boolean }) => {
+      if (!canvasId) {
+        return;
+      }
+
+      await updateCanvasMutation.mutateAsync({
+        name: values.name,
+        description: values.description,
+        canvasVersioningEnabled: values.canvasVersioningEnabled,
+      });
+    },
+    [canvasId, updateCanvasMutation],
+  );
+
   const isInitialCanvasBootstrapLoading =
     !canvas &&
     (canvasLoading ||
@@ -4258,7 +4305,10 @@ export function WorkflowPageV2() {
   const saveButtonHidden = isTemplate || !canUpdateCanvas || !hasEditableVersion || !hasUnsavedChanges;
   const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas;
   const canUndo = !isTemplate && canUpdateCanvas && hasEditableVersion && initialWorkflowSnapshot !== null;
-  const versioningDisabledTooltip = "Versioning is disabled. Enable canvas versioning in organization settings.";
+  const versioningDisabledTooltip =
+    isOrgVersioningEnabled === false
+      ? "Versioning is disabled by organization settings."
+      : "Versioning is disabled. Enable canvas versioning in canvas settings.";
   const toggleEditModeDisabled =
     isVersioningDisabled ||
     !canUpdateCanvas ||
@@ -4361,6 +4411,14 @@ export function WorkflowPageV2() {
           canUpdateCanvas && isViewingLiveVersion ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined
         }
         deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
+      />
+    ) : topViewMode === "settings" ? (
+      <CanvasSettingsView
+        initialValues={canvasSettingsInitialValues}
+        canUpdateCanvas={canUpdateCanvas && !isTemplate}
+        orgVersioningEnabled={isOrgVersioningEnabled}
+        isSaving={updateCanvasMutation.isPending}
+        onSave={handleSaveCanvasSettings}
       />
     ) : null;
 
@@ -4525,7 +4583,7 @@ export function WorkflowPageV2() {
             },
           ]}
           versionControlSidebar={
-            showVersioningUI ? (
+            showVersioningUI && topViewMode === "canvas" ? (
               <CanvasVersionControlSidebar
                 isOpen={isVersionControlOpen}
                 onToggle={setIsVersionControlOpen}

@@ -66,12 +66,12 @@ func CreateCanvasChangeRequestWithMetadata(
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	versioningEnabled, modeErr := isCanvasVersioningEnabled(organizationID)
+	versioningEnabled, modeErr := isCanvasVersioningEnabledForCanvas(canvas)
 	if modeErr != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load organization canvas versioning: %v", modeErr)
+		return nil, status.Errorf(codes.Internal, "failed to load canvas versioning: %v", modeErr)
 	}
 	if !versioningEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this organization")
+		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this canvas")
 	}
 
 	userUUID := uuid.MustParse(userID)

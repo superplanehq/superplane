@@ -61,8 +61,8 @@ interface HeaderProps {
   autoSaveDisabledTooltip?: string;
   onExportYamlCopy?: () => void;
   onExportYamlDownload?: () => void;
-  topViewMode?: "canvas" | "memory" | "versioning";
-  onTopViewModeChange?: (mode: "canvas" | "memory" | "versioning") => void;
+  topViewMode?: "canvas" | "memory" | "settings" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "memory" | "settings" | "versioning") => void;
   showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;
@@ -308,6 +308,15 @@ export function Header({
                     ) : null}
                   </span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => onTopViewModeChange("settings")}
+                  className={`rounded px-2 py-1 text-xs font-medium ${
+                    topViewMode === "settings" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  Settings
+                </button>
                 {showVersioningTab ? (
                   <button
                     type="button"
@@ -429,8 +438,7 @@ export function Header({
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  {versioningDisabledTooltip ||
-                    "Versioning is disabled. Enable canvas versioning in organization settings."}
+                  {versioningDisabledTooltip || "Versioning is disabled. Enable canvas versioning in canvas settings."}
                 </TooltipContent>
               </Tooltip>
             ) : null}

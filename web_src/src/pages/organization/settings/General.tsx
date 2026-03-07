@@ -354,6 +354,9 @@ export function General({ organization }: GeneralProps) {
                 Manage canvas edits with versions and change requests. When disabled, users edit the live canvas
                 directly.
               </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                <strong>New canvases will inherit this setting from the organization.</strong>
+              </p>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-500 dark:text-gray-400">

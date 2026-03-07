@@ -4259,6 +4259,9 @@
         },
         "isTemplate": {
           "type": "boolean"
+        },
+        "canvasVersioningEnabled": {
+          "type": "boolean"
         }
       }
     },
@@ -4800,6 +4803,9 @@
         },
         "description": {
           "type": "string"
+        },
+        "canvasVersioningEnabled": {
+          "type": "boolean"
         }
       }
     },

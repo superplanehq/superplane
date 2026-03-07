@@ -182,6 +182,7 @@ export type CanvasesCanvasMetadata = {
   updatedAt?: string;
   createdBy?: SuperplaneCanvasesUserRef;
   isTemplate?: boolean;
+  canvasVersioningEnabled?: boolean;
 };
 
 export type CanvasesCanvasNodeExecution = {
@@ -418,6 +419,7 @@ export type CanvasesSendAiMessageResponse = {
 export type CanvasesUpdateCanvasBody = {
   name?: string;
   description?: string;
+  canvasVersioningEnabled?: boolean;
 };
 
 export type CanvasesUpdateCanvasResponse = {

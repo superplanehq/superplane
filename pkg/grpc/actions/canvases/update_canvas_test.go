@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -17,7 +18,9 @@ func Test__UpdateCanvas(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
-		_, err := UpdateCanvas(context.Background(), r.Organization.ID.String(), "invalid-id", "name", "description")
+		name := "name"
+		description := "description"
+		_, err := UpdateCanvas(context.Background(), r.Organization.ID.String(), "invalid-id", &name, &description, nil)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -28,8 +31,9 @@ func Test__UpdateCanvas(t *testing.T) {
 			context.Background(),
 			r.Organization.ID.String(),
 			uuid.New().String(),
-			"updated-name",
-			"updated-description",
+			stringPointer("updated-name"),
+			stringPointer("updated-description"),
+			nil,
 		)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -39,7 +43,14 @@ func Test__UpdateCanvas(t *testing.T) {
 	t.Run("empty name -> error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		_, err := UpdateCanvas(context.Background(), r.Organization.ID.String(), canvas.ID.String(), "   ", "description")
+		_, err := UpdateCanvas(
+			context.Background(),
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			stringPointer("   "),
+			stringPointer("description"),
+			nil,
+		)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -54,8 +65,9 @@ func Test__UpdateCanvas(t *testing.T) {
 			context.Background(),
 			r.Organization.ID.String(),
 			canvas.ID.String(),
-			newName,
-			newDescription,
+			&newName,
+			&newDescription,
+			nil,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -79,11 +91,108 @@ func Test__UpdateCanvas(t *testing.T) {
 			context.Background(),
 			r.Organization.ID.String(),
 			targetCanvas.ID.String(),
-			existingCanvas.Name,
-			targetCanvas.Description,
+			&existingCanvas.Name,
+			&targetCanvas.Description,
+			nil,
 		)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.AlreadyExists, s.Code())
 	})
+
+	t.Run("updates canvas versioning setting", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+		require.NoError(
+			t,
+			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("canvas_versioning_enabled", true).Error,
+		)
+		enabled := true
+
+		response, err := UpdateCanvas(
+			context.Background(),
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			nil,
+			nil,
+			&enabled,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.Canvas)
+		require.NotNil(t, response.Canvas.Metadata)
+		assert.True(t, response.Canvas.Metadata.CanvasVersioningEnabled)
+
+		updatedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
+		require.NoError(t, findErr)
+		assert.True(t, updatedCanvas.CanvasVersioningEnabled)
+	})
+
+	t.Run("allows disabling canvas versioning when organization versioning is enabled", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+		require.NoError(
+			t,
+			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("canvas_versioning_enabled", true).Error,
+		)
+
+		enabled := true
+		_, err := UpdateCanvas(
+			context.Background(),
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			nil,
+			nil,
+			&enabled,
+		)
+		require.NoError(t, err)
+
+		disabled := false
+		response, err := UpdateCanvas(
+			context.Background(),
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			nil,
+			nil,
+			&disabled,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.Canvas)
+		require.NotNil(t, response.Canvas.Metadata)
+		assert.False(t, response.Canvas.Metadata.CanvasVersioningEnabled)
+
+		updatedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
+		require.NoError(t, findErr)
+		assert.False(t, updatedCanvas.CanvasVersioningEnabled)
+	})
+
+	t.Run("organization versioning disabled keeps effective canvas versioning disabled", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+		require.NoError(
+			t,
+			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("canvas_versioning_enabled", false).Error,
+		)
+
+		enabled := true
+		response, err := UpdateCanvas(
+			context.Background(),
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			nil,
+			nil,
+			&enabled,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.Canvas)
+		require.NotNil(t, response.Canvas.Metadata)
+		assert.False(t, response.Canvas.Metadata.CanvasVersioningEnabled)
+
+		updatedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
+		require.NoError(t, findErr)
+		assert.True(t, updatedCanvas.CanvasVersioningEnabled)
+	})
+}
+
+func stringPointer(value string) *string {
+	return &value
 }

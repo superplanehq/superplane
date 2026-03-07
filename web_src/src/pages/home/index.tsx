@@ -829,7 +829,10 @@ function CanvasActionsMenu({
         <DialogActions>
           <Button
             variant="destructive"
-            onClick={handleDelete}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleDelete();
+            }}
             disabled={deleteCanvasMutation.isPending || !canDeleteCanvases}
             className="flex items-center gap-2"
           >

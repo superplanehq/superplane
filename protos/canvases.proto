@@ -371,8 +371,9 @@ message DescribeCanvasResponse {
 
 message UpdateCanvasRequest {
   string id = 1;
-  string name = 2;
-  string description = 3;
+  optional string name = 2;
+  optional string description = 3;
+  optional bool canvas_versioning_enabled = 4;
 }
 
 message UpdateCanvasResponse {
@@ -503,6 +504,7 @@ message Canvas {
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
     bool is_template = 8;
+    bool canvas_versioning_enabled = 9;
   }
 
   message Spec {

@@ -20,8 +20,9 @@ var _ MappedNullable = &CanvasesUpdateCanvasBody{}
 
 // CanvasesUpdateCanvasBody struct for CanvasesUpdateCanvasBody
 type CanvasesUpdateCanvasBody struct {
-	Name        *string `json:"name,omitempty"`
-	Description *string `json:"description,omitempty"`
+	Name                    *string `json:"name,omitempty"`
+	Description             *string `json:"description,omitempty"`
+	CanvasVersioningEnabled *bool   `json:"canvasVersioningEnabled,omitempty"`
 }
 
 // NewCanvasesUpdateCanvasBody instantiates a new CanvasesUpdateCanvasBody object
@@ -105,6 +106,38 @@ func (o *CanvasesUpdateCanvasBody) SetDescription(v string) {
 	o.Description = &v
 }
 
+// GetCanvasVersioningEnabled returns the CanvasVersioningEnabled field value if set, zero value otherwise.
+func (o *CanvasesUpdateCanvasBody) GetCanvasVersioningEnabled() bool {
+	if o == nil || IsNil(o.CanvasVersioningEnabled) {
+		var ret bool
+		return ret
+	}
+	return *o.CanvasVersioningEnabled
+}
+
+// GetCanvasVersioningEnabledOk returns a tuple with the CanvasVersioningEnabled field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesUpdateCanvasBody) GetCanvasVersioningEnabledOk() (*bool, bool) {
+	if o == nil || IsNil(o.CanvasVersioningEnabled) {
+		return nil, false
+	}
+	return o.CanvasVersioningEnabled, true
+}
+
+// HasCanvasVersioningEnabled returns a boolean if a field has been set.
+func (o *CanvasesUpdateCanvasBody) HasCanvasVersioningEnabled() bool {
+	if o != nil && !IsNil(o.CanvasVersioningEnabled) {
+		return true
+	}
+
+	return false
+}
+
+// SetCanvasVersioningEnabled gets a reference to the given bool and assigns it to the CanvasVersioningEnabled field.
+func (o *CanvasesUpdateCanvasBody) SetCanvasVersioningEnabled(v bool) {
+	o.CanvasVersioningEnabled = &v
+}
+
 func (o CanvasesUpdateCanvasBody) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -120,6 +153,9 @@ func (o CanvasesUpdateCanvasBody) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Description) {
 		toSerialize["description"] = o.Description
+	}
+	if !IsNil(o.CanvasVersioningEnabled) {
+		toSerialize["canvasVersioningEnabled"] = o.CanvasVersioningEnabled
 	}
 	return toSerialize, nil
 }

@@ -62,15 +62,15 @@ func UpdateCanvasVersion(
 		return nil, err
 	}
 
-	versioningEnabled, err := isCanvasVersioningEnabled(organizationID)
+	versioningEnabled, err := isCanvasVersioningEnabledForCanvas(canvas)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load organization canvas versioning: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to load canvas versioning: %v", err)
 	}
 
 	requestedVersionID := strings.TrimSpace(versionID)
 	if requestedVersionID == "" {
 		if versioningEnabled {
-			return nil, status.Error(codes.FailedPrecondition, "canvas versioning is enabled; version id is required")
+			return nil, status.Error(codes.FailedPrecondition, "canvas versioning is enabled for this canvas; version id is required")
 		}
 
 		return updateLiveCanvasWithoutVersioning(
@@ -86,7 +86,7 @@ func UpdateCanvasVersion(
 	}
 
 	if !versioningEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this organization")
+		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this canvas")
 	}
 
 	versionUUID, err := uuid.Parse(requestedVersionID)

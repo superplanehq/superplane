@@ -305,6 +305,8 @@ func CreateNextNodeExecution(
 func CreateCanvas(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
 	liveVersionID := uuid.New()
+	canvasVersioningEnabled, err := models.IsCanvasVersioningEnabled(orgID)
+	require.NoError(t, err)
 
 	inputNodes := make([]models.Node, len(nodes))
 	for i, node := range nodes {
@@ -324,14 +326,15 @@ func CreateCanvas(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []model
 	// Create canvas
 	//
 	workflow := &models.Canvas{
-		ID:             uuid.New(),
-		OrganizationID: orgID,
-		LiveVersionID:  &liveVersionID,
-		Name:           RandomName("canvas"),
-		Description:    "Test canvas",
-		CreatedBy:      &userID,
-		CreatedAt:      &now,
-		UpdatedAt:      &now,
+		ID:                      uuid.New(),
+		OrganizationID:          orgID,
+		LiveVersionID:           &liveVersionID,
+		CanvasVersioningEnabled: canvasVersioningEnabled,
+		Name:                    RandomName("canvas"),
+		Description:             "Test canvas",
+		CreatedBy:               &userID,
+		CreatedAt:               &now,
+		UpdatedAt:               &now,
 	}
 
 	//

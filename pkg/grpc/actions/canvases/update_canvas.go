@@ -17,15 +17,17 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateCanvas(_ context.Context, organizationID string, id string, name string, description string) (*pb.UpdateCanvasResponse, error) {
+func UpdateCanvas(
+	_ context.Context,
+	organizationID string,
+	id string,
+	name *string,
+	description *string,
+	canvasVersioningEnabled *bool,
+) (*pb.UpdateCanvasResponse, error) {
 	canvasID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
-	}
-
-	nextName := strings.TrimSpace(name)
-	if nextName == "" {
-		return nil, status.Error(codes.InvalidArgument, "canvas name is required")
 	}
 
 	canvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasID)
@@ -42,10 +44,31 @@ func UpdateCanvas(_ context.Context, organizationID string, id string, name stri
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	if canvas.Name != nextName || canvas.Description != description {
+	changed := false
+	if name != nil {
+		nextName := strings.TrimSpace(*name)
+		if nextName == "" {
+			return nil, status.Error(codes.InvalidArgument, "canvas name is required")
+		}
+
+		if canvas.Name != nextName {
+			canvas.Name = nextName
+			changed = true
+		}
+	}
+
+	if description != nil && canvas.Description != *description {
+		canvas.Description = *description
+		changed = true
+	}
+
+	if canvasVersioningEnabled != nil && canvas.CanvasVersioningEnabled != *canvasVersioningEnabled {
+		canvas.CanvasVersioningEnabled = *canvasVersioningEnabled
+		changed = true
+	}
+
+	if changed {
 		now := time.Now()
-		canvas.Name = nextName
-		canvas.Description = description
 		canvas.UpdatedAt = &now
 
 		if saveErr := database.Conn().Save(canvas).Error; saveErr != nil {

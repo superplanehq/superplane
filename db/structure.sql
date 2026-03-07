@@ -604,7 +604,8 @@ CREATE TABLE public.workflows (
     created_by uuid,
     deleted_at timestamp without time zone,
     is_template boolean DEFAULT false NOT NULL,
-    live_version_id uuid NOT NULL
+    live_version_id uuid NOT NULL,
+    canvas_versioning_enabled boolean DEFAULT false NOT NULL
 );
 
 
@@ -1846,7 +1847,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260306193850	f
+20260306201921	f
 \.
 
 

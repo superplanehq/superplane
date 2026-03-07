@@ -1,25 +1,32 @@
 package canvases
 
 import (
-	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
 
-func isCanvasVersioningEnabled(organizationID string) (bool, error) {
-	orgID, err := uuid.Parse(organizationID)
-	if err != nil {
-		return false, err
-	}
-
-	return models.IsCanvasVersioningEnabled(orgID)
+func isCanvasVersioningEnabledForCanvas(canvas *models.Canvas) (bool, error) {
+	return isCanvasVersioningEnabledForCanvasInTransaction(database.Conn(), canvas)
 }
 
-func isCanvasVersioningEnabledInTransaction(tx *gorm.DB, organizationID string) (bool, error) {
-	orgID, err := uuid.Parse(organizationID)
+func isCanvasVersioningEnabledForCanvasInTransaction(tx *gorm.DB, canvas *models.Canvas) (bool, error) {
+	if canvas == nil {
+		return false, nil
+	}
+
+	// Template canvases are not user-editable, but keep the value stable if needed.
+	if canvas.IsTemplate {
+		return canvas.CanvasVersioningEnabled, nil
+	}
+
+	organizationVersioningEnabled, err := models.IsCanvasVersioningEnabledInTransaction(tx, canvas.OrganizationID)
 	if err != nil {
 		return false, err
 	}
+	if !organizationVersioningEnabled {
+		return false, nil
+	}
 
-	return models.IsCanvasVersioningEnabledInTransaction(tx, orgID)
+	return canvas.CanvasVersioningEnabled, nil
 }

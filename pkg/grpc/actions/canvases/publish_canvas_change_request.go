@@ -53,12 +53,12 @@ func PublishCanvasChangeRequest(
 		return nil, nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	versioningEnabled, modeErr := isCanvasVersioningEnabled(organizationID)
+	versioningEnabled, modeErr := isCanvasVersioningEnabledForCanvas(canvas)
 	if modeErr != nil {
-		return nil, nil, status.Errorf(codes.Internal, "failed to load organization canvas versioning: %v", modeErr)
+		return nil, nil, status.Errorf(codes.Internal, "failed to load canvas versioning: %v", modeErr)
 	}
 	if !versioningEnabled {
-		return nil, nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this organization")
+		return nil, nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this canvas")
 	}
 
 	var version *models.CanvasVersion

@@ -503,12 +503,13 @@ func (x *DescribeCanvasResponse) GetCanvas() *Canvas {
 }
 
 type UpdateCanvasRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	Id                      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name                    *string                `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	Description             *string                `protobuf:"bytes,3,opt,name=description,proto3,oneof" json:"description,omitempty"`
+	CanvasVersioningEnabled *bool                  `protobuf:"varint,4,opt,name=canvas_versioning_enabled,json=canvasVersioningEnabled,proto3,oneof" json:"canvas_versioning_enabled,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *UpdateCanvasRequest) Reset() {
@@ -549,17 +550,24 @@ func (x *UpdateCanvasRequest) GetId() string {
 }
 
 func (x *UpdateCanvasRequest) GetName() string {
-	if x != nil {
-		return x.Name
+	if x != nil && x.Name != nil {
+		return *x.Name
 	}
 	return ""
 }
 
 func (x *UpdateCanvasRequest) GetDescription() string {
-	if x != nil {
-		return x.Description
+	if x != nil && x.Description != nil {
+		return *x.Description
 	}
 	return ""
+}
+
+func (x *UpdateCanvasRequest) GetCanvasVersioningEnabled() bool {
+	if x != nil && x.CanvasVersioningEnabled != nil {
+		return *x.CanvasVersioningEnabled
+	}
+	return false
 }
 
 type UpdateCanvasResponse struct {
@@ -4643,17 +4651,18 @@ func (x *CanvasVersionMessage) GetTimestamp() *timestamp.Timestamp {
 }
 
 type Canvas_Metadata struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	OrganizationId string                 `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	Name           string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Description    string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	CreatedAt      *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt      *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	CreatedBy      *UserRef               `protobuf:"bytes,7,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	IsTemplate     bool                   `protobuf:"varint,8,opt,name=is_template,json=isTemplate,proto3" json:"is_template,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	Id                      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	OrganizationId          string                 `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	Name                    string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Description             string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	CreatedAt               *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt               *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	CreatedBy               *UserRef               `protobuf:"bytes,7,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	IsTemplate              bool                   `protobuf:"varint,8,opt,name=is_template,json=isTemplate,proto3" json:"is_template,omitempty"`
+	CanvasVersioningEnabled bool                   `protobuf:"varint,9,opt,name=canvas_versioning_enabled,json=canvasVersioningEnabled,proto3" json:"canvas_versioning_enabled,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *Canvas_Metadata) Reset() {
@@ -4738,6 +4747,13 @@ func (x *Canvas_Metadata) GetCreatedBy() *UserRef {
 func (x *Canvas_Metadata) GetIsTemplate() bool {
 	if x != nil {
 		return x.IsTemplate
+	}
+	return false
+}
+
+func (x *Canvas_Metadata) GetCanvasVersioningEnabled() bool {
+	if x != nil {
+		return x.CanvasVersioningEnabled
 	}
 	return false
 }
@@ -5074,11 +5090,15 @@ const file_canvases_proto_rawDesc = "" +
 	"\x15DescribeCanvasRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"M\n" +
 	"\x16DescribeCanvasResponse\x123\n" +
-	"\x06canvas\x18\x01 \x01(\v2\x1b.Superplane.Canvases.CanvasR\x06canvas\"[\n" +
+	"\x06canvas\x18\x01 \x01(\v2\x1b.Superplane.Canvases.CanvasR\x06canvas\"\xdd\x01\n" +
 	"\x13UpdateCanvasRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\"K\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12%\n" +
+	"\vdescription\x18\x03 \x01(\tH\x01R\vdescription\x88\x01\x01\x12?\n" +
+	"\x19canvas_versioning_enabled\x18\x04 \x01(\bH\x02R\x17canvasVersioningEnabled\x88\x01\x01B\a\n" +
+	"\x05_nameB\x0e\n" +
+	"\f_descriptionB\x1c\n" +
+	"\x1a_canvas_versioning_enabled\"K\n" +
 	"\x14UpdateCanvasResponse\x123\n" +
 	"\x06canvas\x18\x01 \x01(\v2\x1b.Superplane.Canvases.CanvasR\x06canvas\"J\n" +
 	"\x13CreateCanvasRequest\x123\n" +
@@ -5157,11 +5177,11 @@ const file_canvases_proto_rawDesc = "" +
 	"\x14DeleteCanvasResponse\"-\n" +
 	"\aUserRef\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\xef\x06\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\xab\a\n" +
 	"\x06Canvas\x12@\n" +
 	"\bmetadata\x18\x01 \x01(\v2$.Superplane.Canvases.Canvas.MetadataR\bmetadata\x124\n" +
 	"\x04spec\x18\x02 \x01(\v2 .Superplane.Canvases.Canvas.SpecR\x04spec\x12:\n" +
-	"\x06status\x18\x03 \x01(\v2\".Superplane.Canvases.Canvas.StatusR\x06status\x1a\xcd\x02\n" +
+	"\x06status\x18\x03 \x01(\v2\".Superplane.Canvases.Canvas.StatusR\x06status\x1a\x89\x03\n" +
 	"\bMetadata\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\x12\x12\n" +
@@ -5174,7 +5194,8 @@ const file_canvases_proto_rawDesc = "" +
 	"\n" +
 	"created_by\x18\a \x01(\v2\x1c.Superplane.Canvases.UserRefR\tcreatedBy\x12\x1f\n" +
 	"\vis_template\x18\b \x01(\bR\n" +
-	"isTemplate\x1al\n" +
+	"isTemplate\x12:\n" +
+	"\x19canvas_versioning_enabled\x18\t \x01(\bR\x17canvasVersioningEnabled\x1al\n" +
 	"\x04Spec\x121\n" +
 	"\x05nodes\x18\x01 \x03(\v2\x1b.Superplane.Components.NodeR\x05nodes\x121\n" +
 	"\x05edges\x18\x02 \x03(\v2\x1b.Superplane.Components.EdgeR\x05edges\x1a\xf2\x01\n" +
@@ -5794,6 +5815,7 @@ func file_canvases_proto_init() {
 	if File_canvases_proto != nil {
 		return
 	}
+	file_canvases_proto_msgTypes[4].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
