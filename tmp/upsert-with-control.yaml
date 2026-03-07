@@ -1,0 +1,233 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  id: 602c0b3e-d6a6-44aa-92de-670b65daea8f
+  name: Upsert
+spec:
+  control:
+    blocks:
+      - id: "machines-intro"
+        type: "markdown"
+        content: |
+          # Ephemeral Machines
+
+          Provision, operate, and retire temporary machines for short-lived tasks.
+
+          Use this app to manage machine lifecycle for testing, debugging, and one-off workloads.
+      - id: "machines-table"
+        type: "table"
+        title: "Ephemeral Machines"
+        source:
+          type: "memory"
+          namespace: "machines"
+        columns:
+          - key: "machineId"
+            label: "Machine ID"
+          - key: "status"
+            label: "Status"
+            colorRules:
+              - when: 'row.status == "ONLINE"'
+                color: "#16a34a"
+              - when: 'row.status == "BOOTING_UP"'
+                color: "#2563eb"
+          - key: "zone"
+            label: "Zone"
+          - key: "machineType"
+            label: "Type"
+        actions:
+          - id: "table-shutdown"
+            label: "Shutdown"
+            nodeId: "start-shutdown"
+            channel: "default"
+            variant: "destructive"
+            confirm: "Shut down machine {{row.machineId}}?"
+            payload:
+              action: "shutdown"
+              machineId: "{{row.machineId}}"
+              projectId: "{{row.projectId}}"
+              zone: "{{row.zone}}"
+      - id: "start-new-machine"
+        type: "button"
+        label: "Start new machine"
+        nodeId: "start-spin-up"
+        channel: "default"
+        variant: "default"
+        payload:
+          action: "spin_up"
+          machineId: "ephemeral-{{runTs}}"
+          projectId: "my-project"
+          zone: "us-central1-a"
+          machineType: "e2-medium"
+  nodes:
+    - id: "start-spin-up"
+      name: "Spin up machine"
+      type: "TYPE_TRIGGER"
+      trigger:
+        name: "start"
+      configuration: {}
+      position:
+        x: 120
+        y: 260
+      paused: false
+      isCollapsed: false
+    - id: "start-shutdown"
+      name: "Shut down machine"
+      type: "TYPE_TRIGGER"
+      trigger:
+        name: "start"
+      configuration: {}
+      position:
+        x: 120
+        y: 0
+      paused: false
+      isCollapsed: false
+    - id: "wait-spin-up"
+      name: "Simulate spin up operation"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "wait"
+      configuration:
+        mode: "interval"
+        unit: "seconds"
+        waitFor: "2"
+      position:
+        x: 680
+        y: 260
+      paused: false
+      isCollapsed: false
+    - id: "upsert-machine-booting"
+      name: "Upsert machine as BOOTING_UP"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "machines"
+        matchList:
+          - name: "machineId"
+            value: "{{ root().machineId }}"
+        valueList:
+          - name: "machineId"
+            value: "{{ root().machineId }}"
+          - name: "projectId"
+            value: "{{ root().projectId }}"
+          - name: "zone"
+            value: "{{ root().zone }}"
+          - name: "machineType"
+            value: "{{ root().machineType }}"
+          - name: "status"
+            value: "BOOTING_UP"
+          - name: "lastAction"
+            value: "spin_up"
+      position:
+        x: 420
+        y: 260
+      paused: false
+      isCollapsed: false
+    - id: "wait-shutdown"
+      name: "Simulate shutdown operation"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "wait"
+      configuration:
+        mode: "interval"
+        unit: "seconds"
+        waitFor: "2"
+      position:
+        x: 680
+        y: 0
+      paused: false
+      isCollapsed: false
+    - id: "upsert-machine-shutting-down"
+      name: "Upsert machine as SHUTTING_DOWN"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "machines"
+        matchList:
+          - name: "machineId"
+            value: "{{ root().machineId }}"
+        valueList:
+          - name: "machineId"
+            value: "{{ root().machineId }}"
+          - name: "projectId"
+            value: "{{ root().projectId }}"
+          - name: "zone"
+            value: "{{ root().zone }}"
+          - name: "machineType"
+            value: "{{ root().machineType }}"
+          - name: "status"
+            value: "SHUTTING_DOWN"
+          - name: "lastAction"
+            value: "shutdown"
+      position:
+        x: 420
+        y: 0
+      paused: false
+      isCollapsed: false
+    - id: "upsert-machine-online"
+      name: "Upsert machine as ONLINE"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "upsertMemory"
+      configuration:
+        namespace: "machines"
+        matchList:
+          - name: "machineId"
+            value: "{{ root().machineId }}"
+        valueList:
+          - name: "machineId"
+            value: "{{ root().machineId }}"
+          - name: "projectId"
+            value: "{{ root().projectId }}"
+          - name: "zone"
+            value: "{{ root().zone }}"
+          - name: "machineType"
+            value: "{{ root().machineType }}"
+          - name: "status"
+            value: "ONLINE"
+          - name: "lastAction"
+            value: "spin_up"
+          - name: "simulatedResult"
+            value: "{{ $['Simulate spin up operation'].data.result }}"
+          - name: "simulatedReason"
+            value: "{{ $['Simulate spin up operation'].data.reason }}"
+      position:
+        x: 1240
+        y: 260
+      paused: false
+      isCollapsed: false
+    - id: "delete-machine-after-shutdown"
+      name: "Delete machine after shutdown"
+      type: "TYPE_COMPONENT"
+      component:
+        name: "deleteMemory"
+      configuration:
+        namespace: "machines"
+        matchList:
+          - name: "machineId"
+            value: "{{ root().machineId }}"
+      position:
+        x: 1240
+        y: 0
+      paused: false
+      isCollapsed: false
+  edges:
+    - sourceId: "start-spin-up"
+      targetId: "upsert-machine-booting"
+      channel: "default"
+    - sourceId: "upsert-machine-booting"
+      targetId: "wait-spin-up"
+      channel: "default"
+    - sourceId: "start-shutdown"
+      targetId: "upsert-machine-shutting-down"
+      channel: "default"
+    - sourceId: "upsert-machine-shutting-down"
+      targetId: "wait-shutdown"
+      channel: "default"
+    - sourceId: "wait-spin-up"
+      targetId: "upsert-machine-online"
+      channel: "default"
+    - sourceId: "wait-shutdown"
+      targetId: "delete-machine-after-shutdown"
+      channel: "default"
