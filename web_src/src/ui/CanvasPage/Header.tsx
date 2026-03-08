@@ -16,7 +16,7 @@ import {
 import { Button } from "../button";
 import { Switch } from "../switch";
 import { useCanvases } from "@/hooks/useCanvasData";
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
@@ -119,7 +119,6 @@ export function Header({
   showPendingDraftBadge,
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
-  const navigate = useNavigate();
   const { data: workflows = [], isLoading: workflowsLoading } = useCanvases(organizationId || "");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isYamlMenuOpen, setIsYamlMenuOpen] = useState(false);
@@ -172,13 +171,6 @@ export function Header({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isMenuOpen]);
-
-  const handleWorkflowClick = (selectedWorkflowId: string) => {
-    if (selectedWorkflowId && organizationId) {
-      setIsMenuOpen(false);
-      navigate(`/${organizationId}/canvases/${selectedWorkflowId}`);
-    }
-  };
 
   const wrapWithTooltip = (disabled: boolean | undefined, message: string | undefined, child: ReactNode) => {
     if (!disabled || !message) return child;
@@ -239,14 +231,14 @@ export function Header({
                     <div className="px-4 pt-3 pb-4">
                       {/* All Canvases Link */}
                       <div className="mb-2">
-                        <a
-                          href={organizationId ? `/${organizationId}` : "/"}
+                        <Link
+                          to={organizationId ? `/${organizationId}` : "/"}
                           className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:text-gray-800"
                           onClick={() => setIsMenuOpen(false)}
                         >
                           <Home size={16} className="text-gray-500 transition group-hover:text-gray-800" />
                           <span>All Canvases</span>
-                        </a>
+                        </Link>
                       </div>
                       {/* Divider */}
                       <div className="border-b border-gray-300 mb-2"></div>
@@ -254,11 +246,27 @@ export function Header({
                       <div className="mt-2 flex flex-col">
                         {workflows.map((workflow) => {
                           const isSelected = workflow.metadata?.id === workflowId;
+                          const workflowHref =
+                            workflow.metadata?.id && organizationId
+                              ? `/${organizationId}/canvases/${workflow.metadata.id}`
+                              : undefined;
+                          if (!workflowHref) {
+                            return (
+                              <span
+                                key={workflow.metadata?.id}
+                                className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-left text-gray-500"
+                              >
+                                <span className="w-4" />
+                                <span>{workflow.metadata?.name || "Unnamed Canvas"}</span>
+                              </span>
+                            );
+                          }
+
                           return (
-                            <button
+                            <Link
                               key={workflow.metadata?.id}
-                              type="button"
-                              onClick={() => handleWorkflowClick(workflow.metadata?.id || "")}
+                              to={workflowHref}
+                              onClick={() => setIsMenuOpen(false)}
                               className={`group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-left ${
                                 isSelected
                                   ? "bg-sky-100 text-gray-800"
@@ -271,7 +279,7 @@ export function Header({
                                 <span className="w-4" />
                               )}
                               <span>{workflow.metadata?.name || "Unnamed Canvas"}</span>
-                            </button>
+                            </Link>
                           );
                         })}
                       </div>

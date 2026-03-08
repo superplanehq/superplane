@@ -4,7 +4,7 @@ import "@xyflow/react/dist/style.css";
 import ELK from "elkjs/lib/elk.bundled.js";
 import { AlertCircle, Component as ComponentIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ComponentsComponent, ComponentsIntegrationRef, ComponentsNode } from "../../api-client";
 import { Heading } from "../../components/Heading/heading";
 import { Button } from "../../components/ui/button";
@@ -134,7 +134,6 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
 
 export const CustomComponent = () => {
   const { organizationId, blueprintId } = useParams<{ organizationId: string; blueprintId: string }>();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [blueprintConfiguration, setBlueprintConfiguration] = useState<any[]>([]);
   const [blueprintOutputChannels, setBlueprintOutputChannels] = useState<any[]>([]);
@@ -1267,8 +1266,8 @@ export const CustomComponent = () => {
       <div className="flex flex-col items-center justify-center h-screen">
         <AlertCircle className="text-red-500 mb-4" size={32} />
         <Heading level={2}>Blueprint not found</Heading>
-        <Button variant="outline" onClick={() => navigate(`/${organizationId}`)} className="mt-4">
-          Go back to home
+        <Button asChild variant="outline" className="mt-4">
+          <Link to={`/${organizationId}`}>Go back to home</Link>
         </Button>
       </div>
     );
