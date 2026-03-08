@@ -1,0 +1,16 @@
+{
+  "data": {
+    "name": "output/results.json",
+    "bucket": "my-bucket",
+    "size": "2048",
+    "contentType": "application/json",
+    "timeCreated": "2025-01-01T12:00:00.000Z",
+    "updated": "2025-01-01T12:00:00.000Z",
+    "storageClass": "STANDARD",
+    "md5Hash": "3q2+7w==",
+    "generation": "1735689600000000",
+    "selfLink": "https://www.googleapis.com/storage/v1/b/my-bucket/o/output%2Fresults.json"
+  },
+  "timestamp": "2025-01-01T12:00:01Z",
+  "type": "gcp.cloudstorage.upload"
+}

@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudbuild"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudfunctions"
+	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudstorage"
 	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/compute"
 	gcppubsub "github.com/superplanehq/superplane/pkg/integrations/gcp/pubsub"
@@ -31,6 +32,9 @@ func init() {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 	cloudfunctions.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (cloudfunctions.Client, error) {
+		return gcpcommon.NewClient(httpCtx, integration)
+	})
+	cloudstorage.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (cloudstorage.Client, error) {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 }
@@ -154,6 +158,8 @@ func (g *GCP) Components() []core.Component {
 		&cloudbuild.GetBuild{},
 		&cloudbuild.RunTrigger{},
 		&cloudfunctions.InvokeFunction{},
+		&cloudstorage.GetObject{},
+		&cloudstorage.UploadObject{},
 	}
 }
 
@@ -161,6 +167,7 @@ func (g *GCP) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&compute.OnVMInstance{},
 		&cloudbuild.OnBuildComplete{},
+		&cloudstorage.OnObjectFinalized{},
 	}
 }
 
@@ -629,6 +636,8 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return cloudbuild.ListBranchResources(reqCtx, client, p["repository"])
 	case cloudbuild.ResourceTypeTag:
 		return cloudbuild.ListTagResources(reqCtx, client, p["repository"])
+	case cloudstorage.ResourceTypeBucket:
+		return cloudstorage.ListBucketResources(reqCtx, client, p["projectId"])
 	default:
 		return nil, nil
 	}

@@ -1,0 +1,14 @@
+{
+  "data": {
+    "protoPayload": {
+      "methodName": "storage.objects.create",
+      "resourceName": "projects/_/buckets/my-bucket/objects/path/to/file.json",
+      "serviceName": "storage.googleapis.com"
+    }
+  },
+  "logName": "projects/my-project/logs/cloudaudit.googleapis.com%2Fdata_access",
+  "methodName": "storage.objects.create",
+  "resourceName": "projects/_/buckets/my-bucket/objects/path/to/file.json",
+  "serviceName": "storage.googleapis.com",
+  "timestamp": "2025-06-01T12:00:00Z"
+}

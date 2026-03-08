@@ -1,0 +1,16 @@
+{
+  "data": {
+    "name": "data/report.csv",
+    "bucket": "my-bucket",
+    "size": "1048576",
+    "contentType": "text/csv",
+    "timeCreated": "2025-01-01T12:00:00.000Z",
+    "updated": "2025-01-01T12:00:00.000Z",
+    "storageClass": "STANDARD",
+    "md5Hash": "1B2M2Y8AsgTpgAmY7PhCfg==",
+    "generation": "1735689600000000",
+    "selfLink": "https://www.googleapis.com/storage/v1/b/my-bucket/o/data%2Freport.csv"
+  },
+  "timestamp": "2025-01-01T12:00:01Z",
+  "type": "gcp.cloudstorage.object"
+}

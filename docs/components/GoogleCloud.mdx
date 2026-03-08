@@ -10,6 +10,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Cloud Build • On Build Complete" href="#cloud-build-•-on-build-complete" description="Trigger a workflow when a GCP Cloud Build build reaches a terminal status" />
+  <LinkCard title="Cloud Storage • On Object Finalized" href="#cloud-storage-•-on-object-finalized" description="Trigger a workflow when a new object is created or overwritten in a Cloud Storage bucket" />
   <LinkCard title="Compute • On VM Instance" href="#compute-•-on-vm-instance" description="Listen to GCP Compute Engine VM instance lifecycle events" />
 </CardGrid>
 
@@ -20,6 +21,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cloud Build • Get Build" href="#cloud-build-•-get-build" description="Retrieve a Cloud Build build by ID" />
   <LinkCard title="Cloud Build • Run Trigger" href="#cloud-build-•-run-trigger" description="Run a Cloud Build trigger and wait for the build to finish" />
   <LinkCard title="Cloud Functions • Invoke Function" href="#cloud-functions-•-invoke-function" description="Invoke a Google Cloud Function and return the response" />
+  <LinkCard title="Cloud Storage • Get Object" href="#cloud-storage-•-get-object" description="Retrieve metadata for an object in a Google Cloud Storage bucket" />
+  <LinkCard title="Cloud Storage • Upload Object" href="#cloud-storage-•-upload-object" description="Upload an object to a Google Cloud Storage bucket" />
   <LinkCard title="Create Virtual Machine" href="#create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
 </CardGrid>
 
@@ -90,6 +93,57 @@ Each event contains the full Cloud Build resource, including `id`, `status` (SUC
   },
   "timestamp": "2025-01-01T00:05:00Z",
   "type": "gcp.cloudbuild.build"
+}
+```
+
+<a id="cloud-storage-•-on-object-finalized"></a>
+
+## Cloud Storage • On Object Finalized
+
+The On Object Finalized trigger starts a workflow execution when a new object is created or overwritten in a Google Cloud Storage bucket.
+
+**Trigger behavior:** SuperPlane creates a Cloud Logging sink that captures Cloud Storage audit log events and routes them to a shared Pub/Sub topic. Events are pushed to SuperPlane and matched to this trigger automatically.
+
+### Use Cases
+
+- **Data pipeline automation**: Process files as soon as they arrive in a bucket
+- **ETL workflows**: Trigger data transformations when new data lands in storage
+- **Backup verification**: Run checks when new backups are uploaded
+- **Media processing**: Start transcoding or analysis when media files are uploaded
+
+### Setup
+
+**Required GCP setup:**
+1. Enable the **Pub/Sub** API and **Cloud Logging** API in your project.
+2. Enable **Data Access audit logs** for Cloud Storage in the Google Cloud Console under IAM & Admin → Audit Logs → Cloud Storage. Make sure "Admin Read" and "Data Write" are checked.
+3. The integration's service account must have `roles/logging.configWriter` and `roles/pubsub.admin` permissions.
+
+SuperPlane automatically creates a Cloud Logging sink to capture Cloud Storage object creation events.
+
+### Configuration
+
+- **Bucket**: Optionally filter events to a specific bucket. Leave empty to listen for object creation across all buckets in the project.
+
+### Event Data
+
+Each event includes the audit log entry with resourceName, serviceName (storage.googleapis.com), methodName (storage.objects.create), and the full log entry data.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "protoPayload": {
+      "methodName": "storage.objects.create",
+      "resourceName": "projects/_/buckets/my-bucket/objects/path/to/file.json",
+      "serviceName": "storage.googleapis.com"
+    }
+  },
+  "logName": "projects/my-project/logs/cloudaudit.googleapis.com%2Fdata_access",
+  "methodName": "storage.objects.create",
+  "resourceName": "projects/_/buckets/my-bucket/objects/path/to/file.json",
+  "serviceName": "storage.googleapis.com",
+  "timestamp": "2025-06-01T12:00:00Z"
 }
 ```
 
@@ -305,6 +359,103 @@ The invocation result, including:
   },
   "timestamp": "2025-01-01T00:00:05Z",
   "type": "gcp.cloudfunctions.invoke"
+}
+```
+
+<a id="cloud-storage-•-get-object"></a>
+
+## Cloud Storage • Get Object
+
+Retrieves the metadata of an object stored in a Google Cloud Storage bucket.
+
+### Configuration
+
+- **Bucket** (required): The Cloud Storage bucket containing the object.
+- **Object** (required): The full path of the object within the bucket (e.g. `data/report.csv`).
+
+### Required IAM roles
+
+The service account used by the integration must have `roles/storage.objectViewer` (or `roles/storage.objectAdmin`) on the bucket or project.
+
+### Output
+
+The object metadata, including:
+- `name`: Object name (path within the bucket).
+- `bucket`: Bucket name.
+- `size`: Object size in bytes.
+- `contentType`: MIME type of the object.
+- `timeCreated`: Timestamp when the object was created.
+- `updated`: Timestamp when the object was last updated.
+- `storageClass`: Storage class of the object.
+- `md5Hash`: MD5 hash of the object content.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-bucket",
+    "contentType": "text/csv",
+    "generation": "1735689600000000",
+    "md5Hash": "1B2M2Y8AsgTpgAmY7PhCfg==",
+    "name": "data/report.csv",
+    "selfLink": "https://www.googleapis.com/storage/v1/b/my-bucket/o/data%2Freport.csv",
+    "size": "1048576",
+    "storageClass": "STANDARD",
+    "timeCreated": "2025-01-01T12:00:00.000Z",
+    "updated": "2025-01-01T12:00:00.000Z"
+  },
+  "timestamp": "2025-01-01T12:00:01Z",
+  "type": "gcp.cloudstorage.object"
+}
+```
+
+<a id="cloud-storage-•-upload-object"></a>
+
+## Cloud Storage • Upload Object
+
+Uploads content as an object to a Google Cloud Storage bucket.
+
+### Configuration
+
+- **Bucket** (required): The Cloud Storage bucket to upload to.
+- **Object** (required): The destination path within the bucket (e.g. `data/report.csv`).
+- **Content** (required): The content to upload.
+- **Content Type**: MIME type for the uploaded object (e.g. `application/json`, `text/plain`). Defaults to `application/octet-stream`.
+
+### Required IAM roles
+
+The service account used by the integration must have `roles/storage.objectCreator` (or `roles/storage.objectAdmin`) on the bucket or project.
+
+### Output
+
+The uploaded object metadata, including:
+- `name`: Object name (path within the bucket).
+- `bucket`: Bucket name.
+- `size`: Object size in bytes.
+- `contentType`: MIME type of the object.
+- `timeCreated`: Timestamp when the object was created.
+- `storageClass`: Storage class of the object.
+- `md5Hash`: MD5 hash of the uploaded content.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-bucket",
+    "contentType": "application/json",
+    "generation": "1735689600000000",
+    "md5Hash": "3q2+7w==",
+    "name": "output/results.json",
+    "selfLink": "https://www.googleapis.com/storage/v1/b/my-bucket/o/output%2Fresults.json",
+    "size": "2048",
+    "storageClass": "STANDARD",
+    "timeCreated": "2025-01-01T12:00:00.000Z",
+    "updated": "2025-01-01T12:00:00.000Z"
+  },
+  "timestamp": "2025-01-01T12:00:01Z",
+  "type": "gcp.cloudstorage.upload"
 }
 ```
 
