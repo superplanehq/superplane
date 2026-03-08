@@ -40,6 +40,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/aws"
 	_ "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	_ "github.com/superplanehq/superplane/pkg/integrations/circleci"
+	_ "github.com/superplanehq/superplane/pkg/integrations/azure"
 	_ "github.com/superplanehq/superplane/pkg/integrations/claude"
 	_ "github.com/superplanehq/superplane/pkg/integrations/cloudflare"
 	_ "github.com/superplanehq/superplane/pkg/integrations/cursor"
@@ -382,6 +383,7 @@ func Start() {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
 
+	registry.SetOIDCProvider(oidcProvider)
 	templates.Setup(registry)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {

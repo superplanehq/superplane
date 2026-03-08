@@ -113,6 +113,11 @@ import {
   triggerRenderers as jfrogArtifactoryTriggerRenderers,
   eventStateRegistry as jfrogArtifactoryEventStateRegistry,
 } from "./jfrogArtifactory/index";
+import {
+  componentMappers as azureComponentMappers,
+  triggerRenderers as azureTriggerRenderers,
+  eventStateRegistry as azureEventStateRegistry,
+} from "./azure/index";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
   componentMappers as digitaloceanComponentMappers,
@@ -262,6 +267,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   firehydrant: firehydrantComponentMappers,
   launchdarkly: launchdarklyComponentMappers,
   aws: awsComponentMappers,
+  azure: azureComponentMappers,
   discord: discordComponentMappers,
   telegram: telegramComponentMappers,
   octopus: octopusComponentMappers,
@@ -300,6 +306,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   firehydrant: firehydrantTriggerRenderers,
   launchdarkly: launchdarklyTriggerRenderers,
   aws: awsTriggerRenderers,
+  azure: azureTriggerRenderers,
   discord: discordTriggerRenderers,
   telegram: telegramTriggerRenderers,
   octopus: octopusTriggerRenderers,
@@ -350,6 +357,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   grafana: grafanaEventStateRegistry,
   prometheus: prometheusEventStateRegistry,
   cursor: cursorEventStateRegistry,
+  azure: azureEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
