@@ -12,6 +12,7 @@ import {
   SquarePen,
   Pencil,
   Rocket,
+  Edit,
 } from "lucide-react";
 import { Button } from "../button";
 import { Switch } from "../switch";
@@ -20,6 +21,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { Dialog, DialogActions, DialogBody, DialogTitle } from "@/components/Dialog/dialog";
+import { Field, Label } from "@/components/Fieldset/fieldset";
+import { Input } from "@/components/Input/input";
 
 export interface BreadcrumbItem {
   label: string;
@@ -61,6 +65,7 @@ interface HeaderProps {
   autoSaveDisabledTooltip?: string;
   onExportYamlCopy?: () => void;
   onExportYamlDownload?: () => void;
+  onRenameCanvas?: (name: string) => Promise<void>;
   topViewMode?: "canvas" | "memory" | "versioning";
   onTopViewModeChange?: (mode: "canvas" | "memory" | "versioning") => void;
   showVersioningTab?: boolean;
@@ -102,6 +107,7 @@ export function Header({
   autoSaveDisabledTooltip,
   onExportYamlCopy,
   onExportYamlDownload,
+  onRenameCanvas,
   topViewMode,
   onTopViewModeChange,
   showVersioningTab = true,
@@ -126,6 +132,61 @@ export function Header({
   const [isEditingMenuOpen, setIsEditingMenuOpen] = useState(false);
   const [isSaveMenuOpen, setIsSaveMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [renameName, setRenameName] = useState("");
+  const [renameError, setRenameError] = useState("");
+  const [isRenaming, setIsRenaming] = useState(false);
+
+  const MAX_CANVAS_NAME_LENGTH = 50;
+
+  const handleRenameOpen = () => {
+    setRenameName(currentWorkflowName);
+    setRenameError("");
+    setIsRenaming(false);
+    setIsMenuOpen(false);
+    setIsRenameOpen(true);
+  };
+
+  const handleRenameClose = () => {
+    setIsRenameOpen(false);
+    setRenameName("");
+    setRenameError("");
+  };
+
+  const handleRenameSubmit = async () => {
+    const trimmed = renameName.trim();
+
+    if (!trimmed) {
+      setRenameError("Name is required");
+      return;
+    }
+    if (trimmed.length > MAX_CANVAS_NAME_LENGTH) {
+      setRenameError(`Name must be ${MAX_CANVAS_NAME_LENGTH} characters or less`);
+      return;
+    }
+    if (trimmed === currentWorkflowName) {
+      handleRenameClose();
+      return;
+    }
+    if (!onRenameCanvas) {
+      return;
+    };
+
+    setIsRenaming(true);
+    try {
+      await onRenameCanvas(trimmed);
+      handleRenameClose();
+    } catch (error) {
+      const message = (error as Error)?.message || "Failed to rename canvas";
+      if (message.toLowerCase().includes("already") || message.toLowerCase().includes("exists")) {
+        setRenameError("A canvas with this name already exists");
+      } else {
+        setRenameError(message);
+      }
+    } finally {
+      setIsRenaming(false);
+    }
+  };
 
   // Get the workflow name from the workflows list if workflowId is available
   // Otherwise, use breadcrumbs[1] which is always the workflow name (index 0 is "Canvases")
@@ -237,6 +298,25 @@ export function Header({
                 {isMenuOpen && !workflowsLoading && (
                   <div className="absolute left-0 top-13 z-50 min-w-[15rem] w-max rounded-md outline outline-slate-950/20 bg-white shadow-lg">
                     <div className="px-4 pt-3 pb-4">
+                      {/* Rename Canvas */}
+                      {onRenameCanvas && (
+                        <div className="mb-2">
+                          <button
+                            type="button"
+                            onClick={handleRenameOpen}
+                            className="group flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:text-gray-800"
+                          >
+                            <Edit size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                            <span>Rename Canvas</span>
+                          </button>
+                        </div>
+                      )}
+                      {onRenameCanvas && (
+                        <>
+                          {/* Divider */}
+                          <div className="border-b border-gray-300 mb-2"></div>
+                        </>
+                      )}
                       {/* All Canvases Link */}
                       <div className="mb-2">
                         <a
@@ -259,11 +339,10 @@ export function Header({
                               key={workflow.metadata?.id}
                               type="button"
                               onClick={() => handleWorkflowClick(workflow.metadata?.id || "")}
-                              className={`group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-left ${
-                                isSelected
-                                  ? "bg-sky-100 text-gray-800"
-                                  : "text-gray-500 hover:bg-sky-100 hover:text-gray-800"
-                              }`}
+                              className={`group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-left ${isSelected
+                                ? "bg-sky-100 text-gray-800"
+                                : "text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                                }`}
                             >
                               {isSelected ? (
                                 <Palette size={16} className="text-gray-800 transition group-hover:text-gray-800" />
@@ -288,18 +367,16 @@ export function Header({
                 <button
                   type="button"
                   onClick={() => onTopViewModeChange("canvas")}
-                  className={`rounded px-2 py-1 text-xs font-medium ${
-                    topViewMode === "canvas" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
-                  }`}
+                  className={`rounded px-2 py-1 text-xs font-medium ${topViewMode === "canvas" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+                    }`}
                 >
                   Canvas
                 </button>
                 <button
                   type="button"
                   onClick={() => onTopViewModeChange("memory")}
-                  className={`rounded px-2 py-1 text-xs font-medium ${
-                    topViewMode === "memory" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
-                  }`}
+                  className={`rounded px-2 py-1 text-xs font-medium ${topViewMode === "memory" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+                    }`}
                 >
                   <span className="inline-flex items-center gap-1">
                     <span>Memory</span>
@@ -627,6 +704,49 @@ export function Header({
           </div>
         </div>
       </header>
+
+      {/* Rename Canvas Dialog */}
+      <Dialog open={isRenameOpen} onClose={handleRenameClose} size="sm">
+        <DialogTitle>Rename Canvas</DialogTitle>
+        <DialogBody>
+          <Field>
+            <Label className="block text-sm font-medium text-gray-700 mb-2">Canvas name</Label>
+            <Input
+              type="text"
+              autoComplete="off"
+              value={renameName}
+              onChange={(e) => {
+                if (e.target.value.length <= MAX_CANVAS_NAME_LENGTH) {
+                  setRenameName(e.target.value);
+                }
+                if (renameError) {
+                  setRenameError("");
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && renameName.trim() && !isRenaming) {
+                  handleRenameSubmit();
+                }
+              }}
+              className={`w-full ${renameError ? "border-red-500" : ""}`}
+              autoFocus
+              maxLength={MAX_CANVAS_NAME_LENGTH}
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              {renameName.length}/{MAX_CANVAS_NAME_LENGTH} characters
+            </div>
+            {renameError && <div className="text-xs text-red-600 mt-1">{renameError}</div>}
+          </Field>
+        </DialogBody>
+        <DialogActions>
+          <Button onClick={handleRenameSubmit} disabled={!renameName.trim() || isRenaming}>
+            {isRenaming ? "Renaming..." : "Rename"}
+          </Button>
+          <Button variant="outline" onClick={handleRenameClose}>
+            Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }
