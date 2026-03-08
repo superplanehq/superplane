@@ -14,21 +14,21 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-// TestOnVMWriteTrigger_Metadata verifies the trigger's metadata methods
-func TestOnVMWriteTrigger_Metadata(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_Metadata verifies the trigger's metadata methods
+func TestOnVMDeleted_Metadata(t *testing.T) {
+	trigger := &OnVMDeleted{}
 
-	assert.Equal(t, "azure.onVirtualMachineWrite", trigger.Name())
-	assert.Equal(t, "Azure • On VM Write", trigger.Label())
+	assert.Equal(t, "azure.onVirtualMachineDeleted", trigger.Name())
+	assert.Equal(t, "On VM Deleted", trigger.Label())
 	assert.Equal(t, "azure", trigger.Icon())
 	assert.Equal(t, "blue", trigger.Color())
 	assert.NotEmpty(t, trigger.Description())
 	assert.NotEmpty(t, trigger.Documentation())
 }
 
-// TestOnVMWriteTrigger_Configuration verifies the trigger's configuration fields
-func TestOnVMWriteTrigger_Configuration(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_Configuration verifies the trigger's configuration fields
+func TestOnVMDeleted_Configuration(t *testing.T) {
+	trigger := &OnVMDeleted{}
 	config := trigger.Configuration()
 
 	require.Len(t, config, 2)
@@ -40,21 +40,22 @@ func TestOnVMWriteTrigger_Configuration(t *testing.T) {
 	assert.False(t, config[1].Required)
 }
 
-// TestOnVMWriteTrigger_ExampleData verifies the trigger's example output
-func TestOnVMWriteTrigger_ExampleData(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_ExampleData verifies the trigger's example output
+func TestOnVMDeleted_ExampleData(t *testing.T) {
+	trigger := &OnVMDeleted{}
 	example := trigger.ExampleData()
 
 	require.NotNil(t, example)
 	assert.Contains(t, example, "id")
 	assert.Contains(t, example, "eventType")
+	assert.Equal(t, "Microsoft.Resources.ResourceDeleteSuccess", example["eventType"])
 	assert.Contains(t, example, "subject")
 	assert.Contains(t, example, "data")
 }
 
-// TestOnVMWriteTrigger_Setup verifies the trigger setup method
-func TestOnVMWriteTrigger_Setup(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_Setup verifies the trigger setup method
+func TestOnVMDeleted_Setup(t *testing.T) {
+	trigger := &OnVMDeleted{}
 
 	t.Run("setup with no resource group filter", func(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
@@ -87,9 +88,9 @@ func TestOnVMWriteTrigger_Setup(t *testing.T) {
 	})
 }
 
-// TestOnVMWriteTrigger_Cleanup verifies the trigger cleanup method
-func TestOnVMWriteTrigger_Cleanup(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_Cleanup verifies the trigger cleanup method
+func TestOnVMDeleted_Cleanup(t *testing.T) {
+	trigger := &OnVMDeleted{}
 	metadataCtx := &contexts.MetadataContext{}
 	logger := logrus.NewEntry(logrus.New())
 
@@ -103,16 +104,16 @@ func TestOnVMWriteTrigger_Cleanup(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// TestOnVMWriteTrigger_Actions verifies the trigger has no actions
-func TestOnVMWriteTrigger_Actions(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_Actions verifies the trigger has no actions
+func TestOnVMDeleted_Actions(t *testing.T) {
+	trigger := &OnVMDeleted{}
 	actions := trigger.Actions()
 	assert.Empty(t, actions)
 }
 
-// TestOnVMWriteTrigger_HandleAction verifies the trigger's action handler
-func TestOnVMWriteTrigger_HandleAction(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_HandleAction verifies the trigger's action handler
+func TestOnVMDeleted_HandleAction(t *testing.T) {
+	trigger := &OnVMDeleted{}
 	logger := logrus.NewEntry(logrus.New())
 
 	ctx := core.TriggerActionContext{
@@ -127,9 +128,9 @@ func TestOnVMWriteTrigger_HandleAction(t *testing.T) {
 	assert.Nil(t, result)
 }
 
-// TestOnVMWriteTrigger_HandleWebhook_SubscriptionValidation verifies subscription validation handling
-func TestOnVMWriteTrigger_HandleWebhook_SubscriptionValidation(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_HandleWebhook_SubscriptionValidation verifies subscription validation handling
+func TestOnVMDeleted_HandleWebhook_SubscriptionValidation(t *testing.T) {
+	trigger := &OnVMDeleted{}
 
 	// Create a test server to serve as the validation URL
 	validationServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -178,21 +179,21 @@ func TestOnVMWriteTrigger_HandleWebhook_SubscriptionValidation(t *testing.T) {
 	assert.Equal(t, 0, eventsCtx.Count())
 }
 
-// TestOnVMWriteTrigger_HandleWebhook_VMWriteSuccess verifies VM write event handling
-func TestOnVMWriteTrigger_HandleWebhook_VMWriteSuccess(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_HandleWebhook_VMDeleteSuccess verifies VM delete event handling
+func TestOnVMDeleted_HandleWebhook_VMDeleteSuccess(t *testing.T) {
+	trigger := &OnVMDeleted{}
 
-	t.Run("VM write with no filter", func(t *testing.T) {
+	t.Run("VM deleted with no filter", func(t *testing.T) {
 		events := []EventGridEvent{
 			{
 				ID:        "vm-event-1",
 				Topic:     "/subscriptions/test-sub/resourceGroups/test-rg",
 				Subject:   "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachines/test-vm",
-				EventType: EventTypeResourceWriteSuccess,
+				EventType: EventTypeResourceDeleteSuccess,
 				EventTime: time.Now(),
 				Data: map[string]any{
 					"subscriptionId": "test-sub",
-					"operationName":  "Microsoft.Compute/virtualMachines/write",
+					"operationName":  "Microsoft.Compute/virtualMachines/delete",
 					"status":         "Succeeded",
 				},
 				DataVersion:     "1.0",
@@ -221,32 +222,32 @@ func TestOnVMWriteTrigger_HandleWebhook_VMWriteSuccess(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 
 		require.Equal(t, 1, eventsCtx.Count())
-		assert.Equal(t, "azure.vm.write", eventsCtx.Payloads[0].Type)
+		assert.Equal(t, "azure.vm.deleted", eventsCtx.Payloads[0].Type)
 
 		// The emitted payload is the full, raw Event Grid event
 		payload, ok := eventsCtx.Payloads[0].Data.(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "vm-event-1", payload["id"])
-		assert.Equal(t, EventTypeResourceWriteSuccess, payload["eventType"])
+		assert.Equal(t, EventTypeResourceDeleteSuccess, payload["eventType"])
 		assert.Equal(t, "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachines/test-vm", payload["subject"])
 
 		data, ok := payload["data"].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "Succeeded", data["status"])
-		assert.Equal(t, "Microsoft.Compute/virtualMachines/write", data["operationName"])
+		assert.Equal(t, "Microsoft.Compute/virtualMachines/delete", data["operationName"])
 	})
 
-	t.Run("VM write with matching resource group filter", func(t *testing.T) {
+	t.Run("VM deleted with matching resource group filter", func(t *testing.T) {
 		events := []EventGridEvent{
 			{
 				ID:        "vm-event-2",
 				Topic:     "/subscriptions/test-sub/resourceGroups/my-target-rg",
 				Subject:   "/subscriptions/test-sub/resourceGroups/my-target-rg/providers/Microsoft.Compute/virtualMachines/test-vm-2",
-				EventType: EventTypeResourceWriteSuccess,
+				EventType: EventTypeResourceDeleteSuccess,
 				EventTime: time.Now(),
 				Data: map[string]any{
 					"subscriptionId": "test-sub",
-					"operationName":  "Microsoft.Compute/virtualMachines/write",
+					"operationName":  "Microsoft.Compute/virtualMachines/delete",
 					"status":         "Succeeded",
 				},
 				DataVersion:     "1.0",
@@ -277,7 +278,7 @@ func TestOnVMWriteTrigger_HandleWebhook_VMWriteSuccess(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 
 		require.Equal(t, 1, eventsCtx.Count())
-		assert.Equal(t, "azure.vm.write", eventsCtx.Payloads[0].Type)
+		assert.Equal(t, "azure.vm.deleted", eventsCtx.Payloads[0].Type)
 
 		payload, ok := eventsCtx.Payloads[0].Data.(map[string]any)
 		require.True(t, ok)
@@ -285,20 +286,20 @@ func TestOnVMWriteTrigger_HandleWebhook_VMWriteSuccess(t *testing.T) {
 	})
 }
 
-// TestOnVMWriteTrigger_HandleWebhook_FilterMismatch verifies resource group filtering
-func TestOnVMWriteTrigger_HandleWebhook_FilterMismatch(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_HandleWebhook_FilterMismatch verifies resource group filtering
+func TestOnVMDeleted_HandleWebhook_FilterMismatch(t *testing.T) {
+	trigger := &OnVMDeleted{}
 
 	events := []EventGridEvent{
 		{
 			ID:        "vm-event-3",
 			Topic:     "/subscriptions/test-sub/resourceGroups/rg-other",
 			Subject:   "/subscriptions/test-sub/resourceGroups/rg-other/providers/Microsoft.Compute/virtualMachines/test-vm-other",
-			EventType: EventTypeResourceWriteSuccess,
+			EventType: EventTypeResourceDeleteSuccess,
 			EventTime: time.Now(),
 			Data: map[string]any{
 				"subscriptionId": "test-sub",
-				"operationName":  "Microsoft.Compute/virtualMachines/write",
+				"operationName":  "Microsoft.Compute/virtualMachines/delete",
 				"status":         "Succeeded",
 			},
 			DataVersion:     "1.0",
@@ -331,9 +332,9 @@ func TestOnVMWriteTrigger_HandleWebhook_FilterMismatch(t *testing.T) {
 	assert.Equal(t, 0, eventsCtx.Count())
 }
 
-// TestOnVMWriteTrigger_HandleWebhook_NameFilter verifies VM name regex filtering
-func TestOnVMWriteTrigger_HandleWebhook_NameFilter(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_HandleWebhook_NameFilter verifies VM name regex filtering
+func TestOnVMDeleted_HandleWebhook_NameFilter(t *testing.T) {
+	trigger := &OnVMDeleted{}
 
 	t.Run("matching name filter", func(t *testing.T) {
 		events := []EventGridEvent{
@@ -341,11 +342,11 @@ func TestOnVMWriteTrigger_HandleWebhook_NameFilter(t *testing.T) {
 				ID:        "vm-event-name-1",
 				Topic:     "/subscriptions/test-sub/resourceGroups/test-rg",
 				Subject:   "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachines/prod-web-01",
-				EventType: EventTypeResourceWriteSuccess,
+				EventType: EventTypeResourceDeleteSuccess,
 				EventTime: time.Now(),
 				Data: map[string]any{
 					"subscriptionId": "test-sub",
-					"operationName":  "Microsoft.Compute/virtualMachines/write",
+					"operationName":  "Microsoft.Compute/virtualMachines/delete",
 					"status":         "Succeeded",
 				},
 				DataVersion:     "1.0",
@@ -387,11 +388,11 @@ func TestOnVMWriteTrigger_HandleWebhook_NameFilter(t *testing.T) {
 				ID:        "vm-event-name-2",
 				Topic:     "/subscriptions/test-sub/resourceGroups/test-rg",
 				Subject:   "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachines/dev-web-01",
-				EventType: EventTypeResourceWriteSuccess,
+				EventType: EventTypeResourceDeleteSuccess,
 				EventTime: time.Now(),
 				Data: map[string]any{
 					"subscriptionId": "test-sub",
-					"operationName":  "Microsoft.Compute/virtualMachines/write",
+					"operationName":  "Microsoft.Compute/virtualMachines/delete",
 					"status":         "Succeeded",
 				},
 				DataVersion:     "1.0",
@@ -430,11 +431,11 @@ func TestOnVMWriteTrigger_HandleWebhook_NameFilter(t *testing.T) {
 				ID:        "vm-event-name-3",
 				Topic:     "/subscriptions/test-sub/resourceGroups/test-rg",
 				Subject:   "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachines/any-vm",
-				EventType: EventTypeResourceWriteSuccess,
+				EventType: EventTypeResourceDeleteSuccess,
 				EventTime: time.Now(),
 				Data: map[string]any{
 					"subscriptionId": "test-sub",
-					"operationName":  "Microsoft.Compute/virtualMachines/write",
+					"operationName":  "Microsoft.Compute/virtualMachines/delete",
 					"status":         "Succeeded",
 				},
 				DataVersion:     "1.0",
@@ -466,21 +467,21 @@ func TestOnVMWriteTrigger_HandleWebhook_NameFilter(t *testing.T) {
 	})
 }
 
-// TestOnVMWriteTrigger_HandleWebhook_NonVMResource verifies non-VM resource filtering
-func TestOnVMWriteTrigger_HandleWebhook_NonVMResource(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_HandleWebhook_NonVMResource verifies non-VM resource filtering
+func TestOnVMDeleted_HandleWebhook_NonVMResource(t *testing.T) {
+	trigger := &OnVMDeleted{}
 
-	t.Run("storage account creation", func(t *testing.T) {
+	t.Run("storage account deletion", func(t *testing.T) {
 		events := []EventGridEvent{
 			{
 				ID:        "storage-event-1",
 				Topic:     "/subscriptions/test-sub/resourceGroups/test-rg",
 				Subject:   "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Storage/storageAccounts/teststorage",
-				EventType: EventTypeResourceWriteSuccess,
+				EventType: EventTypeResourceDeleteSuccess,
 				EventTime: time.Now(),
 				Data: map[string]any{
 					"subscriptionId": "test-sub",
-					"operationName":  "Microsoft.Storage/storageAccounts/write",
+					"operationName":  "Microsoft.Storage/storageAccounts/delete",
 					"status":         "Succeeded",
 				},
 				DataVersion:     "1.0",
@@ -511,17 +512,17 @@ func TestOnVMWriteTrigger_HandleWebhook_NonVMResource(t *testing.T) {
 		assert.Equal(t, 0, eventsCtx.Count())
 	})
 
-	t.Run("network interface creation", func(t *testing.T) {
+	t.Run("network interface deletion", func(t *testing.T) {
 		events := []EventGridEvent{
 			{
 				ID:        "nic-event-1",
 				Topic:     "/subscriptions/test-sub/resourceGroups/test-rg",
 				Subject:   "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Network/networkInterfaces/test-nic",
-				EventType: EventTypeResourceWriteSuccess,
+				EventType: EventTypeResourceDeleteSuccess,
 				EventTime: time.Now(),
 				Data: map[string]any{
 					"subscriptionId": "test-sub",
-					"operationName":  "Microsoft.Network/networkInterfaces/write",
+					"operationName":  "Microsoft.Network/networkInterfaces/delete",
 					"status":         "Succeeded",
 				},
 				DataVersion:     "1.0",
@@ -553,20 +554,20 @@ func TestOnVMWriteTrigger_HandleWebhook_NonVMResource(t *testing.T) {
 	})
 }
 
-// TestOnVMWriteTrigger_HandleWebhook_FailedStatus verifies failed VM operation handling
-func TestOnVMWriteTrigger_HandleWebhook_FailedStatus(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_HandleWebhook_FailedStatus verifies failed VM operation handling
+func TestOnVMDeleted_HandleWebhook_FailedStatus(t *testing.T) {
+	trigger := &OnVMDeleted{}
 
 	events := []EventGridEvent{
 		{
 			ID:        "vm-event-failed",
 			Topic:     "/subscriptions/test-sub/resourceGroups/test-rg",
 			Subject:   "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachines/failed-vm",
-			EventType: EventTypeResourceWriteSuccess,
+			EventType: EventTypeResourceDeleteSuccess,
 			EventTime: time.Now(),
 			Data: map[string]any{
 				"subscriptionId": "test-sub",
-				"operationName":  "Microsoft.Compute/virtualMachines/write",
+				"operationName":  "Microsoft.Compute/virtualMachines/delete",
 				"status":         "Failed",
 			},
 			DataVersion:     "1.0",
@@ -597,16 +598,16 @@ func TestOnVMWriteTrigger_HandleWebhook_FailedStatus(t *testing.T) {
 	assert.Equal(t, 0, eventsCtx.Count())
 }
 
-// TestOnVMWriteTrigger_HandleWebhook_MultipleEvents verifies handling multiple events in one batch
-func TestOnVMWriteTrigger_HandleWebhook_MultipleEvents(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_HandleWebhook_MultipleEvents verifies handling multiple events in one batch
+func TestOnVMDeleted_HandleWebhook_MultipleEvents(t *testing.T) {
+	trigger := &OnVMDeleted{}
 
 	events := []EventGridEvent{
 		{
 			ID:        "vm-event-1",
 			Topic:     "/subscriptions/test-sub/resourceGroups/test-rg",
 			Subject:   "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachines/test-vm-1",
-			EventType: EventTypeResourceWriteSuccess,
+			EventType: EventTypeResourceDeleteSuccess,
 			EventTime: time.Now(),
 			Data: map[string]any{
 				"status":         ProvisioningStateSucceeded,
@@ -619,7 +620,7 @@ func TestOnVMWriteTrigger_HandleWebhook_MultipleEvents(t *testing.T) {
 			ID:        "vm-event-2",
 			Topic:     "/subscriptions/test-sub/resourceGroups/test-rg",
 			Subject:   "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachines/test-vm-2",
-			EventType: EventTypeResourceWriteSuccess,
+			EventType: EventTypeResourceDeleteSuccess,
 			EventTime: time.Now(),
 			Data: map[string]any{
 				"status":         ProvisioningStateSucceeded,
@@ -632,7 +633,7 @@ func TestOnVMWriteTrigger_HandleWebhook_MultipleEvents(t *testing.T) {
 			ID:        "storage-event",
 			Topic:     "/subscriptions/test-sub/resourceGroups/test-rg",
 			Subject:   "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Storage/storageAccounts/teststorage",
-			EventType: EventTypeResourceWriteSuccess,
+			EventType: EventTypeResourceDeleteSuccess,
 			EventTime: time.Now(),
 			Data: map[string]any{
 				"status":         ProvisioningStateSucceeded,
@@ -664,13 +665,13 @@ func TestOnVMWriteTrigger_HandleWebhook_MultipleEvents(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 
 	assert.Equal(t, 2, eventsCtx.Count())
-	assert.Equal(t, "azure.vm.write", eventsCtx.Payloads[0].Type)
-	assert.Equal(t, "azure.vm.write", eventsCtx.Payloads[1].Type)
+	assert.Equal(t, "azure.vm.deleted", eventsCtx.Payloads[0].Type)
+	assert.Equal(t, "azure.vm.deleted", eventsCtx.Payloads[1].Type)
 }
 
-// TestOnVMWriteTrigger_HandleWebhook_InvalidJSON verifies error handling for invalid JSON
-func TestOnVMWriteTrigger_HandleWebhook_InvalidJSON(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_HandleWebhook_InvalidJSON verifies error handling for invalid JSON
+func TestOnVMDeleted_HandleWebhook_InvalidJSON(t *testing.T) {
+	trigger := &OnVMDeleted{}
 
 	eventsCtx := &contexts.EventContext{}
 	webhookCtx := &contexts.WebhookContext{}
@@ -691,16 +692,16 @@ func TestOnVMWriteTrigger_HandleWebhook_InvalidJSON(t *testing.T) {
 	assert.Equal(t, 0, eventsCtx.Count())
 }
 
-// TestOnVMWriteTrigger_HandleWebhook_InvalidConfiguration verifies error handling for invalid configuration
-func TestOnVMWriteTrigger_HandleWebhook_InvalidConfiguration(t *testing.T) {
-	trigger := &OnVMWriteTrigger{}
+// TestOnVMDeleted_HandleWebhook_InvalidConfiguration verifies error handling for invalid configuration
+func TestOnVMDeleted_HandleWebhook_InvalidConfiguration(t *testing.T) {
+	trigger := &OnVMDeleted{}
 
 	events := []EventGridEvent{
 		{
 			ID:        "vm-event-1",
 			Topic:     "/subscriptions/test-sub/resourceGroups/test-rg",
 			Subject:   "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachines/test-vm",
-			EventType: EventTypeResourceWriteSuccess,
+			EventType: EventTypeResourceDeleteSuccess,
 			EventTime: time.Now(),
 			Data: map[string]any{
 				"status": ProvisioningStateSucceeded,
@@ -733,169 +734,47 @@ func TestOnVMWriteTrigger_HandleWebhook_InvalidConfiguration(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, code)
 }
 
-// Tests for helper functions
+// TestOnVMDeleted_HandleWebhook_IgnoresWriteEvents verifies that write events are ignored
+func TestOnVMDeleted_HandleWebhook_IgnoresWriteEvents(t *testing.T) {
+	trigger := &OnVMDeleted{}
 
-func TestExtractVMName(t *testing.T) {
-	tests := []struct {
-		name       string
-		resourceID string
-		expected   string
-	}{
+	events := []EventGridEvent{
 		{
-			name:       "valid VM resource ID",
-			resourceID: "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
-			expected:   "my-vm",
-		},
-		{
-			name:       "empty resource ID",
-			resourceID: "",
-			expected:   "",
-		},
-		{
-			name:       "single segment",
-			resourceID: "vm-name",
-			expected:   "vm-name",
+			ID:        "vm-write-event",
+			Topic:     "/subscriptions/test-sub/resourceGroups/test-rg",
+			Subject:   "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachines/test-vm",
+			EventType: EventTypeResourceWriteSuccess,
+			EventTime: time.Now(),
+			Data: map[string]any{
+				"subscriptionId": "test-sub",
+				"operationName":  "Microsoft.Compute/virtualMachines/write",
+				"status":         "Succeeded",
+			},
+			DataVersion:     "1.0",
+			MetadataVersion: "1",
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := extractVMName(tt.resourceID)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
+	body, err := json.Marshal(events)
+	require.NoError(t, err)
 
-func TestExtractResourceGroup(t *testing.T) {
-	tests := []struct {
-		name       string
-		resourceID string
-		expected   string
-	}{
-		{
-			name:       "valid resource ID",
-			resourceID: "/subscriptions/test-sub/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
-			expected:   "my-rg",
-		},
-		{
-			name:       "lowercase resourcegroups from Azure Event Grid",
-			resourceID: "/subscriptions/test-sub/resourcegroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
-			expected:   "my-rg",
-		},
-		{
-			name:       "no resource group",
-			resourceID: "/subscriptions/test-sub",
-			expected:   "",
-		},
-		{
-			name:       "empty resource ID",
-			resourceID: "",
-			expected:   "",
-		},
+	eventsCtx := &contexts.EventContext{}
+	webhookCtx := &contexts.WebhookContext{}
+	logger := logrus.NewEntry(logrus.New())
+
+	ctx := core.WebhookRequestContext{
+		Body:          body,
+		Headers:       http.Header{},
+		Configuration: map[string]any{},
+		Webhook:       webhookCtx,
+		Events:        eventsCtx,
+		Logger:        logger,
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := extractResourceGroup(tt.resourceID)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
+	code, err := trigger.HandleWebhook(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, code)
 
-func TestExtractSubscriptionID(t *testing.T) {
-	tests := []struct {
-		name       string
-		resourceID string
-		expected   string
-	}{
-		{
-			name:       "valid resource ID",
-			resourceID: "/subscriptions/my-subscription-id/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
-			expected:   "my-subscription-id",
-		},
-		{
-			name:       "no subscription",
-			resourceID: "/resourceGroups/my-rg",
-			expected:   "",
-		},
-		{
-			name:       "empty resource ID",
-			resourceID: "",
-			expected:   "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := extractSubscriptionID(tt.resourceID)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestIsVirtualMachineEvent(t *testing.T) {
-	tests := []struct {
-		name     string
-		subject  string
-		expected bool
-	}{
-		{
-			name:     "VM event",
-			subject:  "/subscriptions/test/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm1",
-			expected: true,
-		},
-		{
-			name:     "storage event",
-			subject:  "/subscriptions/test/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/storage1",
-			expected: false,
-		},
-		{
-			name:     "empty subject",
-			subject:  "",
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := isVirtualMachineEvent(tt.subject)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestIsSuccessfulStatus(t *testing.T) {
-	tests := []struct {
-		name     string
-		status   string
-		expected bool
-	}{
-		{
-			name:     "succeeded",
-			status:   ProvisioningStateSucceeded,
-			expected: true,
-		},
-		{
-			name:     "failed",
-			status:   ProvisioningStateFailed,
-			expected: false,
-		},
-		{
-			name:     "creating",
-			status:   ProvisioningStateCreating,
-			expected: false,
-		},
-		{
-			name:     "empty",
-			status:   "",
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := isSuccessfulStatus(tt.status)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
+	// Write events should be ignored by the delete trigger
+	assert.Equal(t, 0, eventsCtx.Count())
 }

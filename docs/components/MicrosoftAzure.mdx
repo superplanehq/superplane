@@ -9,7 +9,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Triggers
 
 <CardGrid>
-  <LinkCard title="Azure • On VM Write" href="#azure-•-on-vm-write" description="Triggers when a Virtual Machine write operation succeeds in Azure (create, update, or delete)" />
+  <LinkCard title="On VM Deleted" href="#on-vm-deleted" description="Listen to Azure VM deletion events" />
 </CardGrid>
 
 ## Actions
@@ -41,30 +41,29 @@ After creation, you will be guided through configuring the Federated Identity Cr
 
 SuperPlane will use Workload Identity Federation to authenticate without storing any credentials.
 
-<a id="azure-•-on-vm-write"></a>
+<a id="on-vm-deleted"></a>
 
-## Azure • On VM Write
+## On VM Deleted
 
-The On VM Write trigger starts a workflow execution when an Azure Virtual Machine write operation succeeds.
-This includes VM creation, updates, and state changes during deletion.
+The On VM Deleted trigger starts a workflow execution when an Azure Virtual Machine is deleted.
 
 ### Use Cases
 
-- **Automated configuration**: Run configuration scripts on newly created VMs
-- **Compliance checks**: Verify that VMs meet security and compliance requirements after changes
-- **Inventory tracking**: Update external inventory systems when VMs are created, modified, or deleted
-- **Notification workflows**: Send notifications to teams when VM changes occur
-- **Cost tracking**: Log VM write events for cost analysis and reporting
-- **Cleanup workflows**: Trigger cleanup tasks when VMs are deleted
+- **Cleanup workflows**: Remove DNS records, monitoring agents, or other dependent resources when a VM is deleted
+- **Inventory tracking**: Update external inventory systems when VMs are removed
+- **Notification workflows**: Send notifications to teams when VMs are deleted
+- **Cost tracking**: Log VM deletion events for cost analysis and reporting
+- **Compliance auditing**: Track and audit VM deletions for security and compliance
 
 ### How It Works
 
-This trigger listens to Azure Event Grid events for Virtual Machine resource write operations.
-When a VM write operation succeeds (`status: Succeeded`), the trigger fires and
+This trigger listens to Azure Event Grid events for Virtual Machine resource delete operations.
+When a VM delete operation succeeds (`status: Succeeded`), the trigger fires and
 provides the full Azure Event Grid event payload.
 
-Azure fires `Microsoft.Resources.ResourceWriteSuccess` for all successful ARM write
-operations on a VM, including creation, updates, and state changes during deletion.
+Azure fires `Microsoft.Resources.ResourceDeleteSuccess` when a VM is successfully deleted.
+This is a distinct event from write operations — it only fires when the VM is actually removed,
+not during creation or updates.
 
 ### Configuration
 
@@ -75,12 +74,12 @@ operations on a VM, including creation, updates, and state changes during deleti
 
 ### Event Data
 
-Each VM write event includes the full Azure Event Grid event:
+Each VM delete event includes the full Azure Event Grid event:
 
 - **id**: Unique event ID
 - **topic**: The Azure subscription topic
 - **subject**: The full ARM resource ID of the VM
-- **eventType**: The event type (typically `Microsoft.Resources.ResourceWriteSuccess`)
+- **eventType**: The event type (`Microsoft.Resources.ResourceDeleteSuccess`)
 - **eventTime**: The timestamp when the event occurred
 - **data**: The event data including operationName, status, resourceProvider, resourceUri, subscriptionId, tenantId
 
@@ -89,7 +88,7 @@ Each VM write event includes the full Azure Event Grid event:
 Event Grid subscriptions are created automatically when the trigger is set up. SuperPlane will:
 
 1. Create an Event Grid subscription at the Azure subscription scope
-2. Configure it to forward `Microsoft.Resources.ResourceWriteSuccess` events to the trigger webhook
+2. Configure it to forward `Microsoft.Resources.ResourceDeleteSuccess` events to the trigger webhook
 3. Apply subject filters based on the configured resource group and resource type
 4. Handle the Event Grid validation handshake automatically
 
@@ -97,8 +96,8 @@ No manual setup is required.
 
 ### Notes
 
-- The trigger fires for all successful VM write operations (create, update, delete)
-- Failed operations do not trigger the workflow
+- The trigger fires only when a VM is successfully deleted
+- Failed delete operations do not trigger the workflow
 - The trigger processes events from Azure Event Grid in real-time
 - Multiple triggers can share the same Event Grid subscription if configured correctly
 
@@ -109,12 +108,12 @@ No manual setup is required.
   "id": "96257b6d-17d3-49e2-8369-fb185b29e1b5",
   "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc",
   "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-  "eventType": "Microsoft.Resources.ResourceWriteSuccess",
+  "eventType": "Microsoft.Resources.ResourceDeleteSuccess",
   "eventTime": "2026-02-11T10:30:00Z",
   "dataVersion": "2",
   "metadataVersion": "1",
   "data": {
-    "operationName": "Microsoft.Compute/virtualMachines/write",
+    "operationName": "Microsoft.Compute/virtualMachines/delete",
     "status": "Succeeded",
     "resourceProvider": "Microsoft.Compute",
     "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",

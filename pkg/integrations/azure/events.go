@@ -49,9 +49,9 @@ type SubscriptionValidationResponse struct {
 	ValidationResponse string `json:"validationResponse"`
 }
 
-// ResourceWriteSuccessData contains the data for a successful resource write operation
-// This is used for events like VM creation, update, or deletion
-type ResourceWriteSuccessData struct {
+// ResourceDeleteSuccessData contains the data for a successful resource delete operation
+// This is used for events like VM deletion
+type ResourceDeleteSuccessData struct {
 	// ProvisioningState indicates the current state of the resource operation
 	// Common values: "Succeeded", "Failed", "Canceled", "Creating", "Updating", "Deleting"
 	ProvisioningState string `json:"provisioningState"`
