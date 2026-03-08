@@ -207,6 +207,52 @@ func (c *armClient) put(ctx context.Context, url string, body any) (*http.Respon
 	return resp, nil
 }
 
+// deleteAndPoll performs a DELETE, then polls the LRO until terminal state.
+func (c *armClient) deleteAndPoll(ctx context.Context, url string) error {
+	resp, err := c.doRequest(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return readARMError(resp)
+	}
+
+	// 200 or 204 with no async header means synchronous completion
+	if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusOK {
+		asyncURL := resp.Header.Get("Azure-AsyncOperation")
+		locationURL := resp.Header.Get("Location")
+		if asyncURL == "" && locationURL == "" {
+			return nil
+		}
+
+		pollURL := asyncURL
+		if pollURL == "" {
+			pollURL = locationURL
+		}
+		_, err = c.pollLRO(ctx, pollURL, "")
+		return err
+	}
+
+	// 202 Accepted — poll the LRO
+	asyncURL := resp.Header.Get("Azure-AsyncOperation")
+	locationURL := resp.Header.Get("Location")
+
+	pollURL := asyncURL
+	if pollURL == "" {
+		pollURL = locationURL
+	}
+
+	if pollURL == "" {
+		// No poll URL but 202 — treat as success
+		return nil
+	}
+
+	_, err = c.pollLRO(ctx, pollURL, "")
+	return err
+}
+
 // putAndPoll performs a PUT, then polls the LRO until terminal state.
 // Returns the final response body.
 func (c *armClient) putAndPoll(ctx context.Context, url string, body any) (json.RawMessage, error) {
@@ -271,6 +317,11 @@ func (c *armClient) pollLRO(ctx context.Context, pollURL, resourceURL string) (j
 
 		switch status.Status {
 		case "Succeeded":
+			// For delete operations (empty resourceURL), no final GET is needed.
+			if resourceURL == "" {
+				return nil, nil
+			}
+
 			// Fetch the final resource state
 			var result json.RawMessage
 			if err := c.get(ctx, resourceURL, &result); err != nil {

@@ -112,6 +112,7 @@ func (a *AzureIntegration) Configuration() []configuration.Field {
 func (a *AzureIntegration) Components() []core.Component {
 	return []core.Component{
 		&CreateVMComponent{integration: a},
+		&DeleteVMComponent{integration: a},
 	}
 }
 

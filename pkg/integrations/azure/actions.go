@@ -436,6 +436,58 @@ func ensurePublicIP(ctx context.Context, provider *AzureProvider, resourceGroup,
 	return pip.ID, nil
 }
 
+// DeleteVMRequest contains parameters for Azure VM deletion.
+type DeleteVMRequest struct {
+	ResourceGroup string
+	VMName        string
+}
+
+// DeleteVMResponse contains the result of a VM deletion.
+type DeleteVMResponse struct {
+	VMID          string
+	Name          string
+	ResourceGroup string
+}
+
+// DeleteVM deletes a VM and waits for the operation to complete.
+func DeleteVM(ctx context.Context, provider *AzureProvider, req DeleteVMRequest, logger *logrus.Entry) (*DeleteVMResponse, error) {
+	if err := validateDeleteVMRequest(req); err != nil {
+		return nil, fmt.Errorf("invalid request: %w", err)
+	}
+
+	logger.Infof("Starting VM deletion: name=%s, resourceGroup=%s", req.VMName, req.ResourceGroup)
+
+	vmURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s?api-version=%s",
+		armBaseURL, provider.GetSubscriptionID(), req.ResourceGroup, req.VMName, armAPIVersionCompute)
+
+	if err := provider.GetClient().deleteAndPoll(ctx, vmURL); err != nil {
+		return nil, fmt.Errorf("VM deletion failed: %w", err)
+	}
+
+	vmID := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s",
+		provider.GetSubscriptionID(), req.ResourceGroup, req.VMName)
+
+	response := &DeleteVMResponse{
+		VMID:          vmID,
+		Name:          req.VMName,
+		ResourceGroup: req.ResourceGroup,
+	}
+
+	logger.Infof("VM deleted successfully: name=%s, id=%s", response.Name, response.VMID)
+	return response, nil
+}
+
+// validateDeleteVMRequest validates required VM deletion request fields.
+func validateDeleteVMRequest(req DeleteVMRequest) error {
+	if req.ResourceGroup == "" {
+		return fmt.Errorf("resource group is required")
+	}
+	if req.VMName == "" {
+		return fmt.Errorf("VM name is required")
+	}
+	return nil
+}
+
 // validateCreateVMRequest validates required VM request fields.
 func validateCreateVMRequest(req CreateVMRequest) error {
 	if req.ResourceGroup == "" {
