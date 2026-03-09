@@ -8,7 +8,7 @@ import { onArtifactPushTriggerRenderer } from "./on_artifact_push";
 import { onArtifactAnalysisTriggerRenderer } from "./on_artifact_analysis";
 import { runTriggerMapper } from "./run_trigger";
 import { invokeFunctionMapper } from "./invoke_function";
-import { getArtifactMapper, analyzeArtifactMapper, getArtifactAnalysisMapper } from "./artifact_registry_mapper";
+import { getArtifactMapper, getArtifactAnalysisMapper } from "./artifact_registry_mapper";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createVM: baseMapper,
@@ -17,7 +17,6 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "cloudbuild.runTrigger": runTriggerMapper,
   "cloudfunctions.invokeFunction": invokeFunctionMapper,
   "artifactregistry.getArtifact": getArtifactMapper,
-  "artifactregistry.analyzeArtifact": analyzeArtifactMapper,
   "artifactregistry.getArtifactAnalysis": getArtifactAnalysisMapper,
 };
 
@@ -35,7 +34,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "cloudbuild.runTrigger": CLOUD_BUILD_EXECUTION_STATE_REGISTRY,
   "cloudfunctions.invokeFunction": buildActionStateRegistry("completed"),
   "artifactregistry.getArtifact": buildActionStateRegistry("completed"),
-  "artifactregistry.analyzeArtifact": buildActionStateRegistry("completed"),
   "artifactregistry.getArtifactAnalysis": buildActionStateRegistry("completed"),
 };
 
