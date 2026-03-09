@@ -1,0 +1,16 @@
+{
+  "data": {
+    "id": "my-build-project:a1b2c3d4-5678-90ab-cdef-111122223333",
+    "arn": "arn:aws:codebuild:us-east-1:123456789012:build/my-build-project:a1b2c3d4-5678-90ab-cdef-111122223333",
+    "buildNumber": 42,
+    "buildStatus": "SUCCEEDED",
+    "projectName": "my-build-project",
+    "currentPhase": "COMPLETED",
+    "startTime": 1707570922.518,
+    "endTime": 1707571022.518,
+    "initiator": "codebuild/my-build-project",
+    "buildComplete": true
+  },
+  "timestamp": "2026-02-10T14:37:02.518372841Z",
+  "type": "aws.codebuild.build"
+}

@@ -1,0 +1,17 @@
+{
+  "data": {
+    "build": {
+      "project": "my-build-project",
+      "id": "my-build-project:a1b2c3d4-5678-90ab-cdef-111122223333",
+      "status": "SUCCEEDED"
+    },
+    "detail": {
+      "project-name": "my-build-project",
+      "build-id": "my-build-project:a1b2c3d4-5678-90ab-cdef-111122223333",
+      "build-status": "SUCCEEDED",
+      "current-phase": "COMPLETED"
+    }
+  },
+  "timestamp": "2026-02-10T14:35:22.518372841Z",
+  "type": "aws.codebuild.build.finished"
+}

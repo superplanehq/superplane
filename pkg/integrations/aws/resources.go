@@ -3,6 +3,7 @@ package aws
 import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/codebuild"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codepipeline"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ec2"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
@@ -44,6 +45,9 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 
 	case "codeartifact.domain":
 		return codeartifact.ListDomains(ctx, resourceType)
+
+	case "codebuild.project":
+		return codebuild.ListProjects(ctx, resourceType)
 
 	case "codepipeline.pipeline":
 		return codepipeline.ListPipelines(ctx, resourceType)

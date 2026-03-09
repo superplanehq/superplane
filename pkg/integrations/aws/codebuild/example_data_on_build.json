@@ -1,0 +1,26 @@
+{
+  "data": {
+    "account": "123456789012",
+    "detail": {
+      "build-id": "arn:aws:codebuild:us-east-1:123456789012:build/demo-project:00000000-0000-0000-0000-000000000001",
+      "build-status": "SUCCEEDED",
+      "current-phase": "COMPLETED",
+      "project-name": "demo-project",
+      "additional-information": {
+        "initiator": "codebuild/demo-project",
+        "build-start-time": "Feb 24, 2026 3:21:42 PM"
+      }
+    },
+    "detail-type": "CodeBuild Build State Change",
+    "id": "00000000-0000-0000-0000-000000000002",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:codebuild:us-east-1:123456789012:build/demo-project:00000000-0000-0000-0000-000000000001"
+    ],
+    "source": "aws.codebuild",
+    "time": "2026-02-24T15:25:12Z",
+    "version": "0"
+  },
+  "timestamp": "2026-02-24T15:25:22.212Z",
+  "type": "aws.codebuild.build"
+}

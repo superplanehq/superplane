@@ -11,6 +11,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="CloudWatch • On Alarm" href="#cloud-watch-•-on-alarm" description="Listen to AWS CloudWatch alarm state change events" />
   <LinkCard title="CodeArtifact • On Package Version" href="#code-artifact-•-on-package-version" description="Listen to AWS CodeArtifact package version events" />
+  <LinkCard title="CodeBuild • On Build Completed" href="#code-build-•-on-build-completed" description="Listen to AWS CodeBuild build state change events" />
   <LinkCard title="CodePipeline • On Pipeline" href="#code-pipeline-•-on-pipeline" description="Listen to AWS CodePipeline pipeline execution state change events" />
   <LinkCard title="EC2 • On Image" href="#ec2-•-on-image" description="Listen to AWS EC2 AMI state change events" />
   <LinkCard title="ECR • On Image Push" href="#ecr-•-on-image-push" description="Listen to AWS ECR image push events" />
@@ -28,6 +29,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CodeArtifact • Dispose Package Versions" href="#code-artifact-•-dispose-package-versions" description="Delete assets and set package version status to Disposed (record remains)" />
   <LinkCard title="CodeArtifact • Get Package Version" href="#code-artifact-•-get-package-version" description="Describe an AWS CodeArtifact package version" />
   <LinkCard title="CodeArtifact • Update Package Versions Status" href="#code-artifact-•-update-package-versions-status" description="Update the status of one or more package versions (Archived, Published, Unlisted)" />
+  <LinkCard title="CodeBuild • Get Build Status" href="#code-build-•-get-build-status" description="Retrieve the status and details of an AWS CodeBuild build" />
+  <LinkCard title="CodeBuild • Start Build" href="#code-build-•-start-build" description="Start an AWS CodeBuild build and wait for it to complete" />
+  <LinkCard title="CodeBuild • Stop Build" href="#code-build-•-stop-build" description="Stop a running AWS CodeBuild build" />
   <LinkCard title="CodePipeline • Get Pipeline" href="#code-pipeline-•-get-pipeline" description="Retrieve the definition of an AWS CodePipeline pipeline" />
   <LinkCard title="CodePipeline • Get Pipeline Execution" href="#code-pipeline-•-get-pipeline-execution" description="Retrieve the status and details of an AWS CodePipeline execution" />
   <LinkCard title="CodePipeline • Retry Stage Execution" href="#code-pipeline-•-retry-stage-execution" description="Retry a failed stage in an existing AWS CodePipeline execution" />
@@ -180,6 +184,62 @@ The On Package Version trigger starts a workflow execution when a package versio
   },
   "timestamp": "2026-03-10T14:25:30.31254162Z",
   "type": "aws.codeartifact.package.version"
+}
+```
+
+<a id="code-build-•-on-build-completed"></a>
+
+## CodeBuild • On Build Completed
+
+The On Build Completed trigger starts a workflow execution when AWS CodeBuild emits a build state change event.
+
+### Use Cases
+
+- **Build visibility**: Start workflows whenever build state changes
+- **Notification**: Notify teams when a build fails or times out
+- **Workflow orchestration**: Trigger follow-up automations on specific build states
+
+### Configuration
+
+- **Region**: AWS region where build events are observed
+- **Projects**: Optional project name filters (supports equals, not-equals, and regex matches)
+- **Build States**: Optional list of states to match (for example SUCCEEDED, FAILED, STOPPED)
+
+### Event Data
+
+Each event includes:
+- **detail.project-name**: CodeBuild project name
+- **detail.build-id**: Build ID
+- **detail.build-status**: Build status
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account": "123456789012",
+    "detail": {
+      "build-id": "arn:aws:codebuild:us-east-1:123456789012:build/demo-project:00000000-0000-0000-0000-000000000001",
+      "build-status": "SUCCEEDED",
+      "current-phase": "COMPLETED",
+      "project-name": "demo-project",
+      "additional-information": {
+        "initiator": "codebuild/demo-project",
+        "build-start-time": "Feb 24, 2026 3:21:42 PM"
+      }
+    },
+    "detail-type": "CodeBuild Build State Change",
+    "id": "00000000-0000-0000-0000-000000000002",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:codebuild:us-east-1:123456789012:build/demo-project:00000000-0000-0000-0000-000000000001"
+    ],
+    "source": "aws.codebuild",
+    "time": "2026-02-24T15:25:12Z",
+    "version": "0"
+  },
+  "timestamp": "2026-02-24T15:25:22.212Z",
+  "type": "aws.codebuild.build"
 }
 ```
 
@@ -673,6 +733,148 @@ The Update Package Versions Status component sets the status of package versions
       "status": "Archived"
     }
   }
+}
+```
+
+<a id="code-build-•-get-build-status"></a>
+
+## CodeBuild • Get Build Status
+
+The Get Build Status component retrieves the full details of an AWS CodeBuild build.
+
+### Use Cases
+
+- **Build inspection**: Fetch build status, phases, and configuration
+- **Workflow branching**: Route workflow based on build status
+- **Monitoring**: Check build progress and results
+
+### Configuration
+
+- **Region**: AWS region where the build exists
+- **Build ID**: The full build ID to retrieve (e.g., "project-name:build-uuid")
+
+### Output
+
+Emits the full build details including:
+- Build ID, ARN, and build number
+- Build status and current phase
+- Project name and source configuration
+- Build start and end times
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "my-build-project:a1b2c3d4-5678-90ab-cdef-111122223333",
+    "arn": "arn:aws:codebuild:us-east-1:123456789012:build/my-build-project:a1b2c3d4-5678-90ab-cdef-111122223333",
+    "buildNumber": 42,
+    "buildStatus": "SUCCEEDED",
+    "projectName": "my-build-project",
+    "currentPhase": "COMPLETED",
+    "startTime": 1707570922.518,
+    "endTime": 1707571022.518,
+    "initiator": "codebuild/my-build-project",
+    "buildComplete": true
+  },
+  "timestamp": "2026-02-10T14:37:02.518372841Z",
+  "type": "aws.codebuild.build"
+}
+```
+
+<a id="code-build-•-start-build"></a>
+
+## CodeBuild • Start Build
+
+The Start Build component triggers an AWS CodeBuild build and waits for it to complete.
+
+### Use Cases
+
+- **CI/CD orchestration**: Trigger builds from SuperPlane workflows
+- **Build automation**: Run CodeBuild projects as part of workflow automation
+- **Multi-stage deployments**: Coordinate complex build and deploy pipelines
+- **Workflow chaining**: Chain multiple CodeBuild projects together
+
+### How It Works
+
+1. Starts a CodeBuild build with the specified project name
+2. Waits for the build to complete (monitored via EventBridge webhook and polling)
+3. Routes execution based on build result:
+   - **Passed channel**: Build completed successfully
+   - **Failed channel**: Build failed, timed out, or was stopped
+
+### Configuration
+
+- **Region**: AWS region where the project exists
+- **Project**: CodeBuild project name to build
+- **Environment Variables**: Optional environment variable overrides for the build
+
+### Output Channels
+
+- **Passed**: Emitted when build completes successfully
+- **Failed**: Emitted when build fails, times out, or is stopped
+
+### Example Output
+
+```json
+{
+  "data": {
+    "build": {
+      "project": "my-build-project",
+      "id": "my-build-project:a1b2c3d4-5678-90ab-cdef-111122223333",
+      "status": "SUCCEEDED"
+    },
+    "detail": {
+      "project-name": "my-build-project",
+      "build-id": "my-build-project:a1b2c3d4-5678-90ab-cdef-111122223333",
+      "build-status": "SUCCEEDED",
+      "current-phase": "COMPLETED"
+    }
+  },
+  "timestamp": "2026-02-10T14:35:22.518372841Z",
+  "type": "aws.codebuild.build.finished"
+}
+```
+
+<a id="code-build-•-stop-build"></a>
+
+## CodeBuild • Stop Build
+
+The Stop Build component stops a running AWS CodeBuild build.
+
+### Use Cases
+
+- **Build cancellation**: Stop builds that are no longer needed
+- **Resource management**: Cancel running builds to free up build resources
+- **Workflow control**: Stop builds as part of error handling or workflow branching
+
+### Configuration
+
+- **Region**: AWS region where the build is running
+- **Build ID**: The full build ID to stop (e.g., "project-name:build-uuid")
+
+### Output
+
+Emits the stopped build details including project name, build ID, and final status.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "my-build-project:a1b2c3d4-5678-90ab-cdef-111122223333",
+    "arn": "arn:aws:codebuild:us-east-1:123456789012:build/my-build-project:a1b2c3d4-5678-90ab-cdef-111122223333",
+    "buildNumber": 42,
+    "buildStatus": "STOPPED",
+    "projectName": "my-build-project",
+    "currentPhase": "COMPLETED",
+    "startTime": 1707570922.518,
+    "endTime": 1707571022.518,
+    "initiator": "codebuild/my-build-project",
+    "buildComplete": true
+  },
+  "timestamp": "2026-02-10T14:37:02.518372841Z",
+  "type": "aws.codebuild.build"
 }
 ```
 

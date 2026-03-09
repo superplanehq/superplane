@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/cloudwatch"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/codebuild"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codepipeline"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ec2"
@@ -144,6 +145,9 @@ func (a *AWS) Components() []core.Component {
 		&codeartifact.DisposePackageVersions{},
 		&codeartifact.GetPackageVersion{},
 		&codeartifact.UpdatePackageVersionsStatus{},
+		&codebuild.GetBuildStatus{},
+		&codebuild.StartBuild{},
+		&codebuild.StopBuild{},
 		&codepipeline.GetPipeline{},
 		&codepipeline.GetPipelineExecution{},
 		&codepipeline.RetryStageExecution{},
@@ -186,6 +190,7 @@ func (a *AWS) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&cloudwatch.OnAlarm{},
 		&codeartifact.OnPackageVersion{},
+		&codebuild.OnBuild{},
 		&codepipeline.OnPipeline{},
 		&ec2.OnImage{},
 		&ecr.OnImageScan{},

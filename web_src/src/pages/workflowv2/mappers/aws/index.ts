@@ -31,6 +31,10 @@ import { deleteTopicMapper } from "./sns/delete_topic";
 import { getSubscriptionMapper } from "./sns/get_subscription";
 import { getTopicMapper } from "./sns/get_topic";
 import { publishMessageMapper } from "./sns/publish_message";
+import { getBuildStatusMapper } from "./codebuild/get_build_status";
+import { START_BUILD_STATE_REGISTRY, startBuildMapper } from "./codebuild/start_build";
+import { stopBuildMapper } from "./codebuild/stop_build";
+import { onBuildTriggerRenderer } from "./codebuild/on_build";
 import { getPipelineExecutionMapper } from "./codepipeline/get_pipeline_execution";
 import { retryStageExecutionMapper } from "./codepipeline/retry_stage_execution";
 import { RUN_PIPELINE_STATE_REGISTRY, runPipelineMapper } from "./codepipeline/run_pipeline";
@@ -47,6 +51,9 @@ import { enableImageDeprecationMapper } from "./ec2/enable_image_deprecation";
 import { disableImageDeprecationMapper } from "./ec2/disable_image_deprecation";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
+  "codebuild.getBuildStatus": getBuildStatusMapper,
+  "codebuild.startBuild": startBuildMapper,
+  "codebuild.stopBuild": stopBuildMapper,
   "codepipeline.getPipeline": getPipelineMapper,
   "codepipeline.getPipelineExecution": getPipelineExecutionMapper,
   "codepipeline.retryStageExecution": retryStageExecutionMapper,
@@ -94,6 +101,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   "cloudwatch.onAlarm": onAlarmTriggerRenderer,
   "codeArtifact.onPackageVersion": onPackageVersionTriggerRenderer,
+  "codebuild.onBuild": onBuildTriggerRenderer,
   "codepipeline.onPipeline": onPipelineTriggerRenderer,
   "ecr.onImagePush": onImagePushTriggerRenderer,
   "ecr.onImageScan": onImageScanTriggerRenderer,
@@ -102,6 +110,9 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
+  "codebuild.getBuildStatus": buildActionStateRegistry("retrieved"),
+  "codebuild.startBuild": START_BUILD_STATE_REGISTRY,
+  "codebuild.stopBuild": buildActionStateRegistry("stopped"),
   "codepipeline.getPipeline": buildActionStateRegistry("retrieved"),
   "codepipeline.getPipelineExecution": buildActionStateRegistry("retrieved"),
   "codepipeline.retryStageExecution": buildActionStateRegistry("retried"),
