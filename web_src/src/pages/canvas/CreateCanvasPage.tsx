@@ -1,7 +1,7 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Field, Label } from "../../components/Fieldset/fieldset";
 import { Heading } from "../../components/Heading/heading";
 import { Input } from "../../components/Input/input";
@@ -170,12 +170,7 @@ export function CreateCanvasPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {workflowTemplates.map((template) => (
-                  <TemplateCard
-                    key={template.metadata?.id}
-                    template={template}
-                    organizationId={organizationId || ""}
-                    navigate={navigate}
-                  />
+                  <TemplateCard key={template.metadata?.id} template={template} organizationId={organizationId || ""} />
                 ))}
               </div>
             </div>
@@ -188,32 +183,20 @@ export function CreateCanvasPage() {
 interface TemplateCardProps {
   template: any;
   organizationId: string;
-  navigate: any;
 }
 
-function TemplateCard({ template, organizationId, navigate }: TemplateCardProps) {
+function TemplateCard({ template, organizationId }: TemplateCardProps) {
   const previewNodes = (template.spec?.nodes || []) as ComponentsNode[];
   const previewEdges = (template.spec?.edges || []) as ComponentsEdge[];
   const templateId = template.metadata?.id;
 
   if (!templateId) return null;
 
-  const handleNavigate = () => navigate(`/${organizationId}/templates/${templateId}`);
+  const templateHref = `/${organizationId}/templates/${templateId}`;
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={(event) => {
-        if (event.defaultPrevented) return;
-        handleNavigate();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          handleNavigate();
-        }
-      }}
+    <Link
+      to={templateHref}
       className="min-h-48 bg-white dark:bg-gray-800 rounded-md outline outline-slate-950/10 hover:shadow-md transition-shadow cursor-pointer group"
     >
       <div className="flex flex-col h-full">
@@ -246,7 +229,7 @@ function TemplateCard({ template, organizationId, navigate }: TemplateCardProps)
           ) : null}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 

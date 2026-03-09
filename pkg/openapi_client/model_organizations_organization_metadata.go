@@ -21,12 +21,12 @@ var _ MappedNullable = &OrganizationsOrganizationMetadata{}
 
 // OrganizationsOrganizationMetadata struct for OrganizationsOrganizationMetadata
 type OrganizationsOrganizationMetadata struct {
-	Id                       *string    `json:"id,omitempty"`
-	Name                     *string    `json:"name,omitempty"`
-	Description              *string    `json:"description,omitempty"`
-	CreatedAt                *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt                *time.Time `json:"updatedAt,omitempty"`
-	CanvasSandboxModeEnabled *bool      `json:"canvasSandboxModeEnabled,omitempty"`
+	Id                      *string    `json:"id,omitempty"`
+	Name                    *string    `json:"name,omitempty"`
+	Description             *string    `json:"description,omitempty"`
+	CreatedAt               *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt               *time.Time `json:"updatedAt,omitempty"`
+	CanvasVersioningEnabled *bool      `json:"canvasVersioningEnabled,omitempty"`
 }
 
 // NewOrganizationsOrganizationMetadata instantiates a new OrganizationsOrganizationMetadata object
@@ -206,36 +206,36 @@ func (o *OrganizationsOrganizationMetadata) SetUpdatedAt(v time.Time) {
 	o.UpdatedAt = &v
 }
 
-// GetCanvasSandboxModeEnabled returns the CanvasSandboxModeEnabled field value if set, zero value otherwise.
-func (o *OrganizationsOrganizationMetadata) GetCanvasSandboxModeEnabled() bool {
-	if o == nil || IsNil(o.CanvasSandboxModeEnabled) {
+// GetCanvasVersioningEnabled returns the CanvasVersioningEnabled field value if set, zero value otherwise.
+func (o *OrganizationsOrganizationMetadata) GetCanvasVersioningEnabled() bool {
+	if o == nil || IsNil(o.CanvasVersioningEnabled) {
 		var ret bool
 		return ret
 	}
-	return *o.CanvasSandboxModeEnabled
+	return *o.CanvasVersioningEnabled
 }
 
-// GetCanvasSandboxModeEnabledOk returns a tuple with the CanvasSandboxModeEnabled field value if set, nil otherwise
+// GetCanvasVersioningEnabledOk returns a tuple with the CanvasVersioningEnabled field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *OrganizationsOrganizationMetadata) GetCanvasSandboxModeEnabledOk() (*bool, bool) {
-	if o == nil || IsNil(o.CanvasSandboxModeEnabled) {
+func (o *OrganizationsOrganizationMetadata) GetCanvasVersioningEnabledOk() (*bool, bool) {
+	if o == nil || IsNil(o.CanvasVersioningEnabled) {
 		return nil, false
 	}
-	return o.CanvasSandboxModeEnabled, true
+	return o.CanvasVersioningEnabled, true
 }
 
-// HasCanvasSandboxModeEnabled returns a boolean if a field has been set.
-func (o *OrganizationsOrganizationMetadata) HasCanvasSandboxModeEnabled() bool {
-	if o != nil && !IsNil(o.CanvasSandboxModeEnabled) {
+// HasCanvasVersioningEnabled returns a boolean if a field has been set.
+func (o *OrganizationsOrganizationMetadata) HasCanvasVersioningEnabled() bool {
+	if o != nil && !IsNil(o.CanvasVersioningEnabled) {
 		return true
 	}
 
 	return false
 }
 
-// SetCanvasSandboxModeEnabled gets a reference to the given bool and assigns it to the CanvasSandboxModeEnabled field.
-func (o *OrganizationsOrganizationMetadata) SetCanvasSandboxModeEnabled(v bool) {
-	o.CanvasSandboxModeEnabled = &v
+// SetCanvasVersioningEnabled gets a reference to the given bool and assigns it to the CanvasVersioningEnabled field.
+func (o *OrganizationsOrganizationMetadata) SetCanvasVersioningEnabled(v bool) {
+	o.CanvasVersioningEnabled = &v
 }
 
 func (o OrganizationsOrganizationMetadata) MarshalJSON() ([]byte, error) {
@@ -263,8 +263,8 @@ func (o OrganizationsOrganizationMetadata) ToMap() (map[string]interface{}, erro
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updatedAt"] = o.UpdatedAt
 	}
-	if !IsNil(o.CanvasSandboxModeEnabled) {
-		toSerialize["canvasSandboxModeEnabled"] = o.CanvasSandboxModeEnabled
+	if !IsNil(o.CanvasVersioningEnabled) {
+		toSerialize["canvasVersioningEnabled"] = o.CanvasVersioningEnabled
 	}
 	return toSerialize, nil
 }

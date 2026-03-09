@@ -167,7 +167,7 @@ export interface CanvasPageProps {
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit" | "sandbox";
+  headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved";
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
@@ -175,14 +175,14 @@ export interface CanvasPageProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  sandboxModeTooltip?: string;
+  versioningDisabledTooltip?: string;
   showPendingDraftBadge?: boolean;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
-  topViewMode?: "canvas" | "memory" | "versioning";
-  onTopViewModeChange?: (mode: "canvas" | "memory" | "versioning") => void;
+  topViewMode?: "canvas" | "memory" | "settings" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "memory" | "settings" | "versioning") => void;
   showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;
@@ -901,7 +901,7 @@ function CanvasPage(props: CanvasPageProps) {
           onExitEditMode={props.onExitEditMode}
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
-          sandboxModeTooltip={props.sandboxModeTooltip}
+          versioningDisabledTooltip={props.versioningDisabledTooltip}
           showPendingDraftBadge={props.showPendingDraftBadge}
           topViewMode={props.topViewMode}
           onTopViewModeChange={props.onTopViewModeChange}
@@ -1002,7 +1002,7 @@ function CanvasPage(props: CanvasPageProps) {
                 onExitEditMode={props.onExitEditMode}
                 exitEditModeDisabled={props.exitEditModeDisabled}
                 exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
-                sandboxModeTooltip={props.sandboxModeTooltip}
+                versioningDisabledTooltip={props.versioningDisabledTooltip}
                 showPendingDraftBadge={props.showPendingDraftBadge}
                 isVersionControlOpen={props.isVersionControlOpen}
                 onOpenVersionControl={props.onOpenVersionControl}
@@ -1404,7 +1404,7 @@ function CanvasContentHeader({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  sandboxModeTooltip,
+  versioningDisabledTooltip,
   showPendingDraftBadge,
   topViewMode,
   onTopViewModeChange,
@@ -1438,7 +1438,7 @@ function CanvasContentHeader({
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit" | "sandbox";
+  headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved";
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
@@ -1446,10 +1446,10 @@ function CanvasContentHeader({
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  sandboxModeTooltip?: string;
+  versioningDisabledTooltip?: string;
   showPendingDraftBadge?: boolean;
-  topViewMode?: "canvas" | "memory" | "versioning";
-  onTopViewModeChange?: (mode: "canvas" | "memory" | "versioning") => void;
+  topViewMode?: "canvas" | "memory" | "settings" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "memory" | "settings" | "versioning") => void;
   showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;
@@ -1518,7 +1518,7 @@ function CanvasContentHeader({
       onExitEditMode={onExitEditMode}
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-      sandboxModeTooltip={sandboxModeTooltip}
+      versioningDisabledTooltip={versioningDisabledTooltip}
       showPendingDraftBadge={showPendingDraftBadge}
       topViewMode={topViewMode}
       onTopViewModeChange={onTopViewModeChange}
@@ -1594,7 +1594,7 @@ function CanvasContent({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  sandboxModeTooltip,
+  versioningDisabledTooltip,
   showPendingDraftBadge,
   isVersionControlOpen,
   onOpenVersionControl,
@@ -1672,7 +1672,7 @@ function CanvasContent({
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit" | "sandbox";
+  headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved";
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
@@ -1680,7 +1680,7 @@ function CanvasContent({
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  sandboxModeTooltip?: string;
+  versioningDisabledTooltip?: string;
   showPendingDraftBadge?: boolean;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
@@ -2420,7 +2420,7 @@ function CanvasContent({
           onExitEditMode={onExitEditMode}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          sandboxModeTooltip={sandboxModeTooltip}
+          versioningDisabledTooltip={versioningDisabledTooltip}
           showPendingDraftBadge={showPendingDraftBadge}
         />
       )}
