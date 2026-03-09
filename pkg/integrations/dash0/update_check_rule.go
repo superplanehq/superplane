@@ -278,7 +278,7 @@ func (c *UpdateCheckRule) Execute(ctx core.ExecutionContext) error {
 	request := buildCheckRuleRequest(CreateCheckRuleSpec{
 		Name:          spec.Name,
 		Expression:    spec.Expression,
-		Dataset:       spec.Dataset,
+		Dataset:       dataset,
 		Thresholds:    spec.Thresholds,
 		Summary:       spec.Summary,
 		Description:   spec.Description,

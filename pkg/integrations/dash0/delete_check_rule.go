@@ -133,7 +133,7 @@ func (c *DeleteCheckRule) Setup(ctx core.SetupContext) error {
 	}
 
 	if checkRuleName != "" {
-		return ctx.Metadata.Set(GetCheckRuleNodeMetadata{
+		return ctx.Metadata.Set(DeleteCheckRuleNodeMetadata{
 			CheckRuleName: checkRuleName,
 		})
 	}
