@@ -105,18 +105,14 @@ export function CanvasYamlView({
     setEditedText(yamlText);
   }, [yamlText]);
 
-  // Keep autocomplete data in sync without re-registering providers
-  useEffect(() => {
-    updateYamlCompletionData({
-      components: components ?? [],
-      triggers: triggers ?? [],
-      widgets: widgets ?? [],
-    });
-  }, [components, triggers, widgets]);
-
-  useEffect(() => {
-    updateYamlExpressionData(autocompleteExampleObj ?? null);
-  }, [autocompleteExampleObj]);
+  // Sync autocomplete data on every render — these are simple ref assignments
+  // with no side effects, so useEffect indirection is unnecessary.
+  updateYamlCompletionData({
+    components: components ?? [],
+    triggers: triggers ?? [],
+    widgets: widgets ?? [],
+  });
+  updateYamlExpressionData(autocompleteExampleObj ?? null);
 
   // ---- Validation ----------------------------------------------------------
 
