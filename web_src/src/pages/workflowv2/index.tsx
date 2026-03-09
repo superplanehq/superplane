@@ -2041,26 +2041,26 @@ export function WorkflowPageV2() {
   );
 
   const handleSaveWorkflow = useCallback(
-    async (workflowToSave?: CanvasesCanvas, options?: { showToast?: boolean }): Promise<boolean> => {
+    async (workflowToSave?: CanvasesCanvas, options?: { showToast?: boolean }) => {
       const targetWorkflow = workflowToSave || canvasRef.current;
-      if (!targetWorkflow || !organizationId || !canvasId) return false;
+      if (!targetWorkflow || !organizationId || !canvasId) return;
       if (!canUpdateCanvas) {
         if (options?.showToast !== false) {
           showErrorToast("You don't have permission to update this canvas");
         }
-        return false;
+        return;
       }
       if (isTemplate) {
         if (options?.showToast !== false) {
           showErrorToast("Template canvases are read-only");
         }
-        return false;
+        return;
       }
       if (!activeCanvasVersionId && !isVersioningDisabled) {
         if (options?.showToast !== false) {
           showErrorToast("Enable edit mode before saving changes");
         }
-        return false;
+        return;
       }
       const shouldRestoreFocus = options?.showToast === false;
       const focusedNoteId = shouldRestoreFocus ? getActiveNoteId() : null;
@@ -2087,7 +2087,7 @@ export function WorkflowPageV2() {
           setActiveCanvasVersion(updateResponse.data.version);
         }
         if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
-          return true;
+          return;
         }
 
         setLiveCanvasEntries((prev) => [
@@ -2110,7 +2110,6 @@ export function WorkflowPageV2() {
         // Clear the snapshot since changes are now saved
         setInitialWorkflowSnapshot(null);
         lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(targetWorkflow));
-        return true;
       } catch (error: any) {
         console.error("Failed to save canvas", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
@@ -2124,7 +2123,6 @@ export function WorkflowPageV2() {
           }),
           ...prev,
         ]);
-        return false;
       } finally {
         if (focusedNoteId) {
           requestAnimationFrame(() => {
