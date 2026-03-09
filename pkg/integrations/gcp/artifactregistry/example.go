@@ -10,9 +10,6 @@ import (
 //go:embed example_output_get_artifact.json
 var exampleOutputGetArtifactBytes []byte
 
-//go:embed example_output_analyze_artifact.json
-var exampleOutputAnalyzeArtifactBytes []byte
-
 //go:embed example_output_get_artifact_analysis.json
 var exampleOutputGetArtifactAnalysisBytes []byte
 
@@ -25,9 +22,6 @@ var exampleDataOnArtifactAnalysisBytes []byte
 var exampleOutputGetArtifactOnce sync.Once
 var exampleOutputGetArtifact map[string]any
 
-var exampleOutputAnalyzeArtifactOnce sync.Once
-var exampleOutputAnalyzeArtifact map[string]any
-
 var exampleOutputGetArtifactAnalysisOnce sync.Once
 var exampleOutputGetArtifactAnalysis map[string]any
 
@@ -39,10 +33,6 @@ var exampleDataOnArtifactAnalysis map[string]any
 
 func (c *GetArtifact) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetArtifactOnce, exampleOutputGetArtifactBytes, &exampleOutputGetArtifact)
-}
-
-func (c *AnalyzeArtifact) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputAnalyzeArtifactOnce, exampleOutputAnalyzeArtifactBytes, &exampleOutputAnalyzeArtifact)
 }
 
 func (c *GetArtifactAnalysis) ExampleOutput() map[string]any {

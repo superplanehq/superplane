@@ -25,11 +25,6 @@ export type VulnerabilityFinding = {
   vulnerability?: VulnerabilityData;
 };
 
-export type AnalyzeArtifactData = {
-  scan?: string;
-  vulnerabilities?: VulnerabilityFinding[];
-};
-
 export type OccurrenceData = {
   name?: string;
   resourceUri?: string;

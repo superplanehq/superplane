@@ -163,7 +163,6 @@ func (g *GCP) Components() []core.Component {
 		&cloudbuild.RunTrigger{},
 		&cloudfunctions.InvokeFunction{},
 		&artifactregistry.GetArtifact{},
-		&artifactregistry.AnalyzeArtifact{},
 		&artifactregistry.GetArtifactAnalysis{},
 	}
 }

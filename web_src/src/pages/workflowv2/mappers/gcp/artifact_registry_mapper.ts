@@ -46,38 +46,6 @@ export const getArtifactMapper: ComponentBaseMapper = {
   },
 };
 
-export const analyzeArtifactMapper: ComponentBaseMapper = {
-  props(context: ComponentBaseContext): ComponentBaseProps {
-    return { ...baseMapper.props(context), iconSrc: gcpArtifactRegistryIcon };
-  },
-
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const payload = getArtifactOutputPayload(context.execution);
-    const data = getArtifactData(context.execution) as Record<string, any> | undefined;
-    const details: Record<string, string> = {};
-
-    if (payload?.timestamp) {
-      details["Retrieved At"] = new Date(payload.timestamp).toLocaleString();
-    }
-
-    if (data?.resourceUri) {
-      details["Resource URI"] = String(data.resourceUri);
-    }
-
-    const occurrences = data?.occurrences as any[] | null | undefined;
-    if (Array.isArray(occurrences)) {
-      details["Vulnerabilities"] = String(occurrences.length);
-    }
-
-    return details;
-  },
-
-  subtitle(context: SubtitleContext): string {
-    const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
-  },
-};
-
 export const getArtifactAnalysisMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return { ...baseMapper.props(context), iconSrc: gcpArtifactRegistryIcon };
