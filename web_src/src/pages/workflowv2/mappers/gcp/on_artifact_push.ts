@@ -24,10 +24,12 @@ export const onArtifactPushTriggerRenderer: TriggerRenderer = {
       details["Action"] = data.action;
     }
 
+    if (data?.digest) {
+      details["Image (Digest)"] = data.digest;
+    }
+
     if (data?.tag) {
-      details["Tag"] = data.tag;
-    } else if (data?.digest) {
-      details["Digest"] = data.digest;
+      details["Image (Tag)"] = data.tag;
     }
 
     return details;
@@ -42,10 +44,10 @@ export const onArtifactPushTriggerRenderer: TriggerRenderer = {
       iconSlug: definition.icon || "cloud",
       iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass(definition.color ?? "gray"),
-      metadata: data?.tag
-        ? [{ icon: "package", label: data.tag }]
-        : data?.digest
-          ? [{ icon: "package", label: data.digest }]
+      metadata: data?.digest
+        ? [{ icon: "package", label: data.digest }]
+        : data?.tag
+          ? [{ icon: "package", label: data.tag }]
           : [],
       ...(lastEvent && {
         lastEventData: {

@@ -45,15 +45,19 @@ type subscriptionRequest struct {
 	PushConfig               *pushConfig `json:"pushConfig"`
 	AckDeadlineSeconds       int         `json:"ackDeadlineSeconds"`
 	MessageRetentionDuration string      `json:"messageRetentionDuration"`
+	Filter                   string      `json:"filter,omitempty"`
 }
 
-func CreatePushSubscription(ctx context.Context, client *common.Client, projectID, subscriptionID, topicID, pushEndpoint string) error {
+func CreatePushSubscription(ctx context.Context, client *common.Client, projectID, subscriptionID, topicID, pushEndpoint string, filter ...string) error {
 	url := fmt.Sprintf("%s/projects/%s/subscriptions/%s", pubsubBaseURL, projectID, subscriptionID)
 	req := subscriptionRequest{
 		Topic:                    fmt.Sprintf("projects/%s/topics/%s", projectID, topicID),
 		PushConfig:               &pushConfig{PushEndpoint: pushEndpoint},
 		AckDeadlineSeconds:       30,
 		MessageRetentionDuration: "600s",
+	}
+	if len(filter) > 0 && filter[0] != "" {
+		req.Filter = filter[0]
 	}
 	raw, err := json.Marshal(req)
 	if err != nil {

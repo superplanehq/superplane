@@ -21,6 +21,7 @@ const (
 type GetArtifact struct{}
 
 type GetArtifactConfiguration struct {
+	InputMode   string `json:"inputMode" mapstructure:"inputMode"`
 	ResourceURL string `json:"resourceUrl" mapstructure:"resourceUrl"`
 	Location    string `json:"location" mapstructure:"location"`
 	Repository  string `json:"repository" mapstructure:"repository"`
@@ -72,19 +73,40 @@ func (c *GetArtifact) OutputChannels(_ any) []core.OutputChannel {
 func (c *GetArtifact) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:     "inputMode",
+			Label:    "Input Mode",
+			Type:     configuration.FieldTypeSelect,
+			Required: true,
+			Default:  "url",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Resource URL", Value: "url"},
+						{Label: "Select from Registry", Value: "select"},
+					},
+				},
+			},
+		},
+		{
 			Name:        "resourceUrl",
 			Label:       "Resource URL",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Full resource URL of the artifact (e.g. from an On Artifact Push event). When provided, the fields below are not required.",
+			Description: "Full resource URL of the artifact (e.g. from an On Artifact Push event).",
 			Placeholder: "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "inputMode", Values: []string{"url"}},
+			},
 		},
 		{
 			Name:        "location",
 			Label:       "Location",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Select the Artifact Registry region. Required if Resource URL is not provided.",
+			Description: "Select the Artifact Registry region.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "inputMode", Values: []string{"select"}},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:       ResourceTypeLocation,
@@ -97,8 +119,9 @@ func (c *GetArtifact) Configuration() []configuration.Field {
 			Label:       "Repository",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Select the Artifact Registry repository. Required if Resource URL is not provided.",
+			Description: "Select the Artifact Registry repository.",
 			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "inputMode", Values: []string{"select"}},
 				{Field: "location", Values: []string{"*"}},
 			},
 			TypeOptions: &configuration.TypeOptions{
@@ -115,8 +138,9 @@ func (c *GetArtifact) Configuration() []configuration.Field {
 			Label:       "Package",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Select the package (image, library, etc.) to retrieve. Required if Resource URL is not provided.",
+			Description: "Select the package (image, library, etc.) to retrieve.",
 			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "inputMode", Values: []string{"select"}},
 				{Field: "location", Values: []string{"*"}},
 				{Field: "repository", Values: []string{"*"}},
 			},
@@ -135,8 +159,9 @@ func (c *GetArtifact) Configuration() []configuration.Field {
 			Label:       "Version",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Select the version or tag to retrieve. Required if Resource URL is not provided.",
+			Description: "Select the version or tag to retrieve.",
 			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "inputMode", Values: []string{"select"}},
 				{Field: "location", Values: []string{"*"}},
 				{Field: "repository", Values: []string{"*"}},
 				{Field: "package", Values: []string{"*"}},
@@ -160,7 +185,7 @@ func decodeGetArtifactConfiguration(raw any) (GetArtifactConfiguration, error) {
 	if err := mapstructure.Decode(raw, &config); err != nil {
 		return GetArtifactConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	config.ResourceURL = strings.TrimSpace(config.ResourceURL)
+	config.ResourceURL = sanitizeConfigValue(config.ResourceURL)
 	config.Location = strings.TrimSpace(config.Location)
 	config.Repository = strings.TrimSpace(config.Repository)
 	config.Package = strings.TrimSpace(config.Package)
@@ -173,21 +198,24 @@ func (c *GetArtifact) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return err
 	}
-	if config.ResourceURL != "" {
-		_, _, _, _, err := parseArtifactResourceURL(config.ResourceURL)
-		return err
+	if config.InputMode == "url" || config.InputMode == "" {
+		if config.ResourceURL != "" && !strings.Contains(config.ResourceURL, "{{") {
+			_, _, _, _, err := parseArtifactResourceURL(config.ResourceURL)
+			return err
+		}
+		return nil
 	}
 	if config.Location == "" {
-		return fmt.Errorf("location is required (or provide resourceUrl)")
+		return fmt.Errorf("location is required")
 	}
 	if config.Repository == "" {
-		return fmt.Errorf("repository is required (or provide resourceUrl)")
+		return fmt.Errorf("repository is required")
 	}
 	if config.Package == "" {
-		return fmt.Errorf("package is required (or provide resourceUrl)")
+		return fmt.Errorf("package is required")
 	}
 	if config.Version == "" {
-		return fmt.Errorf("version is required (or provide resourceUrl)")
+		return fmt.Errorf("version is required")
 	}
 	return nil
 }

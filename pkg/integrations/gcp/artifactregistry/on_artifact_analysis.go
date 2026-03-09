@@ -1,6 +1,8 @@
 package artifactregistry
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -23,8 +25,10 @@ const (
 type OnArtifactAnalysis struct{}
 
 type OnArtifactAnalysisConfiguration struct {
-	Kinds       []string `json:"kinds" mapstructure:"kinds"`
-	ResourceURI string   `json:"resourceUri" mapstructure:"resourceUri"`
+	Kinds      []string `json:"kinds" mapstructure:"kinds"`
+	Location   string   `json:"location" mapstructure:"location"`
+	Repository string   `json:"repository" mapstructure:"repository"`
+	Package    string   `json:"package" mapstructure:"package"`
 }
 
 type OnArtifactAnalysisMetadata struct {
@@ -60,8 +64,8 @@ func (t *OnArtifactAnalysis) Documentation() string {
 
 ## Configuration
 
-- **Occurrence Kinds**: Optional filter by occurrence type (VULNERABILITY, BUILD, ATTESTATION, SBOM). Leave empty to receive all kinds.
-- **Resource URI**: Optional filter by artifact resource URI. Leave empty to receive events for all artifacts.
+- **Occurrence Kinds**: Filter by occurrence type. Leave empty to receive only **DISCOVERY** occurrences (one event per completed scan — recommended). Set explicitly to receive other types such as VULNERABILITY (one event per CVE found).
+- **Location / Repository / Package**: Optional filters to scope events to a specific artifact.
 
 ## Event Data
 
@@ -91,12 +95,55 @@ func (t *OnArtifactAnalysis) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "resourceUri",
-			Label:       "Resource URI",
-			Type:        configuration.FieldTypeString,
+			Name:        "location",
+			Label:       "Location",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Optional filter by artifact resource URI. Leave empty to receive events for all artifacts.",
-			Placeholder: "e.g. https://us-central1-docker.pkg.dev/project/repo/image@sha256:...",
+			Description: "Optional filter by Artifact Registry location. Leave empty to receive events for all locations.",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:       ResourceTypeLocation,
+					Parameters: []configuration.ParameterRef{},
+				},
+			},
+		},
+		{
+			Name:        "repository",
+			Label:       "Repository",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Optional filter by repository. Leave empty to receive events for all repositories.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "location", Values: []string{"*"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeRepository,
+					Parameters: []configuration.ParameterRef{
+						{Name: "location", ValueFrom: &configuration.ParameterValueFrom{Field: "location"}},
+					},
+				},
+			},
+		},
+		{
+			Name:        "package",
+			Label:       "Package",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Optional filter by package (image). Leave empty to receive events for all packages.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "location", Values: []string{"*"}},
+				{Field: "repository", Values: []string{"*"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypePackage,
+					Parameters: []configuration.ParameterRef{
+						{Name: "location", ValueFrom: &configuration.ParameterValueFrom{Field: "location"}},
+						{Name: "repository", ValueFrom: &configuration.ParameterValueFrom{Field: "repository"}},
+					},
+				},
+			},
 		},
 	}
 }
@@ -138,11 +185,35 @@ func (t *OnArtifactAnalysis) OnIntegrationMessage(ctx core.IntegrationMessageCon
 		return err
 	}
 
+	var msg struct {
+		Name string `mapstructure:"name"`
+		Kind string `mapstructure:"kind"`
+	}
+	if err := mapstructure.Decode(ctx.Message, &msg); err != nil {
+		return fmt.Errorf("failed to decode occurrence message: %w", err)
+	}
+
+	// The Pub/Sub message only contains name/kind/notificationTime.
+	// Fetch the full occurrence to get resourceUri and other fields.
+	client, err := getClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create GCP client: %w", err)
+	}
+	occURL := fmt.Sprintf("https://containeranalysis.googleapis.com/v1/%s", msg.Name)
+	body, err := client.GetURL(context.Background(), occURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch occurrence: %w", err)
+	}
+	var fullOccurrence map[string]any
+	if err := json.Unmarshal(body, &fullOccurrence); err != nil {
+		return fmt.Errorf("failed to parse occurrence: %w", err)
+	}
+
 	var occurrence struct {
 		Kind        string `mapstructure:"kind"`
 		ResourceURI string `mapstructure:"resourceUri"`
 	}
-	if err := mapstructure.Decode(ctx.Message, &occurrence); err != nil {
+	if err := mapstructure.Decode(fullOccurrence, &occurrence); err != nil {
 		return fmt.Errorf("failed to decode occurrence: %w", err)
 	}
 
@@ -158,14 +229,41 @@ func (t *OnArtifactAnalysis) OnIntegrationMessage(ctx core.IntegrationMessageCon
 			ctx.Logger.Infof("gcp artifact registry: occurrence kind %q does not match configured kinds, skipping", occurrence.Kind)
 			return nil
 		}
+	} else {
+		// Default: only emit on DISCOVERY occurrences (scan completion signal).
+		// Without this, every individual vulnerability occurrence fires a separate event.
+		if !strings.EqualFold(occurrence.Kind, "DISCOVERY") {
+			return nil
+		}
 	}
 
-	if config.ResourceURI != "" && !strings.Contains(occurrence.ResourceURI, config.ResourceURI) {
-		ctx.Logger.Infof("gcp artifact registry: resource URI %q does not match filter %q, skipping", occurrence.ResourceURI, config.ResourceURI)
+	if config.Location != "" && !strings.Contains(occurrence.ResourceURI, config.Location+"-docker.pkg.dev") {
+		ctx.Logger.Infof("gcp artifact registry: resource URI %q does not match location filter %q, skipping", occurrence.ResourceURI, config.Location)
 		return nil
 	}
 
-	return ctx.Events.Emit(ArtifactAnalysisEmittedEventType, ctx.Message)
+	if config.Repository != "" || config.Package != "" {
+		uri := strings.TrimPrefix(occurrence.ResourceURI, "https://")
+		uri = strings.TrimPrefix(uri, "http://")
+		// uri: LOCATION-docker.pkg.dev/PROJECT/REPOSITORY/PACKAGE@...
+		parts := strings.SplitN(uri, "/", 4)
+		if config.Repository != "" && (len(parts) < 3 || parts[2] != config.Repository) {
+			ctx.Logger.Infof("gcp artifact registry: resource URI %q does not match repository filter %q, skipping", occurrence.ResourceURI, config.Repository)
+			return nil
+		}
+		if config.Package != "" && len(parts) >= 4 {
+			imagePart := parts[3]
+			if idx := strings.IndexAny(imagePart, "@:"); idx >= 0 {
+				imagePart = imagePart[:idx]
+			}
+			if imagePart != config.Package {
+				ctx.Logger.Infof("gcp artifact registry: resource URI %q does not match package filter %q, skipping", occurrence.ResourceURI, config.Package)
+				return nil
+			}
+		}
+	}
+
+	return ctx.Events.Emit(ArtifactAnalysisEmittedEventType, fullOccurrence)
 }
 
 func (t *OnArtifactAnalysis) Cleanup(_ core.TriggerContext) error { return nil }
@@ -179,6 +277,8 @@ func decodeOnArtifactAnalysisConfiguration(raw any) (OnArtifactAnalysisConfigura
 	if err := mapstructure.Decode(raw, &config); err != nil {
 		return OnArtifactAnalysisConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	config.ResourceURI = strings.TrimSpace(config.ResourceURI)
+	config.Location = strings.TrimSpace(config.Location)
+	config.Repository = strings.TrimSpace(config.Repository)
+	config.Package = strings.TrimSpace(config.Package)
 	return config, nil
 }

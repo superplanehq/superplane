@@ -181,7 +181,16 @@ func (t *OnArtifactPush) OnIntegrationMessage(ctx core.IntegrationMessageContext
 		}
 	}
 
-	return ctx.Events.Emit(ArtifactPushEmittedEventType, ctx.Message)
+	event := map[string]any{
+		"action": pushEvent.Action,
+	}
+	if pushEvent.Digest != "" {
+		event["digest"] = "https://" + pushEvent.Digest
+	}
+	if pushEvent.Tag != "" {
+		event["tag"] = "https://" + pushEvent.Tag
+	}
+	return ctx.Events.Emit(ArtifactPushEmittedEventType, event)
 }
 
 func (t *OnArtifactPush) Cleanup(_ core.TriggerContext) error { return nil }
