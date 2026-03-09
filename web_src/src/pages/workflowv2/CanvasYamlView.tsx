@@ -18,7 +18,7 @@ import type { Monaco } from "@monaco-editor/react";
 import type { editor as MonacoEditor, IDisposable } from "monaco-editor";
 import { AlertTriangle, CircleX, Copy, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as yaml from "js-yaml";
 import { validateCanvasYaml, type YamlDiagnostic } from "./yamlCanvasValidation";
 import { registerQuickFixProvider } from "./yamlQuickFixes";
@@ -105,14 +105,17 @@ export function CanvasYamlView({
     setEditedText(yamlText);
   }, [yamlText]);
 
-  // Sync autocomplete data on every render — these are simple ref assignments
-  // with no side effects, so useEffect indirection is unnecessary.
-  updateYamlCompletionData({
-    components: components ?? [],
-    triggers: triggers ?? [],
-    widgets: widgets ?? [],
-  });
-  updateYamlExpressionData(autocompleteExampleObj ?? null);
+  useMemo(() => {
+    updateYamlCompletionData({
+      components: components ?? [],
+      triggers: triggers ?? [],
+      widgets: widgets ?? [],
+    });
+  }, [components, triggers, widgets]);
+
+  useMemo(() => {
+    updateYamlExpressionData(autocompleteExampleObj ?? null);
+  }, [autocompleteExampleObj]);
 
   // ---- Validation ----------------------------------------------------------
 
