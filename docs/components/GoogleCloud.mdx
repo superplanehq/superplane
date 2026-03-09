@@ -18,7 +18,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Artifact Registry • Analyze Artifact" href="#artifact-registry-•-analyze-artifact" description="Analyze an Artifact Registry image for vulnerabilities and wait for results" />
   <LinkCard title="Artifact Registry • Get Artifact" href="#artifact-registry-•-get-artifact" description="Retrieve artifact version details from GCP Artifact Registry" />
   <LinkCard title="Artifact Registry • Get Artifact Analysis" href="#artifact-registry-•-get-artifact-analysis" description="Retrieve Container Analysis occurrences (vulnerabilities, build provenance, attestations) for an artifact" />
   <LinkCard title="Cloud Build • Create Build" href="#cloud-build-•-create-build" description="Create a Cloud Build build and wait for it to finish" />
@@ -72,8 +71,8 @@ The On Artifact Analysis trigger starts a workflow execution when Google Contain
 
 ### Configuration
 
-- **Occurrence Kinds**: Optional filter by occurrence type (VULNERABILITY, BUILD, ATTESTATION, SBOM). Leave empty to receive all kinds.
-- **Resource URI**: Optional filter by artifact resource URI. Leave empty to receive events for all artifacts.
+- **Occurrence Kinds**: Filter by occurrence type. Leave empty to receive only **DISCOVERY** occurrences (one event per completed scan — recommended). Set explicitly to receive other types such as VULNERABILITY (one event per CVE found).
+- **Location / Repository / Package**: Optional filters to scope events to a specific artifact.
 
 ### Event Data
 
@@ -83,27 +82,31 @@ Each event contains the full Container Analysis Occurrence resource, including `
 
 ```json
 {
-  "kind": "VULNERABILITY",
-  "name": "projects/my-project/occurrences/vuln-001",
-  "noteName": "projects/goog-vulnz/notes/CVE-2023-1234",
-  "resourceUri": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
-  "vulnerability": {
-    "cvssScore": 7.5,
-    "packageIssue": [
-      {
-        "affectedPackage": "libssl1.1",
-        "affectedVersion": {
-          "kind": "NORMAL",
-          "name": "1.1.1n-0+deb11u3"
-        },
-        "fixedVersion": {
-          "kind": "NORMAL",
-          "name": "1.1.1n-0+deb11u5"
+  "data": {
+    "kind": "VULNERABILITY",
+    "name": "projects/my-project/occurrences/vuln-001",
+    "noteName": "projects/goog-vulnz/notes/CVE-2023-1234",
+    "resourceUri": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
+    "vulnerability": {
+      "cvssScore": 7.5,
+      "packageIssue": [
+        {
+          "affectedPackage": "libssl1.1",
+          "affectedVersion": {
+            "kind": "NORMAL",
+            "name": "1.1.1n-0+deb11u3"
+          },
+          "fixedVersion": {
+            "kind": "NORMAL",
+            "name": "1.1.1n-0+deb11u5"
+          }
         }
-      }
-    ],
-    "severity": "HIGH"
-  }
+      ],
+      "severity": "HIGH"
+    }
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.artifactregistry.artifact.analysis"
 }
 ```
 
@@ -141,9 +144,13 @@ Each event contains:
 
 ```json
 {
-  "action": "INSERT",
-  "digest": "us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123def456",
-  "tag": "us-central1-docker.pkg.dev/my-project/my-repo/my-image:latest"
+  "data": {
+    "action": "INSERT",
+    "digest": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123def456",
+    "tag": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image:latest"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.artifactregistry.artifact.push"
 }
 ```
 
@@ -236,69 +243,6 @@ Each event includes the audit log entry with resourceName (e.g. projects/my-proj
 }
 ```
 
-<a id="artifact-registry-•-analyze-artifact"></a>
-
-## Artifact Registry • Analyze Artifact
-
-Queries Container Analysis for vulnerability occurrences on a container image and emits the results immediately.
-
-### Configuration
-
-Provide either a **Resource URL** or the four fields below:
-
-- **Resource URL**: Full resource URL of the image (e.g. from an On Artifact Push event). When provided, the fields below are not required.
-- **Location**: The GCP region where the repository is located.
-- **Repository**: The Artifact Registry repository containing the artifact.
-- **Package**: The package (image) within the repository.
-- **Version**: The version (digest or tag) to analyze.
-
-### Output
-
-The list of vulnerability occurrences for the image. May be empty if the image has not been scanned yet.
-
-### Notes
-
-- Automatic vulnerability scanning must be enabled in your Artifact Registry repository settings.
-- The Container Analysis API must be enabled in your project.
-- The service account must have `roles/containeranalysis.occurrences.viewer`.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "occurrences": [
-      {
-        "kind": "VULNERABILITY",
-        "name": "projects/my-project/occurrences/vuln-001",
-        "noteName": "projects/goog-vulnz/notes/CVE-2023-1234",
-        "resourceUri": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
-        "vulnerability": {
-          "cvssScore": 7.5,
-          "packageIssue": [
-            {
-              "affectedPackage": "libssl1.1",
-              "affectedVersion": {
-                "kind": "NORMAL",
-                "name": "1.1.1n-0+deb11u3"
-              },
-              "fixedVersion": {
-                "kind": "NORMAL",
-                "name": "1.1.1n-0+deb11u5"
-              }
-            }
-          ],
-          "severity": "HIGH"
-        }
-      }
-    ],
-    "resourceUri": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123"
-  },
-  "timestamp": "2025-01-01T00:05:00Z",
-  "type": "gcp.artifactregistry.artifactAnalysis"
-}
-```
-
 <a id="artifact-registry-•-get-artifact"></a>
 
 ## Artifact Registry • Get Artifact
@@ -327,10 +271,14 @@ Artifact Registry supports all package formats: Docker, Maven, npm, PyPI, Go, AP
 
 ```json
 {
-  "createTime": "2025-01-01T00:00:00Z",
-  "description": "my-image:latest",
-  "name": "projects/my-project/locations/us-central1/repositories/my-repo/packages/my-image/versions/sha256:abc123def456",
-  "updateTime": "2025-01-01T00:05:00Z"
+  "data": {
+    "createTime": "2025-01-01T00:00:00Z",
+    "description": "my-image:latest",
+    "name": "projects/my-project/locations/us-central1/repositories/my-repo/packages/my-image/versions/sha256:abc123def456",
+    "updateTime": "2025-01-01T00:05:00Z"
+  },
+  "timestamp": "2025-01-01T00:05:00Z",
+  "type": "gcp.artifactregistry.version"
 }
 ```
 
@@ -366,32 +314,14 @@ A list of Container Analysis occurrences for the artifact. Each occurrence inclu
 ```json
 {
   "data": {
-    "occurrences": [
-      {
-        "kind": "VULNERABILITY",
-        "name": "projects/my-project/occurrences/vuln-001",
-        "noteName": "projects/goog-vulnz/notes/CVE-2023-1234",
-        "resourceUri": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
-        "vulnerability": {
-          "cvssScore": 7.5,
-          "packageIssue": [
-            {
-              "affectedPackage": "libssl1.1",
-              "affectedVersion": {
-                "kind": "NORMAL",
-                "name": "1.1.1n-0+deb11u3"
-              },
-              "fixedVersion": {
-                "kind": "NORMAL",
-                "name": "1.1.1n-0+deb11u5"
-              }
-            }
-          ],
-          "severity": "HIGH"
-        }
-      }
-    ],
-    "resourceUri": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123"
+    "critical": 0,
+    "fixAvailable": 1,
+    "high": 1,
+    "low": 0,
+    "medium": 2,
+    "resourceUri": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
+    "scanStatus": "FINISHED_SUCCESS",
+    "vulnerabilities": 3
   },
   "timestamp": "2025-01-01T00:05:00Z",
   "type": "gcp.containeranalysis.occurrences"

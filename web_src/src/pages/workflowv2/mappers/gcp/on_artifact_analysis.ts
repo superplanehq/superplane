@@ -37,13 +37,18 @@ export const onArtifactAnalysisTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
+    const data = lastEvent?.data as OccurrenceData | undefined;
     return {
       title: node.name || definition.label || "On Artifact Analysis",
       iconSrc: gcpArtifactRegistryIcon,
       iconSlug: definition.icon || "cloud",
       iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass(definition.color ?? "gray"),
-      metadata: [],
+      metadata: data?.resourceUri
+        ? [{ icon: "package", label: data.resourceUri }]
+        : data?.resourceUri
+          ? [{ icon: "package", label: data.resourceUri }]
+          : [],
       ...(lastEvent && {
         lastEventData: {
           title: "Container analysis event",

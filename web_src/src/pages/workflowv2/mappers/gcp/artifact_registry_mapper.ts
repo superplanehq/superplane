@@ -19,22 +19,29 @@ export const getArtifactMapper: ComponentBaseMapper = {
       details["Retrieved At"] = new Date(payload.timestamp).toLocaleString();
     }
 
-    if (data?.name) {
-      details["Artifact"] = artifactShortName(data.name as string);
-    }
-
-    if (data?.description) {
-      details["Description"] = String(data.description);
-    }
-
-    if (data?.updateTime) {
-      const formatted = formatDateTime(data.updateTime as string);
-      if (formatted) details["Updated At"] = formatted;
+    const dockerUri = buildDockerUri(data?.metadata?.name as string | undefined);
+    if (dockerUri) {
+      details["Image"] = dockerUri;
     }
 
     if (data?.createTime) {
       const formatted = formatDateTime(data.createTime as string);
-      if (formatted) details["Created At"] = formatted;
+      if (formatted) details["Created"] = formatted;
+    }
+
+    if (data?.updateTime) {
+      const formatted = formatDateTime(data.updateTime as string);
+      if (formatted) details["Updated"] = formatted;
+    }
+
+    const sizeBytes = data?.metadata?.imageSizeBytes;
+    if (sizeBytes) {
+      details["Size"] = formatBytes(Number(sizeBytes));
+    }
+
+    const digest = artifactShortName(data?.name as string | undefined);
+    if (digest) {
+      details["Digest"] = digest;
     }
 
     return details;
@@ -61,13 +68,21 @@ export const getArtifactAnalysisMapper: ComponentBaseMapper = {
     }
 
     if (data?.resourceUri) {
-      details["Resource URI"] = String(data.resourceUri);
+      details["Image"] = String(data.resourceUri);
     }
 
-    const occurrences = data?.occurrences as any[] | null | undefined;
-    if (Array.isArray(occurrences)) {
-      details["Occurrences"] = String(occurrences.length);
+    if (data?.scanStatus) {
+      details["Scan Status"] = String(data.scanStatus);
     }
+
+    if (typeof data?.vulnerabilities === "number") {
+      details["Vulnerabilities"] = String(data.vulnerabilities);
+    }
+
+    if (typeof data?.critical === "number" && data.critical > 0) details["Critical"] = String(data.critical);
+    if (typeof data?.high === "number" && data.high > 0) details["High"] = String(data.high);
+    if (typeof data?.medium === "number" && data.medium > 0) details["Medium"] = String(data.medium);
+    if (typeof data?.fixAvailable === "number" && data.fixAvailable > 0) details["Fix Available"] = String(data.fixAvailable);
 
     return details;
   },
@@ -83,4 +98,23 @@ function formatDateTime(value?: string): string | undefined {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return undefined;
   return date.toLocaleString();
+}
+
+// Converts a metadata.name like
+// "projects/P/locations/L/repositories/R/dockerImages/IMG@sha256:DIGEST"
+// into "L-docker.pkg.dev/P/R/IMG@sha256:DIGEST"
+function buildDockerUri(metadataName?: string): string | undefined {
+  if (!metadataName) return undefined;
+  const m = metadataName.match(
+    /^projects\/([^/]+)\/locations\/([^/]+)\/repositories\/([^/]+)\/dockerImages\/(.+)$/,
+  );
+  if (!m) return undefined;
+  const [, project, location, repo, imageRef] = m;
+  return `https://${location}-docker.pkg.dev/${project}/${repo}/${imageRef}`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
