@@ -351,11 +351,12 @@ export function General({ organization }: GeneralProps) {
                 Canvas Versioning
               </Label>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Manage canvas edits with versions and change requests. When disabled, users edit the live canvas
-                directly.
+                Manage canvas edits with drafts and publish flow. When enabled at the organization level, versioning is
+                enforced for every canvas and cannot be turned off per canvas.
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                <strong>New canvases will inherit this setting from the organization.</strong>
+                When disabled here, each canvas can choose its own versioning setting. New canvases inherit this
+                organization setting by default.
               </p>
             </div>
             <div className="flex items-center gap-3">
