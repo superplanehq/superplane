@@ -1,5 +1,5 @@
 import { ExecutionInfo, OutputPayload, StateFunction } from "../types";
-import { DEFAULT_EVENT_STATE_MAP, EventState, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP, EventState } from "@/ui/componentBase";
 import { EventStateRegistry } from "../types";
 
 export type ArtifactPushData = {
@@ -71,10 +71,8 @@ export function getArtifactData(execution: ExecutionInfo): Record<string, any> |
 }
 
 export function buildArtifactSummaryDetails({
-  data,
   timestamp,
 }: {
-  data?: Record<string, any>;
   timestamp?: string;
 }): Record<string, string> {
   const details: Record<string, string> = {};

@@ -1,10 +1,5 @@
 import { ComponentBaseProps } from "@/ui/componentBase";
-import {
-  ComponentBaseContext,
-  ComponentBaseMapper,
-  ExecutionDetailsContext,
-  SubtitleContext,
-} from "../types";
+import { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
 import { baseMapper } from "./base";
 import { formatTimeAgo } from "@/utils/date";
 import { getArtifactOutputPayload, getArtifactData, artifactShortName } from "./artifact_registry";
@@ -62,16 +57,16 @@ export const analyzeArtifactMapper: ComponentBaseMapper = {
     const details: Record<string, string> = {};
 
     if (payload?.timestamp) {
-      details["Scanned At"] = new Date(payload.timestamp).toLocaleString();
+      details["Retrieved At"] = new Date(payload.timestamp).toLocaleString();
     }
 
-    const vulnerabilities = data?.vulnerabilities as any[] | undefined;
-    if (vulnerabilities !== undefined) {
-      details["Vulnerabilities"] = String(vulnerabilities.length);
+    if (data?.resourceUri) {
+      details["Resource URI"] = String(data.resourceUri);
     }
 
-    if (data?.scan) {
-      details["Scan"] = artifactShortName(data.scan as string);
+    const occurrences = data?.occurrences as any[] | null | undefined;
+    if (Array.isArray(occurrences)) {
+      details["Vulnerabilities"] = String(occurrences.length);
     }
 
     return details;
@@ -101,8 +96,8 @@ export const getArtifactAnalysisMapper: ComponentBaseMapper = {
       details["Resource URI"] = String(data.resourceUri);
     }
 
-    const occurrences = data?.occurrences as any[] | undefined;
-    if (occurrences !== undefined) {
+    const occurrences = data?.occurrences as any[] | null | undefined;
+    if (Array.isArray(occurrences)) {
       details["Occurrences"] = String(occurrences.length);
     }
 

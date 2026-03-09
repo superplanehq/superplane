@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -15,26 +16,20 @@ import (
 )
 
 const (
-	analyzeArtifactPayloadType          = "gcp.artifactregistry.vulnerabilities"
-	analyzeArtifactPassedOutputChannel  = "passed"
-	analyzeArtifactFailedOutputChannel  = "failed"
-	analyzeArtifactPollAction           = "poll"
-	analyzeArtifactPollInterval         = 30 * time.Second
-	analyzeArtifactExecutionKV          = "scan_operation"
+	analyzeArtifactPayloadType   = "gcp.artifactregistry.artifactAnalysis"
+	analyzeArtifactOutputChannel = "default"
+	analyzeArtifactPollAction    = "poll"
+	analyzeArtifactPollInterval  = 30 * time.Second
 )
 
 type AnalyzeArtifact struct{}
 
 type AnalyzeArtifactConfiguration struct {
-	Location   string `json:"location" mapstructure:"location"`
-	Repository string `json:"repository" mapstructure:"repository"`
-	Package    string `json:"package" mapstructure:"package"`
-	Version    string `json:"version" mapstructure:"version"`
+	ResourceURL string `json:"resourceUrl" mapstructure:"resourceUrl"`
 }
 
-type AnalyzeArtifactExecutionMetadata struct {
-	OperationName string `json:"operationName,omitempty" mapstructure:"operationName,omitempty"`
-	ScanName      string `json:"scanName,omitempty" mapstructure:"scanName,omitempty"`
+type AnalyzeArtifactMetadata struct {
+	ResourceURL string `json:"resourceUrl" mapstructure:"resourceUrl"`
 }
 
 func (c *AnalyzeArtifact) Name() string {
@@ -46,126 +41,49 @@ func (c *AnalyzeArtifact) Label() string {
 }
 
 func (c *AnalyzeArtifact) Description() string {
-	return "Trigger on-demand vulnerability analysis for a container image and wait for results"
+	return "Analyze an Artifact Registry image for vulnerabilities and wait for results"
 }
 
 func (c *AnalyzeArtifact) Documentation() string {
-	return `Triggers Google On Demand Scanning to perform vulnerability analysis on a container image and waits for the scan to complete.
+	return `Queries Container Analysis for vulnerability occurrences on a container image and waits until scan results are available.
 
 ## Configuration
 
-- **Resource URI** (required): The full resource URI of the container image to scan (e.g. ` + "`us-central1-docker.pkg.dev/project/repo/image@sha256:...`" + `). You can use template variables to pass the digest from an upstream On Artifact Push event.
-- **Location** (required): The GCP region where the scan should run (must match the image location).
+- **Resource URL** (required): The full resource URL of the image, in the format ` + "`https://LOCATION-docker.pkg.dev/PROJECT/REPOSITORY/IMAGE@sha256:DIGEST`" + `.
+
+## Behavior
+
+1. Queries the Container Analysis API for existing vulnerability occurrences for the specified image.
+2. If occurrences are found, emits them immediately.
+3. If no occurrences are found (scan may still be in progress), polls every 30 seconds until results appear.
 
 ## Output
 
-The vulnerability findings from the scan, including a list of ` + "`vulnerabilities`" + ` each with severity, CVE ID, affected package, and fix availability.
-
-## Output Channels
-
-- **Passed**: Emitted when the scan completes successfully (even if vulnerabilities are found).
-- **Failed**: Emitted when the scan fails or encounters an error.
+The list of vulnerability occurrences, including severity, package name, and remediation information.
 
 ## Notes
 
-- Only container images stored in Artifact Registry or Container Registry are supported.
-- The ` + "`On Demand Scanning API`" + ` (` + "`ondemandscanning.googleapis.com`" + `) must be enabled in your project.
-- The service account needs ` + "`roles/ondemandscanning.admin`" + ` or ` + "`roles/ondemandscanning.editor`" + `.`
+- Automatic vulnerability scanning must be enabled in your Artifact Registry repository settings.
+- The Container Analysis API must be enabled in your project.
+- The service account must have ` + "`roles/containeranalysis.occurrences.viewer`" + `.`
 }
 
 func (c *AnalyzeArtifact) Icon() string  { return "gcp" }
 func (c *AnalyzeArtifact) Color() string { return "gray" }
 
 func (c *AnalyzeArtifact) OutputChannels(_ any) []core.OutputChannel {
-	return []core.OutputChannel{
-		{Name: analyzeArtifactPassedOutputChannel, Label: "Passed"},
-		{Name: analyzeArtifactFailedOutputChannel, Label: "Failed"},
-	}
+	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
 func (c *AnalyzeArtifact) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "location",
-			Label:       "Location",
-			Type:        configuration.FieldTypeIntegrationResource,
+			Name:        "resourceUrl",
+			Label:       "Resource URL",
+			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Select the Artifact Registry region.",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type:       ResourceTypeLocation,
-					Parameters: []configuration.ParameterRef{},
-				},
-			},
-		},
-		{
-			Name:        "repository",
-			Label:       "Repository",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "Select the Artifact Registry repository.",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "location", Values: []string{"*"}},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "location", Values: []string{"*"}},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: ResourceTypeRepository,
-					Parameters: []configuration.ParameterRef{
-						{Name: "location", ValueFrom: &configuration.ParameterValueFrom{Field: "location"}},
-					},
-				},
-			},
-		},
-		{
-			Name:        "package",
-			Label:       "Package",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "Select the package (image) to scan.",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "location", Values: []string{"*"}},
-				{Field: "repository", Values: []string{"*"}},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "repository", Values: []string{"*"}},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: ResourceTypePackage,
-					Parameters: []configuration.ParameterRef{
-						{Name: "location", ValueFrom: &configuration.ParameterValueFrom{Field: "location"}},
-						{Name: "repository", ValueFrom: &configuration.ParameterValueFrom{Field: "repository"}},
-					},
-				},
-			},
-		},
-		{
-			Name:        "version",
-			Label:       "Version",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "Select the version (digest) to scan.",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "location", Values: []string{"*"}},
-				{Field: "repository", Values: []string{"*"}},
-				{Field: "package", Values: []string{"*"}},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "package", Values: []string{"*"}},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: ResourceTypeVersion,
-					Parameters: []configuration.ParameterRef{
-						{Name: "location", ValueFrom: &configuration.ParameterValueFrom{Field: "location"}},
-						{Name: "repository", ValueFrom: &configuration.ParameterValueFrom{Field: "repository"}},
-						{Name: "package", ValueFrom: &configuration.ParameterValueFrom{Field: "package"}},
-					},
-				},
-			},
+			Description: "Full resource URL of the container image to analyze.",
+			Placeholder: "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
 		},
 	}
 }
@@ -175,10 +93,7 @@ func decodeAnalyzeArtifactConfiguration(raw any) (AnalyzeArtifactConfiguration, 
 	if err := mapstructure.Decode(raw, &config); err != nil {
 		return AnalyzeArtifactConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	config.Location = strings.TrimSpace(config.Location)
-	config.Repository = strings.TrimSpace(config.Repository)
-	config.Package = strings.TrimSpace(config.Package)
-	config.Version = strings.TrimSpace(config.Version)
+	config.ResourceURL = strings.TrimSpace(config.ResourceURL)
 	return config, nil
 }
 
@@ -187,17 +102,8 @@ func (c *AnalyzeArtifact) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return err
 	}
-	if config.Location == "" {
-		return fmt.Errorf("location is required")
-	}
-	if config.Repository == "" {
-		return fmt.Errorf("repository is required")
-	}
-	if config.Package == "" {
-		return fmt.Errorf("package is required")
-	}
-	if config.Version == "" {
-		return fmt.Errorf("version is required")
+	if config.ResourceURL == "" {
+		return fmt.Errorf("resourceUrl is required")
 	}
 	return nil
 }
@@ -208,127 +114,29 @@ func (c *AnalyzeArtifact) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
+	if config.ResourceURL == "" {
+		return ctx.ExecutionState.Fail("error", "resourceUrl is required")
+	}
+
 	client, err := getClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
 	}
 
-	projectID := client.ProjectID()
-	resourceURI := fmt.Sprintf("%s-docker.pkg.dev/%s/%s/%s@%s", config.Location, projectID, config.Repository, config.Package, config.Version)
-	url := analyzePackagesURL(projectID, config.Location)
-	body := map[string]any{
-		"resourceUri": resourceURI,
-	}
-
-	responseBody, err := client.PostURL(context.Background(), url, body)
+	result, hasOccurrences, err := fetchVulnerabilityOccurrences(client, config.ResourceURL)
 	if err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to start vulnerability scan: %v", err))
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to query vulnerability occurrences: %v", err))
 	}
 
-	var operation struct {
-		Name     string         `json:"name"`
-		Done     bool           `json:"done"`
-		Error    map[string]any `json:"error"`
-		Metadata map[string]any `json:"metadata"`
-	}
-	if err := json.Unmarshal(responseBody, &operation); err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse operation response: %v", err))
+	if hasOccurrences {
+		return ctx.ExecutionState.Emit(analyzeArtifactOutputChannel, analyzeArtifactPayloadType, []any{result})
 	}
 
-	if operation.Done {
-		if len(operation.Error) > 0 {
-			return ctx.ExecutionState.Emit(analyzeArtifactFailedOutputChannel, analyzeArtifactPayloadType, []any{operation.Error})
-		}
-		return c.fetchAndEmitVulnerabilities(ctx.ExecutionState, client, operation.Metadata)
-	}
-
-	metadata := AnalyzeArtifactExecutionMetadata{OperationName: operation.Name}
-	if err := ctx.Metadata.Set(metadata); err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to store operation metadata: %v", err))
-	}
-
-	if err := ctx.ExecutionState.SetKV(analyzeArtifactExecutionKV, operation.Name); err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to track scan operation: %v", err))
+	if err := ctx.Metadata.Set(AnalyzeArtifactMetadata{ResourceURL: config.ResourceURL}); err != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to store metadata: %v", err))
 	}
 
 	return ctx.Requests.ScheduleActionCall(analyzeArtifactPollAction, map[string]any{}, analyzeArtifactPollInterval)
-}
-
-func (c *AnalyzeArtifact) poll(ctx core.ActionContext) error {
-	if ctx.ExecutionState.IsFinished() {
-		return nil
-	}
-
-	var metadata AnalyzeArtifactExecutionMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode metadata: %w", err)
-	}
-
-	if metadata.OperationName == "" {
-		return fmt.Errorf("operation name is missing from metadata")
-	}
-
-	client, err := getClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create GCP client: %w", err)
-	}
-
-	url := getOperationURL(metadata.OperationName)
-	responseBody, err := client.GetURL(context.Background(), url)
-	if err != nil {
-		return fmt.Errorf("failed to poll operation: %w", err)
-	}
-
-	var operation struct {
-		Name     string         `json:"name"`
-		Done     bool           `json:"done"`
-		Error    map[string]any `json:"error"`
-		Metadata map[string]any `json:"metadata"`
-	}
-	if err := json.Unmarshal(responseBody, &operation); err != nil {
-		return fmt.Errorf("failed to parse operation response: %w", err)
-	}
-
-	if !operation.Done {
-		return ctx.Requests.ScheduleActionCall(analyzeArtifactPollAction, map[string]any{}, analyzeArtifactPollInterval)
-	}
-
-	if len(operation.Error) > 0 {
-		return ctx.ExecutionState.Emit(analyzeArtifactFailedOutputChannel, analyzeArtifactPayloadType, []any{operation.Error})
-	}
-
-	return c.fetchAndEmitVulnerabilities(ctx.ExecutionState, client, operation.Metadata)
-}
-
-func (c *AnalyzeArtifact) fetchAndEmitVulnerabilities(
-	executionState core.ExecutionStateContext,
-	client Client,
-	operationMetadata map[string]any,
-) error {
-	scanName, _ := operationMetadata["scan"].(string)
-	if scanName == "" {
-		return executionState.Emit(analyzeArtifactPassedOutputChannel, analyzeArtifactPayloadType, []any{map[string]any{
-			"vulnerabilities": []any{},
-		}})
-	}
-
-	url := listVulnerabilitiesURL(scanName)
-	responseBody, err := client.GetURL(context.Background(), url)
-	if err != nil {
-		return executionState.Emit(analyzeArtifactFailedOutputChannel, analyzeArtifactPayloadType, []any{map[string]any{
-			"error": err.Error(),
-		}})
-	}
-
-	var result map[string]any
-	if err := json.Unmarshal(responseBody, &result); err != nil {
-		return executionState.Emit(analyzeArtifactFailedOutputChannel, analyzeArtifactPayloadType, []any{map[string]any{
-			"error": fmt.Sprintf("failed to parse vulnerabilities: %v", err),
-		}})
-	}
-
-	result["scan"] = scanName
-	return executionState.Emit(analyzeArtifactPassedOutputChannel, analyzeArtifactPayloadType, []any{result})
 }
 
 func (c *AnalyzeArtifact) Actions() []core.Action {
@@ -346,7 +154,76 @@ func (c *AnalyzeArtifact) HandleAction(ctx core.ActionContext) error {
 	}
 }
 
-func (c *AnalyzeArtifact) OnIntegrationMessage(_ core.IntegrationMessageContext) error { return nil }
+func (c *AnalyzeArtifact) poll(ctx core.ActionContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	var metadata AnalyzeArtifactMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	client, err := getClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create GCP client: %w", err)
+	}
+
+	result, hasOccurrences, err := fetchVulnerabilityOccurrences(client, metadata.ResourceURL)
+	if err != nil {
+		return fmt.Errorf("failed to query vulnerability occurrences: %w", err)
+	}
+
+	if !hasOccurrences {
+		return ctx.Requests.ScheduleActionCall(analyzeArtifactPollAction, map[string]any{}, analyzeArtifactPollInterval)
+	}
+
+	return ctx.ExecutionState.Emit(analyzeArtifactOutputChannel, analyzeArtifactPayloadType, []any{result})
+}
+
+func fetchVulnerabilityOccurrences(client Client, resourceURL string) (map[string]any, bool, error) {
+	filter := fmt.Sprintf(`kind="VULNERABILITY" AND resourceUrl="%s"`, resourceURL)
+	reqURL := fmt.Sprintf(
+		"%s/projects/%s/occurrences?filter=%s",
+		containerAnalysisBaseURL,
+		client.ProjectID(),
+		url.QueryEscape(filter),
+	)
+
+	var allOccurrences []any
+
+	for {
+		responseBody, err := client.GetURL(context.Background(), reqURL)
+		if err != nil {
+			return nil, false, err
+		}
+
+		var resp struct {
+			Occurrences   []map[string]any `json:"occurrences"`
+			NextPageToken string           `json:"nextPageToken"`
+		}
+		if err := json.Unmarshal(responseBody, &resp); err != nil {
+			return nil, false, fmt.Errorf("failed to parse occurrences response: %w", err)
+		}
+
+		for _, occ := range resp.Occurrences {
+			allOccurrences = append(allOccurrences, occ)
+		}
+
+		if resp.NextPageToken == "" {
+			break
+		}
+
+		reqURL = addPageTokenToURL(reqURL, resp.NextPageToken)
+	}
+
+	result := map[string]any{
+		"occurrences": allOccurrences,
+		"resourceUri": resourceURL,
+	}
+
+	return result, len(allOccurrences) > 0, nil
+}
 
 func (c *AnalyzeArtifact) HandleWebhook(_ core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
