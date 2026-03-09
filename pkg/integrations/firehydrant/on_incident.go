@@ -316,9 +316,5 @@ func verifyWebhookSignature(signature string, body, secret []byte) error {
 		return fmt.Errorf("missing signature")
 	}
 
-	if err := crypto.VerifySignature(secret, body, signature); err != nil {
-		return fmt.Errorf("invalid signature: %v", err)
-	}
-
-	return nil
+	return crypto.VerifySignature(secret, body, signature)
 }

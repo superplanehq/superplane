@@ -613,7 +613,7 @@ func Test__verifyWebhookSignature(t *testing.T) {
 
 	t.Run("signature mismatch -> error", func(t *testing.T) {
 		err := verifyWebhookSignature("invalid-hex", []byte("body"), []byte("secret"))
-		require.ErrorContains(t, err, "signature mismatch")
+		require.ErrorContains(t, err, "invalid signature")
 	})
 
 	t.Run("valid signature -> no error", func(t *testing.T) {
