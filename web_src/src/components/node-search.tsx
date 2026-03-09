@@ -30,15 +30,15 @@ function getNodeIconSlug(node: Node): string {
 
   // Try to get icon from component/trigger/composite data
   if (nodeType === "component" && node.data.component) {
-    return node.data.component.iconSlug || "box";
+    return (node.data.component as { iconSlug?: string }).iconSlug || "box";
   }
 
   if (nodeType === "trigger" && node.data.trigger) {
-    return node.data.trigger.iconSlug || "play";
+    return (node.data.trigger as { iconSlug?: string }).iconSlug || "play";
   }
 
   if (nodeType === "composite" && node.data.composite) {
-    return node.data.composite.iconSlug || "boxes";
+    return (node.data.composite as { iconSlug?: string }).iconSlug || "boxes";
   }
 
   // Default fallback
