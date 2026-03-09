@@ -338,7 +338,12 @@ func validateAndParseServiceAccountKey(keyJSON []byte) (gcpcommon.Metadata, erro
 
 func (g *GCP) configurePubSub(ctx core.SyncContext, client *gcpcommon.Client, metadata *gcpcommon.Metadata) error {
 	if metadata.PubSubTopic != "" {
-		return nil
+		secret, err := g.eventsSecret(ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("generate events secret: %w", err)
+		}
+		pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/events?token=%s", ctx.WebhooksBaseURL, ctx.Integration.ID(), secret)
+		return gcppubsub.UpdatePushEndpoint(context.Background(), client, client.ProjectID(), metadata.PubSubSubscription, pushEndpoint)
 	}
 
 	projectID := client.ProjectID()
@@ -474,6 +479,28 @@ func (g *GCP) ensureArtifactRegistrySetup(
 			caPushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-analysis-events?token=%s", webhooksBaseURL, integration.ID(), caSecret)
 			return gcppubsub.UpdatePushEndpoint(reqCtx, client, projectID, metadata.ContainerAnalysisSubscription, caPushEndpoint)
 		}
+		// CA subscription doesn't exist yet — create it if the API is enabled
+		caEnabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "containeranalysis.googleapis.com")
+		if err != nil {
+			return fmt.Errorf("check Container Analysis API: %w", err)
+		}
+		if !caEnabled {
+			return nil
+		}
+		sanitized := sanitizeID(integration.ID().String())
+		caSecret, err := g.containerAnalysisSecret(integration)
+		if err != nil {
+			return fmt.Errorf("generate container analysis secret: %w", err)
+		}
+		caSubscriptionID := "sp-ca-sub-" + sanitized
+		caPushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-analysis-events?token=%s", webhooksBaseURL, integration.ID(), caSecret)
+		if err := gcppubsub.CreateTopic(reqCtx, client, projectID, ContainerAnalysisTopicID); err != nil {
+			return fmt.Errorf("create Container Analysis topic: %w", err)
+		}
+		if err := gcppubsub.CreatePushSubscription(reqCtx, client, projectID, caSubscriptionID, ContainerAnalysisTopicID, caPushEndpoint); err != nil {
+			return fmt.Errorf("create Container Analysis push subscription: %w", err)
+		}
+		metadata.ContainerAnalysisSubscription = caSubscriptionID
 		return nil
 	}
 
