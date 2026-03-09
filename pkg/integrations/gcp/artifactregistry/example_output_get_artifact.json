@@ -1,0 +1,6 @@
+{
+  "name": "projects/my-project/locations/us-central1/repositories/my-repo/packages/my-image/versions/sha256:abc123def456",
+  "createTime": "2025-01-01T00:00:00Z",
+  "updateTime": "2025-01-01T00:05:00Z",
+  "description": "my-image:latest"
+}
