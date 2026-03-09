@@ -1,3 +1,33 @@
+/**
+ * Client-side validation for canvas YAML.
+ *
+ * Mirrors key backend validation rules (see pkg/grpc/actions/canvases/serialization.go)
+ * so that errors surface inline in the Monaco editor before a save round-trip.
+ *
+ * Architecture:
+ *  - `validateCanvasYaml` is the single entry point. It returns an array of
+ *    `YamlDiagnostic` objects that the editor maps to markers (underlines)
+ *    and decorations (block highlights).
+ *  - Each diagnostic has a `kind`:
+ *      "line"  → squiggly underline on a single line
+ *      "block" → background highlight spanning the full node block
+ *  - Diagnostics with `severity: "error"` block saves; "warning" does not.
+ *  - An optional `code` field (DiagnosticCode) tags fixable diagnostics so
+ *    the code-action provider in yamlQuickFixes.ts can offer quick fixes.
+ *
+ * To add a new validation rule:
+ *  1. Add the check inside `validateCanvasYaml` (or a helper it calls).
+ *  2. If the rule should be fixable, add a new DiagnosticCode and tag the
+ *     diagnostic, then register a matching quick fix in yamlQuickFixes.ts.
+ */
+
+// ---------------------------------------------------------------------------
+// Diagnostic types
+// ---------------------------------------------------------------------------
+
+/** Codes that identify fixable diagnostics. Add new codes here when adding quick fixes. */
+export type DiagnosticCode = "duplicate-id" | "position-overlap" | "duplicate-name";
+
 export interface YamlDiagnostic {
   startLineNumber: number;
   endLineNumber: number;
@@ -5,8 +35,15 @@ export interface YamlDiagnostic {
   endColumn: number;
   message: string;
   severity: "error" | "warning";
+  /** "line" = single-line underline, "block" = full node-block background highlight */
   kind: "line" | "block";
+  /** When set, the code-action provider can offer a quick fix for this diagnostic */
+  code?: DiagnosticCode;
 }
+
+// ---------------------------------------------------------------------------
+// Parsed YAML shapes (mirrors the proto definitions in protos/components.proto)
+// ---------------------------------------------------------------------------
 
 interface ParsedNode {
   id?: string;
@@ -32,8 +69,21 @@ interface ParsedEdge {
   channel?: unknown;
 }
 
+interface ParsedCanvas {
+  metadata?: { name?: string };
+  spec?: {
+    nodes?: ParsedNode[];
+    edges?: ParsedEdge[];
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Field-type rules (proto type → JS typeof check)
+// ---------------------------------------------------------------------------
+
 type FieldTypeRule = { field: string; type: "bool" | "string" | "integer" | "object" };
 
+/** Top-level scalar fields on a Node and their expected proto types. */
 const NODE_FIELD_TYPES: FieldTypeRule[] = [
   { field: "id", type: "string" },
   { field: "name", type: "string" },
@@ -49,19 +99,34 @@ const POSITION_FIELD_TYPES: FieldTypeRule[] = [
   { field: "y", type: "integer" },
 ];
 
-interface ParsedCanvas {
-  metadata?: { name?: string };
-  spec?: {
-    nodes?: ParsedNode[];
-    edges?: ParsedEdge[];
-  };
+function checkFieldType(value: unknown, rule: FieldTypeRule): boolean {
+  if (value === null || value === undefined) return true;
+  switch (rule.type) {
+    case "bool":
+      return typeof value === "boolean";
+    case "string":
+      return typeof value === "string";
+    case "integer":
+      return typeof value === "number" && Number.isInteger(value);
+    case "object":
+      return typeof value === "object";
+  }
 }
 
+// ---------------------------------------------------------------------------
+// Line-range helpers — map parsed array indices back to YAML line numbers
+// ---------------------------------------------------------------------------
+
+/** Inclusive 1-based line range within the YAML text. */
 interface LineRange {
   start: number;
   end: number;
 }
 
+/**
+ * Returns the line range for each node in the `spec.nodes` array.
+ * Ranges are bounded by the next array item or the `edges:` header.
+ */
 function findNodeLineRanges(lines: string[]): LineRange[] {
   const ranges: LineRange[] = [];
   const nodesHeaderPattern = /^\s+nodes:\s*$/;
@@ -91,6 +156,7 @@ function findNodeLineRanges(lines: string[]): LineRange[] {
   return ranges;
 }
 
+/** Returns the 1-based line number of the Nth edge array item. */
 function findEdgeLine(lines: string[], edgeIndex: number): number {
   let arrayItemIndex = -1;
   const edgesHeaderPattern = /^\s+edges:\s*$/;
@@ -112,6 +178,23 @@ function findEdgeLine(lines: string[], edgeIndex: number): number {
   return 1;
 }
 
+/** Finds the 1-based line of a YAML field within a node's line range. */
+function findFieldLine(lines: string[], range: LineRange | undefined, fieldName: string): number | null {
+  if (!range) return null;
+  const pattern = new RegExp(`^\\s+${fieldName}:\\s`);
+  for (let i = range.start - 1; i < range.end; i++) {
+    if (pattern.test(lines[i])) {
+      return i + 1;
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Diagnostic factory helpers
+// ---------------------------------------------------------------------------
+
+/** Single-line diagnostic (squiggly underline). */
 function makeDiagnostic(
   line: number,
   lineText: string,
@@ -129,20 +212,13 @@ function makeDiagnostic(
   };
 }
 
-function makeNodeDiagnostic(
-  range: LineRange | undefined,
-  line: number,
-  lineText: string,
+/** Block diagnostic (background highlight spanning the full node). */
+function makeRangeDiagnostic(
+  range: LineRange,
   message: string,
   severity: "error" | "warning",
+  code?: DiagnosticCode,
 ): YamlDiagnostic {
-  if (range) {
-    return makeRangeDiagnostic(range, message, severity);
-  }
-  return makeDiagnostic(line, lineText, message, severity);
-}
-
-function makeRangeDiagnostic(range: LineRange, message: string, severity: "error" | "warning"): YamlDiagnostic {
   return {
     startLineNumber: range.start,
     endLineNumber: range.end,
@@ -151,13 +227,56 @@ function makeRangeDiagnostic(range: LineRange, message: string, severity: "error
     message,
     severity,
     kind: "block",
+    code,
   };
 }
+
+/** Block diagnostic when range is available, falls back to single-line. */
+function makeNodeDiagnostic(
+  range: LineRange | undefined,
+  line: number,
+  lineText: string,
+  message: string,
+  severity: "error" | "warning",
+  code?: DiagnosticCode,
+): YamlDiagnostic {
+  if (range) {
+    return makeRangeDiagnostic(range, message, severity, code);
+  }
+  return makeDiagnostic(line, lineText, message, severity);
+}
+
+/**
+ * Emits both a block highlight AND a line underline on the specific field.
+ * Used for type-mismatch errors where we want to point at the exact field
+ * but also light up the whole node.
+ */
+function addFieldTypeDiagnostic(
+  range: LineRange | undefined,
+  lines: string[],
+  fieldName: string,
+  message: string,
+  diagnostics: YamlDiagnostic[],
+): void {
+  if (range) {
+    diagnostics.push(makeRangeDiagnostic(range, message, "error"));
+  }
+  const fieldLine = findFieldLine(lines, range, fieldName);
+  const line = fieldLine ?? range?.start ?? 1;
+  const lt = lines[line - 1] ?? "";
+  diagnostics.push(makeDiagnostic(line, lt, message, "error"));
+}
+
+// ---------------------------------------------------------------------------
+// Validation entry point
+// ---------------------------------------------------------------------------
 
 export function validateCanvasYaml(parsed: Record<string, unknown>, yamlText: string): YamlDiagnostic[] {
   const canvas = parsed as ParsedCanvas;
   const diagnostics: YamlDiagnostic[] = [];
   const lines = yamlText.split("\n");
+
+  // -- Canvas-level checks --------------------------------------------------
 
   if (!canvas.metadata?.name) {
     diagnostics.push(makeDiagnostic(1, lines[0], "Canvas name is required", "error"));
@@ -167,6 +286,8 @@ export function validateCanvasYaml(parsed: Record<string, unknown>, yamlText: st
   if (!nodes || !Array.isArray(nodes)) {
     return diagnostics;
   }
+
+  // -- Node-level checks ----------------------------------------------------
 
   const nodeRanges = findNodeLineRanges(lines);
   const seenIds = new Map<string, number>();
@@ -187,7 +308,9 @@ export function validateCanvasYaml(parsed: Record<string, unknown>, yamlText: st
     }
 
     if (seenIds.has(node.id)) {
-      diagnostics.push(makeNodeDiagnostic(range, line, lineText, `Node "${node.id}": duplicate node id`, "error"));
+      diagnostics.push(
+        makeNodeDiagnostic(range, line, lineText, `Node "${node.id}": duplicate node id`, "error", "duplicate-id"),
+      );
     } else {
       seenIds.set(node.id, i);
     }
@@ -206,14 +329,21 @@ export function validateCanvasYaml(parsed: Record<string, unknown>, yamlText: st
       diagnostics,
     );
 
+    // Surface server-side errorMessage / warningMessage as block highlights.
+    // These are informational — they don't block saves.
     if (range && node.errorMessage) {
       diagnostics.push(makeRangeDiagnostic(range, `Node "${node.id}": ${node.errorMessage}`, "warning"));
     }
 
     if (range && node.warningMessage) {
-      diagnostics.push(makeRangeDiagnostic(range, `Node "${node.id}": ${node.warningMessage}`, "warning"));
+      const warnCode: DiagnosticCode | undefined = /multiple\s+(components|triggers)\s+named/i.test(node.warningMessage)
+        ? "duplicate-name"
+        : undefined;
+      diagnostics.push(makeRangeDiagnostic(range, `Node "${node.id}": ${node.warningMessage}`, "warning", warnCode));
     }
   }
+
+  // -- Position overlap check (warning, does not block saves) ---------------
 
   const seenPositions = new Map<string, { id: string; index: number }>();
   for (let i = 0; i < nodes.length; i++) {
@@ -233,6 +363,7 @@ export function validateCanvasYaml(parsed: Record<string, unknown>, yamlText: st
             range,
             `Node "${node.id}" overlaps with node "${existing.id}" at position (${x}, ${y})`,
             "warning",
+            "position-overlap",
           ),
         );
       }
@@ -243,6 +374,7 @@ export function validateCanvasYaml(parsed: Record<string, unknown>, yamlText: st
             existingRange,
             `Node "${existing.id}" overlaps with node "${node.id}" at position (${x}, ${y})`,
             "warning",
+            "position-overlap",
           ),
         );
       }
@@ -250,6 +382,8 @@ export function validateCanvasYaml(parsed: Record<string, unknown>, yamlText: st
       seenPositions.set(key, { id: node.id, index: i });
     }
   }
+
+  // -- Edge-level checks ----------------------------------------------------
 
   const edges = canvas.spec?.edges;
   if (!edges || !Array.isArray(edges)) {
@@ -280,47 +414,11 @@ export function validateCanvasYaml(parsed: Record<string, unknown>, yamlText: st
   return diagnostics;
 }
 
-function checkFieldType(value: unknown, rule: FieldTypeRule): boolean {
-  if (value === null || value === undefined) return true;
-  switch (rule.type) {
-    case "bool":
-      return typeof value === "boolean";
-    case "string":
-      return typeof value === "string";
-    case "integer":
-      return typeof value === "number" && Number.isInteger(value);
-    case "object":
-      return typeof value === "object";
-  }
-}
+// ---------------------------------------------------------------------------
+// Per-node sub-validators
+// ---------------------------------------------------------------------------
 
-function findFieldLine(lines: string[], range: LineRange | undefined, fieldName: string): number | null {
-  if (!range) return null;
-  const pattern = new RegExp(`^\\s+${fieldName}:\\s`);
-  for (let i = range.start - 1; i < range.end; i++) {
-    if (pattern.test(lines[i])) {
-      return i + 1;
-    }
-  }
-  return null;
-}
-
-function addFieldTypeDiagnostic(
-  range: LineRange | undefined,
-  lines: string[],
-  fieldName: string,
-  message: string,
-  diagnostics: YamlDiagnostic[],
-): void {
-  if (range) {
-    diagnostics.push(makeRangeDiagnostic(range, message, "error"));
-  }
-  const fieldLine = findFieldLine(lines, range, fieldName);
-  const line = fieldLine ?? range?.start ?? 1;
-  const lt = lines[line - 1] ?? "";
-  diagnostics.push(makeDiagnostic(line, lt, message, "error"));
-}
-
+/** Validates that scalar fields on a node match their expected proto types. */
 function validateNodeFieldTypes(
   node: Record<string, unknown>,
   range: LineRange | undefined,
@@ -358,6 +456,7 @@ function validateNodeFieldTypes(
   }
 }
 
+/** Validates that the node has the correct ref field for its type (component, trigger, etc.). */
 function validateNodeRef(
   node: ParsedNode,
   range: LineRange | undefined,

@@ -1,21 +1,47 @@
+/**
+ * YAML editor view for a canvas.
+ *
+ * Renders a Monaco editor with:
+ *  - Real-time client-side validation (debounced) via yamlCanvasValidation.ts
+ *  - Block-level background decorations for node-scoped diagnostics
+ *  - Inline squiggly underlines for line-scoped diagnostics
+ *  - Quick-fix code actions via yamlQuickFixes.ts
+ *  - Error/warning counters in the toolbar
+ *
+ * Saves are blocked when any error-severity diagnostic is present.
+ * Warning-severity diagnostics (e.g. errorMessage, warningMessage from
+ * partially configured nodes) do not block saves.
+ */
+
 import Editor from "@monaco-editor/react";
 import type { Monaco } from "@monaco-editor/react";
-import type { editor as MonacoEditor } from "monaco-editor";
+import type { editor as MonacoEditor, IDisposable } from "monaco-editor";
 import { AlertTriangle, CircleX, Copy, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as yaml from "js-yaml";
 import { validateCanvasYaml, type YamlDiagnostic } from "./yamlCanvasValidation";
+import { registerQuickFixProvider } from "./yamlQuickFixes";
+
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
 
 interface CanvasYamlViewProps {
   yamlText: string;
   filename: string;
   readOnly?: boolean;
+  /** Server-side validation error to display as a marker on line 1. */
   serverError?: string | null;
   onCopy?: () => void;
   onDownload?: () => void;
+  /** Called with parsed YAML when edits are valid (no error-severity diagnostics). */
   onChange?: (parsed: { metadata?: Record<string, unknown>; spec?: Record<string, unknown> }) => void;
 }
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
 const MARKER_OWNER = "canvas-validation";
 const VALIDATION_DEBOUNCE_MS = 300;
@@ -23,10 +49,15 @@ const VALIDATION_DEBOUNCE_MS = 300;
 const BLOCK_WARNING_CLASS = "yaml-block-warning";
 const BLOCK_ERROR_CLASS = "yaml-block-error";
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function toMonacoSeverity(monaco: Monaco, severity: YamlDiagnostic["severity"]): number {
   return severity === "error" ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning;
 }
 
+/** Injects CSS for block-level decorations (idempotent). */
 function injectDecorationStyles() {
   const styleId = "yaml-block-highlight-styles";
   if (document.getElementById(styleId)) return;
@@ -44,6 +75,10 @@ function injectDecorationStyles() {
   `;
   document.head.appendChild(style);
 }
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export function CanvasYamlView({
   yamlText,
@@ -65,10 +100,13 @@ export function CanvasYamlView({
   const monacoRef = useRef<Monaco | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const decorationIdsRef = useRef<string[]>([]);
+  const quickFixDisposableRef = useRef<IDisposable | null>(null);
 
   useEffect(() => {
     setEditedText(yamlText);
   }, [yamlText]);
+
+  // ---- Validation ----------------------------------------------------------
 
   const runValidation = useCallback((text: string, extraServerError?: string | null) => {
     const monaco = monacoRef.current;
@@ -86,7 +124,10 @@ export function CanvasYamlView({
       if (parsed && typeof parsed === "object") {
         const diagnostics = validateCanvasYaml(parsed as Record<string, unknown>, text);
         for (const d of diagnostics) {
+          const codeTag = d.code ? { value: d.code, target: model.uri } : undefined;
+
           if (d.kind === "block") {
+            // Block diagnostics get a background decoration + a marker on the first line
             decorations.push({
               range: new monaco.Range(d.startLineNumber, 1, d.endLineNumber, 1),
               options: {
@@ -106,8 +147,10 @@ export function CanvasYamlView({
               endColumn: model.getLineMaxColumn(d.startLineNumber),
               message: d.message,
               severity: toMonacoSeverity(monaco, d.severity),
+              code: codeTag,
             });
           } else {
+            // Line diagnostics get a standard squiggly underline
             markers.push({
               startLineNumber: d.startLineNumber,
               endLineNumber: d.endLineNumber,
@@ -115,6 +158,7 @@ export function CanvasYamlView({
               endColumn: d.endColumn,
               message: d.message,
               severity: toMonacoSeverity(monaco, d.severity),
+              code: codeTag,
             });
           }
         }
@@ -155,14 +199,19 @@ export function CanvasYamlView({
     runValidation(editedText, serverError);
   }, [editedText, serverError, runValidation]);
 
+  // ---- Editor lifecycle ----------------------------------------------------
+
   const handleEditorMount = useCallback(
     (editor: MonacoEditor.IStandaloneCodeEditor, monaco: Monaco) => {
       injectDecorationStyles();
       editorRef.current = editor;
       monacoRef.current = monaco;
+      if (!readOnly) {
+        quickFixDisposableRef.current = registerQuickFixProvider(monaco);
+      }
       runValidation(editedText, serverError);
     },
-    [editedText, serverError, runValidation],
+    [editedText, serverError, runValidation, readOnly],
   );
 
   const handleEditorChange = useCallback(
@@ -177,6 +226,7 @@ export function CanvasYamlView({
       debounceRef.current = setTimeout(() => {
         runValidation(text);
 
+        // Only propagate changes upstream when there are no errors
         try {
           const parsed = yaml.load(text);
           if (parsed && typeof parsed === "object") {
@@ -187,7 +237,7 @@ export function CanvasYamlView({
             }
           }
         } catch {
-          // YAML parse error -- markers already set by runValidation
+          // YAML parse error — markers already set by runValidation
         }
       }, VALIDATION_DEBOUNCE_MS);
     },
@@ -199,8 +249,11 @@ export function CanvasYamlView({
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
+      quickFixDisposableRef.current?.dispose();
     };
   }, []);
+
+  // ---- Render --------------------------------------------------------------
 
   return (
     <div className="flex h-full flex-col">
