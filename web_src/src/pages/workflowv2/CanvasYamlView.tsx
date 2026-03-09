@@ -20,8 +20,29 @@ interface CanvasYamlViewProps {
 const MARKER_OWNER = "canvas-validation";
 const VALIDATION_DEBOUNCE_MS = 300;
 
+const BLOCK_WARNING_CLASS = "yaml-block-warning";
+const BLOCK_ERROR_CLASS = "yaml-block-error";
+
 function toMonacoSeverity(monaco: Monaco, severity: YamlDiagnostic["severity"]): number {
   return severity === "error" ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning;
+}
+
+function injectDecorationStyles() {
+  const styleId = "yaml-block-highlight-styles";
+  if (document.getElementById(styleId)) return;
+  const style = document.createElement("style");
+  style.id = styleId;
+  style.textContent = `
+    .${BLOCK_WARNING_CLASS} {
+      background: rgba(250, 204, 21, 0.12);
+      border-left: 3px solid rgba(234, 179, 8, 0.6);
+    }
+    .${BLOCK_ERROR_CLASS} {
+      background: rgba(239, 68, 68, 0.10);
+      border-left: 3px solid rgba(239, 68, 68, 0.5);
+    }
+  `;
+  document.head.appendChild(style);
 }
 
 export function CanvasYamlView({
@@ -40,6 +61,7 @@ export function CanvasYamlView({
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const decorationIdsRef = useRef<string[]>([]);
 
   useEffect(() => {
     setEditedText(yamlText);
@@ -54,20 +76,44 @@ export function CanvasYamlView({
     if (!model) return;
 
     const markers: MonacoEditor.IMarkerData[] = [];
+    const decorations: MonacoEditor.IModelDeltaDecoration[] = [];
 
     try {
       const parsed = yaml.load(text);
       if (parsed && typeof parsed === "object") {
         const diagnostics = validateCanvasYaml(parsed as Record<string, unknown>, text);
         for (const d of diagnostics) {
-          markers.push({
-            startLineNumber: d.startLineNumber,
-            endLineNumber: d.endLineNumber,
-            startColumn: d.startColumn,
-            endColumn: d.endColumn,
-            message: d.message,
-            severity: toMonacoSeverity(monaco, d.severity),
-          });
+          if (d.kind === "block") {
+            decorations.push({
+              range: new monaco.Range(d.startLineNumber, 1, d.endLineNumber, 1),
+              options: {
+                isWholeLine: true,
+                className: d.severity === "error" ? BLOCK_ERROR_CLASS : BLOCK_WARNING_CLASS,
+                hoverMessage: { value: d.message },
+                overviewRuler: {
+                  color: d.severity === "error" ? "rgba(239,68,68,0.6)" : "rgba(234,179,8,0.6)",
+                  position: monaco.editor.OverviewRulerLane.Right,
+                },
+              },
+            });
+            markers.push({
+              startLineNumber: d.startLineNumber,
+              endLineNumber: d.startLineNumber,
+              startColumn: d.startColumn,
+              endColumn: model.getLineMaxColumn(d.startLineNumber),
+              message: d.message,
+              severity: toMonacoSeverity(monaco, d.severity),
+            });
+          } else {
+            markers.push({
+              startLineNumber: d.startLineNumber,
+              endLineNumber: d.endLineNumber,
+              startColumn: d.startColumn,
+              endColumn: d.endColumn,
+              message: d.message,
+              severity: toMonacoSeverity(monaco, d.severity),
+            });
+          }
         }
       }
     } catch (e) {
@@ -96,6 +142,7 @@ export function CanvasYamlView({
     }
 
     monaco.editor.setModelMarkers(model, MARKER_OWNER, markers);
+    decorationIdsRef.current = editor.deltaDecorations(decorationIdsRef.current, decorations);
   }, []);
 
   useEffect(() => {
@@ -104,6 +151,7 @@ export function CanvasYamlView({
 
   const handleEditorMount = useCallback(
     (editor: MonacoEditor.IStandaloneCodeEditor, monaco: Monaco) => {
+      injectDecorationStyles();
       editorRef.current = editor;
       monacoRef.current = monaco;
       runValidation(editedText, serverError);
