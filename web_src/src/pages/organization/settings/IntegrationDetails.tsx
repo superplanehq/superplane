@@ -1,5 +1,5 @@
 import { ArrowLeft, CircleX, ExternalLink, Loader2, Plug, Trash2 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import {
   useAvailableIntegrations,
@@ -45,6 +45,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
 
   const updateMutation = useUpdateIntegration(organizationId, integrationId || "");
   const deleteMutation = useDeleteIntegration(organizationId, integrationId || "");
+  const integrationsHref = `/${organizationId}/settings/integrations`;
 
   // Initialize config values when installation loads
   const [configLoaded, setConfigLoaded] = useState(false);
@@ -208,12 +209,13 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     return (
       <div className="pt-6">
         <div className="flex items-center gap-4 mb-6">
-          <button
-            onClick={() => navigate(`/${organizationId}/settings/integrations`)}
+          <Link
+            to={integrationsHref}
             className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
+            aria-label="Back to integrations"
           >
             <ArrowLeft className="w-5 h-5" />
-          </button>
+          </Link>
           <h4 className="text-2xl font-semibold">Integration Details</h4>
         </div>
         <div className="flex justify-center items-center h-32">
@@ -227,12 +229,13 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     return (
       <div className="pt-6">
         <div className="flex items-center gap-4 mb-6">
-          <button
-            onClick={() => navigate(`/${organizationId}/settings/integrations`)}
+          <Link
+            to={integrationsHref}
             className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
+            aria-label="Back to integrations"
           >
             <ArrowLeft className="w-5 h-5" />
-          </button>
+          </Link>
           <h4 className="text-2xl font-semibold">Integration Details</h4>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
@@ -245,12 +248,13 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   return (
     <div className="pt-6">
       <div className="flex flex-wrap items-center gap-4 mb-6">
-        <button
-          onClick={() => navigate(`/${organizationId}/settings/integrations`)}
+        <Link
+          to={integrationsHref}
           className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
+          aria-label="Back to integrations"
         >
           <ArrowLeft className="w-5 h-5" />
-        </button>
+        </Link>
         <IntegrationIcon
           integrationName={integration?.spec?.integrationName}
           iconSlug={integrationDef?.icon}

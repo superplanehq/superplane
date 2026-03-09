@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
 import { Sidebar, SidebarBody, SidebarSection } from "../../../components/Sidebar/sidebar";
 import { General } from "./General";
 import { Groups } from "./Groups";
@@ -38,7 +38,6 @@ import { usePermissions } from "@/contexts/PermissionsContext";
 import { PermissionTooltip, RequirePermission } from "@/components/PermissionGate";
 
 export function OrganizationSettings() {
-  const navigate = useNavigate();
   const location = useLocation();
   const { account: user, loading: userLoading } = useAccount();
   const { organizationId } = useParams<{ organizationId: string }>();
@@ -181,25 +180,6 @@ export function OrganizationSettings() {
     { id: "sign-out", label: "Sign Out", action: () => (window.location.href = "/logout"), Icon: LogOut },
   ];
 
-  const handleLinkClick = (link: NavLink) => {
-    if (link.permission && !permissionsLoading && !canAct(link.permission.resource, link.permission.action)) {
-      return;
-    }
-
-    if (link.action) {
-      link.action();
-      return;
-    }
-
-    if (link.href) {
-      if (link.href.startsWith("http")) {
-        window.location.href = link.href;
-      } else {
-        navigate(link.href);
-      }
-    }
-  };
-
   const isLinkActive = (link: NavLink) => {
     if (link.id === "canvases") {
       return location.pathname === `/${organizationId}`;
@@ -276,14 +256,9 @@ export function OrganizationSettings() {
       <Sidebar className="w-60 bg-white dark:bg-gray-800 border-r border-gray-300 dark:border-gray-800">
         <SidebarBody>
           <SidebarSection className="px-4 py-2.5">
-            <button
-              type="button"
-              onClick={() => navigate(`/${organizationId}`)}
-              className="w-7 h-7"
-              aria-label="Go to Canvases"
-            >
+            <Link to={`/${organizationId}`} className="block w-7 h-7" aria-label="Go to Canvases">
               <img src={SuperplaneLogo} alt="SuperPlane" className="w-7 h-7 object-contain" />
-            </button>
+            </Link>
           </SidebarSection>
           <SidebarSection className="p-4 border-t border-gray-300">
             <div>
@@ -294,18 +269,65 @@ export function OrganizationSettings() {
               <div className="mt-3 flex flex-col">
                 {organizationLinks.map((link) => {
                   const allowed = canAccessLink(link);
-                  const linkButton = (
+
+                  if (!allowed) {
+                    return (
+                      <PermissionTooltip
+                        key={link.id}
+                        allowed={false}
+                        message={`You don't have permission to view ${link.label.toLowerCase()}.`}
+                        className="w-full"
+                      >
+                        <button
+                          type="button"
+                          disabled
+                          className={cn(
+                            "group flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition",
+                            "text-gray-500 dark:text-gray-300 opacity-60 cursor-not-allowed hover:bg-transparent hover:text-gray-500",
+                          )}
+                        >
+                          <link.Icon size={16} className="text-gray-500" />
+                          <span className="truncate">{link.label}</span>
+                          <Lock size={12} className="ml-auto text-gray-400" />
+                        </button>
+                      </PermissionTooltip>
+                    );
+                  }
+
+                  if (link.href) {
+                    return (
+                      <Link
+                        key={link.id}
+                        to={link.href}
+                        className={cn(
+                          "group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition",
+                          isLinkActive(link)
+                            ? "bg-sky-100 text-gray-800 dark:bg-sky-800/40 dark:text-white"
+                            : "text-gray-500 dark:text-gray-300 hover:bg-sky-100 hover:text-gray-900 dark:hover:bg-gray-800",
+                        )}
+                      >
+                        <link.Icon
+                          size={16}
+                          className={cn(
+                            "text-gray-500 transition group-hover:text-gray-900 dark:group-hover:text-white",
+                            isLinkActive(link) && "text-gray-800 dark:text-white",
+                          )}
+                        />
+                        <span className="truncate">{link.label}</span>
+                      </Link>
+                    );
+                  }
+
+                  return (
                     <button
                       key={link.id}
                       type="button"
-                      onClick={() => handleLinkClick(link)}
-                      disabled={!allowed}
+                      onClick={link.action}
                       className={cn(
                         "group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition",
                         isLinkActive(link)
                           ? "bg-sky-100 text-gray-800 dark:bg-sky-800/40 dark:text-white"
                           : "text-gray-500 dark:text-gray-300 hover:bg-sky-100 hover:text-gray-900 dark:hover:bg-gray-800",
-                        !allowed && "opacity-60 cursor-not-allowed hover:bg-transparent hover:text-gray-500",
                       )}
                     >
                       <link.Icon
@@ -316,23 +338,7 @@ export function OrganizationSettings() {
                         )}
                       />
                       <span className="truncate">{link.label}</span>
-                      {!allowed && <Lock size={12} className="ml-auto text-gray-400" />}
                     </button>
-                  );
-
-                  if (allowed) {
-                    return linkButton;
-                  }
-
-                  return (
-                    <PermissionTooltip
-                      key={link.id}
-                      allowed={false}
-                      message={`You don't have permission to view ${link.label.toLowerCase()}.`}
-                      className="w-full"
-                    >
-                      {linkButton}
-                    </PermissionTooltip>
                   );
                 })}
               </div>
@@ -349,28 +355,50 @@ export function OrganizationSettings() {
                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{userEmail}</p>
               </div>
               <div className="mt-3 flex flex-col">
-                {userLinks.map((link) => (
-                  <button
-                    key={link.id}
-                    type="button"
-                    onClick={() => handleLinkClick(link)}
-                    className={cn(
-                      "group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition",
-                      isLinkActive(link)
-                        ? "bg-sky-100 text-sky-900 dark:bg-sky-800/40 dark:text-white"
-                        : "text-gray-500 dark:text-gray-300 hover:bg-sky-100 hover:text-gray-900 dark:hover:bg-gray-800",
-                    )}
-                  >
-                    <link.Icon
-                      size={16}
+                {userLinks.map((link) =>
+                  link.href ? (
+                    <Link
+                      key={link.id}
+                      to={link.href}
                       className={cn(
-                        "text-gray-500 transition group-hover:text-gray-900 dark:group-hover:text-white",
-                        isLinkActive(link) && "text-sky-900 dark:text-white",
+                        "group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition",
+                        isLinkActive(link)
+                          ? "bg-sky-100 text-sky-900 dark:bg-sky-800/40 dark:text-white"
+                          : "text-gray-500 dark:text-gray-300 hover:bg-sky-100 hover:text-gray-900 dark:hover:bg-gray-800",
                       )}
-                    />
-                    <span className="truncate">{link.label}</span>
-                  </button>
-                ))}
+                    >
+                      <link.Icon
+                        size={16}
+                        className={cn(
+                          "text-gray-500 transition group-hover:text-gray-900 dark:group-hover:text-white",
+                          isLinkActive(link) && "text-sky-900 dark:text-white",
+                        )}
+                      />
+                      <span className="truncate">{link.label}</span>
+                    </Link>
+                  ) : (
+                    <button
+                      key={link.id}
+                      type="button"
+                      onClick={link.action}
+                      className={cn(
+                        "group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition",
+                        isLinkActive(link)
+                          ? "bg-sky-100 text-sky-900 dark:bg-sky-800/40 dark:text-white"
+                          : "text-gray-500 dark:text-gray-300 hover:bg-sky-100 hover:text-gray-900 dark:hover:bg-gray-800",
+                      )}
+                    >
+                      <link.Icon
+                        size={16}
+                        className={cn(
+                          "text-gray-500 transition group-hover:text-gray-900 dark:group-hover:text-white",
+                          isLinkActive(link) && "text-sky-900 dark:text-white",
+                        )}
+                      />
+                      <span className="truncate">{link.label}</span>
+                    </button>
+                  ),
+                )}
               </div>
             </div>
           </SidebarSection>

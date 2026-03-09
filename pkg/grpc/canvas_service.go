@@ -39,6 +39,18 @@ func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanv
 	return canvases.DescribeCanvas(ctx, s.registry, organizationID, req.Id)
 }
 
+func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRequest) (*pb.UpdateCanvasResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.UpdateCanvas(
+		ctx,
+		organizationID,
+		req.Id,
+		req.Name,
+		req.Description,
+		req.CanvasVersioningEnabled,
+	)
+}
+
 func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateCanvasResponse, error) {
 	if req.Canvas == nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas is required")

@@ -24,6 +24,11 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 		return nil, err
 	}
 
+	canvasVersioningEnabled, err := isCanvasVersioningEnabledForCanvas(canvas)
+	if err != nil {
+		return nil, err
+	}
+
 	serializedNodes, err := serializeCanvasNodes(canvas.ID, liveVersion.Nodes)
 	if err != nil {
 		return nil, err
@@ -42,14 +47,15 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 	if !includeStatus {
 		return &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{
-				Id:             canvas.ID.String(),
-				OrganizationId: canvas.OrganizationID.String(),
-				Name:           canvas.Name,
-				Description:    canvas.Description,
-				CreatedAt:      timestamppb.New(*canvas.CreatedAt),
-				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
-				CreatedBy:      createdBy,
-				IsTemplate:     canvas.IsTemplate,
+				Id:                      canvas.ID.String(),
+				OrganizationId:          canvas.OrganizationID.String(),
+				Name:                    canvas.Name,
+				Description:             canvas.Description,
+				CreatedAt:               timestamppb.New(*canvas.CreatedAt),
+				UpdatedAt:               timestamppb.New(*canvas.UpdatedAt),
+				CreatedBy:               createdBy,
+				IsTemplate:              canvas.IsTemplate,
+				CanvasVersioningEnabled: canvasVersioningEnabled,
 			},
 			Spec: &pb.Canvas_Spec{
 				Nodes: serializedNodes,
@@ -104,14 +110,15 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 
 	return &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Id:             canvas.ID.String(),
-			OrganizationId: canvas.OrganizationID.String(),
-			Name:           canvas.Name,
-			Description:    canvas.Description,
-			CreatedAt:      timestamppb.New(*canvas.CreatedAt),
-			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
-			CreatedBy:      createdBy,
-			IsTemplate:     canvas.IsTemplate,
+			Id:                      canvas.ID.String(),
+			OrganizationId:          canvas.OrganizationID.String(),
+			Name:                    canvas.Name,
+			Description:             canvas.Description,
+			CreatedAt:               timestamppb.New(*canvas.CreatedAt),
+			UpdatedAt:               timestamppb.New(*canvas.UpdatedAt),
+			CreatedBy:               createdBy,
+			IsTemplate:              canvas.IsTemplate,
+			CanvasVersioningEnabled: canvasVersioningEnabled,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: serializedNodes,

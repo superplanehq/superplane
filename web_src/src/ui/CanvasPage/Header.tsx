@@ -16,7 +16,7 @@ import {
 import { Button } from "../button";
 import { Switch } from "../switch";
 import { useCanvases } from "@/hooks/useCanvasData";
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
@@ -30,7 +30,7 @@ export interface BreadcrumbItem {
   iconColor?: string;
 }
 
-type HeaderMode = "default" | "version-live" | "version-edit" | "sandbox";
+type HeaderMode = "default" | "version-live" | "version-edit" | "versioning-disabled";
 type SaveState = "saved" | "saving" | "unsaved";
 
 interface HeaderProps {
@@ -61,8 +61,8 @@ interface HeaderProps {
   autoSaveDisabledTooltip?: string;
   onExportYamlCopy?: () => void;
   onExportYamlDownload?: () => void;
-  topViewMode?: "canvas" | "memory" | "versioning";
-  onTopViewModeChange?: (mode: "canvas" | "memory" | "versioning") => void;
+  topViewMode?: "canvas" | "memory" | "settings" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "memory" | "settings" | "versioning") => void;
   showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;
@@ -74,7 +74,7 @@ interface HeaderProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  sandboxModeTooltip?: string;
+  versioningDisabledTooltip?: string;
   showPendingDraftBadge?: boolean;
 }
 
@@ -115,11 +115,10 @@ export function Header({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  sandboxModeTooltip,
+  versioningDisabledTooltip,
   showPendingDraftBadge,
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
-  const navigate = useNavigate();
   const { data: workflows = [], isLoading: workflowsLoading } = useCanvases(organizationId || "");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isYamlMenuOpen, setIsYamlMenuOpen] = useState(false);
@@ -173,13 +172,6 @@ export function Header({
     };
   }, [isMenuOpen]);
 
-  const handleWorkflowClick = (selectedWorkflowId: string) => {
-    if (selectedWorkflowId && organizationId) {
-      setIsMenuOpen(false);
-      navigate(`/${organizationId}/canvases/${selectedWorkflowId}`);
-    }
-  };
-
   const wrapWithTooltip = (disabled: boolean | undefined, message: string | undefined, child: ReactNode) => {
     if (!disabled || !message) return child;
     return (
@@ -195,8 +187,8 @@ export function Header({
   const isDefaultMode = mode === "default";
   const showEditButton = mode === "version-live";
   const showEditingDropdown = mode === "version-edit";
-  const showSandboxBadge = mode === "sandbox";
-  const showSaveDropdown = mode === "version-edit" || mode === "sandbox";
+  const showVersioningDisabledBadge = mode === "versioning-disabled";
+  const showSaveDropdown = mode === "version-edit" || mode === "versioning-disabled";
   const showSaveUndoActions = showSaveDropdown && !isAutoSaveEnabled && saveState === "unsaved";
   const autoSaveToggleDisabled = autoSaveDisabled || !onToggleAutoSave;
   const saveStatusLabel = saveState === "saving" ? "Saving..." : saveState === "unsaved" ? "Unsaved" : "Saved";
@@ -239,14 +231,14 @@ export function Header({
                     <div className="px-4 pt-3 pb-4">
                       {/* All Canvases Link */}
                       <div className="mb-2">
-                        <a
-                          href={organizationId ? `/${organizationId}` : "/"}
+                        <Link
+                          to={organizationId ? `/${organizationId}` : "/"}
                           className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:text-gray-800"
                           onClick={() => setIsMenuOpen(false)}
                         >
                           <Home size={16} className="text-gray-500 transition group-hover:text-gray-800" />
                           <span>All Canvases</span>
-                        </a>
+                        </Link>
                       </div>
                       {/* Divider */}
                       <div className="border-b border-gray-300 mb-2"></div>
@@ -254,11 +246,27 @@ export function Header({
                       <div className="mt-2 flex flex-col">
                         {workflows.map((workflow) => {
                           const isSelected = workflow.metadata?.id === workflowId;
+                          const workflowHref =
+                            workflow.metadata?.id && organizationId
+                              ? `/${organizationId}/canvases/${workflow.metadata.id}`
+                              : undefined;
+                          if (!workflowHref) {
+                            return (
+                              <span
+                                key={workflow.metadata?.id}
+                                className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-left text-gray-500"
+                              >
+                                <span className="w-4" />
+                                <span>{workflow.metadata?.name || "Unnamed Canvas"}</span>
+                              </span>
+                            );
+                          }
+
                           return (
-                            <button
+                            <Link
                               key={workflow.metadata?.id}
-                              type="button"
-                              onClick={() => handleWorkflowClick(workflow.metadata?.id || "")}
+                              to={workflowHref}
+                              onClick={() => setIsMenuOpen(false)}
                               className={`group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-left ${
                                 isSelected
                                   ? "bg-sky-100 text-gray-800"
@@ -271,7 +279,7 @@ export function Header({
                                 <span className="w-4" />
                               )}
                               <span>{workflow.metadata?.name || "Unnamed Canvas"}</span>
-                            </button>
+                            </Link>
                           );
                         })}
                       </div>
@@ -307,6 +315,15 @@ export function Header({
                       <span aria-label={`${memoryItemCount} memory items`}>({memoryItemCount})</span>
                     ) : null}
                   </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onTopViewModeChange("settings")}
+                  className={`rounded px-2 py-1 text-xs font-medium ${
+                    topViewMode === "settings" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  Settings
                 </button>
                 {showVersioningTab ? (
                   <button
@@ -421,15 +438,15 @@ export function Header({
               </>
             ) : null}
 
-            {showSandboxBadge ? (
+            {showVersioningDisabledBadge ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="rounded border border-amber-300 bg-amber-100 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-900">
-                    SANDBOX
+                    VERSIONING OFF
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  {sandboxModeTooltip || "Versioning is disabled. Turn off sandbox mode in organization settings."}
+                  {versioningDisabledTooltip || "Versioning is disabled. Enable canvas versioning in canvas settings."}
                 </TooltipContent>
               </Tooltip>
             ) : null}

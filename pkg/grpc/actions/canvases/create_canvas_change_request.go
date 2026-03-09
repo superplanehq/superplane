@@ -66,12 +66,12 @@ func CreateCanvasChangeRequestWithMetadata(
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	sandboxModeEnabled, modeErr := isCanvasSandboxModeEnabled(organizationID)
+	versioningEnabled, modeErr := isCanvasVersioningEnabledForCanvas(canvas)
 	if modeErr != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load organization sandbox mode: %v", modeErr)
+		return nil, status.Errorf(codes.Internal, "failed to load canvas versioning: %v", modeErr)
 	}
-	if sandboxModeEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled in sandbox mode")
+	if !versioningEnabled {
+		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this canvas")
 	}
 
 	userUUID := uuid.MustParse(userID)

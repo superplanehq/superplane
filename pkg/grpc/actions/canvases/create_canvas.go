@@ -44,18 +44,26 @@ func CreateCanvas(ctx context.Context, registry *registry.Registry, organization
 	if isTemplate {
 		targetOrganizationID = models.TemplateOrganizationID
 	}
+	canvasVersioningEnabled := false
+	if !isTemplate {
+		canvasVersioningEnabled, err = models.IsCanvasVersioningEnabled(targetOrganizationID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to load organization canvas versioning: %v", err)
+		}
+	}
 	liveVersionID := uuid.New()
 
 	canvas := models.Canvas{
-		ID:             uuid.New(),
-		OrganizationID: targetOrganizationID,
-		LiveVersionID:  &liveVersionID,
-		IsTemplate:     isTemplate,
-		Name:           pbCanvas.Metadata.Name,
-		Description:    pbCanvas.Metadata.Description,
-		CreatedBy:      &createdBy,
-		CreatedAt:      &now,
-		UpdatedAt:      &now,
+		ID:                      uuid.New(),
+		OrganizationID:          targetOrganizationID,
+		LiveVersionID:           &liveVersionID,
+		IsTemplate:              isTemplate,
+		CanvasVersioningEnabled: canvasVersioningEnabled,
+		Name:                    pbCanvas.Metadata.Name,
+		Description:             pbCanvas.Metadata.Description,
+		CreatedBy:               &createdBy,
+		CreatedAt:               &now,
+		UpdatedAt:               &now,
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {

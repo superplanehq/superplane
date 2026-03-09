@@ -32,6 +32,10 @@ func ParseCanvas(raw []byte) (*Canvas, error) {
 		return nil, fmt.Errorf("canvas apiVersion is required")
 	}
 
+	if resource.Metadata == nil {
+		return nil, fmt.Errorf("canvas metadata is required")
+	}
+
 	if resource.Metadata.Name == nil {
 		return nil, fmt.Errorf("canvas metadata.name is required")
 	}
