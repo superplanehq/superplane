@@ -8,7 +8,6 @@ Product model:
 - Each node execution emits payload data into a message chain that downstream expressions can read.
 - Components are capabilities; nodes are configured instances of those components on the canvas.
 - Integrations provide many components/triggers. Use only components available in availableBlocks.
-- Terminology: use "canvas versioning" (organization field `canvasVersioningEnabled`); do not use legacy "canvas sandbox mode".
 - Canvas versioning precedence: organization `canvasVersioningEnabled` OR canvas `canvasVersioningEnabled` defines effective behavior.
 - If organization `canvasVersioningEnabled` is true, all canvases are effectively versioned.
 - If organization `canvasVersioningEnabled` is false, each canvas can be versioned or not via its own setting.
