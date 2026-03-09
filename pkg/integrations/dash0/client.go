@@ -374,6 +374,23 @@ func (c *Client) DeleteSyntheticCheck(checkID string, dataset string) (map[strin
 	return response, nil
 }
 
+// GetSyntheticCheck retrieves a single synthetic check by ID (GET).
+func (c *Client) GetSyntheticCheck(checkID string, dataset string) (*SyntheticCheckResponse, error) {
+	apiURL := fmt.Sprintf("%s/api/synthetic-checks/%s?dataset=%s", c.BaseURL, url.PathEscape(checkID), url.QueryEscape(dataset))
+
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil, "")
+	if err != nil {
+		return nil, err
+	}
+
+	var response SyntheticCheckResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response, nil
+}
+
 // UpdateSyntheticCheck updates an existing synthetic check by ID (PUT).
 // The check ID is typically from metadata.labels["dash0.com/id"] in a create response.
 func (c *Client) UpdateSyntheticCheck(checkID string, request SyntheticCheckRequest, dataset string) (map[string]any, error) {
@@ -395,4 +412,48 @@ func (c *Client) UpdateSyntheticCheck(checkID string, request SyntheticCheckRequ
 	}
 
 	return response, nil
+}
+
+// SyntheticCheckResponse represents the response from the Dash0 GET Synthetic Check API.
+type SyntheticCheckResponse struct {
+	Kind     string                         `json:"kind"`
+	Metadata SyntheticCheckResponseMetadata `json:"metadata"`
+	Spec     SyntheticCheckResponseSpec     `json:"spec"`
+}
+
+type SyntheticCheckResponseMetadata struct {
+	Annotations map[string]any    `json:"annotations"`
+	Description string            `json:"description"`
+	Labels      map[string]string `json:"labels"`
+	Name        string            `json:"name"`
+}
+
+type SyntheticCheckResponseSpec struct {
+	Display       SyntheticCheckDisplay         `json:"display"`
+	Enabled       bool                          `json:"enabled"`
+	Labels        map[string]any                `json:"labels"`
+	Notifications SyntheticCheckNotifications   `json:"notifications"`
+	Plugin        SyntheticCheckResponsePlugin  `json:"plugin"`
+	Retries       SyntheticCheckResponseRetries `json:"retries"`
+	Schedule      SyntheticCheckSchedule        `json:"schedule"`
+}
+
+type SyntheticCheckNotifications struct {
+	Channels             []string `json:"channels"`
+	OnlyCriticalChannels []string `json:"onlyCriticalChannels"`
+}
+
+type SyntheticCheckResponsePlugin struct {
+	Kind string                           `json:"kind"`
+	Spec SyntheticCheckResponsePluginSpec `json:"spec"`
+}
+
+type SyntheticCheckResponsePluginSpec struct {
+	Assertions SyntheticCheckAssertions  `json:"assertions"`
+	Request    SyntheticCheckHTTPRequest `json:"request"`
+}
+
+type SyntheticCheckResponseRetries struct {
+	Kind string         `json:"kind"`
+	Spec map[string]any `json:"spec"`
 }

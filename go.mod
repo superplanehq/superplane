@@ -59,6 +59,7 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.40.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
 )
 

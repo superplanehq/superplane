@@ -9,6 +9,11 @@ import { mockBuildingBlockCategories } from "@/ui/CanvasPage/storybooks/building
 
 // Flow control components that control workflow execution flow
 const FLOW_COMPONENT_NAMES = new Set(["if", "filter", "approval", "wait", "timeGate"]);
+const MEMORY_COMPONENT_NAMES = new Set(["addmemory", "readmemory", "updatememory", "deletememory", "upsertmemory"]);
+
+function isMemoryBlock(block: BuildingBlock): boolean {
+  return MEMORY_COMPONENT_NAMES.has((block.name || "").toLowerCase());
+}
 
 /**
  * Determines the component subtype based on the building block's type and name.
@@ -192,7 +197,37 @@ export function buildBuildingBlockCategories(
     });
   });
 
-  return merged;
+  // Move all memory blocks to a dedicated "memory" category.
+  const memoryBlocksByKey = new Map<string, BuildingBlock>();
+  const categoriesWithoutMemory = merged
+    .map((category) => {
+      const nonMemoryBlocks: BuildingBlock[] = [];
+      category.blocks.forEach((block) => {
+        if (isMemoryBlock(block)) {
+          memoryBlocksByKey.set(`${block.type}:${block.name}`, block);
+          return;
+        }
+        nonMemoryBlocks.push(block);
+      });
+
+      return {
+        ...category,
+        blocks: nonMemoryBlocks,
+      };
+    })
+    .filter((category) => category.blocks.length > 0);
+
+  const memoryCategory: BuildingBlockCategory[] =
+    memoryBlocksByKey.size > 0
+      ? [
+          {
+            name: "Memory",
+            blocks: Array.from(memoryBlocksByKey.values()),
+          },
+        ]
+      : [];
+
+  return [...categoriesWithoutMemory, ...memoryCategory];
 }
 
 export function flattenBuildingBlocks(categories: BuildingBlockCategory[]): BuildingBlock[] {

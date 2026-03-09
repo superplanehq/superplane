@@ -19,27 +19,33 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Canvases_ListCanvases_FullMethodName              = "/Superplane.Canvases.Canvases/ListCanvases"
-	Canvases_CreateCanvas_FullMethodName              = "/Superplane.Canvases.Canvases/CreateCanvas"
-	Canvases_DescribeCanvas_FullMethodName            = "/Superplane.Canvases.Canvases/DescribeCanvas"
-	Canvases_UpdateCanvas_FullMethodName              = "/Superplane.Canvases.Canvases/UpdateCanvas"
-	Canvases_DeleteCanvas_FullMethodName              = "/Superplane.Canvases.Canvases/DeleteCanvas"
-	Canvases_ListNodeQueueItems_FullMethodName        = "/Superplane.Canvases.Canvases/ListNodeQueueItems"
-	Canvases_DeleteNodeQueueItem_FullMethodName       = "/Superplane.Canvases.Canvases/DeleteNodeQueueItem"
-	Canvases_UpdateNodePause_FullMethodName           = "/Superplane.Canvases.Canvases/UpdateNodePause"
-	Canvases_ListNodeExecutions_FullMethodName        = "/Superplane.Canvases.Canvases/ListNodeExecutions"
-	Canvases_ListNodeEvents_FullMethodName            = "/Superplane.Canvases.Canvases/ListNodeEvents"
-	Canvases_EmitNodeEvent_FullMethodName             = "/Superplane.Canvases.Canvases/EmitNodeEvent"
-	Canvases_InvokeNodeExecutionAction_FullMethodName = "/Superplane.Canvases.Canvases/InvokeNodeExecutionAction"
-	Canvases_InvokeNodeTriggerAction_FullMethodName   = "/Superplane.Canvases.Canvases/InvokeNodeTriggerAction"
-	Canvases_ListChildExecutions_FullMethodName       = "/Superplane.Canvases.Canvases/ListChildExecutions"
-	Canvases_CancelExecution_FullMethodName           = "/Superplane.Canvases.Canvases/CancelExecution"
-	Canvases_ResolveExecutionErrors_FullMethodName    = "/Superplane.Canvases.Canvases/ResolveExecutionErrors"
-	Canvases_ListCanvasEvents_FullMethodName          = "/Superplane.Canvases.Canvases/ListCanvasEvents"
-	Canvases_ListCanvasMemories_FullMethodName        = "/Superplane.Canvases.Canvases/ListCanvasMemories"
-	Canvases_DeleteCanvasMemory_FullMethodName        = "/Superplane.Canvases.Canvases/DeleteCanvasMemory"
-	Canvases_ListEventExecutions_FullMethodName       = "/Superplane.Canvases.Canvases/ListEventExecutions"
-	Canvases_SendAiMessage_FullMethodName             = "/Superplane.Canvases.Canvases/SendAiMessage"
+	Canvases_ListCanvases_FullMethodName                = "/Superplane.Canvases.Canvases/ListCanvases"
+	Canvases_CreateCanvas_FullMethodName                = "/Superplane.Canvases.Canvases/CreateCanvas"
+	Canvases_DescribeCanvas_FullMethodName              = "/Superplane.Canvases.Canvases/DescribeCanvas"
+	Canvases_CreateCanvasVersion_FullMethodName         = "/Superplane.Canvases.Canvases/CreateCanvasVersion"
+	Canvases_ListCanvasVersions_FullMethodName          = "/Superplane.Canvases.Canvases/ListCanvasVersions"
+	Canvases_DescribeCanvasVersion_FullMethodName       = "/Superplane.Canvases.Canvases/DescribeCanvasVersion"
+	Canvases_UpdateCanvasVersion_FullMethodName         = "/Superplane.Canvases.Canvases/UpdateCanvasVersion"
+	Canvases_CreateCanvasChangeRequest_FullMethodName   = "/Superplane.Canvases.Canvases/CreateCanvasChangeRequest"
+	Canvases_ListCanvasChangeRequests_FullMethodName    = "/Superplane.Canvases.Canvases/ListCanvasChangeRequests"
+	Canvases_DescribeCanvasChangeRequest_FullMethodName = "/Superplane.Canvases.Canvases/DescribeCanvasChangeRequest"
+	Canvases_DeleteCanvas_FullMethodName                = "/Superplane.Canvases.Canvases/DeleteCanvas"
+	Canvases_ListNodeQueueItems_FullMethodName          = "/Superplane.Canvases.Canvases/ListNodeQueueItems"
+	Canvases_DeleteNodeQueueItem_FullMethodName         = "/Superplane.Canvases.Canvases/DeleteNodeQueueItem"
+	Canvases_UpdateNodePause_FullMethodName             = "/Superplane.Canvases.Canvases/UpdateNodePause"
+	Canvases_ListNodeExecutions_FullMethodName          = "/Superplane.Canvases.Canvases/ListNodeExecutions"
+	Canvases_ListNodeEvents_FullMethodName              = "/Superplane.Canvases.Canvases/ListNodeEvents"
+	Canvases_EmitNodeEvent_FullMethodName               = "/Superplane.Canvases.Canvases/EmitNodeEvent"
+	Canvases_InvokeNodeExecutionAction_FullMethodName   = "/Superplane.Canvases.Canvases/InvokeNodeExecutionAction"
+	Canvases_InvokeNodeTriggerAction_FullMethodName     = "/Superplane.Canvases.Canvases/InvokeNodeTriggerAction"
+	Canvases_ListChildExecutions_FullMethodName         = "/Superplane.Canvases.Canvases/ListChildExecutions"
+	Canvases_CancelExecution_FullMethodName             = "/Superplane.Canvases.Canvases/CancelExecution"
+	Canvases_ResolveExecutionErrors_FullMethodName      = "/Superplane.Canvases.Canvases/ResolveExecutionErrors"
+	Canvases_ListCanvasEvents_FullMethodName            = "/Superplane.Canvases.Canvases/ListCanvasEvents"
+	Canvases_ListCanvasMemories_FullMethodName          = "/Superplane.Canvases.Canvases/ListCanvasMemories"
+	Canvases_DeleteCanvasMemory_FullMethodName          = "/Superplane.Canvases.Canvases/DeleteCanvasMemory"
+	Canvases_ListEventExecutions_FullMethodName         = "/Superplane.Canvases.Canvases/ListEventExecutions"
+	Canvases_SendAiMessage_FullMethodName               = "/Superplane.Canvases.Canvases/SendAiMessage"
 )
 
 // CanvasesClient is the client API for Canvases service.
@@ -49,7 +55,13 @@ type CanvasesClient interface {
 	ListCanvases(ctx context.Context, in *ListCanvasesRequest, opts ...grpc.CallOption) (*ListCanvasesResponse, error)
 	CreateCanvas(ctx context.Context, in *CreateCanvasRequest, opts ...grpc.CallOption) (*CreateCanvasResponse, error)
 	DescribeCanvas(ctx context.Context, in *DescribeCanvasRequest, opts ...grpc.CallOption) (*DescribeCanvasResponse, error)
-	UpdateCanvas(ctx context.Context, in *UpdateCanvasRequest, opts ...grpc.CallOption) (*UpdateCanvasResponse, error)
+	CreateCanvasVersion(ctx context.Context, in *CreateCanvasVersionRequest, opts ...grpc.CallOption) (*CreateCanvasVersionResponse, error)
+	ListCanvasVersions(ctx context.Context, in *ListCanvasVersionsRequest, opts ...grpc.CallOption) (*ListCanvasVersionsResponse, error)
+	DescribeCanvasVersion(ctx context.Context, in *DescribeCanvasVersionRequest, opts ...grpc.CallOption) (*DescribeCanvasVersionResponse, error)
+	UpdateCanvasVersion(ctx context.Context, in *UpdateCanvasVersionRequest, opts ...grpc.CallOption) (*UpdateCanvasVersionResponse, error)
+	CreateCanvasChangeRequest(ctx context.Context, in *CreateCanvasChangeRequestRequest, opts ...grpc.CallOption) (*CreateCanvasChangeRequestResponse, error)
+	ListCanvasChangeRequests(ctx context.Context, in *ListCanvasChangeRequestsRequest, opts ...grpc.CallOption) (*ListCanvasChangeRequestsResponse, error)
+	DescribeCanvasChangeRequest(ctx context.Context, in *DescribeCanvasChangeRequestRequest, opts ...grpc.CallOption) (*DescribeCanvasChangeRequestResponse, error)
 	DeleteCanvas(ctx context.Context, in *DeleteCanvasRequest, opts ...grpc.CallOption) (*DeleteCanvasResponse, error)
 	ListNodeQueueItems(ctx context.Context, in *ListNodeQueueItemsRequest, opts ...grpc.CallOption) (*ListNodeQueueItemsResponse, error)
 	DeleteNodeQueueItem(ctx context.Context, in *DeleteNodeQueueItemRequest, opts ...grpc.CallOption) (*DeleteNodeQueueItemResponse, error)
@@ -107,10 +119,70 @@ func (c *canvasesClient) DescribeCanvas(ctx context.Context, in *DescribeCanvasR
 	return out, nil
 }
 
-func (c *canvasesClient) UpdateCanvas(ctx context.Context, in *UpdateCanvasRequest, opts ...grpc.CallOption) (*UpdateCanvasResponse, error) {
+func (c *canvasesClient) CreateCanvasVersion(ctx context.Context, in *CreateCanvasVersionRequest, opts ...grpc.CallOption) (*CreateCanvasVersionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UpdateCanvasResponse)
-	err := c.cc.Invoke(ctx, Canvases_UpdateCanvas_FullMethodName, in, out, cOpts...)
+	out := new(CreateCanvasVersionResponse)
+	err := c.cc.Invoke(ctx, Canvases_CreateCanvasVersion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) ListCanvasVersions(ctx context.Context, in *ListCanvasVersionsRequest, opts ...grpc.CallOption) (*ListCanvasVersionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCanvasVersionsResponse)
+	err := c.cc.Invoke(ctx, Canvases_ListCanvasVersions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) DescribeCanvasVersion(ctx context.Context, in *DescribeCanvasVersionRequest, opts ...grpc.CallOption) (*DescribeCanvasVersionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DescribeCanvasVersionResponse)
+	err := c.cc.Invoke(ctx, Canvases_DescribeCanvasVersion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) UpdateCanvasVersion(ctx context.Context, in *UpdateCanvasVersionRequest, opts ...grpc.CallOption) (*UpdateCanvasVersionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateCanvasVersionResponse)
+	err := c.cc.Invoke(ctx, Canvases_UpdateCanvasVersion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) CreateCanvasChangeRequest(ctx context.Context, in *CreateCanvasChangeRequestRequest, opts ...grpc.CallOption) (*CreateCanvasChangeRequestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateCanvasChangeRequestResponse)
+	err := c.cc.Invoke(ctx, Canvases_CreateCanvasChangeRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) ListCanvasChangeRequests(ctx context.Context, in *ListCanvasChangeRequestsRequest, opts ...grpc.CallOption) (*ListCanvasChangeRequestsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCanvasChangeRequestsResponse)
+	err := c.cc.Invoke(ctx, Canvases_ListCanvasChangeRequests_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) DescribeCanvasChangeRequest(ctx context.Context, in *DescribeCanvasChangeRequestRequest, opts ...grpc.CallOption) (*DescribeCanvasChangeRequestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DescribeCanvasChangeRequestResponse)
+	err := c.cc.Invoke(ctx, Canvases_DescribeCanvasChangeRequest_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +366,13 @@ type CanvasesServer interface {
 	ListCanvases(context.Context, *ListCanvasesRequest) (*ListCanvasesResponse, error)
 	CreateCanvas(context.Context, *CreateCanvasRequest) (*CreateCanvasResponse, error)
 	DescribeCanvas(context.Context, *DescribeCanvasRequest) (*DescribeCanvasResponse, error)
-	UpdateCanvas(context.Context, *UpdateCanvasRequest) (*UpdateCanvasResponse, error)
+	CreateCanvasVersion(context.Context, *CreateCanvasVersionRequest) (*CreateCanvasVersionResponse, error)
+	ListCanvasVersions(context.Context, *ListCanvasVersionsRequest) (*ListCanvasVersionsResponse, error)
+	DescribeCanvasVersion(context.Context, *DescribeCanvasVersionRequest) (*DescribeCanvasVersionResponse, error)
+	UpdateCanvasVersion(context.Context, *UpdateCanvasVersionRequest) (*UpdateCanvasVersionResponse, error)
+	CreateCanvasChangeRequest(context.Context, *CreateCanvasChangeRequestRequest) (*CreateCanvasChangeRequestResponse, error)
+	ListCanvasChangeRequests(context.Context, *ListCanvasChangeRequestsRequest) (*ListCanvasChangeRequestsResponse, error)
+	DescribeCanvasChangeRequest(context.Context, *DescribeCanvasChangeRequestRequest) (*DescribeCanvasChangeRequestResponse, error)
 	DeleteCanvas(context.Context, *DeleteCanvasRequest) (*DeleteCanvasResponse, error)
 	ListNodeQueueItems(context.Context, *ListNodeQueueItemsRequest) (*ListNodeQueueItemsResponse, error)
 	DeleteNodeQueueItem(context.Context, *DeleteNodeQueueItemRequest) (*DeleteNodeQueueItemResponse, error)
@@ -330,8 +408,26 @@ func (UnimplementedCanvasesServer) CreateCanvas(context.Context, *CreateCanvasRe
 func (UnimplementedCanvasesServer) DescribeCanvas(context.Context, *DescribeCanvasRequest) (*DescribeCanvasResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DescribeCanvas not implemented")
 }
-func (UnimplementedCanvasesServer) UpdateCanvas(context.Context, *UpdateCanvasRequest) (*UpdateCanvasResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method UpdateCanvas not implemented")
+func (UnimplementedCanvasesServer) CreateCanvasVersion(context.Context, *CreateCanvasVersionRequest) (*CreateCanvasVersionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateCanvasVersion not implemented")
+}
+func (UnimplementedCanvasesServer) ListCanvasVersions(context.Context, *ListCanvasVersionsRequest) (*ListCanvasVersionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCanvasVersions not implemented")
+}
+func (UnimplementedCanvasesServer) DescribeCanvasVersion(context.Context, *DescribeCanvasVersionRequest) (*DescribeCanvasVersionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DescribeCanvasVersion not implemented")
+}
+func (UnimplementedCanvasesServer) UpdateCanvasVersion(context.Context, *UpdateCanvasVersionRequest) (*UpdateCanvasVersionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateCanvasVersion not implemented")
+}
+func (UnimplementedCanvasesServer) CreateCanvasChangeRequest(context.Context, *CreateCanvasChangeRequestRequest) (*CreateCanvasChangeRequestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateCanvasChangeRequest not implemented")
+}
+func (UnimplementedCanvasesServer) ListCanvasChangeRequests(context.Context, *ListCanvasChangeRequestsRequest) (*ListCanvasChangeRequestsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCanvasChangeRequests not implemented")
+}
+func (UnimplementedCanvasesServer) DescribeCanvasChangeRequest(context.Context, *DescribeCanvasChangeRequestRequest) (*DescribeCanvasChangeRequestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DescribeCanvasChangeRequest not implemented")
 }
 func (UnimplementedCanvasesServer) DeleteCanvas(context.Context, *DeleteCanvasRequest) (*DeleteCanvasResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteCanvas not implemented")
@@ -458,20 +554,128 @@ func _Canvases_DescribeCanvas_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Canvases_UpdateCanvas_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateCanvasRequest)
+func _Canvases_CreateCanvasVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateCanvasVersionRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(CanvasesServer).UpdateCanvas(ctx, in)
+		return srv.(CanvasesServer).CreateCanvasVersion(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Canvases_UpdateCanvas_FullMethodName,
+		FullMethod: Canvases_CreateCanvasVersion_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CanvasesServer).UpdateCanvas(ctx, req.(*UpdateCanvasRequest))
+		return srv.(CanvasesServer).CreateCanvasVersion(ctx, req.(*CreateCanvasVersionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_ListCanvasVersions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCanvasVersionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).ListCanvasVersions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_ListCanvasVersions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).ListCanvasVersions(ctx, req.(*ListCanvasVersionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_DescribeCanvasVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DescribeCanvasVersionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).DescribeCanvasVersion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_DescribeCanvasVersion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).DescribeCanvasVersion(ctx, req.(*DescribeCanvasVersionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_UpdateCanvasVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateCanvasVersionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).UpdateCanvasVersion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_UpdateCanvasVersion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).UpdateCanvasVersion(ctx, req.(*UpdateCanvasVersionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_CreateCanvasChangeRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateCanvasChangeRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).CreateCanvasChangeRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_CreateCanvasChangeRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).CreateCanvasChangeRequest(ctx, req.(*CreateCanvasChangeRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_ListCanvasChangeRequests_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCanvasChangeRequestsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).ListCanvasChangeRequests(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_ListCanvasChangeRequests_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).ListCanvasChangeRequests(ctx, req.(*ListCanvasChangeRequestsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_DescribeCanvasChangeRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DescribeCanvasChangeRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).DescribeCanvasChangeRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_DescribeCanvasChangeRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).DescribeCanvasChangeRequest(ctx, req.(*DescribeCanvasChangeRequestRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -802,8 +1006,32 @@ var Canvases_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Canvases_DescribeCanvas_Handler,
 		},
 		{
-			MethodName: "UpdateCanvas",
-			Handler:    _Canvases_UpdateCanvas_Handler,
+			MethodName: "CreateCanvasVersion",
+			Handler:    _Canvases_CreateCanvasVersion_Handler,
+		},
+		{
+			MethodName: "ListCanvasVersions",
+			Handler:    _Canvases_ListCanvasVersions_Handler,
+		},
+		{
+			MethodName: "DescribeCanvasVersion",
+			Handler:    _Canvases_DescribeCanvasVersion_Handler,
+		},
+		{
+			MethodName: "UpdateCanvasVersion",
+			Handler:    _Canvases_UpdateCanvasVersion_Handler,
+		},
+		{
+			MethodName: "CreateCanvasChangeRequest",
+			Handler:    _Canvases_CreateCanvasChangeRequest_Handler,
+		},
+		{
+			MethodName: "ListCanvasChangeRequests",
+			Handler:    _Canvases_ListCanvasChangeRequests_Handler,
+		},
+		{
+			MethodName: "DescribeCanvasChangeRequest",
+			Handler:    _Canvases_DescribeCanvasChangeRequest_Handler,
 		},
 		{
 			MethodName: "DeleteCanvas",

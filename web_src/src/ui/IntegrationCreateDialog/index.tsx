@@ -11,7 +11,10 @@ import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { useUpdateIntegration } from "@/hooks/useIntegrations";
+import { integrationKeys, useUpdateIntegration } from "@/hooks/useIntegrations";
+import { organizationsUpdateIntegration } from "@/api-client/sdk.gen";
+import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { useQueryClient } from "@tanstack/react-query";
 import type {
   ConfigurationField,
   IntegrationsIntegrationDefinition,
@@ -59,6 +62,7 @@ export function IntegrationCreateDialog({
   initialStepFieldNames,
   webhookStepDescription,
 }: IntegrationCreateDialogProps) {
+  const queryClient = useQueryClient();
   const [integrationName, setIntegrationName] = useState(defaultName);
   const [configuration, setConfiguration] = useState<Record<string, unknown>>({});
   const [createIntegrationBrowserAction, setCreateIntegrationBrowserAction] = useState<
@@ -71,8 +75,13 @@ export function IntegrationCreateDialog({
   } | null>(null);
   const [isCreatePending, setIsCreatePending] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [createdIntegrationId, setCreatedIntegrationId] = useState<string | undefined>(undefined);
+  const [browserActionCompleted, setBrowserActionCompleted] = useState(false);
 
-  const updateIntegrationMutation = useUpdateIntegration(organizationId, pendingWebhookSetup?.id ?? "");
+  const updateIntegrationMutation = useUpdateIntegration(
+    organizationId,
+    pendingWebhookSetup?.id ?? createdIntegrationId ?? "",
+  );
 
   const selectedInstructions = useMemo(() => {
     const raw = integrationDefinition?.instructions?.trim();
@@ -93,6 +102,8 @@ export function IntegrationCreateDialog({
       setConfiguration({});
       setCreateIntegrationBrowserAction(undefined);
       setPendingWebhookSetup(null);
+      setCreatedIntegrationId(undefined);
+      setBrowserActionCompleted(false);
     }
   }, [open, defaultName]);
 
@@ -103,6 +114,8 @@ export function IntegrationCreateDialog({
         setConfiguration({});
         setCreateIntegrationBrowserAction(undefined);
         setPendingWebhookSetup(null);
+        setCreatedIntegrationId(undefined);
+        setBrowserActionCompleted(false);
         setCreateError(null);
         onReset?.();
       }
@@ -143,6 +156,9 @@ export function IntegrationCreateDialog({
 
       if (browserAction) {
         setCreateIntegrationBrowserAction(browserAction);
+        if (integration?.metadata?.id) {
+          setCreatedIntegrationId(integration.metadata.id);
+        }
         return;
       }
       if (integration?.metadata?.id && webhookUrl) {
@@ -188,7 +204,7 @@ export function IntegrationCreateDialog({
     }
   }, [pendingWebhookSetup, configuration, updateIntegrationMutation, handleClose, onCreated]);
 
-  const handleBrowserActionContinue = useCallback(() => {
+  const handleBrowserActionContinue = useCallback(async () => {
     if (!createIntegrationBrowserAction) return;
     const { url, method, formFields } = createIntegrationBrowserAction;
     if (method?.toUpperCase() === "POST" && formFields) {
@@ -210,7 +226,25 @@ export function IntegrationCreateDialog({
     } else if (url) {
       window.open(url, "_blank");
     }
-  }, [createIntegrationBrowserAction]);
+
+    // Trigger a resync so the backend transitions from pending to ready
+    if (createdIntegrationId) {
+      try {
+        await organizationsUpdateIntegration(
+          withOrganizationHeader({
+            path: { id: organizationId, integrationId: createdIntegrationId },
+            body: { configuration: { ...configuration, installed: "true" } },
+          }),
+        );
+        await queryClient.invalidateQueries({
+          queryKey: integrationKeys.connected(organizationId),
+        });
+      } catch {
+        // Resync is best-effort; the integration will be resynced eventually
+      }
+      setBrowserActionCompleted(true);
+    }
+  }, [createIntegrationBrowserAction, createdIntegrationId, configuration, organizationId, queryClient]);
 
   if (!integrationDefinition) return null;
 
@@ -245,8 +279,16 @@ export function IntegrationCreateDialog({
           </div>
           {!pendingWebhookSetup && (createIntegrationBrowserAction?.description || selectedInstructions) && (
             <IntegrationInstructions
-              description={(createIntegrationBrowserAction?.description || selectedInstructions) ?? ""}
-              onContinue={createIntegrationBrowserAction?.url ? handleBrowserActionContinue : undefined}
+              description={
+                browserActionCompleted
+                  ? [selectedInstructions, createIntegrationBrowserAction?.description].filter(Boolean).join("\n\n")
+                  : ((createIntegrationBrowserAction?.description || selectedInstructions) ?? "")
+              }
+              onContinue={
+                !browserActionCompleted && createIntegrationBrowserAction?.url
+                  ? () => void handleBrowserActionContinue()
+                  : undefined
+              }
               className="mt-2"
             />
           )}
@@ -306,7 +348,7 @@ export function IntegrationCreateDialog({
                   />
                 ))}
             </>
-          ) : (
+          ) : browserActionCompleted ? null : (
             <>
               <div>
                 <Label className="text-gray-800 dark:text-gray-100 mb-2">
@@ -373,12 +415,28 @@ export function IntegrationCreateDialog({
             </>
           ) : createIntegrationBrowserAction ? (
             <>
-              <Button color="blue" onClick={handleClose}>
-                Save
-              </Button>
-              <Button variant="outline" onClick={handleClose}>
-                Cancel
-              </Button>
+              {browserActionCompleted ? (
+                <Button
+                  color="blue"
+                  onClick={() => {
+                    if (createdIntegrationId) {
+                      onCreated?.(createdIntegrationId);
+                    }
+                    handleClose();
+                  }}
+                >
+                  Done
+                </Button>
+              ) : (
+                <>
+                  <Button color="blue" onClick={handleClose}>
+                    Save
+                  </Button>
+                  <Button variant="outline" onClick={handleClose}>
+                    Cancel
+                  </Button>
+                </>
+              )}
             </>
           ) : (
             <>

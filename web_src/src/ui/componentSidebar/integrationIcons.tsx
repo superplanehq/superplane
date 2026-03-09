@@ -29,6 +29,8 @@ import octopusIcon from "@/assets/icons/integrations/octopus.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
+import cloudBuildIcon from "@/assets/icons/integrations/cloud_build.svg";
+import gcpCloudRunIcon from "@/assets/icons/integrations/gcp.cloudrun.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
@@ -44,9 +46,11 @@ import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
 import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
+import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
+import teamsIcon from "@/assets/icons/integrations/teams.svg";
 
 /** Integration type name (e.g. "github") → logo src. Used for Settings tab and header. */
 export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
@@ -85,9 +89,11 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   honeycomb: honeycombIcon,
   gcp: gcpIcon,
   harness: harnessIcon,
+  newrelic: newrelicIcon,
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
   launchdarkly: launchdarklyIcon,
+  teams: teamsIcon,
 };
 
 /** Block name first part (e.g. "github") or compound (e.g. aws.lambda) → logo src for header. */
@@ -124,9 +130,11 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   render: renderIcon,
   dockerhub: dockerIcon,
   harness: harnessIcon,
+  newrelic: newrelicIcon,
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
   launchdarkly: launchdarklyIcon,
+  teams: teamsIcon,
   aws: {
     cloudwatch: awsCloudwatchIcon,
     codeArtifact: awsCodeArtifactIcon,
@@ -140,7 +148,10 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
     sns: awsSnsIcon,
   },
   honeycomb: honeycombIcon,
-  gcp: gcpIcon,
+  gcp: {
+    cloudbuild: cloudBuildIcon,
+    cloudfunctions: gcpCloudRunIcon,
+  },
 };
 
 /**
@@ -168,8 +179,9 @@ export function getHeaderIconSrc(blockName: string | undefined): string | undefi
     const nested = appLogo[nameParts[1]];
     if (nested) return nested;
   }
-  // Use main AWS icon for aws.* components without a dedicated sub-icon mapping.
+  // Use main AWS/GCP icon for components without a dedicated sub-icon mapping.
   if (first === "aws") return getIntegrationIconSrc("aws");
+  if (first === "gcp") return getIntegrationIconSrc("gcp");
   return undefined;
 }
 

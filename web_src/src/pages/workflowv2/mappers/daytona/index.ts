@@ -19,7 +19,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createSandbox: buildActionStateRegistry("created"),
   createRepositorySandbox: buildActionStateRegistry("created"),
   getPreviewUrl: buildActionStateRegistry("generated"),
-  executeCode: buildActionStateRegistry("executed"),
+  executeCode: EXECUTE_COMMAND_STATE_REGISTRY,
   executeCommand: EXECUTE_COMMAND_STATE_REGISTRY,
   deleteSandbox: buildActionStateRegistry("deleted"),
 };

@@ -33,7 +33,7 @@ func (h *Hetzner) Icon() string {
 }
 
 func (h *Hetzner) Description() string {
-	return "Create and delete Hetzner Cloud servers and load balancers"
+	return "Create and delete Hetzner Cloud servers/load balancers and create/delete server snapshots"
 }
 
 func (h *Hetzner) Instructions() string {
@@ -58,6 +58,8 @@ func (h *Hetzner) Configuration() []configuration.Field {
 func (h *Hetzner) Components() []core.Component {
 	return []core.Component{
 		&CreateServer{},
+		&CreateSnapshot{},
+		&DeleteSnapshot{},
 		&DeleteServer{},
 		&CreateLoadBalancer{},
 		&DeleteLoadBalancer{},
@@ -170,11 +172,40 @@ func (h *Hetzner) ListResources(resourceType string, ctx core.ListResourcesConte
 		}
 		resources := make([]core.IntegrationResource, 0, len(images))
 		for _, img := range images {
-			id := img.Name
-			if id == "" {
-				id = fmt.Sprintf("%d", img.ID)
+			id := fmt.Sprintf("%d", img.ID)
+			displayName := strings.TrimSpace(img.Name)
+			if displayName == "" {
+				displayName = strings.TrimSpace(img.Description)
 			}
-			resources = append(resources, core.IntegrationResource{Type: "image", Name: img.Name, ID: id})
+			if displayName == "" {
+				displayName = id
+			}
+			if img.Type != "" {
+				displayName = fmt.Sprintf("%s (%s)", displayName, img.Type)
+			}
+			resources = append(resources, core.IntegrationResource{Type: "image", Name: displayName, ID: id})
+		}
+		return resources, nil
+	case "snapshot_image":
+		images, err := client.ListImages()
+		if err != nil {
+			return nil, err
+		}
+		resources := make([]core.IntegrationResource, 0, len(images))
+		for _, img := range images {
+			if strings.TrimSpace(img.Type) != "snapshot" {
+				continue
+			}
+			id := fmt.Sprintf("%d", img.ID)
+			displayName := strings.TrimSpace(img.Description)
+			if displayName == "" {
+				displayName = strings.TrimSpace(img.Name)
+			}
+			if displayName == "" {
+				displayName = id
+			}
+			displayName = fmt.Sprintf("%s (snapshot)", displayName)
+			resources = append(resources, core.IntegrationResource{Type: "snapshot_image", Name: displayName, ID: id})
 		}
 		return resources, nil
 	case "location":
@@ -209,6 +240,21 @@ func (h *Hetzner) ListResources(resourceType string, ctx core.ListResourcesConte
 				displayName = id
 			}
 			resources = append(resources, core.IntegrationResource{Type: "location", Name: displayName, ID: id})
+		}
+		return resources, nil
+	case "firewall":
+		firewalls, err := client.ListFirewalls()
+		if err != nil {
+			return nil, err
+		}
+		resources := make([]core.IntegrationResource, 0, len(firewalls))
+		for _, firewall := range firewalls {
+			id := fmt.Sprintf("%d", firewall.ID)
+			name := strings.TrimSpace(firewall.Name)
+			if name == "" {
+				name = id
+			}
+			resources = append(resources, core.IntegrationResource{Type: "firewall", Name: name, ID: id})
 		}
 		return resources, nil
 	case "load_balancing_algorithm":

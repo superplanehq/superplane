@@ -16,6 +16,7 @@ import { addMemoryMapper } from "./addMemory";
 import { deleteMemoryMapper } from "./deleteMemory";
 import { readMemoryMapper } from "./readMemory";
 import { updateMemoryMapper } from "./updateMemory";
+import { upsertMemoryMapper } from "./upsertMemory";
 import { ifMapper, IF_STATE_REGISTRY } from "./if";
 import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
 import {
@@ -91,6 +92,12 @@ import {
   customFieldRenderers as incidentCustomFieldRenderers,
 } from "./incident/index";
 import {
+  componentMappers as newrelicComponentMappers,
+  customFieldRenderers as newrelicCustomFieldRenderers,
+  triggerRenderers as newrelicTriggerRenderers,
+  eventStateRegistry as newrelicEventStateRegistry,
+} from "./newrelic/index";
+import {
   componentMappers as firehydrantComponentMappers,
   triggerRenderers as firehydrantTriggerRenderers,
   eventStateRegistry as firehydrantEventStateRegistry,
@@ -133,6 +140,11 @@ import {
   triggerRenderers as octopusTriggerRenderers,
   eventStateRegistry as octopusEventStateRegistry,
 } from "./octopus/index";
+import {
+  componentMappers as teamsComponentMappers,
+  triggerRenderers as teamsTriggerRenderers,
+  eventStateRegistry as teamsEventStateRegistry,
+} from "./teams";
 import {
   componentMappers as openaiComponentMappers,
   triggerRenderers as openaiTriggerRenderers,
@@ -225,6 +237,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   deleteMemory: deleteMemoryMapper,
   readMemory: readMemoryMapper,
   updateMemory: updateMemoryMapper,
+  upsertMemory: upsertMemoryMapper,
   if: ifMapper,
   http: httpMapper,
   ssh: sshMapper,
@@ -252,12 +265,14 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   render: renderComponentMappers,
   rootly: rootlyComponentMappers,
   incident: incidentComponentMappers,
+  newrelic: newrelicComponentMappers,
   firehydrant: firehydrantComponentMappers,
   launchdarkly: launchdarklyComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
   telegram: telegramComponentMappers,
   octopus: octopusComponentMappers,
+  teams: teamsComponentMappers,
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
@@ -289,12 +304,14 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   render: renderTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   incident: incidentTriggerRenderers,
+  newrelic: newrelicTriggerRenderers,
   firehydrant: firehydrantTriggerRenderers,
   launchdarkly: launchdarklyTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
   telegram: telegramTriggerRenderers,
   octopus: octopusTriggerRenderers,
+  teams: teamsTriggerRenderers,
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
@@ -326,8 +343,10 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   render: renderEventStateRegistry,
   discord: discordEventStateRegistry,
   telegram: telegramEventStateRegistry,
+  teams: teamsEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   incident: incidentEventStateRegistry,
+  newrelic: newrelicEventStateRegistry,
   octopus: octopusEventStateRegistry,
   firehydrant: firehydrantEventStateRegistry,
   launchdarkly: launchdarklyEventStateRegistry,
@@ -372,6 +391,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
   grafana: grafanaCustomFieldRenderers,
+  newrelic: newrelicCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
   incident: incidentCustomFieldRenderers,

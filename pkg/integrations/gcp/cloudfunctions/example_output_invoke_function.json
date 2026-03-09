@@ -1,0 +1,12 @@
+{
+  "data": {
+    "functionName": "projects/my-project/locations/us-central1/functions/my-function",
+    "executionId": "h7g2k9qw3x",
+    "result": {
+      "message": "Hello, World!",
+      "status": "ok"
+    }
+  },
+  "timestamp": "2025-01-01T00:00:05Z",
+  "type": "gcp.cloudfunctions.invoke"
+}

@@ -3,14 +3,15 @@ package workers
 import (
 	"sort"
 	"testing"
-	"time"
 
+	"github.com/renderedtext/go-tackle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	protos "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/proto"
 )
 
 func Test__NotificationEmailConsumer(t *testing.T) {
@@ -20,11 +21,6 @@ func Test__NotificationEmailConsumer(t *testing.T) {
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
 
 	consumer := NewNotificationEmailConsumer(amqpURL, testEmailService, r.AuthService)
-
-	go consumer.Start()
-	defer consumer.Stop()
-
-	time.Sleep(100 * time.Millisecond)
 
 	t.Run("should send notification email with deduped recipients", func(t *testing.T) {
 		testEmailService.Reset()
@@ -58,23 +54,20 @@ func Test__NotificationEmailConsumer(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		message := messages.NewNotificationEmailRequestedMessage(
-			r.Organization.ID.String(),
-			"Approval needed",
-			"Please review the pending approval.",
-			"https://app.superplane.com/approvals/123",
-			"Review approval",
-			[]string{groupUser.GetEmail(), "external@example.com"},
-			[]string{groupName},
-			[]string{models.RoleOrgAdmin},
-		)
-
-		err = message.Publish()
+		payload, err := proto.Marshal(&protos.NotificationEmailRequested{
+			OrganizationId: r.Organization.ID.String(),
+			Title:          "Approval needed",
+			Body:           "Please review the pending approval.",
+			Url:            "https://app.superplane.com/approvals/123",
+			UrlLabel:       "Review approval",
+			Emails:         []string{groupUser.GetEmail(), "external@example.com"},
+			Groups:         []string{groupName},
+			Roles:          []string{models.RoleOrgAdmin},
+		})
 		require.NoError(t, err)
 
-		require.Eventually(t, func() bool {
-			return len(testEmailService.SentNotificationEmails()) > 0
-		}, time.Second*5, 100*time.Millisecond)
+		err = consumer.Consume(tackle.NewFakeDelivery(payload))
+		require.NoError(t, err)
 
 		sentEmails := testEmailService.SentNotificationEmails()
 		require.Len(t, sentEmails, 1)
