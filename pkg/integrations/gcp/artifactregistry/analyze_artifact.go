@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -18,18 +17,16 @@ import (
 const (
 	analyzeArtifactPayloadType   = "gcp.artifactregistry.artifactAnalysis"
 	analyzeArtifactOutputChannel = "default"
-	analyzeArtifactPollAction    = "poll"
-	analyzeArtifactPollInterval  = 30 * time.Second
 )
 
 type AnalyzeArtifact struct{}
 
 type AnalyzeArtifactConfiguration struct {
 	ResourceURL string `json:"resourceUrl" mapstructure:"resourceUrl"`
-}
-
-type AnalyzeArtifactMetadata struct {
-	ResourceURL string `json:"resourceUrl" mapstructure:"resourceUrl"`
+	Location    string `json:"location" mapstructure:"location"`
+	Repository  string `json:"repository" mapstructure:"repository"`
+	Package     string `json:"package" mapstructure:"package"`
+	Version     string `json:"version" mapstructure:"version"`
 }
 
 func (c *AnalyzeArtifact) Name() string {
@@ -45,21 +42,21 @@ func (c *AnalyzeArtifact) Description() string {
 }
 
 func (c *AnalyzeArtifact) Documentation() string {
-	return `Queries Container Analysis for vulnerability occurrences on a container image and waits until scan results are available.
+	return `Queries Container Analysis for vulnerability occurrences on a container image and emits the results immediately.
 
 ## Configuration
 
-- **Resource URL** (required): The full resource URL of the image, in the format ` + "`https://LOCATION-docker.pkg.dev/PROJECT/REPOSITORY/IMAGE@sha256:DIGEST`" + `.
+Provide either a **Resource URL** or the four fields below:
 
-## Behavior
-
-1. Queries the Container Analysis API for existing vulnerability occurrences for the specified image.
-2. If occurrences are found, emits them immediately.
-3. If no occurrences are found (scan may still be in progress), polls every 30 seconds until results appear.
+- **Resource URL**: Full resource URL of the image (e.g. from an On Artifact Push event). When provided, the fields below are not required.
+- **Location**: The GCP region where the repository is located.
+- **Repository**: The Artifact Registry repository containing the artifact.
+- **Package**: The package (image) within the repository.
+- **Version**: The version (digest or tag) to analyze.
 
 ## Output
 
-The list of vulnerability occurrences, including severity, package name, and remediation information.
+The list of vulnerability occurrences for the image. May be empty if the image has not been scanned yet.
 
 ## Notes
 
@@ -81,9 +78,82 @@ func (c *AnalyzeArtifact) Configuration() []configuration.Field {
 			Name:        "resourceUrl",
 			Label:       "Resource URL",
 			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Full resource URL of the container image to analyze.",
+			Required:    false,
+			Description: "Full resource URL of the container image to analyze (e.g. from an On Artifact Push event). When provided, the fields below are not required.",
 			Placeholder: "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
+		},
+		{
+			Name:        "location",
+			Label:       "Location",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Select the Artifact Registry region. Required if Resource URL is not provided.",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:       ResourceTypeLocation,
+					Parameters: []configuration.ParameterRef{},
+				},
+			},
+		},
+		{
+			Name:        "repository",
+			Label:       "Repository",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Select the Artifact Registry repository. Required if Resource URL is not provided.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "location", Values: []string{"*"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeRepository,
+					Parameters: []configuration.ParameterRef{
+						{Name: "location", ValueFrom: &configuration.ParameterValueFrom{Field: "location"}},
+					},
+				},
+			},
+		},
+		{
+			Name:        "package",
+			Label:       "Package",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Select the package (image) to analyze. Required if Resource URL is not provided.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "location", Values: []string{"*"}},
+				{Field: "repository", Values: []string{"*"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypePackage,
+					Parameters: []configuration.ParameterRef{
+						{Name: "location", ValueFrom: &configuration.ParameterValueFrom{Field: "location"}},
+						{Name: "repository", ValueFrom: &configuration.ParameterValueFrom{Field: "repository"}},
+					},
+				},
+			},
+		},
+		{
+			Name:        "version",
+			Label:       "Version",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Select the version (digest or tag) to analyze. Required if Resource URL is not provided.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "location", Values: []string{"*"}},
+				{Field: "repository", Values: []string{"*"}},
+				{Field: "package", Values: []string{"*"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeVersion,
+					Parameters: []configuration.ParameterRef{
+						{Name: "location", ValueFrom: &configuration.ParameterValueFrom{Field: "location"}},
+						{Name: "repository", ValueFrom: &configuration.ParameterValueFrom{Field: "repository"}},
+						{Name: "package", ValueFrom: &configuration.ParameterValueFrom{Field: "package"}},
+					},
+				},
+			},
 		},
 	}
 }
@@ -94,6 +164,10 @@ func decodeAnalyzeArtifactConfiguration(raw any) (AnalyzeArtifactConfiguration, 
 		return AnalyzeArtifactConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 	config.ResourceURL = strings.TrimSpace(config.ResourceURL)
+	config.Location = strings.TrimSpace(config.Location)
+	config.Repository = strings.TrimSpace(config.Repository)
+	config.Package = strings.TrimSpace(config.Package)
+	config.Version = strings.TrimSpace(config.Version)
 	return config, nil
 }
 
@@ -102,8 +176,21 @@ func (c *AnalyzeArtifact) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return err
 	}
-	if config.ResourceURL == "" {
-		return fmt.Errorf("resourceUrl is required")
+	if config.ResourceURL != "" {
+		_, _, _, _, err := parseArtifactResourceURL(config.ResourceURL)
+		return err
+	}
+	if config.Location == "" {
+		return fmt.Errorf("location is required (or provide resourceUrl)")
+	}
+	if config.Repository == "" {
+		return fmt.Errorf("repository is required (or provide resourceUrl)")
+	}
+	if config.Package == "" {
+		return fmt.Errorf("package is required (or provide resourceUrl)")
+	}
+	if config.Version == "" {
+		return fmt.Errorf("version is required (or provide resourceUrl)")
 	}
 	return nil
 }
@@ -114,72 +201,28 @@ func (c *AnalyzeArtifact) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
-	if config.ResourceURL == "" {
-		return ctx.ExecutionState.Fail("error", "resourceUrl is required")
-	}
-
 	client, err := getClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
 	}
 
-	result, hasOccurrences, err := fetchVulnerabilityOccurrences(client, config.ResourceURL)
+	resourceURL := config.ResourceURL
+	if resourceURL == "" {
+		projectID := client.ProjectID()
+		resourceURL = fmt.Sprintf("https://%s-docker.pkg.dev/%s/%s/%s@%s",
+			config.Location, projectID, config.Repository, config.Package, config.Version)
+	}
+
+	result, _, err := fetchVulnerabilityOccurrences(client, resourceURL)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to query vulnerability occurrences: %v", err))
 	}
 
-	if hasOccurrences {
-		return ctx.ExecutionState.Emit(analyzeArtifactOutputChannel, analyzeArtifactPayloadType, []any{result})
-	}
-
-	if err := ctx.Metadata.Set(AnalyzeArtifactMetadata{ResourceURL: config.ResourceURL}); err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to store metadata: %v", err))
-	}
-
-	return ctx.Requests.ScheduleActionCall(analyzeArtifactPollAction, map[string]any{}, analyzeArtifactPollInterval)
-}
-
-func (c *AnalyzeArtifact) Actions() []core.Action {
-	return []core.Action{
-		{Name: analyzeArtifactPollAction, UserAccessible: false},
-	}
-}
-
-func (c *AnalyzeArtifact) HandleAction(ctx core.ActionContext) error {
-	switch ctx.Name {
-	case analyzeArtifactPollAction:
-		return c.poll(ctx)
-	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
-	}
-}
-
-func (c *AnalyzeArtifact) poll(ctx core.ActionContext) error {
-	if ctx.ExecutionState.IsFinished() {
-		return nil
-	}
-
-	var metadata AnalyzeArtifactMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode metadata: %w", err)
-	}
-
-	client, err := getClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create GCP client: %w", err)
-	}
-
-	result, hasOccurrences, err := fetchVulnerabilityOccurrences(client, metadata.ResourceURL)
-	if err != nil {
-		return fmt.Errorf("failed to query vulnerability occurrences: %w", err)
-	}
-
-	if !hasOccurrences {
-		return ctx.Requests.ScheduleActionCall(analyzeArtifactPollAction, map[string]any{}, analyzeArtifactPollInterval)
-	}
-
 	return ctx.ExecutionState.Emit(analyzeArtifactOutputChannel, analyzeArtifactPayloadType, []any{result})
 }
+
+func (c *AnalyzeArtifact) Actions() []core.Action                  { return nil }
+func (c *AnalyzeArtifact) HandleAction(_ core.ActionContext) error { return nil }
 
 func fetchVulnerabilityOccurrences(client Client, resourceURL string) (map[string]any, bool, error) {
 	filter := fmt.Sprintf(`kind="VULNERABILITY" AND resourceUrl="%s"`, resourceURL)
@@ -190,7 +233,7 @@ func fetchVulnerabilityOccurrences(client Client, resourceURL string) (map[strin
 		url.QueryEscape(filter),
 	)
 
-	var allOccurrences []any
+	allOccurrences := make([]any, 0)
 
 	for {
 		responseBody, err := client.GetURL(context.Background(), reqURL)

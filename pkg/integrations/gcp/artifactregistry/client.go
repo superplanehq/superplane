@@ -88,3 +88,49 @@ func versionShortName(name string) string {
 	}
 	return parts[len(parts)-1]
 }
+
+// parseArtifactResourceURL parses a GCP Artifact Registry resource URL into its components.
+// Accepts URLs in the form:
+//
+//	https://LOCATION-docker.pkg.dev/PROJECT/REPOSITORY/PACKAGE@sha256:DIGEST
+//	https://LOCATION-docker.pkg.dev/PROJECT/REPOSITORY/PACKAGE:TAG
+func parseArtifactResourceURL(rawURL string) (location, repository, pkg, version string, err error) {
+	rawURL = strings.TrimPrefix(rawURL, "https://")
+	rawURL = strings.TrimPrefix(rawURL, "http://")
+
+	host, path, ok := strings.Cut(rawURL, "/")
+	if !ok {
+		return "", "", "", "", fmt.Errorf("invalid resource URL: missing path")
+	}
+
+	const dockerSuffix = "-docker.pkg.dev"
+	if !strings.HasSuffix(host, dockerSuffix) {
+		return "", "", "", "", fmt.Errorf("invalid resource URL: expected host ending in -docker.pkg.dev, got %q", host)
+	}
+	location = strings.TrimSuffix(host, dockerSuffix)
+
+	// path: PROJECT/REPOSITORY/PACKAGE@sha256:DIGEST
+	parts := strings.SplitN(path, "/", 3)
+	if len(parts) < 3 {
+		return "", "", "", "", fmt.Errorf("invalid resource URL: expected PROJECT/REPOSITORY/PACKAGE in path")
+	}
+
+	repository = parts[1]
+	packageRef := parts[2]
+
+	if idx := strings.LastIndex(packageRef, "@"); idx >= 0 {
+		pkg = packageRef[:idx]
+		version = packageRef[idx+1:] // sha256:DIGEST
+	} else if idx := strings.LastIndex(packageRef, ":"); idx >= 0 {
+		pkg = packageRef[:idx]
+		version = packageRef[idx+1:] // TAG
+	} else {
+		return "", "", "", "", fmt.Errorf("invalid resource URL: package reference must include @digest or :tag")
+	}
+
+	if location == "" || repository == "" || pkg == "" || version == "" {
+		return "", "", "", "", fmt.Errorf("invalid resource URL: could not extract all components")
+	}
+
+	return location, repository, pkg, version, nil
+}
