@@ -12,18 +12,42 @@ interface ParsedNode {
   id?: string;
   name?: string;
   type?: string;
+  configuration?: unknown;
+  metadata?: unknown;
+  position?: { x?: unknown; y?: unknown } | null;
   component?: { name?: string } | null;
   blueprint?: { id?: string } | null;
   trigger?: { name?: string } | null;
   widget?: { name?: string } | null;
+  isCollapsed?: unknown;
+  integration?: { id?: string; name?: string } | null;
   errorMessage?: string;
   warningMessage?: string;
+  paused?: unknown;
 }
 
 interface ParsedEdge {
   sourceId?: string;
   targetId?: string;
+  channel?: unknown;
 }
+
+type FieldTypeRule = { field: string; type: "bool" | "string" | "integer" | "object" };
+
+const NODE_FIELD_TYPES: FieldTypeRule[] = [
+  { field: "id", type: "string" },
+  { field: "name", type: "string" },
+  { field: "type", type: "string" },
+  { field: "isCollapsed", type: "bool" },
+  { field: "paused", type: "bool" },
+  { field: "errorMessage", type: "string" },
+  { field: "warningMessage", type: "string" },
+];
+
+const POSITION_FIELD_TYPES: FieldTypeRule[] = [
+  { field: "x", type: "integer" },
+  { field: "y", type: "integer" },
+];
 
 interface ParsedCanvas {
   metadata?: { name?: string };
@@ -174,12 +198,56 @@ export function validateCanvasYaml(parsed: Record<string, unknown>, yamlText: st
       validateNodeRef(node, range, line, lineText, diagnostics);
     }
 
+    validateNodeFieldTypes(
+      nodes[i] as unknown as Record<string, unknown>,
+      range,
+      lines,
+      `Node "${node.id}"`,
+      diagnostics,
+    );
+
     if (range && node.errorMessage) {
       diagnostics.push(makeRangeDiagnostic(range, `Node "${node.id}": ${node.errorMessage}`, "warning"));
     }
 
     if (range && node.warningMessage) {
       diagnostics.push(makeRangeDiagnostic(range, `Node "${node.id}": ${node.warningMessage}`, "warning"));
+    }
+  }
+
+  const seenPositions = new Map<string, { id: string; index: number }>();
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    if (!node.id || !node.position) continue;
+    const x = node.position.x;
+    const y = node.position.y;
+    if (typeof x !== "number" || typeof y !== "number") continue;
+
+    const key = `${x},${y}`;
+    const existing = seenPositions.get(key);
+    if (existing) {
+      const range = nodeRanges[i];
+      if (range) {
+        diagnostics.push(
+          makeRangeDiagnostic(
+            range,
+            `Node "${node.id}" overlaps with node "${existing.id}" at position (${x}, ${y})`,
+            "warning",
+          ),
+        );
+      }
+      const existingRange = nodeRanges[existing.index];
+      if (existingRange) {
+        diagnostics.push(
+          makeRangeDiagnostic(
+            existingRange,
+            `Node "${existing.id}" overlaps with node "${node.id}" at position (${x}, ${y})`,
+            "warning",
+          ),
+        );
+      }
+    } else {
+      seenPositions.set(key, { id: node.id, index: i });
     }
   }
 
@@ -210,6 +278,84 @@ export function validateCanvasYaml(parsed: Record<string, unknown>, yamlText: st
   }
 
   return diagnostics;
+}
+
+function checkFieldType(value: unknown, rule: FieldTypeRule): boolean {
+  if (value === null || value === undefined) return true;
+  switch (rule.type) {
+    case "bool":
+      return typeof value === "boolean";
+    case "string":
+      return typeof value === "string";
+    case "integer":
+      return typeof value === "number" && Number.isInteger(value);
+    case "object":
+      return typeof value === "object";
+  }
+}
+
+function findFieldLine(lines: string[], range: LineRange | undefined, fieldName: string): number | null {
+  if (!range) return null;
+  const pattern = new RegExp(`^\\s+${fieldName}:\\s`);
+  for (let i = range.start - 1; i < range.end; i++) {
+    if (pattern.test(lines[i])) {
+      return i + 1;
+    }
+  }
+  return null;
+}
+
+function addFieldTypeDiagnostic(
+  range: LineRange | undefined,
+  lines: string[],
+  fieldName: string,
+  message: string,
+  diagnostics: YamlDiagnostic[],
+): void {
+  if (range) {
+    diagnostics.push(makeRangeDiagnostic(range, message, "error"));
+  }
+  const fieldLine = findFieldLine(lines, range, fieldName);
+  const line = fieldLine ?? range?.start ?? 1;
+  const lt = lines[line - 1] ?? "";
+  diagnostics.push(makeDiagnostic(line, lt, message, "error"));
+}
+
+function validateNodeFieldTypes(
+  node: Record<string, unknown>,
+  range: LineRange | undefined,
+  lines: string[],
+  nodeLabel: string,
+  diagnostics: YamlDiagnostic[],
+): void {
+  for (const rule of NODE_FIELD_TYPES) {
+    const value = node[rule.field];
+    if (!checkFieldType(value, rule)) {
+      addFieldTypeDiagnostic(
+        range,
+        lines,
+        rule.field,
+        `${nodeLabel}: "${rule.field}" must be a ${rule.type}, got ${typeof value}`,
+        diagnostics,
+      );
+    }
+  }
+
+  const pos = node.position as { x?: unknown; y?: unknown } | null | undefined;
+  if (pos && typeof pos === "object") {
+    for (const rule of POSITION_FIELD_TYPES) {
+      const value = (pos as Record<string, unknown>)[rule.field];
+      if (!checkFieldType(value, rule)) {
+        addFieldTypeDiagnostic(
+          range,
+          lines,
+          rule.field,
+          `${nodeLabel}: position.${rule.field} must be an ${rule.type}, got ${typeof value}`,
+          diagnostics,
+        );
+      }
+    }
+  }
 }
 
 function validateNodeRef(
