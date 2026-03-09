@@ -83,7 +83,7 @@ interface ParsedCanvas {
 
 type FieldTypeRule = { field: string; type: "bool" | "string" | "integer" | "object" };
 
-/** Top-level scalar fields on a Node and their expected proto types. */
+/** Top-level fields on a Node and their expected proto types. */
 const NODE_FIELD_TYPES: FieldTypeRule[] = [
   { field: "id", type: "string" },
   { field: "name", type: "string" },
@@ -92,6 +92,14 @@ const NODE_FIELD_TYPES: FieldTypeRule[] = [
   { field: "paused", type: "bool" },
   { field: "errorMessage", type: "string" },
   { field: "warningMessage", type: "string" },
+  { field: "configuration", type: "object" },
+  { field: "metadata", type: "object" },
+  { field: "position", type: "object" },
+  { field: "component", type: "object" },
+  { field: "blueprint", type: "object" },
+  { field: "trigger", type: "object" },
+  { field: "widget", type: "object" },
+  { field: "integration", type: "object" },
 ];
 
 const POSITION_FIELD_TYPES: FieldTypeRule[] = [
