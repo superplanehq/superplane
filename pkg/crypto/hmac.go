@@ -17,3 +17,9 @@ func VerifySignature(key []byte, data []byte, signature string) error {
 
 	return nil
 }
+
+func Sign(key []byte, data []byte) string {
+	h := hmac.New(sha256.New, key)
+	h.Write(data)
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
