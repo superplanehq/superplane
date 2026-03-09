@@ -11,7 +11,7 @@ import {
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import { GetCheckRuleConfiguration, GetCheckRuleNodeMetadata } from "./types";
+import { GetCheckRuleConfiguration } from "./types";
 import { formatTimeAgo } from "@/utils/date";
 
 export const getCheckRuleMapper: ComponentBaseMapper = {
@@ -86,17 +86,14 @@ export const getCheckRuleMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as GetCheckRuleNodeMetadata | undefined;
   const configuration = node.configuration as GetCheckRuleConfiguration;
 
-  if (nodeMetadata?.checkRuleName) {
-    metadata.push({ icon: "bell", label: nodeMetadata.checkRuleName });
-  } else if (configuration?.checkRuleId) {
+  if (configuration?.checkRuleId) {
     const idPreview =
-      configuration.checkRuleId.length > 24
-        ? configuration.checkRuleId.substring(0, 24) + "…"
+      configuration.checkRuleId.length > 30
+        ? configuration.checkRuleId.substring(0, 30) + "…"
         : configuration.checkRuleId;
-    metadata.push({ icon: "fingerprint", label: idPreview });
+    metadata.push({ icon: "bell", label: idPreview });
   }
 
   if (configuration?.dataset) metadata.push({ icon: "database", label: configuration.dataset });

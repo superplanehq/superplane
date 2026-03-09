@@ -112,10 +112,6 @@ export interface GetCheckRuleConfiguration {
   dataset: string;
 }
 
-export interface GetCheckRuleNodeMetadata {
-  checkRuleName?: string;
-}
-
 export interface UpdateCheckRuleConfiguration extends CheckRuleConfiguration {
   checkRuleId: string;
 }
@@ -123,7 +119,4 @@ export interface UpdateCheckRuleConfiguration extends CheckRuleConfiguration {
 export interface DeleteCheckRuleConfiguration {
   checkRuleId: string;
   dataset: string;
-}
-export interface DeleteCheckRuleNodeMetadata {
-  checkRuleName: string;
 }

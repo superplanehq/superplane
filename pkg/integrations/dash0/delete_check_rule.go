@@ -18,9 +18,6 @@ type DeleteCheckRuleSpec struct {
 	CheckRuleID string `mapstructure:"checkRuleId"`
 	Dataset     string `mapstructure:"dataset"`
 }
-type DeleteCheckRuleNodeMetadata struct {
-	CheckRuleName string `json:"checkRuleName" mapstructure:"checkRuleName"`
-}
 
 func (c *DeleteCheckRule) Name() string {
 	return "dash0.deleteCheckRule"
@@ -103,39 +100,6 @@ func (c *DeleteCheckRule) Setup(ctx core.SetupContext) error {
 
 	if strings.TrimSpace(spec.Dataset) == "" {
 		return errors.New("dataset is required")
-	}
-	// Try to fetch and store the check rule name as metadata
-	var nodeMetadata DeleteCheckRuleNodeMetadata
-	err = mapstructure.Decode(ctx.Metadata.Get(), &nodeMetadata)
-	if err != nil {
-		return fmt.Errorf("error decoding metadata: %v", err)
-	}
-
-	if nodeMetadata.CheckRuleName != "" {
-		return nil
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("error creating client during setup: %v", err)
-	}
-
-	checkRule, err := client.GetCheckRule(spec.CheckRuleID, spec.Dataset)
-	if err != nil {
-		return fmt.Errorf("failed to get check rule during setup: %v", err)
-	}
-
-	checkRuleName := ""
-	if name, ok := checkRule["name"].(string); ok {
-		checkRuleName = name
-	} else if id, ok := checkRule["id"].(string); ok {
-		checkRuleName = id
-	}
-
-	if checkRuleName != "" {
-		return ctx.Metadata.Set(DeleteCheckRuleNodeMetadata{
-			CheckRuleName: checkRuleName,
-		})
 	}
 
 	return nil
