@@ -2039,26 +2039,26 @@ export function WorkflowPageV2() {
   );
 
   const handleSaveWorkflow = useCallback(
-    async (workflowToSave?: CanvasesCanvas, options?: { showToast?: boolean }) => {
+    async (workflowToSave?: CanvasesCanvas, options?: { showToast?: boolean }): Promise<boolean> => {
       const targetWorkflow = workflowToSave || canvasRef.current;
-      if (!targetWorkflow || !organizationId || !canvasId) return;
+      if (!targetWorkflow || !organizationId || !canvasId) return false;
       if (!canUpdateCanvas) {
         if (options?.showToast !== false) {
           showErrorToast("You don't have permission to update this canvas");
         }
-        return;
+        return false;
       }
       if (isTemplate) {
         if (options?.showToast !== false) {
           showErrorToast("Template canvases are read-only");
         }
-        return;
+        return false;
       }
       if (!activeCanvasVersionId && !isSandboxModeEnabled) {
         if (options?.showToast !== false) {
           showErrorToast("Enable edit mode before saving changes");
         }
-        return;
+        return false;
       }
       const shouldRestoreFocus = options?.showToast === false;
       const focusedNoteId = shouldRestoreFocus ? getActiveNoteId() : null;
@@ -2085,7 +2085,7 @@ export function WorkflowPageV2() {
           setActiveCanvasVersion(updateResponse.data.version);
         }
         if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
-          return;
+          return true;
         }
 
         setLiveCanvasEntries((prev) => [
@@ -2108,6 +2108,7 @@ export function WorkflowPageV2() {
         // Clear the snapshot since changes are now saved
         setInitialWorkflowSnapshot(null);
         lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(targetWorkflow));
+        return true;
       } catch (error: any) {
         console.error("Failed to save canvas", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
@@ -2124,6 +2125,7 @@ export function WorkflowPageV2() {
           }),
           ...prev,
         ]);
+        return false;
       } finally {
         if (focusedNoteId) {
           requestAnimationFrame(() => {
@@ -4418,11 +4420,18 @@ export function WorkflowPageV2() {
         },
       };
 
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-
+      // When auto-save is enabled, only update the local query cache after the
+      // backend confirms the save. This prevents corrupted state from persisting
+      // locally when the server rejects the payload (e.g. proto validation errors).
+      // When auto-save is off, the optimistic update is safe because the user will
+      // explicitly trigger save later and can see/fix issues before committing.
       if (canAutoSave) {
-        await handleSaveWorkflow(updatedWorkflow as CanvasesCanvas, { showToast: false });
+        const saved = await handleSaveWorkflow(updatedWorkflow as CanvasesCanvas, { showToast: false });
+        if (saved) {
+          queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+        }
       } else {
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
         markUnsavedChange("structural");
       }
     },
@@ -4508,6 +4517,8 @@ export function WorkflowPageV2() {
           onTopViewModeChange={(mode) => {
             setIsCreateChangeRequestMode(false);
             setTopViewMode(mode);
+            // Server errors are only relevant while in the YAML editor — clear them
+            // when switching away so stale messages don't reappear on return.
             if (mode !== "yaml") {
               setYamlServerError(null);
             }

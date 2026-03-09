@@ -235,7 +235,9 @@ export function CanvasYamlView({
       debounceRef.current = setTimeout(() => {
         runValidation(text);
 
-        // Only propagate changes upstream when there are no errors
+        // Errors (duplicate IDs, type mismatches, syntax) block saves entirely to
+        // prevent corrupted state from reaching the backend. Warnings (overlapping
+        // positions, duplicate names) are informational and still allow saves.
         try {
           const parsed = yaml.load(text);
           if (parsed && typeof parsed === "object") {
