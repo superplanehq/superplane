@@ -7,15 +7,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func Test__OnIncident__HandleWebhook(t *testing.T) {
 	trigger := &OnIncident{}
-
-	signatureFor := func(secret string, body []byte) string {
-		return computeHMACSHA256([]byte(secret), body)
-	}
 
 	t.Run("missing fh-signature -> 403", func(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -69,7 +66,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		body := []byte("invalid json")
 		secret := "test-secret"
 		headers := http.Header{}
-		headers.Set("fh-signature", signatureFor(secret, body))
+		headers.Set("fh-signature", crypto.Sign([]byte(secret), body))
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
@@ -87,7 +84,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		body := []byte(`{"data":{},"event":{"operation":"CREATED","resource_type":"change_event"}}`)
 		secret := "test-secret"
 		headers := http.Header{}
-		headers.Set("fh-signature", signatureFor(secret, body))
+		headers.Set("fh-signature", crypto.Sign([]byte(secret), body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -107,7 +104,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		body := []byte(`{"data":{"incident":{"id":"inc-123"}},"event":{"operation":"UPDATED","resource_type":"incident"}}`)
 		secret := "test-secret"
 		headers := http.Header{}
-		headers.Set("fh-signature", signatureFor(secret, body))
+		headers.Set("fh-signature", crypto.Sign([]byte(secret), body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -142,7 +139,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		}`)
 		secret := "test-secret"
 		headers := http.Header{}
-		headers.Set("fh-signature", signatureFor(secret, body))
+		headers.Set("fh-signature", crypto.Sign([]byte(secret), body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -189,7 +186,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		}`)
 		secret := "test-secret"
 		headers := http.Header{}
-		headers.Set("fh-signature", signatureFor(secret, body))
+		headers.Set("fh-signature", crypto.Sign([]byte(secret), body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -224,7 +221,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		}`)
 		secret := "test-secret"
 		headers := http.Header{}
-		headers.Set("fh-signature", signatureFor(secret, body))
+		headers.Set("fh-signature", crypto.Sign([]byte(secret), body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -258,7 +255,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		}`)
 		secret := "test-secret"
 		headers := http.Header{}
-		headers.Set("fh-signature", signatureFor(secret, body))
+		headers.Set("fh-signature", crypto.Sign([]byte(secret), body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -293,7 +290,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		}`)
 		secret := "test-secret"
 		headers := http.Header{}
-		headers.Set("fh-signature", signatureFor(secret, body))
+		headers.Set("fh-signature", crypto.Sign([]byte(secret), body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -328,7 +325,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		}`)
 		secret := "test-secret"
 		headers := http.Header{}
-		headers.Set("fh-signature", signatureFor(secret, body))
+		headers.Set("fh-signature", crypto.Sign([]byte(secret), body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -365,7 +362,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		}`)
 		secret := "test-secret"
 		headers := http.Header{}
-		headers.Set("fh-signature", signatureFor(secret, body))
+		headers.Set("fh-signature", crypto.Sign([]byte(secret), body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -406,7 +403,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		}`)
 		secret := "test-secret"
 		headers := http.Header{}
-		headers.Set("fh-signature", signatureFor(secret, body))
+		headers.Set("fh-signature", crypto.Sign([]byte(secret), body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -439,7 +436,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		}`)
 		secret := "test-secret"
 		headers := http.Header{}
-		headers.Set("fh-signature", signatureFor(secret, body))
+		headers.Set("fh-signature", crypto.Sign([]byte(secret), body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -474,7 +471,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		}`)
 		secret := "test-secret"
 		headers := http.Header{}
-		headers.Set("fh-signature", signatureFor(secret, body))
+		headers.Set("fh-signature", crypto.Sign([]byte(secret), body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -510,7 +507,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		}`)
 		secret := "test-secret"
 		headers := http.Header{}
-		headers.Set("fh-signature", signatureFor(secret, body))
+		headers.Set("fh-signature", crypto.Sign([]byte(secret), body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -547,7 +544,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		}`)
 		secret := "test-secret"
 		headers := http.Header{}
-		headers.Set("fh-signature", signatureFor(secret, body))
+		headers.Set("fh-signature", crypto.Sign([]byte(secret), body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -616,13 +613,13 @@ func Test__verifyWebhookSignature(t *testing.T) {
 
 	t.Run("signature mismatch -> error", func(t *testing.T) {
 		err := verifyWebhookSignature("invalid-hex", []byte("body"), []byte("secret"))
-		require.ErrorContains(t, err, "signature mismatch")
+		require.ErrorContains(t, err, "invalid signature")
 	})
 
 	t.Run("valid signature -> no error", func(t *testing.T) {
 		body := []byte("test body")
 		secret := []byte("test secret")
-		sig := computeHMACSHA256(secret, body)
+		sig := crypto.Sign(secret, body)
 
 		err := verifyWebhookSignature(sig, body, secret)
 		require.NoError(t, err)

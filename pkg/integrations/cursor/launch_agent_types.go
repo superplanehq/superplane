@@ -1,11 +1,10 @@
 package cursor
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"strings"
 	"time"
+
+	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
 // --- CONSTANTS ---
@@ -180,11 +179,9 @@ func verifyWebhookSignature(body []byte, signature, secret string) bool {
 		return false
 	}
 
-	// Compute expected signature
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(body)
-	expectedSig := hex.EncodeToString(mac.Sum(nil))
+	if err := crypto.VerifySignature([]byte(secret), body, signature); err != nil {
+		return false
+	}
 
-	// Compare signatures using constant-time comparison
-	return hmac.Equal([]byte(signature), []byte(expectedSig))
+	return true
 }
