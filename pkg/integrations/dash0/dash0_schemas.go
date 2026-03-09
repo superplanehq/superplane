@@ -157,3 +157,57 @@ func retriesObjectSchema() []configuration.Field {
 		{Name: "delay", Label: "Delay", Type: configuration.FieldTypeString, Required: true, Default: "1s", Description: "Delay between retries", Placeholder: "1s"},
 	}
 }
+
+// checkRuleThresholdsSchema returns the thresholds object fields for check rules.
+func checkRuleThresholdsSchema() []configuration.Field {
+	return []configuration.Field{
+		{
+			Name:        "degraded",
+			Label:       "Degraded Threshold",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Togglable:   true,
+			Description: "Threshold value for degraded state",
+			Placeholder: "50",
+		},
+		{
+			Name:        "critical",
+			Label:       "Critical Threshold",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Togglable:   true,
+			Description: "Threshold value for critical state",
+			Placeholder: "100",
+		},
+	}
+}
+
+// checkRuleIntervalOptions returns the evaluation interval options for check rules.
+func checkRuleIntervalOptions() []configuration.FieldOption {
+	return []configuration.FieldOption{
+		{Label: "1 minute", Value: "1m"},
+		{Label: "5 minutes", Value: "5m"},
+		{Label: "10 minutes", Value: "10m"},
+	}
+}
+
+// checkRuleGracePeriodOptions returns the grace period options for check rules.
+func checkRuleGracePeriodOptions() []configuration.FieldOption {
+	return []configuration.FieldOption{
+		{Label: "0 seconds", Value: "0s"},
+		{Label: "10 seconds", Value: "10s"},
+		{Label: "30 seconds", Value: "30s"},
+		{Label: "1 minute", Value: "1m"},
+		{Label: "2 minutes", Value: "2m"},
+		{Label: "5 minutes", Value: "5m"},
+		{Label: "10 minutes", Value: "10m"},
+	}
+}
+
+// keyValueListSchema returns the list fields for labels/annotations (key-value pairs).
+func keyValueListSchema() []configuration.Field {
+	return []configuration.Field{
+		{Name: "key", Label: "Key", Type: configuration.FieldTypeString, Required: true, DisallowExpression: true, Placeholder: "environment"},
+		{Name: "value", Label: "Value", Type: configuration.FieldTypeString, Required: true, Placeholder: "production"},
+	}
+}

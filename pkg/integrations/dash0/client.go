@@ -207,6 +207,112 @@ func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	return checkRules, nil
 }
 
+// CheckRuleRequest represents the request body for creating or updating a check rule.
+type CheckRuleRequest struct {
+	Dataset       string               `json:"dataset,omitempty"`
+	ID            string               `json:"id,omitempty"`
+	Name          string               `json:"name"`
+	Expression    string               `json:"expression"`
+	Thresholds    *CheckRuleThresholds `json:"thresholds,omitempty"`
+	Summary       string               `json:"summary,omitempty"`
+	Description   string               `json:"description,omitempty"`
+	Interval      string               `json:"interval,omitempty"`
+	For           string               `json:"for,omitempty"`
+	KeepFiringFor string               `json:"keepFiringFor,omitempty"`
+	Labels        map[string]string    `json:"labels,omitempty"`
+	Annotations   map[string]string    `json:"annotations,omitempty"`
+	Enabled       *bool                `json:"enabled,omitempty"`
+}
+
+// CheckRuleThresholds represents the degraded and critical thresholds for a check rule.
+type CheckRuleThresholds struct {
+	Degraded *float64 `json:"degraded,omitempty"`
+	Critical *float64 `json:"critical,omitempty"`
+}
+
+// CreateCheckRule creates a new check rule (Prometheus alert rule) in Dash0.
+func (c *Client) CreateCheckRule(request CheckRuleRequest, dataset string) (map[string]any, error) {
+	apiURL := fmt.Sprintf("%s/api/alerting/check-rules?dataset=%s", c.BaseURL, url.QueryEscape(dataset))
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, apiURL, bytes.NewReader(body), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
+}
+
+// GetCheckRule retrieves a specific check rule by its origin or ID.
+func (c *Client) GetCheckRule(originOrID string, dataset string) (map[string]any, error) {
+	apiURL := fmt.Sprintf("%s/api/alerting/check-rules/%s?dataset=%s", c.BaseURL, url.PathEscape(originOrID), url.QueryEscape(dataset))
+
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil, "")
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
+}
+
+// UpdateCheckRule updates an existing check rule by its origin or ID.
+func (c *Client) UpdateCheckRule(originOrID string, request CheckRuleRequest, dataset string) (map[string]any, error) {
+	apiURL := fmt.Sprintf("%s/api/alerting/check-rules/%s?dataset=%s", c.BaseURL, url.PathEscape(originOrID), url.QueryEscape(dataset))
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, apiURL, bytes.NewReader(body), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
+}
+
+// DeleteCheckRule deletes a specific check rule by its origin or ID.
+func (c *Client) DeleteCheckRule(originOrID string, dataset string) (map[string]any, error) {
+	apiURL := fmt.Sprintf("%s/api/alerting/check-rules/%s?dataset=%s", c.BaseURL, url.PathEscape(originOrID), url.QueryEscape(dataset))
+
+	responseBody, err := c.execRequest(http.MethodDelete, apiURL, nil, "")
+	if err != nil {
+		return nil, err
+	}
+
+	// DELETE might return empty body on success
+	if len(responseBody) == 0 {
+		return map[string]any{"deleted": true, "id": originOrID}, nil
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
+}
+
 // SyntheticCheckAssertion represents a single assertion in a synthetic check.
 type SyntheticCheckAssertion struct {
 	Kind string         `json:"kind"`
