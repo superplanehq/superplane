@@ -25,7 +25,7 @@ func (c *publishCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 	if !versioningContext.versioningEnabled {
-		return fmt.Errorf("canvas versioning is disabled for this canvas")
+		return fmt.Errorf("effective canvas versioning is disabled for this canvas")
 	}
 
 	draftVersionID, err := findCurrentUserDraftVersionID(ctx, canvasID)

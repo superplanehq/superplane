@@ -127,7 +127,7 @@ func Test__UpdateCanvas(t *testing.T) {
 		assert.True(t, updatedCanvas.CanvasVersioningEnabled)
 	})
 
-	t.Run("allows disabling canvas versioning when organization versioning is enabled", func(t *testing.T) {
+	t.Run("organization versioning enabled keeps effective canvas versioning enabled", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		require.NoError(
 			t,
@@ -158,14 +158,14 @@ func Test__UpdateCanvas(t *testing.T) {
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
 		require.NotNil(t, response.Canvas.Metadata)
-		assert.False(t, response.Canvas.Metadata.CanvasVersioningEnabled)
+		assert.True(t, response.Canvas.Metadata.CanvasVersioningEnabled)
 
 		updatedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
 		require.NoError(t, findErr)
 		assert.False(t, updatedCanvas.CanvasVersioningEnabled)
 	})
 
-	t.Run("organization versioning disabled keeps effective canvas versioning disabled", func(t *testing.T) {
+	t.Run("organization versioning disabled allows effective canvas versioning to be enabled", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		require.NoError(
 			t,
@@ -185,7 +185,7 @@ func Test__UpdateCanvas(t *testing.T) {
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
 		require.NotNil(t, response.Canvas.Metadata)
-		assert.False(t, response.Canvas.Metadata.CanvasVersioningEnabled)
+		assert.True(t, response.Canvas.Metadata.CanvasVersioningEnabled)
 
 		updatedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
 		require.NoError(t, findErr)

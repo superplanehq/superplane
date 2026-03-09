@@ -23,7 +23,7 @@ interface CanvasSettingsViewProps {
 export function CanvasSettingsView({
   initialValues,
   canUpdateCanvas,
-  orgVersioningEnabled = false,
+  orgVersioningEnabled,
   isSaving,
   onSave,
 }: CanvasSettingsViewProps) {
@@ -31,23 +31,24 @@ export function CanvasSettingsView({
   const [description, setDescription] = useState(initialValues.description);
   const [canvasVersioningEnabled, setCanvasVersioningEnabled] = useState(initialValues.canvasVersioningEnabled);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const isVersioningBlockedByOrganization = orgVersioningEnabled === false;
-  const isVersioningToggleDisabled = !canUpdateCanvas || isVersioningBlockedByOrganization;
-  const versioningBlockedTooltip = "Versioning is currently disabled by your organization settings.";
+  const isVersioningEnforcedByOrganization = orgVersioningEnabled === true;
+  const isVersioningToggleDisabled = !canUpdateCanvas || isVersioningEnforcedByOrganization;
+  const versioningEnforcedTooltip = "Versioning is enabled by your organization settings for all canvases.";
 
   useEffect(() => {
     setName(initialValues.name);
     setDescription(initialValues.description);
-    setCanvasVersioningEnabled(initialValues.canvasVersioningEnabled);
-  }, [initialValues]);
+    setCanvasVersioningEnabled(isVersioningEnforcedByOrganization ? true : initialValues.canvasVersioningEnabled);
+  }, [initialValues, isVersioningEnforcedByOrganization]);
 
   const hasChanges = useMemo(() => {
+    const effectiveCanvasVersioningEnabled = isVersioningEnforcedByOrganization ? true : canvasVersioningEnabled;
     return (
       name !== initialValues.name ||
       description !== initialValues.description ||
-      canvasVersioningEnabled !== initialValues.canvasVersioningEnabled
+      effectiveCanvasVersioningEnabled !== initialValues.canvasVersioningEnabled
     );
-  }, [canvasVersioningEnabled, description, initialValues, name]);
+  }, [canvasVersioningEnabled, description, initialValues, isVersioningEnforcedByOrganization, name]);
 
   const handleSave = async () => {
     if (!canUpdateCanvas) {
@@ -59,7 +60,7 @@ export function CanvasSettingsView({
       await onSave({
         name,
         description,
-        canvasVersioningEnabled: isVersioningBlockedByOrganization ? undefined : canvasVersioningEnabled,
+        canvasVersioningEnabled: isVersioningEnforcedByOrganization ? undefined : canvasVersioningEnabled,
       });
       setSaveMessage("Canvas updated successfully");
       setTimeout(() => setSaveMessage(null), 3000);
@@ -71,22 +72,24 @@ export function CanvasSettingsView({
 
   const versioningSection = (
     <Fieldset
-      className={`rounded-lg border border-gray-300 bg-white p-6 ${isVersioningBlockedByOrganization ? "opacity-60" : ""}`}
+      className={`rounded-lg border border-gray-300 bg-white p-6 ${isVersioningEnforcedByOrganization ? "opacity-60" : ""}`}
     >
       <div className="flex items-start justify-between gap-6">
         <div>
           <Label className="mb-1 block text-sm font-medium text-gray-700">Canvas Versioning</Label>
           <p className="text-sm text-gray-500">
             Manage canvas edits with drafts and publish flow. When disabled, users edit the live canvas directly.
-            {isVersioningBlockedByOrganization
-              ? " Versioning is currently disabled by your organization settings."
+            {isVersioningEnforcedByOrganization
+              ? " Versioning is enabled by your organization settings for all canvases."
               : " This toggle controls versioning for this canvas."}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-500">{canvasVersioningEnabled ? "Enabled" : "Disabled"}</span>
+          <span className="text-xs text-gray-500">
+            {isVersioningEnforcedByOrganization ? "Enabled" : canvasVersioningEnabled ? "Enabled" : "Disabled"}
+          </span>
           <Switch
-            checked={canvasVersioningEnabled}
+            checked={isVersioningEnforcedByOrganization ? true : canvasVersioningEnabled}
             onCheckedChange={setCanvasVersioningEnabled}
             disabled={isVersioningToggleDisabled}
             aria-label="Toggle canvas versioning"
@@ -120,14 +123,14 @@ export function CanvasSettingsView({
         </Field>
       </Fieldset>
 
-      {isVersioningBlockedByOrganization ? (
+      {isVersioningEnforcedByOrganization ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <div aria-disabled="true" className="cursor-not-allowed">
               {versioningSection}
             </div>
           </TooltipTrigger>
-          <TooltipContent side="top">{versioningBlockedTooltip}</TooltipContent>
+          <TooltipContent side="top">{versioningEnforcedTooltip}</TooltipContent>
         </Tooltip>
       ) : (
         versioningSection

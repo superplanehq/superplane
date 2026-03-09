@@ -24,8 +24,8 @@ func isCanvasVersioningEnabledForCanvasInTransaction(tx *gorm.DB, canvas *models
 	if err != nil {
 		return false, err
 	}
-	if !organizationVersioningEnabled {
-		return false, nil
+	if organizationVersioningEnabled {
+		return true, nil
 	}
 
 	return canvas.CanvasVersioningEnabled, nil

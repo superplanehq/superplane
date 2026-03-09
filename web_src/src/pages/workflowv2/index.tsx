@@ -932,11 +932,7 @@ export function WorkflowPageV2() {
     }
 
     if (isVersioningDisabled) {
-      showErrorToast(
-        isOrgVersioningEnabled === false
-          ? "Versioning is disabled by organization settings."
-          : "Versioning is disabled. Enable canvas versioning in canvas settings.",
-      );
+      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
       return;
     }
 
@@ -3561,11 +3557,7 @@ export function WorkflowPageV2() {
     }
 
     if (isVersioningDisabled) {
-      showErrorToast(
-        isOrgVersioningEnabled === false
-          ? "Versioning is disabled by organization settings."
-          : "Versioning is disabled. Enable canvas versioning in canvas settings.",
-      );
+      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
       return;
     }
 
@@ -3609,11 +3601,7 @@ export function WorkflowPageV2() {
       }
 
       if (isVersioningDisabled) {
-        showErrorToast(
-          isOrgVersioningEnabled === false
-            ? "Versioning is disabled by organization settings."
-            : "Versioning is disabled. Enable canvas versioning in canvas settings.",
-        );
+        showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
         return;
       }
 
@@ -3816,11 +3804,7 @@ export function WorkflowPageV2() {
     }
 
     if (isVersioningDisabled) {
-      showErrorToast(
-        isOrgVersioningEnabled === false
-          ? "Versioning is disabled by organization settings."
-          : "Versioning is disabled. Enable canvas versioning in canvas settings.",
-      );
+      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
       return;
     }
 
@@ -3869,11 +3853,7 @@ export function WorkflowPageV2() {
     }
 
     if (isVersioningDisabled) {
-      showErrorToast(
-        isOrgVersioningEnabled === false
-          ? "Versioning is disabled by organization settings."
-          : "Versioning is disabled. Enable canvas versioning in canvas settings.",
-      );
+      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
       return;
     }
 
@@ -4305,10 +4285,7 @@ export function WorkflowPageV2() {
   const saveButtonHidden = isTemplate || !canUpdateCanvas || !hasEditableVersion || !hasUnsavedChanges;
   const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas;
   const canUndo = !isTemplate && canUpdateCanvas && hasEditableVersion && initialWorkflowSnapshot !== null;
-  const versioningDisabledTooltip =
-    isOrgVersioningEnabled === false
-      ? "Versioning is disabled by organization settings."
-      : "Versioning is disabled. Enable canvas versioning in canvas settings.";
+  const versioningDisabledTooltip = "Versioning is disabled. Enable canvas versioning in canvas settings.";
   const toggleEditModeDisabled =
     isVersioningDisabled ||
     !canUpdateCanvas ||
