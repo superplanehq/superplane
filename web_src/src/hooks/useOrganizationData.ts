@@ -28,6 +28,7 @@ import {
   organizationsDeleteAgentOpenAiKey,
 } from "../api-client/sdk.gen";
 import { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData } from "@/api-client";
+import { canvasKeys } from "./useCanvasData";
 import { withOrganizationHeader } from "../utils/withOrganizationHeader";
 
 // Query Keys
@@ -611,8 +612,11 @@ export const useUpdateOrganization = (organizationId: string) => {
         }),
       );
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.details(organizationId) });
+      if (typeof variables.canvasVersioningEnabled === "boolean") {
+        queryClient.invalidateQueries({ queryKey: canvasKeys.all });
+      }
     },
   });
 };
