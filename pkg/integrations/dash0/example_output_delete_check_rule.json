@@ -1,0 +1,8 @@
+{
+  "type": "dash0.checkRule.deleted",
+  "data": {
+    "deleted": true,
+    "id": "high-error-rate-alert"
+  },
+  "timestamp": "2026-03-06T12:00:00Z"
+}
