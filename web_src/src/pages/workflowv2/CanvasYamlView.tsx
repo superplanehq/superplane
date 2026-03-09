@@ -25,6 +25,7 @@ import { registerQuickFixProvider } from "./yamlQuickFixes";
 import { registerYamlCompletionProvider, updateYamlCompletionData } from "./yamlCompletionProvider";
 import { registerYamlExpressionProvider, updateYamlExpressionData } from "./yamlExpressionProvider";
 import type { ComponentsComponent, TriggersTrigger, WidgetsWidget } from "@/api-client/types.gen";
+import "./yaml-block-highlights.css";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -66,25 +67,6 @@ const BLOCK_ERROR_CLASS = "yaml-block-error";
 
 function toMonacoSeverity(monaco: Monaco, severity: YamlDiagnostic["severity"]): number {
   return severity === "error" ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning;
-}
-
-/** Injects CSS for block-level decorations (idempotent). */
-function injectDecorationStyles() {
-  const styleId = "yaml-block-highlight-styles";
-  if (document.getElementById(styleId)) return;
-  const style = document.createElement("style");
-  style.id = styleId;
-  style.textContent = `
-    .${BLOCK_WARNING_CLASS} {
-      background: rgba(250, 204, 21, 0.12);
-      border-left: 3px solid rgba(234, 179, 8, 0.6);
-    }
-    .${BLOCK_ERROR_CLASS} {
-      background: rgba(239, 68, 68, 0.10);
-      border-left: 3px solid rgba(239, 68, 68, 0.5);
-    }
-  `;
-  document.head.appendChild(style);
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +215,6 @@ export function CanvasYamlView({
 
   const handleEditorMount = useCallback(
     (editor: MonacoEditor.IStandaloneCodeEditor, monaco: Monaco) => {
-      injectDecorationStyles();
       editorRef.current = editor;
       monacoRef.current = monaco;
       if (!readOnly) {

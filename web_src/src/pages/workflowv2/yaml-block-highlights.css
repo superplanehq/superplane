@@ -1,0 +1,9 @@
+.yaml-block-warning {
+  background: rgba(250, 204, 21, 0.12);
+  border-left: 3px solid rgba(234, 179, 8, 0.6);
+}
+
+.yaml-block-error {
+  background: rgba(239, 68, 68, 0.1);
+  border-left: 3px solid rgba(239, 68, 68, 0.5);
+}
