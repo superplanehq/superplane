@@ -124,3 +124,6 @@ export interface DeleteCheckRuleConfiguration {
   checkRuleId: string;
   dataset: string;
 }
+export interface DeleteCheckRuleNodeMetadata {
+  checkRuleName: string;
+}
