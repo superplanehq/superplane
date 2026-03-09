@@ -35,7 +35,13 @@ export type OccurrenceData = {
 
 export type GetArtifactAnalysisData = {
   resourceUri?: string;
-  occurrences?: OccurrenceData[];
+  scanStatus?: string;
+  vulnerabilities?: number;
+  critical?: number;
+  high?: number;
+  medium?: number;
+  low?: number;
+  fixAvailable?: number;
 };
 
 export type ArtifactVersionData = {

@@ -22,6 +22,7 @@ const (
 type GetArtifactAnalysis struct{}
 
 type GetArtifactAnalysisConfiguration struct {
+	InputMode   string   `json:"inputMode" mapstructure:"inputMode"`
 	ResourceURL string   `json:"resourceUrl" mapstructure:"resourceUrl"`
 	Location    string   `json:"location" mapstructure:"location"`
 	Repository  string   `json:"repository" mapstructure:"repository"`
@@ -77,19 +78,40 @@ func (c *GetArtifactAnalysis) OutputChannels(_ any) []core.OutputChannel {
 func (c *GetArtifactAnalysis) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:     "inputMode",
+			Label:    "Input Mode",
+			Type:     configuration.FieldTypeSelect,
+			Required: true,
+			Default:  "url",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Resource URL", Value: "url"},
+						{Label: "Select from Registry", Value: "select"},
+					},
+				},
+			},
+		},
+		{
 			Name:        "resourceUrl",
 			Label:       "Resource URL",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Full resource URL of the artifact (e.g. from an On Artifact Push event). When provided, the fields below are not required.",
+			Description: "Full resource URL of the artifact (e.g. from an On Artifact Push event).",
 			Placeholder: "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "inputMode", Values: []string{"url"}},
+			},
 		},
 		{
 			Name:        "location",
 			Label:       "Location",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Select the Artifact Registry region. Required if Resource URL is not provided.",
+			Description: "Select the Artifact Registry region.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "inputMode", Values: []string{"select"}},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:       ResourceTypeLocation,
@@ -102,8 +124,9 @@ func (c *GetArtifactAnalysis) Configuration() []configuration.Field {
 			Label:       "Repository",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Select the Artifact Registry repository. Required if Resource URL is not provided.",
+			Description: "Select the Artifact Registry repository.",
 			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "inputMode", Values: []string{"select"}},
 				{Field: "location", Values: []string{"*"}},
 			},
 			TypeOptions: &configuration.TypeOptions{
@@ -120,8 +143,9 @@ func (c *GetArtifactAnalysis) Configuration() []configuration.Field {
 			Label:       "Package",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Select the package (image) to query. Required if Resource URL is not provided.",
+			Description: "Select the package (image) to query.",
 			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "inputMode", Values: []string{"select"}},
 				{Field: "location", Values: []string{"*"}},
 				{Field: "repository", Values: []string{"*"}},
 			},
@@ -140,8 +164,9 @@ func (c *GetArtifactAnalysis) Configuration() []configuration.Field {
 			Label:       "Version",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Select the version (digest) to query. Required if Resource URL is not provided.",
+			Description: "Select the version (digest) to query.",
 			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "inputMode", Values: []string{"select"}},
 				{Field: "location", Values: []string{"*"}},
 				{Field: "repository", Values: []string{"*"}},
 				{Field: "package", Values: []string{"*"}},
@@ -182,7 +207,7 @@ func decodeGetArtifactAnalysisConfiguration(raw any) (GetArtifactAnalysisConfigu
 	if err := mapstructure.Decode(raw, &config); err != nil {
 		return GetArtifactAnalysisConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	config.ResourceURL = strings.TrimSpace(config.ResourceURL)
+	config.ResourceURL = sanitizeConfigValue(config.ResourceURL)
 	config.Location = strings.TrimSpace(config.Location)
 	config.Repository = strings.TrimSpace(config.Repository)
 	config.Package = strings.TrimSpace(config.Package)
@@ -190,25 +215,38 @@ func decodeGetArtifactAnalysisConfiguration(raw any) (GetArtifactAnalysisConfigu
 	return config, nil
 }
 
+// sanitizeConfigValue trims whitespace and clears nil-expression artifacts.
+func sanitizeConfigValue(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "<nil>" || s == "nil" {
+		return ""
+	}
+	return s
+}
+
 func (c *GetArtifactAnalysis) Setup(ctx core.SetupContext) error {
 	config, err := decodeGetArtifactAnalysisConfiguration(ctx.Configuration)
 	if err != nil {
 		return err
 	}
-	if config.ResourceURL != "" {
+	if config.InputMode == "url" || config.InputMode == "" {
+		if config.ResourceURL != "" && !strings.Contains(config.ResourceURL, "{{") {
+			_, _, _, _, err := parseArtifactResourceURL(config.ResourceURL)
+			return err
+		}
 		return nil
 	}
 	if config.Location == "" {
-		return fmt.Errorf("location is required (or provide resourceUrl)")
+		return fmt.Errorf("location is required")
 	}
 	if config.Repository == "" {
-		return fmt.Errorf("repository is required (or provide resourceUrl)")
+		return fmt.Errorf("repository is required")
 	}
 	if config.Package == "" {
-		return fmt.Errorf("package is required (or provide resourceUrl)")
+		return fmt.Errorf("package is required")
 	}
 	if config.Version == "" {
-		return fmt.Errorf("version is required (or provide resourceUrl)")
+		return fmt.Errorf("version is required")
 	}
 	return nil
 }
@@ -234,7 +272,7 @@ func (c *GetArtifactAnalysis) Execute(ctx core.ExecutionContext) error {
 	filter := buildOccurrenceFilter(config, resourceURI)
 	reqURL := listOccurrencesURL(projectID, filter)
 
-	allOccurrences := make([]any, 0)
+	summary := &analysisSummary{ResourceURI: resourceURI}
 
 	for {
 		responseBody, err := client.GetURL(context.Background(), reqURL)
@@ -251,7 +289,7 @@ func (c *GetArtifactAnalysis) Execute(ctx core.ExecutionContext) error {
 		}
 
 		for _, occ := range resp.Occurrences {
-			allOccurrences = append(allOccurrences, occ)
+			summary.accumulate(occ)
 		}
 
 		if resp.NextPageToken == "" {
@@ -261,12 +299,7 @@ func (c *GetArtifactAnalysis) Execute(ctx core.ExecutionContext) error {
 		reqURL = addPageTokenToURL(reqURL, resp.NextPageToken)
 	}
 
-	result := map[string]any{
-		"occurrences": allOccurrences,
-		"resourceUri": resourceURI,
-	}
-
-	return ctx.ExecutionState.Emit(getArtifactAnalysisOutputChannel, getArtifactAnalysisPayloadType, []any{result})
+	return ctx.ExecutionState.Emit(getArtifactAnalysisOutputChannel, getArtifactAnalysisPayloadType, []any{summary})
 }
 
 func buildOccurrenceFilter(config GetArtifactAnalysisConfiguration, resourceURI string) string {
@@ -301,6 +334,46 @@ func addPageTokenToURL(baseURL, token string) string {
 		return baseURL + "&" + encoded
 	}
 	return baseURL + "?" + encoded
+}
+
+type analysisSummary struct {
+	ResourceURI     string `json:"resourceUri"`
+	ScanStatus      string `json:"scanStatus,omitempty"`
+	Vulnerabilities int    `json:"vulnerabilities"`
+	Critical        int    `json:"critical"`
+	High            int    `json:"high"`
+	Medium          int    `json:"medium"`
+	Low             int    `json:"low"`
+	FixAvailable    int    `json:"fixAvailable"`
+}
+
+func (s *analysisSummary) accumulate(occ map[string]any) {
+	kind, _ := occ["kind"].(string)
+	switch kind {
+	case "DISCOVERY":
+		if disc, ok := occ["discovery"].(map[string]any); ok {
+			if status, ok := disc["analysisStatus"].(string); ok {
+				s.ScanStatus = status
+			}
+		}
+	case "VULNERABILITY":
+		s.Vulnerabilities++
+		if vuln, ok := occ["vulnerability"].(map[string]any); ok {
+			switch vuln["effectiveSeverity"] {
+			case "CRITICAL":
+				s.Critical++
+			case "HIGH":
+				s.High++
+			case "MEDIUM":
+				s.Medium++
+			case "LOW":
+				s.Low++
+			}
+			if vuln["fixAvailable"] == true {
+				s.FixAvailable++
+			}
+		}
+	}
 }
 
 func (c *GetArtifactAnalysis) Actions() []core.Action                  { return nil }

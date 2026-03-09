@@ -84,18 +84,28 @@ func TestParseArtifactResourceURL(t *testing.T) {
 func TestGetArtifactSetup(t *testing.T) {
 	component := &GetArtifact{}
 
-	t.Run("rejects missing configuration", func(t *testing.T) {
+	t.Run("accepts empty configuration in url mode", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{},
+			Integration:   &testcontexts.IntegrationContext{},
+			Metadata:      &testcontexts.MetadataContext{},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects select mode with missing location", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{"inputMode": "select"},
 			Integration:   &testcontexts.IntegrationContext{},
 			Metadata:      &testcontexts.MetadataContext{},
 		})
 		require.ErrorContains(t, err, "location is required")
 	})
 
-	t.Run("accepts valid resourceUrl", func(t *testing.T) {
+	t.Run("accepts valid resourceUrl in url mode", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
+				"inputMode":   "url",
 				"resourceUrl": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
 			},
 			Integration: &testcontexts.IntegrationContext{},
@@ -104,9 +114,22 @@ func TestGetArtifactSetup(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("accepts all four fields", func(t *testing.T) {
+	t.Run("accepts expression in resourceUrl", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
+				"inputMode":   "url",
+				"resourceUrl": "{{ $[\"trigger\"].data.digest }}",
+			},
+			Integration: &testcontexts.IntegrationContext{},
+			Metadata:    &testcontexts.MetadataContext{},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("accepts all four fields in select mode", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"inputMode":  "select",
 				"location":   "us-central1",
 				"repository": "my-repo",
 				"package":    "my-image",
@@ -122,18 +145,28 @@ func TestGetArtifactSetup(t *testing.T) {
 func TestGetArtifactAnalysisSetup(t *testing.T) {
 	component := &GetArtifactAnalysis{}
 
-	t.Run("rejects missing configuration", func(t *testing.T) {
+	t.Run("accepts empty configuration in url mode", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{},
+			Integration:   &testcontexts.IntegrationContext{},
+			Metadata:      &testcontexts.MetadataContext{},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects select mode with missing location", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{"inputMode": "select"},
 			Integration:   &testcontexts.IntegrationContext{},
 			Metadata:      &testcontexts.MetadataContext{},
 		})
 		require.ErrorContains(t, err, "location is required")
 	})
 
-	t.Run("accepts valid resourceUrl", func(t *testing.T) {
+	t.Run("accepts valid resourceUrl in url mode", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
+				"inputMode":   "url",
 				"resourceUrl": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
 			},
 			Integration: &testcontexts.IntegrationContext{},
@@ -142,9 +175,22 @@ func TestGetArtifactAnalysisSetup(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("accepts all four fields", func(t *testing.T) {
+	t.Run("accepts expression in resourceUrl", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
+				"inputMode":   "url",
+				"resourceUrl": "{{ $[\"trigger\"].data.resourceUri }}",
+			},
+			Integration: &testcontexts.IntegrationContext{},
+			Metadata:    &testcontexts.MetadataContext{},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("accepts all four fields in select mode", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"inputMode":  "select",
 				"location":   "us-central1",
 				"repository": "my-repo",
 				"package":    "my-image",
@@ -156,4 +202,3 @@ func TestGetArtifactAnalysisSetup(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
-
