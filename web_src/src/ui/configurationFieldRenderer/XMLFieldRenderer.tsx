@@ -2,7 +2,12 @@ import React from "react";
 import Editor from "@monaco-editor/react";
 import { FieldRendererProps } from "./types";
 import { resolveIcon } from "@/lib/utils";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import {
+  ResizableDialog,
+  ResizableDialogContent,
+  ResizableDialogDescription,
+  ResizableDialogTitle,
+} from "@/components/ui/resizable-dialog";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
 
@@ -113,13 +118,21 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
       </div>
 
       {/* Expanded Editor Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center justify-between">
-            <DialogTitle>{field.label || field.name}</DialogTitle>
-            <DialogDescription className="sr-only">
+      <ResizableDialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <ResizableDialogContent
+          className="flex flex-col"
+          defaultWidth="min(1200px, 90vw)"
+          defaultHeight="80vh"
+          minWidth={500}
+          minHeight={400}
+          storageKey="xml-editor"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <ResizableDialogTitle>{field.label || field.name}</ResizableDialogTitle>
+            <ResizableDialogDescription className="sr-only">
               Expanded XML editor for {field.label || field.name}.
-            </DialogDescription>
+            </ResizableDialogDescription>
             <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
               <button
                 onClick={(e) => {
@@ -133,9 +146,9 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
               </button>
             </SimpleTooltip>
           </div>
-          <div className="flex-1 border border-gray-200 dark:border-gray-700 rounded-md">
+          <div className="flex-1 border border-gray-200 dark:border-gray-700 rounded-md min-h-0">
             <Editor
-              height="600px"
+              height="100%"
               defaultLanguage="xml"
               value={editorValue}
               onChange={handleEditorChange}
@@ -147,8 +160,8 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
               }}
             />
           </div>
-        </DialogContent>
-      </Dialog>
+        </ResizableDialogContent>
+      </ResizableDialog>
     </>
   );
 };
