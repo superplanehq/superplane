@@ -2,7 +2,6 @@ import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRe
 import { baseMapper, cloudBuildBaseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
 import { CLOUD_BUILD_EXECUTION_STATE_REGISTRY } from "./cloudbuild";
-import { ARTIFACT_REGISTRY_EXECUTION_STATE_REGISTRY } from "./artifact_registry";
 import { onVMInstanceTriggerRenderer } from "./on_vm_instance";
 import { onBuildCompleteTriggerRenderer } from "./on_build_complete";
 import { onArtifactPushTriggerRenderer } from "./on_artifact_push";
@@ -36,7 +35,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "cloudbuild.runTrigger": CLOUD_BUILD_EXECUTION_STATE_REGISTRY,
   "cloudfunctions.invokeFunction": buildActionStateRegistry("completed"),
   "artifactregistry.getArtifact": buildActionStateRegistry("completed"),
-  "artifactregistry.analyzeArtifact": ARTIFACT_REGISTRY_EXECUTION_STATE_REGISTRY,
+  "artifactregistry.analyzeArtifact": buildActionStateRegistry("completed"),
   "artifactregistry.getArtifactAnalysis": buildActionStateRegistry("completed"),
 };
 

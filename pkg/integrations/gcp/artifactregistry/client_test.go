@@ -51,6 +51,112 @@ func setTestClientFactory(
 	})
 }
 
+func TestParseArtifactResourceURL(t *testing.T) {
+	t.Run("parses digest URL", func(t *testing.T) {
+		loc, repo, pkg, ver, err := parseArtifactResourceURL("https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123")
+		require.NoError(t, err)
+		assert.Equal(t, "us-central1", loc)
+		assert.Equal(t, "my-repo", repo)
+		assert.Equal(t, "my-image", pkg)
+		assert.Equal(t, "sha256:abc123", ver)
+	})
+
+	t.Run("parses tag URL", func(t *testing.T) {
+		loc, repo, pkg, ver, err := parseArtifactResourceURL("https://europe-west1-docker.pkg.dev/proj/repo/image:latest")
+		require.NoError(t, err)
+		assert.Equal(t, "europe-west1", loc)
+		assert.Equal(t, "repo", repo)
+		assert.Equal(t, "image", pkg)
+		assert.Equal(t, "latest", ver)
+	})
+
+	t.Run("rejects missing digest or tag", func(t *testing.T) {
+		_, _, _, _, err := parseArtifactResourceURL("https://us-central1-docker.pkg.dev/proj/repo/image")
+		require.ErrorContains(t, err, "must include @digest or :tag")
+	})
+
+	t.Run("rejects non-artifact-registry host", func(t *testing.T) {
+		_, _, _, _, err := parseArtifactResourceURL("https://gcr.io/proj/image@sha256:abc")
+		require.ErrorContains(t, err, "-docker.pkg.dev")
+	})
+}
+
+func TestGetArtifactSetup(t *testing.T) {
+	component := &GetArtifact{}
+
+	t.Run("rejects missing configuration", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{},
+			Integration:   &testcontexts.IntegrationContext{},
+			Metadata:      &testcontexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, "location is required")
+	})
+
+	t.Run("accepts valid resourceUrl", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"resourceUrl": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
+			},
+			Integration: &testcontexts.IntegrationContext{},
+			Metadata:    &testcontexts.MetadataContext{},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("accepts all four fields", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"location":   "us-central1",
+				"repository": "my-repo",
+				"package":    "my-image",
+				"version":    "sha256:abc123",
+			},
+			Integration: &testcontexts.IntegrationContext{},
+			Metadata:    &testcontexts.MetadataContext{},
+		})
+		require.NoError(t, err)
+	})
+}
+
+func TestGetArtifactAnalysisSetup(t *testing.T) {
+	component := &GetArtifactAnalysis{}
+
+	t.Run("rejects missing configuration", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{},
+			Integration:   &testcontexts.IntegrationContext{},
+			Metadata:      &testcontexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, "location is required")
+	})
+
+	t.Run("accepts valid resourceUrl", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"resourceUrl": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
+			},
+			Integration: &testcontexts.IntegrationContext{},
+			Metadata:    &testcontexts.MetadataContext{},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("accepts all four fields", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"location":   "us-central1",
+				"repository": "my-repo",
+				"package":    "my-image",
+				"version":    "sha256:abc123",
+			},
+			Integration: &testcontexts.IntegrationContext{},
+			Metadata:    &testcontexts.MetadataContext{},
+		})
+		require.NoError(t, err)
+	})
+}
+
 func TestAnalyzeArtifactSetup(t *testing.T) {
 	component := &AnalyzeArtifact{}
 
@@ -109,7 +215,7 @@ func TestAnalyzeArtifactExecuteEmitsWhenOccurrencesFound(t *testing.T) {
 	assert.Equal(t, analyzeArtifactOutputChannel, executionState.Channel)
 }
 
-func TestAnalyzeArtifactExecutePollsWhenNoOccurrences(t *testing.T) {
+func TestAnalyzeArtifactExecuteEmitsWhenNoOccurrences(t *testing.T) {
 	component := &AnalyzeArtifact{}
 	resourceURL := "https://us-central1-docker.pkg.dev/demo-project/my-repo/my-image@sha256:abc123"
 
@@ -125,8 +231,6 @@ func TestAnalyzeArtifactExecutePollsWhenNoOccurrences(t *testing.T) {
 	})
 
 	executionState := &testcontexts.ExecutionStateContext{}
-	requests := &testcontexts.RequestContext{}
-	metadata := &testcontexts.MetadataContext{}
 
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
@@ -134,11 +238,10 @@ func TestAnalyzeArtifactExecutePollsWhenNoOccurrences(t *testing.T) {
 		},
 		Integration:    &testcontexts.IntegrationContext{},
 		ExecutionState: executionState,
-		Requests:       requests,
-		Metadata:       metadata,
+		Metadata:       &testcontexts.MetadataContext{},
 	})
 
 	require.NoError(t, err)
-	assert.False(t, executionState.Passed)
-	assert.Equal(t, analyzeArtifactPollAction, requests.Action)
+	assert.True(t, executionState.Passed)
+	assert.Equal(t, analyzeArtifactOutputChannel, executionState.Channel)
 }
