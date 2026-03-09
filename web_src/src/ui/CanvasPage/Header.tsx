@@ -61,8 +61,8 @@ interface HeaderProps {
   autoSaveDisabledTooltip?: string;
   onExportYamlCopy?: () => void;
   onExportYamlDownload?: () => void;
-  topViewMode?: "canvas" | "memory" | "versioning";
-  onTopViewModeChange?: (mode: "canvas" | "memory" | "versioning") => void;
+  topViewMode?: "canvas" | "yaml" | "memory" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "versioning") => void;
   showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;
@@ -293,6 +293,15 @@ export function Header({
                   }`}
                 >
                   Canvas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onTopViewModeChange("yaml")}
+                  className={`rounded px-2 py-1 text-xs font-medium ${
+                    topViewMode === "yaml" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  YAML
                 </button>
                 <button
                   type="button"

@@ -96,6 +96,7 @@ import {
 } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
 import { CanvasMemoryView } from "./CanvasMemoryView";
+import { CanvasYamlView } from "./CanvasYamlView";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
@@ -461,7 +462,7 @@ export function WorkflowPageV2() {
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
   const isDev = import.meta.env.DEV;
-  const [topViewMode, setTopViewMode] = useState<"canvas" | "memory" | "versioning">("canvas");
+  const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "memory" | "versioning">("canvas");
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
@@ -4345,8 +4346,41 @@ export function WorkflowPageV2() {
             : hasRunBlockingChanges
               ? "Save canvas changes before running"
               : undefined;
+  const yamlPayload = useMemo(() => getYamlExportPayload(nodes), [getYamlExportPayload, nodes]);
+
+  const handleYamlViewCopy = useCallback(async () => {
+    if (!yamlPayload) return;
+    try {
+      await navigator.clipboard.writeText(yamlPayload.yamlText);
+      showSuccessToast("YAML copied to clipboard");
+    } catch {
+      showErrorToast("Failed to copy YAML to clipboard");
+    }
+  }, [yamlPayload]);
+
+  const handleYamlViewDownload = useCallback(() => {
+    if (!yamlPayload) return;
+    const blob = new Blob([yamlPayload.yamlText], { type: "text/yaml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = yamlPayload.filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showSuccessToast("Canvas exported as YAML");
+  }, [yamlPayload]);
+
   const dataViewContent =
-    topViewMode === "memory" ? (
+    topViewMode === "yaml" && yamlPayload ? (
+      <CanvasYamlView
+        yamlText={yamlPayload.yamlText}
+        filename={yamlPayload.filename}
+        onCopy={handleYamlViewCopy}
+        onDownload={handleYamlViewDownload}
+      />
+    ) : topViewMode === "memory" ? (
       <CanvasMemoryView
         entries={isViewingDraftVersion ? [] : canvasMemoryEntries}
         isLoading={isViewingDraftVersion ? false : canvasMemoryLoading}
