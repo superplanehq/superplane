@@ -4357,6 +4357,23 @@ export function WorkflowPageV2() {
               : undefined;
   const yamlPayload = useMemo(() => getYamlExportPayload(nodes), [getYamlExportPayload, nodes]);
 
+  const yamlAutocompleteExampleObj = useMemo(() => {
+    const workflowNodes = canvas?.spec?.nodes || [];
+    const exampleObj: Record<string, unknown> = {};
+    for (const node of workflowNodes) {
+      if (!node.name?.trim()) continue;
+      const name = node.name.trim();
+      if (node.type === "TYPE_TRIGGER") {
+        const meta = allTriggers.find((t) => t.name === node.trigger?.name);
+        if (meta?.exampleData) exampleObj[name] = meta.exampleData;
+      } else {
+        const meta = allComponents.find((c) => c.name === node.component?.name);
+        if (meta?.exampleOutput) exampleObj[name] = meta.exampleOutput;
+      }
+    }
+    return Object.keys(exampleObj).length > 0 ? exampleObj : null;
+  }, [canvas, allComponents, allTriggers]);
+
   const handleYamlViewCopy = useCallback(async () => {
     if (!yamlPayload) return;
     try {
@@ -4431,6 +4448,10 @@ export function WorkflowPageV2() {
         onCopy={handleYamlViewCopy}
         onDownload={handleYamlViewDownload}
         onChange={isReadOnly ? undefined : handleYamlChange}
+        components={allComponents}
+        triggers={allTriggers}
+        widgets={widgets}
+        autocompleteExampleObj={yamlAutocompleteExampleObj}
       />
     ) : topViewMode === "memory" ? (
       <CanvasMemoryView

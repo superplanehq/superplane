@@ -22,6 +22,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as yaml from "js-yaml";
 import { validateCanvasYaml, type YamlDiagnostic } from "./yamlCanvasValidation";
 import { registerQuickFixProvider } from "./yamlQuickFixes";
+import { registerYamlCompletionProvider, updateYamlCompletionData } from "./yamlCompletionProvider";
+import { registerYamlExpressionProvider, updateYamlExpressionData } from "./yamlExpressionProvider";
+import type { ComponentsComponent, TriggersTrigger, WidgetsWidget } from "@/api-client/types.gen";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -37,6 +40,14 @@ interface CanvasYamlViewProps {
   onDownload?: () => void;
   /** Called with parsed YAML when edits are valid (no error-severity diagnostics). */
   onChange?: (parsed: { metadata?: Record<string, unknown>; spec?: Record<string, unknown> }) => void;
+  /** Available components for structural autocomplete. */
+  components?: ComponentsComponent[];
+  /** Available triggers for structural autocomplete. */
+  triggers?: TriggersTrigger[];
+  /** Available widgets for structural autocomplete. */
+  widgets?: WidgetsWidget[];
+  /** Expression autocomplete context (upstream node payloads). */
+  autocompleteExampleObj?: Record<string, unknown> | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +99,10 @@ export function CanvasYamlView({
   onCopy,
   onDownload,
   onChange,
+  components,
+  triggers,
+  widgets,
+  autocompleteExampleObj,
 }: CanvasYamlViewProps) {
   const [editedText, setEditedText] = useState(yamlText);
   const onChangeRef = useRef(onChange);
@@ -101,10 +116,25 @@ export function CanvasYamlView({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const decorationIdsRef = useRef<string[]>([]);
   const quickFixDisposableRef = useRef<IDisposable | null>(null);
+  const structuralProviderRef = useRef<IDisposable | null>(null);
+  const expressionProviderRef = useRef<IDisposable | null>(null);
 
   useEffect(() => {
     setEditedText(yamlText);
   }, [yamlText]);
+
+  // Keep autocomplete data in sync without re-registering providers
+  useEffect(() => {
+    updateYamlCompletionData({
+      components: components ?? [],
+      triggers: triggers ?? [],
+      widgets: widgets ?? [],
+    });
+  }, [components, triggers, widgets]);
+
+  useEffect(() => {
+    updateYamlExpressionData(autocompleteExampleObj ?? null);
+  }, [autocompleteExampleObj]);
 
   // ---- Validation ----------------------------------------------------------
 
@@ -208,6 +238,8 @@ export function CanvasYamlView({
       monacoRef.current = monaco;
       if (!readOnly) {
         quickFixDisposableRef.current = registerQuickFixProvider(monaco);
+        structuralProviderRef.current = registerYamlCompletionProvider(monaco);
+        expressionProviderRef.current = registerYamlExpressionProvider(monaco);
       }
       runValidation(editedText, serverError);
     },
@@ -250,6 +282,8 @@ export function CanvasYamlView({
         clearTimeout(debounceRef.current);
       }
       quickFixDisposableRef.current?.dispose();
+      structuralProviderRef.current?.dispose();
+      expressionProviderRef.current?.dispose();
     };
   }, []);
 
