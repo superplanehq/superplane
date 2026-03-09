@@ -1321,7 +1321,7 @@ func (c *CreateVM) Name() string {
 }
 
 func (c *CreateVM) Label() string {
-	return "Create Virtual Machine"
+	return "Compute • Create Virtual Machine"
 }
 
 func (c *CreateVM) Description() string {

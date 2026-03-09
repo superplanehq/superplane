@@ -1,0 +1,24 @@
+{
+  "data": {
+    "scan": "projects/my-project/locations/us-central1/scans/abc123",
+    "vulnerabilities": [
+      {
+        "name": "projects/my-project/locations/us-central1/scans/abc123/vulnerabilities/vuln-001",
+        "vulnerability": {
+          "severity": "HIGH",
+          "cvssScore": 7.5,
+          "packageIssue": [
+            {
+              "affectedCpeUri": "cpe:/o:debian:debian_linux:11",
+              "affectedPackage": "libssl1.1",
+              "affectedVersion": {"name": "1.1.1n-0+deb11u3", "kind": "NORMAL"},
+              "fixedVersion": {"name": "1.1.1n-0+deb11u5", "kind": "NORMAL"}
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "timestamp": "2025-01-01T00:05:00Z",
+  "type": "gcp.artifactregistry.vulnerabilities"
+}

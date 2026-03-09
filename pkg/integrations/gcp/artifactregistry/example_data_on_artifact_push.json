@@ -1,0 +1,5 @@
+{
+  "action": "INSERT",
+  "digest": "us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123def456",
+  "tag": "us-central1-docker.pkg.dev/my-project/my-repo/my-image:latest"
+}
