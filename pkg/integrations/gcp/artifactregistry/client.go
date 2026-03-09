@@ -13,7 +13,6 @@ import (
 const (
 	artifactRegistryBaseURL  = "https://artifactregistry.googleapis.com/v1"
 	containerAnalysisBaseURL = "https://containeranalysis.googleapis.com/v1"
-	onDemandScanningBaseURL  = "https://ondemandscanning.googleapis.com/v1"
 )
 
 // Client is the interface used by Artifact Registry components to call the API.
@@ -64,18 +63,6 @@ func getVersionURL(packageName, version string) string {
 	return fmt.Sprintf("%s/%s/versions/%s", artifactRegistryBaseURL, packageName, version)
 }
 
-func analyzePackagesURL(projectID, location string) string {
-	return fmt.Sprintf("%s/projects/%s/locations/%s/scans:analyzePackages", onDemandScanningBaseURL, projectID, location)
-}
-
-func getOperationURL(operationName string) string {
-	return fmt.Sprintf("%s/%s", onDemandScanningBaseURL, operationName)
-}
-
-func listVulnerabilitiesURL(scanName string) string {
-	return fmt.Sprintf("%s/%s/vulnerabilities?pageSize=100", onDemandScanningBaseURL, scanName)
-}
-
 func listOccurrencesURL(projectID, resourceFilter string) string {
 	base := fmt.Sprintf("%s/projects/%s/occurrences?pageSize=100", containerAnalysisBaseURL, projectID)
 	if resourceFilter != "" {
@@ -100,27 +87,4 @@ func versionShortName(name string) string {
 		return name
 	}
 	return parts[len(parts)-1]
-}
-
-// locationFromResourceName extracts the location from a resource name like
-// projects/p/locations/l/repositories/r/...
-func locationFromResourceName(name string) string {
-	parts := strings.Split(name, "/")
-	for i, p := range parts {
-		if p == "locations" && i+1 < len(parts) {
-			return parts[i+1]
-		}
-	}
-	return ""
-}
-
-// projectFromResourceName extracts the project from a resource name.
-func projectFromResourceName(name string) string {
-	parts := strings.Split(name, "/")
-	for i, p := range parts {
-		if p == "projects" && i+1 < len(parts) {
-			return parts[i+1]
-		}
-	}
-	return ""
 }

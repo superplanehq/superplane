@@ -37,7 +37,6 @@ export const onArtifactAnalysisTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
-    const data = lastEvent?.data as OccurrenceData | undefined;
     return {
       title: node.name || definition.label || "On Artifact Analysis",
       iconSrc: gcpArtifactRegistryIcon,

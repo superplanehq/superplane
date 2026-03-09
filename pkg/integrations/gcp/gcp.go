@@ -45,13 +45,13 @@ const (
 	ConnectionMethodServiceAccountKey = "serviceAccountKey"
 	ConnectionMethodWIF               = "workloadIdentityFederation"
 
-	PubSubSecretName              = "pubsub.events.secret"
-	CloudBuildSecretName          = "cloudbuild.events.secret"
-	ArtifactPushSecretName        = "artifactregistry.push.secret"
-	ContainerAnalysisSecretName   = "containeranalysis.occurrences.secret"
-	CloudBuildTopicID             = "cloud-builds"
-	ArtifactPushTopicID           = "gcr"
-	ContainerAnalysisTopicID      = "container-analysis-occurrences-v1"
+	PubSubSecretName            = "pubsub.events.secret"
+	CloudBuildSecretName        = "cloudbuild.events.secret"
+	ArtifactPushSecretName      = "artifactregistry.push.secret"
+	ContainerAnalysisSecretName = "containeranalysis.occurrences.secret"
+	CloudBuildTopicID           = "cloud-builds"
+	ArtifactPushTopicID         = "gcr"
+	ContainerAnalysisTopicID    = "container-analysis-occurrences-v1"
 )
 
 type Configuration struct {
