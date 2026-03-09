@@ -11,7 +11,7 @@ func VerifySignature(key []byte, data []byte, signature string) error {
 	h.Write(data)
 
 	computed := fmt.Sprintf("%x", h.Sum(nil))
-	if computed != signature {
+	if !hmac.Equal([]byte(computed), []byte(signature)) {
 		return fmt.Errorf("invalid signature")
 	}
 
