@@ -22,11 +22,12 @@ const (
 type GetArtifactAnalysis struct{}
 
 type GetArtifactAnalysisConfiguration struct {
-	Location   string   `json:"location" mapstructure:"location"`
-	Repository string   `json:"repository" mapstructure:"repository"`
-	Package    string   `json:"package" mapstructure:"package"`
-	Version    string   `json:"version" mapstructure:"version"`
-	Kinds      []string `json:"kinds" mapstructure:"kinds"`
+	ResourceURL string   `json:"resourceUrl" mapstructure:"resourceUrl"`
+	Location    string   `json:"location" mapstructure:"location"`
+	Repository  string   `json:"repository" mapstructure:"repository"`
+	Package     string   `json:"package" mapstructure:"package"`
+	Version     string   `json:"version" mapstructure:"version"`
+	Kinds       []string `json:"kinds" mapstructure:"kinds"`
 }
 
 func (c *GetArtifactAnalysis) Name() string {
@@ -46,7 +47,13 @@ func (c *GetArtifactAnalysis) Documentation() string {
 
 ## Configuration
 
-- **Resource URI** (required): The resource URI of the artifact to query (e.g. ` + "`https://us-central1-docker.pkg.dev/project/repo/image@sha256:...`" + `).
+Provide either a **Resource URL** or the four fields below:
+
+- **Resource URL**: Full resource URL of the image (e.g. ` + "`https://us-central1-docker.pkg.dev/project/repo/image@sha256:abc`" + `). Use this to pass a digest directly from an upstream event such as On Artifact Push or Analyze Artifact output.
+- **Location**: The GCP region where the repository is located.
+- **Repository**: The Artifact Registry repository containing the artifact.
+- **Package**: The package (image) within the repository.
+- **Version**: The version (digest) to query.
 - **Occurrence Kinds**: Optional filter by occurrence kind (VULNERABILITY, BUILD, ATTESTATION, SBOM). Leave empty to retrieve all kinds.
 
 ## Output
@@ -70,11 +77,19 @@ func (c *GetArtifactAnalysis) OutputChannels(_ any) []core.OutputChannel {
 func (c *GetArtifactAnalysis) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:        "resourceUrl",
+			Label:       "Resource URL",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Full resource URL of the artifact (e.g. from an On Artifact Push event). When provided, the fields below are not required.",
+			Placeholder: "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
+		},
+		{
 			Name:        "location",
 			Label:       "Location",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "Select the Artifact Registry region.",
+			Required:    false,
+			Description: "Select the Artifact Registry region. Required if Resource URL is not provided.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:       ResourceTypeLocation,
@@ -86,12 +101,9 @@ func (c *GetArtifactAnalysis) Configuration() []configuration.Field {
 			Name:        "repository",
 			Label:       "Repository",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "Select the Artifact Registry repository.",
+			Required:    false,
+			Description: "Select the Artifact Registry repository. Required if Resource URL is not provided.",
 			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "location", Values: []string{"*"}},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "location", Values: []string{"*"}},
 			},
 			TypeOptions: &configuration.TypeOptions{
@@ -107,13 +119,10 @@ func (c *GetArtifactAnalysis) Configuration() []configuration.Field {
 			Name:        "package",
 			Label:       "Package",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "Select the package (image) to query.",
+			Required:    false,
+			Description: "Select the package (image) to query. Required if Resource URL is not provided.",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "location", Values: []string{"*"}},
-				{Field: "repository", Values: []string{"*"}},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "repository", Values: []string{"*"}},
 			},
 			TypeOptions: &configuration.TypeOptions{
@@ -130,14 +139,11 @@ func (c *GetArtifactAnalysis) Configuration() []configuration.Field {
 			Name:        "version",
 			Label:       "Version",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "Select the version (digest) to query.",
+			Required:    false,
+			Description: "Select the version (digest) to query. Required if Resource URL is not provided.",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "location", Values: []string{"*"}},
 				{Field: "repository", Values: []string{"*"}},
-				{Field: "package", Values: []string{"*"}},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "package", Values: []string{"*"}},
 			},
 			TypeOptions: &configuration.TypeOptions{
@@ -176,6 +182,7 @@ func decodeGetArtifactAnalysisConfiguration(raw any) (GetArtifactAnalysisConfigu
 	if err := mapstructure.Decode(raw, &config); err != nil {
 		return GetArtifactAnalysisConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
 	}
+	config.ResourceURL = strings.TrimSpace(config.ResourceURL)
 	config.Location = strings.TrimSpace(config.Location)
 	config.Repository = strings.TrimSpace(config.Repository)
 	config.Package = strings.TrimSpace(config.Package)
@@ -188,17 +195,20 @@ func (c *GetArtifactAnalysis) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return err
 	}
+	if config.ResourceURL != "" {
+		return nil
+	}
 	if config.Location == "" {
-		return fmt.Errorf("location is required")
+		return fmt.Errorf("location is required (or provide resourceUrl)")
 	}
 	if config.Repository == "" {
-		return fmt.Errorf("repository is required")
+		return fmt.Errorf("repository is required (or provide resourceUrl)")
 	}
 	if config.Package == "" {
-		return fmt.Errorf("package is required")
+		return fmt.Errorf("package is required (or provide resourceUrl)")
 	}
 	if config.Version == "" {
-		return fmt.Errorf("version is required")
+		return fmt.Errorf("version is required (or provide resourceUrl)")
 	}
 	return nil
 }
@@ -215,11 +225,16 @@ func (c *GetArtifactAnalysis) Execute(ctx core.ExecutionContext) error {
 	}
 
 	projectID := client.ProjectID()
-	resourceURI := fmt.Sprintf("https://%s-docker.pkg.dev/%s/%s/%s@%s", config.Location, projectID, config.Repository, config.Package, config.Version)
+	var resourceURI string
+	if config.ResourceURL != "" {
+		resourceURI = config.ResourceURL
+	} else {
+		resourceURI = fmt.Sprintf("https://%s-docker.pkg.dev/%s/%s/%s@%s", config.Location, projectID, config.Repository, config.Package, config.Version)
+	}
 	filter := buildOccurrenceFilter(config, resourceURI)
 	reqURL := listOccurrencesURL(projectID, filter)
 
-	var allOccurrences []any
+	allOccurrences := make([]any, 0)
 
 	for {
 		responseBody, err := client.GetURL(context.Background(), reqURL)
