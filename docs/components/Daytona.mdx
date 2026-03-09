@@ -41,22 +41,27 @@ The Create Repository Sandbox component creates a new Daytona sandbox, clones a 
 {
   "data": {
     "bootstrap": {
-      "exitCode": 0,
-      "result": "Dependencies installed successfully\n"
-    },
-    "clone": {
-      "exitCode": 0,
-      "result": "Cloning into 'example-app'...\n"
+      "from": "file",
+      "path": "scripts/bootstrap.sh"
     },
     "directory": "/home/daytona/example-app",
     "repository": "https://github.com/superplanehq/example-app.git",
-    "sandbox": {
-      "id": "sandbox-abc123def456",
-      "state": "started"
-    }
+    "sandboxId": "sandbox-abc123def456",
+    "sandboxStartedAt": "2026-01-19T12:00:00Z",
+    "secrets": [
+      {
+        "name": "API_KEY",
+        "type": "env",
+        "value": {
+          "key": "API_KEY",
+          "secret": "api-key-secret"
+        }
+      }
+    ],
+    "timeout": 300
   },
   "timestamp": "2026-01-19T12:00:00Z",
-  "type": "daytona.repository.sandbox"
+  "type": "daytona.repository.sandbox.created"
 }
 ```
 

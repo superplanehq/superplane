@@ -25,9 +25,9 @@ func Test__GetPipelineExecution__Setup(t *testing.T) {
 	t.Run("missing region -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"region":      " ",
-				"pipeline":    "my-pipeline",
-				"executionId": "abc-123",
+				"region":    " ",
+				"pipeline":  "my-pipeline",
+				"execution": "abc-123",
 			},
 		})
 		require.ErrorContains(t, err, "region is required")
@@ -36,29 +36,29 @@ func Test__GetPipelineExecution__Setup(t *testing.T) {
 	t.Run("missing pipeline -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"region":      "us-east-1",
-				"executionId": "abc-123",
+				"region":    "us-east-1",
+				"execution": "abc-123",
 			},
 		})
 		require.ErrorContains(t, err, "pipeline is required")
 	})
 
-	t.Run("missing executionId -> error", func(t *testing.T) {
+	t.Run("missing execution -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"region":   "us-east-1",
 				"pipeline": "my-pipeline",
 			},
 		})
-		require.ErrorContains(t, err, "execution ID is required")
+		require.ErrorContains(t, err, "execution is required")
 	})
 
 	t.Run("valid configuration -> ok", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"region":      "us-east-1",
-				"pipeline":    "my-pipeline",
-				"executionId": "a1b2c3d4-5678-90ab-cdef-111122223333",
+				"region":    "us-east-1",
+				"pipeline":  "my-pipeline",
+				"execution": "a1b2c3d4-5678-90ab-cdef-111122223333",
 			},
 		})
 		require.NoError(t, err)
@@ -79,9 +79,9 @@ func Test__GetPipelineExecution__Execute(t *testing.T) {
 	t.Run("missing credentials -> error", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"region":      "us-east-1",
-				"pipeline":    "my-pipeline",
-				"executionId": "a1b2c3d4-5678-90ab-cdef-111122223333",
+				"region":    "us-east-1",
+				"pipeline":  "my-pipeline",
+				"execution": "a1b2c3d4-5678-90ab-cdef-111122223333",
 			},
 			Integration:    &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{}},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
@@ -122,9 +122,9 @@ func Test__GetPipelineExecution__Execute(t *testing.T) {
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"region":      "us-east-1",
-				"pipeline":    "my-pipeline",
-				"executionId": "a1b2c3d4-5678-90ab-cdef-111122223333",
+				"region":    "us-east-1",
+				"pipeline":  "my-pipeline",
+				"execution": "a1b2c3d4-5678-90ab-cdef-111122223333",
 			},
 			HTTP:           httpContext,
 			ExecutionState: execState,

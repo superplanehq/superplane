@@ -28,6 +28,7 @@
 - For UI component workflow, see [web_src/AGENTS.md](web_src/AGENTS.md)
 - For new components or triggers, see [docs/contributing/component-implementations.md](docs/contributing/component-implementations.md)
 - For component design guidelines and quality standards, see [docs/contributing/component-design.md](docs/contributing/component-design.md)
+- Whenever adding or updating components/triggers that should be AI-assisted, always create or update the matching skill file in `templates/skills/` (for example `templates/skills/<component-or-trigger>.md`).
 - After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI:
   - `make pb.gen` to regenerate protobuf files
   - `make openapi.spec.gen` to generate OpenAPI spec for the API

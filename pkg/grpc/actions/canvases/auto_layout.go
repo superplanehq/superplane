@@ -4,21 +4,25 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 const (
-	autoLayoutHorizontalSpacing = 560
-	autoLayoutVerticalSpacing   = 260
+	autoLayoutHorizontalSpacing  = 560
+	autoLayoutVerticalSpacing    = 260
+	autoLayoutUnknownChannelRank = 1 << 20
 )
 
 func applyCanvasAutoLayout(
 	nodes []models.Node,
 	edges []models.Edge,
 	autoLayout *pb.CanvasAutoLayout,
+	registry *registry.Registry,
 ) ([]models.Node, []models.Edge, error) {
 	if autoLayout == nil {
 		return nodes, edges, nil
@@ -28,7 +32,7 @@ func applyCanvasAutoLayout(
 	case pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED:
 		return nil, nil, status.Error(codes.InvalidArgument, "auto_layout.algorithm is required")
 	case pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL:
-		layoutedNodes, err := applyHorizontalAutoLayout(nodes, edges, autoLayout)
+		layoutedNodes, err := applyHorizontalAutoLayout(nodes, edges, autoLayout, registry)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -38,7 +42,24 @@ func applyCanvasAutoLayout(
 	}
 }
 
-func applyHorizontalAutoLayout(nodes []models.Node, edges []models.Edge, autoLayout *pb.CanvasAutoLayout) ([]models.Node, error) {
+type incomingEdgeOrdering struct {
+	parentID    string
+	channel     string
+	channelRank int
+}
+
+type nodeLayerPriority struct {
+	parentOrder int
+	channelRank int
+	channel     string
+}
+
+func applyHorizontalAutoLayout(
+	nodes []models.Node,
+	edges []models.Edge,
+	autoLayout *pb.CanvasAutoLayout,
+	registry *registry.Registry,
+) ([]models.Node, error) {
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
@@ -87,6 +108,8 @@ func applyHorizontalAutoLayout(nodes []models.Node, edges []models.Edge, autoLay
 	indegreeByID := make(map[string]int, len(selectedNodeIDs))
 	outgoingByID := make(map[string][]string, len(selectedNodeIDs))
 	incomingByID := make(map[string][]string, len(selectedNodeIDs))
+	incomingEdgeOrderingByTargetID := make(map[string][]incomingEdgeOrdering, len(selectedNodeIDs))
+	channelRankByNodeID := buildOutputChannelRankByNodeID(nodes, nodeIndexByID, registry)
 	originalMinX := 0
 	originalMinY := 0
 	hasSelectedNodes := false
@@ -96,6 +119,7 @@ func applyHorizontalAutoLayout(nodes []models.Node, edges []models.Edge, autoLay
 		indegreeByID[nodeID] = 0
 		outgoingByID[nodeID] = []string{}
 		incomingByID[nodeID] = []string{}
+		incomingEdgeOrderingByTargetID[nodeID] = []incomingEdgeOrdering{}
 
 		node := nodes[nodeIndexByID[nodeID]]
 		if !hasSelectedNodes {
@@ -123,6 +147,14 @@ func applyHorizontalAutoLayout(nodes []models.Node, edges []models.Edge, autoLay
 
 		outgoingByID[edge.SourceID] = append(outgoingByID[edge.SourceID], edge.TargetID)
 		incomingByID[edge.TargetID] = append(incomingByID[edge.TargetID], edge.SourceID)
+		incomingEdgeOrderingByTargetID[edge.TargetID] = append(
+			incomingEdgeOrderingByTargetID[edge.TargetID],
+			incomingEdgeOrdering{
+				parentID:    edge.SourceID,
+				channel:     edge.Channel,
+				channelRank: resolveEdgeChannelRank(edge.SourceID, edge.Channel, channelRankByNodeID),
+			},
+		)
 		indegreeByID[edge.TargetID]++
 	}
 
@@ -179,6 +211,11 @@ func applyHorizontalAutoLayout(nodes []models.Node, edges []models.Edge, autoLay
 		order = append(order, remaining...)
 	}
 
+	nodeOrderIndexByID := make(map[string]int, len(order))
+	for idx, nodeID := range order {
+		nodeOrderIndexByID[nodeID] = idx
+	}
+
 	layerByID := make(map[string]int, len(selectedNodeIDs))
 	maxLayer := 0
 	for _, nodeID := range order {
@@ -203,7 +240,31 @@ func applyHorizontalAutoLayout(nodes []models.Node, edges []models.Edge, autoLay
 
 	for layer := range nodesByLayer {
 		sort.SliceStable(nodesByLayer[layer], func(i, j int) bool {
-			return nodeOrderLess(nodesByLayer[layer][i], nodesByLayer[layer][j], nodes, nodeIndexByID)
+			nodeIDA := nodesByLayer[layer][i]
+			nodeIDB := nodesByLayer[layer][j]
+
+			priorityA := resolveNodeLayerPriority(
+				nodeIDA,
+				incomingEdgeOrderingByTargetID,
+				nodeOrderIndexByID,
+			)
+			priorityB := resolveNodeLayerPriority(
+				nodeIDB,
+				incomingEdgeOrderingByTargetID,
+				nodeOrderIndexByID,
+			)
+
+			if priorityA.parentOrder != priorityB.parentOrder {
+				return priorityA.parentOrder < priorityB.parentOrder
+			}
+			if priorityA.channelRank != priorityB.channelRank {
+				return priorityA.channelRank < priorityB.channelRank
+			}
+			if priorityA.channel != priorityB.channel {
+				return strings.Compare(priorityA.channel, priorityB.channel) < 0
+			}
+
+			return nodeOrderLess(nodeIDA, nodeIDB, nodes, nodeIndexByID)
 		})
 	}
 
@@ -268,6 +329,112 @@ func nodeOrderLess(nodeIDA string, nodeIDB string, nodes []models.Node, nodeInde
 	}
 
 	return strings.Compare(nodeA.ID, nodeB.ID) < 0
+}
+
+func buildOutputChannelRankByNodeID(
+	nodes []models.Node,
+	nodeIndexByID map[string]int,
+	registry *registry.Registry,
+) map[string]map[string]int {
+	channelRankByNodeID := make(map[string]map[string]int, len(nodeIndexByID))
+	if registry == nil {
+		return channelRankByNodeID
+	}
+
+	for nodeID, index := range nodeIndexByID {
+		node := nodes[index]
+		if node.Ref.Component == nil || strings.TrimSpace(node.Ref.Component.Name) == "" {
+			continue
+		}
+
+		component, err := registry.GetComponent(node.Ref.Component.Name)
+		if err != nil {
+			continue
+		}
+
+		outputChannels := component.OutputChannels(node.Configuration)
+		if len(outputChannels) == 0 {
+			outputChannels = []core.OutputChannel{core.DefaultOutputChannel}
+		}
+
+		channelRanks := make(map[string]int, len(outputChannels))
+		for i, outputChannel := range outputChannels {
+			channelName := strings.TrimSpace(outputChannel.Name)
+			if channelName == "" {
+				continue
+			}
+			channelRanks[channelName] = i
+		}
+
+		channelRankByNodeID[nodeID] = channelRanks
+	}
+
+	return channelRankByNodeID
+}
+
+func resolveEdgeChannelRank(
+	sourceNodeID string,
+	channel string,
+	channelRankByNodeID map[string]map[string]int,
+) int {
+	channelRanks, ok := channelRankByNodeID[sourceNodeID]
+	if !ok {
+		return autoLayoutUnknownChannelRank
+	}
+
+	channelRank, ok := channelRanks[channel]
+	if !ok {
+		return autoLayoutUnknownChannelRank
+	}
+
+	return channelRank
+}
+
+func resolveNodeLayerPriority(
+	nodeID string,
+	incomingEdgeOrderingByTargetID map[string][]incomingEdgeOrdering,
+	nodeOrderIndexByID map[string]int,
+) nodeLayerPriority {
+	incomingEdges := incomingEdgeOrderingByTargetID[nodeID]
+	priority := nodeLayerPriority{
+		parentOrder: len(nodeOrderIndexByID) + 1,
+		channelRank: autoLayoutUnknownChannelRank,
+		channel:     "",
+	}
+
+	for _, incomingEdge := range incomingEdges {
+		parentOrder, exists := nodeOrderIndexByID[incomingEdge.parentID]
+		if !exists {
+			continue
+		}
+
+		if parentOrder < priority.parentOrder {
+			priority.parentOrder = parentOrder
+			priority.channelRank = incomingEdge.channelRank
+			priority.channel = incomingEdge.channel
+			continue
+		}
+
+		if parentOrder > priority.parentOrder {
+			continue
+		}
+
+		if incomingEdge.channelRank < priority.channelRank {
+			priority.channelRank = incomingEdge.channelRank
+			priority.channel = incomingEdge.channel
+			continue
+		}
+
+		if incomingEdge.channelRank > priority.channelRank {
+			continue
+		}
+
+		if strings.Compare(incomingEdge.channel, priority.channel) < 0 {
+			priority.channel = incomingEdge.channel
+		}
+	}
+
+	return priority
 }
 
 func resolveLayoutSeedNodeIDs(autoLayout *pb.CanvasAutoLayout, flowNodeSet map[string]struct{}) ([]string, error) {

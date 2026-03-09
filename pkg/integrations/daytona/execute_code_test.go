@@ -1,6 +1,7 @@
 package daytona
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -207,6 +208,51 @@ func Test__ExecuteCode__Execute(t *testing.T) {
 		assert.Contains(t, string(body), "python3 -c")
 	})
 
+	t.Run("constructs python command with multiline code", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"cmdId":"cmd-001"}`))},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		multilineCode := "print('hello')\nprint('world')"
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"sandbox":  "sandbox-123",
+				"code":     multilineCode,
+				"language": "python",
+			},
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       &contexts.RequestContext{},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 4)
+
+		body, err := io.ReadAll(httpContext.Requests[3].Body)
+		require.NoError(t, err)
+
+		var req SessionExecuteRequest
+		err = json.Unmarshal(body, &req)
+		require.NoError(t, err)
+		expectedCommand := wrapCommandWithSandboxSecretEnv(buildExecuteCodeCommand("python", multilineCode))
+		assert.Equal(t, expectedCommand, req.Command)
+		assert.Contains(t, req.Command, "\n")
+		assert.NotContains(t, req.Command, "\\n")
+	})
+
 	t.Run("create session failure -> error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -315,6 +361,49 @@ func Test__ExecuteCode__HandleAction(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, execCtx.Finished)
 		assert.True(t, execCtx.Passed)
+		assert.Equal(t, ExecuteCodeOutputChannelSuccess, execCtx.Channel)
+		assert.Equal(t, ExecuteCodePayloadType, execCtx.Type)
+		require.Len(t, execCtx.Payloads, 1)
+	})
+
+	t.Run("poll emits failed channel when command exits with non-zero status", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-abc","commands":[{"id":"cmd-001","exitCode":1}]}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`Traceback (most recent call last)`))},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.HandleAction(core.ActionContext{
+			Name: "poll",
+			HTTP: httpContext,
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{
+					"sandboxId": "sandbox-123",
+					"sessionId": "session-abc",
+					"cmdId":     "cmd-001",
+					"startedAt": time.Now().Unix(),
+					"timeout":   300,
+				},
+			},
+			ExecutionState: execCtx,
+			Requests:       &contexts.RequestContext{},
+			Integration:    appCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+		assert.Equal(t, ExecuteCodeOutputChannelFailed, execCtx.Channel)
 		assert.Equal(t, ExecuteCodePayloadType, execCtx.Type)
 		require.Len(t, execCtx.Payloads, 1)
 	})
@@ -416,6 +505,7 @@ func Test__ExecuteCode__OutputChannels(t *testing.T) {
 	component := ExecuteCode{}
 
 	channels := component.OutputChannels(nil)
-	require.Len(t, channels, 1)
-	assert.Equal(t, core.DefaultOutputChannel, channels[0])
+	require.Len(t, channels, 2)
+	assert.Equal(t, ExecuteCodeOutputChannelSuccess, channels[0].Name)
+	assert.Equal(t, ExecuteCodeOutputChannelFailed, channels[1].Name)
 }

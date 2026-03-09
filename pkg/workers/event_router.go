@@ -118,8 +118,13 @@ func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models
 		return nil, nil, err
 	}
 
+	_, liveEdges, err := models.FindLiveCanvasSpecInTransaction(tx, canvas.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	if event.ExecutionID == nil {
-		queueItems, err := w.processRootEvent(tx, canvas, event)
+		queueItems, err := w.processRootEvent(tx, canvas, liveEdges, event)
 		return queueItems, nil, err
 	}
 
@@ -132,18 +137,29 @@ func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models
 		return w.processChildExecutionEvent(tx, logger, canvas, execution, event)
 	}
 
-	queueItems, err := w.processExecutionEvent(tx, logger, canvas, execution, event)
+	queueItems, err := w.processExecutionEvent(tx, logger, canvas, liveEdges, execution, event)
 	return queueItems, execution, err
 }
 
-func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, error) {
+func findOutgoingEdges(edges []models.Edge, sourceID string, channel string) []models.Edge {
+	matches := make([]models.Edge, 0, len(edges))
+	for _, edge := range edges {
+		if edge.SourceID == sourceID && edge.Channel == channel {
+			matches = append(matches, edge)
+		}
+	}
+
+	return matches
+}
+
+func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges []models.Edge, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, error) {
 	now := time.Now()
 
 	w.logger.Infof("Processing root event %s", event.ID)
 
-	edges := canvas.FindEdges(event.NodeID, event.Channel)
+	outgoingEdges := findOutgoingEdges(edges, event.NodeID, event.Channel)
 	var queueItems []models.CanvasNodeQueueItem
-	for _, edge := range edges {
+	for _, edge := range outgoingEdges {
 		targetNode, err := models.FindCanvasNode(tx, canvas.ID, edge.TargetID)
 		if err != nil {
 			return nil, err
@@ -176,15 +192,22 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, event
 	return queueItems, nil
 }
 
-func (w *EventRouter) processExecutionEvent(tx *gorm.DB, logger *log.Entry, canvas *models.Canvas, execution *models.CanvasNodeExecution, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, error) {
+func (w *EventRouter) processExecutionEvent(
+	tx *gorm.DB,
+	logger *log.Entry,
+	canvas *models.Canvas,
+	edges []models.Edge,
+	execution *models.CanvasNodeExecution,
+	event *models.CanvasEvent,
+) ([]models.CanvasNodeQueueItem, error) {
 	now := time.Now()
 
 	logger = logging.WithExecution(logger, execution, nil)
 	w.logger.Infof("Processing event")
 
 	var createdQueueItems []models.CanvasNodeQueueItem
-	edges := canvas.FindEdges(execution.NodeID, event.Channel)
-	for _, edge := range edges {
+	outgoingEdges := findOutgoingEdges(edges, execution.NodeID, event.Channel)
+	for _, edge := range outgoingEdges {
 		targetNode, err := models.FindCanvasNode(tx, canvas.ID, edge.TargetID)
 		if err != nil {
 			return nil, err

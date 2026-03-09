@@ -150,16 +150,16 @@ func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb
 	}
 
 	now := time.Now()
+	liveVersionID := uuid.New()
 	canvas := models.Canvas{
 		ID:             uuid.New(),
 		OrganizationID: models.TemplateOrganizationID,
+		LiveVersionID:  &liveVersionID,
 		IsTemplate:     true,
 		Name:           template.Metadata.Name,
 		Description:    template.Metadata.Description,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
-		Edges:          datatypes.NewJSONSlice(edges),
-		Nodes:          datatypes.NewJSONSlice(expandedNodes),
 	}
 
 	if err := tx.Create(&canvas).Error; err != nil {
@@ -192,7 +192,18 @@ func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb
 		}
 	}
 
-	return nil
+	version := models.CanvasVersion{
+		ID:          liveVersionID,
+		WorkflowID:  canvas.ID,
+		IsPublished: true,
+		PublishedAt: &now,
+		Nodes:       datatypes.NewJSONSlice(expandedNodes),
+		Edges:       datatypes.NewJSONSlice(edges),
+		CreatedAt:   &now,
+		UpdatedAt:   &now,
+	}
+
+	return tx.Create(&version).Error
 }
 
 func lockTemplateSeed(tx *gorm.DB) (bool, error) {

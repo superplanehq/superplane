@@ -4,6 +4,8 @@ import {
   Panel,
   ReactFlow,
   ReactFlowProvider,
+  ViewportPortal,
+  useOnSelectionChange,
   useReactFlow,
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
@@ -11,7 +13,20 @@ import {
   type EdgeChange,
 } from "@xyflow/react";
 
-import { CircleX, Loader2, ScanLine, ScanText, ScrollText, TriangleAlert, Workflow } from "lucide-react";
+import {
+  CircleX,
+  GitBranch,
+  Loader2,
+  Map as MapIcon,
+  ScanLine,
+  ScanText,
+  ScrollText,
+  Copy,
+  LayoutGrid,
+  Trash2,
+  TriangleAlert,
+  Workflow,
+} from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
@@ -42,11 +57,13 @@ import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
+import { CanvasMiniMap } from "./CanvasMiniMap";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header, type BreadcrumbItem } from "./Header";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
+import { useMinimapVisibility } from "./useMinimapVisibility";
 import { SidebarEvent } from "../componentSidebar/types";
 import { CanvasLogSidebar, type LogEntry, type LogScopeFilter, type LogTypeFilter } from "../CanvasLogSidebar";
 
@@ -136,10 +153,46 @@ export interface CanvasPageProps {
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
   saveDisabledTooltip?: string;
+  versionLabel?: string;
+  onCreateVersion?: () => void;
+  onPublishVersion?: () => void;
+  onDiscardVersion?: () => void;
+  createVersionDisabled?: boolean;
+  createVersionDisabledTooltip?: string;
+  publishVersionDisabled?: boolean;
+  publishVersionDisabledTooltip?: string;
+  discardVersionDisabled?: boolean;
+  discardVersionDisabledTooltip?: string;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
+  headerMode?: "default" | "version-live" | "version-edit" | "sandbox";
+  saveState?: "saved" | "saving" | "unsaved";
+  onEnterEditMode?: () => void;
+  enterEditModeDisabled?: boolean;
+  enterEditModeDisabledTooltip?: string;
+  onExitEditMode?: () => void;
+  exitEditModeDisabled?: boolean;
+  exitEditModeDisabledTooltip?: string;
+  sandboxModeTooltip?: string;
+  showPendingDraftBadge?: boolean;
+  isAutoLayoutOnUpdateEnabled?: boolean;
+  onToggleAutoLayoutOnUpdate?: () => void;
+  autoLayoutOnUpdateDisabled?: boolean;
+  autoLayoutOnUpdateDisabledTooltip?: string;
+  topViewMode?: "canvas" | "memory" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "memory" | "versioning") => void;
+  showVersioningTab?: boolean;
+  memoryItemCount?: number;
+  versioningItemCount?: number;
+  dataViewContent?: React.ReactNode;
+  versionControlSidebar?: React.ReactNode;
+  isVersionControlOpen?: boolean;
+  onOpenVersionControl?: () => void;
+  versionControlButtonLabel?: string;
+  versionControlButtonTooltip?: string;
+  showBottomStatusControls?: boolean;
   readOnly?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
@@ -179,6 +232,9 @@ export interface CanvasPageProps {
   integrations?: OrganizationsIntegration[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
+  onNodesDelete?: (nodeIds: string[]) => void;
+  onDuplicateNodes?: (nodeIds: string[]) => void;
+  onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
   onResolveExecutionErrors?: (executionIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
@@ -198,7 +254,6 @@ export interface CanvasPageProps {
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
-  onAutoLayout?: (selectedNodeIDs: string[]) => void | Promise<void>;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
 
   ai?: AiProps;
@@ -278,6 +333,7 @@ const EDGE_STYLE = {
 } as const;
 
 const DEFAULT_CANVAS_ZOOM = 0.8;
+const MIN_CANVAS_ZOOM = 0.1;
 
 /*
  * nodeTypes must be defined outside of the component to prevent
@@ -299,7 +355,7 @@ const nodeTypes = {
         selected={nodeProps.selected}
         runDisabled={callbacks?.runDisabled}
         runDisabledTooltip={callbacks?.runDisabledTooltip}
-        showHeader={callbacks?.showHeader}
+        showHeader={callbacks?.showHeader && !callbacks?.hasMultiSelection}
         onExpand={callbacks.handleNodeExpand}
         onClick={() => callbacks.handleNodeClick(nodeProps.id)}
         onEdit={() => callbacks.onNodeEdit.current?.(nodeProps.id)}
@@ -377,6 +433,16 @@ function CanvasPage(props: CanvasPageProps) {
     channels: string[];
     initialData?: string;
   } | null>(null);
+  const canvasNodesForAiContext = useMemo(
+    () =>
+      (props.workflowNodes || []).map((node) => ({
+        id: node.id || "",
+        name: node.name || "",
+        label: node.name || "",
+        type: node.type || "",
+      })),
+    [props.workflowNodes],
+  );
 
   useEffect(() => {
     if (!props.focusRequest?.tab || props.focusRequest.tab === "execution-chain") {
@@ -813,153 +879,212 @@ function CanvasPage(props: CanvasPageProps) {
           saveButtonHidden={props.saveButtonHidden}
           saveDisabled={props.saveDisabled}
           saveDisabledTooltip={props.saveDisabledTooltip}
+          versionLabel={props.versionLabel}
+          onCreateVersion={props.onCreateVersion}
+          onPublishVersion={props.onPublishVersion}
+          onDiscardVersion={props.onDiscardVersion}
+          createVersionDisabled={props.createVersionDisabled}
+          createVersionDisabledTooltip={props.createVersionDisabledTooltip}
+          publishVersionDisabled={props.publishVersionDisabled}
+          publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
+          discardVersionDisabled={props.discardVersionDisabled}
+          discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
           isAutoSaveEnabled={props.isAutoSaveEnabled}
           onToggleAutoSave={props.onToggleAutoSave}
           autoSaveDisabled={props.autoSaveDisabled}
           autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
+          headerMode={props.headerMode}
+          saveState={props.saveState}
+          onEnterEditMode={props.onEnterEditMode}
+          enterEditModeDisabled={props.enterEditModeDisabled}
+          enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
+          onExitEditMode={props.onExitEditMode}
+          exitEditModeDisabled={props.exitEditModeDisabled}
+          exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
+          sandboxModeTooltip={props.sandboxModeTooltip}
+          showPendingDraftBadge={props.showPendingDraftBadge}
+          topViewMode={props.topViewMode}
+          onTopViewModeChange={props.onTopViewModeChange}
+          showVersioningTab={props.showVersioningTab}
+          memoryItemCount={props.memoryItemCount}
+          versioningItemCount={props.versioningItemCount}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
 
-      {/* Main content area with sidebar and canvas */}
-      <div className="flex-1 flex relative overflow-hidden">
-        <BuildingBlocksSidebar
-          isOpen={isBuildingBlocksSidebarOpen}
-          onToggle={handleSidebarToggle}
-          blocks={props.buildingBlocks || []}
-          showAiBuilderTab={props.showAiBuilderTab}
-          canvasId={props.canvasId}
-          canvasNodes={state.nodes.map((node) => ({
-            id: node.id,
-            name: String((node.data as { nodeName?: string })?.nodeName || ""),
-            label: String((node.data as { label?: string })?.label || ""),
-            type: String((node.data as { type?: string })?.type || ""),
-          }))}
-          onApplyAiOperations={props.onApplyAiOperations}
-          integrations={props.integrations}
-          canvasZoom={canvasZoom}
-          disabled={readOnly}
-          disabledMessage="You don't have permission to edit this canvas."
-          onBlockClick={handleBuildingBlockClick}
-          onAddNote={handleAddNote}
-        />
+      {/* Main content area with sidebar and canvas/memory/versioning */}
+      {props.topViewMode && props.topViewMode !== "canvas" ? (
+        <div className="flex-1 flex relative overflow-hidden">
+          {props.versionControlSidebar}
+          <div className="flex-1 overflow-auto bg-slate-50">{props.dataViewContent}</div>
+        </div>
+      ) : (
+        <div className="flex-1 flex relative overflow-hidden">
+          {props.versionControlSidebar}
+          <BuildingBlocksSidebar
+            isOpen={isBuildingBlocksSidebarOpen}
+            onToggle={handleSidebarToggle}
+            blocks={props.buildingBlocks || []}
+            showAiBuilderTab={props.showAiBuilderTab}
+            canvasId={props.canvasId}
+            canvasNodes={canvasNodesForAiContext}
+            onApplyAiOperations={props.onApplyAiOperations}
+            integrations={props.integrations}
+            canvasZoom={canvasZoom}
+            disabled={readOnly}
+            disabledMessage="You don't have permission to edit this canvas."
+            onBlockClick={handleBuildingBlockClick}
+            onAddNote={handleAddNote}
+          />
 
-        <div className="flex-1 relative">
-          <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
-            <CanvasContent
+          <div className="flex-1 relative">
+            <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
+              <CanvasContent
+                state={state}
+                onSave={props.onSave}
+                onNodeEdit={handleNodeEdit}
+                onNodeDelete={handleNodeDelete}
+                onNodesDelete={props.onNodesDelete}
+                onDuplicateNodes={props.onDuplicateNodes}
+                onAutoLayoutNodes={props.onAutoLayoutNodes}
+                onEdgeCreate={props.onEdgeCreate}
+                hideHeader={true}
+                onToggleView={handleToggleView}
+                onToggleCollapse={props.onToggleCollapse}
+                onRun={(nodeId) => handleNodeRun(nodeId)}
+                onDuplicate={props.onDuplicate}
+                onConfigure={props.onConfigure}
+                onDeactivate={props.onDeactivate}
+                onAnnotationUpdate={props.onAnnotationUpdate}
+                onAnnotationBlur={props.onAnnotationBlur}
+                onTogglePause={props.onTogglePause}
+                runDisabled={props.runDisabled}
+                runDisabledTooltip={props.runDisabledTooltip}
+                onBuildingBlockDrop={handleBuildingBlockDrop}
+                onBuildingBlocksSidebarToggle={handleSidebarToggle}
+                onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
+                onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
+                onZoomChange={setCanvasZoom}
+                hasFitToViewRef={hasFitToViewRef}
+                viewportRefProp={props.viewportRef}
+                highlightedNodeIds={highlightedNodeIds}
+                workflowNodes={props.workflowNodes}
+                setCurrentTab={setCurrentTab}
+                onUndo={props.onUndo}
+                canUndo={props.canUndo}
+                organizationId={props.organizationId}
+                unsavedMessage={props.unsavedMessage}
+                saveIsPrimary={props.saveIsPrimary}
+                saveButtonHidden={props.saveButtonHidden}
+                saveDisabled={props.saveDisabled}
+                saveDisabledTooltip={props.saveDisabledTooltip}
+                versionLabel={props.versionLabel}
+                onCreateVersion={props.onCreateVersion}
+                onPublishVersion={props.onPublishVersion}
+                onDiscardVersion={props.onDiscardVersion}
+                createVersionDisabled={props.createVersionDisabled}
+                createVersionDisabledTooltip={props.createVersionDisabledTooltip}
+                publishVersionDisabled={props.publishVersionDisabled}
+                publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
+                discardVersionDisabled={props.discardVersionDisabled}
+                discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
+                isAutoSaveEnabled={props.isAutoSaveEnabled}
+                onToggleAutoSave={props.onToggleAutoSave}
+                autoSaveDisabled={props.autoSaveDisabled}
+                autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
+                headerMode={props.headerMode}
+                saveState={props.saveState}
+                onEnterEditMode={props.onEnterEditMode}
+                enterEditModeDisabled={props.enterEditModeDisabled}
+                enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
+                onExitEditMode={props.onExitEditMode}
+                exitEditModeDisabled={props.exitEditModeDisabled}
+                exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
+                sandboxModeTooltip={props.sandboxModeTooltip}
+                showPendingDraftBadge={props.showPendingDraftBadge}
+                isVersionControlOpen={props.isVersionControlOpen}
+                onOpenVersionControl={props.onOpenVersionControl}
+                versionControlButtonLabel={props.versionControlButtonLabel}
+                versionControlButtonTooltip={props.versionControlButtonTooltip}
+                showBottomStatusControls={props.showBottomStatusControls}
+                isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
+                onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
+                autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
+                autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
+                readOnly={props.readOnly}
+                logEntries={props.logEntries}
+                focusRequest={props.focusRequest}
+                onExecutionChainHandled={props.onExecutionChainHandled}
+                initialFocusNodeId={props.initialFocusNodeId}
+                onResolveExecutionErrors={props.onResolveExecutionErrors}
+                title={props.title}
+              />
+            </ReactFlowProvider>
+
+            <AiSidebar
+              enabled={state.ai.enabled}
+              isOpen={state.ai.sidebarOpen}
+              setIsOpen={state.ai.setSidebarOpen}
+              showNotifications={state.ai.showNotifications}
+              notificationMessage={state.ai.notificationMessage}
+            />
+
+            <Sidebar
               state={state}
-              onSave={props.onSave}
-              onNodeEdit={handleNodeEdit}
-              onNodeDelete={handleNodeDelete}
-              onEdgeCreate={props.onEdgeCreate}
-              hideHeader={true}
-              onToggleView={handleToggleView}
-              onToggleCollapse={props.onToggleCollapse}
-              onAutoLayout={props.onAutoLayout}
-              onRun={(nodeId) => handleNodeRun(nodeId)}
+              getSidebarData={props.getSidebarData}
+              loadSidebarData={props.loadSidebarData}
+              getTabData={props.getTabData}
+              getAutocompleteExampleObj={props.getAutocompleteExampleObj}
+              onCancelQueueItem={handleCancelQueueItem}
+              onPushThrough={handlePushThrough}
+              onCancelExecution={handleCancelExecution}
+              supportsPushThrough={props.supportsPushThrough}
+              onRun={handleNodeRun}
               onDuplicate={props.onDuplicate}
+              onDocs={props.onDocs}
               onConfigure={props.onConfigure}
               onDeactivate={props.onDeactivate}
-              onAnnotationUpdate={props.onAnnotationUpdate}
-              onAnnotationBlur={props.onAnnotationBlur}
-              onTogglePause={props.onTogglePause}
+              onToggleView={handleToggleView}
+              onDelete={handleNodeDelete}
               runDisabled={props.runDisabled}
               runDisabledTooltip={props.runDisabledTooltip}
-              onBuildingBlockDrop={handleBuildingBlockDrop}
-              onBuildingBlocksSidebarToggle={handleSidebarToggle}
-              onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
-              onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
-              onZoomChange={setCanvasZoom}
-              hasFitToViewRef={hasFitToViewRef}
-              viewportRefProp={props.viewportRef}
-              highlightedNodeIds={highlightedNodeIds}
-              workflowNodes={props.workflowNodes}
-              setCurrentTab={setCurrentTab}
-              onUndo={props.onUndo}
-              canUndo={props.canUndo}
+              getAllHistoryEvents={props.getAllHistoryEvents}
+              onLoadMoreHistory={props.onLoadMoreHistory}
+              getHasMoreHistory={props.getHasMoreHistory}
+              getLoadingMoreHistory={props.getLoadingMoreHistory}
+              onLoadMoreQueue={props.onLoadMoreQueue}
+              getAllQueueEvents={props.getAllQueueEvents}
+              getHasMoreQueue={props.getHasMoreQueue}
+              getLoadingMoreQueue={props.getLoadingMoreQueue}
+              onReEmit={props.onReEmit}
+              loadExecutionChain={props.loadExecutionChain}
+              getExecutionState={props.getExecutionState}
+              onSidebarClose={handleSidebarClose}
+              editingNodeData={editingNodeData}
+              onSaveConfiguration={handleSaveConfiguration}
+              onEdit={handleNodeEdit}
+              currentTab={currentTab}
+              onTabChange={setCurrentTab}
               organizationId={props.organizationId}
-              unsavedMessage={props.unsavedMessage}
-              saveIsPrimary={props.saveIsPrimary}
-              saveButtonHidden={props.saveButtonHidden}
-              saveDisabled={props.saveDisabled}
-              saveDisabledTooltip={props.saveDisabledTooltip}
-              isAutoSaveEnabled={props.isAutoSaveEnabled}
-              onToggleAutoSave={props.onToggleAutoSave}
-              autoSaveDisabled={props.autoSaveDisabled}
-              autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
-              readOnly={props.readOnly}
-              logEntries={props.logEntries}
+              getCustomField={props.getCustomField}
+              integrations={props.integrations}
+              workflowNodes={props.workflowNodes}
+              components={props.components}
+              triggers={props.triggers}
+              blueprints={props.blueprints}
+              onHighlightedNodesChange={setHighlightedNodeIds}
               focusRequest={props.focusRequest}
               onExecutionChainHandled={props.onExecutionChainHandled}
-              initialFocusNodeId={props.initialFocusNodeId}
-              onResolveExecutionErrors={props.onResolveExecutionErrors}
-              title={props.title}
+              readOnly={readOnly}
+              canReadIntegrations={props.canReadIntegrations}
+              canCreateIntegrations={props.canCreateIntegrations}
+              canUpdateIntegrations={props.canUpdateIntegrations}
             />
-          </ReactFlowProvider>
-
-          <AiSidebar
-            enabled={state.ai.enabled}
-            isOpen={state.ai.sidebarOpen}
-            setIsOpen={state.ai.setSidebarOpen}
-            showNotifications={state.ai.showNotifications}
-            notificationMessage={state.ai.notificationMessage}
-          />
-
-          <Sidebar
-            state={state}
-            getSidebarData={props.getSidebarData}
-            loadSidebarData={props.loadSidebarData}
-            getTabData={props.getTabData}
-            getAutocompleteExampleObj={props.getAutocompleteExampleObj}
-            onCancelQueueItem={handleCancelQueueItem}
-            onPushThrough={handlePushThrough}
-            onCancelExecution={handleCancelExecution}
-            supportsPushThrough={props.supportsPushThrough}
-            onRun={handleNodeRun}
-            onDuplicate={props.onDuplicate}
-            onDocs={props.onDocs}
-            onConfigure={props.onConfigure}
-            onDeactivate={props.onDeactivate}
-            onToggleView={handleToggleView}
-            onDelete={handleNodeDelete}
-            runDisabled={props.runDisabled}
-            runDisabledTooltip={props.runDisabledTooltip}
-            getAllHistoryEvents={props.getAllHistoryEvents}
-            onLoadMoreHistory={props.onLoadMoreHistory}
-            getHasMoreHistory={props.getHasMoreHistory}
-            getLoadingMoreHistory={props.getLoadingMoreHistory}
-            onLoadMoreQueue={props.onLoadMoreQueue}
-            getAllQueueEvents={props.getAllQueueEvents}
-            getHasMoreQueue={props.getHasMoreQueue}
-            getLoadingMoreQueue={props.getLoadingMoreQueue}
-            onReEmit={props.onReEmit}
-            loadExecutionChain={props.loadExecutionChain}
-            getExecutionState={props.getExecutionState}
-            onSidebarClose={handleSidebarClose}
-            editingNodeData={editingNodeData}
-            onSaveConfiguration={handleSaveConfiguration}
-            onEdit={handleNodeEdit}
-            currentTab={currentTab}
-            onTabChange={setCurrentTab}
-            organizationId={props.organizationId}
-            getCustomField={props.getCustomField}
-            integrations={props.integrations}
-            workflowNodes={props.workflowNodes}
-            components={props.components}
-            triggers={props.triggers}
-            blueprints={props.blueprints}
-            onHighlightedNodesChange={setHighlightedNodeIds}
-            focusRequest={props.focusRequest}
-            onExecutionChainHandled={props.onExecutionChainHandled}
-            readOnly={readOnly}
-            canReadIntegrations={props.canReadIntegrations}
-            canCreateIntegrations={props.canCreateIntegrations}
-            canUpdateIntegrations={props.canUpdateIntegrations}
-          />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Edit existing node modal - now handled by settings sidebar */}
 
@@ -1257,10 +1382,35 @@ function CanvasContentHeader({
   saveButtonHidden,
   saveDisabled,
   saveDisabledTooltip,
+  versionLabel,
+  onCreateVersion,
+  onPublishVersion,
+  onDiscardVersion,
+  createVersionDisabled,
+  createVersionDisabledTooltip,
+  publishVersionDisabled,
+  publishVersionDisabledTooltip,
+  discardVersionDisabled,
+  discardVersionDisabledTooltip,
   isAutoSaveEnabled,
   onToggleAutoSave,
   autoSaveDisabled,
   autoSaveDisabledTooltip,
+  headerMode,
+  saveState,
+  onEnterEditMode,
+  enterEditModeDisabled,
+  enterEditModeDisabledTooltip,
+  onExitEditMode,
+  exitEditModeDisabled,
+  exitEditModeDisabledTooltip,
+  sandboxModeTooltip,
+  showPendingDraftBadge,
+  topViewMode,
+  onTopViewModeChange,
+  showVersioningTab,
+  memoryItemCount,
+  versioningItemCount,
   onExportYamlCopy,
   onExportYamlDownload,
 }: {
@@ -1274,10 +1424,35 @@ function CanvasContentHeader({
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
   saveDisabledTooltip?: string;
+  versionLabel?: string;
+  onCreateVersion?: () => void;
+  onPublishVersion?: () => void;
+  onDiscardVersion?: () => void;
+  createVersionDisabled?: boolean;
+  createVersionDisabledTooltip?: string;
+  publishVersionDisabled?: boolean;
+  publishVersionDisabledTooltip?: string;
+  discardVersionDisabled?: boolean;
+  discardVersionDisabledTooltip?: string;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
+  headerMode?: "default" | "version-live" | "version-edit" | "sandbox";
+  saveState?: "saved" | "saving" | "unsaved";
+  onEnterEditMode?: () => void;
+  enterEditModeDisabled?: boolean;
+  enterEditModeDisabledTooltip?: string;
+  onExitEditMode?: () => void;
+  exitEditModeDisabled?: boolean;
+  exitEditModeDisabledTooltip?: string;
+  sandboxModeTooltip?: string;
+  showPendingDraftBadge?: boolean;
+  topViewMode?: "canvas" | "memory" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "memory" | "versioning") => void;
+  showVersioningTab?: boolean;
+  memoryItemCount?: number;
+  versioningItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
 }) {
@@ -1321,10 +1496,35 @@ function CanvasContentHeader({
       saveButtonHidden={saveButtonHidden}
       saveDisabled={saveDisabled}
       saveDisabledTooltip={saveDisabledTooltip}
+      versionLabel={versionLabel}
+      onCreateVersion={onCreateVersion}
+      onPublishVersion={onPublishVersion}
+      onDiscardVersion={onDiscardVersion}
+      createVersionDisabled={createVersionDisabled}
+      createVersionDisabledTooltip={createVersionDisabledTooltip}
+      publishVersionDisabled={publishVersionDisabled}
+      publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+      discardVersionDisabled={discardVersionDisabled}
+      discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       isAutoSaveEnabled={isAutoSaveEnabled}
       onToggleAutoSave={onToggleAutoSave}
       autoSaveDisabled={autoSaveDisabled}
       autoSaveDisabledTooltip={autoSaveDisabledTooltip}
+      mode={headerMode}
+      saveState={saveState}
+      onEnterEditMode={onEnterEditMode}
+      enterEditModeDisabled={enterEditModeDisabled}
+      enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+      onExitEditMode={onExitEditMode}
+      exitEditModeDisabled={exitEditModeDisabled}
+      exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+      sandboxModeTooltip={sandboxModeTooltip}
+      showPendingDraftBadge={showPendingDraftBadge}
+      topViewMode={topViewMode}
+      onTopViewModeChange={onTopViewModeChange}
+      showVersioningTab={showVersioningTab}
+      memoryItemCount={memoryItemCount}
+      versioningItemCount={versioningItemCount}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
     />
@@ -1336,6 +1536,9 @@ function CanvasContent({
   onSave,
   onNodeEdit,
   onNodeDelete,
+  onNodesDelete,
+  onDuplicateNodes,
+  onAutoLayoutNodes,
   onEdgeCreate,
   hideHeader,
   onRun,
@@ -1345,7 +1548,6 @@ function CanvasContent({
   onTogglePause,
   onToggleView,
   onToggleCollapse,
-  onAutoLayout,
   onAnnotationUpdate,
   onAnnotationBlur,
   onBuildingBlockDrop,
@@ -1370,10 +1572,38 @@ function CanvasContent({
   saveButtonHidden,
   saveDisabled,
   saveDisabledTooltip,
+  versionLabel,
+  onCreateVersion,
+  onPublishVersion,
+  onDiscardVersion,
+  createVersionDisabled,
+  createVersionDisabledTooltip,
+  publishVersionDisabled,
+  publishVersionDisabledTooltip,
+  discardVersionDisabled,
+  discardVersionDisabledTooltip,
   isAutoSaveEnabled,
   onToggleAutoSave,
   autoSaveDisabled,
   autoSaveDisabledTooltip,
+  headerMode,
+  saveState,
+  onEnterEditMode,
+  enterEditModeDisabled,
+  enterEditModeDisabledTooltip,
+  onExitEditMode,
+  exitEditModeDisabled,
+  exitEditModeDisabledTooltip,
+  sandboxModeTooltip,
+  showPendingDraftBadge,
+  isVersionControlOpen,
+  onOpenVersionControl,
+  versionControlButtonTooltip,
+  showBottomStatusControls = true,
+  isAutoLayoutOnUpdateEnabled,
+  onToggleAutoLayoutOnUpdate,
+  autoLayoutOnUpdateDisabled,
+  autoLayoutOnUpdateDisabledTooltip,
   readOnly,
   logEntries = [],
   focusRequest,
@@ -1385,6 +1615,9 @@ function CanvasContent({
   onSave?: (nodes: CanvasNode[]) => void;
   onNodeEdit: (nodeId: string) => void;
   onNodeDelete?: (nodeId: string) => void;
+  onNodesDelete?: (nodeIds: string[]) => void;
+  onDuplicateNodes?: (nodeIds: string[]) => void;
+  onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   hideHeader?: boolean;
   onRun?: (nodeId: string) => void;
@@ -1394,7 +1627,6 @@ function CanvasContent({
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
-  onAutoLayout?: (selectedNodeIDs: string[]) => void | Promise<void>;
   onDelete?: (nodeId: string) => void;
   onAnnotationUpdate?: (
     nodeId: string,
@@ -1426,10 +1658,39 @@ function CanvasContent({
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
   saveDisabledTooltip?: string;
+  versionLabel?: string;
+  onCreateVersion?: () => void;
+  onPublishVersion?: () => void;
+  onDiscardVersion?: () => void;
+  createVersionDisabled?: boolean;
+  createVersionDisabledTooltip?: string;
+  publishVersionDisabled?: boolean;
+  publishVersionDisabledTooltip?: string;
+  discardVersionDisabled?: boolean;
+  discardVersionDisabledTooltip?: string;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
+  headerMode?: "default" | "version-live" | "version-edit" | "sandbox";
+  saveState?: "saved" | "saving" | "unsaved";
+  onEnterEditMode?: () => void;
+  enterEditModeDisabled?: boolean;
+  enterEditModeDisabledTooltip?: string;
+  onExitEditMode?: () => void;
+  exitEditModeDisabled?: boolean;
+  exitEditModeDisabledTooltip?: string;
+  sandboxModeTooltip?: string;
+  showPendingDraftBadge?: boolean;
+  isVersionControlOpen?: boolean;
+  onOpenVersionControl?: () => void;
+  versionControlButtonLabel?: string;
+  versionControlButtonTooltip?: string;
+  showBottomStatusControls?: boolean;
+  isAutoLayoutOnUpdateEnabled?: boolean;
+  onToggleAutoLayoutOnUpdate?: () => void;
+  autoLayoutOnUpdateDisabled?: boolean;
+  autoLayoutOnUpdateDisabledTooltip?: string;
   readOnly?: boolean;
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
@@ -1462,6 +1723,22 @@ function CanvasContent({
 
   // Use viewport from ref as the state value
   const viewport = viewportRef.current;
+  const lastReportedZoomRef = useRef<number | null>(null);
+  const reportZoom = useCallback(
+    (zoom: number) => {
+      if (!onZoomChange) {
+        return;
+      }
+
+      if (lastReportedZoomRef.current === zoom) {
+        return;
+      }
+
+      lastReportedZoomRef.current = zoom;
+      onZoomChange(zoom);
+    },
+    [onZoomChange],
+  );
 
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
@@ -1472,7 +1749,38 @@ function CanvasContent({
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set());
   const [logSidebarHeight, setLogSidebarHeight] = useState(320);
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
-  const [isAutoLayouting, setIsAutoLayouting] = useState(false);
+  const { isMinimapVisible, setIsMinimapVisible } = useMinimapVisibility(false);
+
+  useEffect(() => {
+    if (!showBottomStatusControls) {
+      setIsLogSidebarOpen(false);
+    }
+  }, [showBottomStatusControls]);
+
+  const [multiSelectedNodes, setMultiSelectedNodes] = useState<ReactFlowNode[]>([]);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const previouslySelectedRef = useRef<Set<string>>(new Set());
+
+  useOnSelectionChange({
+    onChange: useCallback(({ nodes }: { nodes: ReactFlowNode[] }) => {
+      setMultiSelectedNodes(nodes.length >= 2 ? nodes : []);
+    }, []),
+  });
+
+  const selectionToolbarFlowPos = useMemo(() => {
+    if (multiSelectedNodes.length < 2) return null;
+
+    let minY = Infinity;
+    let maxX = -Infinity;
+
+    for (const node of multiSelectedNodes) {
+      const w = node.measured?.width ?? node.width ?? 240;
+      if (node.position.y < minY) minY = node.position.y;
+      if (node.position.x + w > maxX) maxX = node.position.x + w;
+    }
+
+    return { x: maxX, y: minY };
+  }, [multiSelectedNodes]);
 
   useEffect(() => {
     const activeNoteId = getActiveNoteId();
@@ -1669,14 +1977,10 @@ function CanvasContent({
 
   const handleMove = useCallback(
     (_event: any, newViewport: { x: number; y: number; zoom: number }) => {
-      // Store the viewport in the ref (which persists across re-renders)
       viewportRef.current = newViewport;
-
-      if (onZoomChange) {
-        onZoomChange(newViewport.zoom);
-      }
+      reportZoom(newViewport.zoom);
     },
-    [onZoomChange, viewportRef],
+    [reportZoom, viewportRef],
   );
 
   const handleToggleCollapse = useCallback(() => {
@@ -1684,29 +1988,19 @@ function CanvasContent({
     onToggleCollapse?.();
   }, [state.toggleCollapse, onToggleCollapse]);
 
-  const selectedNodeIDs = useMemo(
-    () => state.nodes.filter((node) => node.selected).map((node) => node.id),
-    [state.nodes],
-  );
-
-  const handleAutoLayout = useCallback(async () => {
-    if (!onAutoLayout || isReadOnly || isAutoLayouting || selectedNodeIDs.length === 0) {
+  const handleToggleAutoLayoutOnUpdate = useCallback(() => {
+    if (isReadOnly || !onToggleAutoLayoutOnUpdate || autoLayoutOnUpdateDisabled) {
       return;
     }
+    onToggleAutoLayoutOnUpdate();
+  }, [isReadOnly, onToggleAutoLayoutOnUpdate, autoLayoutOnUpdateDisabled]);
 
-    try {
-      setIsAutoLayouting(true);
-      await onAutoLayout(selectedNodeIDs);
-    } finally {
-      setIsAutoLayouting(false);
-    }
-  }, [onAutoLayout, isReadOnly, isAutoLayouting, selectedNodeIDs]);
-
-  const isAutoLayoutDisabled = isReadOnly || !onAutoLayout || isAutoLayouting || selectedNodeIDs.length === 0;
+  const isAutoLayoutToggleDisabled = isReadOnly || !onToggleAutoLayoutOnUpdate || autoLayoutOnUpdateDisabled;
   const autoLayoutTooltipMessage =
-    selectedNodeIDs.length === 0
-      ? "Select one or more nodes to auto arrange"
-      : "Auto arrange selected components left-to-right";
+    autoLayoutOnUpdateDisabledTooltip ||
+    (isAutoLayoutOnUpdateEnabled
+      ? "Auto-layout on add is enabled. New nodes reflow their connected graph."
+      : "Auto-layout on add is disabled. Click to enable connected-graph layout for newly added nodes.");
 
   useEffect(() => {
     if (!focusRequest) {
@@ -1745,6 +2039,8 @@ function CanvasContent({
     // Do not close sidebar or reset state while creating a new component
     if (templateNodeId) return;
 
+    previouslySelectedRef.current = new Set();
+
     // Clear ReactFlow's selection state and close both sidebars
     stateRef.current.setNodes((nodes) =>
       nodes.map((node) => ({
@@ -1782,18 +2078,12 @@ function CanvasContent({
           // Store the initial viewport after fit
           const initialViewport = getViewport();
           viewportRef.current = initialViewport;
-
-          if (onZoomChange) {
-            onZoomChange(initialViewport.zoom);
-          }
+          reportZoom(initialViewport.zoom);
         } else {
           const defaultViewport = viewportRef.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
           viewportRef.current = defaultViewport;
           reactFlowInstance.setViewport(defaultViewport);
-
-          if (onZoomChange) {
-            onZoomChange(defaultViewport.zoom);
-          }
+          reportZoom(defaultViewport.zoom);
         }
 
         hasFitToViewRef.current = true;
@@ -1806,10 +2096,12 @@ function CanvasContent({
         setIsInitialized(true);
       }
     },
-    [fitView, getViewport, onZoomChange, hasFitToViewRef, viewportRef, initialFocusNodeId],
+    [fitView, getViewport, reportZoom, hasFitToViewRef, viewportRef, initialFocusNodeId],
   );
 
   const showHeader = !isReadOnly;
+
+  const hasMultiSelection = multiSelectedNodes.length >= 2;
 
   // Store callback handlers in a ref so they can be accessed without being in node data
   const callbacksRef = useRef({
@@ -1829,6 +2121,7 @@ function CanvasContent({
     runDisabled,
     runDisabledTooltip,
     showHeader,
+    hasMultiSelection,
   });
   callbacksRef.current = {
     handleNodeExpand,
@@ -1847,6 +2140,7 @@ function CanvasContent({
     runDisabled,
     runDisabledTooltip,
     showHeader,
+    hasMultiSelection,
   };
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes
@@ -1936,7 +2230,7 @@ function CanvasContent({
         _hasHighlightedNodes: hasHighlightedNodes,
       },
     }));
-  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds]);
+  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds, hasMultiSelection]);
 
   const edgeTypes = useMemo(
     () => ({
@@ -1961,6 +2255,16 @@ function CanvasContent({
 
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
+      const prev = previouslySelectedRef.current;
+      if (prev.size > 0) {
+        changes = changes.map((c) => {
+          if (c.type === "select" && !c.selected && prev.has(c.id)) {
+            return { ...c, selected: true };
+          }
+          return c;
+        });
+      }
+
       if (!isReadOnly) {
         state.onNodesChange(changes);
         return;
@@ -2077,6 +2381,8 @@ function CanvasContent({
     });
   }, []);
 
+  const showVersionControlTrigger = showBottomStatusControls && !!onOpenVersionControl && !isVersionControlOpen;
+
   return (
     <div className="h-full w-full relative">
       {/* Header */}
@@ -2092,10 +2398,30 @@ function CanvasContent({
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}
           saveDisabledTooltip={saveDisabledTooltip}
+          versionLabel={versionLabel}
+          onCreateVersion={onCreateVersion}
+          onPublishVersion={onPublishVersion}
+          onDiscardVersion={onDiscardVersion}
+          createVersionDisabled={createVersionDisabled}
+          createVersionDisabledTooltip={createVersionDisabledTooltip}
+          publishVersionDisabled={publishVersionDisabled}
+          publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+          discardVersionDisabled={discardVersionDisabled}
+          discardVersionDisabledTooltip={discardVersionDisabledTooltip}
           isAutoSaveEnabled={isAutoSaveEnabled}
           onToggleAutoSave={onToggleAutoSave}
           autoSaveDisabled={autoSaveDisabled}
           autoSaveDisabledTooltip={autoSaveDisabledTooltip}
+          mode={headerMode}
+          saveState={saveState}
+          onEnterEditMode={onEnterEditMode}
+          enterEditModeDisabled={enterEditModeDisabled}
+          enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+          onExitEditMode={onExitEditMode}
+          exitEditModeDisabled={exitEditModeDisabled}
+          exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+          sandboxModeTooltip={sandboxModeTooltip}
+          showPendingDraftBadge={showPendingDraftBadge}
         />
       )}
 
@@ -2106,7 +2432,7 @@ function CanvasContent({
             edges={styledEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
-            minZoom={0.4}
+            minZoom={MIN_CANVAS_ZOOM}
             maxZoom={1.5}
             zoomOnScroll={true}
             zoomOnPinch={true}
@@ -2133,6 +2459,15 @@ function CanvasContent({
             onInit={handleInit}
             deleteKeyCode={null}
             onPaneClick={handlePaneClick}
+            onSelectionStart={() => {
+              setIsSelecting(true);
+              const selected = (stateRef.current.nodes || []).filter((n) => n.selected).map((n) => n.id);
+              previouslySelectedRef.current = new Set(selected);
+            }}
+            onSelectionEnd={() => {
+              setIsSelecting(false);
+              previouslySelectedRef.current = new Set();
+            }}
             onEdgeMouseEnter={handleEdgeMouseEnter}
             onEdgeMouseLeave={handleEdgeMouseLeave}
             defaultViewport={viewport}
@@ -2141,139 +2476,256 @@ function CanvasContent({
             className="h-full w-full"
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
-            <ZoomSlider
-              position="bottom-left"
-              orientation="horizontal"
-              screenshotName={title}
-              isSnapToGridEnabled={isSnapToGridEnabled}
-              onSnapToGridToggle={() => setIsSnapToGridEnabled((prev) => !prev)}
-            >
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" onClick={handleToggleCollapse}>
-                    {state.isCollapsed ? <ScanText className="h-3 w-3" /> : <ScanLine className="h-3 w-3" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {state.isCollapsed
-                    ? "Switch components to Detailed view (Ctrl/Cmd + E)"
-                    : "Switch components to Compact view (Ctrl/Cmd + E)"}
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-xs font-medium"
-                      onClick={handleAutoLayout}
-                      disabled={isAutoLayoutDisabled}
-                    >
-                      {isAutoLayouting ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Workflow className="h-3 w-3" />
-                      )}
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
-              </Tooltip>
-              <NodeSearch
-                onSearch={(searchString) => {
-                  const query = searchString.toLowerCase();
-                  return state.nodes.filter((node) => {
-                    const label = ((node.data?.label as string) || "").toLowerCase();
-                    const nodeName = ((node.data as any)?.nodeName || "").toLowerCase();
-                    const id = (node.id || "").toLowerCase();
-                    return label.includes(query) || nodeName.includes(query) || id.includes(query);
-                  });
-                }}
-                onSelectNode={(node) => {
-                  const isAnnotationNode = (node.data as any)?.type === "annotation";
-                  if (isAnnotationNode) {
-                    return;
-                  }
-                  state.componentSidebar.open(node.id);
-                }}
-              />
-            </ZoomSlider>
+            <CanvasMiniMap nodes={state.nodes} edges={state.edges} isVisible={isMinimapVisible} />
             <Panel
               position="bottom-left"
-              className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8"
-              style={{ marginLeft: 370 }}
+              className="!bg-transparent !outline-none !shadow-none p-0 flex items-center gap-2"
             >
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 items-center text-xs font-medium"
-                    onClick={() => handleLogButtonClick("all")}
-                  >
-                    <ScrollText className="h-3 w-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>All Logs</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 items-center text-xs font-medium"
-                    onClick={() => handleLogButtonClick("error")}
-                  >
-                    <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
-                    <span className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}>
-                      {logCounts.error}
+              <ZoomSlider
+                orientation="horizontal"
+                className="!static !m-0"
+                screenshotName={title}
+                isSnapToGridEnabled={isSnapToGridEnabled}
+                onSnapToGridToggle={() => setIsSnapToGridEnabled((prev) => !prev)}
+                leadingContent={
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={isMinimapVisible ? "secondary" : "ghost"}
+                        size="sm"
+                        className={`h-8 w-8 px-0 ${
+                          isMinimapVisible
+                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                        onClick={() => setIsMinimapVisible((prev: boolean) => !prev)}
+                        aria-pressed={isMinimapVisible}
+                      >
+                        <MapIcon className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{isMinimapVisible ? "Hide minimap" : "Show minimap"}</TooltipContent>
+                  </Tooltip>
+                }
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon-sm" onClick={handleToggleCollapse}>
+                      {state.isCollapsed ? <ScanText className="h-3 w-3" /> : <ScanLine className="h-3 w-3" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {state.isCollapsed
+                      ? "Switch components to Detailed view (Ctrl/Cmd + E)"
+                      : "Switch components to Compact view (Ctrl/Cmd + E)"}
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <Button
+                        variant={isAutoLayoutOnUpdateEnabled ? "secondary" : "ghost"}
+                        size="sm"
+                        className={`h-8 w-8 px-0 ${
+                          isAutoLayoutOnUpdateEnabled
+                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                        onClick={handleToggleAutoLayoutOnUpdate}
+                        disabled={isAutoLayoutToggleDisabled}
+                        aria-pressed={isAutoLayoutOnUpdateEnabled}
+                      >
+                        <Workflow className="h-3 w-3" />
+                      </Button>
                     </span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Errors</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 items-center text-xs font-medium"
-                    onClick={() => handleLogButtonClick("warning")}
-                  >
-                    <TriangleAlert
-                      className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
-                    />
-                    <span
-                      className={logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"}
-                    >
-                      {logCounts.warning}
-                    </span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Warnings</TooltipContent>
-              </Tooltip>
+                  </TooltipTrigger>
+                  <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
+                </Tooltip>
+                <NodeSearch
+                  onSearch={(searchString) => {
+                    const query = searchString.toLowerCase();
+                    return state.nodes.filter((node) => {
+                      const label = ((node.data?.label as string) || "").toLowerCase();
+                      const nodeName = ((node.data as any)?.nodeName || "").toLowerCase();
+                      const id = (node.id || "").toLowerCase();
+                      return label.includes(query) || nodeName.includes(query) || id.includes(query);
+                    });
+                  }}
+                  onSelectNode={(node) => {
+                    const isAnnotationNode = (node.data as any)?.type === "annotation";
+                    if (isAnnotationNode) {
+                      return;
+                    }
+                    state.componentSidebar.open(node.id);
+                  }}
+                />
+              </ZoomSlider>
+              {showVersionControlTrigger ? (
+                <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center rounded-md p-0.5 h-8">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 items-center text-xs font-medium gap-1.5"
+                        onClick={onOpenVersionControl}
+                      >
+                        <GitBranch className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{versionControlButtonTooltip || "Open version control"}</TooltipContent>
+                  </Tooltip>
+                </div>
+              ) : null}
+              {showBottomStatusControls ? (
+                <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 items-center text-xs font-medium"
+                        onClick={() => handleLogButtonClick("all")}
+                      >
+                        <ScrollText className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>All Logs</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 items-center text-xs font-medium"
+                        onClick={() => handleLogButtonClick("error")}
+                      >
+                        <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
+                        <span
+                          className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}
+                        >
+                          {logCounts.error}
+                        </span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Errors</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 items-center text-xs font-medium"
+                        onClick={() => handleLogButtonClick("warning")}
+                      >
+                        <TriangleAlert
+                          className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
+                        />
+                        <span
+                          className={
+                            logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"
+                          }
+                        >
+                          {logCounts.warning}
+                        </span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Warnings</TooltipContent>
+                  </Tooltip>
+                </div>
+              ) : null}
             </Panel>
+            {selectionToolbarFlowPos &&
+              !isSelecting &&
+              !isReadOnly &&
+              (onNodesDelete || onNodeDelete || onAutoLayoutNodes || onDuplicateNodes) && (
+                <ViewportPortal>
+                  <div
+                    className="nodrag nopan flex items-center gap-2"
+                    style={{
+                      position: "absolute",
+                      left: selectionToolbarFlowPos.x,
+                      top: selectionToolbarFlowPos.y,
+                      transform: "translate(-100%, -100%) translateY(-24px)",
+                      pointerEvents: "all",
+                    }}
+                  >
+                    {onAutoLayoutNodes && (
+                      <button
+                        type="button"
+                        data-testid="multi-select-auto-layout"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onAutoLayoutNodes(multiSelectedNodes.map((n) => n.id));
+                        }}
+                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                      >
+                        <LayoutGrid className="h-4 w-4" />
+                      </button>
+                    )}
+                    {onDuplicateNodes && (
+                      <button
+                        type="button"
+                        data-testid="multi-select-duplicate"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onDuplicateNodes(multiSelectedNodes.map((n) => n.id));
+                        }}
+                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    )}
+                    {(onNodesDelete || onNodeDelete) && (
+                      <button
+                        type="button"
+                        data-testid="multi-select-delete"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const nodeIds = multiSelectedNodes.map((n) => n.id);
+                          if (onNodesDelete) {
+                            onNodesDelete(nodeIds);
+                          } else {
+                            for (const id of nodeIds) {
+                              onNodeDelete?.(id);
+                            }
+                          }
+                          stateRef.current.setNodes((nodes) => nodes.map((node) => ({ ...node, selected: false })));
+                          setMultiSelectedNodes([]);
+                        }}
+                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </ViewportPortal>
+              )}
           </ReactFlow>
         </div>
       </div>
-      <CanvasLogSidebar
-        isOpen={isLogSidebarOpen}
-        onClose={() => setIsLogSidebarOpen(false)}
-        filter={logFilter}
-        onFilterChange={setLogFilter}
-        onResolveErrors={onResolveExecutionErrors}
-        height={logSidebarHeight}
-        onHeightChange={setLogSidebarHeight}
-        scope={logScope}
-        onScopeChange={setLogScope}
-        searchValue={logSearch}
-        onSearchChange={setLogSearch}
-        entries={filteredLogEntries}
-        counts={logCounts}
-        expandedRuns={expandedRuns}
-        onToggleRun={handleRunToggle}
-      />
+      {showBottomStatusControls ? (
+        <CanvasLogSidebar
+          isOpen={isLogSidebarOpen}
+          onClose={() => setIsLogSidebarOpen(false)}
+          filter={logFilter}
+          onFilterChange={setLogFilter}
+          onResolveErrors={onResolveExecutionErrors}
+          height={logSidebarHeight}
+          onHeightChange={setLogSidebarHeight}
+          scope={logScope}
+          onScopeChange={setLogScope}
+          searchValue={logSearch}
+          onSearchChange={setLogSearch}
+          entries={filteredLogEntries}
+          counts={logCounts}
+          expandedRuns={expandedRuns}
+          onToggleRun={handleRunToggle}
+        />
+      ) : null}
     </div>
   );
 }

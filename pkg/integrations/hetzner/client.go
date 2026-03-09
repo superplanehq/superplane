@@ -34,17 +34,32 @@ func (e *APIError) Error() string {
 }
 
 type createServerRequest struct {
-	Name             string   `json:"name"`
-	ServerType       string   `json:"server_type"`
-	Image            string   `json:"image"`
-	Location         string   `json:"location,omitempty"`
-	SSHKeys          []string `json:"ssh_keys,omitempty"`
-	UserData         string   `json:"user_data,omitempty"`
-	StartAfterCreate *bool    `json:"start_after_create,omitempty"`
+	Name             string                 `json:"name"`
+	ServerType       string                 `json:"server_type"`
+	Image            string                 `json:"image"`
+	Location         string                 `json:"location,omitempty"`
+	SSHKeys          []string               `json:"ssh_keys,omitempty"`
+	Firewalls        []createServerFirewall `json:"firewalls,omitempty"`
+	UserData         string                 `json:"user_data,omitempty"`
+	StartAfterCreate *bool                  `json:"start_after_create,omitempty"`
+}
+
+type createServerFirewall struct {
+	Firewall string `json:"firewall"`
 }
 
 type createServerResponse struct {
 	Server *ServerResponse `json:"server"`
+	Action *ActionResponse `json:"action"`
+}
+
+type createSnapshotRequest struct {
+	Type        string `json:"type"`
+	Description string `json:"description,omitempty"`
+}
+
+type createSnapshotResponse struct {
+	Image  *ImageResponse  `json:"image"`
 	Action *ActionResponse `json:"action"`
 }
 
@@ -70,10 +85,16 @@ type createLoadBalancerResponse struct {
 }
 
 type ServerResponse struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Status    string `json:"status"`
-	Created   string `json:"created"`
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Status  string `json:"status"`
+	Created string `json:"created"`
+	Image   struct {
+		ID          int    `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Type        string `json:"type"`
+	} `json:"image"`
 	PublicNet struct {
 		IPv4 struct {
 			IP string `json:"ip"`
@@ -184,7 +205,7 @@ func (c *Client) parseError(resp *http.Response) error {
 
 // server actions
 
-func (c *Client) CreateServer(name, serverType, image, location string, sshKeys []string, userData string) (*ServerResponse, *ActionResponse, error) {
+func (c *Client) CreateServer(name, serverType, image, location string, sshKeys []string, firewall, userData string) (*ServerResponse, *ActionResponse, error) {
 	req := createServerRequest{
 		Name:       name,
 		ServerType: serverType,
@@ -192,6 +213,11 @@ func (c *Client) CreateServer(name, serverType, image, location string, sshKeys 
 		Location:   location,
 		SSHKeys:    sshKeys,
 		UserData:   userData,
+	}
+	if strings.TrimSpace(firewall) != "" {
+		req.Firewalls = []createServerFirewall{
+			{Firewall: firewall},
+		}
 	}
 	startAfter := true
 	req.StartAfterCreate = &startAfter
@@ -272,6 +298,32 @@ func (c *Client) DeleteServer(serverID string) (*ActionResponse, error) {
 		return nil, fmt.Errorf("decode delete server response: %w", err)
 	}
 	return &out.Action, nil
+}
+
+func (c *Client) CreateServerSnapshot(serverID, description string) (*ImageResponse, *ActionResponse, error) {
+	req := createSnapshotRequest{
+		Type:        "snapshot",
+		Description: description,
+	}
+
+	resp, err := c.do("POST", "/servers/"+serverID+"/actions/create_image", req)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, nil, c.parseError(resp)
+	}
+
+	var out createSnapshotResponse
+	if err := decodeJSON(resp.Body, &out); err != nil {
+		return nil, nil, fmt.Errorf("decode create snapshot response: %w", err)
+	}
+	if out.Image == nil || out.Action == nil {
+		return nil, nil, fmt.Errorf("create snapshot response missing image or action")
+	}
+	return out.Image, out.Action, nil
 }
 
 func (c *Client) ListServers() ([]ServerResponse, error) {
@@ -439,12 +491,59 @@ func (s *ServerTypeResponse) ServerTypeDisplayName() string {
 }
 
 type ImageResponse struct {
-	Name string `json:"name"`
-	ID   int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Type        string `json:"type"`
+	ID          int    `json:"id"`
 }
 
 func (c *Client) ListImages() ([]ImageResponse, error) {
-	resp, err := c.do("GET", "/images?per_page=50&type=system", nil)
+	all := []ImageResponse{}
+	seen := map[int]struct{}{}
+	page := 1
+
+	for {
+		resp, err := c.do("GET", fmt.Sprintf("/images?per_page=50&page=%d", page), nil)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, c.parseError(resp)
+		}
+
+		var out struct {
+			Images []ImageResponse `json:"images"`
+			Meta   struct {
+				Pagination struct {
+					NextPage *int `json:"next_page"`
+				} `json:"pagination"`
+			} `json:"meta"`
+		}
+		if err := decodeJSON(resp.Body, &out); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("decode list images response: %w", err)
+		}
+		resp.Body.Close()
+
+		for _, img := range out.Images {
+			if _, ok := seen[img.ID]; ok {
+				continue
+			}
+			seen[img.ID] = struct{}{}
+			all = append(all, img)
+		}
+
+		if out.Meta.Pagination.NextPage == nil || *out.Meta.Pagination.NextPage <= page {
+			break
+		}
+		page = *out.Meta.Pagination.NextPage
+	}
+
+	return all, nil
+}
+
+func (c *Client) GetImage(imageID string) (*ImageResponse, error) {
+	resp, err := c.do("GET", "/images/"+imageID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -455,12 +554,26 @@ func (c *Client) ListImages() ([]ImageResponse, error) {
 	}
 
 	var out struct {
-		Images []ImageResponse `json:"images"`
+		Image ImageResponse `json:"image"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return nil, fmt.Errorf("decode list images response: %w", err)
+	if err := decodeJSON(resp.Body, &out); err != nil {
+		return nil, fmt.Errorf("decode get image response: %w", err)
 	}
-	return out.Images, nil
+	return &out.Image, nil
+}
+
+func (c *Client) DeleteImage(imageID string) error {
+	resp, err := c.do("DELETE", "/images/"+imageID, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		return c.parseError(resp)
+	}
+
+	return nil
 }
 
 type LocationResponse struct {
@@ -469,6 +582,11 @@ type LocationResponse struct {
 	Description string `json:"description"`
 	City        string `json:"city"`
 	Country     string `json:"country"`
+}
+
+type FirewallResponse struct {
+	Name string `json:"name"`
+	ID   int    `json:"id"`
 }
 
 // LocationDisplayName returns a label for the location (e.g. "Nuremberg, DE (nbg1)").
@@ -506,6 +624,26 @@ func (c *Client) ListLocations() ([]LocationResponse, error) {
 		return nil, fmt.Errorf("decode list locations response: %w", err)
 	}
 	return out.Locations, nil
+}
+
+func (c *Client) ListFirewalls() ([]FirewallResponse, error) {
+	resp, err := c.do("GET", "/firewalls?per_page=50", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var out struct {
+		Firewalls []FirewallResponse `json:"firewalls"`
+	}
+	if err := decodeJSON(resp.Body, &out); err != nil {
+		return nil, fmt.Errorf("decode list firewalls response: %w", err)
+	}
+	return out.Firewalls, nil
 }
 
 func (c *Client) Verify() error {
@@ -605,5 +743,34 @@ func resolveLoadBalancerID(config any) (string, error) {
 		return fmt.Sprintf("%d", v), nil
 	default:
 		return "", fmt.Errorf("invalid loadBalancer value: %v", raw)
+	}
+}
+
+// resolveImageID extracts the image ID from configuration, handling
+// both string and numeric values.
+func resolveImageID(config any, fieldName string) (string, error) {
+	m, ok := config.(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("invalid configuration type")
+	}
+
+	raw, ok := m[fieldName]
+	if !ok {
+		return "", fmt.Errorf("%s is required", fieldName)
+	}
+
+	switch v := raw.(type) {
+	case string:
+		s := strings.TrimSpace(v)
+		if s == "" {
+			return "", fmt.Errorf("%s is required", fieldName)
+		}
+		return s, nil
+	case float64:
+		return fmt.Sprintf("%.0f", v), nil
+	case int:
+		return fmt.Sprintf("%d", v), nil
+	default:
+		return "", fmt.Errorf("invalid %s value: %v", fieldName, raw)
 	}
 }

@@ -168,6 +168,26 @@ func LockWebhook(tx *gorm.DB, ID uuid.UUID) (*Webhook, error) {
 	return &webhook, nil
 }
 
+// LockDeletedWebhook acquires a row-level lock on a soft-deleted webhook
+// regardless of its state. Used by WebhookCleanupWorker to clean up
+// webhooks that were in any state (ready, failed, etc.) when deleted.
+func LockDeletedWebhook(tx *gorm.DB, ID uuid.UUID) (*Webhook, error) {
+	var webhook Webhook
+
+	err := tx.Unscoped().
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("id = ?", ID).
+		Where("deleted_at IS NOT NULL").
+		First(&webhook).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &webhook, nil
+}
+
 // ResetStuckProvisioningWebhooks resets webhooks that have been stuck in
 // "provisioning" state back to "pending". This handles the edge case where
 // the process crashes during the external API call (Phase 2).

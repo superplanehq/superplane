@@ -4,6 +4,7 @@ This integration connects SuperPlane with Microsoft Azure to automate VM-centric
 It currently provides:
 
 - `azure.onVirtualMachineCreated` trigger (Event Grid driven)
+- `azure.onVirtualMachineDeleted` trigger (Event Grid driven)
 - `azure.createVirtualMachine` action (VM provisioning with dynamic networking UX)
 
 Website: https://azure.microsoft.com/
@@ -31,6 +32,10 @@ and the audience is the integration ID.
 ## Trigger: `azure.onVirtualMachineCreated`
 
 Starts workflows when Azure emits `Microsoft.Resources.ResourceWriteSuccess` for VM resources via Event Grid.
+
+## Trigger: `azure.onVirtualMachineDeleted`
+
+Starts workflows when Azure emits `Microsoft.Resources.ResourceDeleteSuccess` for VM resources via Event Grid.
 
 Key behavior:
 

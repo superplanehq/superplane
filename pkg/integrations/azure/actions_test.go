@@ -228,6 +228,78 @@ func TestImageReference_StructFields(t *testing.T) {
 	assert.Equal(t, "1.0.0", img.Version)
 }
 
+func TestValidateDeleteVMRequest(t *testing.T) {
+	validRequest := DeleteVMRequest{
+		ResourceGroup: "test-rg",
+		VMName:        "test-vm",
+	}
+
+	tests := []struct {
+		name        string
+		modifyReq   func(*DeleteVMRequest)
+		expectedErr string
+	}{
+		{
+			name:        "valid request",
+			modifyReq:   func(r *DeleteVMRequest) {},
+			expectedErr: "",
+		},
+		{
+			name: "missing resource group",
+			modifyReq: func(r *DeleteVMRequest) {
+				r.ResourceGroup = ""
+			},
+			expectedErr: "resource group is required",
+		},
+		{
+			name: "missing VM name",
+			modifyReq: func(r *DeleteVMRequest) {
+				r.VMName = ""
+			},
+			expectedErr: "VM name is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := validRequest
+			tt.modifyReq(&req)
+
+			err := validateDeleteVMRequest(req)
+
+			if tt.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+			}
+		})
+	}
+}
+
+func TestDeleteVMRequest_AllFields(t *testing.T) {
+	req := DeleteVMRequest{
+		ResourceGroup: "my-rg",
+		VMName:        "my-vm",
+	}
+
+	assert.Equal(t, "my-rg", req.ResourceGroup)
+	assert.Equal(t, "my-vm", req.VMName)
+}
+
+func TestDeleteVMResponse_AllFields(t *testing.T) {
+	resp := DeleteVMResponse{
+		VMID:          "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute/virtualMachines/vm1",
+		Name:          "vm1",
+		ResourceGroup: "rg1",
+	}
+
+	assert.Contains(t, resp.VMID, "virtualMachines/vm1")
+	assert.Equal(t, "vm1", resp.Name)
+	assert.Equal(t, "rg1", resp.ResourceGroup)
+}
+
+
 func TestCreateVMRequest_WithUbuntuImage(t *testing.T) {
 	req := CreateVMRequest{
 		ResourceGroup:      "test-rg",

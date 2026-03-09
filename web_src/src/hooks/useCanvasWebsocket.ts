@@ -8,11 +8,11 @@ import { canvasKeys } from "./useCanvasData";
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/`;
 
 type CanvasWebsocketPayload = {
-  id?: string;
-  canvasId?: string;
+  canvasId: string;
+  versionId?: string;
 };
 
-type CanvasLifecycleEventName = "canvas_updated" | "canvas_deleted";
+type CanvasLifecycleEventName = "canvas_updated" | "canvas_version_updated" | "canvas_deleted";
 
 type WebsocketPayload =
   | CanvasesCanvasNodeExecution
@@ -36,6 +36,8 @@ export function useCanvasWebsocket(
   onExecutionEvent?: (execution: CanvasesCanvasNodeExecution, eventName: string) => void,
   onCanvasLifecycleEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasLifecycleEventName) => void,
   shouldApplyCanvasUpdate?: () => boolean,
+  processRuntimeEvents = true,
+  enabled = true,
 ): void {
   const nodeExecutionStore = useNodeExecutionStore();
   const queryClient = useQueryClient();
@@ -47,6 +49,11 @@ export function useCanvasWebsocket(
   const processMessage = useCallback(
     (data: QueuedMessage["data"]) => {
       const payload = data.payload;
+      const isCanvasLifecycleEvent =
+        data.event === "canvas_updated" || data.event === "canvas_version_updated" || data.event === "canvas_deleted";
+      if (!isCanvasLifecycleEvent && !processRuntimeEvents) {
+        return;
+      }
 
       switch (data.event) {
         case "event_created":
@@ -96,16 +103,29 @@ export function useCanvasWebsocket(
           }
           break;
         case "canvas_updated":
+        case "canvas_version_updated":
         case "canvas_deleted": {
           // Canvas structure changed from another actor (e.g. CLI), refresh cache.
-          const canvasMessage = payload as CanvasWebsocketPayload;
-          if (canvasMessage.canvasId && canvasMessage.canvasId !== canvasId) {
+          const canvasMessage = payload as Partial<CanvasWebsocketPayload>;
+          if (!canvasMessage.canvasId || canvasMessage.canvasId !== canvasId) {
             break;
           }
-          onCanvasLifecycleEvent?.(canvasMessage, data.event);
+
+          if (data.event === "canvas_version_updated" && !canvasMessage.versionId) {
+            break;
+          }
+
+          onCanvasLifecycleEvent?.(canvasMessage as CanvasWebsocketPayload, data.event);
 
           if (data.event === "canvas_deleted") {
             queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+            queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+            break;
+          }
+
+          queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+
+          if (data.event === "canvas_version_updated") {
             break;
           }
 
@@ -130,6 +150,7 @@ export function useCanvasWebsocket(
       onExecutionEvent,
       onCanvasLifecycleEvent,
       shouldApplyCanvasUpdate,
+      processRuntimeEvents,
     ],
   );
 
@@ -224,15 +245,19 @@ export function useCanvasWebsocket(
     };
   }, []);
 
-  useWebSocket(`${SOCKET_SERVER_URL}${canvasId}?organization_id=${organizationId}`, {
-    shouldReconnect: () => true,
-    reconnectAttempts: Number.POSITIVE_INFINITY,
-    heartbeat: false,
-    reconnectInterval: 3000,
-    onOpen: () => {},
-    onError: () => {},
-    onClose: () => {},
-    share: false,
-    onMessage: onMessage,
-  });
+  useWebSocket(
+    `${SOCKET_SERVER_URL}${canvasId}?organization_id=${organizationId}`,
+    {
+      shouldReconnect: () => true,
+      reconnectAttempts: Number.POSITIVE_INFINITY,
+      heartbeat: false,
+      reconnectInterval: 3000,
+      onOpen: () => {},
+      onError: () => {},
+      onClose: () => {},
+      share: false,
+      onMessage: onMessage,
+    },
+    enabled,
+  );
 }

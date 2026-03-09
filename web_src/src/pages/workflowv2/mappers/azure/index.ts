@@ -7,4 +7,5 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {};
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createVirtualMachine: buildActionStateRegistry("created"),
+  deleteVirtualMachine: buildActionStateRegistry("deleted"),
 };

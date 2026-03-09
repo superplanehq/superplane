@@ -78,6 +78,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 <td align="center" width="150"><a href="https://docs.superplane.com/components/github/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/github.svg" alt="GitHub"/><br/>GitHub</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/gitlab/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/gitlab.svg" alt="GitLab"/><br/>GitLab</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/harness/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/harness.svg" alt="Harness"/><br/>Harness</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/octopus-deploy/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/octopus.svg" alt="Octopus Deploy"/><br/>Octopus Deploy</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/render/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/render.svg" alt="Render"/><br/>Render</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/semaphore/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/semaphore-logo-sign-black.svg" alt="Semaphore"/><br/>Semaphore</a></td>
 </tr>
@@ -109,6 +110,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 <td align="center" width="150"><a href="https://docs.superplane.com/components/datadog/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/datadog.svg" alt="DataDog"/><br/>DataDog</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/dash0/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/dash0.svg" alt="Dash0"/><br/>Dash0</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/grafana/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/grafana.svg" alt="Grafana"/><br/>Grafana</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/honeycomb/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/honeycomb.svg" alt="Honeycomb"/><br/>Honeycomb</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/prometheus/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/prometheus.svg" alt="Prometheus"/><br/>Prometheus</a></td>
 </tr>
 </table>
@@ -117,6 +119,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 
 <table>
 <tr>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/incident/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/incident.svg" alt="Incident.io"/><br/>Incident.io</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/pagerduty/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/pagerduty.svg" alt="PagerDuty"/><br/>PagerDuty</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/rootly/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/rootly.svg" alt="Rootly"/><br/>Rootly</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/statuspage/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/statuspage.svg" alt="Statuspage"/><br/>Statuspage</a></td>
@@ -150,6 +153,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 <tr>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/daytona/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/daytona.svg" alt="Daytona"/><br/>Daytona</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/jfrog-artifactory/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/jfrog-artifactory.svg" alt="JFrog Artifactory"/><br/>JFrog Artifactory</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/launchdarkly/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/launchdarkly.svg" alt="LaunchDarkly"/><br/>LaunchDarkly</a></td>
 </tr>
 </table>
 
@@ -160,25 +164,6 @@ You can deploy SuperPlane on a single host or on Kubernetes:
 - **[Single Host Installation](https://docs.superplane.com/installation/overview/#single-host-installation)** - Deploy on AWS EC2, GCP Compute Engine, or other cloud providers
 - **[Kubernetes Installation](https://docs.superplane.com/installation/overview/#kubernetes)** - Deploy on GKE, EKS, or any Kubernetes cluster
 
-## Roadmap Overview
-
-This section gives a quick snapshot of what SuperPlane already supports and what’s coming next.
-
-**Available now**
-
-✓ 75+ components  
-✓ Event-driven workflow engine  
-✓ Visual Canvas builder  
-✓ Run history, event chain view, debug console  
-✓ Starter CLI and example workflows
-
-**In progress / upcoming**
-
-→ 200+ new components (AWS, Grafana, DataDog, Azure, GitLab, Jira, and more)  
-→ [Canvas version control](https://github.com/superplanehq/superplane/issues/1380)  
-→ [SAML/SCIM](https://github.com/superplanehq/superplane/issues/1377) with [extended RBAC and permissions](https://github.com/superplanehq/superplane/issues/1378)  
-→ [Artifact version tracking](https://github.com/superplanehq/superplane/issues/1382)  
-→ [Public API](https://github.com/superplanehq/superplane/issues/1854)
 
 ## Contributing
 

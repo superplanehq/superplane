@@ -112,12 +112,14 @@ func (a *AzureIntegration) Configuration() []configuration.Field {
 func (a *AzureIntegration) Components() []core.Component {
 	return []core.Component{
 		&CreateVMComponent{integration: a},
+		&DeleteVMComponent{integration: a},
 	}
 }
 
 func (a *AzureIntegration) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnVMCreatedTrigger{},
+		&OnVMDeleted{integration: a},
 	}
 }
 

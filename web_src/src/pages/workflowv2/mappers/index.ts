@@ -12,6 +12,11 @@ import { defaultTriggerRenderer } from "./default";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
 import { noopMapper } from "./noop";
+import { addMemoryMapper } from "./addMemory";
+import { deleteMemoryMapper } from "./deleteMemory";
+import { readMemoryMapper } from "./readMemory";
+import { updateMemoryMapper } from "./updateMemory";
+import { upsertMemoryMapper } from "./upsertMemory";
 import { ifMapper, IF_STATE_REGISTRY } from "./if";
 import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
 import {
@@ -87,6 +92,16 @@ import {
   customFieldRenderers as incidentCustomFieldRenderers,
 } from "./incident/index";
 import {
+  componentMappers as firehydrantComponentMappers,
+  triggerRenderers as firehydrantTriggerRenderers,
+  eventStateRegistry as firehydrantEventStateRegistry,
+} from "./firehydrant/index";
+import {
+  componentMappers as launchdarklyComponentMappers,
+  triggerRenderers as launchdarklyTriggerRenderers,
+  eventStateRegistry as launchdarklyEventStateRegistry,
+} from "./launchdarkly/index";
+import {
   componentMappers as awsComponentMappers,
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
@@ -124,6 +139,11 @@ import {
   triggerRenderers as octopusTriggerRenderers,
   eventStateRegistry as octopusEventStateRegistry,
 } from "./octopus/index";
+import {
+  componentMappers as teamsComponentMappers,
+  triggerRenderers as teamsTriggerRenderers,
+  eventStateRegistry as teamsEventStateRegistry,
+} from "./teams";
 import {
   componentMappers as openaiComponentMappers,
   triggerRenderers as openaiTriggerRenderers,
@@ -172,6 +192,12 @@ import {
   triggerRenderers as dockerhubTriggerRenderers,
   eventStateRegistry as dockerhubEventStateRegistry,
 } from "./dockerhub";
+
+import {
+  componentMappers as honeycombComponentMappers,
+  triggerRenderers as honeycombTriggerRenderers,
+  eventStateRegistry as honeycombEventStateRegistry,
+} from "./honeycomb/index";
 import {
   componentMappers as gcpComponentMappers,
   customFieldRenderers as gcpCustomFieldRenderers,
@@ -206,6 +232,11 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   noop: noopMapper,
+  addMemory: addMemoryMapper,
+  deleteMemory: deleteMemoryMapper,
+  readMemory: readMemoryMapper,
+  updateMemory: updateMemoryMapper,
+  upsertMemory: upsertMemoryMapper,
   if: ifMapper,
   http: httpMapper,
   ssh: sshMapper,
@@ -233,11 +264,14 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   render: renderComponentMappers,
   rootly: rootlyComponentMappers,
   incident: incidentComponentMappers,
+  firehydrant: firehydrantComponentMappers,
+  launchdarkly: launchdarklyComponentMappers,
   aws: awsComponentMappers,
   azure: azureComponentMappers,
   discord: discordComponentMappers,
   telegram: telegramComponentMappers,
   octopus: octopusComponentMappers,
+  teams: teamsComponentMappers,
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
@@ -248,6 +282,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   jfrogArtifactory: jfrogArtifactoryComponentMappers,
   statuspage: statuspageComponentMappers,
   dockerhub: dockerhubComponentMappers,
+  honeycomb: honeycombComponentMappers,
   harness: harnessComponentMappers,
   servicenow: servicenowComponentMappers,
 };
@@ -268,11 +303,14 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   render: renderTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   incident: incidentTriggerRenderers,
+  firehydrant: firehydrantTriggerRenderers,
+  launchdarkly: launchdarklyTriggerRenderers,
   aws: awsTriggerRenderers,
   azure: azureTriggerRenderers,
   discord: discordTriggerRenderers,
   telegram: telegramTriggerRenderers,
   octopus: octopusTriggerRenderers,
+  teams: teamsTriggerRenderers,
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
@@ -284,6 +322,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   jfrogArtifactory: jfrogArtifactoryTriggerRenderers,
   statuspage: statuspageTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
+  honeycomb: honeycombTriggerRenderers,
   harness: harnessTriggerRenderers,
   servicenow: servicenowTriggerRenderers,
 };
@@ -303,9 +342,12 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   render: renderEventStateRegistry,
   discord: discordEventStateRegistry,
   telegram: telegramEventStateRegistry,
+  teams: teamsEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   incident: incidentEventStateRegistry,
   octopus: octopusEventStateRegistry,
+  firehydrant: firehydrantEventStateRegistry,
+  launchdarkly: launchdarklyEventStateRegistry,
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
@@ -319,6 +361,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   gitlab: gitlabEventStateRegistry,
   jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
+  honeycomb: honeycombEventStateRegistry,
   harness: harnessEventStateRegistry,
   servicenow: servicenowEventStateRegistry,
 };
