@@ -1,7 +1,7 @@
 import Editor from "@monaco-editor/react";
 import type { Monaco } from "@monaco-editor/react";
 import type { editor as MonacoEditor } from "monaco-editor";
-import { Copy, Download } from "lucide-react";
+import { AlertTriangle, CircleX, Copy, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as yaml from "js-yaml";
@@ -57,6 +57,9 @@ export function CanvasYamlView({
   const [editedText, setEditedText] = useState(yamlText);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+
+  const [errorCount, setErrorCount] = useState(0);
+  const [warningCount, setWarningCount] = useState(0);
 
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
@@ -143,6 +146,9 @@ export function CanvasYamlView({
 
     monaco.editor.setModelMarkers(model, MARKER_OWNER, markers);
     decorationIdsRef.current = editor.deltaDecorations(decorationIdsRef.current, decorations);
+
+    setErrorCount(markers.filter((m) => m.severity === monaco.MarkerSeverity.Error).length);
+    setWarningCount(markers.filter((m) => m.severity === monaco.MarkerSeverity.Warning).length);
   }, []);
 
   useEffect(() => {
@@ -201,6 +207,18 @@ export function CanvasYamlView({
       <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2">
         <span className="font-mono text-sm text-gray-600">{filename}</span>
         <div className="flex items-center gap-2">
+          {errorCount > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-200">
+              <CircleX className="h-3.5 w-3.5" />
+              {errorCount}
+            </span>
+          )}
+          {warningCount > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {warningCount}
+            </span>
+          )}
           {onCopy && (
             <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={onCopy}>
               <Copy className="h-3.5 w-3.5" />
