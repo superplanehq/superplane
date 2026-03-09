@@ -1258,7 +1258,7 @@
       },
       "put": {
         "summary": "Update canvas version",
-        "description": "Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode",
+        "description": "Updates a user-owned canvas version; if version_id is omitted, updates the live canvas when versioning is disabled",
         "operationId": "Canvases_UpdateCanvasVersion2",
         "responses": {
           "200": {
@@ -1334,7 +1334,7 @@
       },
       "put": {
         "summary": "Update canvas version",
-        "description": "Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode",
+        "description": "Updates a user-owned canvas version; if version_id is omitted, updates the live canvas when versioning is disabled",
         "operationId": "Canvases_UpdateCanvasVersion",
         "responses": {
           "200": {
@@ -1432,6 +1432,44 @@
             "in": "path",
             "required": true,
             "type": "string"
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
+      },
+      "put": {
+        "summary": "Update canvas",
+        "description": "Updates canvas metadata",
+        "operationId": "Canvases_UpdateCanvas",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateCanvasResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateCanvasBody"
+            }
           }
         ],
         "tags": [
@@ -4221,6 +4259,9 @@
         },
         "isTemplate": {
           "type": "boolean"
+        },
+        "canvasVersioningEnabled": {
+          "type": "boolean"
         }
       }
     },
@@ -4751,6 +4792,28 @@
           "items": {
             "type": "object"
           }
+        }
+      }
+    },
+    "CanvasesUpdateCanvasBody": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "canvasVersioningEnabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "CanvasesUpdateCanvasResponse": {
+      "type": "object",
+      "properties": {
+        "canvas": {
+          "$ref": "#/definitions/CanvasesCanvas"
         }
       }
     },
@@ -5938,7 +6001,7 @@
           "type": "string",
           "format": "date-time"
         },
-        "canvasSandboxModeEnabled": {
+        "canvasVersioningEnabled": {
           "type": "boolean"
         }
       }

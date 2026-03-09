@@ -182,6 +182,7 @@ export type CanvasesCanvasMetadata = {
   updatedAt?: string;
   createdBy?: SuperplaneCanvasesUserRef;
   isTemplate?: boolean;
+  canvasVersioningEnabled?: boolean;
 };
 
 export type CanvasesCanvasNodeExecution = {
@@ -413,6 +414,16 @@ export type CanvasesSendAiMessageResponse = {
   operations?: Array<{
     [key: string]: unknown;
   }>;
+};
+
+export type CanvasesUpdateCanvasBody = {
+  name?: string;
+  description?: string;
+  canvasVersioningEnabled?: boolean;
+};
+
+export type CanvasesUpdateCanvasResponse = {
+  canvas?: CanvasesCanvas;
 };
 
 export type CanvasesUpdateCanvasVersionBody = {
@@ -900,7 +911,7 @@ export type OrganizationsOrganizationMetadata = {
   description?: string;
   createdAt?: string;
   updatedAt?: string;
-  canvasSandboxModeEnabled?: boolean;
+  canvasVersioningEnabled?: boolean;
 };
 
 export type OrganizationsRemoveInvitationResponse = {
@@ -2276,6 +2287,33 @@ export type CanvasesDescribeCanvasResponses = {
 };
 
 export type CanvasesDescribeCanvasResponse2 = CanvasesDescribeCanvasResponses[keyof CanvasesDescribeCanvasResponses];
+
+export type CanvasesUpdateCanvasData = {
+  body: CanvasesUpdateCanvasBody;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{id}";
+};
+
+export type CanvasesUpdateCanvasErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesUpdateCanvasError = CanvasesUpdateCanvasErrors[keyof CanvasesUpdateCanvasErrors];
+
+export type CanvasesUpdateCanvasResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesUpdateCanvasResponse;
+};
+
+export type CanvasesUpdateCanvasResponse2 = CanvasesUpdateCanvasResponses[keyof CanvasesUpdateCanvasResponses];
 
 export type ComponentsListComponentsData = {
   body?: never;

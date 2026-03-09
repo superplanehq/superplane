@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Text } from "../../components/Text/text";
 import { Button } from "../../ui/button";
 
@@ -7,7 +7,6 @@ const OrganizationCreate: React.FC = () => {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,13 +52,9 @@ const OrganizationCreate: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-100">
       <div className="p-6 flex items-center">
-        <button
-          type="button"
-          onClick={() => navigate("/")}
-          className="text-sm font-medium text-gray-500 px-2 py-1 hover:bg-gray-950/5 rounded"
-        >
+        <Link to="/" className="text-sm font-medium text-gray-500 px-2 py-1 hover:bg-gray-950/5 rounded">
           ← Back to Organizations
-        </button>
+        </Link>
       </div>
       <div className="flex items-center justify-center p-8">
         <div className="max-w-md w-full bg-white rounded-lg shadow-sm p-8 outline outline-slate-950/10">

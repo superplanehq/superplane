@@ -1,8 +1,6 @@
 package firehydrant
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -12,6 +10,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
 const (
@@ -317,16 +316,5 @@ func verifyWebhookSignature(signature string, body, secret []byte) error {
 		return fmt.Errorf("missing signature")
 	}
 
-	expectedSig := computeHMACSHA256(secret, body)
-	if !hmac.Equal([]byte(signature), []byte(expectedSig)) {
-		return fmt.Errorf("signature mismatch")
-	}
-
-	return nil
-}
-
-func computeHMACSHA256(key, data []byte) string {
-	h := hmac.New(sha256.New, key)
-	h.Write(data)
-	return fmt.Sprintf("%x", h.Sum(nil))
+	return crypto.VerifySignature(secret, body, signature)
 }
