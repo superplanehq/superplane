@@ -464,8 +464,6 @@ export function WorkflowPageV2() {
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
   const isDev = import.meta.env.DEV;
   const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "memory" | "versioning">("canvas");
-  const topViewModeRef = useRef(topViewMode);
-  topViewModeRef.current = topViewMode;
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
@@ -2113,9 +2111,6 @@ export function WorkflowPageV2() {
         console.error("Failed to save canvas", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
         showErrorToast(errorMessage);
-        if (topViewModeRef.current === "yaml") {
-          setYamlServerError(errorMessage);
-        }
         setLiveCanvasEntries((prev) => [
           buildCanvasStatusLogEntry({
             id: `canvas-save-error-${Date.now()}`,
@@ -3543,9 +3538,6 @@ export function WorkflowPageV2() {
           (error as { message: string })?.message ||
           "Failed to save changes to the canvas";
         showErrorToast(errorMessage);
-        if (topViewModeRef.current === "yaml") {
-          setYamlServerError(errorMessage);
-        }
       }
     },
     [
@@ -4357,28 +4349,9 @@ export function WorkflowPageV2() {
             : hasRunBlockingChanges
               ? "Save canvas changes before running"
               : undefined;
-  const {
-    yamlPayload,
-    yamlServerError,
-    setYamlServerError,
-    yamlAutocompleteExampleObj,
-    handleYamlViewCopy,
-    handleYamlViewDownload,
-    handleYamlChange,
-  } = useCanvasYaml({
-    canvas,
-    organizationId,
-    canvasId,
+  const { yamlPayload, handleYamlViewCopy, handleYamlViewDownload } = useCanvasYaml({
     nodes,
-    allComponents,
-    allTriggers,
-    widgets,
-    canAutoSave,
-    isReadOnly,
     getYamlExportPayload,
-    saveWorkflowSnapshot,
-    handleSaveWorkflow,
-    markUnsavedChange,
   });
 
   const dataViewContent =
@@ -4386,15 +4359,8 @@ export function WorkflowPageV2() {
       <CanvasYamlView
         yamlText={yamlPayload.yamlText}
         filename={yamlPayload.filename}
-        readOnly={isReadOnly}
-        serverError={yamlServerError}
         onCopy={handleYamlViewCopy}
         onDownload={handleYamlViewDownload}
-        onChange={handleYamlChange}
-        components={allComponents}
-        triggers={allTriggers}
-        widgets={widgets}
-        autocompleteExampleObj={yamlAutocompleteExampleObj}
       />
     ) : topViewMode === "memory" ? (
       <CanvasMemoryView
@@ -4451,11 +4417,6 @@ export function WorkflowPageV2() {
           onTopViewModeChange={(mode) => {
             setIsCreateChangeRequestMode(false);
             setTopViewMode(mode);
-            // Server errors are only relevant while in the YAML editor — clear them
-            // when switching away so stale messages don't reappear on return.
-            if (mode !== "yaml") {
-              setYamlServerError(null);
-            }
           }}
           showVersioningTab={false}
           isVersionControlOpen={showVersioningUI ? isVersionControlOpen : false}
