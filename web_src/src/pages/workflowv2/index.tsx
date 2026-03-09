@@ -4372,13 +4372,54 @@ export function WorkflowPageV2() {
     showSuccessToast("Canvas exported as YAML");
   }, [yamlPayload]);
 
+  const handleYamlChange = useCallback(
+    async (parsed: { metadata?: Record<string, unknown>; spec?: Record<string, unknown> }) => {
+      if (!canvas || !organizationId || !canvasId) return;
+
+      saveWorkflowSnapshot(canvas);
+
+      const updatedWorkflow = {
+        ...canvas,
+        metadata: {
+          ...canvas.metadata,
+          ...(parsed.metadata || {}),
+        },
+        spec: {
+          ...canvas.spec,
+          nodes: (parsed.spec as { nodes?: unknown[] })?.nodes || [],
+          edges: (parsed.spec as { edges?: unknown[] })?.edges || [],
+        },
+      };
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+      if (canAutoSave) {
+        await handleSaveWorkflow(updatedWorkflow as CanvasesCanvas, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      canAutoSave,
+      markUnsavedChange,
+    ],
+  );
+
   const dataViewContent =
     topViewMode === "yaml" && yamlPayload ? (
       <CanvasYamlView
         yamlText={yamlPayload.yamlText}
         filename={yamlPayload.filename}
+        readOnly={isReadOnly}
         onCopy={handleYamlViewCopy}
         onDownload={handleYamlViewDownload}
+        onChange={isReadOnly ? undefined : handleYamlChange}
       />
     ) : topViewMode === "memory" ? (
       <CanvasMemoryView
