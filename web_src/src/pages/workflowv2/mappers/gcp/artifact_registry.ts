@@ -44,11 +44,25 @@ export type GetArtifactAnalysisData = {
   fixAvailable?: number;
 };
 
+export type ArtifactVersionFingerprint = {
+  type?: string;
+  value?: string;
+};
+
+export type ArtifactVersionMetadata = {
+  buildTime?: string;
+  imageSizeBytes?: string;
+  mediaType?: string;
+  name?: string;
+};
+
 export type ArtifactVersionData = {
   name?: string;
   createTime?: string;
   updateTime?: string;
   description?: string;
+  fingerprints?: ArtifactVersionFingerprint[];
+  metadata?: ArtifactVersionMetadata;
 };
 
 type ArtifactOutputPayload = OutputPayload & {

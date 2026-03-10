@@ -44,6 +44,15 @@ export const getArtifactMapper: ComponentBaseMapper = {
       details["Digest"] = digest;
     }
 
+    if (data?.metadata?.mediaType) {
+      details["Media Type"] = String(data.metadata.mediaType);
+    }
+
+    if (data?.metadata?.buildTime) {
+      const formatted = formatDateTime(data.metadata.buildTime as string);
+      if (formatted) details["Build Time"] = formatted;
+    }
+
     return details;
   },
 
