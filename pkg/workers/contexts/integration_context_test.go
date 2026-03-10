@@ -34,7 +34,7 @@ func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry)
+	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
 
 	t.Run("rejects short interval", func(t *testing.T) {
 		err = ctx.ScheduleResync(500 * time.Millisecond)
@@ -135,7 +135,7 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 	node.WebhookID = &webhookID
 	require.NoError(t, database.Conn().Save(&node).Error)
 
-	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry)
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, nil)
 	require.NoError(t, ctx.RequestWebhook(newConfig))
 
 	require.NotNil(t, node.WebhookID)
@@ -239,7 +239,7 @@ func Test__IntegrationContext_RequestWebhook_MergesExistingWebhookConfig(t *test
 	node.AppInstallationID = &integration.ID
 	require.NoError(t, database.Conn().Save(&node).Error)
 
-	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry)
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, nil)
 	require.NoError(t, ctx.RequestWebhook(map[string]any{"eventTypes": []string{"build_ended"}}))
 
 	require.NotNil(t, node.WebhookID)

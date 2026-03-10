@@ -29,7 +29,14 @@ func (e *ConfigurationBuildError) Unwrap() error {
 	return e.Err
 }
 
-func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *models.CanvasNode, queueItem *models.CanvasNodeQueueItem, configFields []configuration.Field) (*core.ProcessQueueContext, error) {
+func BuildProcessQueueContext(
+	httpCtx core.HTTPContext,
+	tx *gorm.DB,
+	node *models.CanvasNode,
+	queueItem *models.CanvasNodeQueueItem,
+	configFields []configuration.Field,
+	onNewEvents func([]models.CanvasEvent),
+) (*core.ProcessQueueContext, error) {
 	event, err := models.FindCanvasEventInTransaction(tx, queueItem.EventID)
 	if err != nil {
 		return nil, err
@@ -123,7 +130,7 @@ func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *model
 			HTTP:           httpCtx,
 			Metadata:       NewExecutionMetadataContext(tx, &execution),
 			NodeMetadata:   NewNodeMetadataContext(tx, node),
-			ExecutionState: NewExecutionStateContext(tx, &execution),
+			ExecutionState: NewExecutionStateContext(tx, &execution, onNewEvents),
 			Requests:       NewExecutionRequestContext(tx, &execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), &execution, nil),
 			Notifications:  NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
@@ -224,7 +231,7 @@ func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *model
 			HTTP:           httpCtx,
 			Metadata:       NewExecutionMetadataContext(tx, execution),
 			NodeMetadata:   NewNodeMetadataContext(tx, node),
-			ExecutionState: NewExecutionStateContext(tx, execution),
+			ExecutionState: NewExecutionStateContext(tx, execution, onNewEvents),
 			Requests:       NewExecutionRequestContext(tx, execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), execution, nil),
 			Notifications:  NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),

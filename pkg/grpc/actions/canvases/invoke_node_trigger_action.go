@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -89,6 +90,11 @@ func InvokeNodeTriggerAction(
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
 	}
 
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
 	if node.AppInstallationID != nil {
 		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
@@ -97,13 +103,17 @@ func InvokeNodeTriggerAction(
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry)
+		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry, onNewEvents)
 	}
 
 	actionCtx.Logger = logger
 	result, err := trigger.HandleAction(actionCtx)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "action execution failed: %v", err)
+	}
+
+	for _, event := range newEvents {
+		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
 	}
 
 	// Convert result to protobuf struct

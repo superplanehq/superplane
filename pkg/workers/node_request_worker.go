@@ -82,35 +82,50 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 }
 
 func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeRequest) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := models.LockNodeRequest(tx, request.ID)
 		if err != nil {
 			w.log("Request %s already being processed - skipping", request.ID)
 			return nil
 		}
 
-		return w.processRequest(tx, r)
+		return w.processRequest(tx, r, onNewEvents)
 	})
+
+	if err != nil {
+		return err
+	}
+
+	for _, event := range newEvents {
+		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+	}
+
+	return nil
 }
 
-func (w *NodeRequestWorker) processRequest(tx *gorm.DB, request *models.CanvasNodeRequest) error {
+func (w *NodeRequestWorker) processRequest(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
 	switch request.Type {
 	case models.NodeRequestTypeInvokeAction:
-		return w.invokeAction(tx, request)
+		return w.invokeAction(tx, request, onNewEvents)
 	}
 
 	return fmt.Errorf("unsupported node execution request type %s", request.Type)
 }
 
-func (w *NodeRequestWorker) invokeAction(tx *gorm.DB, request *models.CanvasNodeRequest) error {
+func (w *NodeRequestWorker) invokeAction(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
 	if request.ExecutionID == nil {
-		return w.invokeNodeAction(tx, request)
+		return w.invokeNodeAction(tx, request, onNewEvents)
 	}
 
-	return w.invokeComponentAction(tx, request)
+	return w.invokeComponentAction(tx, request, onNewEvents)
 }
 
-func (w *NodeRequestWorker) invokeNodeAction(tx *gorm.DB, request *models.CanvasNodeRequest) error {
+func (w *NodeRequestWorker) invokeNodeAction(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
 	node, err := models.FindCanvasNode(tx, request.WorkflowID, request.NodeID)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
@@ -118,16 +133,16 @@ func (w *NodeRequestWorker) invokeNodeAction(tx *gorm.DB, request *models.Canvas
 
 	switch node.Type {
 	case models.NodeTypeTrigger:
-		return w.invokeTriggerAction(tx, request, node)
+		return w.invokeTriggerAction(tx, request, node, onNewEvents)
 
 	case models.NodeTypeComponent:
-		return w.invokeNodeComponentAction(tx, request, node)
+		return w.invokeNodeComponentAction(tx, request, node, onNewEvents)
 	}
 
 	return fmt.Errorf("unsupported node type %s for node action", node.Type)
 }
 
-func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode) error {
+func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
 	nodeRef := node.Ref.Data()
 	if nodeRef.Trigger == nil {
 		return fmt.Errorf("node %s is not a trigger", node.NodeID)
@@ -156,7 +171,7 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 		Logger:        logging.ForNode(*node),
 		HTTP:          w.registry.HTTPContext(),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
-		Events:        contexts.NewEventContext(tx, node),
+		Events:        contexts.NewEventContext(tx, node, onNewEvents),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
 	}
 
@@ -175,7 +190,7 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 			return fmt.Errorf("failed to find integration: %v", err)
 		}
 
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry)
+		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
 	}
 
 	_, err = trigger.HandleAction(actionCtx)
@@ -191,7 +206,7 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 	return request.Complete(tx)
 }
 
-func (w *NodeRequestWorker) invokeNodeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode) error {
+func (w *NodeRequestWorker) invokeNodeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
 	nodeRef := node.Ref.Data()
 	if nodeRef.Component == nil {
 		return fmt.Errorf("node %s is not a component", node.NodeID)
@@ -236,7 +251,7 @@ func (w *NodeRequestWorker) invokeNodeComponentAction(tx *gorm.DB, request *mode
 		}
 
 		logger = logging.WithIntegration(logger, *instance)
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry)
+		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
 		actionCtx.Logger = logger
 	}
 
@@ -253,20 +268,25 @@ func (w *NodeRequestWorker) invokeNodeComponentAction(tx *gorm.DB, request *mode
 	return request.Complete(tx)
 }
 
-func (w *NodeRequestWorker) invokeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest) error {
+func (w *NodeRequestWorker) invokeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
 	execution, err := models.FindNodeExecutionInTransaction(tx, request.WorkflowID, *request.ExecutionID)
 	if err != nil {
 		return fmt.Errorf("execution %s not found: %w", request.ExecutionID, err)
 	}
 
 	if execution.ParentExecutionID == nil {
-		return w.invokeParentNodeComponentAction(tx, request, execution)
+		return w.invokeParentNodeComponentAction(tx, request, execution, onNewEvents)
 	}
 
-	return w.invokeChildNodeComponentAction(tx, request, execution)
+	return w.invokeChildNodeComponentAction(tx, request, execution, onNewEvents)
 }
 
-func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest, execution *models.CanvasNodeExecution) error {
+func (w *NodeRequestWorker) invokeParentNodeComponentAction(
+	tx *gorm.DB,
+	request *models.CanvasNodeRequest,
+	execution *models.CanvasNodeExecution,
+	onNewEvents func([]models.CanvasEvent),
+) error {
 	node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
@@ -300,7 +320,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 		Parameters:     spec.InvokeAction.Parameters,
 		HTTP:           w.registry.HTTPContext(),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
-		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
+		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, node.WorkflowID),
 		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
@@ -314,7 +334,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 		}
 
 		logger = logging.WithIntegration(logger, *instance)
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry)
+		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
 	}
 
 	actionCtx.Logger = logger
@@ -331,7 +351,12 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 	return request.Complete(tx)
 }
 
-func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest, execution *models.CanvasNodeExecution) error {
+func (w *NodeRequestWorker) invokeChildNodeComponentAction(
+	tx *gorm.DB,
+	request *models.CanvasNodeRequest,
+	execution *models.CanvasNodeExecution,
+	onNewEvents func([]models.CanvasEvent),
+) error {
 	parentExecution, err := models.FindNodeExecutionInTransaction(tx, execution.WorkflowID, *execution.ParentExecutionID)
 	if err != nil {
 		return fmt.Errorf("parent execution %s not found: %w", execution.ParentExecutionID, err)
@@ -381,7 +406,7 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request 
 		Logger:         logging.ForExecution(execution, parentExecution),
 		HTTP:           w.registry.HTTPContext(),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
-		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
+		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
 		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
