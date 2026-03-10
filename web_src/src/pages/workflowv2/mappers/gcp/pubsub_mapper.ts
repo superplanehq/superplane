@@ -1,5 +1,5 @@
-import { ComponentBaseMapper, EventStateRegistry } from "../types";
-import { ComponentBaseContext, ComponentBaseProps, ExecutionDetailsContext, SubtitleContext } from "../types";
+import { ComponentBaseMapper, ComponentBaseContext, EventStateRegistry, ExecutionDetailsContext, SubtitleContext } from "../types";
+import { ComponentBaseProps } from "@/ui/componentBase";
 import { baseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
 import { formatTimeAgo } from "@/utils/date";
