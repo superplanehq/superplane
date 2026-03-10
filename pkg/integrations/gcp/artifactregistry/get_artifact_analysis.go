@@ -50,7 +50,7 @@ func (c *GetArtifactAnalysis) Documentation() string {
 
 Provide either a **Resource URL** or the four fields below:
 
-- **Resource URL**: Full resource URL of the image (e.g. ` + "`https://us-central1-docker.pkg.dev/project/repo/image@sha256:abc`" + `). Use this to pass a digest directly from an upstream event such as On Artifact Push or Analyze Artifact output.
+- **Resource URL**: Full resource URL of the image (e.g. ` + "`https://us-central1-docker.pkg.dev/project/repo/image@sha256:abc`" + `). Use this to pass a digest directly from an upstream event such as On Artifact Push.
 - **Location**: The GCP region where the repository is located.
 - **Repository**: The Artifact Registry repository containing the artifact.
 - **Package**: The package (image) within the repository.
@@ -59,13 +59,18 @@ Provide either a **Resource URL** or the four fields below:
 
 ## Output
 
-A list of Container Analysis occurrences for the artifact. Each occurrence includes ` + "`kind`" + `, ` + "`resourceUri`" + `, ` + "`noteName`" + `, and the occurrence-specific data.
+An analysis summary for the artifact, including:
+- ` + "`resourceUri`" + `: The analyzed artifact URI
+- ` + "`scanStatus`" + `: Discovery scan status (if available)
+- Severity counts: ` + "`critical`" + `, ` + "`high`" + `, ` + "`medium`" + `, ` + "`low`" + `
+- ` + "`vulnerabilities`" + `: Total vulnerability occurrences
+- ` + "`fixAvailable`" + `: Count of vulnerabilities with fixes
 
 ## Notes
 
 - The **Container Analysis API** (` + "`containeranalysis.googleapis.com`" + `) must be enabled.
 - The service account needs ` + "`roles/containeranalysis.occurrences.viewer`" + `.
-- This retrieves existing occurrences. To trigger a new analysis, use the **Analyze Artifact** component.`
+- This summarizes existing occurrences for the selected artifact.`
 }
 
 func (c *GetArtifactAnalysis) Icon() string  { return "gcp" }
@@ -257,6 +262,26 @@ func (c *GetArtifactAnalysis) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
+	useURLMode := config.InputMode == "url" || config.InputMode == ""
+	if useURLMode {
+		if config.ResourceURL == "" {
+			return ctx.ExecutionState.Fail("error", "resourceUrl is required in url mode")
+		}
+	} else {
+		if config.Location == "" {
+			return ctx.ExecutionState.Fail("error", "location is required")
+		}
+		if config.Repository == "" {
+			return ctx.ExecutionState.Fail("error", "repository is required")
+		}
+		if config.Package == "" {
+			return ctx.ExecutionState.Fail("error", "package is required")
+		}
+		if config.Version == "" {
+			return ctx.ExecutionState.Fail("error", "version is required")
+		}
+	}
+
 	client, err := getClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
@@ -264,7 +289,7 @@ func (c *GetArtifactAnalysis) Execute(ctx core.ExecutionContext) error {
 
 	projectID := client.ProjectID()
 	var resourceURI string
-	if config.ResourceURL != "" {
+	if useURLMode {
 		resourceURI = config.ResourceURL
 	} else {
 		resourceURI = fmt.Sprintf("https://%s-docker.pkg.dev/%s/%s/%s@%s", config.Location, projectID, config.Repository, config.Package, config.Version)

@@ -44,11 +44,7 @@ export const onArtifactAnalysisTriggerRenderer: TriggerRenderer = {
       iconSlug: definition.icon || "cloud",
       iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass(definition.color ?? "gray"),
-      metadata: data?.resourceUri
-        ? [{ icon: "package", label: data.resourceUri }]
-        : data?.resourceUri
-          ? [{ icon: "package", label: data.resourceUri }]
-          : [],
+      metadata: data?.resourceUri ? [{ icon: "package", label: data.resourceUri }] : [],
       ...(lastEvent && {
         lastEventData: {
           title: "Container analysis event",

@@ -71,11 +71,7 @@ export function getArtifactData(execution: ExecutionInfo): Record<string, any> |
   return payload?.data as Record<string, any> | undefined;
 }
 
-export function buildArtifactSummaryDetails({
-  timestamp,
-}: {
-  timestamp?: string;
-}): Record<string, string> {
+export function buildArtifactSummaryDetails({ timestamp }: { timestamp?: string }): Record<string, string> {
   const details: Record<string, string> = {};
 
   if (timestamp) {
