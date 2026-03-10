@@ -1,8 +1,8 @@
 import { CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import Editor from "@monaco-editor/react";
 import type { Monaco } from "@monaco-editor/react";
@@ -10,6 +10,12 @@ import { AlertTriangle, ArrowLeft, Check, CheckCircle2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as yaml from "js-yaml";
 import type { editor as MonacoEditor } from "monaco-editor";
+import {
+  ChangeRequestDescriptionCard,
+  formatTimestamp as formatDisplayTimestamp,
+  summarizeNodeDiff,
+  VersionNodeDiffAccordion,
+} from "./VersionNodeDiff";
 
 type ChangeRequestFilter = "all" | "open" | "rejected" | "published";
 type CanvasNodeLike = Record<string, unknown>;
@@ -24,17 +30,6 @@ type ConflictMarkerBlock = {
   incomingLabel: string;
 };
 
-type DiffLine = {
-  kind: "add" | "remove";
-  path: string;
-  value: string;
-};
-
-type DiffGroup = {
-  section: string;
-  lines: DiffLine[];
-};
-
 interface CanvasChangeRequestsViewProps {
   changeRequests: CanvasesCanvasChangeRequest[];
   selectedChangeRequestId?: string;
@@ -42,6 +37,7 @@ interface CanvasChangeRequestsViewProps {
   actionPending: boolean;
   resolvePending: boolean;
   liveCanvasVersion?: CanvasesCanvasVersion;
+  ownerProfilesByID?: Map<string, { name: string; avatarUrl?: string }>;
   canvasName: string;
   canvasDescription?: string;
   onSelectChangeRequest: (changeRequestId: string) => void;
@@ -76,6 +72,19 @@ function statusBadgeVariant(
   if (status === "published") return "default";
   if (status === "rejected") return "destructive";
   return "outline";
+}
+
+function resolveUserDisplay(
+  userRef: { id?: string; name?: string } | undefined,
+  profilesByID?: Map<string, { name: string; avatarUrl?: string }>,
+): { name: string; avatarUrl?: string; id?: string } {
+  const userID = userRef?.id || "";
+  const profile = userID ? profilesByID?.get(userID) : undefined;
+  return {
+    id: userID || undefined,
+    name: userRef?.name || profile?.name || "Unknown user",
+    avatarUrl: profile?.avatarUrl,
+  };
 }
 
 function isChangeRequestConflicted(changeRequest?: CanvasesCanvasChangeRequest): boolean {
@@ -291,153 +300,8 @@ function deepMergeObjects(current: unknown, incoming: unknown): unknown {
   return merged;
 }
 
-function serializeDiffValue(value: unknown): string {
-  if (value === undefined) {
-    return "undefined";
-  }
-  if (typeof value === "string") {
-    return JSON.stringify(value);
-  }
-  return JSON.stringify(normalizeForCompare(value));
-}
-
-function flattenValue(value: unknown, basePath: string): Record<string, string> {
-  if (value === undefined) {
-    return {};
-  }
-
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return { [basePath]: serializeDiffValue(value) };
-  }
-
-  const objectValue = value as Record<string, unknown>;
-  const keys = Object.keys(objectValue).sort((left, right) => left.localeCompare(right));
-  if (keys.length === 0) {
-    return { [basePath]: "{}" };
-  }
-
-  const flattened: Record<string, string> = {};
-  keys.forEach((key) => {
-    const nestedPath = `${basePath}.${key}`;
-    const nestedValue = objectValue[key];
-    if (nestedValue && typeof nestedValue === "object" && !Array.isArray(nestedValue)) {
-      Object.assign(flattened, flattenValue(nestedValue, nestedPath));
-      return;
-    }
-    flattened[nestedPath] = serializeDiffValue(nestedValue);
-  });
-  return flattened;
-}
-
-function buildNodeSnapshot(node?: Record<string, unknown>): Record<string, unknown> {
-  if (!node) {
-    return {};
-  }
-
-  return {
-    name: node.name,
-    type: node.type,
-    position: node.position,
-    isCollapsed: node.isCollapsed,
-    integrationId: node.integrationId,
-    ref: node.ref,
-    configuration: node.configuration,
-  };
-}
-
-function buildNodeDiffLines(oldNode?: Record<string, unknown>, newNode?: Record<string, unknown>): DiffLine[] {
-  const oldSnapshot = buildNodeSnapshot(oldNode);
-  const newSnapshot = buildNodeSnapshot(newNode);
-
-  const oldFlat = Object.entries(oldSnapshot).reduce<Record<string, string>>((acc, [key, value]) => {
-    Object.assign(acc, flattenValue(value, key));
-    return acc;
-  }, {});
-  const newFlat = Object.entries(newSnapshot).reduce<Record<string, string>>((acc, [key, value]) => {
-    Object.assign(acc, flattenValue(value, key));
-    return acc;
-  }, {});
-
-  const allPaths = Array.from(new Set([...Object.keys(oldFlat), ...Object.keys(newFlat)])).sort((left, right) =>
-    left.localeCompare(right),
-  );
-
-  const lines: DiffLine[] = [];
-  allPaths.forEach((path) => {
-    const oldValue = oldFlat[path];
-    const newValue = newFlat[path];
-    if (oldValue === newValue) {
-      return;
-    }
-
-    if (oldValue !== undefined) {
-      lines.push({ kind: "remove", path, value: oldValue });
-    }
-    if (newValue !== undefined) {
-      lines.push({ kind: "add", path, value: newValue });
-    }
-  });
-
-  return lines;
-}
-
-function getDiffSection(path: string): string {
-  const firstSegment = path.split(".")[0] || "other";
-  if (firstSegment === "configuration") {
-    return "Configuration";
-  }
-  if (firstSegment === "position") {
-    return "Position";
-  }
-  if (firstSegment === "ref") {
-    return "Reference";
-  }
-  if (firstSegment === "name") {
-    return "Name";
-  }
-  if (firstSegment === "type") {
-    return "Type";
-  }
-  if (firstSegment === "isCollapsed") {
-    return "Display";
-  }
-  if (firstSegment === "integrationId") {
-    return "Integration";
-  }
-  return "Other";
-}
-
-function buildNodeDiffGroups(lines: DiffLine[]): DiffGroup[] {
-  if (lines.length === 0) {
-    return [];
-  }
-
-  const groupsMap = new Map<string, DiffLine[]>();
-  lines.forEach((line) => {
-    const section = getDiffSection(line.path);
-    const current = groupsMap.get(section) || [];
-    current.push(line);
-    groupsMap.set(section, current);
-  });
-
-  const orderedSections = ["Configuration", "Position", "Reference", "Name", "Type", "Display", "Integration", "Other"];
-  return orderedSections
-    .filter((section) => groupsMap.has(section))
-    .map((section) => ({
-      section,
-      lines: groupsMap.get(section) || [],
-    }));
-}
-
 function formatTimestamp(value?: string): string {
-  if (!value) {
-    return "unknown time";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "unknown time";
-  }
-  return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return formatDisplayTimestamp(value) || "unknown time";
 }
 
 function upsertNode(nodes: CanvasNodeLike[], nodeID: string, node: CanvasNodeLike | null): CanvasNodeLike[] {
@@ -1100,6 +964,7 @@ export function CanvasChangeRequestsView({
   actionPending,
   resolvePending,
   liveCanvasVersion,
+  ownerProfilesByID,
   canvasName,
   canvasDescription,
   onSelectChangeRequest,
@@ -1110,7 +975,6 @@ export function CanvasChangeRequestsView({
 }: CanvasChangeRequestsViewProps) {
   const [filter, setFilter] = useState<ChangeRequestFilter>("open");
   const [resolvingChangeRequestID, setResolvingChangeRequestID] = useState("");
-  const [selectedTab, setSelectedTab] = useState<"conversation" | "nodes">("conversation");
   const [showDetailView, setShowDetailView] = useState(Boolean(selectedChangeRequestId));
 
   const filteredRequests = useMemo(() => {
@@ -1127,10 +991,6 @@ export function CanvasChangeRequestsView({
     }
     return filteredRequests[0];
   }, [changeRequests, filteredRequests, selectedChangeRequestId]);
-
-  useEffect(() => {
-    setSelectedTab("conversation");
-  }, [selectedChangeRequest?.metadata?.id]);
 
   useEffect(() => {
     if (!selectedChangeRequestId) {
@@ -1159,6 +1019,15 @@ export function CanvasChangeRequestsView({
   const conflictingNodeIds = selectedChangeRequest?.diff?.conflictingNodeIds || [];
   const changedNodeIds = selectedChangeRequest?.diff?.changedNodeIds || [];
   const selectedHasConflicts = isChangeRequestConflicted(selectedChangeRequest);
+  const selectedDiffSummary = useMemo(
+    () => summarizeNodeDiff(selectedChangeRequest?.version, liveCanvasVersion),
+    [selectedChangeRequest?.version, liveCanvasVersion],
+  );
+  const selectedConflictingNodeIDSet = useMemo(() => new Set(conflictingNodeIds), [conflictingNodeIds]);
+  const requestedBy = useMemo(
+    () => resolveUserDisplay(selectedChangeRequest?.metadata?.owner, ownerProfilesByID),
+    [selectedChangeRequest?.metadata?.owner, ownerProfilesByID],
+  );
 
   const canApprove = canUpdateCanvas && selectedStatus === "open" && !selectedHasConflicts;
   const canReject = canUpdateCanvas && selectedStatus === "open";
@@ -1169,77 +1038,6 @@ export function CanvasChangeRequestsView({
     selectedHasConflicts &&
     !!selectedChangeRequest?.version?.spec?.nodes &&
     !!selectedChangeRequest?.version?.spec?.edges;
-
-  const selectedChangeNodeDiffs = useMemo(() => {
-    if (!selectedChangeRequest) {
-      return [];
-    }
-
-    const conflictingNodeIDSet = new Set(selectedChangeRequest.diff?.conflictingNodeIds || []);
-    const liveNodes = (liveCanvasVersion?.spec?.nodes || []) as Record<string, unknown>[];
-    const crNodes = (selectedChangeRequest.version?.spec?.nodes || []) as Record<string, unknown>[];
-
-    const liveNodeByID = new Map<string, Record<string, unknown>>();
-    liveNodes.forEach((node) => {
-      const nodeID = (node.id as string) || "";
-      if (nodeID) {
-        liveNodeByID.set(nodeID, node);
-      }
-    });
-
-    const crNodeByID = new Map<string, Record<string, unknown>>();
-    crNodes.forEach((node) => {
-      const nodeID = (node.id as string) || "";
-      if (nodeID) {
-        crNodeByID.set(nodeID, node);
-      }
-    });
-
-    const allNodeIDs = Array.from(new Set([...liveNodeByID.keys(), ...crNodeByID.keys()])).sort((left, right) =>
-      left.localeCompare(right),
-    );
-
-    return allNodeIDs
-      .map((nodeID) => {
-        const oldNode = liveNodeByID.get(nodeID);
-        const newNode = crNodeByID.get(nodeID);
-        const lines = buildNodeDiffLines(oldNode, newNode);
-        if (lines.length === 0) {
-          return null;
-        }
-
-        const groups = buildNodeDiffGroups(lines);
-        const kind = !oldNode && newNode ? "added" : oldNode && !newNode ? "removed" : "updated";
-        const nodeNameValue = newNode?.name ?? oldNode?.name;
-        const nodeName =
-          typeof nodeNameValue === "string" && nodeNameValue.trim() ? nodeNameValue.trim() : "Unnamed node";
-
-        return {
-          nodeID,
-          nodeName,
-          kind,
-          isConflicting: conflictingNodeIDSet.has(nodeID),
-          lines,
-          groups,
-        };
-      })
-      .filter(
-        (
-          item,
-        ): item is {
-          nodeID: string;
-          nodeName: string;
-          kind: "added" | "removed" | "updated";
-          isConflicting: boolean;
-          lines: DiffLine[];
-          groups: DiffGroup[];
-        } => Boolean(item),
-      );
-  }, [selectedChangeRequest, liveCanvasVersion?.spec?.nodes]);
-
-  const addedNodes = selectedChangeNodeDiffs.filter((diff) => diff.kind === "added").length;
-  const removedNodes = selectedChangeNodeDiffs.filter((diff) => diff.kind === "removed").length;
-  const updatedNodes = selectedChangeNodeDiffs.filter((diff) => diff.kind === "updated").length;
 
   if (resolvingChangeRequest) {
     return (
@@ -1312,15 +1110,21 @@ export function CanvasChangeRequestsView({
                           </p>
                           <div className="flex items-center gap-2">
                             {hasConflicts ? (
-                              <Badge variant="destructive" className="uppercase">
-                                Conflicted
-                              </Badge>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="destructive" className="uppercase">
+                                    Conflicted
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  This change request is conflicted. It cannot be approved until conflicts are resolved.
+                                </TooltipContent>
+                              </Tooltip>
                             ) : null}
                             <Badge variant={statusBadgeVariant(itemStatus)}>{formatStatusLabel(itemStatus)}</Badge>
                           </div>
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-600">
-                          <span>#{itemId.slice(0, 8)}</span>
                           <span>changed nodes: {itemChangedCount}</span>
                           <span className={hasConflicts ? "font-semibold text-red-700" : "text-emerald-700"}>
                             conflicts: {conflictCount}
@@ -1357,163 +1161,54 @@ export function CanvasChangeRequestsView({
                 <ArrowLeft className="h-4 w-4" />
                 Back to Change Requests
               </Button>
-              {selectedHasConflicts ? (
-                <div className="mb-3 rounded-md border-2 border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800">
-                  This change request is conflicted. It cannot be approved until conflicts are resolved.
-                </div>
-              ) : null}
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-lg font-semibold text-slate-900">
                       {selectedChangeRequest.metadata?.title?.trim() || "Untitled change request"}
                     </h3>
-                    <span className="text-sm text-slate-500">#{selectedChangeRequestIdSafe.slice(0, 8)}</span>
                   </div>
-                  <p className="text-sm text-slate-600">
-                    {selectedChangeRequest.metadata?.owner?.name || "Unknown owner"} opened this change request on{" "}
-                    {formatTimestamp(selectedChangeRequest.metadata?.createdAt)}.
-                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   {selectedHasConflicts ? (
-                    <Badge variant="destructive" className="uppercase">
-                      Conflicted
-                    </Badge>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="destructive" className="uppercase">
+                          Conflicted
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        This change request is conflicted. It cannot be approved until conflicts are resolved.
+                      </TooltipContent>
+                    </Tooltip>
                   ) : null}
                   <Badge variant={statusBadgeVariant(selectedStatus)}>{formatStatusLabel(selectedStatus)}</Badge>
                 </div>
+              </div>
+
+              <div className="mt-4">
+                <ChangeRequestDescriptionCard
+                  ownerName={requestedBy.name}
+                  ownerAvatarUrl={requestedBy.avatarUrl}
+                  timestamp={formatTimestamp(selectedChangeRequest.metadata?.createdAt)}
+                  actionLabel="requested changes"
+                  content={selectedChangeRequest.metadata?.description?.trim() || "No description provided."}
+                />
               </div>
             </section>
 
             <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
               <section className="space-y-4">
-                <Tabs value={selectedTab} onValueChange={(value) => setSelectedTab(value as "conversation" | "nodes")}>
-                  <TabsList className="w-full justify-start gap-1 rounded-md border border-slate-200 bg-white p-1">
-                    <TabsTrigger value="conversation">Conversation</TabsTrigger>
-                    <TabsTrigger value="nodes">Nodes changed ({selectedChangeNodeDiffs.length})</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="conversation" className="mt-3 space-y-3">
-                    <div className="rounded-xl border border-slate-200 bg-white p-4">
-                      <p className="text-sm font-semibold text-slate-900">Description</p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
-                        {selectedChangeRequest.metadata?.description?.trim() || "No description provided."}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl border border-slate-200 bg-white p-4">
-                      <p className="text-sm font-semibold text-slate-900">Summary</p>
-                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                        <span className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-slate-700">
-                          changed nodes: {changedNodeIds.length}
-                        </span>
-                        <span
-                          className={cn(
-                            "rounded border px-2 py-1",
-                            selectedHasConflicts
-                              ? "border-red-200 bg-red-50 text-red-700"
-                              : "border-emerald-200 bg-emerald-50 text-emerald-700",
-                          )}
-                        >
-                          conflicts: {conflictingNodeIds.length}
-                        </span>
-                        <span className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-slate-700">
-                          base version:{" "}
-                          {selectedChangeRequest.metadata?.basedOnVersionId?.slice(0, 8) || "current live"}
-                        </span>
-                        <span className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-slate-700">
-                          updated: {formatTimestamp(selectedChangeRequest.metadata?.updatedAt)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {selectedHasConflicts ? (
-                      <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-                        <p className="font-semibold">Conflicts detected</p>
-                        <p className="mt-1 text-xs">Resolve conflicts before approving this change request.</p>
-                        <p className="mt-2 break-all text-xs">{conflictingNodeIds.join(", ")}</p>
-                      </div>
-                    ) : null}
-                  </TabsContent>
-
-                  <TabsContent value="nodes" className="mt-3">
-                    <div className="rounded-xl border border-slate-200 bg-white p-4">
-                      <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px]">
-                        <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700">
-                          +{addedNodes} added
-                        </span>
-                        <span className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700">
-                          ~{updatedNodes} updated
-                        </span>
-                        <span className="rounded border border-red-200 bg-red-50 px-2 py-0.5 text-red-700">
-                          -{removedNodes} removed
-                        </span>
-                      </div>
-
-                      {selectedChangeNodeDiffs.length === 0 ? (
-                        <p className="text-sm text-slate-600">No node-level differences found.</p>
-                      ) : (
-                        <Accordion type="multiple" className="rounded-md border border-slate-200 bg-white px-3">
-                          {selectedChangeNodeDiffs.map((nodeDiff) => (
-                            <AccordionItem key={nodeDiff.nodeID} value={nodeDiff.nodeID} className="border-slate-200">
-                              <AccordionTrigger className="py-3 text-xs hover:no-underline">
-                                <div className="min-w-0 flex-1 text-left">
-                                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                    <span className="truncate font-semibold text-slate-900">{nodeDiff.nodeName}</span>
-                                    <span className="truncate text-[11px] text-slate-400">{nodeDiff.nodeID}</span>
-                                    <span
-                                      className={cn(
-                                        "rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide",
-                                        nodeDiff.kind === "added" && "bg-emerald-100 text-emerald-700",
-                                        nodeDiff.kind === "removed" && "bg-red-100 text-red-700",
-                                        nodeDiff.kind === "updated" && "bg-blue-100 text-blue-700",
-                                      )}
-                                    >
-                                      {nodeDiff.kind}
-                                    </span>
-                                    {nodeDiff.isConflicting ? (
-                                      <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-red-700">
-                                        conflict
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              </AccordionTrigger>
-                              <AccordionContent className="pb-3">
-                                <div className="space-y-3">
-                                  {nodeDiff.groups.map((group) => (
-                                    <div
-                                      key={`${nodeDiff.nodeID}-${group.section}`}
-                                      className="rounded-md border border-slate-200 bg-slate-50"
-                                    >
-                                      <div className="border-b border-slate-200 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                                        {group.section}
-                                      </div>
-                                      <div className="px-3 py-2 font-mono text-xs">
-                                        {group.lines.map((line, index) => (
-                                          <p
-                                            key={`${nodeDiff.nodeID}-${group.section}-${line.kind}-${line.path}-${index}`}
-                                            className={cn(
-                                              "break-all",
-                                              line.kind === "add" ? "text-emerald-700" : "text-red-700",
-                                            )}
-                                          >
-                                            {line.kind === "add" ? "+" : "-"} {line.path}: {line.value}
-                                          </p>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </AccordionContent>
-                            </AccordionItem>
-                          ))}
-                        </Accordion>
-                      )}
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-semibold text-slate-900">Summary</p>
+                  <div className="mt-4">
+                    <VersionNodeDiffAccordion
+                      summary={selectedDiffSummary}
+                      conflictingNodeIDs={selectedConflictingNodeIDSet}
+                      emptyMessage="No node-level differences found."
+                    />
+                  </div>
+                </div>
               </section>
 
               <aside className="space-y-3">

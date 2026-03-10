@@ -4521,6 +4521,7 @@ export function WorkflowPageV2() {
         actionPending={actOnCanvasChangeRequestMutation.isPending}
         resolvePending={resolveCanvasChangeRequestMutation.isPending}
         liveCanvasVersion={liveCanvasVersion}
+        ownerProfilesByID={liveVersionOwnerProfilesById}
         canvasName={canvas?.metadata?.name || ""}
         canvasDescription={canvas?.metadata?.description}
         onSelectChangeRequest={setSelectedChangeRequestId}
