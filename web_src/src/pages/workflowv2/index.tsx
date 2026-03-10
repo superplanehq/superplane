@@ -879,9 +879,9 @@ export function WorkflowPageV2() {
 
     return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap, nodeEventsMap: eventsMap };
   }, [storeVersion]);
-  const visibleNodeExecutionsMap = isViewingDraftVersion ? {} : nodeExecutionsMap;
-  const visibleNodeQueueItemsMap = isViewingDraftVersion ? {} : nodeQueueItemsMap;
-  const visibleNodeEventsMap = isViewingDraftVersion ? {} : nodeEventsMap;
+  const visibleNodeExecutionsMap = isViewingLiveVersion ? nodeExecutionsMap : {};
+  const visibleNodeQueueItemsMap = isViewingLiveVersion ? nodeQueueItemsMap : {};
+  const visibleNodeEventsMap = isViewingLiveVersion ? nodeEventsMap : {};
 
   const approvalGroupNames = useMemo(() => {
     if (!organizationId) return [];
@@ -1353,15 +1353,15 @@ export function WorkflowPageV2() {
 
       // Build maps with current node data for sidebar
       const executionsMap =
-        isViewingDraftVersion || nodeData.executions.length === 0 ? {} : { [nodeId]: nodeData.executions };
+        !isViewingLiveVersion || nodeData.executions.length === 0 ? {} : { [nodeId]: nodeData.executions };
       const queueItemsMap =
-        isViewingDraftVersion || nodeData.queueItems.length === 0 ? {} : { [nodeId]: nodeData.queueItems.reverse() };
+        !isViewingLiveVersion || nodeData.queueItems.length === 0 ? {} : { [nodeId]: nodeData.queueItems.reverse() };
       const eventsMapForSidebar =
-        isViewingDraftVersion || nodeData.events.length === 0
+        !isViewingLiveVersion || nodeData.events.length === 0
           ? {}
           : { [nodeId]: nodeData.events.length > 0 ? nodeData.events : visibleNodeEventsMap[nodeId] || [] };
-      const totalHistoryCount = isViewingDraftVersion ? 0 : nodeData.totalInHistoryCount;
-      const totalQueueCount = isViewingDraftVersion ? 0 : nodeData.totalInQueueCount;
+      const totalHistoryCount = !isViewingLiveVersion ? 0 : nodeData.totalInHistoryCount;
+      const totalQueueCount = !isViewingLiveVersion ? 0 : nodeData.totalInQueueCount;
 
       const sidebarData = prepareSidebarData(
         node,
@@ -1393,7 +1393,7 @@ export function WorkflowPageV2() {
       allComponents,
       allTriggers,
       visibleNodeEventsMap,
-      isViewingDraftVersion,
+      isViewingLiveVersion,
       getNodeData,
       queryClient,
       organizationId,
@@ -1404,7 +1404,7 @@ export function WorkflowPageV2() {
   // Trigger data loading when sidebar opens for a node
   const loadSidebarData = useCallback(
     (nodeId: string) => {
-      if (isViewingDraftVersion) {
+      if (!isViewingLiveVersion) {
         return;
       }
 
@@ -1416,7 +1416,7 @@ export function WorkflowPageV2() {
 
       loadNodeDataMethod(canvasId!, nodeId, node.type!, queryClient);
     },
-    [canvas, canvasId, queryClient, loadNodeDataMethod, isViewingDraftVersion],
+    [canvas, canvasId, queryClient, loadNodeDataMethod, isViewingLiveVersion],
   );
 
   const onCancelQueueItem = useOnCancelQueueItemHandler({
@@ -1639,7 +1639,7 @@ export function WorkflowPageV2() {
   );
 
   const logEntries = useMemo(() => {
-    if (isViewingDraftVersion) {
+    if (!isViewingLiveVersion) {
       return [];
     }
 
@@ -1693,7 +1693,7 @@ export function WorkflowPageV2() {
       return aTime - bTime;
     });
   }, [
-    isViewingDraftVersion,
+    isViewingLiveVersion,
     handleLogNodeSelect,
     handleLogRunNodeSelect,
     handleLogRunExecutionSelect,
