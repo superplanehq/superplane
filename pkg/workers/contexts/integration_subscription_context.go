@@ -133,7 +133,7 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 		HTTP:           c.registry.HTTPContext(),
 		Metadata:       NewExecutionMetadataContext(c.tx, execution),
 		NodeMetadata:   NewNodeMetadataContext(c.tx, c.node),
-		ExecutionState: NewExecutionStateContext(c.tx, execution, nil),
+		ExecutionState: NewExecutionStateContext(c.tx, execution, c.onNewEvents),
 		Requests:       NewExecutionRequestContext(c.tx, execution),
 		Integration:    c.integrationCtx,
 		Logger:         logging.WithExecution(logging.ForNode(*c.node), execution, nil),

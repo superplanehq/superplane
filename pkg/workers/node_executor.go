@@ -84,8 +84,6 @@ func (w *NodeExecutor) Start(ctx context.Context) {
 					continue
 				}
 
-				messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).Publish()
-
 				go func(execution models.CanvasNodeExecution) {
 					defer w.semaphore.Release(1)
 
@@ -151,12 +149,17 @@ func (w *NodeExecutor) Consume(delivery tackle.Delivery) error {
 	}
 
 	err = w.LockAndProcessNodeExecution(executionID)
-	if err != nil && err != ErrRecordLocked {
-		w.logger.Errorf("Error processing node execution - execution=%s: %v", executionID, err)
-		return err
+	if err == nil {
+		messages.NewCanvasExecutionMessage(data.CanvasId, data.Id, data.NodeId).Publish()
+		return nil
 	}
 
-	return nil
+	if err == ErrRecordLocked {
+		return nil
+	}
+
+	w.logger.Errorf("Error processing node execution - execution=%s: %v", executionID, err)
+	return err
 }
 
 func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {

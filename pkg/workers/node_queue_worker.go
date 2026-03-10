@@ -163,6 +163,12 @@ func (w *NodeQueueWorker) Consume(delivery tackle.Delivery) error {
 func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.CanvasNode) error {
 	var executionIDs []*uuid.UUID
 	var queueItem *models.CanvasNodeQueueItem
+
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		n, err := models.LockCanvasNode(tx, node.WorkflowID, node.NodeID)
 		if err != nil {
@@ -170,7 +176,7 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 			return nil
 		}
 
-		executionIDs, queueItem, err = w.processNode(tx, logger, n)
+		executionIDs, queueItem, err = w.processNode(tx, logger, n, onNewEvents)
 		return err
 	})
 
@@ -196,12 +202,16 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 				queueItem.NodeID,
 			).Publish(true)
 		}
+
+		for _, event := range newEvents {
+			messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+		}
 	}
 
 	return err
 }
 
-func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.CanvasNode) ([]*uuid.UUID, *models.CanvasNodeQueueItem, error) {
+func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) ([]*uuid.UUID, *models.CanvasNodeQueueItem, error) {
 	queueItem, err := node.FirstQueueItem(tx)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -219,7 +229,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		return nil, nil, err
 	}
 
-	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContext(), tx, node, queueItem, configFields)
+	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContext(), tx, node, queueItem, configFields, onNewEvents)
 	if err != nil {
 
 		//
