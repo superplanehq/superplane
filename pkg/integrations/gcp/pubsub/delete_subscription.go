@@ -24,11 +24,13 @@ type DeleteSubscriptionConfiguration struct {
 	SubscriptionID string `json:"subscriptionId" mapstructure:"subscriptionId"`
 }
 
-func (c *DeleteSubscriptionComponent) Name() string        { return "gcp.pubsub.deleteSubscription" }
-func (c *DeleteSubscriptionComponent) Label() string       { return "Pub/Sub • Delete Subscription" }
-func (c *DeleteSubscriptionComponent) Description() string { return "Delete a GCP Pub/Sub subscription" }
-func (c *DeleteSubscriptionComponent) Icon() string        { return "gcp" }
-func (c *DeleteSubscriptionComponent) Color() string       { return "gray" }
+func (c *DeleteSubscriptionComponent) Name() string  { return "gcp.pubsub.deleteSubscription" }
+func (c *DeleteSubscriptionComponent) Label() string { return "Pub/Sub • Delete Subscription" }
+func (c *DeleteSubscriptionComponent) Description() string {
+	return "Delete a GCP Pub/Sub subscription"
+}
+func (c *DeleteSubscriptionComponent) Icon() string  { return "gcp" }
+func (c *DeleteSubscriptionComponent) Color() string { return "gray" }
 
 func (c *DeleteSubscriptionComponent) Documentation() string {
 	return `The Delete Subscription component deletes a GCP Pub/Sub subscription.
@@ -102,7 +104,7 @@ func (c *DeleteSubscriptionComponent) Execute(ctx core.ExecutionContext) error {
 	})
 }
 
-func (c *DeleteSubscriptionComponent) Actions() []core.Action                 { return nil }
+func (c *DeleteSubscriptionComponent) Actions() []core.Action                  { return nil }
 func (c *DeleteSubscriptionComponent) HandleAction(_ core.ActionContext) error { return nil }
 func (c *DeleteSubscriptionComponent) Cancel(_ core.ExecutionContext) error    { return nil }
 func (c *DeleteSubscriptionComponent) Cleanup(_ core.SetupContext) error       { return nil }

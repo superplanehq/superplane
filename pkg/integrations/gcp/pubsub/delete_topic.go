@@ -102,7 +102,7 @@ func (c *DeleteTopicComponent) Execute(ctx core.ExecutionContext) error {
 	})
 }
 
-func (c *DeleteTopicComponent) Actions() []core.Action                 { return nil }
+func (c *DeleteTopicComponent) Actions() []core.Action                  { return nil }
 func (c *DeleteTopicComponent) HandleAction(_ core.ActionContext) error { return nil }
 func (c *DeleteTopicComponent) Cancel(_ core.ExecutionContext) error    { return nil }
 func (c *DeleteTopicComponent) Cleanup(_ core.SetupContext) error       { return nil }

@@ -164,9 +164,9 @@ func (c *PublishMessage) buildMessageData(config PublishMessageConfiguration) (s
 }
 
 func (c *PublishMessage) Actions() []core.Action                  { return nil }
-func (c *PublishMessage) HandleAction(_ core.ActionContext) error  { return nil }
-func (c *PublishMessage) Cancel(_ core.ExecutionContext) error     { return nil }
-func (c *PublishMessage) Cleanup(_ core.SetupContext) error        { return nil }
+func (c *PublishMessage) HandleAction(_ core.ActionContext) error { return nil }
+func (c *PublishMessage) Cancel(_ core.ExecutionContext) error    { return nil }
+func (c *PublishMessage) Cleanup(_ core.SetupContext) error       { return nil }
 func (c *PublishMessage) HandleWebhook(_ core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
