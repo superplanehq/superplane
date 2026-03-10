@@ -1,9 +1,9 @@
 package common
 
 const (
-	SecretNameServiceAccountKey = "serviceAccountKey"
-	SecretNameAccessToken       = "accessToken"
-	ScopeCloudPlatform          = "https://www.googleapis.com/auth/cloud-platform"
+	SecretNameServiceAccountKey     = "serviceAccountKey"
+	SecretNameAccessToken           = "accessToken"
+	ScopeCloudPlatform              = "https://www.googleapis.com/auth/cloud-platform"
 	ActionNameEnsureCloudBuild      = "ensureCloudBuild"
 	ActionNameEnsurePubSubOnMessage = "ensurePubSubOnMessage"
 )
