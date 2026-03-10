@@ -622,6 +622,14 @@ export function WorkflowPageV2() {
     setSearchParams,
   ]);
 
+  useEffect(() => {
+    if (!hasEditableVersion || !isVersionControlOpen) {
+      return;
+    }
+
+    setIsVersionControlOpen(false);
+  }, [hasEditableVersion, isVersionControlOpen]);
+
   // Revert functionality - track initial workflow snapshot
   const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<CanvasesCanvas | null>(null);
   const lastSavedWorkflowRef = useRef<CanvasesCanvas | null>(null);
@@ -4593,7 +4601,14 @@ export function WorkflowPageV2() {
       : "version-live";
   const headerSaveState = updateCanvasVersionMutation.isPending ? "saving" : hasUnsavedChanges ? "unsaved" : "saved";
   const showPendingDraftBadge =
-    !isVersioningDisabled && !hasEditableVersion && !!latestDraftVersion && pendingDraftDiffSummary.items.length > 0;
+    !isVersioningDisabled && !!latestDraftVersion && pendingDraftDiffSummary.items.length > 0;
+  const canvasStateMode = !showVersioningUI
+    ? "default"
+    : hasEditableVersion
+      ? "editing"
+      : !isViewingCurrentLiveVersion
+        ? "previewing-previous-version"
+        : "default";
   const exitEditModeDisabled =
     !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion || createCanvasVersionMutation.isPending;
   const exitEditModeDisabledTooltip = !canUpdateCanvas
@@ -4674,7 +4689,7 @@ export function WorkflowPageV2() {
   return (
     <>
       <div className="relative h-full w-full">
-        {showVersioningUI && topViewMode === "canvas" && !isVersionControlOpen ? (
+        {showVersioningUI && !hasEditableVersion && topViewMode === "canvas" && !isVersionControlOpen ? (
           <div className="absolute left-4 top-16 z-20">
             <Button
               variant="outline"
@@ -4709,6 +4724,7 @@ export function WorkflowPageV2() {
           title={canvas?.metadata?.name || "Canvas"}
           headerBanner={headerBanner}
           topViewMode={showVersioningUI || topViewMode !== "versioning" ? topViewMode : "canvas"}
+          canvasStateMode={canvasStateMode}
           onTopViewModeChange={(mode) => {
             setIsCreateChangeRequestMode(false);
             setTopViewMode(mode);
@@ -4832,7 +4848,7 @@ export function WorkflowPageV2() {
             },
           ]}
           versionControlSidebar={
-            showVersioningUI && topViewMode === "canvas" ? (
+            showVersioningUI && !hasEditableVersion && topViewMode === "canvas" ? (
               <CanvasVersionControlSidebar
                 isOpen={isVersionControlOpen}
                 onToggle={setIsVersionControlOpen}
