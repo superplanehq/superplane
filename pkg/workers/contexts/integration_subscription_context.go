@@ -36,6 +36,7 @@ func NewIntegrationSubscriptionContext(
 		node:           node,
 		integration:    integration,
 		integrationCtx: integrationCtx,
+		onNewEvents:    onNewEvents,
 	}
 }
 
