@@ -4,6 +4,12 @@ export type ClientOptions = {
   baseUrl: `http://${string}` | `https://${string}` | (string & {});
 };
 
+export type ActOnCanvasChangeRequestRequestAction =
+  | "ACTION_UNSPECIFIED"
+  | "ACTION_APPROVE"
+  | "ACTION_REJECT"
+  | "ACTION_REOPEN";
+
 /**
  * Enums
  */
@@ -79,6 +85,14 @@ export type CanvasNodeExecutionResultReason =
 
 export type CanvasNodeExecutionState = "STATE_UNKNOWN" | "STATE_PENDING" | "STATE_STARTED" | "STATE_FINISHED";
 
+export type CanvasesActOnCanvasChangeRequestBody = {
+  action?: ActOnCanvasChangeRequestRequestAction;
+};
+
+export type CanvasesActOnCanvasChangeRequestResponse = {
+  changeRequest?: CanvasesCanvasChangeRequest;
+};
+
 export type CanvasesCancelExecutionBody = {
   [key: string]: unknown;
 };
@@ -125,6 +139,7 @@ export type CanvasesCanvasChangeRequest = {
 
 export type CanvasesCanvasChangeRequestDiff = {
   changedNodeIds?: Array<string>;
+  conflictingNodeIds?: Array<string>;
 };
 
 export type CanvasesCanvasChangeRequestMetadata = {
@@ -132,6 +147,7 @@ export type CanvasesCanvasChangeRequestMetadata = {
   canvasId?: string;
   versionId?: string;
   owner?: SuperplaneCanvasesUserRef;
+  basedOnVersionId?: string;
   status?: CanvasesCanvasChangeRequestStatus;
   publishedAt?: string;
   createdAt?: string;
@@ -140,7 +156,12 @@ export type CanvasesCanvasChangeRequestMetadata = {
   description?: string;
 };
 
-export type CanvasesCanvasChangeRequestStatus = "STATUS_UNSPECIFIED" | "STATUS_OPEN" | "STATUS_PUBLISHED";
+export type CanvasesCanvasChangeRequestStatus =
+  | "STATUS_UNSPECIFIED"
+  | "STATUS_OPEN"
+  | "STATUS_PUBLISHED"
+  | "STATUS_CONFLICTED"
+  | "STATUS_REJECTED";
 
 export type CanvasesCanvasEvent = {
   id?: string;
@@ -394,6 +415,16 @@ export type CanvasesListNodeQueueItemsResponse = {
   totalCount?: number;
   hasNextPage?: boolean;
   lastTimestamp?: string;
+};
+
+export type CanvasesResolveCanvasChangeRequestBody = {
+  canvas?: CanvasesCanvas;
+  autoLayout?: CanvasesCanvasAutoLayout;
+};
+
+export type CanvasesResolveCanvasChangeRequestResponse = {
+  version?: CanvasesCanvasVersion;
+  changeRequest?: CanvasesCanvasChangeRequest;
 };
 
 export type CanvasesResolveExecutionErrorsBody = {
@@ -1633,6 +1664,66 @@ export type CanvasesDescribeCanvasChangeRequestResponses = {
 
 export type CanvasesDescribeCanvasChangeRequestResponse2 =
   CanvasesDescribeCanvasChangeRequestResponses[keyof CanvasesDescribeCanvasChangeRequestResponses];
+
+export type CanvasesActOnCanvasChangeRequestData = {
+  body: CanvasesActOnCanvasChangeRequestBody;
+  path: {
+    canvasId: string;
+    changeRequestId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/actions";
+};
+
+export type CanvasesActOnCanvasChangeRequestErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesActOnCanvasChangeRequestError =
+  CanvasesActOnCanvasChangeRequestErrors[keyof CanvasesActOnCanvasChangeRequestErrors];
+
+export type CanvasesActOnCanvasChangeRequestResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesActOnCanvasChangeRequestResponse;
+};
+
+export type CanvasesActOnCanvasChangeRequestResponse2 =
+  CanvasesActOnCanvasChangeRequestResponses[keyof CanvasesActOnCanvasChangeRequestResponses];
+
+export type CanvasesResolveCanvasChangeRequestData = {
+  body: CanvasesResolveCanvasChangeRequestBody;
+  path: {
+    canvasId: string;
+    changeRequestId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/resolve";
+};
+
+export type CanvasesResolveCanvasChangeRequestErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesResolveCanvasChangeRequestError =
+  CanvasesResolveCanvasChangeRequestErrors[keyof CanvasesResolveCanvasChangeRequestErrors];
+
+export type CanvasesResolveCanvasChangeRequestResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesResolveCanvasChangeRequestResponse;
+};
+
+export type CanvasesResolveCanvasChangeRequestResponse2 =
+  CanvasesResolveCanvasChangeRequestResponses[keyof CanvasesResolveCanvasChangeRequestResponses];
 
 export type CanvasesListCanvasEventsData = {
   body?: never;

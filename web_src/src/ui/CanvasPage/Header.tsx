@@ -479,14 +479,12 @@ export function Header({
                             disabled={publishVersionDisabled || !onPublishVersion}
                           >
                             <Rocket className="h-4 w-4" />
-                            Publish
+                            Create CR
                           </Button>,
                         )}
                       </div>
                     </TooltipTrigger>
-                    <TooltipContent side="left">
-                      Create and publish a change request from your current draft.
-                    </TooltipContent>
+                    <TooltipContent side="left">Create a change request from your current draft.</TooltipContent>
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>

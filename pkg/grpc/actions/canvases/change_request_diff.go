@@ -18,6 +18,35 @@ type comparableCanvasNode struct {
 	IntegrationID *string
 }
 
+type canvasChangeRequestDiff struct {
+	ChangedNodeIDs     []string
+	ConflictingNodeIDs []string
+}
+
+func computeCanvasChangeRequestDiff(
+	baseNodes []models.Node,
+	baseEdges []models.Edge,
+	liveNodes []models.Node,
+	liveEdges []models.Edge,
+	versionNodes []models.Node,
+	versionEdges []models.Edge,
+) canvasChangeRequestDiff {
+	changedInVersion := resolveChangedNodeIDSet(baseNodes, baseEdges, versionNodes, versionEdges)
+	changedInLive := resolveChangedNodeIDSet(baseNodes, baseEdges, liveNodes, liveEdges)
+
+	conflictingSet := make(map[string]struct{})
+	for nodeID := range changedInVersion {
+		if _, ok := changedInLive[nodeID]; ok {
+			conflictingSet[nodeID] = struct{}{}
+		}
+	}
+
+	return canvasChangeRequestDiff{
+		ChangedNodeIDs:     resolveOrderedNodeIDs(changedInVersion, versionNodes, liveNodes, baseNodes),
+		ConflictingNodeIDs: resolveOrderedNodeIDs(conflictingSet, versionNodes, liveNodes, baseNodes),
+	}
+}
+
 func resolveChangedNodeIDSet(
 	baseNodes []models.Node,
 	baseEdges []models.Edge,

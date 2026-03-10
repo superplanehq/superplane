@@ -11,22 +11,26 @@ import (
 )
 
 const (
-	CanvasChangeRequestStatusOpen      = "open"
-	CanvasChangeRequestStatusPublished = "published"
+	CanvasChangeRequestStatusOpen       = "open"
+	CanvasChangeRequestStatusPublished  = "published"
+	CanvasChangeRequestStatusConflicted = "conflicted"
+	CanvasChangeRequestStatusRejected   = "rejected"
 )
 
 type CanvasChangeRequest struct {
-	ID             uuid.UUID
-	WorkflowID     uuid.UUID
-	VersionID      uuid.UUID
-	OwnerID        *uuid.UUID
-	Title          string
-	Description    string
-	Status         string
-	ChangedNodeIDs datatypes.JSONSlice[string]
-	PublishedAt    *time.Time
-	CreatedAt      *time.Time
-	UpdatedAt      *time.Time
+	ID                 uuid.UUID
+	WorkflowID         uuid.UUID
+	VersionID          uuid.UUID
+	OwnerID            *uuid.UUID
+	BasedOnVersionID   *uuid.UUID
+	Title              string
+	Description        string
+	Status             string
+	ChangedNodeIDs     datatypes.JSONSlice[string]
+	ConflictingNodeIDs datatypes.JSONSlice[string]
+	PublishedAt        *time.Time
+	CreatedAt          *time.Time
+	UpdatedAt          *time.Time
 }
 
 type CanvasChangeRequestListOptions struct {

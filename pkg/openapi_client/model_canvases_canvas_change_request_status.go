@@ -24,6 +24,8 @@ const (
 	CANVASESCANVASCHANGEREQUESTSTATUS_STATUS_UNSPECIFIED CanvasesCanvasChangeRequestStatus = "STATUS_UNSPECIFIED"
 	CANVASESCANVASCHANGEREQUESTSTATUS_STATUS_OPEN        CanvasesCanvasChangeRequestStatus = "STATUS_OPEN"
 	CANVASESCANVASCHANGEREQUESTSTATUS_STATUS_PUBLISHED   CanvasesCanvasChangeRequestStatus = "STATUS_PUBLISHED"
+	CANVASESCANVASCHANGEREQUESTSTATUS_STATUS_CONFLICTED  CanvasesCanvasChangeRequestStatus = "STATUS_CONFLICTED"
+	CANVASESCANVASCHANGEREQUESTSTATUS_STATUS_REJECTED    CanvasesCanvasChangeRequestStatus = "STATUS_REJECTED"
 )
 
 // All allowed values of CanvasesCanvasChangeRequestStatus enum
@@ -31,6 +33,8 @@ var AllowedCanvasesCanvasChangeRequestStatusEnumValues = []CanvasesCanvasChangeR
 	"STATUS_UNSPECIFIED",
 	"STATUS_OPEN",
 	"STATUS_PUBLISHED",
+	"STATUS_CONFLICTED",
+	"STATUS_REJECTED",
 }
 
 func (v *CanvasesCanvasChangeRequestStatus) UnmarshalJSON(src []byte) error {

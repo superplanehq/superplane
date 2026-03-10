@@ -110,7 +110,17 @@ func resolveChangeRequestStatusFilter(filter string) ([]string, error) {
 	case "", "all":
 		return nil, nil
 	case "open":
-		return []string{models.CanvasChangeRequestStatusOpen}, nil
+		return []string{
+			models.CanvasChangeRequestStatusOpen,
+			models.CanvasChangeRequestStatusConflicted,
+		}, nil
+	case "conflicted":
+		return []string{
+			models.CanvasChangeRequestStatusOpen,
+			models.CanvasChangeRequestStatusConflicted,
+		}, nil
+	case "rejected":
+		return []string{models.CanvasChangeRequestStatusRejected}, nil
 	case "merged", "published":
 		return []string{models.CanvasChangeRequestStatusPublished}, nil
 	default:

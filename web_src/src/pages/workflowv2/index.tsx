@@ -45,6 +45,8 @@ import {
   useUpdateCanvas,
   useCreateCanvasVersion,
   useCreateCanvasChangeRequest,
+  useActOnCanvasChangeRequest,
+  useResolveCanvasChangeRequest,
   useUpdateCanvasVersion,
   useCanvasChangeRequests,
   useTriggers,
@@ -131,6 +133,7 @@ import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
 import { buildDraftNodeDiffSummary } from "./draftNodeDiff";
 import { CreateChangeRequestModal } from "./CreateChangeRequestModal";
+import { CanvasChangeRequestsView } from "./CanvasChangeRequestsView";
 import { CanvasSettingsView } from "./CanvasSettingsView";
 
 const BUNDLE_ICON_SLUG = "component";
@@ -216,6 +219,8 @@ export function WorkflowPageV2() {
   const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
   const createCanvasChangeRequestMutation = useCreateCanvasChangeRequest(organizationId!, canvasId!);
+  const actOnCanvasChangeRequestMutation = useActOnCanvasChangeRequest(organizationId!, canvasId!);
+  const resolveCanvasChangeRequestMutation = useResolveCanvasChangeRequest(organizationId!, canvasId!);
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
@@ -3608,12 +3613,12 @@ export function WorkflowPageV2() {
       const editVersionID = createChangeRequestVersion?.metadata?.id || "";
 
       if (!editVersionID) {
-        showErrorToast("Enable edit mode before publishing");
+        showErrorToast("Enable edit mode before creating a change request");
         return;
       }
 
       if (hasUnsavedChanges && editVersionID === activeCanvasVersionId) {
-        showErrorToast("Save your version before publishing");
+        showErrorToast("Save your version before creating a change request");
         return;
       }
 
@@ -3628,28 +3633,14 @@ export function WorkflowPageV2() {
           setSelectedChangeRequestId(changeRequestID);
         }
 
-        debouncedAutoSave.cancel();
-        debouncedAnnotationAutoSave.cancel();
-        pendingPositionUpdatesRef.current.clear();
-        pendingAnnotationUpdatesRef.current.clear();
-        setHasUnsavedChanges(false);
-        setHasNonPositionalUnsavedChanges(false);
-        setInitialWorkflowSnapshot(null);
-        lastSavedWorkflowRef.current = null;
-        setActiveCanvasVersion(null);
-        await queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-        await queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-        await queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-        setSearchParams((current) => {
-          const next = new URLSearchParams(current);
-          next.delete("version");
-          return next;
-        });
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
         setIsCreateChangeRequestMode(false);
-        showSuccessToast("Version published");
+        setTopViewMode("versioning");
+        showSuccessToast("Change request created");
       } catch (error) {
         const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to Publish to Live";
+        const errorMessage =
+          responseMessage || (error as { message?: string })?.message || "Failed to create change request";
         showErrorToast(errorMessage);
       }
     },
@@ -3661,9 +3652,130 @@ export function WorkflowPageV2() {
       createChangeRequestVersion,
       hasUnsavedChanges,
       createCanvasChangeRequestMutation,
-      debouncedAutoSave,
-      debouncedAnnotationAutoSave,
       queryClient,
+    ],
+  );
+
+  const handleApproveChangeRequest = useCallback(
+    async (changeRequestId: string) => {
+      if (!organizationId || !canvasId || !changeRequestId) {
+        return;
+      }
+
+      try {
+        const response = await actOnCanvasChangeRequestMutation.mutateAsync({
+          changeRequestId,
+          action: "ACTION_APPROVE",
+        });
+
+        const actedChangeRequestId = response?.data?.changeRequest?.metadata?.id || changeRequestId;
+        setSelectedChangeRequestId(actedChangeRequestId);
+        setActiveCanvasVersion(null);
+        setSearchParams((current) => {
+          const next = new URLSearchParams(current);
+          next.delete("version");
+          return next;
+        });
+        setTopViewMode("canvas");
+        showSuccessToast("Change request approved and published");
+      } catch (error) {
+        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to approve";
+        showErrorToast(errorMessage);
+      }
+    },
+    [organizationId, canvasId, actOnCanvasChangeRequestMutation, setSearchParams],
+  );
+
+  const handleRejectChangeRequest = useCallback(
+    async (changeRequestId: string) => {
+      if (!organizationId || !canvasId || !changeRequestId) {
+        return;
+      }
+
+      try {
+        const response = await actOnCanvasChangeRequestMutation.mutateAsync({
+          changeRequestId,
+          action: "ACTION_REJECT",
+        });
+
+        const actedChangeRequestId = response?.data?.changeRequest?.metadata?.id || changeRequestId;
+        setSelectedChangeRequestId(actedChangeRequestId);
+        showSuccessToast("Change request rejected");
+      } catch (error) {
+        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to reject";
+        showErrorToast(errorMessage);
+      }
+    },
+    [organizationId, canvasId, actOnCanvasChangeRequestMutation],
+  );
+
+  const handleReopenChangeRequest = useCallback(
+    async (changeRequestId: string) => {
+      if (!organizationId || !canvasId || !changeRequestId) {
+        return;
+      }
+
+      try {
+        const response = await actOnCanvasChangeRequestMutation.mutateAsync({
+          changeRequestId,
+          action: "ACTION_REOPEN",
+        });
+
+        const actedChangeRequestId = response?.data?.changeRequest?.metadata?.id || changeRequestId;
+        setSelectedChangeRequestId(actedChangeRequestId);
+        showSuccessToast("Change request reopened");
+      } catch (error) {
+        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to reopen";
+        showErrorToast(errorMessage);
+      }
+    },
+    [organizationId, canvasId, actOnCanvasChangeRequestMutation],
+  );
+
+  const handleResolveChangeRequest = useCallback(
+    async (data: { changeRequestId: string; nodes: Record<string, unknown>[]; edges: Record<string, unknown>[] }) => {
+      if (!organizationId || !canvasId || !canvas?.metadata?.name) {
+        return;
+      }
+
+      try {
+        const response = await resolveCanvasChangeRequestMutation.mutateAsync({
+          changeRequestId: data.changeRequestId,
+          name: canvas.metadata.name,
+          description: canvas.metadata.description || "",
+          nodes: data.nodes,
+          edges: data.edges,
+        });
+
+        const resolvedVersion = response?.data?.version;
+        const resolvedVersionID = resolvedVersion?.metadata?.id || "";
+        if (resolvedVersion && resolvedVersionID) {
+          setActiveCanvasVersion(resolvedVersion);
+          setSearchParams((current) => {
+            const next = new URLSearchParams(current);
+            next.set("version", resolvedVersionID);
+            return next;
+          });
+        }
+
+        const resolvedChangeRequestID = response?.data?.changeRequest?.metadata?.id || data.changeRequestId;
+        setSelectedChangeRequestId(resolvedChangeRequestID);
+        showSuccessToast("Change request conflicts resolved");
+      } catch (error) {
+        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to resolve";
+        showErrorToast(errorMessage);
+      }
+    },
+    [
+      organizationId,
+      canvasId,
+      canvas?.metadata?.name,
+      canvas?.metadata?.description,
+      resolveCanvasChangeRequestMutation,
       setSearchParams,
     ],
   );
@@ -4335,10 +4447,14 @@ export function WorkflowPageV2() {
     : isVersioningDisabled
       ? versioningDisabledTooltip
       : !hasEditableVersion
-        ? "Enable edit mode before publishing."
+        ? "Enable edit mode before creating a change request."
         : hasUnsavedChanges
-          ? "Save your version before publishing."
+          ? "Save your version before creating a change request."
           : undefined;
+  const versioningItemCount = canvasChangeRequests.filter((changeRequest) => {
+    const status = (changeRequest.metadata?.status || "").toLowerCase();
+    return status.includes("open");
+  }).length;
   const headerMode = isVersioningDisabled
     ? "versioning-disabled"
     : hasEditableVersion
@@ -4397,6 +4513,22 @@ export function WorkflowPageV2() {
         isSaving={updateCanvasMutation.isPending}
         onSave={handleSaveCanvasSettings}
       />
+    ) : topViewMode === "versioning" ? (
+      <CanvasChangeRequestsView
+        changeRequests={canvasChangeRequests}
+        selectedChangeRequestId={selectedChangeRequestId}
+        canUpdateCanvas={canUpdateCanvas && !isTemplate && !canvasDeletedRemotely}
+        actionPending={actOnCanvasChangeRequestMutation.isPending}
+        resolvePending={resolveCanvasChangeRequestMutation.isPending}
+        liveCanvasVersion={liveCanvasVersion}
+        canvasName={canvas?.metadata?.name || ""}
+        canvasDescription={canvas?.metadata?.description}
+        onSelectChangeRequest={setSelectedChangeRequestId}
+        onApprove={handleApproveChangeRequest}
+        onReject={handleRejectChangeRequest}
+        onReopen={handleReopenChangeRequest}
+        onResolve={handleResolveChangeRequest}
+      />
     ) : null;
 
   return (
@@ -4441,11 +4573,11 @@ export function WorkflowPageV2() {
             setIsCreateChangeRequestMode(false);
             setTopViewMode(mode);
           }}
-          showVersioningTab={false}
+          showVersioningTab={showVersioningUI}
           isVersionControlOpen={showVersioningUI ? isVersionControlOpen : false}
           showBottomStatusControls={true}
           memoryItemCount={canvasMemoryEntries.length}
-          versioningItemCount={undefined}
+          versioningItemCount={versioningItemCount}
           dataViewContent={dataViewContent}
           nodes={nodes}
           edges={edges}

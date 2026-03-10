@@ -12,6 +12,10 @@ func canvasChangeRequestStatusToProto(status string) pb.CanvasChangeRequest_Stat
 		return pb.CanvasChangeRequest_STATUS_OPEN
 	case models.CanvasChangeRequestStatusPublished:
 		return pb.CanvasChangeRequest_STATUS_PUBLISHED
+	case models.CanvasChangeRequestStatusConflicted:
+		return pb.CanvasChangeRequest_STATUS_OPEN
+	case models.CanvasChangeRequestStatusRejected:
+		return pb.CanvasChangeRequest_STATUS_REJECTED
 	default:
 		return pb.CanvasChangeRequest_STATUS_UNSPECIFIED
 	}
@@ -41,6 +45,9 @@ func SerializeCanvasChangeRequest(
 		Title:       request.Title,
 		Description: request.Description,
 	}
+	if request.BasedOnVersionID != nil {
+		metadata.BasedOnVersionId = request.BasedOnVersionID.String()
+	}
 
 	if request.PublishedAt != nil {
 		metadata.PublishedAt = timestamppb.New(*request.PublishedAt)
@@ -55,7 +62,8 @@ func SerializeCanvasChangeRequest(
 	protoRequest := &pb.CanvasChangeRequest{
 		Metadata: metadata,
 		Diff: &pb.CanvasChangeRequestDiff{
-			ChangedNodeIds: request.ChangedNodeIDs,
+			ChangedNodeIds:     request.ChangedNodeIDs,
+			ConflictingNodeIds: request.ConflictingNodeIDs,
 		},
 	}
 

@@ -191,7 +191,7 @@ CREATE TABLE public.canvas_memories (
 
 CREATE TABLE public.casbin_rule (
     id integer NOT NULL,
-    ptype character varying(100) NOT NULL,
+    ptype character varying(100),
     v0 character varying(100),
     v1 character varying(100),
     v2 character varying(100),
@@ -443,7 +443,9 @@ CREATE TABLE public.workflow_change_requests (
     description text DEFAULT ''::text NOT NULL,
     published_at timestamp without time zone,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    based_on_version_id uuid,
+    conflicting_node_ids jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -1122,6 +1124,13 @@ CREATE INDEX idx_canvas_memories_canvas_namespace ON public.canvas_memories USIN
 
 
 --
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
+
+
+--
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1196,6 +1205,13 @@ CREATE INDEX idx_webhooks_app_installation_id ON public.webhooks USING btree (ap
 --
 
 CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at);
+
+
+--
+-- Name: idx_workflow_change_requests_based_on_version; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_change_requests_based_on_version ON public.workflow_change_requests USING btree (workflow_id, based_on_version_id);
 
 
 --
@@ -1616,6 +1632,14 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
+-- Name: workflow_change_requests workflow_change_requests_based_on_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_requests
+    ADD CONSTRAINT workflow_change_requests_based_on_version_id_fkey FOREIGN KEY (based_on_version_id) REFERENCES public.workflow_versions(id) ON DELETE SET NULL;
+
+
+--
 -- Name: workflow_change_requests workflow_change_requests_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1847,7 +1871,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260306201921	f
+20260309191150	f
 \.
 
 

@@ -64,15 +64,35 @@ func (c *publishCommand) Execute(ctx core.CommandContext) error {
 		return nil
 	}
 
+	changeRequestID := ""
+	if response.ChangeRequest.Metadata != nil {
+		changeRequestID = response.ChangeRequest.Metadata.GetId()
+	}
+	if changeRequestID == "" {
+		return fmt.Errorf("change request id not found in response")
+	}
+
+	actionBody := openapi_client.CanvasesActOnCanvasChangeRequestBody{}
+	actionBody.SetAction(openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE)
+	actionResponse, _, err := ctx.API.CanvasChangeRequestAPI.
+		CanvasesActOnCanvasChangeRequest(ctx.Context, canvasID, changeRequestID).
+		Body(actionBody).
+		Execute()
+	if err != nil {
+		return err
+	}
+
+	changeRequest := actionResponse.ChangeRequest
+	if changeRequest == nil {
+		return nil
+	}
+
 	if ctx.Renderer.IsText() {
-		changeRequest := response.ChangeRequest
 		metadata := changeRequest.Metadata
 		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			changeRequestID := ""
 			status := ""
 			versionID := ""
 			if metadata != nil {
-				changeRequestID = metadata.GetId()
 				status = string(metadata.GetStatus())
 				versionID = metadata.GetVersionId()
 			}
@@ -84,7 +104,7 @@ func (c *publishCommand) Execute(ctx core.CommandContext) error {
 		})
 	}
 
-	return ctx.Renderer.Render(response.ChangeRequest)
+	return ctx.Renderer.Render(changeRequest)
 }
 
 func resolveCanvasTarget(ctx core.CommandContext) (string, error) {
