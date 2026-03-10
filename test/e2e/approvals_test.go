@@ -316,7 +316,7 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 
 func (s *ApprovalSteps) runManualTrigger() {
 	s.canvas.RunManualTrigger("Start")
-	s.canvas.WaitForExecution("Approval", models.CanvasNodeExecutionStatePending, 5*time.Second)
+	s.canvas.WaitForExecution("Approval", models.CanvasNodeExecutionStateStarted, 5*time.Second)
 }
 
 func (s *ApprovalSteps) approveFirstPendingRequirement() {
