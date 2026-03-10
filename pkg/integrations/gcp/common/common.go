@@ -6,6 +6,7 @@ const (
 	ScopeCloudPlatform               = "https://www.googleapis.com/auth/cloud-platform"
 	ActionNameEnsureCloudBuild       = "ensureCloudBuild"
 	ActionNameEnsureArtifactRegistry = "ensureArtifactRegistry"
+	ActionNameEnsurePubSubOnMessage  = "ensurePubSubOnMessage"
 )
 
 var RequiredJSONKeys = []string{"type", "project_id", "private_key_id", "private_key", "client_email", "client_id"}

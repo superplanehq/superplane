@@ -34,7 +34,86 @@ func DeleteTopic(ctx context.Context, client *common.Client, projectID, topicID 
 	return err
 }
 
-// --- Pub/Sub Push Subscription ---
+type listTopicsResponse struct {
+	Topics        []TopicResource `json:"topics"`
+	NextPageToken string          `json:"nextPageToken"`
+}
+
+type TopicResource struct {
+	Name string `json:"name"`
+}
+
+func ListTopics(ctx context.Context, client *common.Client, projectID string) ([]TopicResource, error) {
+	var all []TopicResource
+	pageToken := ""
+	for {
+		u := fmt.Sprintf("%s/projects/%s/topics", pubsubBaseURL, projectID)
+		if pageToken != "" {
+			u += "?pageToken=" + pageToken
+		}
+		body, err := client.GetURL(ctx, u)
+		if err != nil {
+			return nil, err
+		}
+		var resp listTopicsResponse
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return nil, fmt.Errorf("parse list topics response: %w", err)
+		}
+		all = append(all, resp.Topics...)
+		if resp.NextPageToken == "" {
+			break
+		}
+		pageToken = resp.NextPageToken
+	}
+	return all, nil
+}
+
+func TopicShortName(name string) string {
+	parts := strings.Split(name, "/")
+	return parts[len(parts)-1]
+}
+
+// --- Pub/Sub Publish ---
+
+type publishRequest struct {
+	Messages []pubsubMessage `json:"messages"`
+}
+
+type pubsubMessage struct {
+	Data       string            `json:"data"`
+	Attributes map[string]string `json:"attributes,omitempty"`
+}
+
+type publishResponse struct {
+	MessageIDs []string `json:"messageIds"`
+}
+
+func PublishMessageToTopic(ctx context.Context, client *common.Client, projectID, topicID, data string, attributes map[string]string) (string, error) {
+	url := fmt.Sprintf("%s/projects/%s/topics/%s:publish", pubsubBaseURL, projectID, topicID)
+	req := publishRequest{
+		Messages: []pubsubMessage{
+			{Data: data, Attributes: attributes},
+		},
+	}
+	raw, err := json.Marshal(req)
+	if err != nil {
+		return "", fmt.Errorf("marshal publish body: %w", err)
+	}
+	resp, err := client.ExecRequest(ctx, "POST", url, strings.NewReader(string(raw)))
+	if err != nil {
+		return "", err
+	}
+	var result publishResponse
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return "", fmt.Errorf("parse publish response: %w", err)
+	}
+	if len(result.MessageIDs) == 0 {
+		return "", fmt.Errorf("no message ID returned")
+	}
+	return result.MessageIDs[0], nil
+}
+
+// --- Pub/Sub Subscription ---
 
 type pushConfig struct {
 	PushEndpoint string `json:"pushEndpoint"`
@@ -42,7 +121,7 @@ type pushConfig struct {
 
 type subscriptionRequest struct {
 	Topic                    string      `json:"topic"`
-	PushConfig               *pushConfig `json:"pushConfig"`
+	PushConfig               *pushConfig `json:"pushConfig,omitempty"`
 	AckDeadlineSeconds       int         `json:"ackDeadlineSeconds"`
 	MessageRetentionDuration string      `json:"messageRetentionDuration"`
 	Filter                   string      `json:"filter,omitempty"`
@@ -58,6 +137,27 @@ func CreatePushSubscription(ctx context.Context, client *common.Client, projectI
 	}
 	if len(filter) > 0 && filter[0] != "" {
 		req.Filter = filter[0]
+	}
+	raw, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("marshal subscription body: %w", err)
+	}
+	_, err = client.ExecRequest(ctx, "PUT", url, strings.NewReader(string(raw)))
+	if err != nil {
+		if common.IsAlreadyExistsError(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+func CreatePullSubscription(ctx context.Context, client *common.Client, projectID, subscriptionID, topicID string) error {
+	url := fmt.Sprintf("%s/projects/%s/subscriptions/%s", pubsubBaseURL, projectID, subscriptionID)
+	req := subscriptionRequest{
+		Topic:                    fmt.Sprintf("projects/%s/topics/%s", projectID, topicID),
+		AckDeadlineSeconds:       30,
+		MessageRetentionDuration: "604800s",
 	}
 	raw, err := json.Marshal(req)
 	if err != nil {
@@ -92,6 +192,46 @@ func DeleteSubscription(ctx context.Context, client *common.Client, projectID, s
 	url := fmt.Sprintf("%s/projects/%s/subscriptions/%s", pubsubBaseURL, projectID, subscriptionID)
 	_, err := client.ExecRequest(ctx, "DELETE", url, nil)
 	return err
+}
+
+type listSubscriptionsResponse struct {
+	Subscriptions []SubscriptionResource `json:"subscriptions"`
+	NextPageToken string                 `json:"nextPageToken"`
+}
+
+type SubscriptionResource struct {
+	Name  string `json:"name"`
+	Topic string `json:"topic"`
+}
+
+func ListSubscriptions(ctx context.Context, client *common.Client, projectID string) ([]SubscriptionResource, error) {
+	var all []SubscriptionResource
+	pageToken := ""
+	for {
+		u := fmt.Sprintf("%s/projects/%s/subscriptions", pubsubBaseURL, projectID)
+		if pageToken != "" {
+			u += "?pageToken=" + pageToken
+		}
+		body, err := client.GetURL(ctx, u)
+		if err != nil {
+			return nil, err
+		}
+		var resp listSubscriptionsResponse
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return nil, fmt.Errorf("parse list subscriptions response: %w", err)
+		}
+		all = append(all, resp.Subscriptions...)
+		if resp.NextPageToken == "" {
+			break
+		}
+		pageToken = resp.NextPageToken
+	}
+	return all, nil
+}
+
+func SubscriptionShortName(name string) string {
+	parts := strings.Split(name, "/")
+	return parts[len(parts)-1]
 }
 
 // --- Cloud Logging Sink ---
