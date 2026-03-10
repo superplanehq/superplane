@@ -172,7 +172,7 @@ func CreateVM(ctx context.Context, provider *AzureProvider, req CreateVMRequest,
 	vmURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s?api-version=%s",
 		armBaseURL, provider.GetSubscriptionID(), req.ResourceGroup, req.VMName, armAPIVersionCompute)
 
-	result, err := provider.GetClient().putAndPoll(ctx, vmURL, vmBody)
+	result, err := provider.getClient().putAndPoll(ctx, vmURL, vmBody)
 	if err != nil {
 		return nil, fmt.Errorf("VM creation failed: %w", err)
 	}
@@ -237,7 +237,7 @@ func ensureNetworkInterface(ctx context.Context, provider *AzureProvider, req Cr
 	logger.Infof("resolving subnet: resourceGroup=%s vnet=%s subnet=%s", req.ResourceGroup, virtualNetworkName, subnetName)
 
 	var subnet armSubnetResponse
-	if err := provider.GetClient().get(ctx, subnetURL, &subnet); err != nil {
+	if err := provider.getClient().get(ctx, subnetURL, &subnet); err != nil {
 		return "", fmt.Errorf("failed to resolve subnet %s in virtual network %s: %w", subnetName, virtualNetworkName, err)
 	}
 	if subnet.ID == "" {
@@ -282,7 +282,7 @@ func ensureNetworkInterface(ctx context.Context, provider *AzureProvider, req Cr
 	nicURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkInterfaces/%s?api-version=%s",
 		armBaseURL, provider.GetSubscriptionID(), req.ResourceGroup, nicName, armAPIVersionNetwork)
 
-	result, err := provider.GetClient().putAndPoll(ctx, nicURL, nicBody)
+	result, err := provider.getClient().putAndPoll(ctx, nicURL, nicBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to create network interface %s: %w", nicName, err)
 	}
@@ -317,7 +317,7 @@ func getPrimaryNICIPAddresses(ctx context.Context, provider *AzureProvider, vm a
 		armBaseURL, provider.GetSubscriptionID(), nicResourceGroup, nicName, armAPIVersionNetwork)
 
 	var nic armNIC
-	if err := provider.GetClient().get(ctx, nicURL, &nic); err != nil {
+	if err := provider.getClient().get(ctx, nicURL, &nic); err != nil {
 		return "", "", fmt.Errorf("failed to get primary network interface %s: %w", nicName, err)
 	}
 
@@ -346,7 +346,7 @@ func getPrimaryNICIPAddresses(ctx context.Context, provider *AzureProvider, vm a
 			armBaseURL, provider.GetSubscriptionID(), publicIPResourceGroup, publicIPName, armAPIVersionNetwork)
 
 		var pip armPublicIP
-		if err := provider.GetClient().get(ctx, pipURL, &pip); err != nil {
+		if err := provider.getClient().get(ctx, pipURL, &pip); err != nil {
 			return privateIP, "", fmt.Errorf("failed to get public IP resource %s: %w", publicIPName, err)
 		}
 
@@ -401,7 +401,7 @@ func ensurePublicIP(ctx context.Context, provider *AzureProvider, resourceGroup,
 		armBaseURL, provider.GetSubscriptionID(), resourceGroup, publicIPName, armAPIVersionNetwork)
 
 	var existing armPublicIP
-	err := provider.GetClient().get(ctx, pipURL, &existing)
+	err := provider.getClient().get(ctx, pipURL, &existing)
 	if err == nil && existing.ID != "" {
 		return existing.ID, nil
 	}
@@ -420,7 +420,7 @@ func ensurePublicIP(ctx context.Context, provider *AzureProvider, resourceGroup,
 		},
 	}
 
-	result, err := provider.GetClient().putAndPoll(ctx, pipURL, pipBody)
+	result, err := provider.getClient().putAndPoll(ctx, pipURL, pipBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to create public IP %s: %w", publicIPName, err)
 	}
@@ -460,7 +460,7 @@ func DeleteVM(ctx context.Context, provider *AzureProvider, req DeleteVMRequest,
 	vmURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s?api-version=%s",
 		armBaseURL, provider.GetSubscriptionID(), req.ResourceGroup, req.VMName, armAPIVersionCompute)
 
-	if err := provider.GetClient().deleteAndPoll(ctx, vmURL); err != nil {
+	if err := provider.getClient().deleteAndPoll(ctx, vmURL); err != nil {
 		return nil, fmt.Errorf("VM deletion failed: %w", err)
 	}
 
@@ -487,7 +487,6 @@ func validateDeleteVMRequest(req DeleteVMRequest) error {
 	}
 	return nil
 }
-
 
 // validateCreateVMRequest validates required VM request fields.
 func validateCreateVMRequest(req CreateVMRequest) error {

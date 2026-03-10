@@ -369,4 +369,3 @@ func (t *OnVMDeleted) Cleanup(ctx core.TriggerContext) error {
 	ctx.Logger.Info("Cleaning up Azure On VM Deleted trigger")
 	return nil
 }
-

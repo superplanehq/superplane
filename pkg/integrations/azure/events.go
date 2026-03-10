@@ -53,13 +53,13 @@ type SubscriptionValidationResponse struct {
 // ResourceWriteSuccessData contains the data for a successful resource write operation
 // This is used for events like VM creation, update, or deletion
 type ResourceWriteSuccessData struct {
-	ProvisioningState string `json:"provisioningState"`
-	ResourceProvider  string `json:"resourceProvider"`
-	ResourceURI       string `json:"resourceUri"`
-	OperationName     string `json:"operationName"`
-	Status            string `json:"status"`
-	SubscriptionID    string `json:"subscriptionId"`
-	TenantID          string `json:"tenantId"`
+	ProvisioningState string             `json:"provisioningState"`
+	ResourceProvider  string             `json:"resourceProvider"`
+	ResourceURI       string             `json:"resourceUri"`
+	OperationName     string             `json:"operationName"`
+	Status            string             `json:"status"`
+	SubscriptionID    string             `json:"subscriptionId"`
+	TenantID          string             `json:"tenantId"`
 	Authorization     *AuthorizationInfo `json:"authorization,omitempty"`
 	Claims            map[string]any     `json:"claims,omitempty"`
 	CorrelationID     string             `json:"correlationId"`

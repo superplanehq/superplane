@@ -129,7 +129,7 @@ func TestAzureProvider_GetClient(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	client := provider.GetClient()
+	client := provider.getClient()
 	assert.NotNil(t, client)
 }
 

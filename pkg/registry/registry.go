@@ -139,7 +139,6 @@ func (r *Registry) SetOIDCProvider(p oidc.Provider) {
 	}
 }
 
-
 func (r *Registry) ListTriggers() []core.Trigger {
 	triggers := make([]core.Trigger, 0, len(r.Triggers))
 	for _, trigger := range r.Triggers {

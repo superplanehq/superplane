@@ -353,4 +353,3 @@ func (t *OnVMCreatedTrigger) Cleanup(ctx core.TriggerContext) error {
 	ctx.Logger.Info("Cleaning up Azure VM Created trigger")
 	return nil
 }
-

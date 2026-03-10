@@ -51,7 +51,7 @@ func (a *AzureIntegration) ListResourceGroups(ctx core.ListResourcesContext) ([]
 	listURL := fmt.Sprintf("%s/subscriptions/%s/resourcegroups?api-version=%s",
 		armBaseURL, provider.GetSubscriptionID(), armAPIVersionResources)
 
-	items, err := provider.GetClient().listAll(context.Background(), listURL)
+	items, err := provider.getClient().listAll(context.Background(), listURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list resource groups: %w", err)
 	}
@@ -88,10 +88,10 @@ func (a *AzureIntegration) ListResourceGroups(ctx core.ListResourcesContext) ([]
 
 func getResourceGroupLocation(ctx context.Context, provider *AzureProvider, resourceGroup string) (string, error) {
 	getURL := fmt.Sprintf("%s/subscriptions/%s/resourcegroups/%s?api-version=%s",
-		provider.GetClient().getBaseURL(), provider.GetSubscriptionID(), resourceGroup, armAPIVersionResources)
+		provider.getClient().getBaseURL(), provider.GetSubscriptionID(), resourceGroup, armAPIVersionResources)
 
 	var group armResourceGroup
-	if err := provider.GetClient().get(ctx, getURL, &group); err != nil {
+	if err := provider.getClient().get(ctx, getURL, &group); err != nil {
 		return "", fmt.Errorf("failed to get resource group: %w", err)
 	}
 
@@ -158,7 +158,7 @@ func (a *AzureIntegration) ListVMSizes(ctx core.ListResourcesContext, resourceGr
 	listURL := fmt.Sprintf("%s/subscriptions/%s/providers/Microsoft.Compute/locations/%s/vmSizes?api-version=%s",
 		armBaseURL, provider.GetSubscriptionID(), strings.ToLower(location), armAPIVersionCompute)
 
-	items, err := provider.GetClient().listAll(context.Background(), listURL)
+	items, err := provider.getClient().listAll(context.Background(), listURL)
 	if err != nil {
 		ctx.Logger.WithError(err).Errorf("failed to list VM sizes for location=%s", location)
 		return nil, fmt.Errorf("failed to list VM sizes: %w", err)
@@ -202,7 +202,7 @@ func (a *AzureIntegration) ListVirtualNetworks(ctx core.ListResourcesContext, re
 	listURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks?api-version=%s",
 		armBaseURL, provider.GetSubscriptionID(), resourceGroup, armAPIVersionNetwork)
 
-	items, err := provider.GetClient().listAll(context.Background(), listURL)
+	items, err := provider.getClient().listAll(context.Background(), listURL)
 	if err != nil {
 		if isARMNotFound(err) {
 			ctx.Logger.Warnf("resource group %s not found, returning empty virtual networks list", resourceGroup)
@@ -259,7 +259,7 @@ func (a *AzureIntegration) ListSubnets(ctx core.ListResourcesContext, resourceGr
 	listURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks/%s/subnets?api-version=%s",
 		armBaseURL, provider.GetSubscriptionID(), resourceGroup, vnetName, armAPIVersionNetwork)
 
-	items, err := provider.GetClient().listAll(context.Background(), listURL)
+	items, err := provider.getClient().listAll(context.Background(), listURL)
 	if err != nil {
 		if isARMNotFound(err) {
 			ctx.Logger.Warnf("resource group %s or vnet %s not found, returning empty subnets list", resourceGroup, vnetName)

@@ -34,7 +34,7 @@ func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error)
 	// Ensure Microsoft.EventGrid resource provider is registered before
 	// creating the subscription, otherwise the LRO will fail.
 	ctx.Logger.Info("Ensuring Microsoft.EventGrid resource provider is registered")
-	if err := provider.GetClient().ensureResourceProviderRegistered(context.Background(), "Microsoft.EventGrid"); err != nil {
+	if err := provider.getClient().ensureResourceProviderRegistered(context.Background(), "Microsoft.EventGrid"); err != nil {
 		return nil, fmt.Errorf("failed to register Microsoft.EventGrid resource provider: %w", err)
 	}
 
@@ -88,7 +88,6 @@ func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error)
 		})
 	}
 
-
 	body := map[string]any{
 		"properties": map[string]any{
 			"destination": map[string]any{
@@ -109,7 +108,7 @@ func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error)
 	url := fmt.Sprintf("%s%s/providers/Microsoft.EventGrid/eventSubscriptions/%s?api-version=%s",
 		armBaseURL, scope, subName, armAPIVersionEventGrid)
 
-	_, err = provider.GetClient().putAndPoll(context.Background(), url, body)
+	_, err = provider.getClient().putAndPoll(context.Background(), url, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Event Grid subscription: %w", err)
 	}
@@ -139,7 +138,7 @@ func (h *AzureWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	url := fmt.Sprintf("%s%s/providers/Microsoft.EventGrid/eventSubscriptions/%s?api-version=%s",
 		armBaseURL, scope, subName, armAPIVersionEventGrid)
 
-	resp, err := provider.GetClient().doRequest(context.Background(), http.MethodDelete, url, nil)
+	resp, err := provider.getClient().doRequest(context.Background(), http.MethodDelete, url, nil)
 	if err != nil {
 		ctx.Logger.Warnf("Failed to delete Event Grid subscription: %v", err)
 		return nil

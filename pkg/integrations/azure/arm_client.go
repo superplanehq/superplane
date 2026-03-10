@@ -254,7 +254,6 @@ func (c *armClient) deleteAndPoll(ctx context.Context, url string) error {
 	return err
 }
 
-
 // putAndPoll performs a PUT, then polls the LRO until terminal state.
 // Returns the final response body.
 func (c *armClient) putAndPoll(ctx context.Context, url string, body any) (json.RawMessage, error) {

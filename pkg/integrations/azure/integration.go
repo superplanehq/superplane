@@ -176,7 +176,7 @@ func (a *AzureIntegration) Sync(ctx core.SyncContext) error {
 	verifyURL := fmt.Sprintf("%s/subscriptions/%s/resourcegroups?api-version=%s",
 		armBaseURL, config.SubscriptionID, armAPIVersionResources)
 
-	_, err = provider.GetClient().listAll(context.Background(), verifyURL)
+	_, err = provider.getClient().listAll(context.Background(), verifyURL)
 	if err != nil {
 		ctx.Logger.Infof("Credential verification failed: %v", err)
 		ctx.Logger.Info("Showing setup instructions for federated identity credential")

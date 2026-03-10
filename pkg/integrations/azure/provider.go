@@ -56,8 +56,8 @@ func (p *AzureProvider) GetCredential() azcore.TokenCredential {
 	return p.credential
 }
 
-// GetClient returns the ARM REST client.
-func (p *AzureProvider) GetClient() *armClient {
+// getClient returns the ARM REST client.
+func (p *AzureProvider) getClient() *armClient {
 	return p.client
 }
 

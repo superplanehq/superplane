@@ -299,7 +299,6 @@ func TestDeleteVMResponse_AllFields(t *testing.T) {
 	assert.Equal(t, "rg1", resp.ResourceGroup)
 }
 
-
 func TestCreateVMRequest_WithUbuntuImage(t *testing.T) {
 	req := CreateVMRequest{
 		ResourceGroup:      "test-rg",
