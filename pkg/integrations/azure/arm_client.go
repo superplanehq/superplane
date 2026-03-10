@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -412,8 +413,6 @@ func readARMError(resp *http.Response) error {
 }
 
 func isARMNotFound(err error) bool {
-	if armErr, ok := err.(*armError); ok {
-		return armErr.StatusCode == 404
-	}
-	return false
+	var armErr *armError
+	return errors.As(err, &armErr) && armErr.StatusCode == 404
 }

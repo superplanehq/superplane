@@ -86,6 +86,18 @@ func (a *AzureIntegration) ListResourceGroups(ctx core.ListResourcesContext) ([]
 	return resources, nil
 }
 
+func getResourceGroupLocation(ctx context.Context, provider *AzureProvider, resourceGroup string) (string, error) {
+	getURL := fmt.Sprintf("%s/subscriptions/%s/resourcegroups/%s?api-version=%s",
+		provider.GetClient().getBaseURL(), provider.GetSubscriptionID(), resourceGroup, armAPIVersionResources)
+
+	var group armResourceGroup
+	if err := provider.GetClient().get(ctx, getURL, &group); err != nil {
+		return "", fmt.Errorf("failed to get resource group: %w", err)
+	}
+
+	return group.Location, nil
+}
+
 func (a *AzureIntegration) ListResourceGroupLocations(ctx core.ListResourcesContext, resourceGroup string) ([]core.IntegrationResource, error) {
 	if resourceGroup == "" {
 		return []core.IntegrationResource{}, nil
@@ -97,42 +109,51 @@ func (a *AzureIntegration) ListResourceGroupLocations(ctx core.ListResourcesCont
 		return nil, err
 	}
 
-	getURL := fmt.Sprintf("%s/subscriptions/%s/resourcegroups/%s?api-version=%s",
-		provider.GetClient().getBaseURL(), provider.GetSubscriptionID(), resourceGroup, armAPIVersionResources)
-
-	var group armResourceGroup
-	if err := provider.GetClient().get(context.Background(), getURL, &group); err != nil {
+	location, err := getResourceGroupLocation(context.Background(), provider, resourceGroup)
+	if err != nil {
 		if isARMNotFound(err) {
 			ctx.Logger.Warnf("resource group %s not found, returning empty location", resourceGroup)
 			return []core.IntegrationResource{}, nil
 		}
-		return nil, fmt.Errorf("failed to get resource group: %w", err)
+		return nil, err
 	}
 
-	if group.Location == "" {
+	if location == "" {
 		return []core.IntegrationResource{}, nil
 	}
 
 	return []core.IntegrationResource{
 		{
 			Type: ResourceTypeResourceGroupLocation,
-			Name: group.Location,
-			ID:   group.Location,
+			Name: location,
+			ID:   location,
 		},
 	}, nil
 }
 
-func (a *AzureIntegration) ListVMSizes(ctx core.ListResourcesContext, location string) ([]core.IntegrationResource, error) {
-	ctx.Logger.Infof("listing Azure VM sizes for location=%s", location)
+func (a *AzureIntegration) ListVMSizes(ctx core.ListResourcesContext, resourceGroup string) ([]core.IntegrationResource, error) {
+	ctx.Logger.Infof("listing Azure VM sizes for resourceGroup=%s", resourceGroup)
 
-	if location == "" {
+	if resourceGroup == "" {
 		return []core.IntegrationResource{}, nil
 	}
+	resourceGroup = azureResourceName(resourceGroup)
 
 	provider, err := a.ensureProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
+
+	location, err := getResourceGroupLocation(context.Background(), provider, resourceGroup)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve location for resource group: %w", err)
+	}
+
+	if location == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	ctx.Logger.Infof("resolved location=%s for resourceGroup=%s", location, resourceGroup)
 
 	listURL := fmt.Sprintf("%s/subscriptions/%s/providers/Microsoft.Compute/locations/%s/vmSizes?api-version=%s",
 		armBaseURL, provider.GetSubscriptionID(), strings.ToLower(location), armAPIVersionCompute)
@@ -161,7 +182,7 @@ func (a *AzureIntegration) ListVMSizes(ctx core.ListResourcesContext, location s
 		return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
 	})
 
-	ctx.Logger.Infof("found %d VM sizes for location=%s", len(resources), location)
+	ctx.Logger.Infof("found %d VM sizes for resourceGroup=%s", len(resources), resourceGroup)
 	return resources, nil
 }
 

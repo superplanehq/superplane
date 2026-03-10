@@ -173,26 +173,27 @@ No manual setup is required.
 - The trigger fires only when a VM is successfully deleted
 - Failed delete operations do not trigger the workflow
 - The trigger processes events from Azure Event Grid in real-time
+- Multiple triggers can share the same Event Grid subscription if configured correctly
 
 ### Example Data
 
 ```json
 {
-  "id": "96257b6d-17d3-49e2-8369-fb185b29e1b5",
-  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc",
-  "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-  "eventType": "Microsoft.Resources.ResourceDeleteSuccess",
-  "eventTime": "2026-02-11T10:30:00Z",
-  "dataVersion": "2",
-  "metadataVersion": "1",
   "data": {
     "operationName": "Microsoft.Compute/virtualMachines/delete",
-    "status": "Succeeded",
     "resourceProvider": "Microsoft.Compute",
     "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+    "status": "Succeeded",
     "subscriptionId": "12345678-1234-1234-1234-123456789abc",
     "tenantId": "12345678-1234-1234-1234-123456789abc"
-  }
+  },
+  "dataVersion": "2",
+  "eventTime": "2026-02-11T10:30:00Z",
+  "eventType": "Microsoft.Resources.ResourceDeleteSuccess",
+  "id": "96257b6d-17d3-49e2-8369-fb185b29e1b5",
+  "metadataVersion": "1",
+  "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
 }
 ```
 
@@ -304,3 +305,4 @@ Returns the deleted VM information including:
   "resourceGroup": "my-rg"
 }
 ```
+

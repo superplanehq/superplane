@@ -18,7 +18,6 @@ type CreateVMComponent struct {
 type CreateVMConfiguration struct {
 	ResourceGroup      string `json:"resourceGroup" mapstructure:"resourceGroup"`
 	Name               string `json:"name" mapstructure:"name"`
-	Location           string `json:"location" mapstructure:"location"`
 	VirtualNetworkName string `json:"virtualNetworkName" mapstructure:"virtualNetworkName"`
 	SubnetName         string `json:"subnetName" mapstructure:"subnetName"`
 	Size               string `json:"size" mapstructure:"size"`
@@ -137,25 +136,6 @@ func (c *CreateVMComponent) Configuration() []configuration.Field {
 			Placeholder: "my-vm",
 		},
 		{
-			Name:        "location",
-			Label:       "Location",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "The Azure region, derived from the selected resource group",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type:           ResourceTypeResourceGroupLocation,
-					UseNameAsValue: true,
-					Parameters: []configuration.ParameterRef{
-						{
-							Name:      "resourceGroup",
-							ValueFrom: &configuration.ParameterValueFrom{Field: "resourceGroup"},
-						},
-					},
-				},
-			},
-		},
-		{
 			Name:        "size",
 			Label:       "VM Size",
 			Type:        configuration.FieldTypeIntegrationResource,
@@ -166,8 +146,8 @@ func (c *CreateVMComponent) Configuration() []configuration.Field {
 					Type: ResourceTypeVMSizeDropdown,
 					Parameters: []configuration.ParameterRef{
 						{
-							Name:      "location",
-							ValueFrom: &configuration.ParameterValueFrom{Field: "location"},
+							Name:      "resourceGroup",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "resourceGroup"},
 						},
 					},
 				},
@@ -307,9 +287,6 @@ func (c *CreateVMComponent) Setup(ctx core.SetupContext) error {
 	if config.Name == "" {
 		return fmt.Errorf("VM name is required")
 	}
-	if config.Location == "" {
-		return fmt.Errorf("location is required")
-	}
 	if config.Size == "" {
 		return fmt.Errorf("VM size is required")
 	}
@@ -344,12 +321,17 @@ func (c *CreateVMComponent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("Azure provider not available: %w", err)
 	}
 
+	location, err := getResourceGroupLocation(context.Background(), provider, azureResourceName(config.ResourceGroup))
+	if err != nil {
+		return fmt.Errorf("failed to resolve location for resource group %s: %w", config.ResourceGroup, err)
+	}
+
 	image := ResolveImagePreset(config.Image)
 
 	req := CreateVMRequest{
 		ResourceGroup:      config.ResourceGroup,
 		VMName:             config.Name,
-		Location:           config.Location,
+		Location:           location,
 		Size:               config.Size,
 		PublicIPName:       config.PublicIPName,
 		AdminUsername:      config.AdminUsername,

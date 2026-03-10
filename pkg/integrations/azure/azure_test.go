@@ -380,21 +380,23 @@ func TestCreateVMComponent_LocationField(t *testing.T) {
 	component := &CreateVMComponent{}
 	fields := component.Configuration()
 
-	var locationField *configuration.Field
 	for i := range fields {
-		if fields[i].Name == "location" {
-			locationField = &fields[i]
+		assert.NotEqual(t, "location", fields[i].Name, "location field must not be in configuration")
+	}
+
+	var sizeField *configuration.Field
+	for i := range fields {
+		if fields[i].Name == "size" {
+			sizeField = &fields[i]
 			break
 		}
 	}
 
-	require.NotNil(t, locationField, "location field must exist")
-	assert.Equal(t, configuration.FieldTypeIntegrationResource, locationField.Type)
-	require.NotNil(t, locationField.TypeOptions)
-	require.NotNil(t, locationField.TypeOptions.Resource)
-	assert.Equal(t, ResourceTypeResourceGroupLocation, locationField.TypeOptions.Resource.Type)
-	assert.True(t, locationField.TypeOptions.Resource.UseNameAsValue)
-	require.Len(t, locationField.TypeOptions.Resource.Parameters, 1)
-	assert.Equal(t, "resourceGroup", locationField.TypeOptions.Resource.Parameters[0].Name)
-	assert.Equal(t, "resourceGroup", locationField.TypeOptions.Resource.Parameters[0].ValueFrom.Field)
+	require.NotNil(t, sizeField, "size field must exist")
+	require.NotNil(t, sizeField.TypeOptions)
+	require.NotNil(t, sizeField.TypeOptions.Resource)
+	assert.Equal(t, ResourceTypeVMSizeDropdown, sizeField.TypeOptions.Resource.Type)
+	require.Len(t, sizeField.TypeOptions.Resource.Parameters, 1)
+	assert.Equal(t, "resourceGroup", sizeField.TypeOptions.Resource.Parameters[0].Name)
+	assert.Equal(t, "resourceGroup", sizeField.TypeOptions.Resource.Parameters[0].ValueFrom.Field)
 }

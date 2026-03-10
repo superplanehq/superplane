@@ -159,7 +159,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_SubscriptionValidation(t *testing.T) {
 	require.NoError(t, err)
 
 	eventsCtx := &contexts.EventContext{}
-	webhookCtx := &contexts.WebhookContext{}
+	webhookCtx := &contexts.NodeWebhookContext{}
 	logger := logrus.NewEntry(logrus.New())
 
 	ctx := core.WebhookRequestContext{
@@ -205,7 +205,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_VMCreatedSuccess(t *testing.T) {
 		require.NoError(t, err)
 
 		eventsCtx := &contexts.EventContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		logger := logrus.NewEntry(logrus.New())
 
 		ctx := core.WebhookRequestContext{
@@ -254,7 +254,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_VMCreatedSuccess(t *testing.T) {
 		require.NoError(t, err)
 
 		eventsCtx := &contexts.EventContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		logger := logrus.NewEntry(logrus.New())
 
 		ctx := core.WebhookRequestContext{
@@ -306,7 +306,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_FilterMismatch(t *testing.T) {
 	require.NoError(t, err)
 
 	eventsCtx := &contexts.EventContext{}
-	webhookCtx := &contexts.WebhookContext{}
+	webhookCtx := &contexts.NodeWebhookContext{}
 	logger := logrus.NewEntry(logrus.New())
 
 	ctx := core.WebhookRequestContext{
@@ -353,7 +353,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_NameFilter(t *testing.T) {
 		require.NoError(t, err)
 
 		eventsCtx := &contexts.EventContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		logger := logrus.NewEntry(logrus.New())
 
 		ctx := core.WebhookRequestContext{
@@ -399,7 +399,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_NameFilter(t *testing.T) {
 		require.NoError(t, err)
 
 		eventsCtx := &contexts.EventContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		logger := logrus.NewEntry(logrus.New())
 
 		ctx := core.WebhookRequestContext{
@@ -442,7 +442,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_NameFilter(t *testing.T) {
 		require.NoError(t, err)
 
 		eventsCtx := &contexts.EventContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		logger := logrus.NewEntry(logrus.New())
 
 		ctx := core.WebhookRequestContext{
@@ -488,7 +488,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_NonVMResource(t *testing.T) {
 		require.NoError(t, err)
 
 		eventsCtx := &contexts.EventContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		logger := logrus.NewEntry(logrus.New())
 
 		ctx := core.WebhookRequestContext{
@@ -529,7 +529,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_NonVMResource(t *testing.T) {
 		require.NoError(t, err)
 
 		eventsCtx := &contexts.EventContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		logger := logrus.NewEntry(logrus.New())
 
 		ctx := core.WebhookRequestContext{
@@ -574,7 +574,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_ProvisioningStateFailed(t *testing.T) 
 	require.NoError(t, err)
 
 	eventsCtx := &contexts.EventContext{}
-	webhookCtx := &contexts.WebhookContext{}
+	webhookCtx := &contexts.NodeWebhookContext{}
 	logger := logrus.NewEntry(logrus.New())
 
 	ctx := core.WebhookRequestContext{
@@ -643,7 +643,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_MultipleEvents(t *testing.T) {
 	require.NoError(t, err)
 
 	eventsCtx := &contexts.EventContext{}
-	webhookCtx := &contexts.WebhookContext{}
+	webhookCtx := &contexts.NodeWebhookContext{}
 	logger := logrus.NewEntry(logrus.New())
 
 	ctx := core.WebhookRequestContext{
@@ -669,7 +669,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_InvalidJSON(t *testing.T) {
 	trigger := &OnVMCreatedTrigger{}
 
 	eventsCtx := &contexts.EventContext{}
-	webhookCtx := &contexts.WebhookContext{}
+	webhookCtx := &contexts.NodeWebhookContext{}
 	logger := logrus.NewEntry(logrus.New())
 
 	ctx := core.WebhookRequestContext{
@@ -710,7 +710,7 @@ func TestOnVMCreatedTrigger_HandleWebhook_InvalidConfiguration(t *testing.T) {
 	require.NoError(t, err)
 
 	eventsCtx := &contexts.EventContext{}
-	webhookCtx := &contexts.WebhookContext{}
+	webhookCtx := &contexts.NodeWebhookContext{}
 	logger := logrus.NewEntry(logrus.New())
 
 	ctx := core.WebhookRequestContext{

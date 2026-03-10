@@ -159,7 +159,7 @@ func TestOnVMDeleted_HandleWebhook_SubscriptionValidation(t *testing.T) {
 	require.NoError(t, err)
 
 	eventsCtx := &contexts.EventContext{}
-	webhookCtx := &contexts.WebhookContext{}
+	webhookCtx := &contexts.NodeWebhookContext{}
 	logger := logrus.NewEntry(logrus.New())
 
 	ctx := core.WebhookRequestContext{
@@ -205,7 +205,7 @@ func TestOnVMDeleted_HandleWebhook_VMDeleteSuccess(t *testing.T) {
 		require.NoError(t, err)
 
 		eventsCtx := &contexts.EventContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		logger := logrus.NewEntry(logrus.New())
 
 		ctx := core.WebhookRequestContext{
@@ -259,7 +259,7 @@ func TestOnVMDeleted_HandleWebhook_VMDeleteSuccess(t *testing.T) {
 		require.NoError(t, err)
 
 		eventsCtx := &contexts.EventContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		logger := logrus.NewEntry(logrus.New())
 
 		ctx := core.WebhookRequestContext{
@@ -311,7 +311,7 @@ func TestOnVMDeleted_HandleWebhook_FilterMismatch(t *testing.T) {
 	require.NoError(t, err)
 
 	eventsCtx := &contexts.EventContext{}
-	webhookCtx := &contexts.WebhookContext{}
+	webhookCtx := &contexts.NodeWebhookContext{}
 	logger := logrus.NewEntry(logrus.New())
 
 	ctx := core.WebhookRequestContext{
@@ -358,7 +358,7 @@ func TestOnVMDeleted_HandleWebhook_NameFilter(t *testing.T) {
 		require.NoError(t, err)
 
 		eventsCtx := &contexts.EventContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		logger := logrus.NewEntry(logrus.New())
 
 		ctx := core.WebhookRequestContext{
@@ -404,7 +404,7 @@ func TestOnVMDeleted_HandleWebhook_NameFilter(t *testing.T) {
 		require.NoError(t, err)
 
 		eventsCtx := &contexts.EventContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		logger := logrus.NewEntry(logrus.New())
 
 		ctx := core.WebhookRequestContext{
@@ -447,7 +447,7 @@ func TestOnVMDeleted_HandleWebhook_NameFilter(t *testing.T) {
 		require.NoError(t, err)
 
 		eventsCtx := &contexts.EventContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		logger := logrus.NewEntry(logrus.New())
 
 		ctx := core.WebhookRequestContext{
@@ -493,7 +493,7 @@ func TestOnVMDeleted_HandleWebhook_NonVMResource(t *testing.T) {
 		require.NoError(t, err)
 
 		eventsCtx := &contexts.EventContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		logger := logrus.NewEntry(logrus.New())
 
 		ctx := core.WebhookRequestContext{
@@ -534,7 +534,7 @@ func TestOnVMDeleted_HandleWebhook_NonVMResource(t *testing.T) {
 		require.NoError(t, err)
 
 		eventsCtx := &contexts.EventContext{}
-		webhookCtx := &contexts.WebhookContext{}
+		webhookCtx := &contexts.NodeWebhookContext{}
 		logger := logrus.NewEntry(logrus.New())
 
 		ctx := core.WebhookRequestContext{
@@ -579,7 +579,7 @@ func TestOnVMDeleted_HandleWebhook_FailedStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	eventsCtx := &contexts.EventContext{}
-	webhookCtx := &contexts.WebhookContext{}
+	webhookCtx := &contexts.NodeWebhookContext{}
 	logger := logrus.NewEntry(logrus.New())
 
 	ctx := core.WebhookRequestContext{
@@ -648,7 +648,7 @@ func TestOnVMDeleted_HandleWebhook_MultipleEvents(t *testing.T) {
 	require.NoError(t, err)
 
 	eventsCtx := &contexts.EventContext{}
-	webhookCtx := &contexts.WebhookContext{}
+	webhookCtx := &contexts.NodeWebhookContext{}
 	logger := logrus.NewEntry(logrus.New())
 
 	ctx := core.WebhookRequestContext{
@@ -674,7 +674,7 @@ func TestOnVMDeleted_HandleWebhook_InvalidJSON(t *testing.T) {
 	trigger := &OnVMDeleted{}
 
 	eventsCtx := &contexts.EventContext{}
-	webhookCtx := &contexts.WebhookContext{}
+	webhookCtx := &contexts.NodeWebhookContext{}
 	logger := logrus.NewEntry(logrus.New())
 
 	ctx := core.WebhookRequestContext{
@@ -715,7 +715,7 @@ func TestOnVMDeleted_HandleWebhook_InvalidConfiguration(t *testing.T) {
 	require.NoError(t, err)
 
 	eventsCtx := &contexts.EventContext{}
-	webhookCtx := &contexts.WebhookContext{}
+	webhookCtx := &contexts.NodeWebhookContext{}
 	logger := logrus.NewEntry(logrus.New())
 
 	ctx := core.WebhookRequestContext{
@@ -759,7 +759,7 @@ func TestOnVMDeleted_HandleWebhook_IgnoresWriteEvents(t *testing.T) {
 	require.NoError(t, err)
 
 	eventsCtx := &contexts.EventContext{}
-	webhookCtx := &contexts.WebhookContext{}
+	webhookCtx := &contexts.NodeWebhookContext{}
 	logger := logrus.NewEntry(logrus.New())
 
 	ctx := core.WebhookRequestContext{
