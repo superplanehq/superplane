@@ -38,6 +38,7 @@ type ConflictMarkerBlock = {
 
 interface CanvasChangeRequestsViewProps {
   changeRequests: CanvasesCanvasChangeRequest[];
+  canvasVersions?: CanvasesCanvasVersion[];
   selectedChangeRequestId?: string;
   canUpdateCanvas: boolean;
   currentUserId?: string;
@@ -978,6 +979,7 @@ function CanvasChangeRequestConflictResolver({
 
 export function CanvasChangeRequestsView({
   changeRequests,
+  canvasVersions = [],
   selectedChangeRequestId,
   canUpdateCanvas,
   currentUserId,
@@ -1041,6 +1043,51 @@ export function CanvasChangeRequestsView({
   const selectedStatus = normalizeStatus(selectedChangeRequest?.metadata?.status);
   const selectedChangeRequestIdSafe = selectedChangeRequest?.metadata?.id || "";
   const conflictingNodeIds = selectedChangeRequest?.diff?.conflictingNodeIds || [];
+  const canvasVersionsByID = useMemo(() => {
+    const result = new Map<string, CanvasesCanvasVersion>();
+    canvasVersions.forEach((version) => {
+      const id = version.metadata?.id || "";
+      if (!id) {
+        return;
+      }
+      result.set(id, version);
+    });
+    if (liveCanvasVersion?.metadata?.id) {
+      result.set(liveCanvasVersion.metadata.id, liveCanvasVersion);
+    }
+    return result;
+  }, [canvasVersions, liveCanvasVersion]);
+  const selectedBasedOnVersion = useMemo(() => {
+    const basedOnVersionID = selectedChangeRequest?.metadata?.basedOnVersionId || "";
+    if (!basedOnVersionID) {
+      return undefined;
+    }
+
+    return canvasVersionsByID.get(basedOnVersionID);
+  }, [canvasVersionsByID, selectedChangeRequest?.metadata?.basedOnVersionId]);
+  const selectedPublishedPreviousVersion = useMemo(() => {
+    if (selectedStatus !== "published") {
+      return undefined;
+    }
+
+    const selectedVersionID =
+      selectedChangeRequest?.version?.metadata?.id || selectedChangeRequest?.metadata?.versionId || "";
+    if (!selectedVersionID) {
+      return undefined;
+    }
+
+    const selectedVersionIndex = canvasVersions.findIndex((version) => version.metadata?.id === selectedVersionID);
+    if (selectedVersionIndex < 0) {
+      return undefined;
+    }
+
+    return canvasVersions[selectedVersionIndex + 1];
+  }, [
+    canvasVersions,
+    selectedChangeRequest?.metadata?.versionId,
+    selectedChangeRequest?.version?.metadata?.id,
+    selectedStatus,
+  ]);
   const selectedApprovals = selectedChangeRequest?.approvals || [];
   const activeApprovals = useMemo(
     () => selectedApprovals.filter((approval) => !approval.invalidatedAt),
@@ -1048,8 +1095,12 @@ export function CanvasChangeRequestsView({
   );
   const selectedHasConflicts = isChangeRequestConflicted(selectedChangeRequest);
   const selectedDiffSummary = useMemo(
-    () => summarizeNodeDiff(selectedChangeRequest?.version, liveCanvasVersion),
-    [selectedChangeRequest?.version, liveCanvasVersion],
+    () =>
+      summarizeNodeDiff(
+        selectedChangeRequest?.version,
+        selectedBasedOnVersion || selectedPublishedPreviousVersion || liveCanvasVersion,
+      ),
+    [selectedBasedOnVersion, selectedChangeRequest?.version, selectedPublishedPreviousVersion, liveCanvasVersion],
   );
   const selectedConflictingNodeIDSet = useMemo(() => new Set(conflictingNodeIds), [conflictingNodeIds]);
   const requestedBy = useMemo(
@@ -1195,12 +1246,15 @@ export function CanvasChangeRequestsView({
   const showReopenAction = canReopen && !actionPending && hasChangeRequestID;
   const hasReviewActions =
     showPublishAction || showApproveAction || showUnapproveAction || showRejectAction || showReopenAction;
+  const showReviewActionsCard = selectedStatus !== "published" && hasReviewActions;
   const canResolveConflicts =
     canUpdateCanvas &&
     selectedStatus === "open" &&
     selectedHasConflicts &&
     !!selectedChangeRequest?.version?.spec?.nodes &&
     !!selectedChangeRequest?.version?.spec?.edges;
+  const showConflictResolutionCard = selectedHasConflicts;
+  const hasSidebarContent = showReviewActionsCard || showConflictResolutionCard;
 
   if (resolvingChangeRequest) {
     return (
@@ -1360,8 +1414,19 @@ export function CanvasChangeRequestsView({
               </div>
             </section>
 
-            <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+            <div className={cn("grid gap-4", hasSidebarContent ? "lg:grid-cols-[1fr_280px]" : "lg:grid-cols-1")}>
               <section className="space-y-4">
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-semibold text-slate-900">Summary</p>
+                  <div className="mt-4">
+                    <VersionNodeDiffAccordion
+                      summary={selectedDiffSummary}
+                      conflictingNodeIDs={selectedConflictingNodeIDSet}
+                      emptyMessage="No node-level differences found."
+                    />
+                  </div>
+                </div>
+
                 <div className="rounded-xl border border-slate-200 bg-white p-4">
                   <p className="text-sm font-semibold text-slate-900">Activity</p>
                   <ol className="mt-3 space-y-3">
@@ -1411,92 +1476,83 @@ export function CanvasChangeRequestsView({
                     ))}
                   </ol>
                 </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-4">
-                  <p className="text-sm font-semibold text-slate-900">Summary</p>
-                  <div className="mt-4">
-                    <VersionNodeDiffAccordion
-                      summary={selectedDiffSummary}
-                      conflictingNodeIDs={selectedConflictingNodeIDSet}
-                      emptyMessage="No node-level differences found."
-                    />
-                  </div>
-                </div>
               </section>
 
-              <aside className="space-y-3">
-                <div className="rounded-xl border border-slate-200 bg-white p-4">
-                  <p className="text-sm font-semibold text-slate-900">Review Actions</p>
-                  <p className="mt-1 text-xs text-slate-600">
-                    Active approvals: {activeApprovedCount}/{requiredApprovalsCount}
-                  </p>
-                  {hasReviewActions ? (
-                    <div className="mt-3 space-y-2">
-                      {showPublishAction ? (
-                        <Button
-                          className="w-full justify-center"
-                          onClick={() => onPublish(selectedChangeRequestIdSafe)}
-                        >
-                          Publish
-                        </Button>
-                      ) : null}
-                      {showApproveAction ? (
-                        <Button
-                          className="w-full justify-center"
-                          variant="secondary"
-                          onClick={() => onApprove(selectedChangeRequestIdSafe)}
-                        >
-                          Approve
-                        </Button>
-                      ) : null}
-                      {showUnapproveAction ? (
-                        <Button
-                          className="w-full justify-center"
-                          variant="outline"
-                          onClick={() => onUnapprove(selectedChangeRequestIdSafe)}
-                        >
-                          Unapprove
-                        </Button>
-                      ) : null}
-                      {showRejectAction ? (
-                        <Button
-                          className="w-full justify-center"
-                          variant="destructive"
-                          onClick={() => onReject(selectedChangeRequestIdSafe)}
-                        >
-                          Reject
-                        </Button>
-                      ) : null}
-                      {showReopenAction ? (
-                        <Button
-                          className="w-full justify-center"
-                          variant="outline"
-                          onClick={() => onReopen(selectedChangeRequestIdSafe)}
-                        >
-                          Reopen
-                        </Button>
-                      ) : null}
+              {hasSidebarContent ? (
+                <aside className="space-y-3">
+                  {showReviewActionsCard ? (
+                    <div className="rounded-xl border border-slate-200 bg-white p-4">
+                      <p className="text-sm font-semibold text-slate-900">Review Actions</p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        Active approvals: {activeApprovedCount}/{requiredApprovalsCount}
+                      </p>
+                      <div className="mt-3 space-y-2">
+                        {showPublishAction ? (
+                          <Button
+                            className="w-full justify-center"
+                            onClick={() => onPublish(selectedChangeRequestIdSafe)}
+                          >
+                            Publish
+                          </Button>
+                        ) : null}
+                        {showApproveAction ? (
+                          <Button
+                            className="w-full justify-center"
+                            variant="secondary"
+                            onClick={() => onApprove(selectedChangeRequestIdSafe)}
+                          >
+                            Approve
+                          </Button>
+                        ) : null}
+                        {showUnapproveAction ? (
+                          <Button
+                            className="w-full justify-center"
+                            variant="outline"
+                            onClick={() => onUnapprove(selectedChangeRequestIdSafe)}
+                          >
+                            Unapprove
+                          </Button>
+                        ) : null}
+                        {showRejectAction ? (
+                          <Button
+                            className="w-full justify-center"
+                            variant="destructive"
+                            onClick={() => onReject(selectedChangeRequestIdSafe)}
+                          >
+                            Reject
+                          </Button>
+                        ) : null}
+                        {showReopenAction ? (
+                          <Button
+                            className="w-full justify-center"
+                            variant="outline"
+                            onClick={() => onReopen(selectedChangeRequestIdSafe)}
+                          >
+                            Reopen
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
                   ) : null}
-                </div>
 
-                {selectedHasConflicts ? (
-                  <div className="rounded-xl border border-slate-200 bg-white p-4">
-                    <p className="text-sm font-semibold text-slate-900">Conflict Resolution</p>
-                    <p className="mt-1 text-xs text-slate-600">
-                      Conflicts found in this request. Open resolver to merge node changes.
-                    </p>
-                    <Button
-                      className="mt-3 w-full justify-center"
-                      variant="secondary"
-                      onClick={() => setResolvingChangeRequestID(selectedChangeRequestIdSafe)}
-                      disabled={!canResolveConflicts || resolvePending}
-                    >
-                      Resolve Conflicts
-                    </Button>
-                  </div>
-                ) : null}
-              </aside>
+                  {showConflictResolutionCard ? (
+                    <div className="rounded-xl border border-slate-200 bg-white p-4">
+                      <p className="text-sm font-semibold text-slate-900">Conflict Resolution</p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        Conflicts found in this request. Open resolver to merge node changes.
+                      </p>
+                      <Button
+                        className="mt-3 w-full justify-center"
+                        variant="secondary"
+                        onClick={() => setResolvingChangeRequestID(selectedChangeRequestIdSafe)}
+                        disabled={!canResolveConflicts || resolvePending}
+                      >
+                        Resolve Conflicts
+                      </Button>
+                    </div>
+                  ) : null}
+                </aside>
+              ) : null}
             </div>
           </>
         )}

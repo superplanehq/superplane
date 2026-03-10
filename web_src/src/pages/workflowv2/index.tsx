@@ -4649,6 +4649,7 @@ export function WorkflowPageV2() {
     ) : topViewMode === "versioning" ? (
       <CanvasChangeRequestsView
         changeRequests={canvasChangeRequests}
+        canvasVersions={liveVersions}
         selectedChangeRequestId={selectedChangeRequestId}
         canUpdateCanvas={canUpdateCanvas && !isTemplate && !canvasDeletedRemotely}
         currentUserId={currentUserId}
