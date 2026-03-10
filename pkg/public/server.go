@@ -768,26 +768,36 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	response := &core.WebhookResponseBody{}
+
 	for _, node := range nodes {
-		code, err := s.executeWebhookNode(r.Context(), body, r.Header, node)
+		code, err := s.executeWebhookNode(r.Context(), body, r.Header, node, response)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
 			return
 		}
 	}
 
-	w.WriteHeader(http.StatusOK)
+	if len(response.Body) > 0 {
+		if response.ContentType != "" {
+			w.Header().Set("Content-Type", response.ContentType)
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write(response.Body)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
 }
 
-func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode) (int, error) {
+func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, response *core.WebhookResponseBody) (int, error) {
 	if node.Type == models.NodeTypeTrigger {
-		return s.executeTriggerNode(ctx, body, headers, node)
+		return s.executeTriggerNode(ctx, body, headers, node, response)
 	}
 
-	return s.executeComponentNode(ctx, body, headers, node)
+	return s.executeComponentNode(ctx, body, headers, node, response)
 }
 
-func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode) (int, error) {
+func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, response *core.WebhookResponseBody) (int, error) {
 	ref := node.Ref.Data()
 	trigger, err := s.registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
@@ -819,10 +829,11 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        contexts.NewEventContext(tx, &node),
 		Integration:   integrationCtx,
+		Response:      response,
 	})
 }
 
-func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode) (int, error) {
+func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, response *core.WebhookResponseBody) (int, error) {
 	ref := node.Ref.Data()
 	component, err := s.registry.GetComponent(ref.Component.Name)
 	if err != nil {
@@ -854,6 +865,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        contexts.NewEventContext(tx, &node),
 		Integration:   integrationCtx,
+		Response:      response,
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
 			if err != nil {
