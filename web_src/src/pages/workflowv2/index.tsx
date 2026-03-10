@@ -4176,6 +4176,11 @@ export function WorkflowPageV2() {
     [canvasId, updateCanvasMutation],
   );
 
+  const { yamlPayload, handleYamlViewCopy, handleYamlViewDownload } = useCanvasYaml({
+    nodes,
+    getYamlExportPayload,
+  });
+
   const isInitialCanvasBootstrapLoading =
     !canvas &&
     (canvasLoading ||
@@ -4378,10 +4383,6 @@ export function WorkflowPageV2() {
             : hasRunBlockingChanges
               ? "Save canvas changes before running"
               : undefined;
-  const { yamlPayload, handleYamlViewCopy, handleYamlViewDownload } = useCanvasYaml({
-    nodes,
-    getYamlExportPayload,
-  });
 
   const dataViewContent =
     topViewMode === "yaml" && yamlPayload ? (
