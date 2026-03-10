@@ -31,6 +31,7 @@ import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import cloudBuildIcon from "@/assets/icons/integrations/cloud_build.svg";
 import gcpCloudRunIcon from "@/assets/icons/integrations/gcp.cloudrun.svg";
+import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactregistry.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
@@ -151,6 +152,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   gcp: {
     cloudbuild: cloudBuildIcon,
     cloudfunctions: gcpCloudRunIcon,
+    artifactregistry: gcpArtifactRegistryIcon,
   },
 };
 

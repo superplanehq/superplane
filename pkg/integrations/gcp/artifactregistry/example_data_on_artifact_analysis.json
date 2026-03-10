@@ -1,0 +1,21 @@
+{
+  "data": {
+    "name": "projects/my-project/occurrences/vuln-001",
+    "resourceUri": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
+    "noteName": "projects/goog-vulnz/notes/CVE-2023-1234",
+    "kind": "VULNERABILITY",
+    "vulnerability": {
+      "severity": "HIGH",
+      "cvssScore": 7.5,
+      "packageIssue": [
+        {
+          "affectedPackage": "libssl1.1",
+          "affectedVersion": {"name": "1.1.1n-0+deb11u3", "kind": "NORMAL"},
+          "fixedVersion": {"name": "1.1.1n-0+deb11u5", "kind": "NORMAL"}
+        }
+      ]
+    }
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.artifactregistry.artifact.analysis"
+}
