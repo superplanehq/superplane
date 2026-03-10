@@ -487,7 +487,7 @@ export const canvasesDescribeCanvasChangeRequest = <ThrowOnError extends boolean
 /**
  * Act on canvas change request
  *
- * Applies an action (approve, reject, reopen) to a change request
+ * Applies an action (approve, unapprove, reject, reopen, publish) to a change request
  */
 export const canvasesActOnCanvasChangeRequest = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesActOnCanvasChangeRequestData, ThrowOnError>,

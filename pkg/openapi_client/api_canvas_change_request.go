@@ -44,7 +44,7 @@ func (r ApiCanvasesActOnCanvasChangeRequestRequest) Execute() (*CanvasesActOnCan
 /*
 CanvasesActOnCanvasChangeRequest Act on canvas change request
 
-Applies an action (approve, reject, reopen) to a change request
+Applies an action (approve, unapprove, reject, reopen, publish) to a change request
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param canvasId

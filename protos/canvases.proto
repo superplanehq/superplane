@@ -164,7 +164,7 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Act on canvas change request";
-      description: "Applies an action (approve, reject, reopen) to a change request";
+      description: "Applies an action (approve, unapprove, reject, reopen, publish) to a change request";
       tags: "CanvasChangeRequest";
     };
   }
@@ -398,6 +398,7 @@ message UpdateCanvasRequest {
   optional string name = 2;
   optional string description = 3;
   optional bool canvas_versioning_enabled = 4;
+  optional CanvasChangeRequestApprovalConfig change_request_approval_config = 5;
 }
 
 message UpdateCanvasResponse {
@@ -513,6 +514,8 @@ message ActOnCanvasChangeRequestRequest {
     ACTION_APPROVE = 1;
     ACTION_REJECT = 2;
     ACTION_REOPEN = 3;
+    ACTION_PUBLISH = 4;
+    ACTION_UNAPPROVE = 5;
   }
 
   string canvas_id = 1;
@@ -558,6 +561,7 @@ message Canvas {
     UserRef created_by = 7;
     bool is_template = 8;
     bool canvas_versioning_enabled = 9;
+    CanvasChangeRequestApprovalConfig change_request_approval_config = 10;
   }
 
   message Spec {
@@ -596,6 +600,38 @@ message CanvasChangeRequestDiff {
   repeated string conflicting_node_ids = 2;
 }
 
+message CanvasChangeRequestApprover {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    TYPE_ANYONE = 1;
+    TYPE_USER = 2;
+    TYPE_ROLE = 3;
+  }
+
+  Type type = 1;
+  string user_id = 2;
+  string role_name = 3;
+}
+
+message CanvasChangeRequestApprovalConfig {
+  repeated CanvasChangeRequestApprover items = 1;
+}
+
+message CanvasChangeRequestApproval {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_APPROVED = 1;
+    STATE_REJECTED = 2;
+    STATE_UNAPPROVED = 3;
+  }
+
+  UserRef actor = 1;
+  CanvasChangeRequestApprover approver = 2;
+  State state = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp invalidated_at = 5;
+}
+
 message CanvasChangeRequest {
   enum Status {
     STATUS_UNSPECIFIED = 0;
@@ -622,6 +658,7 @@ message CanvasChangeRequest {
   Metadata metadata = 1;
   CanvasVersion version = 2;
   CanvasChangeRequestDiff diff = 3;
+  repeated CanvasChangeRequestApproval approvals = 4;
 }
 
 message ListNodeEventsRequest {

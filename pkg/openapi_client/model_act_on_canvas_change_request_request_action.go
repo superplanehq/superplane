@@ -25,6 +25,8 @@ const (
 	ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE     ActOnCanvasChangeRequestRequestAction = "ACTION_APPROVE"
 	ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REJECT      ActOnCanvasChangeRequestRequestAction = "ACTION_REJECT"
 	ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REOPEN      ActOnCanvasChangeRequestRequestAction = "ACTION_REOPEN"
+	ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_PUBLISH     ActOnCanvasChangeRequestRequestAction = "ACTION_PUBLISH"
+	ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_UNAPPROVE   ActOnCanvasChangeRequestRequestAction = "ACTION_UNAPPROVE"
 )
 
 // All allowed values of ActOnCanvasChangeRequestRequestAction enum
@@ -33,6 +35,8 @@ var AllowedActOnCanvasChangeRequestRequestActionEnumValues = []ActOnCanvasChange
 	"ACTION_APPROVE",
 	"ACTION_REJECT",
 	"ACTION_REOPEN",
+	"ACTION_PUBLISH",
+	"ACTION_UNAPPROVE",
 }
 
 func (v *ActOnCanvasChangeRequestRequestAction) UnmarshalJSON(src []byte) error {

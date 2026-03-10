@@ -433,7 +433,47 @@ func renderCanvasChangeRequestText(ctx core.CommandContext, changeRequest openap
 		_, _ = fmt.Fprintf(stdout, "Description: %s\n", description)
 		_, _ = fmt.Fprintf(stdout, "Published At: %s\n", publishedAt)
 		_, _ = fmt.Fprintf(stdout, "Created At: %s\n", formatTimeOrDash(metadata.GetCreatedAt(), metadata.HasCreatedAt()))
-		_, err := fmt.Fprintf(stdout, "Updated At: %s\n", formatTimeOrDash(metadata.GetUpdatedAt(), metadata.HasUpdatedAt()))
+		_, _ = fmt.Fprintf(stdout, "Updated At: %s\n", formatTimeOrDash(metadata.GetUpdatedAt(), metadata.HasUpdatedAt()))
+
+		approvals := changeRequest.GetApprovals()
+		_, _ = fmt.Fprintf(stdout, "Approvals: %d\n", len(approvals))
+		for index, approval := range approvals {
+			actor := approval.GetActor()
+			actorName := actor.GetName()
+			if strings.TrimSpace(actorName) == "" {
+				actorName = actor.GetId()
+			}
+			if strings.TrimSpace(actorName) == "" {
+				actorName = "unknown"
+			}
+
+			approverScope := "any user"
+			approver := approval.GetApprover()
+			if approver.GetType() == openapi_client.CANVASESCANVASCHANGEREQUESTAPPROVERTYPE_TYPE_USER {
+				approverScope = "user " + approver.GetUserId()
+			} else if approver.GetType() == openapi_client.CANVASESCANVASCHANGEREQUESTAPPROVERTYPE_TYPE_ROLE {
+				approverScope = "role " + approver.GetRoleName()
+			}
+
+			state := strings.ToLower(strings.TrimPrefix(string(approval.GetState()), "STATE_"))
+			createdAt := formatTimeOrDash(approval.GetCreatedAt(), approval.HasCreatedAt())
+			invalidatedAt := formatTimeOrDash(approval.GetInvalidatedAt(), approval.HasInvalidatedAt())
+			_, _ = fmt.Fprintf(
+				stdout,
+				"  - %d. %s by %s (%s) at %s",
+				index+1,
+				state,
+				actorName,
+				approverScope,
+				createdAt,
+			)
+			if approval.HasInvalidatedAt() {
+				_, _ = fmt.Fprintf(stdout, " [invalidated at %s]", invalidatedAt)
+			}
+			_, _ = fmt.Fprintln(stdout, "")
+		}
+
+		_, err := fmt.Fprintln(stdout)
 		return err
 	})
 }
@@ -465,10 +505,14 @@ func eventLabelForChangeRequestAction(action openapi_client.ActOnCanvasChangeReq
 	switch action {
 	case openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE:
 		return "approved"
+	case openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_UNAPPROVE:
+		return "unapproved"
 	case openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REJECT:
 		return "rejected"
 	case openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REOPEN:
 		return "reopened"
+	case openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_PUBLISH:
+		return "published"
 	default:
 		return strings.ToLower(string(action))
 	}

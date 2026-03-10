@@ -1,4 +1,8 @@
-import { CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
+import {
+  CanvasesCanvasChangeRequest,
+  CanvasesCanvasChangeRequestApprovalConfig,
+  CanvasesCanvasVersion,
+} from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,14 +40,19 @@ interface CanvasChangeRequestsViewProps {
   changeRequests: CanvasesCanvasChangeRequest[];
   selectedChangeRequestId?: string;
   canUpdateCanvas: boolean;
+  currentUserId?: string;
   actionPending: boolean;
   resolvePending: boolean;
   liveCanvasVersion?: CanvasesCanvasVersion;
+  changeRequestApprovalConfig?: CanvasesCanvasChangeRequestApprovalConfig;
   ownerProfilesByID?: Map<string, { name: string; avatarUrl?: string }>;
+  roleDisplayNamesByName?: Map<string, string>;
   canvasName: string;
   canvasDescription?: string;
   onSelectChangeRequest: (changeRequestId: string) => void;
   onApprove: (changeRequestId: string) => Promise<void>;
+  onUnapprove: (changeRequestId: string) => Promise<void>;
+  onPublish: (changeRequestId: string) => Promise<void>;
   onReject: (changeRequestId: string) => Promise<void>;
   onReopen: (changeRequestId: string) => Promise<void>;
   onResolve: (data: {
@@ -74,6 +83,14 @@ function statusBadgeVariant(
   if (status === "published") return "default";
   if (status === "rejected") return "destructive";
   return "outline";
+}
+
+function normalizeApprovalState(state?: string): "approved" | "rejected" | "unapproved" | "unknown" {
+  const value = (state || "").toLowerCase();
+  if (value.includes("unapproved")) return "unapproved";
+  if (value.includes("approved")) return "approved";
+  if (value.includes("rejected")) return "rejected";
+  return "unknown";
 }
 
 function resolveUserDisplay(
@@ -963,14 +980,19 @@ export function CanvasChangeRequestsView({
   changeRequests,
   selectedChangeRequestId,
   canUpdateCanvas,
+  currentUserId,
   actionPending,
   resolvePending,
   liveCanvasVersion,
+  changeRequestApprovalConfig,
   ownerProfilesByID,
+  roleDisplayNamesByName,
   canvasName,
   canvasDescription,
   onSelectChangeRequest,
   onApprove,
+  onUnapprove,
+  onPublish,
   onReject,
   onReopen,
   onResolve,
@@ -1019,6 +1041,11 @@ export function CanvasChangeRequestsView({
   const selectedStatus = normalizeStatus(selectedChangeRequest?.metadata?.status);
   const selectedChangeRequestIdSafe = selectedChangeRequest?.metadata?.id || "";
   const conflictingNodeIds = selectedChangeRequest?.diff?.conflictingNodeIds || [];
+  const selectedApprovals = selectedChangeRequest?.approvals || [];
+  const activeApprovals = useMemo(
+    () => selectedApprovals.filter((approval) => !approval.invalidatedAt),
+    [selectedApprovals],
+  );
   const selectedHasConflicts = isChangeRequestConflicted(selectedChangeRequest);
   const selectedDiffSummary = useMemo(
     () => summarizeNodeDiff(selectedChangeRequest?.version, liveCanvasVersion),
@@ -1029,6 +1056,24 @@ export function CanvasChangeRequestsView({
     () => resolveUserDisplay(selectedChangeRequest?.metadata?.owner, ownerProfilesByID),
     [selectedChangeRequest?.metadata?.owner, ownerProfilesByID],
   );
+  const requiredApprovalsCount = useMemo(() => {
+    const configuredCount = changeRequestApprovalConfig?.items?.length || 0;
+    return configuredCount > 0 ? configuredCount : 1;
+  }, [changeRequestApprovalConfig?.items]);
+  const activeApprovedCount = useMemo(
+    () => activeApprovals.filter((approval) => normalizeApprovalState(approval.state) === "approved").length,
+    [activeApprovals],
+  );
+  const hasCurrentUserActiveApproval = useMemo(() => {
+    if (!currentUserId) {
+      return false;
+    }
+
+    return activeApprovals.some(
+      (approval) => normalizeApprovalState(approval.state) === "approved" && approval.actor?.id === currentUserId,
+    );
+  }, [activeApprovals, currentUserId]);
+  const approvalRequirementsSatisfied = activeApprovedCount >= requiredApprovalsCount;
   const activityItems = useMemo(() => {
     const openedAt = formatTimestamp(selectedChangeRequest?.metadata?.createdAt);
     const items: Array<{
@@ -1036,7 +1081,8 @@ export function CanvasChangeRequestsView({
       title: string;
       detail: string;
       timestamp: string;
-      tone: "slate" | "emerald";
+      tone: "slate" | "emerald" | "rose" | "amber";
+      invalidated?: boolean;
       actor?: {
         name: string;
         avatarUrl?: string;
@@ -1053,6 +1099,59 @@ export function CanvasChangeRequestsView({
         name: requestedBy.name,
         avatarUrl: requestedBy.avatarUrl,
       },
+    });
+
+    selectedApprovals.forEach((approval, index) => {
+      const state = normalizeApprovalState(approval.state);
+      if (state === "unknown") {
+        return;
+      }
+
+      const actor = resolveUserDisplay(approval.actor, ownerProfilesByID);
+      const approverType = approval.approver?.type || "";
+      const roleName = approval.approver?.roleName || "";
+      const roleDisplayName = roleDisplayNamesByName?.get(roleName) || roleName;
+      let detail = "updated approval state.";
+      let title = "Approval Updated";
+      let tone: "slate" | "emerald" | "rose" | "amber" = "slate";
+      let invalidated = false;
+
+      if (state === "approved") {
+        title = "Approved";
+        detail = "approved this change request.";
+        tone = "emerald";
+      } else if (state === "rejected") {
+        title = "Rejected";
+        detail = "rejected this change request.";
+        tone = "rose";
+      } else if (state === "unapproved") {
+        title = "Unapproved";
+        detail = "removed their approval.";
+        tone = "slate";
+      }
+
+      if (approverType === "TYPE_ROLE" && roleName) {
+        detail = `${detail} (role: ${roleDisplayName})`;
+      }
+      if (approval.invalidatedAt && state === "approved") {
+        invalidated = true;
+      }
+      if (approval.invalidatedAt && state === "approved") {
+        tone = "amber";
+      }
+
+      items.push({
+        id: `approval-${approval.createdAt || index}-${state}`,
+        title,
+        detail,
+        timestamp: formatTimestamp(approval.createdAt) || "unknown time",
+        tone,
+        invalidated,
+        actor: {
+          name: actor.name,
+          avatarUrl: actor.avatarUrl,
+        },
+      });
     });
 
     if (selectedStatus === "published") {
@@ -1074,13 +1173,28 @@ export function CanvasChangeRequestsView({
     selectedChangeRequest?.metadata?.publishedAt,
     selectedChangeRequest?.metadata?.updatedAt,
     selectedStatus,
+    selectedApprovals,
+    ownerProfilesByID,
+    roleDisplayNamesByName,
     requestedBy.avatarUrl,
     requestedBy.name,
   ]);
 
-  const canApprove = canUpdateCanvas && selectedStatus === "open" && !selectedHasConflicts;
+  const canApprove =
+    canUpdateCanvas && selectedStatus === "open" && !selectedHasConflicts && !hasCurrentUserActiveApproval;
+  const canUnapprove = canUpdateCanvas && selectedStatus === "open" && hasCurrentUserActiveApproval;
+  const canPublish =
+    canUpdateCanvas && selectedStatus === "open" && !selectedHasConflicts && approvalRequirementsSatisfied;
   const canReject = canUpdateCanvas && selectedStatus === "open";
   const canReopen = canUpdateCanvas && selectedStatus === "rejected";
+  const hasChangeRequestID = !!selectedChangeRequestIdSafe;
+  const showPublishAction = canPublish && !actionPending && hasChangeRequestID;
+  const showApproveAction = canApprove && !actionPending && hasChangeRequestID;
+  const showUnapproveAction = canUnapprove && !actionPending && hasChangeRequestID;
+  const showRejectAction = canReject && !actionPending && hasChangeRequestID;
+  const showReopenAction = canReopen && !actionPending && hasChangeRequestID;
+  const hasReviewActions =
+    showPublishAction || showApproveAction || showUnapproveAction || showRejectAction || showReopenAction;
   const canResolveConflicts =
     canUpdateCanvas &&
     selectedStatus === "open" &&
@@ -1255,28 +1369,38 @@ export function CanvasChangeRequestsView({
                       <li key={item.id} className="relative flex items-start gap-3">
                         <div className="relative flex w-3 justify-center">
                           {index < activityItems.length - 1 ? (
-                            <span className="absolute left-1/2 top-3 h-[calc(100%+0.75rem)] w-px -translate-x-1/2 bg-slate-200" />
+                            <span className="absolute left-1/2 top-4 h-[calc(100%+1.5rem)] w-px -translate-x-1/2 bg-slate-200" />
                           ) : null}
                           <span
                             className={cn(
                               "mt-1 h-2.5 w-2.5 rounded-full",
-                              item.tone === "emerald" ? "bg-emerald-500" : "bg-slate-400",
+                              item.tone === "emerald"
+                                ? "bg-emerald-500"
+                                : item.tone === "rose"
+                                  ? "bg-rose-500"
+                                  : item.tone === "amber"
+                                    ? "bg-amber-500"
+                                    : "bg-slate-400",
                             )}
                           />
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-slate-900">
-                            {item.title} <span className="text-xs font-normal text-slate-500">· {item.timestamp}</span>
+                            {item.title}
+                            {item.invalidated ? (
+                              <span className="ml-1 text-xs text-amber-600">(invalidated)</span>
+                            ) : null}
+                            <span className="text-xs font-normal text-slate-500">· {item.timestamp}</span>
                           </p>
                           {item.actor ? (
-                            <p className="flex items-center gap-1.5 text-xs text-slate-600">
+                            <p className="flex items-center gap-1.5 text-xs text-slate-600 mt-1">
                               <Avatar className="h-4 w-4">
                                 <AvatarImage src={item.actor.avatarUrl} alt={item.actor.name} />
                                 <AvatarFallback className="text-[8px] font-medium">
                                   {buildInitials(item.actor.name)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="font-semibold text-slate-900">{item.actor.name}</span>
+                              <span className="font-bold text-slate-900">{item.actor.name}</span>
                               <span>{item.detail}</span>
                             </p>
                           ) : (
@@ -1303,34 +1427,57 @@ export function CanvasChangeRequestsView({
               <aside className="space-y-3">
                 <div className="rounded-xl border border-slate-200 bg-white p-4">
                   <p className="text-sm font-semibold text-slate-900">Review Actions</p>
-                  <p className="mt-1 text-xs text-slate-600">Conflicted requests must be resolved or rejected first.</p>
-                  <div className="mt-3 space-y-2">
-                    <Button
-                      className="w-full justify-center"
-                      onClick={() => onApprove(selectedChangeRequestIdSafe)}
-                      disabled={!canApprove || actionPending || !selectedChangeRequestIdSafe}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      className="w-full justify-center"
-                      variant="destructive"
-                      onClick={() => onReject(selectedChangeRequestIdSafe)}
-                      disabled={!canReject || actionPending || !selectedChangeRequestIdSafe}
-                    >
-                      Reject
-                    </Button>
-                    {selectedStatus === "rejected" ? (
-                      <Button
-                        className="w-full justify-center"
-                        variant="outline"
-                        onClick={() => onReopen(selectedChangeRequestIdSafe)}
-                        disabled={!canReopen || actionPending || !selectedChangeRequestIdSafe}
-                      >
-                        Reopen
-                      </Button>
-                    ) : null}
-                  </div>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Active approvals: {activeApprovedCount}/{requiredApprovalsCount}
+                  </p>
+                  {hasReviewActions ? (
+                    <div className="mt-3 space-y-2">
+                      {showPublishAction ? (
+                        <Button
+                          className="w-full justify-center"
+                          onClick={() => onPublish(selectedChangeRequestIdSafe)}
+                        >
+                          Publish
+                        </Button>
+                      ) : null}
+                      {showApproveAction ? (
+                        <Button
+                          className="w-full justify-center"
+                          variant="secondary"
+                          onClick={() => onApprove(selectedChangeRequestIdSafe)}
+                        >
+                          Approve
+                        </Button>
+                      ) : null}
+                      {showUnapproveAction ? (
+                        <Button
+                          className="w-full justify-center"
+                          variant="outline"
+                          onClick={() => onUnapprove(selectedChangeRequestIdSafe)}
+                        >
+                          Unapprove
+                        </Button>
+                      ) : null}
+                      {showRejectAction ? (
+                        <Button
+                          className="w-full justify-center"
+                          variant="destructive"
+                          onClick={() => onReject(selectedChangeRequestIdSafe)}
+                        >
+                          Reject
+                        </Button>
+                      ) : null}
+                      {showReopenAction ? (
+                        <Button
+                          className="w-full justify-center"
+                          variant="outline"
+                          onClick={() => onReopen(selectedChangeRequestIdSafe)}
+                        >
+                          Reopen
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
 
                 {selectedHasConflicts ? (

@@ -43,11 +43,13 @@ func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRe
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.UpdateCanvas(
 		ctx,
+		s.authService,
 		organizationID,
 		req.Id,
 		req.Name,
 		req.Description,
 		req.CanvasVersioningEnabled,
+		req.ChangeRequestApprovalConfig,
 	)
 }
 
@@ -128,6 +130,7 @@ func (s *CanvasService) ActOnCanvasChangeRequest(ctx context.Context, req *pb.Ac
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.ActOnCanvasChangeRequest(
 		ctx,
+		s.authService,
 		s.encryptor,
 		s.registry,
 		organizationID,

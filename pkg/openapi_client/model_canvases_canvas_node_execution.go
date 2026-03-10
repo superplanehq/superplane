@@ -21,24 +21,24 @@ var _ MappedNullable = &CanvasesCanvasNodeExecution{}
 
 // CanvasesCanvasNodeExecution struct for CanvasesCanvasNodeExecution
 type CanvasesCanvasNodeExecution struct {
-	Id                  *string                          `json:"id,omitempty"`
-	CanvasId            *string                          `json:"canvasId,omitempty"`
-	NodeId              *string                          `json:"nodeId,omitempty"`
-	ParentExecutionId   *string                          `json:"parentExecutionId,omitempty"`
-	PreviousExecutionId *string                          `json:"previousExecutionId,omitempty"`
-	State               *CanvasNodeExecutionState        `json:"state,omitempty"`
-	Result              *CanvasNodeExecutionResult       `json:"result,omitempty"`
-	ResultReason        *CanvasNodeExecutionResultReason `json:"resultReason,omitempty"`
-	ResultMessage       *string                          `json:"resultMessage,omitempty"`
-	Input               map[string]interface{}           `json:"input,omitempty"`
-	Outputs             map[string]interface{}           `json:"outputs,omitempty"`
-	CreatedAt           *time.Time                       `json:"createdAt,omitempty"`
-	UpdatedAt           *time.Time                       `json:"updatedAt,omitempty"`
-	Metadata            map[string]interface{}           `json:"metadata,omitempty"`
-	Configuration       map[string]interface{}           `json:"configuration,omitempty"`
-	ChildExecutions     []CanvasesCanvasNodeExecution    `json:"childExecutions,omitempty"`
-	RootEvent           *CanvasesCanvasEvent             `json:"rootEvent,omitempty"`
-	CancelledBy         *SuperplaneCanvasesUserRef       `json:"cancelledBy,omitempty"`
+	Id                  *string                           `json:"id,omitempty"`
+	CanvasId            *string                           `json:"canvasId,omitempty"`
+	NodeId              *string                           `json:"nodeId,omitempty"`
+	ParentExecutionId   *string                           `json:"parentExecutionId,omitempty"`
+	PreviousExecutionId *string                           `json:"previousExecutionId,omitempty"`
+	State               *CanvasesCanvasNodeExecutionState `json:"state,omitempty"`
+	Result              *CanvasNodeExecutionResult        `json:"result,omitempty"`
+	ResultReason        *CanvasNodeExecutionResultReason  `json:"resultReason,omitempty"`
+	ResultMessage       *string                           `json:"resultMessage,omitempty"`
+	Input               map[string]interface{}            `json:"input,omitempty"`
+	Outputs             map[string]interface{}            `json:"outputs,omitempty"`
+	CreatedAt           *time.Time                        `json:"createdAt,omitempty"`
+	UpdatedAt           *time.Time                        `json:"updatedAt,omitempty"`
+	Metadata            map[string]interface{}            `json:"metadata,omitempty"`
+	Configuration       map[string]interface{}            `json:"configuration,omitempty"`
+	ChildExecutions     []CanvasesCanvasNodeExecution     `json:"childExecutions,omitempty"`
+	RootEvent           *CanvasesCanvasEvent              `json:"rootEvent,omitempty"`
+	CancelledBy         *SuperplaneCanvasesUserRef        `json:"cancelledBy,omitempty"`
 }
 
 // NewCanvasesCanvasNodeExecution instantiates a new CanvasesCanvasNodeExecution object
@@ -47,7 +47,7 @@ type CanvasesCanvasNodeExecution struct {
 // will change when the set of required properties is changed
 func NewCanvasesCanvasNodeExecution() *CanvasesCanvasNodeExecution {
 	this := CanvasesCanvasNodeExecution{}
-	var state CanvasNodeExecutionState = CANVASNODEEXECUTIONSTATE_STATE_UNKNOWN
+	var state CanvasesCanvasNodeExecutionState = CANVASESCANVASNODEEXECUTIONSTATE_STATE_UNKNOWN
 	this.State = &state
 	var result CanvasNodeExecutionResult = CANVASNODEEXECUTIONRESULT_RESULT_UNKNOWN
 	this.Result = &result
@@ -61,7 +61,7 @@ func NewCanvasesCanvasNodeExecution() *CanvasesCanvasNodeExecution {
 // but it doesn't guarantee that properties required by API are set
 func NewCanvasesCanvasNodeExecutionWithDefaults() *CanvasesCanvasNodeExecution {
 	this := CanvasesCanvasNodeExecution{}
-	var state CanvasNodeExecutionState = CANVASNODEEXECUTIONSTATE_STATE_UNKNOWN
+	var state CanvasesCanvasNodeExecutionState = CANVASESCANVASNODEEXECUTIONSTATE_STATE_UNKNOWN
 	this.State = &state
 	var result CanvasNodeExecutionResult = CANVASNODEEXECUTIONRESULT_RESULT_UNKNOWN
 	this.Result = &result
@@ -231,9 +231,9 @@ func (o *CanvasesCanvasNodeExecution) SetPreviousExecutionId(v string) {
 }
 
 // GetState returns the State field value if set, zero value otherwise.
-func (o *CanvasesCanvasNodeExecution) GetState() CanvasNodeExecutionState {
+func (o *CanvasesCanvasNodeExecution) GetState() CanvasesCanvasNodeExecutionState {
 	if o == nil || IsNil(o.State) {
-		var ret CanvasNodeExecutionState
+		var ret CanvasesCanvasNodeExecutionState
 		return ret
 	}
 	return *o.State
@@ -241,7 +241,7 @@ func (o *CanvasesCanvasNodeExecution) GetState() CanvasNodeExecutionState {
 
 // GetStateOk returns a tuple with the State field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesCanvasNodeExecution) GetStateOk() (*CanvasNodeExecutionState, bool) {
+func (o *CanvasesCanvasNodeExecution) GetStateOk() (*CanvasesCanvasNodeExecutionState, bool) {
 	if o == nil || IsNil(o.State) {
 		return nil, false
 	}
@@ -257,8 +257,8 @@ func (o *CanvasesCanvasNodeExecution) HasState() bool {
 	return false
 }
 
-// SetState gets a reference to the given CanvasNodeExecutionState and assigns it to the State field.
-func (o *CanvasesCanvasNodeExecution) SetState(v CanvasNodeExecutionState) {
+// SetState gets a reference to the given CanvasesCanvasNodeExecutionState and assigns it to the State field.
+func (o *CanvasesCanvasNodeExecution) SetState(v CanvasesCanvasNodeExecutionState) {
 	o.State = &v
 }
 

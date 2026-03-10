@@ -8,7 +8,9 @@ export type ActOnCanvasChangeRequestRequestAction =
   | "ACTION_UNSPECIFIED"
   | "ACTION_APPROVE"
   | "ACTION_REJECT"
-  | "ACTION_REOPEN";
+  | "ACTION_REOPEN"
+  | "ACTION_PUBLISH"
+  | "ACTION_UNAPPROVE";
 
 /**
  * Enums
@@ -83,8 +85,6 @@ export type CanvasNodeExecutionResultReason =
   | "RESULT_REASON_ERROR"
   | "RESULT_REASON_ERROR_RESOLVED";
 
-export type CanvasNodeExecutionState = "STATE_UNKNOWN" | "STATE_PENDING" | "STATE_STARTED" | "STATE_FINISHED";
-
 export type CanvasesActOnCanvasChangeRequestBody = {
   action?: ActOnCanvasChangeRequestRequestAction;
 };
@@ -135,7 +135,34 @@ export type CanvasesCanvasChangeRequest = {
   metadata?: CanvasesCanvasChangeRequestMetadata;
   version?: CanvasesCanvasVersion;
   diff?: CanvasesCanvasChangeRequestDiff;
+  approvals?: Array<CanvasesCanvasChangeRequestApproval>;
 };
+
+export type CanvasesCanvasChangeRequestApproval = {
+  actor?: SuperplaneCanvasesUserRef;
+  approver?: CanvasesCanvasChangeRequestApprover;
+  state?: CanvasesCanvasChangeRequestApprovalState;
+  createdAt?: string;
+  invalidatedAt?: string;
+};
+
+export type CanvasesCanvasChangeRequestApprovalConfig = {
+  items?: Array<CanvasesCanvasChangeRequestApprover>;
+};
+
+export type CanvasesCanvasChangeRequestApprovalState =
+  | "STATE_UNSPECIFIED"
+  | "STATE_APPROVED"
+  | "STATE_REJECTED"
+  | "STATE_UNAPPROVED";
+
+export type CanvasesCanvasChangeRequestApprover = {
+  type?: CanvasesCanvasChangeRequestApproverType;
+  userId?: string;
+  roleName?: string;
+};
+
+export type CanvasesCanvasChangeRequestApproverType = "TYPE_UNSPECIFIED" | "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE";
 
 export type CanvasesCanvasChangeRequestDiff = {
   changedNodeIds?: Array<string>;
@@ -204,6 +231,7 @@ export type CanvasesCanvasMetadata = {
   createdBy?: SuperplaneCanvasesUserRef;
   isTemplate?: boolean;
   canvasVersioningEnabled?: boolean;
+  changeRequestApprovalConfig?: CanvasesCanvasChangeRequestApprovalConfig;
 };
 
 export type CanvasesCanvasNodeExecution = {
@@ -212,7 +240,7 @@ export type CanvasesCanvasNodeExecution = {
   nodeId?: string;
   parentExecutionId?: string;
   previousExecutionId?: string;
-  state?: CanvasNodeExecutionState;
+  state?: CanvasesCanvasNodeExecutionState;
   result?: CanvasNodeExecutionResult;
   resultReason?: CanvasNodeExecutionResultReason;
   resultMessage?: string;
@@ -234,6 +262,8 @@ export type CanvasesCanvasNodeExecution = {
   rootEvent?: CanvasesCanvasEvent;
   cancelledBy?: SuperplaneCanvasesUserRef;
 };
+
+export type CanvasesCanvasNodeExecutionState = "STATE_UNKNOWN" | "STATE_PENDING" | "STATE_STARTED" | "STATE_FINISHED";
 
 export type CanvasesCanvasNodeQueueItem = {
   id?: string;
@@ -451,6 +481,7 @@ export type CanvasesUpdateCanvasBody = {
   name?: string;
   description?: string;
   canvasVersioningEnabled?: boolean;
+  changeRequestApprovalConfig?: CanvasesCanvasChangeRequestApprovalConfig;
 };
 
 export type CanvasesUpdateCanvasResponse = {

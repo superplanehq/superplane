@@ -14,7 +14,29 @@ const (
 	CanvasChangeRequestStatusOpen      = "open"
 	CanvasChangeRequestStatusPublished = "published"
 	CanvasChangeRequestStatusRejected  = "rejected"
+
+	CanvasChangeRequestApproverTypeAnyone = "anyone"
+	CanvasChangeRequestApproverTypeUser   = "user"
+	CanvasChangeRequestApproverTypeRole   = "role"
+
+	CanvasChangeRequestApprovalStateApproved   = "approved"
+	CanvasChangeRequestApprovalStateRejected   = "rejected"
+	CanvasChangeRequestApprovalStateUnapproved = "unapproved"
 )
+
+type CanvasChangeRequestApprover struct {
+	Type string `json:"type"`
+	User string `json:"user,omitempty"`
+	Role string `json:"role,omitempty"`
+}
+
+func DefaultCanvasChangeRequestApprovers() []CanvasChangeRequestApprover {
+	return []CanvasChangeRequestApprover{
+		{
+			Type: CanvasChangeRequestApproverTypeAnyone,
+		},
+	}
+}
 
 type CanvasChangeRequest struct {
 	ID                 uuid.UUID

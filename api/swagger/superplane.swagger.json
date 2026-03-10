@@ -464,7 +464,7 @@
     "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/actions": {
       "patch": {
         "summary": "Act on canvas change request",
-        "description": "Applies an action (approve, reject, reopen) to a change request",
+        "description": "Applies an action (approve, unapprove, reject, reopen, publish) to a change request",
         "operationId": "Canvases_ActOnCanvasChangeRequest",
         "responses": {
           "200": {
@@ -3909,7 +3909,9 @@
         "ACTION_UNSPECIFIED",
         "ACTION_APPROVE",
         "ACTION_REJECT",
-        "ACTION_REOPEN"
+        "ACTION_REOPEN",
+        "ACTION_PUBLISH",
+        "ACTION_UNAPPROVE"
       ],
       "default": "ACTION_UNSPECIFIED"
     },
@@ -4091,16 +4093,6 @@
       ],
       "default": "RESULT_REASON_OK"
     },
-    "CanvasNodeExecutionState": {
-      "type": "string",
-      "enum": [
-        "STATE_UNKNOWN",
-        "STATE_PENDING",
-        "STATE_STARTED",
-        "STATE_FINISHED"
-      ],
-      "default": "STATE_UNKNOWN"
-    },
     "CanvasesActOnCanvasChangeRequestBody": {
       "type": "object",
       "properties": {
@@ -4215,8 +4207,83 @@
         },
         "diff": {
           "$ref": "#/definitions/CanvasesCanvasChangeRequestDiff"
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasChangeRequestApproval"
+          }
         }
       }
+    },
+    "CanvasesCanvasChangeRequestApproval": {
+      "type": "object",
+      "properties": {
+        "actor": {
+          "$ref": "#/definitions/SuperplaneCanvasesUserRef"
+        },
+        "approver": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequestApprover"
+        },
+        "state": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequestApprovalState"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "invalidatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "CanvasesCanvasChangeRequestApprovalConfig": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasChangeRequestApprover"
+          }
+        }
+      }
+    },
+    "CanvasesCanvasChangeRequestApprovalState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNSPECIFIED",
+        "STATE_APPROVED",
+        "STATE_REJECTED",
+        "STATE_UNAPPROVED"
+      ],
+      "default": "STATE_UNSPECIFIED"
+    },
+    "CanvasesCanvasChangeRequestApprover": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequestApproverType"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "roleName": {
+          "type": "string"
+        }
+      }
+    },
+    "CanvasesCanvasChangeRequestApproverType": {
+      "type": "string",
+      "enum": [
+        "TYPE_UNSPECIFIED",
+        "TYPE_ANYONE",
+        "TYPE_USER",
+        "TYPE_ROLE"
+      ],
+      "default": "TYPE_UNSPECIFIED"
     },
     "CanvasesCanvasChangeRequestDiff": {
       "type": "object",
@@ -4393,6 +4460,9 @@
         },
         "canvasVersioningEnabled": {
           "type": "boolean"
+        },
+        "changeRequestApprovalConfig": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequestApprovalConfig"
         }
       }
     },
@@ -4415,7 +4485,7 @@
           "type": "string"
         },
         "state": {
-          "$ref": "#/definitions/CanvasNodeExecutionState"
+          "$ref": "#/definitions/CanvasesCanvasNodeExecutionState"
         },
         "result": {
           "$ref": "#/definitions/CanvasNodeExecutionResult"
@@ -4460,6 +4530,16 @@
           "$ref": "#/definitions/SuperplaneCanvasesUserRef"
         }
       }
+    },
+    "CanvasesCanvasNodeExecutionState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNKNOWN",
+        "STATE_PENDING",
+        "STATE_STARTED",
+        "STATE_FINISHED"
+      ],
+      "default": "STATE_UNKNOWN"
     },
     "CanvasesCanvasNodeQueueItem": {
       "type": "object",
@@ -4959,6 +5039,9 @@
         },
         "canvasVersioningEnabled": {
           "type": "boolean"
+        },
+        "changeRequestApprovalConfig": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequestApprovalConfig"
         }
       }
     },

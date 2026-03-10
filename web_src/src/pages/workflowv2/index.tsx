@@ -494,7 +494,7 @@ export function WorkflowPageV2() {
   // user IDs as emails and role names as display names.
   // We don't use the values directly here; loading them populates the
   // react-query cache which prepareApprovalNode reads from.
-  const { isLoading: rolesLoading } = useOrganizationRoles(organizationId!);
+  const { data: organizationRoles = [], isLoading: rolesLoading } = useOrganizationRoles(organizationId!);
   const { isLoading: groupsLoading } = useOrganizationGroups(organizationId!);
 
   /**
@@ -3670,6 +3670,54 @@ export function WorkflowPageV2() {
 
         const actedChangeRequestId = response?.data?.changeRequest?.metadata?.id || changeRequestId;
         setSelectedChangeRequestId(actedChangeRequestId);
+        showSuccessToast("Change request approved");
+      } catch (error) {
+        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to approve";
+        showErrorToast(errorMessage);
+      }
+    },
+    [organizationId, canvasId, actOnCanvasChangeRequestMutation],
+  );
+
+  const handleUnapproveChangeRequest = useCallback(
+    async (changeRequestId: string) => {
+      if (!organizationId || !canvasId || !changeRequestId) {
+        return;
+      }
+
+      try {
+        const response = await actOnCanvasChangeRequestMutation.mutateAsync({
+          changeRequestId,
+          action: "ACTION_UNAPPROVE",
+        });
+
+        const actedChangeRequestId = response?.data?.changeRequest?.metadata?.id || changeRequestId;
+        setSelectedChangeRequestId(actedChangeRequestId);
+        showSuccessToast("Approval removed");
+      } catch (error) {
+        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to unapprove";
+        showErrorToast(errorMessage);
+      }
+    },
+    [organizationId, canvasId, actOnCanvasChangeRequestMutation],
+  );
+
+  const handlePublishChangeRequest = useCallback(
+    async (changeRequestId: string) => {
+      if (!organizationId || !canvasId || !changeRequestId) {
+        return;
+      }
+
+      try {
+        const response = await actOnCanvasChangeRequestMutation.mutateAsync({
+          changeRequestId,
+          action: "ACTION_PUBLISH",
+        });
+
+        const actedChangeRequestId = response?.data?.changeRequest?.metadata?.id || changeRequestId;
+        setSelectedChangeRequestId(actedChangeRequestId);
         setActiveCanvasVersion(null);
         setSearchParams((current) => {
           const next = new URLSearchParams(current);
@@ -3677,10 +3725,10 @@ export function WorkflowPageV2() {
           return next;
         });
         setTopViewMode("canvas");
-        showSuccessToast("Change request approved and published");
+        showSuccessToast("Change request published");
       } catch (error) {
         const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to approve";
+        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to publish";
         showErrorToast(errorMessage);
       }
     },
@@ -4268,11 +4316,93 @@ export function WorkflowPageV2() {
       name: liveCanvas?.metadata?.name || "",
       description: liveCanvas?.metadata?.description || "",
       canvasVersioningEnabled: liveCanvas?.metadata?.canvasVersioningEnabled ?? false,
+      changeRequestApprovalConfig: {
+        items: (liveCanvas?.metadata?.changeRequestApprovalConfig?.items || [])
+          .map((item) => {
+            if (!item.type || (item.type !== "TYPE_ANYONE" && item.type !== "TYPE_USER" && item.type !== "TYPE_ROLE")) {
+              return null;
+            }
+
+            return {
+              type: item.type,
+              userId: item.userId,
+              roleName: item.roleName,
+            };
+          })
+          .filter(
+            (
+              item,
+            ): item is {
+              type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE";
+              userId: string | undefined;
+              roleName: string | undefined;
+            } => !!item,
+          ),
+      },
     }),
-    [liveCanvas?.metadata?.canvasVersioningEnabled, liveCanvas?.metadata?.description, liveCanvas?.metadata?.name],
+    [
+      liveCanvas?.metadata?.canvasVersioningEnabled,
+      liveCanvas?.metadata?.changeRequestApprovalConfig?.items,
+      liveCanvas?.metadata?.description,
+      liveCanvas?.metadata?.name,
+    ],
   );
+  const canvasSettingsApproverUsers = useMemo(
+    () =>
+      organizationUsers
+        .map((user) => {
+          const id = user.metadata?.id || "";
+          if (!id) {
+            return null;
+          }
+
+          return {
+            id,
+            name: user.spec?.displayName || user.metadata?.email || id,
+          };
+        })
+        .filter((item): item is { id: string; name: string } => !!item),
+    [organizationUsers],
+  );
+  const canvasSettingsApproverRoles = useMemo(
+    () =>
+      organizationRoles
+        .map((role) => {
+          const name = role.metadata?.name || "";
+          if (!name) {
+            return null;
+          }
+
+          return {
+            name,
+            label: role.spec?.displayName || name,
+          };
+        })
+        .filter((item): item is { name: string; label: string } => !!item),
+    [organizationRoles],
+  );
+  const changeRequestRoleDisplayNamesByName = useMemo(() => {
+    const result = new Map<string, string>();
+    organizationRoles.forEach((role) => {
+      const name = role.metadata?.name || "";
+      if (!name) {
+        return;
+      }
+
+      result.set(name, role.spec?.displayName || name);
+    });
+
+    return result;
+  }, [organizationRoles]);
   const handleSaveCanvasSettings = useCallback(
-    async (values: { name: string; description: string; canvasVersioningEnabled?: boolean }) => {
+    async (values: {
+      name: string;
+      description: string;
+      canvasVersioningEnabled?: boolean;
+      changeRequestApprovalConfig?: {
+        items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
+      };
+    }) => {
       if (!canvasId) {
         return;
       }
@@ -4281,6 +4411,7 @@ export function WorkflowPageV2() {
         name: values.name,
         description: values.description,
         canvasVersioningEnabled: values.canvasVersioningEnabled,
+        changeRequestApprovalConfig: values.changeRequestApprovalConfig,
       });
     },
     [canvasId, updateCanvasMutation],
@@ -4511,6 +4642,8 @@ export function WorkflowPageV2() {
         canUpdateCanvas={canUpdateCanvas && !isTemplate}
         orgVersioningEnabled={isOrgVersioningEnabled}
         isSaving={updateCanvasMutation.isPending}
+        availableUsers={canvasSettingsApproverUsers}
+        availableRoles={canvasSettingsApproverRoles}
         onSave={handleSaveCanvasSettings}
       />
     ) : topViewMode === "versioning" ? (
@@ -4518,14 +4651,19 @@ export function WorkflowPageV2() {
         changeRequests={canvasChangeRequests}
         selectedChangeRequestId={selectedChangeRequestId}
         canUpdateCanvas={canUpdateCanvas && !isTemplate && !canvasDeletedRemotely}
+        currentUserId={currentUserId}
         actionPending={actOnCanvasChangeRequestMutation.isPending}
         resolvePending={resolveCanvasChangeRequestMutation.isPending}
         liveCanvasVersion={liveCanvasVersion}
+        changeRequestApprovalConfig={liveCanvas?.metadata?.changeRequestApprovalConfig}
         ownerProfilesByID={liveVersionOwnerProfilesById}
+        roleDisplayNamesByName={changeRequestRoleDisplayNamesByName}
         canvasName={canvas?.metadata?.name || ""}
         canvasDescription={canvas?.metadata?.description}
         onSelectChangeRequest={setSelectedChangeRequestId}
         onApprove={handleApproveChangeRequest}
+        onUnapprove={handleUnapproveChangeRequest}
+        onPublish={handlePublishChangeRequest}
         onReject={handleRejectChangeRequest}
         onReopen={handleReopenChangeRequest}
         onResolve={handleResolveChangeRequest}

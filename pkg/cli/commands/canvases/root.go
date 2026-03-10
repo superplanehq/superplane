@@ -137,11 +137,20 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 
 	changeRequestsApproveCmd := &cobra.Command{
 		Use:   "approve <change-request-id> [name-or-id]",
-		Short: "Approve a change request (publishes if eligible)",
+		Short: "Approve a change request",
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsApproveCmd, &changeRequestActionCommand{
 		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE,
+	}, options)
+
+	changeRequestsUnapproveCmd := &cobra.Command{
+		Use:   "unapprove <change-request-id> [name-or-id]",
+		Short: "Remove your active approval from a change request",
+		Args:  cobra.RangeArgs(1, 2),
+	}
+	core.Bind(changeRequestsUnapproveCmd, &changeRequestActionCommand{
+		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_UNAPPROVE,
 	}, options)
 
 	changeRequestsRejectCmd := &cobra.Command{
@@ -160,6 +169,15 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	}
 	core.Bind(changeRequestsReopenCmd, &changeRequestActionCommand{
 		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REOPEN,
+	}, options)
+
+	changeRequestsPublishCmd := &cobra.Command{
+		Use:   "publish <change-request-id> [name-or-id]",
+		Short: "Publish an approved change request",
+		Args:  cobra.RangeArgs(1, 2),
+	}
+	core.Bind(changeRequestsPublishCmd, &changeRequestActionCommand{
+		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_PUBLISH,
 	}, options)
 
 	var changeRequestsResolveFile string
@@ -186,8 +204,10 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	changeRequestsCmd.AddCommand(changeRequestsGetCmd)
 	changeRequestsCmd.AddCommand(changeRequestsCreateCmd)
 	changeRequestsCmd.AddCommand(changeRequestsApproveCmd)
+	changeRequestsCmd.AddCommand(changeRequestsUnapproveCmd)
 	changeRequestsCmd.AddCommand(changeRequestsRejectCmd)
 	changeRequestsCmd.AddCommand(changeRequestsReopenCmd)
+	changeRequestsCmd.AddCommand(changeRequestsPublishCmd)
 	changeRequestsCmd.AddCommand(changeRequestsResolveCmd)
 
 	root.AddCommand(listCmd)

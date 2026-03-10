@@ -43,28 +43,22 @@ func TestActOnCanvasChangeRequestRejectAndReopen(t *testing.T) {
 	require.NoError(t, err)
 	changeRequestID := createResponse.ChangeRequest.Metadata.Id
 
-	rejectResponse, err := ActOnCanvasChangeRequest(
+	rejectResponse, err := actOnCanvasChangeRequestAction(
 		ctx,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
+		r,
 		canvasID,
 		changeRequestID,
 		pb.ActOnCanvasChangeRequestRequest_ACTION_REJECT,
-		testWebhookBaseURL,
 	)
 	require.NoError(t, err)
 	assert.Equal(t, pb.CanvasChangeRequest_STATUS_REJECTED, rejectResponse.ChangeRequest.Metadata.Status)
 
-	reopenResponse, err := ActOnCanvasChangeRequest(
+	reopenResponse, err := actOnCanvasChangeRequestAction(
 		ctx,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
+		r,
 		canvasID,
 		changeRequestID,
 		pb.ActOnCanvasChangeRequestRequest_ACTION_REOPEN,
-		testWebhookBaseURL,
 	)
 	require.NoError(t, err)
 	assert.Equal(t, pb.CanvasChangeRequest_STATUS_OPEN, reopenResponse.ChangeRequest.Metadata.Status)
@@ -86,16 +80,9 @@ func TestConflictedChangeRequestCannotBeApproved(t *testing.T) {
 	require.NoError(t, err)
 	secondChangeRequestID := secondChangeRequestResponse.ChangeRequest.Metadata.Id
 
-	_, err = ActOnCanvasChangeRequest(
-		ctx,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvasID,
-		secondChangeRequestID,
-		pb.ActOnCanvasChangeRequestRequest_ACTION_APPROVE,
-		testWebhookBaseURL,
-	)
+	_, err = actOnCanvasChangeRequestAction(ctx, r, canvasID, secondChangeRequestID, pb.ActOnCanvasChangeRequestRequest_ACTION_APPROVE)
+	require.NoError(t, err)
+	_, err = actOnCanvasChangeRequestAction(ctx, r, canvasID, secondChangeRequestID, pb.ActOnCanvasChangeRequestRequest_ACTION_PUBLISH)
 	require.NoError(t, err)
 
 	firstChangeRequestDetails, err := DescribeCanvasChangeRequest(ctx, r.Organization.ID.String(), canvasID, firstChangeRequestID)
@@ -104,31 +91,156 @@ func TestConflictedChangeRequestCannotBeApproved(t *testing.T) {
 	assert.Equal(t, pb.CanvasChangeRequest_STATUS_OPEN, firstChangeRequestDetails.ChangeRequest.Metadata.Status)
 	assert.NotEmpty(t, firstChangeRequestDetails.ChangeRequest.Diff.ConflictingNodeIds)
 
-	_, err = ActOnCanvasChangeRequest(
-		ctx,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvasID,
-		firstChangeRequestID,
-		pb.ActOnCanvasChangeRequestRequest_ACTION_APPROVE,
-		testWebhookBaseURL,
-	)
+	_, err = actOnCanvasChangeRequestAction(ctx, r, canvasID, firstChangeRequestID, pb.ActOnCanvasChangeRequestRequest_ACTION_APPROVE)
 	require.Error(t, err)
 	assert.Equal(t, codes.FailedPrecondition, grpcstatus.Code(err))
 
-	rejectResponse, err := ActOnCanvasChangeRequest(
+	rejectResponse, err := actOnCanvasChangeRequestAction(
 		ctx,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
+		r,
 		canvasID,
 		firstChangeRequestID,
 		pb.ActOnCanvasChangeRequestRequest_ACTION_REJECT,
-		testWebhookBaseURL,
 	)
 	require.NoError(t, err)
 	assert.Equal(t, pb.CanvasChangeRequest_STATUS_REJECTED, rejectResponse.ChangeRequest.Metadata.Status)
+}
+
+func TestApproveDoesNotPublishUntilPublishAction(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	canvasID := createCanvasWithNoopNode(ctx, t, r, "approve-then-publish")
+	draftVersionID := createDraftVersion(ctx, t, r, canvasID, "Draft Name")
+	createResponse, err := CreateCanvasChangeRequest(ctx, r.Organization.ID.String(), canvasID, draftVersionID)
+	require.NoError(t, err)
+	changeRequestID := createResponse.ChangeRequest.Metadata.Id
+
+	approveResponse, err := actOnCanvasChangeRequestAction(
+		ctx,
+		r,
+		canvasID,
+		changeRequestID,
+		pb.ActOnCanvasChangeRequestRequest_ACTION_APPROVE,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, pb.CanvasChangeRequest_STATUS_OPEN, approveResponse.ChangeRequest.Metadata.Status)
+	require.Len(t, approveResponse.ChangeRequest.Approvals, 1)
+	assert.Equal(t, pb.CanvasChangeRequestApproval_STATE_APPROVED, approveResponse.ChangeRequest.Approvals[0].State)
+
+	publishResponse, err := actOnCanvasChangeRequestAction(
+		ctx,
+		r,
+		canvasID,
+		changeRequestID,
+		pb.ActOnCanvasChangeRequestRequest_ACTION_PUBLISH,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, pb.CanvasChangeRequest_STATUS_PUBLISHED, publishResponse.ChangeRequest.Metadata.Status)
+}
+
+func TestPublishRequiresApprovals(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-needs-approval")
+	draftVersionID := createDraftVersion(ctx, t, r, canvasID, "Draft Name")
+	createResponse, err := CreateCanvasChangeRequest(ctx, r.Organization.ID.String(), canvasID, draftVersionID)
+	require.NoError(t, err)
+
+	_, err = actOnCanvasChangeRequestAction(
+		ctx,
+		r,
+		canvasID,
+		createResponse.ChangeRequest.Metadata.Id,
+		pb.ActOnCanvasChangeRequestRequest_ACTION_PUBLISH,
+	)
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, grpcstatus.Code(err))
+}
+
+func TestUnapproveRequiresReapprovalBeforePublish(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	canvasID := createCanvasWithNoopNode(ctx, t, r, "unapprove-before-publish")
+	draftVersionID := createDraftVersion(ctx, t, r, canvasID, "Draft Name")
+	createResponse, err := CreateCanvasChangeRequest(ctx, r.Organization.ID.String(), canvasID, draftVersionID)
+	require.NoError(t, err)
+	changeRequestID := createResponse.ChangeRequest.Metadata.Id
+
+	_, err = actOnCanvasChangeRequestAction(ctx, r, canvasID, changeRequestID, pb.ActOnCanvasChangeRequestRequest_ACTION_APPROVE)
+	require.NoError(t, err)
+	unapproveResponse, err := actOnCanvasChangeRequestAction(
+		ctx,
+		r,
+		canvasID,
+		changeRequestID,
+		pb.ActOnCanvasChangeRequestRequest_ACTION_UNAPPROVE,
+	)
+	require.NoError(t, err)
+	require.Len(t, unapproveResponse.ChangeRequest.Approvals, 2)
+	assert.Equal(t, pb.CanvasChangeRequestApproval_STATE_UNAPPROVED, unapproveResponse.ChangeRequest.Approvals[1].State)
+
+	_, err = actOnCanvasChangeRequestAction(ctx, r, canvasID, changeRequestID, pb.ActOnCanvasChangeRequestRequest_ACTION_PUBLISH)
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, grpcstatus.Code(err))
+
+	_, err = actOnCanvasChangeRequestAction(ctx, r, canvasID, changeRequestID, pb.ActOnCanvasChangeRequestRequest_ACTION_APPROVE)
+	require.NoError(t, err)
+	publishResponse, err := actOnCanvasChangeRequestAction(
+		ctx,
+		r,
+		canvasID,
+		changeRequestID,
+		pb.ActOnCanvasChangeRequestRequest_ACTION_PUBLISH,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, pb.CanvasChangeRequest_STATUS_PUBLISHED, publishResponse.ChangeRequest.Metadata.Status)
+}
+
+func TestRejectInvalidatesActiveApprovalsAndReopenAllowsApprovalsAgain(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	canvasID := createCanvasWithNoopNode(ctx, t, r, "reject-invalidates-approvals")
+	draftVersionID := createDraftVersion(ctx, t, r, canvasID, "Draft Name")
+	createResponse, err := CreateCanvasChangeRequest(ctx, r.Organization.ID.String(), canvasID, draftVersionID)
+	require.NoError(t, err)
+	changeRequestID := createResponse.ChangeRequest.Metadata.Id
+
+	_, err = actOnCanvasChangeRequestAction(ctx, r, canvasID, changeRequestID, pb.ActOnCanvasChangeRequestRequest_ACTION_APPROVE)
+	require.NoError(t, err)
+
+	rejectResponse, err := actOnCanvasChangeRequestAction(
+		ctx,
+		r,
+		canvasID,
+		changeRequestID,
+		pb.ActOnCanvasChangeRequestRequest_ACTION_REJECT,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, pb.CanvasChangeRequest_STATUS_REJECTED, rejectResponse.ChangeRequest.Metadata.Status)
+	require.Len(t, rejectResponse.ChangeRequest.Approvals, 2)
+	require.NotNil(t, rejectResponse.ChangeRequest.Approvals[0].InvalidatedAt)
+	assert.Equal(t, pb.CanvasChangeRequestApproval_STATE_REJECTED, rejectResponse.ChangeRequest.Approvals[1].State)
+	assert.Nil(t, rejectResponse.ChangeRequest.Approvals[1].InvalidatedAt)
+
+	reopenResponse, err := actOnCanvasChangeRequestAction(
+		ctx,
+		r,
+		canvasID,
+		changeRequestID,
+		pb.ActOnCanvasChangeRequestRequest_ACTION_REOPEN,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, pb.CanvasChangeRequest_STATUS_OPEN, reopenResponse.ChangeRequest.Metadata.Status)
+	for _, approval := range reopenResponse.ChangeRequest.Approvals {
+		require.NotNil(t, approval.InvalidatedAt)
+	}
+
+	_, err = actOnCanvasChangeRequestAction(ctx, r, canvasID, changeRequestID, pb.ActOnCanvasChangeRequestRequest_ACTION_APPROVE)
+	require.NoError(t, err)
 }
 
 func createCanvasWithNoopNode(ctx context.Context, t *testing.T, r *support.ResourceRegistry, canvasName string) string {
@@ -197,4 +309,24 @@ func createDraftVersion(ctx context.Context, t *testing.T, r *support.ResourceRe
 	)
 	require.NoError(t, err)
 	return versionID
+}
+
+func actOnCanvasChangeRequestAction(
+	ctx context.Context,
+	r *support.ResourceRegistry,
+	canvasID string,
+	changeRequestID string,
+	action pb.ActOnCanvasChangeRequestRequest_Action,
+) (*pb.ActOnCanvasChangeRequestResponse, error) {
+	return ActOnCanvasChangeRequest(
+		ctx,
+		r.AuthService,
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		canvasID,
+		changeRequestID,
+		action,
+		testWebhookBaseURL,
+	)
 }

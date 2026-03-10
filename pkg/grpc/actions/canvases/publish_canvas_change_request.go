@@ -102,7 +102,14 @@ func PublishCanvasChangeRequest(
 			return status.Error(codes.FailedPrecondition, "change request has conflicts")
 		}
 		if !isOpenCanvasChangeRequestStatus(request.Status) {
-			return status.Error(codes.FailedPrecondition, "change request cannot be approved in its current status")
+			return status.Error(codes.FailedPrecondition, "change request cannot be published in its current status")
+		}
+		approvals, approvalsErr := models.ListCanvasChangeRequestApprovalsInTransaction(tx, canvasUUID, request.ID)
+		if approvalsErr != nil {
+			return approvalsErr
+		}
+		if publishCheckErr := ensureCanvasChangeRequestReadyToPublish(canvasForUpdate, approvals); publishCheckErr != nil {
+			return publishCheckErr
 		}
 
 		baseNodes, baseEdges, liveNodes, liveEdges, resolveErr := resolveCanvasChangeRequestBaseAndLiveInTransaction(

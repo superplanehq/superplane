@@ -460,7 +460,7 @@ export function Header({
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-33 p-2">
+                <DropdownMenuContent align="end" className="w-44 p-2">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="w-full">

@@ -355,7 +355,14 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { name?: string; description?: string; canvasVersioningEnabled?: boolean }) => {
+    mutationFn: async (data: {
+      name?: string;
+      description?: string;
+      canvasVersioningEnabled?: boolean;
+      changeRequestApprovalConfig?: {
+        items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
+      };
+    }) => {
       return await canvasesUpdateCanvas(
         withOrganizationHeader({
           path: { id: canvasId },
@@ -363,6 +370,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
             name: data.name,
             description: data.description,
             canvasVersioningEnabled: data.canvasVersioningEnabled,
+            changeRequestApprovalConfig: data.changeRequestApprovalConfig,
           },
         }),
       );
@@ -392,6 +400,10 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
                 updatedMetadata?.canvasVersioningEnabled ??
                 variables.canvasVersioningEnabled ??
                 current.metadata?.canvasVersioningEnabled,
+              changeRequestApprovalConfig:
+                updatedMetadata?.changeRequestApprovalConfig ??
+                variables.changeRequestApprovalConfig ??
+                current.metadata?.changeRequestApprovalConfig,
             },
           };
         });
@@ -550,7 +562,7 @@ export const useActOnCanvasChangeRequest = (organizationId: string, canvasId: st
   return useMutation({
     mutationFn: async (data: {
       changeRequestId: string;
-      action: "ACTION_APPROVE" | "ACTION_REJECT" | "ACTION_REOPEN";
+      action: "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_REJECT" | "ACTION_REOPEN" | "ACTION_PUBLISH";
     }) => {
       return await canvasesActOnCanvasChangeRequest(
         withOrganizationHeader({
