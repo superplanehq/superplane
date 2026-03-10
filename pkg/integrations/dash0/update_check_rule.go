@@ -15,7 +15,7 @@ import (
 type UpdateCheckRule struct{}
 
 type UpdateCheckRuleSpec struct {
-	CheckRuleID   string          `mapstructure:"checkRuleId"`
+	CheckRule     string          `mapstructure:"checkRule"`
 	Name          string          `mapstructure:"name"`
 	Expression    string          `mapstructure:"expression"`
 	Dataset       string          `mapstructure:"dataset"`
@@ -54,7 +54,7 @@ func (c *UpdateCheckRule) Documentation() string {
 
 ## Configuration
 
-- **Check Rule ID**: The Dash0 check rule ID to update (required)
+- **Check Rule**: The Dash0 check rule ID to update (required)
 - **Dataset**: The dataset the check rule belongs to (defaults to "default")
 - **Name**, **Expression**, **Thresholds**, **Interval**, etc.: Same as Create Check Rule; the full spec is sent to replace the existing check rule
 
@@ -78,8 +78,8 @@ func (c *UpdateCheckRule) OutputChannels(configuration any) []core.OutputChannel
 func (c *UpdateCheckRule) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "checkRuleId",
-			Label:       "Check Rule ID",
+			Name:        "checkRule",
+			Label:       "Check Rule",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The check rule to update",
@@ -162,26 +162,26 @@ func (c *UpdateCheckRule) Configuration() []configuration.Field {
 			Label:    "Trigger Grace Period",
 			Type:     configuration.FieldTypeSelect,
 			Required: true,
-			Default:  "0s",
+			Default:  "0",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: checkRuleGracePeriodOptions(),
 				},
 			},
-			Description: "How long the expression must be true before triggering",
+			Description: "Multiplier of the evaluation interval the expression must be true before triggering",
 		},
 		{
 			Name:     "keepFiringFor",
 			Label:    "Keep Firing Grace Period",
 			Type:     configuration.FieldTypeSelect,
 			Required: true,
-			Default:  "0s",
+			Default:  "0",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: checkRuleGracePeriodOptions(),
 				},
 			},
-			Description: "How long to keep firing after expression becomes false",
+			Description: "Multiplier of the evaluation interval to keep firing after expression becomes false",
 		},
 		{
 			Name:        "labels",
@@ -235,8 +235,8 @@ func (c *UpdateCheckRule) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if strings.TrimSpace(spec.CheckRuleID) == "" {
-		return errors.New("checkRuleId is required")
+	if strings.TrimSpace(spec.CheckRule) == "" {
+		return errors.New("checkRule is required")
 	}
 
 	if strings.TrimSpace(spec.Name) == "" {
@@ -252,6 +252,15 @@ func (c *UpdateCheckRule) Setup(ctx core.SetupContext) error {
 		if spec.Thresholds == nil || (spec.Thresholds.Degraded == nil && spec.Thresholds.Critical == nil) {
 			return errors.New("at least one threshold (degraded or critical) is required when using $__threshold in expression")
 		}
+	}
+
+	dataset := spec.Dataset
+	if dataset == "" {
+		dataset = "default"
+	}
+	err = resolveCheckRuleMetadata(ctx, spec.CheckRule, dataset)
+	if err != nil {
+		return fmt.Errorf("error resolving check rule metadata: %v", err)
 	}
 
 	return nil
@@ -290,7 +299,7 @@ func (c *UpdateCheckRule) Execute(ctx core.ExecutionContext) error {
 		Enabled:       spec.Enabled,
 	})
 
-	data, err := client.UpdateCheckRule(spec.CheckRuleID, request, dataset)
+	data, err := client.UpdateCheckRule(spec.CheckRule, request, dataset)
 	if err != nil {
 		return fmt.Errorf("failed to update check rule: %v", err)
 	}

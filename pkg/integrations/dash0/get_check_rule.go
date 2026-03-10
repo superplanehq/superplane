@@ -15,8 +15,8 @@ import (
 type GetCheckRule struct{}
 
 type GetCheckRuleSpec struct {
-	CheckRuleID string `mapstructure:"checkRuleId"`
-	Dataset     string `mapstructure:"dataset"`
+	CheckRule string `mapstructure:"checkRule"`
+	Dataset   string `mapstructure:"dataset"`
 }
 
 func (c *GetCheckRule) Name() string {
@@ -42,7 +42,7 @@ func (c *GetCheckRule) Documentation() string {
 
 ## Configuration
 
-- **Check Rule ID**: The ID or origin of the check rule to retrieve (from Dash0)
+- **Check Rule**: The ID or origin of the check rule to retrieve (from Dash0)
 - **Dataset**: The Dash0 dataset the check rule belongs to (defaults to "default")
 
 ## Output
@@ -70,8 +70,8 @@ func (c *GetCheckRule) OutputChannels(configuration any) []core.OutputChannel {
 func (c *GetCheckRule) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "checkRuleId",
-			Label:       "Check Rule ID",
+			Name:        "checkRule",
+			Label:       "Check Rule",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The check rule to retrieve",
@@ -99,12 +99,17 @@ func (c *GetCheckRule) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if strings.TrimSpace(spec.CheckRuleID) == "" {
-		return errors.New("checkRuleId is required")
+	if strings.TrimSpace(spec.CheckRule) == "" {
+		return errors.New("checkRule is required")
 	}
 
 	if strings.TrimSpace(spec.Dataset) == "" {
 		return errors.New("dataset is required")
+	}
+
+	err = resolveCheckRuleMetadata(ctx, spec.CheckRule, spec.Dataset)
+	if err != nil {
+		return fmt.Errorf("error resolving check rule metadata: %v", err)
 	}
 
 	return nil
@@ -127,7 +132,7 @@ func (c *GetCheckRule) Execute(ctx core.ExecutionContext) error {
 		dataset = "default"
 	}
 
-	data, err := client.GetCheckRule(spec.CheckRuleID, dataset)
+	data, err := client.GetCheckRule(spec.CheckRule, dataset)
 	if err != nil {
 		return fmt.Errorf("failed to get check rule: %v", err)
 	}

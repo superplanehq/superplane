@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -179,26 +181,26 @@ func (c *CreateCheckRule) Configuration() []configuration.Field {
 			Label:    "Trigger Grace Period",
 			Type:     configuration.FieldTypeSelect,
 			Required: true,
-			Default:  "0s",
+			Default:  "0",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: checkRuleGracePeriodOptions(),
 				},
 			},
-			Description: "How long the expression must be true before triggering",
+			Description: "Multiplier of the evaluation interval the expression must be true before triggering",
 		},
 		{
 			Name:     "keepFiringFor",
 			Label:    "Keep Firing Grace Period",
 			Type:     configuration.FieldTypeSelect,
 			Required: true,
-			Default:  "0s",
+			Default:  "0",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: checkRuleGracePeriodOptions(),
 				},
 			},
-			Description: "How long to keep firing after expression becomes false",
+			Description: "Multiplier of the evaluation interval to keep firing after expression becomes false",
 		},
 		{
 			Name:        "labels",
@@ -307,15 +309,8 @@ func buildCheckRuleRequest(spec CreateCheckRuleSpec) CheckRuleRequest {
 		interval = "1m"
 	}
 
-	forDuration := spec.For
-	if forDuration == "" {
-		forDuration = "0s"
-	}
-
-	keepFiringFor := spec.KeepFiringFor
-	if keepFiringFor == "" {
-		keepFiringFor = "0s"
-	}
+	forDuration := multiplyInterval(interval, spec.For)
+	keepFiringFor := multiplyInterval(interval, spec.KeepFiringFor)
 
 	request := CheckRuleRequest{
 		Name:          spec.Name,
@@ -356,6 +351,40 @@ func buildCheckRuleRequest(spec CreateCheckRuleSpec) CheckRuleRequest {
 	}
 
 	return request
+}
+
+func multiplyInterval(interval string, multiplier string) string {
+	if multiplier == "" || multiplier == "0" {
+		return "0s"
+	}
+
+	m, err := strconv.Atoi(multiplier)
+	if err != nil || m <= 0 {
+		return "0s"
+	}
+
+	d, err := time.ParseDuration(interval)
+	if err != nil {
+		return "0s"
+	}
+
+	return formatDuration(d * time.Duration(m))
+}
+
+func formatDuration(d time.Duration) string {
+	if d <= 0 {
+		return "0s"
+	}
+
+	if d%time.Hour == 0 {
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	}
+
+	if d%time.Minute == 0 {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+
+	return fmt.Sprintf("%ds", int(d.Seconds()))
 }
 
 func (c *CreateCheckRule) Cancel(ctx core.ExecutionContext) error {

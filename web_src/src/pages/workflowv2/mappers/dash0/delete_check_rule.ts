@@ -11,7 +11,7 @@ import {
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import { DeleteCheckRuleConfiguration } from "./types";
+import { CheckRuleNodeMetadata, DeleteCheckRuleConfiguration } from "./types";
 import { formatTimeAgo } from "@/utils/date";
 
 export const deleteCheckRuleMapper: ComponentBaseMapper = {
@@ -62,13 +62,14 @@ export const deleteCheckRuleMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
+  const nodeMetadata = node.metadata as CheckRuleNodeMetadata | undefined;
   const configuration = node.configuration as DeleteCheckRuleConfiguration;
 
-  if (configuration?.checkRuleId) {
+  if (nodeMetadata?.checkRuleName) {
+    metadata.push({ icon: "trash", label: nodeMetadata.checkRuleName });
+  } else if (configuration?.checkRule) {
     const idPreview =
-      configuration.checkRuleId.length > 30
-        ? configuration.checkRuleId.substring(0, 30) + "…"
-        : configuration.checkRuleId;
+      configuration.checkRule.length > 30 ? configuration.checkRule.substring(0, 30) + "…" : configuration.checkRule;
     metadata.push({ icon: "trash", label: idPreview });
   }
 

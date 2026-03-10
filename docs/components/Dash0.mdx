@@ -442,7 +442,7 @@ The Delete Check Rule component removes a check rule (Prometheus alert rule) fro
 
 ### Configuration
 
-- **Check Rule ID**: The Dash0 check rule ID or origin to delete (required)
+- **Check Rule**: The Dash0 check rule ID or origin to delete (required)
 - **Dataset**: The dataset the check rule belongs to (defaults to "default")
 
 ### Output
@@ -504,7 +504,7 @@ The Get Check Rule component retrieves the full configuration of an existing che
 
 ### Configuration
 
-- **Check Rule ID**: The ID or origin of the check rule to retrieve (from Dash0)
+- **Check Rule**: The ID or origin of the check rule to retrieve (from Dash0)
 - **Dataset**: The Dash0 dataset the check rule belongs to (defaults to "default")
 
 ### Output
@@ -841,7 +841,7 @@ The Update Check Rule component updates an existing check rule (Prometheus alert
 
 ### Configuration
 
-- **Check Rule ID**: The Dash0 check rule ID to update (required)
+- **Check Rule**: The Dash0 check rule ID to update (required)
 - **Dataset**: The dataset the check rule belongs to (defaults to "default")
 - **Name**, **Expression**, **Thresholds**, **Interval**, etc.: Same as Create Check Rule; the full spec is sent to replace the existing check rule
 

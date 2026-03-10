@@ -51,6 +51,11 @@ export interface GetHttpSyntheticCheckNodeMetadata {
   checkName?: string;
 }
 
+export interface CheckRuleNodeMetadata {
+  checkRule?: string;
+  checkRuleName?: string;
+}
+
 export interface UpdateHttpSyntheticCheckConfiguration {
   checkId: string;
   name: string;
@@ -108,15 +113,15 @@ export interface CheckRuleConfiguration {
 }
 
 export interface GetCheckRuleConfiguration {
-  checkRuleId: string;
+  checkRule: string;
   dataset: string;
 }
 
 export interface UpdateCheckRuleConfiguration extends CheckRuleConfiguration {
-  checkRuleId: string;
+  checkRule: string;
 }
 
 export interface DeleteCheckRuleConfiguration {
-  checkRuleId: string;
+  checkRule: string;
   dataset: string;
 }

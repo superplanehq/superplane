@@ -11,7 +11,7 @@ import {
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import { UpdateCheckRuleConfiguration } from "./types";
+import { CheckRuleNodeMetadata, UpdateCheckRuleConfiguration } from "./types";
 import { formatTimeAgo } from "@/utils/date";
 
 export const updateCheckRuleMapper: ComponentBaseMapper = {
@@ -77,7 +77,12 @@ export const updateCheckRuleMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
+  const nodeMetadata = node.metadata as CheckRuleNodeMetadata | undefined;
   const configuration = node.configuration as UpdateCheckRuleConfiguration;
+
+  if (nodeMetadata?.checkRuleName) {
+    metadata.push({ icon: "bell", label: nodeMetadata.checkRuleName });
+  }
 
   if (configuration?.expression) {
     const exprPreview =

@@ -15,8 +15,8 @@ import (
 type DeleteCheckRule struct{}
 
 type DeleteCheckRuleSpec struct {
-	CheckRuleID string `mapstructure:"checkRuleId"`
-	Dataset     string `mapstructure:"dataset"`
+	CheckRule string `mapstructure:"checkRule"`
+	Dataset   string `mapstructure:"dataset"`
 }
 
 func (c *DeleteCheckRule) Name() string {
@@ -42,7 +42,7 @@ func (c *DeleteCheckRule) Documentation() string {
 
 ## Configuration
 
-- **Check Rule ID**: The Dash0 check rule ID or origin to delete (required)
+- **Check Rule**: The Dash0 check rule ID or origin to delete (required)
 - **Dataset**: The dataset the check rule belongs to (defaults to "default")
 
 ## Output
@@ -65,8 +65,8 @@ func (c *DeleteCheckRule) OutputChannels(configuration any) []core.OutputChannel
 func (c *DeleteCheckRule) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "checkRuleId",
-			Label:       "Check Rule ID",
+			Name:        "checkRule",
+			Label:       "Check Rule",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The check rule to delete",
@@ -94,12 +94,17 @@ func (c *DeleteCheckRule) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if strings.TrimSpace(spec.CheckRuleID) == "" {
-		return errors.New("checkRuleId is required")
+	if strings.TrimSpace(spec.CheckRule) == "" {
+		return errors.New("checkRule is required")
 	}
 
 	if strings.TrimSpace(spec.Dataset) == "" {
 		return errors.New("dataset is required")
+	}
+
+	err = resolveCheckRuleMetadata(ctx, spec.CheckRule, spec.Dataset)
+	if err != nil {
+		return fmt.Errorf("error resolving check rule metadata: %v", err)
 	}
 
 	return nil
@@ -122,7 +127,7 @@ func (c *DeleteCheckRule) Execute(ctx core.ExecutionContext) error {
 		dataset = "default"
 	}
 
-	data, err := client.DeleteCheckRule(spec.CheckRuleID, dataset)
+	data, err := client.DeleteCheckRule(spec.CheckRule, dataset)
 	if err != nil {
 		return fmt.Errorf("failed to delete check rule: %v", err)
 	}
