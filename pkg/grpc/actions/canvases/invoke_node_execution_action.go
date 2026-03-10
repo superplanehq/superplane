@@ -87,10 +87,15 @@ func InvokeNodeExecutionAction(
 		Configuration:  node.Configuration.Data(),
 		HTTP:           registry.HTTPContext(),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
-		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
+		ExecutionState: contexts.NewExecutionStateContext(tx, execution, nil),
 		Auth:           contexts.NewAuthContext(tx, orgID, authService, user),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Notifications:  contexts.NewNotificationContext(tx, orgID, canvas.ID),
+	}
+
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
 	}
 
 	if node.AppInstallationID != nil {
@@ -101,7 +106,7 @@ func InvokeNodeExecutionAction(
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry)
+		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry, onNewEvents)
 	}
 
 	actionCtx.Logger = logger
@@ -115,6 +120,10 @@ func InvokeNodeExecutionAction(
 		execution.ID.String(),
 		execution.NodeID,
 	).Publish()
+
+	for _, event := range newEvents {
+		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+	}
 
 	return &pb.InvokeNodeExecutionActionResponse{}, nil
 }

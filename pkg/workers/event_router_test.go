@@ -15,11 +15,12 @@ import (
 )
 
 func Test__EventRouter_ProcessRootEvent(t *testing.T) {
-	router := NewEventRouter()
+	amqpURL, _ := config.RabbitMQURL()
+
+	router := NewEventRouter(amqpURL)
 	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
-	amqpURL, _ := config.RabbitMQURL()
 	eventConsumer := testconsumer.New(amqpURL, messages.WorkflowEventCreatedRoutingKey)
 	queueConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemCreatedRoutingKey)
 	eventConsumer.Start()
@@ -71,11 +72,12 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 }
 
 func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
-	router := NewEventRouter()
+	amqpURL, _ := config.RabbitMQURL()
+
+	router := NewEventRouter(amqpURL)
 	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
-	amqpURL, _ := config.RabbitMQURL()
 	eventConsumer := testconsumer.New(amqpURL, messages.WorkflowEventCreatedRoutingKey)
 	queueConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemCreatedRoutingKey)
 	eventConsumer.Start()
@@ -135,11 +137,11 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 }
 
 func Test__EventRouter_CustomComponent_RespectsOutputChannels(t *testing.T) {
-	router := NewEventRouter()
+	amqpURL, _ := config.RabbitMQURL()
+	router := NewEventRouter(amqpURL)
 	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
-	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
@@ -239,11 +241,11 @@ func Test__EventRouter_CustomComponent_RespectsOutputChannels(t *testing.T) {
 }
 
 func TestEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
-	router := NewEventRouter()
+	amqpURL, _ := config.RabbitMQURL()
+	router := NewEventRouter(amqpURL)
 	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
-	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()

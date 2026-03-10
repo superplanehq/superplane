@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"golang.org/x/sync/semaphore"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 
 	"github.com/google/uuid"
+	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -17,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -26,18 +29,28 @@ type NodeQueueWorker struct {
 	registry  *registry.Registry
 	semaphore *semaphore.Weighted
 	logger    *log.Entry
+
+	rabbitMQURL string
+	consumer    *tackle.Consumer
 }
 
-func NewNodeQueueWorker(registry *registry.Registry) *NodeQueueWorker {
+func NewNodeQueueWorker(registry *registry.Registry, rabbitMQURL string) *NodeQueueWorker {
 	return &NodeQueueWorker{
-		registry:  registry,
-		semaphore: semaphore.NewWeighted(25),
-		logger:    log.WithFields(log.Fields{"worker": "NodeQueueWorker"}),
+		registry:    registry,
+		rabbitMQURL: rabbitMQURL,
+		semaphore:   semaphore.NewWeighted(25),
+		logger:      log.WithFields(log.Fields{"worker": "NodeQueueWorker"}),
 	}
 }
 
+func (w *NodeQueueWorker) Name() string {
+	return "NodeQueueWorker"
+}
+
 func (w *NodeQueueWorker) Start(ctx context.Context) {
-	ticker := time.NewTicker(1 * time.Second)
+	go w.StartRabbitMQConsumer(ctx)
+
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -72,6 +85,69 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 			telemetry.RecordQueueWorkerTickDuration(context.Background(), time.Since(tickStart))
 		}
 	}
+}
+
+func (w *NodeQueueWorker) StartRabbitMQConsumer(ctx context.Context) {
+	options := tackle.Options{
+		URL:            w.rabbitMQURL,
+		ConnectionName: w.Name(),
+		RemoteExchange: messages.WorkflowExchange,
+		Service:        messages.WorkflowExchange + "." + messages.WorkflowQueueItemCreatedRoutingKey + "." + w.Name(),
+		RoutingKey:     messages.WorkflowQueueItemCreatedRoutingKey,
+	}
+
+	consumer := tackle.NewConsumer()
+	consumer.SetLogger(logging.NewTackleLogger(w.logger))
+	w.consumer = consumer
+
+	for {
+		log.Infof("Connecting to RabbitMQ queue for %s events", messages.WorkflowQueueItemCreatedRoutingKey)
+
+		err := w.consumer.Start(&options, w.Consume)
+		if err != nil {
+			w.logger.Errorf("Error consuming messages from %s: %v", messages.WorkflowQueueItemCreatedRoutingKey, err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.WorkflowQueueItemCreatedRoutingKey)
+		time.Sleep(5 * time.Second)
+	}
+}
+
+func (w *NodeQueueWorker) Consume(delivery tackle.Delivery) error {
+	data := &pb.CanvasNodeQueueItemMessage{}
+	err := proto.Unmarshal(delivery.Body(), data)
+	if err != nil {
+		w.logger.Errorf("Error unmarshaling canvas queue item created message: %v", err)
+		return err
+	}
+
+	canvasID, err := uuid.Parse(data.CanvasId)
+	if err != nil {
+		w.logger.Errorf("Error parsing canvas id: %v", err)
+		return err
+	}
+
+	node, err := models.FindCanvasNode(database.Conn(), canvasID, data.NodeId)
+	if err != nil {
+		w.logger.Errorf("Error finding canvas node: %v", err)
+		return err
+	}
+
+	//
+	// New queue item created for a node that is not ready, we should skip it.
+	//
+	if node.State != models.CanvasNodeStateReady {
+		w.logger.Infof("Node %s is not ready, skipping", node.NodeID)
+		return nil
+	}
+
+	//
+	// Node is ready for processing, let's lock it and process it.
+	//
+	logger := logging.WithNode(w.logger, *node)
+	return w.LockAndProcessNode(logger, *node)
 }
 
 func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.CanvasNode) error {

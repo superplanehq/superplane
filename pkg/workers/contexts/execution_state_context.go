@@ -13,10 +13,20 @@ type ExecutionStateContext struct {
 	execution      *models.CanvasNodeExecution
 	tx             *gorm.DB
 	maxPayloadSize int
+	onNewEvents    func([]models.CanvasEvent)
 }
 
-func NewExecutionStateContext(tx *gorm.DB, execution *models.CanvasNodeExecution) *ExecutionStateContext {
-	return &ExecutionStateContext{tx: tx, execution: execution, maxPayloadSize: DefaultMaxPayloadSize}
+func NewExecutionStateContext(
+	tx *gorm.DB,
+	execution *models.CanvasNodeExecution,
+	onNewEvents func([]models.CanvasEvent),
+) *ExecutionStateContext {
+	return &ExecutionStateContext{
+		tx:             tx,
+		execution:      execution,
+		maxPayloadSize: DefaultMaxPayloadSize,
+		onNewEvents:    onNewEvents,
+	}
 }
 
 func (s *ExecutionStateContext) IsFinished() bool {
@@ -24,9 +34,13 @@ func (s *ExecutionStateContext) IsFinished() bool {
 }
 
 func (s *ExecutionStateContext) Pass() error {
-	_, err := s.execution.PassInTransaction(s.tx, map[string][]any{})
+	newEvents, err := s.execution.PassInTransaction(s.tx, map[string][]any{})
 	if err != nil {
 		return err
+	}
+
+	if s.onNewEvents != nil {
+		s.onNewEvents(newEvents)
 	}
 
 	return nil
@@ -56,9 +70,13 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 		outputs[channel] = append(outputs[channel], json.RawMessage(data))
 	}
 
-	_, err := s.execution.PassInTransaction(s.tx, outputs)
+	newEvents, err := s.execution.PassInTransaction(s.tx, outputs)
 	if err != nil {
 		return err
+	}
+
+	if s.onNewEvents != nil {
+		s.onNewEvents(newEvents)
 	}
 
 	return nil
