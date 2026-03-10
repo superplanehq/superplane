@@ -71,6 +71,17 @@ func (d *DigitalOcean) Configuration() []configuration.Field {
 func (d *DigitalOcean) Components() []core.Component {
 	return []core.Component{
 		&CreateDroplet{},
+		&GetDroplet{},
+		&DeleteDroplet{},
+		&ManageDropletPower{},
+		&CreateSnapshot{},
+		&DeleteSnapshot{},
+		&CreateDNSRecord{},
+		&DeleteDNSRecord{},
+		&UpsertDNSRecord{},
+		&CreateLoadBalancer{},
+		&DeleteLoadBalancer{},
+		&AssignReservedIP{},
 	}
 }
 
@@ -180,6 +191,90 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 				Type: resourceType,
 				Name: name,
 				ID:   image.Slug,
+			})
+		}
+		return resources, nil
+
+	case "droplet":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		droplets, err := client.ListDroplets()
+		if err != nil {
+			return nil, fmt.Errorf("error listing droplets: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(droplets))
+		for _, droplet := range droplets {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: fmt.Sprintf("%s (%d)", droplet.Name, droplet.ID),
+				ID:   fmt.Sprintf("%d", droplet.ID),
+			})
+		}
+		return resources, nil
+
+	case "snapshot":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		snapshots, err := client.ListSnapshots()
+		if err != nil {
+			return nil, fmt.Errorf("error listing snapshots: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(snapshots))
+		for _, snapshot := range snapshots {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: snapshot.Name,
+				ID:   snapshot.ID,
+			})
+		}
+		return resources, nil
+
+	case "domain":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		domains, err := client.ListDomains()
+		if err != nil {
+			return nil, fmt.Errorf("error listing domains: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(domains))
+		for _, domain := range domains {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: domain.Name,
+				ID:   domain.Name,
+			})
+		}
+		return resources, nil
+
+	case "load_balancer":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		loadBalancers, err := client.ListLoadBalancers()
+		if err != nil {
+			return nil, fmt.Errorf("error listing load balancers: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(loadBalancers))
+		for _, lb := range loadBalancers {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: lb.Name,
+				ID:   lb.ID,
 			})
 		}
 		return resources, nil

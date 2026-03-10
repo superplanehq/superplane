@@ -10,6 +10,17 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create Droplet" href="#create-droplet" description="Create a new DigitalOcean Droplet" />
+  <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
+  <LinkCard title="Delete Droplet" href="#delete-droplet" description="Delete a DigitalOcean Droplet" />
+  <LinkCard title="Manage Droplet Power" href="#manage-droplet-power" description="Run power operations on a DigitalOcean Droplet" />
+  <LinkCard title="Create Snapshot" href="#create-snapshot" description="Create a snapshot of a DigitalOcean Droplet" />
+  <LinkCard title="Delete Snapshot" href="#delete-snapshot" description="Delete a DigitalOcean snapshot" />
+  <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record for a DigitalOcean domain" />
+  <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a DigitalOcean domain" />
+  <LinkCard title="Upsert DNS Record" href="#upsert-dns-record" description="Create or update a DNS record for a DigitalOcean domain" />
+  <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a DigitalOcean Load Balancer" />
+  <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a DigitalOcean Load Balancer" />
+  <LinkCard title="Assign Reserved IP" href="#assign-reserved-ip" description="Assign or unassign a DigitalOcean Reserved IP" />
 </CardGrid>
 
 ## Instructions
@@ -94,3 +105,255 @@ Returns the created droplet object including:
 }
 ```
 
+<a id="get-droplet"></a>
+
+## Get Droplet
+
+The Get Droplet component retrieves details of an existing DigitalOcean Droplet.
+
+### Use Cases
+
+- **Monitoring**: Check the current status of a droplet
+- **Chaining**: Fetch droplet details before performing other operations
+- **Inventory**: Retrieve droplet configuration for auditing
+
+### Configuration
+
+- **Droplet ID**: The ID of the droplet to fetch (required, supports expressions)
+
+### Output
+
+Returns the droplet object including:
+- **id**: Droplet ID
+- **name**: Droplet hostname
+- **status**: Current droplet status
+- **region**: Region information
+- **networks**: Network information including IP addresses
+
+<a id="delete-droplet"></a>
+
+## Delete Droplet
+
+The Delete Droplet component deletes an existing DigitalOcean Droplet.
+
+### Configuration
+
+- **Droplet ID**: The ID of the droplet to delete (required, supports expressions)
+
+### Output
+
+Returns confirmation of the deleted droplet:
+- **dropletId**: The ID of the deleted droplet
+
+<a id="manage-droplet-power"></a>
+
+## Manage Droplet Power
+
+The Manage Droplet Power component runs power operations on a DigitalOcean Droplet and waits for completion.
+
+### Use Cases
+
+- **Maintenance**: Power off droplets for scheduled maintenance
+- **Recovery**: Reboot unresponsive droplets
+- **Cost management**: Power off unused droplets
+
+### Configuration
+
+- **Droplet ID**: The ID of the droplet (required, supports expressions)
+- **Action**: The power action to perform (required). One of: power_on, shutdown, reboot, power_cycle, power_off
+
+### Output
+
+Returns the completed action details:
+- **actionId**: The DigitalOcean action ID
+- **dropletId**: The droplet ID
+- **action**: The action type performed
+- **status**: The final status of the action
+
+<a id="create-snapshot"></a>
+
+## Create Snapshot
+
+The Create Snapshot component creates a snapshot image from a DigitalOcean Droplet and waits for completion.
+
+### Use Cases
+
+- **Backup**: Create snapshots before making changes to a droplet
+- **Cloning**: Snapshot a droplet to use as a base for new droplets
+- **Disaster recovery**: Automate periodic snapshot creation
+
+### Configuration
+
+- **Droplet ID**: The ID of the droplet to snapshot (required, supports expressions)
+- **Snapshot Name**: A name for the snapshot (optional, supports expressions)
+
+### Output
+
+Returns the snapshot action details:
+- **actionId**: The DigitalOcean action ID
+- **dropletId**: The source droplet ID
+- **status**: The final status of the action
+
+<a id="delete-snapshot"></a>
+
+## Delete Snapshot
+
+The Delete Snapshot component deletes a snapshot image in DigitalOcean.
+
+### Configuration
+
+- **Snapshot ID**: The ID of the snapshot to delete (required, supports expressions)
+
+### Output
+
+Returns confirmation of the deleted snapshot:
+- **snapshotId**: The ID of the deleted snapshot
+
+<a id="create-dns-record"></a>
+
+## Create DNS Record
+
+The Create DNS Record component creates a new DNS record in a DigitalOcean domain.
+
+### Use Cases
+
+- **DNS management**: Automate DNS record creation as part of infrastructure provisioning
+- **Blue/green deployments**: Create DNS records pointing to new infrastructure
+- **Certificate validation**: Create DNS records for domain verification
+
+### Configuration
+
+- **Domain**: The domain to create the record for (required, supports expressions)
+- **Record Type**: The DNS record type (required). One of: A, AAAA, CNAME, MX, TXT, NS, SRV, CAA
+- **Name**: The hostname for the record (required, supports expressions). Use @ for apex domain.
+- **Data**: The record data/value (required, supports expressions)
+- **TTL**: Time-to-live in seconds (optional, defaults to 1800)
+
+### Output
+
+Returns the created DNS record including:
+- **id**: Record ID
+- **type**: Record type
+- **name**: Record name
+- **data**: Record data
+- **ttl**: Record TTL
+
+<a id="delete-dns-record"></a>
+
+## Delete DNS Record
+
+The Delete DNS Record component deletes a DNS record from a DigitalOcean domain.
+
+### Configuration
+
+- **Domain**: The domain the record belongs to (required, supports expressions)
+- **Record ID**: The ID of the DNS record to delete (required, supports expressions)
+
+### Output
+
+Returns confirmation of the deleted record:
+- **domain**: The domain name
+- **recordId**: The ID of the deleted record
+
+<a id="upsert-dns-record"></a>
+
+## Upsert DNS Record
+
+The Upsert DNS Record component provides an idempotent create-or-update flow for DNS records.
+
+### How It Works
+
+1. Lists existing DNS records for the domain
+2. Looks for a record matching the same type and name
+3. If found, updates the existing record with new data
+4. If not found, creates a new record
+
+### Configuration
+
+- **Domain**: The domain to manage the record for (required, supports expressions)
+- **Record Type**: The DNS record type (required). One of: A, AAAA, CNAME, MX, TXT, NS, SRV, CAA
+- **Name**: The hostname for the record (required, supports expressions). Use @ for apex domain.
+- **Data**: The record data/value (required, supports expressions)
+- **TTL**: Time-to-live in seconds (optional, defaults to 1800)
+
+### Output
+
+Returns the created or updated DNS record including:
+- **id**: Record ID
+- **type**: Record type
+- **name**: Record name
+- **data**: Record data
+- **ttl**: Record TTL
+- **action**: Whether the record was "created" or "updated"
+
+<a id="create-load-balancer"></a>
+
+## Create Load Balancer
+
+The Create Load Balancer component creates a new DigitalOcean Load Balancer.
+
+### Use Cases
+
+- **Traffic distribution**: Distribute traffic across multiple droplets
+- **High availability**: Set up load balancing for production environments
+- **Auto-scaling**: Create load balancers as part of scaling workflows
+
+### Configuration
+
+- **Name**: The name for the load balancer (required, supports expressions)
+- **Region**: Region where the load balancer will be created (required)
+- **Algorithm**: Load balancing algorithm (optional, defaults to round_robin)
+- **Entry Protocol**: Protocol for incoming traffic (required)
+- **Entry Port**: Port for incoming traffic (required)
+- **Target Protocol**: Protocol for backend traffic (required)
+- **Target Port**: Port for backend traffic (required)
+
+### Output
+
+Returns the created load balancer object including:
+- **id**: Load balancer ID
+- **name**: Load balancer name
+- **ip**: Load balancer IP address
+- **status**: Current status
+- **region**: Region information
+
+<a id="delete-load-balancer"></a>
+
+## Delete Load Balancer
+
+The Delete Load Balancer component deletes a DigitalOcean Load Balancer.
+
+### Configuration
+
+- **Load Balancer ID**: The ID of the load balancer to delete (required, supports expressions)
+
+### Output
+
+Returns confirmation of the deleted load balancer:
+- **loadBalancerId**: The ID of the deleted load balancer
+
+<a id="assign-reserved-ip"></a>
+
+## Assign Reserved IP
+
+The Assign Reserved IP component assigns or unassigns a Reserved IP to/from a droplet and waits for completion.
+
+### Use Cases
+
+- **Failover**: Reassign a reserved IP to a standby droplet
+- **Blue/green deployments**: Move traffic to a new droplet by reassigning the IP
+- **Cleanup**: Unassign reserved IPs from decommissioned droplets
+
+### Configuration
+
+- **Reserved IP**: The Reserved IP address (required, supports expressions)
+- **Action**: The action to perform — assign or unassign (required)
+- **Droplet ID**: The droplet ID to assign the IP to (required for assign, ignored for unassign; supports expressions)
+
+### Output
+
+Returns the action details:
+- **actionId**: The DigitalOcean action ID
+- **reservedIp**: The Reserved IP address
+- **action**: The action performed (assign or unassign)
+- **status**: The final status of the action
