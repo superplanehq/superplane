@@ -40,7 +40,7 @@ func (w *EventRouter) Name() string {
 }
 
 func (w *EventRouter) Start(ctx context.Context) {
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
 	go w.StartRabbitMQConsumer(ctx)
@@ -94,16 +94,16 @@ func (w *EventRouter) StartRabbitMQConsumer(ctx context.Context) {
 	w.consumer = consumer
 
 	for {
-		log.Infof("Connecting to RabbitMQ queue for %s events", messages.WorkflowExecutionRoutingKey)
+		log.Infof("Connecting to RabbitMQ queue for %s events", messages.WorkflowEventCreatedRoutingKey)
 
 		err := w.consumer.Start(&options, w.Consume)
 		if err != nil {
-			w.logger.Errorf("Error consuming messages from %s: %v", messages.WorkflowExecutionRoutingKey, err)
+			w.logger.Errorf("Error consuming messages from %s: %v", messages.WorkflowEventCreatedRoutingKey, err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
 
-		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.WorkflowExecutionRoutingKey)
+		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.WorkflowEventCreatedRoutingKey)
 		time.Sleep(5 * time.Second)
 	}
 }
@@ -158,16 +158,6 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	if err != nil {
 		return err
 	}
-
-	//
-	// TODO: this is confusing. No workflow_event record is being created here.
-	// I suspect we are sending this here because the event being processed is moved
-	// to "routed" state, and the UI needs to know about it.
-	// Using another message would be better than this.
-	//
-	// This is also causing a loop, since it is publishing the same message it consumes.
-	//
-	messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
 
 	if len(createdQueueItems) > 0 {
 		for _, queueItem := range createdQueueItems {

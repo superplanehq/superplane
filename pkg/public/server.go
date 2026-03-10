@@ -792,6 +792,10 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	for _, event := range newEvents {
+		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 

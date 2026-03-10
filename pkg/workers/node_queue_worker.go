@@ -50,7 +50,17 @@ func (w *NodeQueueWorker) Name() string {
 func (w *NodeQueueWorker) Start(ctx context.Context) {
 	go w.StartRabbitMQConsumer(ctx)
 
-	ticker := time.NewTicker(10 * time.Second)
+	//
+	// Differently from the other workers, the NodeQueueWorker needs to be
+	// aware of two things: queue items being created and nodes becoming ready.
+	//
+	// Since we don't have events for nodes becoming ready, we need to poll still,
+	// so we cannot decrease this interval yet.
+	//
+	// Once we have events for nodes becoming ready,
+	// we can make this worker react to both events.
+	//
+	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
 	for {

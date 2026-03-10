@@ -61,7 +61,7 @@ func (w *NodeExecutor) Name() string {
 func (w *NodeExecutor) Start(ctx context.Context) {
 	go w.StartRabbitMQConsumer(ctx)
 
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
 	for {
