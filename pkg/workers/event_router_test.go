@@ -21,11 +21,8 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
-	eventConsumer := testconsumer.New(amqpURL, messages.WorkflowEventCreatedRoutingKey)
 	queueConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemCreatedRoutingKey)
-	eventConsumer.Start()
 	queueConsumer.Start()
-	defer eventConsumer.Stop()
 	defer queueConsumer.Stop()
 
 	//
@@ -67,7 +64,6 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	assert.Equal(t, node2, queueItems[0].NodeID)
 	assert.Equal(t, event.ID, queueItems[0].EventID)
 
-	assert.True(t, eventConsumer.HasReceivedMessage())
 	assert.True(t, queueConsumer.HasReceivedMessage())
 }
 
@@ -78,11 +74,8 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
-	eventConsumer := testconsumer.New(amqpURL, messages.WorkflowEventCreatedRoutingKey)
 	queueConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemCreatedRoutingKey)
-	eventConsumer.Start()
 	queueConsumer.Start()
-	defer eventConsumer.Stop()
 	defer queueConsumer.Stop()
 
 	trigger1 := "trigger-1"
@@ -132,7 +125,6 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	assert.Equal(t, node2, queueItems[0].NodeID)
 	assert.Equal(t, outputEvent.ID, queueItems[0].EventID)
 
-	assert.True(t, eventConsumer.HasReceivedMessage())
 	assert.True(t, queueConsumer.HasReceivedMessage())
 }
 
