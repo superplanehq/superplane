@@ -4534,7 +4534,6 @@ export function WorkflowPageV2() {
           onExitEditMode={showVersioningUI ? handleToggleEditMode : undefined}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          versioningDisabledTooltip={versioningDisabledTooltip}
           showPendingDraftBadge={showPendingDraftBadge}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
