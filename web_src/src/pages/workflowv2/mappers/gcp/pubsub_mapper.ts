@@ -1,4 +1,10 @@
-import { ComponentBaseMapper, ComponentBaseContext, EventStateRegistry, ExecutionDetailsContext, SubtitleContext } from "../types";
+import {
+  ComponentBaseMapper,
+  ComponentBaseContext,
+  EventStateRegistry,
+  ExecutionDetailsContext,
+  SubtitleContext,
+} from "../types";
 import { ComponentBaseProps } from "@/ui/componentBase";
 import { baseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
@@ -67,9 +73,14 @@ export const createSubscriptionMapper: ComponentBaseMapper = {
   props: pubsubProps,
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const payload = context.execution.outputs as PubSubOutputs<{
-      subscriptionId?: string; topicId?: string; type?: string; name?: string
-    }> | undefined;
+    const payload = context.execution.outputs as
+      | PubSubOutputs<{
+          subscriptionId?: string;
+          topicId?: string;
+          type?: string;
+          name?: string;
+        }>
+      | undefined;
     const item = payload?.default?.[0]?.data;
     const details: Record<string, string> = {};
     if (item?.subscriptionId) details["Subscription ID"] = item.subscriptionId;
