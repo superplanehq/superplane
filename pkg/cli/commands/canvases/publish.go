@@ -2,7 +2,6 @@ package canvases
 
 import (
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -64,47 +63,12 @@ func (c *publishCommand) Execute(ctx core.CommandContext) error {
 		return nil
 	}
 
-	changeRequestID := ""
-	if response.ChangeRequest.Metadata != nil {
-		changeRequestID = response.ChangeRequest.Metadata.GetId()
-	}
-	if changeRequestID == "" {
-		return fmt.Errorf("change request id not found in response")
+	changeRequest := *response.ChangeRequest
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(changeRequest)
 	}
 
-	actionBody := openapi_client.CanvasesActOnCanvasChangeRequestBody{}
-	actionBody.SetAction(openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE)
-	actionResponse, _, err := ctx.API.CanvasChangeRequestAPI.
-		CanvasesActOnCanvasChangeRequest(ctx.Context, canvasID, changeRequestID).
-		Body(actionBody).
-		Execute()
-	if err != nil {
-		return err
-	}
-
-	changeRequest := actionResponse.ChangeRequest
-	if changeRequest == nil {
-		return nil
-	}
-
-	if ctx.Renderer.IsText() {
-		metadata := changeRequest.Metadata
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			status := ""
-			versionID := ""
-			if metadata != nil {
-				status = string(metadata.GetStatus())
-				versionID = metadata.GetVersionId()
-			}
-
-			_, _ = fmt.Fprintf(stdout, "Change request published: %s\n", changeRequestID)
-			_, _ = fmt.Fprintf(stdout, "Status: %s\n", status)
-			_, err := fmt.Fprintf(stdout, "Version: %s\n", versionID)
-			return err
-		})
-	}
-
-	return ctx.Renderer.Render(changeRequest)
+	return renderCanvasChangeRequestSummaryText(ctx, "created", changeRequest)
 }
 
 func resolveCanvasTarget(ctx core.CommandContext) (string, error) {
