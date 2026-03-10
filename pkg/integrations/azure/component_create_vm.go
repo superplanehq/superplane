@@ -35,7 +35,7 @@ func (c *CreateVMComponent) Name() string {
 }
 
 func (c *CreateVMComponent) Label() string {
-	return "Azure • Create Virtual Machine"
+	return "Create Virtual Machine"
 }
 
 func (c *CreateVMComponent) Description() string {
