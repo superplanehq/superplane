@@ -5,7 +5,7 @@ import { formatTimeAgo } from "@/utils/date";
 import gcpPubSubIcon from "@/assets/icons/integrations/gcp.pubsub.svg";
 
 export const onMessageTriggerRenderer: TriggerRenderer = {
-  getEventState: (_context: TriggerEventContext) => "neutral",
+  getEventState: (_context: TriggerEventContext) => "triggered",
 
   getTitleAndSubtitle: (_context: TriggerEventContext): { title: string; subtitle: string } => {
     return { title: "Pub/Sub message", subtitle: "" };
@@ -34,7 +34,7 @@ export const onMessageTriggerRenderer: TriggerRenderer = {
           title: "Pub/Sub message",
           subtitle: formatTimeAgo(new Date(lastEvent.createdAt)),
           receivedAt: new Date(lastEvent.createdAt),
-          state: "neutral",
+          state: "triggered",
           eventId: lastEvent.id,
         },
       }),
