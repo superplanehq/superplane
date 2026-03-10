@@ -27,11 +27,13 @@ type CreateSubscriptionConfiguration struct {
 	PushEndpoint   string `json:"pushEndpoint" mapstructure:"pushEndpoint"`
 }
 
-func (c *CreateSubscriptionComponent) Name() string        { return "gcp.pubsub.createSubscription" }
-func (c *CreateSubscriptionComponent) Label() string       { return "Pub/Sub • Create Subscription" }
-func (c *CreateSubscriptionComponent) Description() string { return "Create a GCP Pub/Sub subscription" }
-func (c *CreateSubscriptionComponent) Icon() string        { return "gcp" }
-func (c *CreateSubscriptionComponent) Color() string       { return "gray" }
+func (c *CreateSubscriptionComponent) Name() string  { return "gcp.pubsub.createSubscription" }
+func (c *CreateSubscriptionComponent) Label() string { return "Pub/Sub • Create Subscription" }
+func (c *CreateSubscriptionComponent) Description() string {
+	return "Create a GCP Pub/Sub subscription"
+}
+func (c *CreateSubscriptionComponent) Icon() string  { return "gcp" }
+func (c *CreateSubscriptionComponent) Color() string { return "gray" }
 
 func (c *CreateSubscriptionComponent) Documentation() string {
 	return `The Create Subscription component creates a new GCP Pub/Sub subscription on a topic.
@@ -171,7 +173,7 @@ func (c *CreateSubscriptionComponent) Execute(ctx core.ExecutionContext) error {
 	})
 }
 
-func (c *CreateSubscriptionComponent) Actions() []core.Action                 { return nil }
+func (c *CreateSubscriptionComponent) Actions() []core.Action                  { return nil }
 func (c *CreateSubscriptionComponent) HandleAction(_ core.ActionContext) error { return nil }
 func (c *CreateSubscriptionComponent) Cancel(_ core.ExecutionContext) error    { return nil }
 func (c *CreateSubscriptionComponent) Cleanup(_ core.SetupContext) error       { return nil }
