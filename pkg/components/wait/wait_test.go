@@ -605,7 +605,7 @@ func TestWait_Execute_CountdownMode_ResolvedValues(t *testing.T) {
 	}
 }
 
-func TestWait_Cancel_CompletionOutput(t *testing.T) {
+func TestWait_Cancel(t *testing.T) {
 	w := &Wait{}
 
 	stateCtx := &contexts.ExecutionStateContext{}
@@ -624,22 +624,5 @@ func TestWait_Cancel_CompletionOutput(t *testing.T) {
 
 	err := w.Cancel(ctx)
 	assert.NoError(t, err)
-	assert.True(t, stateCtx.Passed)
-	assert.True(t, stateCtx.Finished)
-
-	// Check completion output structure
-	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
-	require.Len(t, stateCtx.Payloads, 1)
-	payload := stateCtx.Payloads[0].(map[string]any)
-	output := payload["data"].(map[string]any)
-	assert.Equal(t, "2025-12-10T09:02:43.651Z", output["started_at"])
-	assert.Equal(t, "cancelled", output["result"])
-	assert.Equal(t, "user_cancel", output["reason"])
-	assert.Contains(t, output, "finished_at")
-
-	// Check actor information
-	assert.NotNil(t, output["actor"])
-	actor := output["actor"].(map[string]any)
-	assert.Equal(t, "alex@company.com", actor["email"])
-	assert.Equal(t, "Aleksandar Mitrović", actor["display_name"])
+	require.Zero(t, stateCtx.Payloads)
 }
