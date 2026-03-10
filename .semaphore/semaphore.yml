@@ -63,7 +63,7 @@ blocks:
         always:
           commands:
             - '[ -f junit-report.xml ] && test-results publish junit-report.xml'
-            - 'if [ -d tmp/screenshots ] && ls tmp/screenshots/*.png >/dev/null 2>&1; then artifact push job tmp/screenshots; fi'
+            - 'if [ -d tmp/screenshots ] && ls tmp/screenshots/**/*.png >/dev/null 2>&1; then artifact push job tmp/screenshots; fi'
             - 'cache store go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go'
             - 'cache store go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go-build'
             - 'cache store pw-browsers-$SEMAPHORE_GIT_BRANCH-$(checksum Makefile) tmp/ms-playwright'
