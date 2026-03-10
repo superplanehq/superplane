@@ -601,8 +601,7 @@ message CanvasChangeRequest {
     STATUS_UNSPECIFIED = 0;
     STATUS_OPEN = 1;
     STATUS_PUBLISHED = 2;
-    STATUS_CONFLICTED = 3;
-    STATUS_REJECTED = 4;
+    STATUS_REJECTED = 3;
   }
 
   message Metadata {
@@ -617,6 +616,7 @@ message CanvasChangeRequest {
     google.protobuf.Timestamp updated_at = 9;
     string title = 10;
     string description = 11;
+    bool is_conflicted = 12;
   }
 
   Metadata metadata = 1;

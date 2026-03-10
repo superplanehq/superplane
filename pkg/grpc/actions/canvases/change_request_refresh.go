@@ -51,7 +51,7 @@ func refreshOpenCanvasChangeRequestsInTransaction(
 	if err := tx.
 		Where("workflow_id = ?", canvasID).
 		Where("id <> ?", skipRequestID).
-		Where("status IN ?", []string{models.CanvasChangeRequestStatusOpen, models.CanvasChangeRequestStatusConflicted}).
+		Where("status = ?", models.CanvasChangeRequestStatusOpen).
 		Order("created_at DESC").
 		Find(&requests).
 		Error; err != nil {

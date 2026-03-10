@@ -59,7 +59,6 @@ function normalizeStatus(status?: string): "open" | "published" | "rejected" | "
   const value = (status || "").toLowerCase();
   if (value.includes("open")) return "open";
   if (value.includes("publish")) return "published";
-  if (value.includes("conflict")) return "open";
   if (value.includes("reject")) return "rejected";
   return "unknown";
 }
@@ -77,6 +76,18 @@ function statusBadgeVariant(
   if (status === "published") return "default";
   if (status === "rejected") return "destructive";
   return "outline";
+}
+
+function isChangeRequestConflicted(changeRequest?: CanvasesCanvasChangeRequest): boolean {
+  if (!changeRequest) {
+    return false;
+  }
+
+  if (typeof changeRequest.metadata?.isConflicted === "boolean") {
+    return changeRequest.metadata.isConflicted;
+  }
+
+  return (changeRequest.diff?.conflictingNodeIds || []).length > 0;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -1147,7 +1158,7 @@ export function CanvasChangeRequestsView({
   const selectedChangeRequestIdSafe = selectedChangeRequest?.metadata?.id || "";
   const conflictingNodeIds = selectedChangeRequest?.diff?.conflictingNodeIds || [];
   const changedNodeIds = selectedChangeRequest?.diff?.changedNodeIds || [];
-  const selectedHasConflicts = conflictingNodeIds.length > 0;
+  const selectedHasConflicts = isChangeRequestConflicted(selectedChangeRequest);
 
   const canApprove = canUpdateCanvas && selectedStatus === "open" && !selectedHasConflicts;
   const canReject = canUpdateCanvas && selectedStatus === "open";
@@ -1279,6 +1290,7 @@ export function CanvasChangeRequestsView({
                     const itemId = item.metadata?.id || "";
                     const itemStatus = normalizeStatus(item.metadata?.status);
                     const conflictCount = item.diff?.conflictingNodeIds?.length || 0;
+                    const hasConflicts = isChangeRequestConflicted(item);
                     const itemChangedCount = item.diff?.changedNodeIds?.length || 0;
 
                     return (
@@ -1287,7 +1299,7 @@ export function CanvasChangeRequestsView({
                         type="button"
                         className={cn(
                           "w-full border-b p-3 text-left last:border-b-0 hover:bg-slate-50",
-                          conflictCount > 0 ? "border-red-200 bg-red-50/40" : "border-slate-200",
+                          hasConflicts ? "border-red-200 bg-red-50/40" : "border-slate-200",
                         )}
                         onClick={() => {
                           onSelectChangeRequest(itemId);
@@ -1299,7 +1311,7 @@ export function CanvasChangeRequestsView({
                             {item.metadata?.title?.trim() || "Untitled change request"}
                           </p>
                           <div className="flex items-center gap-2">
-                            {conflictCount > 0 ? (
+                            {hasConflicts ? (
                               <Badge variant="destructive" className="uppercase">
                                 Conflicted
                               </Badge>
@@ -1310,7 +1322,7 @@ export function CanvasChangeRequestsView({
                         <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-600">
                           <span>#{itemId.slice(0, 8)}</span>
                           <span>changed nodes: {itemChangedCount}</span>
-                          <span className={conflictCount > 0 ? "font-semibold text-red-700" : "text-emerald-700"}>
+                          <span className={hasConflicts ? "font-semibold text-red-700" : "text-emerald-700"}>
                             conflicts: {conflictCount}
                           </span>
                           <span>updated: {formatTimestamp(item.metadata?.updatedAt)}</span>

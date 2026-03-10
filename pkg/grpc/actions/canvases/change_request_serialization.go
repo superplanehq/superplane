@@ -12,8 +12,6 @@ func canvasChangeRequestStatusToProto(status string) pb.CanvasChangeRequest_Stat
 		return pb.CanvasChangeRequest_STATUS_OPEN
 	case models.CanvasChangeRequestStatusPublished:
 		return pb.CanvasChangeRequest_STATUS_PUBLISHED
-	case models.CanvasChangeRequestStatusConflicted:
-		return pb.CanvasChangeRequest_STATUS_OPEN
 	case models.CanvasChangeRequestStatusRejected:
 		return pb.CanvasChangeRequest_STATUS_REJECTED
 	default:
@@ -37,13 +35,14 @@ func SerializeCanvasChangeRequest(
 	}
 
 	metadata := &pb.CanvasChangeRequest_Metadata{
-		Id:          request.ID.String(),
-		CanvasId:    request.WorkflowID.String(),
-		VersionId:   request.VersionID.String(),
-		Owner:       owner,
-		Status:      canvasChangeRequestStatusToProto(request.Status),
-		Title:       request.Title,
-		Description: request.Description,
+		Id:           request.ID.String(),
+		CanvasId:     request.WorkflowID.String(),
+		VersionId:    request.VersionID.String(),
+		Owner:        owner,
+		Status:       canvasChangeRequestStatusToProto(request.Status),
+		Title:        request.Title,
+		Description:  request.Description,
+		IsConflicted: request.IsConflicted(),
 	}
 	if request.BasedOnVersionID != nil {
 		metadata.BasedOnVersionId = request.BasedOnVersionID.String()

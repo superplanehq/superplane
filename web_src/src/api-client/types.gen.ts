@@ -154,13 +154,13 @@ export type CanvasesCanvasChangeRequestMetadata = {
   updatedAt?: string;
   title?: string;
   description?: string;
+  isConflicted?: boolean;
 };
 
 export type CanvasesCanvasChangeRequestStatus =
   | "STATUS_UNSPECIFIED"
   | "STATUS_OPEN"
   | "STATUS_PUBLISHED"
-  | "STATUS_CONFLICTED"
   | "STATUS_REJECTED";
 
 export type CanvasesCanvasEvent = {

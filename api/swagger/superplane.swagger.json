@@ -4273,6 +4273,9 @@
         },
         "description": {
           "type": "string"
+        },
+        "isConflicted": {
+          "type": "boolean"
         }
       }
     },
@@ -4282,7 +4285,6 @@
         "STATUS_UNSPECIFIED",
         "STATUS_OPEN",
         "STATUS_PUBLISHED",
-        "STATUS_CONFLICTED",
         "STATUS_REJECTED"
       ],
       "default": "STATUS_UNSPECIFIED"

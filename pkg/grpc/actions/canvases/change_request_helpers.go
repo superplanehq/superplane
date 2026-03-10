@@ -7,7 +7,7 @@ import (
 )
 
 func isOpenCanvasChangeRequestStatus(status string) bool {
-	return status == models.CanvasChangeRequestStatusOpen || status == models.CanvasChangeRequestStatusConflicted
+	return status == models.CanvasChangeRequestStatusOpen
 }
 
 func resolveCanvasChangeRequestBaseAndLiveInTransaction(

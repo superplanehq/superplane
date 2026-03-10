@@ -182,8 +182,7 @@ const (
 	CanvasChangeRequest_STATUS_UNSPECIFIED CanvasChangeRequest_Status = 0
 	CanvasChangeRequest_STATUS_OPEN        CanvasChangeRequest_Status = 1
 	CanvasChangeRequest_STATUS_PUBLISHED   CanvasChangeRequest_Status = 2
-	CanvasChangeRequest_STATUS_CONFLICTED  CanvasChangeRequest_Status = 3
-	CanvasChangeRequest_STATUS_REJECTED    CanvasChangeRequest_Status = 4
+	CanvasChangeRequest_STATUS_REJECTED    CanvasChangeRequest_Status = 3
 )
 
 // Enum value maps for CanvasChangeRequest_Status.
@@ -192,15 +191,13 @@ var (
 		0: "STATUS_UNSPECIFIED",
 		1: "STATUS_OPEN",
 		2: "STATUS_PUBLISHED",
-		3: "STATUS_CONFLICTED",
-		4: "STATUS_REJECTED",
+		3: "STATUS_REJECTED",
 	}
 	CanvasChangeRequest_Status_value = map[string]int32{
 		"STATUS_UNSPECIFIED": 0,
 		"STATUS_OPEN":        1,
 		"STATUS_PUBLISHED":   2,
-		"STATUS_CONFLICTED":  3,
-		"STATUS_REJECTED":    4,
+		"STATUS_REJECTED":    3,
 	}
 )
 
@@ -5265,6 +5262,7 @@ type CanvasChangeRequest_Metadata struct {
 	UpdatedAt        *timestamp.Timestamp       `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	Title            string                     `protobuf:"bytes,10,opt,name=title,proto3" json:"title,omitempty"`
 	Description      string                     `protobuf:"bytes,11,opt,name=description,proto3" json:"description,omitempty"`
+	IsConflicted     bool                       `protobuf:"varint,12,opt,name=is_conflicted,json=isConflicted,proto3" json:"is_conflicted,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -5374,6 +5372,13 @@ func (x *CanvasChangeRequest_Metadata) GetDescription() string {
 		return x.Description
 	}
 	return ""
+}
+
+func (x *CanvasChangeRequest_Metadata) GetIsConflicted() bool {
+	if x != nil {
+		return x.IsConflicted
+	}
+	return false
 }
 
 var File_canvases_proto protoreflect.FileDescriptor
@@ -5537,11 +5542,11 @@ const file_canvases_proto_rawDesc = "" +
 	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"u\n" +
 	"\x17CanvasChangeRequestDiff\x12(\n" +
 	"\x10changed_node_ids\x18\x01 \x03(\tR\x0echangedNodeIds\x120\n" +
-	"\x14conflicting_node_ids\x18\x02 \x03(\tR\x12conflictingNodeIds\"\xcb\x06\n" +
+	"\x14conflicting_node_ids\x18\x02 \x03(\tR\x12conflictingNodeIds\"\xd9\x06\n" +
 	"\x13CanvasChangeRequest\x12M\n" +
 	"\bmetadata\x18\x01 \x01(\v21.Superplane.Canvases.CanvasChangeRequest.MetadataR\bmetadata\x12<\n" +
 	"\aversion\x18\x02 \x01(\v2\".Superplane.Canvases.CanvasVersionR\aversion\x12@\n" +
-	"\x04diff\x18\x03 \x01(\v2,.Superplane.Canvases.CanvasChangeRequestDiffR\x04diff\x1a\xef\x03\n" +
+	"\x04diff\x18\x03 \x01(\v2,.Superplane.Canvases.CanvasChangeRequestDiffR\x04diff\x1a\x94\x04\n" +
 	"\bMetadata\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x1d\n" +
@@ -5557,13 +5562,13 @@ const file_canvases_proto_rawDesc = "" +
 	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x14\n" +
 	"\x05title\x18\n" +
 	" \x01(\tR\x05title\x12 \n" +
-	"\vdescription\x18\v \x01(\tR\vdescription\"s\n" +
+	"\vdescription\x18\v \x01(\tR\vdescription\x12#\n" +
+	"\ris_conflicted\x18\f \x01(\bR\fisConflicted\"\\\n" +
 	"\x06Status\x12\x16\n" +
 	"\x12STATUS_UNSPECIFIED\x10\x00\x12\x0f\n" +
 	"\vSTATUS_OPEN\x10\x01\x12\x14\n" +
-	"\x10STATUS_PUBLISHED\x10\x02\x12\x15\n" +
-	"\x11STATUS_CONFLICTED\x10\x03\x12\x13\n" +
-	"\x0fSTATUS_REJECTED\x10\x04\"\x97\x01\n" +
+	"\x10STATUS_PUBLISHED\x10\x02\x12\x13\n" +
+	"\x0fSTATUS_REJECTED\x10\x03\"\x97\x01\n" +
 	"\x15ListNodeEventsRequest\x12\x1b\n" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x17\n" +
 	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x14\n" +
