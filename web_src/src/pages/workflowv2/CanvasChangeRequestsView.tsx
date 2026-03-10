@@ -11,11 +11,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as yaml from "js-yaml";
 import type { editor as MonacoEditor } from "monaco-editor";
 import {
+  buildInitials,
   ChangeRequestDescriptionCard,
   formatTimestamp as formatDisplayTimestamp,
   summarizeNodeDiff,
   VersionNodeDiffAccordion,
 } from "./VersionNodeDiff";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 
 type ChangeRequestFilter = "all" | "open" | "rejected" | "published";
 type CanvasNodeLike = Record<string, unknown>;
@@ -1017,7 +1019,6 @@ export function CanvasChangeRequestsView({
   const selectedStatus = normalizeStatus(selectedChangeRequest?.metadata?.status);
   const selectedChangeRequestIdSafe = selectedChangeRequest?.metadata?.id || "";
   const conflictingNodeIds = selectedChangeRequest?.diff?.conflictingNodeIds || [];
-  const changedNodeIds = selectedChangeRequest?.diff?.changedNodeIds || [];
   const selectedHasConflicts = isChangeRequestConflicted(selectedChangeRequest);
   const selectedDiffSummary = useMemo(
     () => summarizeNodeDiff(selectedChangeRequest?.version, liveCanvasVersion),
@@ -1028,6 +1029,54 @@ export function CanvasChangeRequestsView({
     () => resolveUserDisplay(selectedChangeRequest?.metadata?.owner, ownerProfilesByID),
     [selectedChangeRequest?.metadata?.owner, ownerProfilesByID],
   );
+  const activityItems = useMemo(() => {
+    const openedAt = formatTimestamp(selectedChangeRequest?.metadata?.createdAt);
+    const items: Array<{
+      id: string;
+      title: string;
+      detail: string;
+      timestamp: string;
+      tone: "slate" | "emerald";
+      actor?: {
+        name: string;
+        avatarUrl?: string;
+      };
+    }> = [];
+
+    items.push({
+      id: "opened",
+      title: "Opened",
+      detail: "opened this change request.",
+      timestamp: openedAt || "unknown time",
+      tone: "slate",
+      actor: {
+        name: requestedBy.name,
+        avatarUrl: requestedBy.avatarUrl,
+      },
+    });
+
+    if (selectedStatus === "published") {
+      const publishedAt = formatTimestamp(
+        selectedChangeRequest?.metadata?.publishedAt || selectedChangeRequest?.metadata?.updatedAt,
+      );
+      items.push({
+        id: "published",
+        title: "Published",
+        detail: "This change request was published to live.",
+        timestamp: publishedAt || "unknown time",
+        tone: "emerald",
+      });
+    }
+
+    return items;
+  }, [
+    selectedChangeRequest?.metadata?.createdAt,
+    selectedChangeRequest?.metadata?.publishedAt,
+    selectedChangeRequest?.metadata?.updatedAt,
+    selectedStatus,
+    requestedBy.avatarUrl,
+    requestedBy.name,
+  ]);
 
   const canApprove = canUpdateCanvas && selectedStatus === "open" && !selectedHasConflicts;
   const canReject = canUpdateCanvas && selectedStatus === "open";
@@ -1199,6 +1248,46 @@ export function CanvasChangeRequestsView({
 
             <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
               <section className="space-y-4">
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-semibold text-slate-900">Activity</p>
+                  <ol className="mt-3 space-y-3">
+                    {activityItems.map((item, index) => (
+                      <li key={item.id} className="relative flex items-start gap-3">
+                        <div className="relative flex w-3 justify-center">
+                          {index < activityItems.length - 1 ? (
+                            <span className="absolute left-1/2 top-3 h-[calc(100%+0.75rem)] w-px -translate-x-1/2 bg-slate-200" />
+                          ) : null}
+                          <span
+                            className={cn(
+                              "mt-1 h-2.5 w-2.5 rounded-full",
+                              item.tone === "emerald" ? "bg-emerald-500" : "bg-slate-400",
+                            )}
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-900">
+                            {item.title} <span className="text-xs font-normal text-slate-500">· {item.timestamp}</span>
+                          </p>
+                          {item.actor ? (
+                            <p className="flex items-center gap-1.5 text-xs text-slate-600">
+                              <Avatar className="h-4 w-4">
+                                <AvatarImage src={item.actor.avatarUrl} alt={item.actor.name} />
+                                <AvatarFallback className="text-[8px] font-medium">
+                                  {buildInitials(item.actor.name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="font-semibold text-slate-900">{item.actor.name}</span>
+                              <span>{item.detail}</span>
+                            </p>
+                          ) : (
+                            <p className="text-xs text-slate-600">{item.detail}</p>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+
                 <div className="rounded-xl border border-slate-200 bg-white p-4">
                   <p className="text-sm font-semibold text-slate-900">Summary</p>
                   <div className="mt-4">
