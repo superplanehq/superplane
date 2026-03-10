@@ -416,7 +416,7 @@ func getInputForExecution(execution models.CanvasNodeExecution, events []models.
 		if event.ID.String() == execution.EventID.String() {
 			eventData, ok := event.Data.Data().(map[string]any)
 			if !ok {
-				return nil, nil
+				return nil, fmt.Errorf("event data cannot be turned into input for execution %s", execution.ID.String())
 			}
 
 			data, err := structpb.NewStruct(eventData)
@@ -428,7 +428,7 @@ func getInputForExecution(execution models.CanvasNodeExecution, events []models.
 		}
 	}
 
-	return nil, nil
+	return nil, fmt.Errorf("input not found for execution %s", execution.ID.String())
 }
 
 func getRootEventForExecution(execution models.CanvasNodeExecution, rootEvents []models.CanvasEvent) (*pb.CanvasEvent, error) {
@@ -436,12 +436,12 @@ func getRootEventForExecution(execution models.CanvasNodeExecution, rootEvents [
 		if rootEvent.ID.String() == execution.RootEventID.String() {
 			data, ok := rootEvent.Data.Data().(map[string]any)
 			if !ok {
-				return &pb.CanvasEvent{Id: rootEvent.ID.String()}, nil
+				return nil, fmt.Errorf("event data is not a map[string]any")
 			}
 
 			s, err := structpb.NewStruct(data)
 			if err != nil {
-				return &pb.CanvasEvent{Id: rootEvent.ID.String()}, nil
+				return nil, err
 			}
 
 			return &pb.CanvasEvent{
@@ -456,7 +456,7 @@ func getRootEventForExecution(execution models.CanvasNodeExecution, rootEvents [
 		}
 	}
 
-	return &pb.CanvasEvent{Id: execution.RootEventID.String()}, nil
+	return nil, fmt.Errorf("input not found for execution %s", execution.ID.String())
 }
 
 func getOutputsForExecution(execution models.CanvasNodeExecution, events []models.CanvasEvent) (*structpb.Struct, error) {

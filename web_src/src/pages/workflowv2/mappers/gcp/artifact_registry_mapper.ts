@@ -82,7 +82,8 @@ export const getArtifactAnalysisMapper: ComponentBaseMapper = {
     if (typeof data?.critical === "number" && data.critical > 0) details["Critical"] = String(data.critical);
     if (typeof data?.high === "number" && data.high > 0) details["High"] = String(data.high);
     if (typeof data?.medium === "number" && data.medium > 0) details["Medium"] = String(data.medium);
-    if (typeof data?.fixAvailable === "number" && data.fixAvailable > 0) details["Fix Available"] = String(data.fixAvailable);
+    if (typeof data?.fixAvailable === "number" && data.fixAvailable > 0)
+      details["Fix Available"] = String(data.fixAvailable);
 
     return details;
   },
@@ -105,9 +106,7 @@ function formatDateTime(value?: string): string | undefined {
 // into "L-docker.pkg.dev/P/R/IMG@sha256:DIGEST"
 function buildDockerUri(metadataName?: string): string | undefined {
   if (!metadataName) return undefined;
-  const m = metadataName.match(
-    /^projects\/([^/]+)\/locations\/([^/]+)\/repositories\/([^/]+)\/dockerImages\/(.+)$/,
-  );
+  const m = metadataName.match(/^projects\/([^/]+)\/locations\/([^/]+)\/repositories\/([^/]+)\/dockerImages\/(.+)$/);
   if (!m) return undefined;
   const [, project, location, repo, imageRef] = m;
   return `https://${location}-docker.pkg.dev/${project}/${repo}/${imageRef}`;

@@ -60,7 +60,8 @@ The full Version resource, including ` + "`name`" + `, ` + "`createTime`" + `, `
 
 ## Supported Formats
 
-Artifact Registry supports all package formats: Docker, Maven, npm, PyPI, Go, APT, YUM, Helm, and more.`
+Artifact Registry supports all package formats when using **Select from Registry** mode.
+**Resource URL** mode is intended for container image URLs (for example from On Artifact Push events).`
 }
 
 func (c *GetArtifact) Icon() string  { return "gcp" }
@@ -226,17 +227,35 @@ func (c *GetArtifact) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
-	client, err := getClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
-	}
-
+	useURLMode := config.InputMode == "url" || config.InputMode == ""
 	location, repository, pkg, version := config.Location, config.Repository, config.Package, config.Version
-	if config.ResourceURL != "" {
+	if useURLMode {
+		if config.ResourceURL == "" {
+			return ctx.ExecutionState.Fail("error", "resourceUrl is required in url mode")
+		}
+
 		location, repository, pkg, version, err = parseArtifactResourceURL(config.ResourceURL)
 		if err != nil {
 			return ctx.ExecutionState.Fail("error", fmt.Sprintf("invalid resourceUrl: %v", err))
 		}
+	} else {
+		if location == "" {
+			return ctx.ExecutionState.Fail("error", "location is required")
+		}
+		if repository == "" {
+			return ctx.ExecutionState.Fail("error", "repository is required")
+		}
+		if pkg == "" {
+			return ctx.ExecutionState.Fail("error", "package is required")
+		}
+		if version == "" {
+			return ctx.ExecutionState.Fail("error", "version is required")
+		}
+	}
+
+	client, err := getClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
 	}
 
 	projectID := client.ProjectID()
