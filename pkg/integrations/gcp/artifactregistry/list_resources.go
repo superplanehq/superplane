@@ -39,6 +39,24 @@ func withPageToken(baseURL, token string) string {
 	return baseURL + "?" + encoded
 }
 
+func packageIDFromName(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+
+	const marker = "/packages/"
+	if idx := strings.Index(name, marker); idx >= 0 {
+		id := strings.TrimSpace(name[idx+len(marker):])
+		if id != "" {
+			return id
+		}
+	}
+
+	parts := strings.Split(name, "/")
+	return parts[len(parts)-1]
+}
+
 // Locations
 
 type locationListResponse struct {
@@ -226,7 +244,12 @@ func ListPackageResources(ctx context.Context, client Client, projectID, locatio
 			if pkgName == "" {
 				continue
 			}
-			shortName := packageShortName(pkgName)
+			packageID := packageIDFromName(pkgName)
+			if packageID == "" {
+				continue
+			}
+
+			shortName := packageShortName(packageID)
 			displayName := strings.TrimSpace(pkg.DisplayName)
 			if displayName == "" {
 				displayName = shortName
@@ -234,7 +257,7 @@ func ListPackageResources(ctx context.Context, client Client, projectID, locatio
 			resources = append(resources, core.IntegrationResource{
 				Type: ResourceTypePackage,
 				Name: displayName,
-				ID:   shortName,
+				ID:   packageID,
 			})
 		}
 

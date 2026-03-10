@@ -251,7 +251,12 @@ func (t *OnArtifactAnalysis) OnIntegrationMessage(ctx core.IntegrationMessageCon
 			ctx.Logger.Infof("gcp artifact registry: resource URI %q does not match repository filter %q, skipping", occurrence.ResourceURI, config.Repository)
 			return nil
 		}
-		if config.Package != "" && len(parts) >= 4 {
+		if config.Package != "" {
+			if len(parts) < 4 {
+				ctx.Logger.Infof("gcp artifact registry: resource URI %q does not contain a package path, skipping", occurrence.ResourceURI)
+				return nil
+			}
+
 			imagePart := parts[3]
 			if idx := strings.IndexAny(imagePart, "@:"); idx >= 0 {
 				imagePart = imagePart[:idx]

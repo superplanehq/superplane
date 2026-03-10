@@ -158,25 +158,25 @@ func (t *OnArtifactPush) OnIntegrationMessage(ctx core.IntegrationMessageContext
 		return nil
 	}
 
-	if config.Location != "" {
+	if config.Location != "" || config.Repository != "" {
 		imageRef := pushEvent.Digest
 		if imageRef == "" {
 			imageRef = pushEvent.Tag
 		}
-		if !strings.Contains(imageRef, "-"+config.Location+"-") && !strings.HasPrefix(imageRef, config.Location+"-") {
+
+		location, repository, _, _, err := parseArtifactResourceURL(imageRef)
+		if err != nil {
+			ctx.Logger.Infof("gcp artifact registry: cannot parse image reference %q: %v", imageRef, err)
+			return nil
+		}
+
+		if config.Location != "" && !strings.EqualFold(location, config.Location) {
 			ctx.Logger.Infof("gcp artifact registry: image %q does not match location filter %q, skipping", imageRef, config.Location)
 			return nil
 		}
-	}
 
-	if config.Repository != "" {
-		imageRef := pushEvent.Digest
-		if imageRef == "" {
-			imageRef = pushEvent.Tag
-		}
-		parts := strings.Split(imageRef, "/")
-		if len(parts) >= 2 && parts[1] != config.Repository {
-			ctx.Logger.Infof("gcp artifact registry: repository %q does not match filter %q, skipping", parts[1], config.Repository)
+		if config.Repository != "" && repository != config.Repository {
+			ctx.Logger.Infof("gcp artifact registry: repository %q does not match filter %q, skipping", repository, config.Repository)
 			return nil
 		}
 	}
