@@ -1,0 +1,13 @@
+{
+  "data": {
+    "bucket": "my-bucket",
+    "contentType": "application/json",
+    "md5Hash": "1B2M2Y8AsgTpgAmY7PhCfg==",
+    "name": "folder/file.json",
+    "selfLink": "https://www.googleapis.com/storage/v1/b/my-bucket/o/folder%2Ffile.json",
+    "size": "1024",
+    "updated": "2025-06-01T12:00:00.000Z"
+  },
+  "timestamp": "2025-06-01T12:00:05Z",
+  "type": "gcp.cloudstorage.getObject"
+}
