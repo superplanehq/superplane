@@ -166,11 +166,12 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 					if err != nil {
 						return nil, fmt.Errorf("failed to update existing webhook: %w", err)
 					}
-					defer func() { _ = uResp.Body.Close() }()
 
 					if uResp.StatusCode >= 400 {
+						_ = uResp.Body.Close()
 						return nil, fmt.Errorf("failed to update existing webhook, status code: %d", uResp.StatusCode)
 					}
+					_ = uResp.Body.Close()
 
 					return map[string]string{
 						"notification_configuration_id": hook.ID,

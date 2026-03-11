@@ -72,11 +72,16 @@ func (c *Client) newRequest(method, path string, body any) (*http.Request, error
 func (c *Client) readBody(resp *http.Response) ([]byte, error) {
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("bad status %d", resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	return io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("bad status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return body, nil
 }
 
 func (c *Client) ResolveWorkspaceID(identifier string) (string, error) {

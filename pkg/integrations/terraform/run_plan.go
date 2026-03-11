@@ -317,7 +317,7 @@ func isFailedState(status string) bool {
 
 func isTerminalStatePlanTarget(status string) bool {
 	switch status {
-	case "planned", "planned_and_finished", "discarded", "errored", "canceled", "policy_soft_failed", "force_canceled", "applied":
+	case "planned", "planned_and_finished", "planned_and_saved", "cost_estimated", "policy_checked", "discarded", "errored", "canceled", "policy_soft_failed", "force_canceled", "applied":
 		return true
 	}
 	return false
