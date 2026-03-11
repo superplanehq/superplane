@@ -135,6 +135,10 @@ func (c *GetHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
 		return errors.New("dataset is required")
 	}
 
+	// If the syntheticCheck is an expression placeholder, skip metadata resolution
+	if strings.Contains(spec.SyntheticCheck, "{{") {
+		return nil
+	}
 	// If metadata is already set, skip the API call.
 	var nodeMetadata GetHTTPSyntheticCheckNodeMetadata
 	err = mapstructure.Decode(ctx.Metadata.Get(), &nodeMetadata)
