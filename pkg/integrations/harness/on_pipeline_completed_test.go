@@ -423,7 +423,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 			LastExecutionID:    "exec-prev",
 		}}
 
-		webhookCode, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		webhookCode, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-no-end","pipelineIdentifier":"deploy","nodeStatus":"FAILED"}}`),
 			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
