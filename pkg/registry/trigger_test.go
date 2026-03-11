@@ -53,7 +53,7 @@ func TestPanicableTrigger_HandleWebhook_CatchesPanic(t *testing.T) {
 	panicable := NewPanicableTrigger(trig)
 	ctx := core.WebhookRequestContext{}
 
-	status, err := panicable.HandleWebhook(ctx)
+	status, _, err := panicable.HandleWebhook(ctx)
 
 	require.Error(t, err)
 	assert.Equal(t, 500, status)

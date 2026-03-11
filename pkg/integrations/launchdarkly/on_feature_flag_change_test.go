@@ -32,7 +32,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 	validSecret := "test-signing-secret"
 
 	t.Run("missing signing secret -> 403", func(t *testing.T) {
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
 			Configuration: defaultConfig,
 			Webhook:       &contexts.NodeWebhookContext{},
@@ -47,7 +47,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 	t.Run("missing X-LD-Signature header -> 403", func(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
 			Body:          []byte(`{}`),
 			Configuration: defaultConfig,
@@ -67,7 +67,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: defaultConfig,
@@ -89,7 +89,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: defaultConfig,
@@ -112,7 +112,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: defaultConfig,
@@ -140,7 +140,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: defaultConfig,
@@ -164,7 +164,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -190,7 +190,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -216,7 +216,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -242,7 +242,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -268,7 +268,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -296,7 +296,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -324,7 +324,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -351,7 +351,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{"projectKey": "default", "actions": []string{ActionUpdateOn}},
@@ -374,7 +374,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{"projectKey": "default", "actions": []string{ActionUpdateOn}},
@@ -398,7 +398,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: defaultConfig,
@@ -421,7 +421,7 @@ func Test__OnFeatureFlagChange__HandleWebhook(t *testing.T) {
 
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: defaultConfig,
