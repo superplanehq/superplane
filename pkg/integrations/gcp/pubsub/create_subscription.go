@@ -21,10 +21,10 @@ const (
 type CreateSubscriptionComponent struct{}
 
 type CreateSubscriptionConfiguration struct {
-	TopicID        string `json:"topicId" mapstructure:"topicId"`
-	SubscriptionID string `json:"subscriptionId" mapstructure:"subscriptionId"`
-	Type           string `json:"type" mapstructure:"type"`
-	PushEndpoint   string `json:"pushEndpoint" mapstructure:"pushEndpoint"`
+	Topic        string `json:"topic" mapstructure:"topic"`
+	Subscription string `json:"subscription" mapstructure:"subscription"`
+	Type         string `json:"type" mapstructure:"type"`
+	PushEndpoint string `json:"pushEndpoint" mapstructure:"pushEndpoint"`
 }
 
 func (c *CreateSubscriptionComponent) Name() string  { return "gcp.pubsub.createSubscription" }
@@ -52,7 +52,7 @@ func (c *CreateSubscriptionComponent) OutputChannels(_ any) []core.OutputChannel
 func (c *CreateSubscriptionComponent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "topicId",
+			Name:        "topic",
 			Label:       "Topic",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -65,14 +65,14 @@ func (c *CreateSubscriptionComponent) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "subscriptionId",
-			Label:       "Subscription ID",
+			Name:        "subscription",
+			Label:       "Subscription",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "The ID for the new subscription (e.g. my-subscription).",
+			Description: "The name for the new subscription (e.g. my-subscription).",
 			Placeholder: "my-subscription",
 			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "topicId", Values: []string{"*"}},
+				{Field: "topic", Values: []string{"*"}},
 			},
 		},
 		{
@@ -82,7 +82,7 @@ func (c *CreateSubscriptionComponent) Configuration() []configuration.Field {
 			Required: true,
 			Default:  "pull",
 			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "topicId", Values: []string{"*"}},
+				{Field: "topic", Values: []string{"*"}},
 			},
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
@@ -101,7 +101,7 @@ func (c *CreateSubscriptionComponent) Configuration() []configuration.Field {
 			Description: "HTTPS URL to deliver messages to (push subscriptions only).",
 			Placeholder: "https://my-service.example.com/pubsub",
 			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "topicId", Values: []string{"*"}},
+				{Field: "topic", Values: []string{"*"}},
 				{Field: "type", Values: []string{"push"}},
 			},
 		},
@@ -113,11 +113,11 @@ func (c *CreateSubscriptionComponent) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if strings.TrimSpace(config.TopicID) == "" {
-		return fmt.Errorf("topicId is required")
+	if strings.TrimSpace(config.Topic) == "" {
+		return fmt.Errorf("topic is required")
 	}
-	if strings.TrimSpace(config.SubscriptionID) == "" {
-		return fmt.Errorf("subscriptionId is required")
+	if strings.TrimSpace(config.Subscription) == "" {
+		return fmt.Errorf("subscription is required")
 	}
 	if config.Type == "push" && strings.TrimSpace(config.PushEndpoint) == "" {
 		return fmt.Errorf("pushEndpoint is required for push subscriptions")
@@ -131,14 +131,14 @@ func (c *CreateSubscriptionComponent) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
-	config.TopicID = strings.TrimSpace(config.TopicID)
-	config.SubscriptionID = strings.TrimSpace(config.SubscriptionID)
+	config.Topic = strings.TrimSpace(config.Topic)
+	config.Subscription = strings.TrimSpace(config.Subscription)
 
-	if config.TopicID == "" {
-		return ctx.ExecutionState.Fail("error", "topicId is required")
+	if config.Topic == "" {
+		return ctx.ExecutionState.Fail("error", "topic is required")
 	}
-	if config.SubscriptionID == "" {
-		return ctx.ExecutionState.Fail("error", "subscriptionId is required")
+	if config.Subscription == "" {
+		return ctx.ExecutionState.Fail("error", "subscription is required")
 	}
 
 	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
@@ -154,21 +154,21 @@ func (c *CreateSubscriptionComponent) Execute(ctx core.ExecutionContext) error {
 		if endpoint == "" {
 			return ctx.ExecutionState.Fail("error", "pushEndpoint is required for push subscriptions")
 		}
-		if err := CreatePushSubscription(reqCtx, client, projectID, config.SubscriptionID, config.TopicID, endpoint); err != nil {
+		if err := CreatePushSubscription(reqCtx, client, projectID, config.Subscription, config.Topic, endpoint); err != nil {
 			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create push subscription: %v", err))
 		}
 	} else {
-		if err := CreatePullSubscription(reqCtx, client, projectID, config.SubscriptionID, config.TopicID); err != nil {
+		if err := CreatePullSubscription(reqCtx, client, projectID, config.Subscription, config.Topic); err != nil {
 			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create pull subscription: %v", err))
 		}
 	}
 
 	return ctx.ExecutionState.Emit(createSubscriptionOutputChannel, createSubscriptionPayloadType, []any{
 		map[string]any{
-			"subscriptionId": config.SubscriptionID,
-			"topicId":        config.TopicID,
-			"type":           config.Type,
-			"name":           fmt.Sprintf("projects/%s/subscriptions/%s", projectID, config.SubscriptionID),
+			"subscription": config.Subscription,
+			"topic":        config.Topic,
+			"type":         config.Type,
+			"name":         fmt.Sprintf("projects/%s/subscriptions/%s", projectID, config.Subscription),
 		},
 	})
 }

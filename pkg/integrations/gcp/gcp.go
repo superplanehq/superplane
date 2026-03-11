@@ -549,14 +549,14 @@ func (g *GCP) HandleAction(ctx core.IntegrationActionContext) error {
 
 func (g *GCP) handleEnsurePubSubOnMessage(ctx core.IntegrationActionContext) error {
 	var params struct {
-		TopicID    string `mapstructure:"topicId"`
+		Topic      string `mapstructure:"topic"`
 		GCPSubName string `mapstructure:"gcpSubName"`
 	}
 	if err := mapstructure.Decode(ctx.Parameters, &params); err != nil {
 		return fmt.Errorf("failed to decode action params: %w", err)
 	}
-	if params.TopicID == "" || params.GCPSubName == "" {
-		return fmt.Errorf("topicId and gcpSubName are required")
+	if params.Topic == "" || params.GCPSubName == "" {
+		return fmt.Errorf("topic and gcpSubName are required")
 	}
 
 	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
@@ -578,11 +578,11 @@ func (g *GCP) handleEnsurePubSubOnMessage(ctx core.IntegrationActionContext) err
 	pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/pubsub-events?token=%s&gcpSubName=%s",
 		ctx.WebhooksBaseURL, ctx.Integration.ID(), secret, params.GCPSubName)
 
-	if err := gcppubsub.CreatePushSubscription(reqCtx, client, projectID, params.GCPSubName, params.TopicID, pushEndpoint); err != nil {
-		return fmt.Errorf("create push subscription on topic %q: %w", params.TopicID, err)
+	if err := gcppubsub.CreatePushSubscription(reqCtx, client, projectID, params.GCPSubName, params.Topic, pushEndpoint); err != nil {
+		return fmt.Errorf("create push subscription on topic %q: %w", params.Topic, err)
 	}
 
-	ctx.Logger.Infof("Created Pub/Sub push subscription %s on topic %s", params.GCPSubName, params.TopicID)
+	ctx.Logger.Infof("Created Pub/Sub push subscription %s on topic %s", params.GCPSubName, params.Topic)
 	return nil
 }
 
