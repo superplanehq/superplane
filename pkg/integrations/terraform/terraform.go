@@ -222,7 +222,7 @@ func getWorkspaceIDFromConfiguration(c any) string {
 		return ""
 	}
 
-	r, ok := configMap["workspaceId"]
+	r, ok := configMap["workspace"]
 	if !ok {
 		return ""
 	}
