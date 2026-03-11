@@ -18,7 +18,7 @@ type SyntheticCheckMetrics struct {
 	CriticalRuns7d  int     `json:"criticalRuns7d"`
 	TotalRuns7d     int     `json:"totalRuns7d"`
 	AvgDuration7d   float64 `json:"avgDuration7dMs"` // Milliseconds
-	LastOutcome     string  `json:"lastOutcome"`     // Most recent run outcome: Healthy or Critical
+	LastOutcome     string  `json:"lastOutcome"`     // Most recent run outcome: Healthy, Degraded, or Critical
 }
 
 // FetchSyntheticCheckMetrics queries the Dash0 Prometheus API for operational metrics
@@ -91,12 +91,12 @@ func FetchSyntheticCheckMetrics(ctx core.ExecutionContext, client *Client, datas
 	}
 
 	// Fetch the most recent run outcome.
-	metrics.LastOutcome = fetchLastSyntheticCheckOutcome(ctx, client, dataset, checkID)
+	metrics.LastOutcome = fetchLastSyntheticCheckOutcome(client, dataset, checkID)
 
 	return metrics
 }
 
-func fetchLastSyntheticCheckOutcome(ctx core.ExecutionContext, client *Client, dataset, checkID string) string {
+func fetchLastSyntheticCheckOutcome(client *Client, dataset, checkID string) string {
 	query := fmt.Sprintf(
 		`topk(1, max by (dash0_synthetic_check_outcome) (timestamp({otel_metric_name="dash0.synthetic_check.runs", dash0_check_id="%s"})))`,
 		checkID,
@@ -112,7 +112,7 @@ func fetchLastSyntheticCheckOutcome(ctx core.ExecutionContext, client *Client, d
 		return ""
 	}
 	outcome := data.Result[0].Metric["dash0_synthetic_check_outcome"]
-	if outcome != "Healthy" && outcome != "Critical" {
+	if outcome != "Healthy" && outcome != "Degraded" && outcome != "Critical" {
 		return ""
 	}
 

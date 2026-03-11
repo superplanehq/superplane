@@ -15,12 +15,13 @@ import (
 type GetHTTPSyntheticCheck struct{}
 
 type GetHTTPSyntheticCheckSpec struct {
-	CheckID string `mapstructure:"checkId"`
-	Dataset string `mapstructure:"dataset"`
+	SyntheticCheck string `mapstructure:"syntheticCheck"`
+	Dataset        string `mapstructure:"dataset"`
 }
 
 type GetHTTPSyntheticCheckNodeMetadata struct {
-	CheckName string `json:"checkName" mapstructure:"checkName"`
+	CheckName      string `json:"checkName" mapstructure:"checkName"`
+	SyntheticCheck string `json:"syntheticCheck" mapstructure:"syntheticCheck"`
 }
 
 func (c *GetHTTPSyntheticCheck) Name() string {
@@ -52,6 +53,7 @@ func (c *GetHTTPSyntheticCheck) Documentation() string {
 ## Output Channels
 
 - **Healthy**: The check is passing — the most recent run outcome is "Healthy"
+- **Degraded**: The check is degraded — the most recent run outcome is "Degraded"
 - **Critical**: The check is failing — the most recent run outcome is "Critical"
 
 ## Output
@@ -89,6 +91,7 @@ const ChannelNameHealthy = "healthy"
 func (c *GetHTTPSyntheticCheck) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
 		{Name: ChannelNameHealthy, Label: "Healthy", Description: "The check is passing"},
+		{Name: ChannelNameDegraded, Label: "Degraded", Description: "The check is degraded"},
 		{Name: ChannelNameCritical, Label: "Critical", Description: "The check is failing"},
 	}
 }
@@ -96,8 +99,8 @@ func (c *GetHTTPSyntheticCheck) OutputChannels(configuration any) []core.OutputC
 func (c *GetHTTPSyntheticCheck) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "checkId",
-			Label:       "Check ID",
+			Name:        "syntheticCheck",
+			Label:       "Synthetic Check",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The synthetic check to retrieve",
@@ -125,8 +128,8 @@ func (c *GetHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if strings.TrimSpace(spec.CheckID) == "" {
-		return errors.New("checkId is required")
+	if strings.TrimSpace(spec.SyntheticCheck) == "" {
+		return errors.New("syntheticCheck is required")
 	}
 	if strings.TrimSpace(spec.Dataset) == "" {
 		return errors.New("dataset is required")
@@ -138,7 +141,7 @@ func (c *GetHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return fmt.Errorf("error decoding metadata: %v", err)
 	}
-	if nodeMetadata.CheckName != "" {
+	if nodeMetadata.CheckName != "" && nodeMetadata.SyntheticCheck == spec.SyntheticCheck {
 		return nil
 	}
 
@@ -147,7 +150,7 @@ func (c *GetHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error creating client during setup: %v", err)
 	}
 
-	checkConfig, err := client.GetSyntheticCheck(spec.CheckID, spec.Dataset)
+	checkConfig, err := client.GetSyntheticCheck(spec.SyntheticCheck, spec.Dataset)
 	if err != nil {
 		return fmt.Errorf("failed to get synthetic check during setup: %v", err)
 	}
@@ -158,7 +161,8 @@ func (c *GetHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
 	}
 
 	return ctx.Metadata.Set(GetHTTPSyntheticCheckNodeMetadata{
-		CheckName: checkName,
+		CheckName:      checkName,
+		SyntheticCheck: spec.SyntheticCheck,
 	})
 }
 
@@ -180,21 +184,16 @@ func (c *GetHTTPSyntheticCheck) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Fetch the check configuration from the Dash0 API.
-	checkConfig, err := client.GetSyntheticCheck(spec.CheckID, dataset)
+	checkConfig, err := client.GetSyntheticCheck(spec.SyntheticCheck, dataset)
 	if err != nil {
 		return fmt.Errorf("failed to get synthetic check: %v", err)
 	}
 
 	// Fetch operational metrics from Prometheus (best-effort).
-	metrics := FetchSyntheticCheckMetrics(ctx, client, dataset, spec.CheckID)
+	metrics := FetchSyntheticCheckMetrics(ctx, client, dataset, spec.SyntheticCheck)
 
 	// Determine the output channel from the last run outcome.
 	channel := outcomeToChannel(metrics.LastOutcome)
-
-	// If no outcome data is available, pass without emitting.
-	if channel == "" {
-		return ctx.ExecutionState.Pass()
-	}
 
 	output := map[string]any{
 		"configuration": checkConfig,
@@ -214,6 +213,8 @@ func outcomeToChannel(outcome string) string {
 	switch outcome {
 	case "Healthy":
 		return ChannelNameHealthy
+	case "Degraded":
+		return ChannelNameDegraded
 	case "Critical":
 		return ChannelNameCritical
 	default:
