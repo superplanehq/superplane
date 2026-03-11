@@ -56,8 +56,14 @@ func (s *SendLogEvent) Documentation() string {
 
 ## Output
 
-Returns a confirmation that the log was sent:
+Returns a confirmation that the log was sent along with the log record details:
 - **sent**: Boolean indicating success
+- **severityText**: The log severity level
+- **body**: The log message content
+- **eventName**: The event name (if provided)
+- **serviceName**: The service name (if provided)
+- **attributes**: Additional metadata (if provided)
+- **dataset**: The dataset name
 - **timestamp**: When the log was sent
 
 ## Notes
@@ -196,10 +202,20 @@ func (s *SendLogEvent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to send log event: %v", err)
 	}
 
+	payload := map[string]any{
+		"sent":         result["sent"],
+		"severityText": record.SeverityText,
+		"body":         record.Body,
+		"eventName":    record.EventName,
+		"serviceName":  record.ServiceName,
+		"attributes":   record.Attributes,
+		"dataset":      dataset,
+	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"dash0.log.sent",
-		[]any{result},
+		[]any{payload},
 	)
 }
 
@@ -219,8 +235,8 @@ func (s *SendLogEvent) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (s *SendLogEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (s *SendLogEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (s *SendLogEvent) Cleanup(ctx core.SetupContext) error {

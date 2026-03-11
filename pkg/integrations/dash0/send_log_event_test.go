@@ -98,6 +98,16 @@ func Test__SendLogEvent__Execute(t *testing.T) {
 		assert.Equal(t, "dash0.log.sent", execCtx.Type)
 		require.Len(t, execCtx.Payloads, 1)
 
+		// Verify the payload includes log record details
+		wrapped, ok := execCtx.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		payload, ok := wrapped["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, true, payload["sent"])
+		assert.Equal(t, "INFO", payload["severityText"])
+		assert.Equal(t, "Deployment completed", payload["body"])
+		assert.Equal(t, "default", payload["dataset"])
+
 		// Verify the request was sent to the correct OTLP ingress endpoint
 		require.Len(t, httpContext.Requests, 1)
 		req := httpContext.Requests[0]
@@ -146,6 +156,20 @@ func Test__SendLogEvent__Execute(t *testing.T) {
 		assert.True(t, execCtx.Passed)
 		assert.Equal(t, "dash0.log.sent", execCtx.Type)
 		require.Len(t, execCtx.Payloads, 1)
+
+		// Verify the payload includes log record details
+		wrapped, ok := execCtx.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		payload, ok := wrapped["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, true, payload["sent"])
+		assert.Equal(t, "ERROR", payload["severityText"])
+		assert.Equal(t, "Deployment failed", payload["body"])
+		assert.Equal(t, "production", payload["dataset"])
+		attribs, ok := payload["attributes"].(map[string]string)
+		require.True(t, ok)
+		assert.Equal(t, "api", attribs["service"])
+		assert.Equal(t, "1.0.0", attribs["version"])
 
 		// Verify the request includes the Dash0-Dataset header for non-default dataset
 		require.Len(t, httpContext.Requests, 1)
