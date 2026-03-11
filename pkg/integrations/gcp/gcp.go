@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations/gcp/artifactregistry"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudbuild"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudfunctions"
 	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
@@ -33,6 +34,9 @@ func init() {
 	cloudfunctions.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (cloudfunctions.Client, error) {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
+	artifactregistry.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (artifactregistry.Client, error) {
+		return gcpcommon.NewClient(httpCtx, integration)
+	})
 }
 
 type GCP struct{}
@@ -41,9 +45,13 @@ const (
 	ConnectionMethodServiceAccountKey = "serviceAccountKey"
 	ConnectionMethodWIF               = "workloadIdentityFederation"
 
-	PubSubSecretName     = "pubsub.events.secret"
-	CloudBuildSecretName = "cloudbuild.events.secret"
-	CloudBuildTopicID    = "cloud-builds"
+	PubSubSecretName            = "pubsub.events.secret"
+	CloudBuildSecretName        = "cloudbuild.events.secret"
+	ArtifactPushSecretName      = "artifactregistry.push.secret"
+	ContainerAnalysisSecretName = "containeranalysis.occurrences.secret"
+	CloudBuildTopicID           = "cloud-builds"
+	ArtifactPushTopicID         = "gcr"
+	ContainerAnalysisTopicID    = "container-analysis-occurrences-v1"
 )
 
 type Configuration struct {
@@ -154,6 +162,8 @@ func (g *GCP) Components() []core.Component {
 		&cloudbuild.GetBuild{},
 		&cloudbuild.RunTrigger{},
 		&cloudfunctions.InvokeFunction{},
+		&artifactregistry.GetArtifact{},
+		&artifactregistry.GetArtifactAnalysis{},
 	}
 }
 
@@ -161,6 +171,8 @@ func (g *GCP) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&compute.OnVMInstance{},
 		&cloudbuild.OnBuildComplete{},
+		&artifactregistry.OnArtifactPush{},
+		&artifactregistry.OnArtifactAnalysis{},
 	}
 }
 
@@ -235,6 +247,9 @@ func (g *GCP) syncWIF(ctx core.SyncContext, config Configuration) error {
 	if err := g.configureCloudBuild(ctx, client, &metadata); err != nil {
 		ctx.Logger.Warnf("failed to configure Cloud Build subscription: %v", err)
 	}
+	if err := g.configureArtifactRegistry(ctx, client, &metadata); err != nil {
+		ctx.Logger.Warnf("failed to configure Artifact Registry subscription: %v", err)
+	}
 	ctx.Integration.SetMetadata(metadata)
 
 	if err := ctx.Integration.ScheduleResync(refreshAfter); err != nil {
@@ -281,6 +296,9 @@ func (g *GCP) syncServiceAccountKey(ctx core.SyncContext, config Configuration) 
 	if err := g.configureCloudBuild(ctx, client, &metadata); err != nil {
 		ctx.Logger.Warnf("failed to configure Cloud Build subscription: %v", err)
 	}
+	if err := g.configureArtifactRegistry(ctx, client, &metadata); err != nil {
+		ctx.Logger.Warnf("failed to configure Artifact Registry subscription: %v", err)
+	}
 	ctx.Integration.SetMetadata(metadata)
 
 	ctx.Integration.Ready()
@@ -319,7 +337,12 @@ func validateAndParseServiceAccountKey(keyJSON []byte) (gcpcommon.Metadata, erro
 
 func (g *GCP) configurePubSub(ctx core.SyncContext, client *gcpcommon.Client, metadata *gcpcommon.Metadata) error {
 	if metadata.PubSubTopic != "" {
-		return nil
+		secret, err := g.eventsSecret(ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("generate events secret: %w", err)
+		}
+		pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/events?token=%s", ctx.WebhooksBaseURL, ctx.Integration.ID(), secret)
+		return gcppubsub.UpdatePushEndpoint(context.Background(), client, client.ProjectID(), metadata.PubSubSubscription, pushEndpoint)
 	}
 
 	projectID := client.ProjectID()
@@ -360,6 +383,10 @@ func (g *GCP) configurePubSub(ctx core.SyncContext, client *gcpcommon.Client, me
 
 func (g *GCP) configureCloudBuild(ctx core.SyncContext, client *gcpcommon.Client, metadata *gcpcommon.Metadata) error {
 	return g.ensureCloudBuildSetup(context.Background(), client, ctx.Integration, ctx.WebhooksBaseURL, metadata)
+}
+
+func (g *GCP) configureArtifactRegistry(ctx core.SyncContext, client *gcpcommon.Client, metadata *gcpcommon.Metadata) error {
+	return g.ensureArtifactRegistrySetup(context.Background(), client, ctx.Integration, ctx.WebhooksBaseURL, metadata)
 }
 
 func (g *GCP) ensureCloudBuildSetup(
@@ -425,6 +452,177 @@ func (g *GCP) ensureCloudBuildSetup(
 	return nil
 }
 
+func (g *GCP) ensureArtifactRegistrySetup(
+	reqCtx context.Context,
+	client *gcpcommon.Client,
+	integration core.IntegrationContext,
+	webhooksBaseURL string,
+	metadata *gcpcommon.Metadata,
+) error {
+	projectID := client.ProjectID()
+
+	if metadata.ArtifactPushSubscription != "" {
+		synced, err := g.syncArtifactRegistrySubscriptions(reqCtx, client, integration, webhooksBaseURL, metadata, projectID)
+		if err != nil {
+			return err
+		}
+		if synced {
+			return nil
+		}
+	}
+
+	return g.bootstrapArtifactRegistrySubscriptions(reqCtx, client, integration, webhooksBaseURL, metadata, projectID)
+}
+
+func (g *GCP) syncArtifactRegistrySubscriptions(
+	reqCtx context.Context,
+	client *gcpcommon.Client,
+	integration core.IntegrationContext,
+	webhooksBaseURL string,
+	metadata *gcpcommon.Metadata,
+	projectID string,
+) (bool, error) {
+	secret, err := g.artifactPushSecret(integration)
+	if err != nil {
+		return false, fmt.Errorf("generate artifact push secret: %w", err)
+	}
+
+	pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-push-events?token=%s", webhooksBaseURL, integration.ID(), secret)
+	updateErr := gcppubsub.UpdatePushEndpoint(reqCtx, client, projectID, metadata.ArtifactPushSubscription, pushEndpoint)
+	if updateErr != nil {
+		if !gcpcommon.IsNotFoundError(updateErr) {
+			return false, fmt.Errorf("update artifact push endpoint: %w", updateErr)
+		}
+		// Subscription no longer exists in GCP — recreate everything.
+		metadata.ArtifactPushSubscription = ""
+		metadata.ContainerAnalysisSubscription = ""
+		return false, nil
+	}
+
+	if metadata.ContainerAnalysisSubscription != "" {
+		caSecret, err := g.containerAnalysisSecret(integration)
+		if err != nil {
+			return false, fmt.Errorf("generate container analysis secret: %w", err)
+		}
+		caPushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-analysis-events?token=%s", webhooksBaseURL, integration.ID(), caSecret)
+		caUpdateErr := gcppubsub.UpdatePushEndpoint(reqCtx, client, projectID, metadata.ContainerAnalysisSubscription, caPushEndpoint)
+		if caUpdateErr == nil {
+			return true, nil
+		}
+		if !gcpcommon.IsNotFoundError(caUpdateErr) {
+			return false, fmt.Errorf("update container analysis endpoint: %w", caUpdateErr)
+		}
+		// Subscription no longer exists in GCP — recreate it below.
+		metadata.ContainerAnalysisSubscription = ""
+	}
+
+	caEnabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "containeranalysis.googleapis.com")
+	if err != nil {
+		return false, fmt.Errorf("check Container Analysis API: %w", err)
+	}
+	if !caEnabled {
+		return true, nil
+	}
+
+	sanitized := sanitizeID(integration.ID().String())
+	caSubscriptionID := "sp-ca-sub-" + sanitized
+	if err := g.createContainerAnalysisSubscription(reqCtx, client, projectID, integration, webhooksBaseURL, caSubscriptionID); err != nil {
+		return false, err
+	}
+	metadata.ContainerAnalysisSubscription = caSubscriptionID
+	return true, nil
+}
+
+func (g *GCP) bootstrapArtifactRegistrySubscriptions(
+	reqCtx context.Context,
+	client *gcpcommon.Client,
+	integration core.IntegrationContext,
+	webhooksBaseURL string,
+	metadata *gcpcommon.Metadata,
+	projectID string,
+) error {
+	enabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "pubsub.googleapis.com")
+	if err != nil {
+		return fmt.Errorf("check Pub/Sub API: %w", err)
+	}
+	if !enabled {
+		return fmt.Errorf(
+			"Pub/Sub API is not enabled in project %s. Enable it at https://console.cloud.google.com/apis/library/pubsub.googleapis.com?project=%s",
+			projectID,
+			projectID,
+		)
+	}
+
+	enabled, err = gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "artifactregistry.googleapis.com")
+	if err != nil {
+		return fmt.Errorf("check Artifact Registry API: %w", err)
+	}
+	if !enabled {
+		return fmt.Errorf(
+			"Artifact Registry API is not enabled in project %s. Enable it at https://console.cloud.google.com/apis/library/artifactregistry.googleapis.com?project=%s",
+			projectID,
+			projectID,
+		)
+	}
+
+	sanitized := sanitizeID(integration.ID().String())
+
+	arSecret, err := g.artifactPushSecret(integration)
+	if err != nil {
+		return fmt.Errorf("generate artifact push secret: %w", err)
+	}
+	arSubscriptionID := "sp-ar-sub-" + sanitized
+	arPushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-push-events?token=%s", webhooksBaseURL, integration.ID(), arSecret)
+
+	if err := gcppubsub.CreateTopic(reqCtx, client, projectID, ArtifactPushTopicID); err != nil {
+		return fmt.Errorf("create Artifact Registry gcr topic: %w", err)
+	}
+	if err := gcppubsub.CreatePushSubscription(reqCtx, client, projectID, arSubscriptionID, ArtifactPushTopicID, arPushEndpoint); err != nil {
+		return fmt.Errorf("create Artifact Registry push subscription: %w", err)
+	}
+	metadata.ArtifactPushSubscription = arSubscriptionID
+
+	caEnabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "containeranalysis.googleapis.com")
+	if err != nil {
+		return fmt.Errorf("check Container Analysis API: %w", err)
+	}
+	if !caEnabled {
+		return nil
+	}
+
+	caSubscriptionID := "sp-ca-sub-" + sanitized
+	if err := g.createContainerAnalysisSubscription(reqCtx, client, projectID, integration, webhooksBaseURL, caSubscriptionID); err != nil {
+		return err
+	}
+	metadata.ContainerAnalysisSubscription = caSubscriptionID
+
+	return nil
+}
+
+func (g *GCP) createContainerAnalysisSubscription(
+	reqCtx context.Context,
+	client *gcpcommon.Client,
+	projectID string,
+	integration core.IntegrationContext,
+	webhooksBaseURL string,
+	subscriptionID string,
+) error {
+	caSecret, err := g.containerAnalysisSecret(integration)
+	if err != nil {
+		return fmt.Errorf("generate container analysis secret: %w", err)
+	}
+	caPushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-analysis-events?token=%s", webhooksBaseURL, integration.ID(), caSecret)
+
+	if err := gcppubsub.CreateTopic(reqCtx, client, projectID, ContainerAnalysisTopicID); err != nil {
+		return fmt.Errorf("create Container Analysis topic: %w", err)
+	}
+	if err := gcppubsub.CreatePushSubscription(reqCtx, client, projectID, subscriptionID, ContainerAnalysisTopicID, caPushEndpoint); err != nil {
+		return fmt.Errorf("create Container Analysis push subscription: %w", err)
+	}
+
+	return nil
+}
+
 func (g *GCP) cloudBuildSecret(integration core.IntegrationContext) (string, error) {
 	secrets, err := integration.GetSecrets()
 	if err != nil {
@@ -444,6 +642,37 @@ func (g *GCP) cloudBuildSecret(integration core.IntegrationContext) (string, err
 
 	if err := integration.SetSecret(CloudBuildSecretName, []byte(secret)); err != nil {
 		return "", fmt.Errorf("store cloud build secret: %w", err)
+	}
+	return secret, nil
+}
+
+func (g *GCP) artifactPushSecret(integration core.IntegrationContext) (string, error) {
+	return g.getOrCreateSecret(integration, ArtifactPushSecretName)
+}
+
+func (g *GCP) containerAnalysisSecret(integration core.IntegrationContext) (string, error) {
+	return g.getOrCreateSecret(integration, ContainerAnalysisSecretName)
+}
+
+func (g *GCP) getOrCreateSecret(integration core.IntegrationContext, secretName string) (string, error) {
+	secrets, err := integration.GetSecrets()
+	if err != nil {
+		return "", err
+	}
+
+	for _, s := range secrets {
+		if s.Name == secretName {
+			return string(s.Value), nil
+		}
+	}
+
+	secret, err := crypto.Base64String(32)
+	if err != nil {
+		return "", fmt.Errorf("generate random secret: %w", err)
+	}
+
+	if err := integration.SetSecret(secretName, []byte(secret)); err != nil {
+		return "", fmt.Errorf("store secret %s: %w", secretName, err)
 	}
 	return secret, nil
 }
@@ -519,6 +748,20 @@ func (g *GCP) Cleanup(ctx core.IntegrationCleanupContext) error {
 			}
 		}
 	}
+	if m.ArtifactPushSubscription != "" {
+		if err := gcppubsub.DeleteSubscription(reqCtx, client, m.ProjectID, m.ArtifactPushSubscription); err != nil {
+			if !gcpcommon.IsNotFoundError(err) {
+				ctx.Logger.Warnf("failed to delete Artifact Registry push subscription %s: %v", m.ArtifactPushSubscription, err)
+			}
+		}
+	}
+	if m.ContainerAnalysisSubscription != "" {
+		if err := gcppubsub.DeleteSubscription(reqCtx, client, m.ProjectID, m.ContainerAnalysisSubscription); err != nil {
+			if !gcpcommon.IsNotFoundError(err) {
+				ctx.Logger.Warnf("failed to delete Container Analysis subscription %s: %v", m.ContainerAnalysisSubscription, err)
+			}
+		}
+	}
 
 	return nil
 }
@@ -526,6 +769,7 @@ func (g *GCP) Cleanup(ctx core.IntegrationCleanupContext) error {
 func (g *GCP) Actions() []core.Action {
 	return []core.Action{
 		{Name: gcpcommon.ActionNameEnsureCloudBuild},
+		{Name: gcpcommon.ActionNameEnsureArtifactRegistry},
 	}
 }
 
@@ -533,6 +777,8 @@ func (g *GCP) HandleAction(ctx core.IntegrationActionContext) error {
 	switch ctx.Name {
 	case gcpcommon.ActionNameEnsureCloudBuild:
 		return g.handleEnsureCloudBuild(ctx)
+	case gcpcommon.ActionNameEnsureArtifactRegistry:
+		return g.handleEnsureArtifactRegistry(ctx)
 	default:
 		return fmt.Errorf("unknown action: %s", ctx.Name)
 	}
@@ -550,6 +796,25 @@ func (g *GCP) handleEnsureCloudBuild(ctx core.IntegrationActionContext) error {
 	}
 
 	if err := g.ensureCloudBuildSetup(context.Background(), client, ctx.Integration, ctx.WebhooksBaseURL, &metadata); err != nil {
+		return err
+	}
+
+	ctx.Integration.SetMetadata(metadata)
+	return nil
+}
+
+func (g *GCP) handleEnsureArtifactRegistry(ctx core.IntegrationActionContext) error {
+	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create GCP client: %w", err)
+	}
+
+	var metadata gcpcommon.Metadata
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	}
+
+	if err := g.ensureArtifactRegistrySetup(context.Background(), client, ctx.Integration, ctx.WebhooksBaseURL, &metadata); err != nil {
 		return err
 	}
 
@@ -629,6 +894,14 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return cloudbuild.ListBranchResources(reqCtx, client, p["repository"])
 	case cloudbuild.ResourceTypeTag:
 		return cloudbuild.ListTagResources(reqCtx, client, p["repository"])
+	case artifactregistry.ResourceTypeLocation:
+		return artifactregistry.ListLocationResources(reqCtx, client, p["projectId"])
+	case artifactregistry.ResourceTypeRepository:
+		return artifactregistry.ListRepositoryResources(reqCtx, client, p["projectId"], p["location"])
+	case artifactregistry.ResourceTypePackage:
+		return artifactregistry.ListPackageResources(reqCtx, client, p["projectId"], p["location"], p["repository"])
+	case artifactregistry.ResourceTypeVersion:
+		return artifactregistry.ListVersionResources(reqCtx, client, p["projectId"], p["location"], p["repository"], p["package"])
 	default:
 		return nil, nil
 	}
@@ -642,6 +915,16 @@ func (g *GCP) HandleRequest(ctx core.HTTPRequestContext) {
 
 	if strings.HasSuffix(ctx.Request.URL.Path, "/cloud-build-events") {
 		g.handleCloudBuildEvent(ctx)
+		return
+	}
+
+	if strings.HasSuffix(ctx.Request.URL.Path, "/artifact-push-events") {
+		g.handleArtifactPushEvent(ctx)
+		return
+	}
+
+	if strings.HasSuffix(ctx.Request.URL.Path, "/artifact-analysis-events") {
+		g.handleArtifactAnalysisEvent(ctx)
 		return
 	}
 
@@ -871,6 +1154,168 @@ func (g *GCP) cloudBuildSubscriptionApplies(subscription core.IntegrationSubscri
 		return false
 	}
 	return pattern.Type == cloudbuild.SubscriptionType
+}
+
+func (g *GCP) handleArtifactPushEvent(ctx core.HTTPRequestContext) {
+	token := ctx.Request.URL.Query().Get("token")
+	if token == "" {
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	secrets, err := ctx.Integration.GetSecrets()
+	if err != nil {
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var secret string
+	for _, s := range secrets {
+		if s.Name == ArtifactPushSecretName {
+			secret = string(s.Value)
+			break
+		}
+	}
+
+	if token != secret {
+		ctx.Response.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var pushMsg pubsubPushMessage
+	if err := json.Unmarshal(body, &pushMsg); err != nil {
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	decoded, err := base64Decode(pushMsg.Message.Data)
+	if err != nil {
+		ctx.Logger.Warnf("failed to decode Artifact Registry Pub/Sub message data: %v", err)
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
+	}
+
+	var event map[string]any
+	if err := json.Unmarshal(decoded, &event); err != nil {
+		ctx.Logger.Warnf("failed to parse Artifact Registry push event: %v", err)
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
+	}
+
+	subscriptions, err := ctx.Integration.ListSubscriptions()
+	if err != nil {
+		ctx.Logger.Errorf("error listing subscriptions: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	for _, subscription := range subscriptions {
+		if !g.artifactPushSubscriptionApplies(subscription) {
+			continue
+		}
+		if err := subscription.SendMessage(event); err != nil {
+			ctx.Logger.Errorf("error sending artifact push message to subscription: %v", err)
+		}
+	}
+
+	ctx.Response.WriteHeader(http.StatusOK)
+}
+
+func (g *GCP) artifactPushSubscriptionApplies(subscription core.IntegrationSubscriptionContext) bool {
+	var pattern struct {
+		Type string `mapstructure:"type"`
+	}
+	if err := mapstructure.Decode(subscription.Configuration(), &pattern); err != nil {
+		return false
+	}
+	return pattern.Type == artifactregistry.ArtifactPushSubscriptionType
+}
+
+func (g *GCP) handleArtifactAnalysisEvent(ctx core.HTTPRequestContext) {
+	token := ctx.Request.URL.Query().Get("token")
+	if token == "" {
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	secrets, err := ctx.Integration.GetSecrets()
+	if err != nil {
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var secret string
+	for _, s := range secrets {
+		if s.Name == ContainerAnalysisSecretName {
+			secret = string(s.Value)
+			break
+		}
+	}
+
+	if token != secret {
+		ctx.Response.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var pushMsg pubsubPushMessage
+	if err := json.Unmarshal(body, &pushMsg); err != nil {
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	decoded, err := base64Decode(pushMsg.Message.Data)
+	if err != nil {
+		ctx.Logger.Warnf("failed to decode Container Analysis Pub/Sub message data: %v", err)
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
+	}
+
+	var occurrence map[string]any
+	if err := json.Unmarshal(decoded, &occurrence); err != nil {
+		ctx.Logger.Warnf("failed to parse Container Analysis occurrence: %v", err)
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
+	}
+
+	subscriptions, err := ctx.Integration.ListSubscriptions()
+	if err != nil {
+		ctx.Logger.Errorf("error listing subscriptions: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	for _, subscription := range subscriptions {
+		if !g.containerAnalysisSubscriptionApplies(subscription) {
+			continue
+		}
+		if err := subscription.SendMessage(occurrence); err != nil {
+			ctx.Logger.Errorf("error sending container analysis message to subscription: %v", err)
+		}
+	}
+
+	ctx.Response.WriteHeader(http.StatusOK)
+}
+
+func (g *GCP) containerAnalysisSubscriptionApplies(subscription core.IntegrationSubscriptionContext) bool {
+	var pattern struct {
+		Type string `mapstructure:"type"`
+	}
+	if err := mapstructure.Decode(subscription.Configuration(), &pattern); err != nil {
+		return false
+	}
+	return pattern.Type == artifactregistry.ArtifactAnalysisSubscriptionType
 }
 
 func base64Decode(s string) ([]byte, error) {
