@@ -268,7 +268,7 @@ func Test__Octopus_DeployRelease__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			HTTP:    httpCtx,
@@ -351,7 +351,7 @@ func Test__Octopus_DeployRelease__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			HTTP:    httpCtx,
@@ -402,7 +402,7 @@ func Test__Octopus_DeployRelease__HandleWebhook(t *testing.T) {
 			"X-Superplane-Webhook-Secret": []string{secret},
 		}
 
-		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},
@@ -431,7 +431,7 @@ func Test__Octopus_DeployRelease__HandleWebhook(t *testing.T) {
 			"X-Superplane-Webhook-Secret": []string{secret},
 		}
 
-		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},
@@ -460,7 +460,7 @@ func Test__Octopus_DeployRelease__HandleWebhook(t *testing.T) {
 			"X-Superplane-Webhook-Secret": []string{secret},
 		}
 
-		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},
@@ -523,7 +523,7 @@ func Test__Octopus_DeployRelease__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			HTTP:    httpCtx,
@@ -581,7 +581,7 @@ func Test__Octopus_DeployRelease__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},

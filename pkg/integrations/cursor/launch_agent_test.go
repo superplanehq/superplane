@@ -248,7 +248,7 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		status, err := c.HandleWebhook(webhookCtx)
+		status, _, err := c.HandleWebhook(webhookCtx)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, status)
 
@@ -299,7 +299,7 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		status, err := c.HandleWebhook(webhookCtx)
+		status, _, err := c.HandleWebhook(webhookCtx)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, status)
 
@@ -321,7 +321,7 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 		}
 
-		status, err := c.HandleWebhook(webhookCtx)
+		status, _, err := c.HandleWebhook(webhookCtx)
 		require.Error(t, err)
 		assert.Equal(t, http.StatusBadRequest, status)
 		assert.Contains(t, err.Error(), "id missing")
@@ -337,7 +337,7 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 		}
 
-		status, err := c.HandleWebhook(webhookCtx)
+		status, _, err := c.HandleWebhook(webhookCtx)
 		require.Error(t, err)
 		assert.Equal(t, http.StatusBadRequest, status)
 	})

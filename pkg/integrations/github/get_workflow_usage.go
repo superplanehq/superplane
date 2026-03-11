@@ -208,8 +208,8 @@ func (g *GetWorkflowUsage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid
 	return ctx.DefaultProcessing()
 }
 
-func (g *GetWorkflowUsage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (g *GetWorkflowUsage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (g *GetWorkflowUsage) Actions() []core.Action {

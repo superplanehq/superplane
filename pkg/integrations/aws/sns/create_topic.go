@@ -126,8 +126,8 @@ func (c *CreateTopic) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *CreateTopic) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *CreateTopic) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *CreateTopic) Cancel(ctx core.ExecutionContext) error {

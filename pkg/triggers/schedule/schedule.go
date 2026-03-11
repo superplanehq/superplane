@@ -120,8 +120,8 @@ func (s *Schedule) Color() string {
 	return "yellow"
 }
 
-func (s *Schedule) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (s *Schedule) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (s *Schedule) Configuration() []configuration.Field {

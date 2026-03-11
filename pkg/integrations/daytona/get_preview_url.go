@@ -263,8 +263,8 @@ func (p *GetPreviewURLComponent) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (p *GetPreviewURLComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (p *GetPreviewURLComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (p *GetPreviewURLComponent) Cleanup(ctx core.SetupContext) error {

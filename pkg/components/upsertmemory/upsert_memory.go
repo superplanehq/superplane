@@ -310,8 +310,8 @@ func (c *UpsertMemory) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *UpsertMemory) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *UpsertMemory) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *UpsertMemory) Cleanup(ctx core.SetupContext) error {

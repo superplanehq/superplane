@@ -481,8 +481,8 @@ func (tg *TimeGate) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (tg *TimeGate) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (tg *TimeGate) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (tg *TimeGate) Cleanup(ctx core.SetupContext) error {

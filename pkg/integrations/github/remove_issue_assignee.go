@@ -192,8 +192,8 @@ func (c *RemoveIssueAssignee) ProcessQueueItem(ctx core.ProcessQueueContext) (*u
 	return ctx.DefaultProcessing()
 }
 
-func (c *RemoveIssueAssignee) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (c *RemoveIssueAssignee) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (c *RemoveIssueAssignee) Actions() []core.Action {

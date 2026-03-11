@@ -114,45 +114,45 @@ func (p *OnPipeline) HandleAction(ctx core.TriggerActionContext) (map[string]any
 	return nil, nil
 }
 
-func (p *OnPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (p *OnPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	var config OnPipelineConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	eventType := ctx.Headers.Get("X-Gitlab-Event")
 	if eventType == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing X-Gitlab-Event header")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing X-Gitlab-Event header")
 	}
 
 	if eventType != "Pipeline Hook" {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	code, err := verifyWebhookToken(ctx)
 	if err != nil {
-		return code, err
+		return code, nil, err
 	}
 
 	data := map[string]any{}
 	if err := json.Unmarshal(ctx.Body, &data); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	status, ok := p.extractStatus(data)
 	if !ok {
-		return http.StatusBadRequest, fmt.Errorf("status missing from pipeline payload")
+		return http.StatusBadRequest, nil, fmt.Errorf("status missing from pipeline payload")
 	}
 
 	if len(config.Statuses) > 0 && !p.whitelistedStatus(ctx.Logger, status, config.Statuses) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if err := ctx.Events.Emit("gitlab.pipeline", data); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (p *OnPipeline) Cleanup(ctx core.TriggerContext) error {

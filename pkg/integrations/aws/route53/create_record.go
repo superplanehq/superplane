@@ -156,8 +156,8 @@ func (c *CreateRecord) HandleAction(ctx core.ActionContext) error {
 	}
 }
 
-func (c *CreateRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *CreateRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *CreateRecord) Cancel(ctx core.ExecutionContext) error {

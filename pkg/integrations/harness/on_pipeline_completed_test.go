@@ -210,7 +210,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 	trigger := &OnPipelineCompleted{}
 
 	t.Run("unauthorized request returns forbidden before config validation", func(t *testing.T) {
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: http.Header{},
 			Body:    []byte(`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-auth","pipelineIdentifier":"deploy","nodeStatus":"FAILED"}}`),
 			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
@@ -227,7 +227,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("Authorization", "Bearer wrong")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PIPELINE_END","data":{"planExecutionId":"exec-1","pipelineIdentifier":"deploy","status":"FAILED"}}`),
 			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
@@ -250,7 +250,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		events := &contexts.EventContext{}
 		metadata := &contexts.MetadataContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PIPELINE_END","data":{"planExecutionId":"exec-1","pipelineIdentifier":"deploy","status":"FAILED"}}`),
 			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
@@ -281,7 +281,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		events := &contexts.EventContext{}
 		metadata := &contexts.MetadataContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PIPELINE_END","data":{"planExecutionId":"exec-errored","pipelineIdentifier":"deploy","status":"ERRORED"}}`),
 			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
@@ -306,7 +306,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 	t.Run("without webhook secret rejects request", func(t *testing.T) {
 		events := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: http.Header{},
 			Body:    []byte(`{"eventType":"PIPELINE_END","data":{"planExecutionId":"exec-2","pipelineIdentifier":"deploy","status":"FAILED"}}`),
 			Webhook: &contexts.NodeWebhookContext{Secret: ""},
@@ -328,7 +328,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("Authorization", "Bearer expected")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PIPELINE_END","data":{"planExecutionId":"exec-2","pipelineIdentifier":"deploy","status":"FAILED"}}`),
 			Webhook: &failingNodeWebhookContext{err: errors.New("secret backend unavailable")},
@@ -346,7 +346,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("missing webhook context -> 403", func(t *testing.T) {
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: http.Header{},
 			Body:    []byte(`{"eventType":"PIPELINE_END","data":{"planExecutionId":"exec-2","pipelineIdentifier":"deploy","status":"FAILED"}}`),
 			Configuration: OnPipelineCompletedConfiguration{
@@ -367,7 +367,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		headers.Set("Authorization", "Bearer expected")
 		events := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"STAGE_END","data":{"planExecutionId":"exec-3","pipelineIdentifier":"deploy","status":"FAILED"}}`),
 			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
@@ -394,7 +394,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 			LastExecutionID:    "exec-prev",
 		}}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-no-end","pipelineIdentifier":"deploy","nodeStatus":"FAILED"}}`),
 			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
@@ -423,7 +423,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 			LastExecutionID:    "exec-prev",
 		}}
 
-		webhookCode, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		webhookCode, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-no-end","pipelineIdentifier":"deploy","nodeStatus":"FAILED"}}`),
 			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
@@ -493,7 +493,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 			LastExecutionID:    "exec-prev",
 		}}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body: []byte(fmt.Sprintf(
 				`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-filtered","pipelineIdentifier":"deploy","nodeStatus":"SUCCESS","endTs":"%d"}}`,
@@ -530,7 +530,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 			LastExecutionEnded: now,
 		}}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body: []byte(fmt.Sprintf(
 				`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-4","pipelineIdentifier":"deploy","nodeStatus":"FAILED","endTs":%d}}`,

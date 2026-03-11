@@ -523,7 +523,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("Authorization", "Bearer wrong")
 
-		code, err := component.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := component.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-1","pipelineIdentifier":"deploy","nodeStatus":"FAILED"}}`),
 			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
@@ -539,7 +539,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		metadata := &contexts.MetadataContext{Metadata: RunPipelineExecutionMetadata{ExecutionID: "exec-1"}}
 
-		code, err := component.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := component.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"StageEnd","eventData":{"planExecutionId":"exec-1","nodeStatus":"FAILED"}}`),
 			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
@@ -560,7 +560,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("Authorization", "Bearer expected")
 
-		code, err := component.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := component.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-unknown","nodeStatus":"FAILED"}}`),
 			Webhook: &contexts.NodeWebhookContext{Secret: "expected"},
@@ -583,7 +583,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 			Status:             "running",
 		}}
 
-		code, err := component.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := component.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body: []byte(
 				`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-1","pipelineIdentifier":"deploy-prod","nodeStatus":"COMPLETED","executionUrl":"https://app.harness.io/executions/exec-1","startTs":"1771083861471","endTs":"1771083876397"}}`,
@@ -627,7 +627,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 			Status:             "running",
 		}}
 
-		code, err := component.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := component.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body: []byte(
 				`{"eventType":"PipelineEnd","eventData":{"planExecutionId":"exec-2","pipelineIdentifier":"deploy-prod","nodeStatus":"ABORTED"}}`,

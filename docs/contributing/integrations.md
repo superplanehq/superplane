@@ -279,53 +279,53 @@ func (t *OnEvent) HandleAction(ctx core.TriggerActionContext) (map[string]any, e
 	return nil, nil
 }
 
-func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	// Validate webhook signature
 	signature := ctx.Headers.Get("X-Signature")
 	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
 	}
 
 	// Verify the signature
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
+		return http.StatusInternalServerError, nil, fmt.Errorf("error authenticating request")
 	}
 
 	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
-		return http.StatusForbidden, err
+		return http.StatusForbidden, nil, err
 	}
 
 	// Parse the webhook payload
 	data := map[string]any{}
 	err = json.Unmarshal(ctx.Body, &data)
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	// Filter by action type
 	config := OnEventConfiguration{}
 	err = mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	action, ok := data["action"]
 	if !ok {
-		return http.StatusBadRequest, fmt.Errorf("missing action")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing action")
 	}
 
 	if !slices.Contains(config.Actions, action.(string)) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	// Emit the event to trigger workflow execution
 	err = ctx.Events.Emit(data)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 ```
 

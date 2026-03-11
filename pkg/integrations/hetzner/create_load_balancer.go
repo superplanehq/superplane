@@ -194,8 +194,8 @@ func (c *CreateLoadBalancer) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *CreateLoadBalancer) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (c *CreateLoadBalancer) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (c *CreateLoadBalancer) Cancel(ctx core.ExecutionContext) error {

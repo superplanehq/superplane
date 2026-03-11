@@ -728,8 +728,8 @@ func (a *Approval) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (a *Approval) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (a *Approval) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (a *Approval) notifyApprovers(ctx core.ExecutionContext, metadata *Metadata) error {
