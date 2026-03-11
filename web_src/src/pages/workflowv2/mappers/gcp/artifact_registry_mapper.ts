@@ -1,5 +1,12 @@
 import { ComponentBaseProps } from "@/ui/componentBase";
-import { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
+import { MetadataItem } from "@/ui/metadataList";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  NodeInfo,
+  SubtitleContext,
+} from "../types";
 import { baseMapper } from "./base";
 import { formatTimeAgo } from "@/utils/date";
 import { getArtifactOutputPayload, getArtifactData, artifactShortName } from "./artifact_registry";
@@ -7,7 +14,11 @@ import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactreg
 
 export const getArtifactMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return { ...baseMapper.props(context), iconSrc: gcpArtifactRegistryIcon };
+    return {
+      ...baseMapper.props(context),
+      iconSrc: gcpArtifactRegistryIcon,
+      metadata: artifactActionMetadataList(context.node),
+    };
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
@@ -55,7 +66,11 @@ export const getArtifactMapper: ComponentBaseMapper = {
 
 export const getArtifactAnalysisMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return { ...baseMapper.props(context), iconSrc: gcpArtifactRegistryIcon };
+    return {
+      ...baseMapper.props(context),
+      iconSrc: gcpArtifactRegistryIcon,
+      metadata: artifactActionMetadataList(context.node),
+    };
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
@@ -120,4 +135,39 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function artifactActionMetadataList(node: NodeInfo): MetadataItem[] {
+  const config = (node.configuration as Record<string, any> | undefined) ?? {};
+  const inputMode = String(config.inputMode || "url").toLowerCase();
+  const metadata: MetadataItem[] = [];
+
+  if (inputMode === "select") {
+    metadata.push({ icon: "funnel", label: "Select from Registry" });
+
+    const scope = [config.location, config.repository, config.package].filter(Boolean).map(String).join(" / ");
+    if (scope) {
+      metadata.push({ icon: "package", label: scope });
+    }
+
+    if (config.version) {
+      metadata.push({ icon: "tag", label: String(config.version) });
+    }
+
+    return metadata;
+  }
+
+  metadata.push({ icon: "link", label: "Resource URL" });
+  if (config.resourceUrl) {
+    metadata.push({ icon: "package", label: compactValue(String(config.resourceUrl), 72) });
+  }
+  return metadata;
+}
+
+function compactValue(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength)}...`;
 }
