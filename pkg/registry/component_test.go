@@ -33,7 +33,7 @@ func (p *panickingComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uu
 	panic("process queue item panic")
 }
 func (p *panickingComponent) HandleAction(ctx core.ActionContext) error { panic("handle action panic") }
-func (p *panickingComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (p *panickingComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	panic("handle webhook panic")
 }
 func (p *panickingComponent) Cancel(ctx core.ExecutionContext) error { panic("cancel panic") }
@@ -100,7 +100,7 @@ func TestPanicableComponent_HandleWebhook_CatchesPanic(t *testing.T) {
 	panicable := NewPanicableComponent(comp)
 	ctx := core.WebhookRequestContext{}
 
-	status, err := panicable.HandleWebhook(ctx)
+	status, _, err := panicable.HandleWebhook(ctx)
 
 	require.Error(t, err)
 	assert.Equal(t, 500, status)

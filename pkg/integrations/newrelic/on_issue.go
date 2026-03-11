@@ -134,36 +134,36 @@ func (t *OnIssue) HandleAction(ctx core.TriggerActionContext) (map[string]any, e
 	return nil, nil
 }
 
-func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	if statusCode, err := validateWebhookAuth(ctx); err != nil {
-		return statusCode, err
+		return statusCode, nil, err
 	}
 
 	config, err := parseAndValidateOnIssueConfiguration(ctx.Configuration)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, nil, err
 	}
 
 	var payload NewRelicIssuePayload
 	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("failed to parse request body: %w", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("failed to parse request body: %w", err)
 	}
 
 	filteredStatuses := filterEmptyStrings(config.Statuses)
 	if !containsIgnoreCase(filteredStatuses, payload.State) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	filteredPriorities := filterEmptyStrings(config.Priorities)
 	if len(filteredPriorities) > 0 && !containsIgnoreCase(filteredPriorities, payload.Priority) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if err := ctx.Events.Emit(NewRelicIssuePayloadType, issueToMap(payload)); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to emit issue event: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to emit issue event: %w", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (t *OnIssue) Cleanup(ctx core.TriggerContext) error {

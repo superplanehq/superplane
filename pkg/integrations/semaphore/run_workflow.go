@@ -319,40 +319,40 @@ func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	signature := ctx.Headers.Get("X-Semaphore-Signature-256")
 	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
 	}
 
 	signature = strings.TrimPrefix(signature, "sha256=")
 	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
 	}
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
+		return http.StatusInternalServerError, nil, fmt.Errorf("error authenticating request")
 	}
 
 	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
 	}
 
 	var payload map[string]any
 	err = json.Unmarshal(ctx.Body, &payload)
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	pipelineData, ok := payload["pipeline"].(map[string]any)
 	if !ok {
-		return http.StatusBadRequest, fmt.Errorf("pipeline data missing from webhook payload")
+		return http.StatusBadRequest, nil, fmt.Errorf("pipeline data missing from webhook payload")
 	}
 
 	pipelineID, _ := pipelineData["id"].(string)
 	if pipelineID == "" {
-		return http.StatusBadRequest, fmt.Errorf("pipeline id missing from webhook payload")
+		return http.StatusBadRequest, nil, fmt.Errorf("pipeline id missing from webhook payload")
 	}
 
 	pipelineState, _ := pipelineData["state"].(string)
@@ -365,27 +365,27 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	// so we just ignore them.
 	//
 	if err != nil {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	metadata := RunWorkflowExecutionMetadata{}
 	err = mapstructure.Decode(executionCtx.Metadata.Get(), &metadata)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error decoding metadata: %v", err)
 	}
 
 	//
 	// Already finished, do not do anything.
 	//
 	if metadata.Pipeline.State == PipelineStateDone {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	metadata.Pipeline.State = pipelineState
 	metadata.Pipeline.Result = pipelineResult
 	err = executionCtx.Metadata.Set(metadata)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error setting metadata: %v", err)
 	}
 
 	if metadata.Workflow != nil && metadata.Workflow.URL != "" {
@@ -404,10 +404,10 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	}
 
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, nil, err
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (r *RunWorkflow) Actions() []core.Action {

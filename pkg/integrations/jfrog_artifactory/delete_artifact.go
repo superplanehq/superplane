@@ -142,8 +142,8 @@ func (d *DeleteArtifact) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (d *DeleteArtifact) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 0, nil
+func (d *DeleteArtifact) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 0, nil, nil
 }
 
 func (d *DeleteArtifact) Actions() []core.Action {

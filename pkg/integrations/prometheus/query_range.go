@@ -163,8 +163,8 @@ func (c *QueryRange) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID,
 	return ctx.DefaultProcessing()
 }
 
-func (c *QueryRange) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (c *QueryRange) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (c *QueryRange) Actions() []core.Action {

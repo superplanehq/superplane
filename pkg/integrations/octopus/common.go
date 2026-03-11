@@ -206,12 +206,12 @@ func webhookRequestIsJSON(ctx core.WebhookRequestContext) bool {
 	return strings.Contains(strings.ToLower(contentType), "application/json")
 }
 
-func errorResponse(statusCode int, format string, a ...any) (int, error) {
-	return statusCode, fmt.Errorf(format, a...)
+func errorResponse(statusCode int, format string, a ...any) (int, *core.WebhookResponseBody, error) {
+	return statusCode, nil, fmt.Errorf(format, a...)
 }
 
-func okResponse() (int, error) {
-	return http.StatusOK, nil
+func okResponse() (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func isResolvedValue(value string) bool {

@@ -158,20 +158,20 @@ type MessageAttribute struct {
 	Value string `json:"Value"`
 }
 
-func (t *OnTopicMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnTopicMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	var config OnTopicMessageConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode trigger configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode trigger configuration: %w", err)
 	}
 
 	var message SubscriptionMessage
 	if err := json.Unmarshal(ctx.Body, &message); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("failed to decode SNS webhook payload: %w", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("failed to decode SNS webhook payload: %w", err)
 	}
 
 	if err := t.verifyMessageSignature(ctx, message); err != nil {
 		ctx.Logger.Errorf("failed to verify SNS signature: %v", err)
-		return http.StatusBadRequest, fmt.Errorf("invalid SNS message signature: %w", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("invalid SNS message signature: %w", err)
 	}
 
 	switch message.Type {
@@ -182,56 +182,56 @@ func (t *OnTopicMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 		return t.emitTopicNotification(ctx, message, config)
 
 	case "UnsubscribeConfirmation":
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 
 	default:
-		return http.StatusBadRequest, fmt.Errorf("unsupported SNS message type %q", message.Type)
+		return http.StatusBadRequest, nil, fmt.Errorf("unsupported SNS message type %q", message.Type)
 	}
 }
 
-func (t *OnTopicMessage) confirmSubscription(ctx core.WebhookRequestContext, config OnTopicMessageConfiguration, message SubscriptionMessage) (int, error) {
+func (t *OnTopicMessage) confirmSubscription(ctx core.WebhookRequestContext, config OnTopicMessageConfiguration, message SubscriptionMessage) (int, *core.WebhookResponseBody, error) {
 	if strings.TrimSpace(message.TopicArn) != config.TopicArn {
 		ctx.Logger.Infof("message topic ARN %s does not match configured topic ARN %s, ignoring", message.TopicArn, config.TopicArn)
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if message.SubscribeURL == "" {
 		ctx.Logger.Errorf("missing SubscribeURL")
-		return http.StatusBadRequest, fmt.Errorf("missing SubscribeURL")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing SubscribeURL")
 	}
 
 	subscribeURL, err := url.Parse(message.SubscribeURL)
 	if err != nil {
 		ctx.Logger.Errorf("invalid SubscribeURL: %v", err)
-		return http.StatusBadRequest, fmt.Errorf("invalid SubscribeURL: %w", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("invalid SubscribeURL: %w", err)
 	}
 
 	if subscribeURL.Scheme != "https" {
 		ctx.Logger.Errorf("SubscribeURL must use https")
-		return http.StatusBadRequest, fmt.Errorf("SubscribeURL must use https")
+		return http.StatusBadRequest, nil, fmt.Errorf("SubscribeURL must use https")
 	}
 
 	host := strings.ToLower(subscribeURL.Hostname())
 	if host == "" {
 		ctx.Logger.Errorf("SubscribeURL host is required")
-		return http.StatusBadRequest, fmt.Errorf("SubscribeURL host is required")
+		return http.StatusBadRequest, nil, fmt.Errorf("SubscribeURL host is required")
 	}
 
 	if !strings.HasSuffix(host, ".amazonaws.com") && !strings.HasSuffix(host, ".amazonaws.com.cn") {
 		ctx.Logger.Errorf("SubscribeURL host must be an AWS SNS domain")
-		return http.StatusBadRequest, fmt.Errorf("SubscribeURL host must be an AWS SNS domain")
+		return http.StatusBadRequest, nil, fmt.Errorf("SubscribeURL host must be an AWS SNS domain")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, subscribeURL.String(), nil)
 	if err != nil {
 		ctx.Logger.Errorf("failed to create request to confirm subscription: %v", err)
-		return http.StatusInternalServerError, fmt.Errorf("failed to create request: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	response, err := ctx.HTTP.Do(req)
 	if err != nil {
 		ctx.Logger.Errorf("failed to confirm SNS subscription: %v", err)
-		return http.StatusInternalServerError, fmt.Errorf("failed to confirm SNS subscription: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to confirm SNS subscription: %w", err)
 	}
 
 	defer response.Body.Close()
@@ -240,7 +240,7 @@ func (t *OnTopicMessage) confirmSubscription(ctx core.WebhookRequestContext, con
 		responseBody, readErr := io.ReadAll(response.Body)
 		if readErr != nil {
 			ctx.Logger.Errorf("failed to read response body: %v", readErr)
-			return http.StatusInternalServerError, fmt.Errorf(
+			return http.StatusInternalServerError, nil, fmt.Errorf(
 				"SNS subscription confirmation failed with status %d and unreadable body: %v",
 				response.StatusCode,
 				readErr,
@@ -248,7 +248,7 @@ func (t *OnTopicMessage) confirmSubscription(ctx core.WebhookRequestContext, con
 		}
 
 		ctx.Logger.Errorf("SNS subscription confirmation failed with status %d: %s", response.StatusCode, strings.TrimSpace(string(responseBody)))
-		return http.StatusInternalServerError, fmt.Errorf(
+		return http.StatusInternalServerError, nil, fmt.Errorf(
 			"SNS subscription confirmation failed with status %d: %s",
 			response.StatusCode,
 			strings.TrimSpace(string(responseBody)),
@@ -256,26 +256,26 @@ func (t *OnTopicMessage) confirmSubscription(ctx core.WebhookRequestContext, con
 	}
 
 	ctx.Logger.Info("Subscription confirmation was successful")
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
-func (t *OnTopicMessage) emitTopicNotification(ctx core.WebhookRequestContext, message SubscriptionMessage, config OnTopicMessageConfiguration) (int, error) {
+func (t *OnTopicMessage) emitTopicNotification(ctx core.WebhookRequestContext, message SubscriptionMessage, config OnTopicMessageConfiguration) (int, *core.WebhookResponseBody, error) {
 	topicArn := strings.TrimSpace(message.TopicArn)
 	if topicArn == "" {
 		ctx.Logger.Errorf("missing TopicArn in SNS notification payload")
-		return http.StatusBadRequest, fmt.Errorf("missing TopicArn in SNS notification payload")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing TopicArn in SNS notification payload")
 	}
 
 	if topicArn != config.TopicArn {
 		ctx.Logger.Infof("message topic ARN %s does not match configured topic ARN %s, ignoring", topicArn, config.TopicArn)
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if err := ctx.Events.Emit("aws.sns.topic.message", message); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to emit topic message event: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to emit topic message event: %w", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (t *OnTopicMessage) Cleanup(ctx core.TriggerContext) error {

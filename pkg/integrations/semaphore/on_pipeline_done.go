@@ -203,87 +203,87 @@ func (p *OnPipelineDone) HandleAction(ctx core.TriggerActionContext) (map[string
 	return nil, nil
 }
 
-func (p *OnPipelineDone) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (p *OnPipelineDone) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	config := OnPipelineDoneConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	signature := ctx.Headers.Get("X-Semaphore-Signature-256")
 	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
 	}
 
 	signature = strings.TrimPrefix(signature, "sha256=")
 	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
 	}
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
+		return http.StatusInternalServerError, nil, fmt.Errorf("error authenticating request")
 	}
 
 	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
 	}
 
 	payload := map[string]any{}
 	err = json.Unmarshal(ctx.Body, &payload)
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	if len(config.Refs) > 0 {
 		ref, ok := getNestedString(payload, "revision", "reference")
 		if !ok || strings.TrimSpace(ref) == "" {
-			return http.StatusBadRequest, fmt.Errorf("missing revision.reference")
+			return http.StatusBadRequest, nil, fmt.Errorf("missing revision.reference")
 		}
 
 		if !configuration.MatchesAnyPredicate(config.Refs, ref) {
 			ctx.Logger.Infof("ref %s does not match the allowed predicates: %v", ref, config.Refs)
-			return http.StatusOK, nil
+			return http.StatusOK, nil, nil
 		}
 	}
 
 	if len(config.Results) > 0 {
 		result, ok := getNestedString(payload, "pipeline", "result")
 		if !ok || strings.TrimSpace(result) == "" {
-			return http.StatusBadRequest, fmt.Errorf("missing pipeline.result")
+			return http.StatusBadRequest, nil, fmt.Errorf("missing pipeline.result")
 		}
 
 		if !matchesPipelineResult(config.Results, result) {
 			ctx.Logger.Infof("result %s does not match the allowed predicates: %v", result, config.Results)
-			return http.StatusOK, nil
+			return http.StatusOK, nil, nil
 		}
 	}
 
 	if len(config.Pipelines) > 0 {
 		workingDirectory, ok := getNestedString(payload, "pipeline", "working_directory")
 		if !ok || strings.TrimSpace(workingDirectory) == "" {
-			return http.StatusBadRequest, fmt.Errorf("missing pipeline.working_directory")
+			return http.StatusBadRequest, nil, fmt.Errorf("missing pipeline.working_directory")
 		}
 
 		pipelineFile, ok := getNestedString(payload, "pipeline", "yaml_file_name")
 		if !ok || strings.TrimSpace(pipelineFile) == "" {
-			return http.StatusBadRequest, fmt.Errorf("missing pipeline.yaml_file_name")
+			return http.StatusBadRequest, nil, fmt.Errorf("missing pipeline.yaml_file_name")
 		}
 
 		pipelinePath := fmt.Sprintf("%s/%s", workingDirectory, pipelineFile)
 		if !configuration.MatchesAnyPredicate(config.Pipelines, pipelinePath) {
 			ctx.Logger.Infof("pipeline file %s does not match the allowed predicates: %v", pipelinePath, config.Pipelines)
-			return http.StatusOK, nil
+			return http.StatusOK, nil, nil
 		}
 	}
 
 	err = ctx.Events.Emit("semaphore.pipeline.done", payload)
 
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (p *OnPipelineDone) Cleanup(ctx core.TriggerContext) error {

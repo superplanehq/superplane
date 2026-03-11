@@ -850,8 +850,8 @@ func (e *HTTP) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (e *HTTP) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (e *HTTP) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (e *HTTP) Cleanup(ctx core.SetupContext) error {

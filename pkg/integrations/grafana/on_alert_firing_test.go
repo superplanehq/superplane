@@ -47,7 +47,7 @@ func Test__OnAlertFiring__HandleWebhook(t *testing.T) {
 	payload := []byte(`{"status":"firing","alerts":[{"status":"firing"}]}`)
 
 	t.Run("missing auth header when secret configured -> 401", func(t *testing.T) {
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"sharedSecret": "secret"},
@@ -62,7 +62,7 @@ func Test__OnAlertFiring__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("Authorization", "Token secret")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       headers,
 			Configuration: map[string]any{"sharedSecret": "secret"},
@@ -77,7 +77,7 @@ func Test__OnAlertFiring__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("Authorization", "Bearer wrong")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       headers,
 			Configuration: map[string]any{"sharedSecret": "secret"},
@@ -93,7 +93,7 @@ func Test__OnAlertFiring__HandleWebhook(t *testing.T) {
 		headers.Set("Authorization", "Bearer secret")
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       headers,
 			Configuration: map[string]any{"sharedSecret": "secret"},
@@ -109,7 +109,7 @@ func Test__OnAlertFiring__HandleWebhook(t *testing.T) {
 
 	t.Run("no secret configured -> event emitted without auth header", func(t *testing.T) {
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{},
@@ -125,7 +125,7 @@ func Test__OnAlertFiring__HandleWebhook(t *testing.T) {
 		mixedPayload := []byte(`{"status":"resolved","alerts":[{"status":"firing"}]}`)
 		eventContext := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          mixedPayload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{},
@@ -141,7 +141,7 @@ func Test__OnAlertFiring__HandleWebhook(t *testing.T) {
 		mixedPayload := []byte(`{"status":"firing","alerts":[{"status":"resolved"}]}`)
 		eventContext := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          mixedPayload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{},
@@ -156,7 +156,7 @@ func Test__OnAlertFiring__HandleWebhook(t *testing.T) {
 
 	t.Run("webhook secret retrieval error returns 500", func(t *testing.T) {
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"sharedSecret": "secret"},
@@ -176,7 +176,7 @@ func Test__OnAlertFiring__HandleWebhook(t *testing.T) {
 		headers.Set("Authorization", "Bearer secret")
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       headers,
 			Configuration: map[string]any{"sharedSecret": "secret"},
