@@ -415,64 +415,64 @@ func (r *RunPipeline) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	var payload map[string]any
 	err := json.Unmarshal(ctx.Body, &payload)
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	detail, ok := payload["detail"].(map[string]any)
 	if !ok {
-		return http.StatusBadRequest, fmt.Errorf("missing detail in event payload")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing detail in event payload")
 	}
 
 	executionID, ok := detail["execution-id"].(string)
 	if !ok || executionID == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing execution-id in event detail")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing execution-id in event detail")
 	}
 
 	state, ok := detail["state"].(string)
 	if !ok {
-		return http.StatusBadRequest, fmt.Errorf("missing state in event detail")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing state in event detail")
 	}
 
 	executionCtx, err := ctx.FindExecutionByKV("pipeline_execution_id", executionID)
 	if err != nil {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if executionCtx == nil {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	metadata := RunPipelineExecutionMetadata{}
 	err = mapstructure.Decode(executionCtx.Metadata.Get(), &metadata)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error decoding metadata: %v", err)
 	}
 
 	if metadata.Execution == nil {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if metadata.Pipeline == nil {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if metadata.Execution.Status == PipelineStatusSucceeded || metadata.Execution.Status == PipelineStatusFailed || metadata.Execution.Status == PipelineStatusStopped {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	status, terminal := terminalStatusFromEventBridgeState(state)
 	if !terminal {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	metadata.Execution.Status = status
 	err = executionCtx.Metadata.Set(metadata)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error setting metadata: %v", err)
 	}
 
 	outputPayload := pipelineExecutionOutputPayload(metadata.Pipeline.Name, executionID, status, state, detail)
@@ -484,10 +484,10 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	}
 
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, nil, err
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (r *RunPipeline) Actions() []core.Action {

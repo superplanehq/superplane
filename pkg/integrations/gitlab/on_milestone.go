@@ -109,40 +109,40 @@ func (m *OnMilestone) HandleAction(ctx core.TriggerActionContext) (map[string]an
 	return nil, nil
 }
 
-func (m *OnMilestone) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (m *OnMilestone) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	var config OnMilestoneConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	eventType := ctx.Headers.Get("X-Gitlab-Event")
 	if eventType == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing X-Gitlab-Event header")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing X-Gitlab-Event header")
 	}
 
 	if eventType != "Milestone Hook" {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	code, err := verifyWebhookToken(ctx)
 	if err != nil {
-		return code, err
+		return code, nil, err
 	}
 
 	data := map[string]any{}
 	if err := json.Unmarshal(ctx.Body, &data); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	if len(config.Actions) > 0 && !m.whitelistedAction(ctx.Logger, data, config.Actions) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if err := ctx.Events.Emit("gitlab.milestone", data); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (m *OnMilestone) Cleanup(ctx core.TriggerContext) error {

@@ -159,8 +159,8 @@ func (c *ResolveIncident) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *ResolveIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *ResolveIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *ResolveIncident) Cleanup(ctx core.SetupContext) error {

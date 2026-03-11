@@ -231,8 +231,8 @@ func (q *QueryDataSource) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (q *QueryDataSource) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (q *QueryDataSource) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (q *QueryDataSource) Cleanup(ctx core.SetupContext) error {

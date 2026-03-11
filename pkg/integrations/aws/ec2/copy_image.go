@@ -427,8 +427,8 @@ func (c *CopyImage) HandleAction(ctx core.ActionContext) error {
 	}
 }
 
-func (c *CopyImage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *CopyImage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *CopyImage) Cancel(ctx core.ExecutionContext) error {

@@ -268,8 +268,8 @@ func (c *CreateSilence) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UU
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateSilence) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (c *CreateSilence) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (c *CreateSilence) Actions() []core.Action {

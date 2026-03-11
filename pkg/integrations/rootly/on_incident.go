@@ -110,29 +110,29 @@ func (t *OnIncident) HandleAction(ctx core.TriggerActionContext) (map[string]any
 	return nil, nil
 }
 
-func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	config := OnIncidentConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	// Verify signature
 	signature := ctx.Headers.Get("X-Rootly-Signature")
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error getting secret: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error getting secret: %v", err)
 	}
 
 	if err := verifyWebhookSignature(signature, ctx.Body, secret); err != nil {
-		return http.StatusForbidden, fmt.Errorf("invalid signature: %v", err)
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature: %v", err)
 	}
 
 	// Parse webhook payload
 	var webhook WebhookPayload
 	err = json.Unmarshal(ctx.Body, &webhook)
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	eventType := webhook.Event.Type
@@ -140,7 +140,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	// Since the webhook may be shared and receive more events than this trigger cares about,
 	// we need to filter events by their type here.
 	if !slices.Contains(config.Events, eventType) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	err = ctx.Events.Emit(
@@ -149,10 +149,10 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	)
 
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 // WebhookPayload represents the Rootly webhook payload

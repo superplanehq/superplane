@@ -174,8 +174,8 @@ func (c *GetLastMessage) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *GetLastMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (c *GetLastMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (c *GetLastMessage) Cancel(ctx core.ExecutionContext) error {

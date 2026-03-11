@@ -25,7 +25,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 	baseConfig := map[string]any{}
 
 	t.Run("missing X-Rootly-Signature -> 403", func(t *testing.T) {
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
 			Configuration: baseConfig,
 			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
@@ -44,7 +44,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: baseConfig,
@@ -65,7 +65,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: baseConfig,
@@ -89,7 +89,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 
 		metadata := &contexts.MetadataContext{}
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: baseConfig,
@@ -113,7 +113,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 
 		metadata := &contexts.MetadataContext{Metadata: OnIncidentTimelineEventMetadata{EventStates: map[string]string{"ev-1": "2026-02-10T15:00:02Z"}}}
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: baseConfig,
@@ -137,7 +137,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 
 		metadata := &contexts.MetadataContext{Metadata: OnIncidentTimelineEventMetadata{EventStates: map[string]string{"ev-2": "2026-02-10T15:10:01Z"}}}
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{"visibility": "internal"},
@@ -161,7 +161,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 
 		metadata := &contexts.MetadataContext{}
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: baseConfig,
@@ -184,7 +184,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: baseConfig,
@@ -218,7 +218,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: baseConfig,
@@ -271,7 +271,7 @@ func Test__OnIncidentTimelineEvent__HandleWebhook(t *testing.T) {
 		}
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{"incidentStatus": []string{"resolved"}, "severity": []string{"sev2"}, "service": []string{"API"}, "team": []string{"Platform"}},

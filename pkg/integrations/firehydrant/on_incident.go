@@ -128,12 +128,12 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	config := OnIncidentConfiguration{}
 	if ctx.Configuration != nil {
 		err := mapstructure.Decode(ctx.Configuration, &config)
 		if err != nil {
-			return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+			return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 		}
 	}
 
@@ -141,35 +141,35 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	signature := ctx.Headers.Get("fh-signature")
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error getting secret: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error getting secret: %v", err)
 	}
 
 	if err := verifyWebhookSignature(signature, ctx.Body, secret); err != nil {
-		return http.StatusForbidden, fmt.Errorf("invalid signature: %v", err)
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature: %v", err)
 	}
 
 	// Parse webhook payload
 	var payload WebhookPayload
 	err = json.Unmarshal(ctx.Body, &payload)
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	// Only process incident events
 	if payload.Event.ResourceType != "incident" {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	op := payload.Event.Operation
 
 	if op != createdOperation && op != updatedOperation {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	// Only trigger on CREATED event when "started" milestone is configured.
 	if op == createdOperation {
 		if !slices.Contains(config.CurrentMilestone, "started") {
-			return http.StatusOK, nil
+			return http.StatusOK, nil, nil
 		}
 	}
 
@@ -177,12 +177,12 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	if op == updatedOperation {
 		// Prevent triggering on duplicate events on incident creation
 		if milestones, ok := payload.Data.Incident["milestones"].([]any); ok && len(milestones) == 1 {
-			return http.StatusOK, nil
+			return http.StatusOK, nil, nil
 		}
 
 		currentMilestone, ok := payload.Data.Incident["current_milestone"].(string)
 		if !ok || currentMilestone == "" || !slices.Contains(config.CurrentMilestone, currentMilestone) {
-			return http.StatusOK, nil
+			return http.StatusOK, nil, nil
 		}
 	}
 
@@ -190,7 +190,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	if len(config.Severities) > 0 {
 		incidentSeverity := extractSeveritySlug(payload)
 		if incidentSeverity == "" || !slices.Contains(config.Severities, incidentSeverity) {
-			return http.StatusOK, nil
+			return http.StatusOK, nil, nil
 		}
 	}
 
@@ -205,10 +205,10 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	)
 
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (t *OnIncident) Actions() []core.Action {

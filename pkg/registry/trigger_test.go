@@ -26,7 +26,7 @@ func (p *panickingTrigger) ExampleData() map[string]any          { return nil }
 func (p *panickingTrigger) Configuration() []configuration.Field { return nil }
 func (p *panickingTrigger) Actions() []core.Action               { return nil }
 func (p *panickingTrigger) Setup(ctx core.TriggerContext) error  { panic("setup panic") }
-func (p *panickingTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (p *panickingTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	panic("handle webhook panic")
 }
 func (p *panickingTrigger) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
@@ -53,7 +53,7 @@ func TestPanicableTrigger_HandleWebhook_CatchesPanic(t *testing.T) {
 	panicable := NewPanicableTrigger(trig)
 	ctx := core.WebhookRequestContext{}
 
-	status, err := panicable.HandleWebhook(ctx)
+	status, _, err := panicable.HandleWebhook(ctx)
 
 	require.Error(t, err)
 	assert.Equal(t, 500, status)

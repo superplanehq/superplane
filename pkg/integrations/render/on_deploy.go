@@ -108,10 +108,10 @@ func (t *OnDeploy) HandleAction(ctx core.TriggerActionContext) (map[string]any, 
 	return nil, nil
 }
 
-func (t *OnDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	config, err := decodeOnResourceEventConfiguration(ctx.Configuration)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	return handleOnResourceEventWebhook(

@@ -123,8 +123,8 @@ func (c *GetService) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *GetService) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *GetService) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *GetService) Actions() []core.Action {

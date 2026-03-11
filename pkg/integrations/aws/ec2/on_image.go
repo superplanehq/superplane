@@ -268,8 +268,8 @@ func (p *OnImage) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 	return ctx.Events.Emit("aws.ec2.image", ctx.Message)
 }
 
-func (p *OnImage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (p *OnImage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (p *OnImage) Cleanup(ctx core.TriggerContext) error {

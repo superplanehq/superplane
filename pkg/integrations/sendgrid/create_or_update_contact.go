@@ -227,8 +227,8 @@ func (c *CreateOrUpdateContact) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, UpsertContactPayloadType, []any{payload})
 }
 
-func (c *CreateOrUpdateContact) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (c *CreateOrUpdateContact) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (c *CreateOrUpdateContact) Actions() []core.Action {

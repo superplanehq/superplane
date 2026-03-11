@@ -263,8 +263,8 @@ func (c *UpdateDNSRecord) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *UpdateDNSRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *UpdateDNSRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *UpdateDNSRecord) Cleanup(ctx core.SetupContext) error {

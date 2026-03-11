@@ -150,8 +150,8 @@ func (c *AcknowledgeIncident) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *AcknowledgeIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *AcknowledgeIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *AcknowledgeIncident) Cleanup(ctx core.SetupContext) error {
