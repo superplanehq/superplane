@@ -155,17 +155,13 @@ func (t *OnVMDeleted) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if ctx.Integration != nil {
-		err := ctx.Integration.RequestWebhook(AzureWebhookConfiguration{
-			EventTypes:    []string{EventTypeResourceDeleteSuccess},
-			ResourceType:  ResourceTypeVirtualMachine,
-			ResourceGroup: config.ResourceGroup,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to request webhook: %w", err)
-		}
-	} else {
-		ctx.Logger.Warn("Integration context missing; skipping webhook request")
+	err := ctx.Integration.RequestWebhook(AzureWebhookConfiguration{
+		EventTypes:    []string{EventTypeResourceDeleteSuccess},
+		ResourceType:  ResourceTypeVirtualMachine,
+		ResourceGroup: config.ResourceGroup,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to request webhook: %w", err)
 	}
 
 	ctx.Logger.Info("Azure On VM Deleted trigger configured successfully")

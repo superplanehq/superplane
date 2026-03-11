@@ -82,7 +82,6 @@ func (a *AzureIntegration) ListResourceGroups(ctx core.ListResourcesContext) ([]
 		return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
 	})
 
-	ctx.Logger.Infof("found %d resource groups", len(resources))
 	return resources, nil
 }
 
@@ -182,7 +181,6 @@ func (a *AzureIntegration) ListVMSizes(ctx core.ListResourcesContext, resourceGr
 		return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
 	})
 
-	ctx.Logger.Infof("found %d VM sizes for resourceGroup=%s", len(resources), resourceGroup)
 	return resources, nil
 }
 
@@ -238,7 +236,6 @@ func (a *AzureIntegration) ListVirtualNetworks(ctx core.ListResourcesContext, re
 		return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
 	})
 
-	ctx.Logger.Infof("found %d virtual networks for resourceGroup=%s", len(resources), resourceGroup)
 	return resources, nil
 }
 
@@ -295,7 +292,6 @@ func (a *AzureIntegration) ListSubnets(ctx core.ListResourcesContext, resourceGr
 		return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
 	})
 
-	ctx.Logger.Infof("found %d subnets for resourceGroup=%s vnet=%s", len(resources), resourceGroup, vnetName)
 	return resources, nil
 }
 
