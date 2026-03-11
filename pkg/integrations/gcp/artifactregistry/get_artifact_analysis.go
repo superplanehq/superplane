@@ -22,13 +22,12 @@ const (
 type GetArtifactAnalysis struct{}
 
 type GetArtifactAnalysisConfiguration struct {
-	InputMode   string   `json:"inputMode" mapstructure:"inputMode"`
-	ResourceURL string   `json:"resourceUrl" mapstructure:"resourceUrl"`
-	Location    string   `json:"location" mapstructure:"location"`
-	Repository  string   `json:"repository" mapstructure:"repository"`
-	Package     string   `json:"package" mapstructure:"package"`
-	Version     string   `json:"version" mapstructure:"version"`
-	Kinds       []string `json:"kinds" mapstructure:"kinds"`
+	InputMode   string `json:"inputMode" mapstructure:"inputMode"`
+	ResourceURL string `json:"resourceUrl" mapstructure:"resourceUrl"`
+	Location    string `json:"location" mapstructure:"location"`
+	Repository  string `json:"repository" mapstructure:"repository"`
+	Package     string `json:"package" mapstructure:"package"`
+	Version     string `json:"version" mapstructure:"version"`
 }
 
 func (c *GetArtifactAnalysis) Name() string {
@@ -55,7 +54,6 @@ Provide either a **Resource URL** or the four fields below:
 - **Repository**: The Artifact Registry repository containing the artifact.
 - **Package**: The package (image) within the repository.
 - **Version**: The version (digest) to query.
-- **Occurrence Kinds**: Optional filter by occurrence kind (VULNERABILITY, BUILD, ATTESTATION, SBOM). Leave empty to retrieve all kinds.
 
 ## Output
 
@@ -187,23 +185,6 @@ func (c *GetArtifactAnalysis) Configuration() []configuration.Field {
 				},
 			},
 		},
-		{
-			Name:        "kinds",
-			Label:       "Occurrence Kinds",
-			Type:        configuration.FieldTypeMultiSelect,
-			Required:    false,
-			Description: "Filter by occurrence kind. Leave empty to retrieve all kinds.",
-			TypeOptions: &configuration.TypeOptions{
-				MultiSelect: &configuration.MultiSelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Vulnerability", Value: occurrenceKindVulnerability},
-						{Label: "Build Provenance", Value: occurrenceKindBuild},
-						{Label: "Attestation", Value: occurrenceKindAttestation},
-						{Label: "SBOM", Value: occurrenceKindSBOM},
-					},
-				},
-			},
-		},
 	}
 }
 
@@ -294,7 +275,7 @@ func (c *GetArtifactAnalysis) Execute(ctx core.ExecutionContext) error {
 	} else {
 		resourceURI = fmt.Sprintf("https://%s-docker.pkg.dev/%s/%s/%s@%s", config.Location, projectID, config.Repository, config.Package, config.Version)
 	}
-	filter := buildOccurrenceFilter(config, resourceURI)
+	filter := buildOccurrenceFilter(resourceURI)
 	reqURL := listOccurrencesURL(projectID, filter)
 
 	summary := &analysisSummary{ResourceURI: resourceURI}
@@ -327,23 +308,11 @@ func (c *GetArtifactAnalysis) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(getArtifactAnalysisOutputChannel, getArtifactAnalysisPayloadType, []any{summary})
 }
 
-func buildOccurrenceFilter(config GetArtifactAnalysisConfiguration, resourceURI string) string {
+func buildOccurrenceFilter(resourceURI string) string {
 	var parts []string
 
 	if resourceURI != "" {
 		parts = append(parts, fmt.Sprintf("resourceUrl=%q", resourceURI))
-	}
-
-	if len(config.Kinds) > 0 {
-		kindFilter := make([]string, 0, len(config.Kinds))
-		for _, k := range config.Kinds {
-			kindFilter = append(kindFilter, fmt.Sprintf("kind=%q", k))
-		}
-		if len(kindFilter) == 1 {
-			parts = append(parts, kindFilter[0])
-		} else {
-			parts = append(parts, "("+strings.Join(kindFilter, " OR ")+")")
-		}
 	}
 
 	return strings.Join(parts, " AND ")
