@@ -26,12 +26,12 @@ export const getArtifactMapper: ComponentBaseMapper = {
 
     if (data?.createTime) {
       const formatted = formatDateTime(data.createTime as string);
-      if (formatted) details["Created"] = formatted;
+      if (formatted) details["Image Created At"] = formatted;
     }
 
     if (data?.updateTime) {
       const formatted = formatDateTime(data.updateTime as string);
-      if (formatted) details["Updated"] = formatted;
+      if (formatted) details["Image Updated At"] = formatted;
     }
 
     const sizeBytes = data?.metadata?.imageSizeBytes;
@@ -42,15 +42,6 @@ export const getArtifactMapper: ComponentBaseMapper = {
     const digest = artifactShortName(data?.name as string | undefined);
     if (digest) {
       details["Digest"] = digest;
-    }
-
-    if (data?.metadata?.mediaType) {
-      details["Media Type"] = String(data.metadata.mediaType);
-    }
-
-    if (data?.metadata?.buildTime) {
-      const formatted = formatDateTime(data.metadata.buildTime as string);
-      if (formatted) details["Build Time"] = formatted;
     }
 
     return details;
@@ -88,11 +79,15 @@ export const getArtifactAnalysisMapper: ComponentBaseMapper = {
       details["Vulnerabilities"] = String(data.vulnerabilities);
     }
 
-    if (typeof data?.critical === "number" && data.critical > 0) details["Critical"] = String(data.critical);
-    if (typeof data?.high === "number" && data.high > 0) details["High"] = String(data.high);
-    if (typeof data?.medium === "number" && data.medium > 0) details["Medium"] = String(data.medium);
-    if (typeof data?.fixAvailable === "number" && data.fixAvailable > 0)
-      details["Fix Available"] = String(data.fixAvailable);
+    if (typeof data?.critical === "number" && data.critical > 0) {
+      details["Critical"] = String(data.critical);
+    }
+    if (typeof data?.high === "number" && data.high > 0) {
+      details["High"] = String(data.high);
+    }
+    if (typeof data?.fixAvailable === "number" && data.fixAvailable > 0) {
+      details["Fixes Available"] = String(data.fixAvailable);
+    }
 
     return details;
   },
