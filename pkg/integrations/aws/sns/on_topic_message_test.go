@@ -142,7 +142,7 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 			}},
 		}
 
-		status, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body: body,
 			Configuration: map[string]any{
 				"region":   "us-east-1",
@@ -190,7 +190,7 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 			}},
 		}
 
-		status, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body: body,
 			Configuration: map[string]any{
 				"region":   "us-east-1",
@@ -232,7 +232,7 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 			}},
 		}
 
-		status, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body: body,
 			Configuration: map[string]any{
 				"region":   "us-east-1",
@@ -251,7 +251,7 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("unsupported message type -> bad request", func(t *testing.T) {
-		status, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body: []byte(`{
 				"Type": "UnknownType",
 				"TopicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"

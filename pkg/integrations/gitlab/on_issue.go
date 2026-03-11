@@ -132,50 +132,50 @@ func (i *OnIssue) HandleAction(ctx core.TriggerActionContext) (map[string]any, e
 	return nil, nil
 }
 
-func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	var config OnIssueConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	eventType := ctx.Headers.Get("X-Gitlab-Event")
 	if eventType == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing X-Gitlab-Event header")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing X-Gitlab-Event header")
 	}
 
 	if eventType != "Issue Hook" {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	code, err := verifyWebhookToken(ctx)
 	if err != nil {
-		return code, err
+		return code, nil, err
 	}
 
 	data := map[string]any{}
 	if err := json.Unmarshal(ctx.Body, &data); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	//
 	// Verify that the action is in the allowed list
 	//
 	if len(config.Actions) > 0 && !i.whitelistedAction(ctx.Logger, data, config.Actions) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	//
 	// Verify that the labels are in the allowed list
 	//
 	if len(config.Labels) > 0 && !i.hasWhitelistedLabel(ctx.Logger, data, config.Labels) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if err := ctx.Events.Emit("gitlab.issue", data); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (i *OnIssue) Cleanup(ctx core.TriggerContext) error {

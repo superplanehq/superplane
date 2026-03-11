@@ -148,33 +148,33 @@ func (t *OnIncidentAnnotated) HandleAction(ctx core.TriggerActionContext) (map[s
 	return nil, nil
 }
 
-func (t *OnIncidentAnnotated) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnIncidentAnnotated) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	log.Printf("[OnIncidentAnnotated] Received webhook request, body length: %d", len(ctx.Body))
 
 	// Verify signature
 	signature := ctx.Headers.Get("X-PagerDuty-Signature")
 	if signature == "" {
 		log.Printf("[OnIncidentAnnotated] Missing signature header")
-		return http.StatusForbidden, fmt.Errorf("missing signature")
+		return http.StatusForbidden, nil, fmt.Errorf("missing signature")
 	}
 
 	// Extract version and signature value (format: v1=<signature>)
 	parts := strings.SplitN(signature, "=", 2)
 	if len(parts) != 2 || parts[0] != "v1" {
 		log.Printf("[OnIncidentAnnotated] Invalid signature format: %s", signature)
-		return http.StatusForbidden, fmt.Errorf("invalid signature format")
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature format")
 	}
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		log.Printf("[OnIncidentAnnotated] Error getting secret: %v", err)
-		return http.StatusInternalServerError, fmt.Errorf("error getting secret: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error getting secret: %v", err)
 	}
 
 	// Verify signature using HMAC SHA256
 	if err := crypto.VerifySignature(secret, ctx.Body, parts[1]); err != nil {
 		log.Printf("[OnIncidentAnnotated] Invalid signature: %v", err)
-		return http.StatusForbidden, fmt.Errorf("invalid signature: %v", err)
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature: %v", err)
 	}
 
 	log.Printf("[OnIncidentAnnotated] Signature verified successfully")
@@ -184,7 +184,7 @@ func (t *OnIncidentAnnotated) HandleWebhook(ctx core.WebhookRequestContext) (int
 	err = json.Unmarshal(ctx.Body, &webhook)
 	if err != nil {
 		log.Printf("[OnIncidentAnnotated] Error parsing request body: %v", err)
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	eventType := webhook.Event.EventType
@@ -195,7 +195,7 @@ func (t *OnIncidentAnnotated) HandleWebhook(ctx core.WebhookRequestContext) (int
 	//
 	if eventType != "incident.annotated" {
 		log.Printf("[OnIncidentAnnotated] Ignoring event type: %s (expected incident.annotated)", eventType)
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	// Parse configuration
@@ -203,7 +203,7 @@ func (t *OnIncidentAnnotated) HandleWebhook(ctx core.WebhookRequestContext) (int
 	err = mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		log.Printf("[OnIncidentAnnotated] Error decoding configuration: %v", err)
-		return http.StatusInternalServerError, fmt.Errorf("error decoding configuration: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error decoding configuration: %v", err)
 	}
 
 	// Extract annotation content from the log_entries or directly from data
@@ -215,11 +215,11 @@ func (t *OnIncidentAnnotated) HandleWebhook(ctx core.WebhookRequestContext) (int
 		matched, err := regexp.MatchString(config.ContentFilter, annotationContent)
 		if err != nil {
 			log.Printf("[OnIncidentAnnotated] Error matching content filter: %v", err)
-			return http.StatusInternalServerError, fmt.Errorf("invalid content filter regex: %v", err)
+			return http.StatusInternalServerError, nil, fmt.Errorf("invalid content filter regex: %v", err)
 		}
 		if !matched {
 			log.Printf("[OnIncidentAnnotated] Content does not match filter, skipping event")
-			return http.StatusOK, nil
+			return http.StatusOK, nil, nil
 		}
 		log.Printf("[OnIncidentAnnotated] Content matches filter")
 	}
@@ -236,11 +236,11 @@ func (t *OnIncidentAnnotated) HandleWebhook(ctx core.WebhookRequestContext) (int
 
 	if err != nil {
 		log.Printf("[OnIncidentAnnotated] Error emitting event: %v", err)
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
 	log.Printf("[OnIncidentAnnotated] Event emitted successfully")
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 // extractAnnotationContent extracts the note content from the webhook data.

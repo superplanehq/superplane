@@ -24,7 +24,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 	}
 
 	t.Run("missing X-Rootly-Signature -> 403", func(t *testing.T) {
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
 			Configuration: validConfig,
 			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
@@ -39,7 +39,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-Rootly-Signature", "invalid")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       headers,
 			Configuration: validConfig,
 			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
@@ -55,7 +55,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-Rootly-Signature", "t=1234567890,v1=invalid")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,
@@ -75,7 +75,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,
@@ -96,7 +96,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig, // Only "incident.created" is configured
@@ -118,7 +118,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,
@@ -150,7 +150,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: multiEventConfig,

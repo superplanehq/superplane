@@ -110,10 +110,10 @@ func (t *OnAlertNotification) HandleAction(ctx core.TriggerActionContext) (map[s
 	return nil, nil
 }
 
-func (t *OnAlertNotification) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnAlertNotification) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	// no-op, since events are received through the integration
 	// and routed to OnIntegrationMessage()
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 type AlertNotificationEvent struct {

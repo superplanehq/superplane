@@ -63,7 +63,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 	}
 
 	t.Run("missing signing secret (no webhook secret) -> 403", func(t *testing.T) {
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
 			Configuration: map[string]any{"events": []string{EventIncidentCreatedV2}},
 			Webhook:       &contexts.NodeWebhookContext{}, // no SetSecret called
@@ -77,7 +77,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 	t.Run("missing webhook headers -> 403", func(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
 			Configuration: validConfig,
 			Webhook:       wc,
@@ -98,7 +98,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,
@@ -122,7 +122,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{"events": []string{EventIncidentCreatedV2}},
@@ -147,7 +147,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,
@@ -180,7 +180,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		wc := &contexts.NodeWebhookContext{}
 		require.NoError(t, wc.SetSecret([]byte(validSecret)))
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,

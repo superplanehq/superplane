@@ -748,8 +748,8 @@ func (c *CreateRepositorySandbox) bootstrapCommand(metadata *CreateRepositorySan
 	)
 }
 
-func (c *CreateRepositorySandbox) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *CreateRepositorySandbox) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *CreateRepositorySandbox) Cleanup(ctx core.SetupContext) error {

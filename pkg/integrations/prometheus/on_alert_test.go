@@ -86,7 +86,7 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 	t.Run("missing bearer auth returns 403", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{AlertStateFiring}},
@@ -104,7 +104,7 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 	t.Run("invalid body returns 400", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          []byte("not-json"),
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{AlertStateFiring}},
@@ -120,7 +120,7 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 	t.Run("status filtered out returns 200 and no events", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{AlertStateResolved}, "alertNames": []string{"OnlyOther"}},
@@ -136,7 +136,7 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 	t.Run("webhook sanitizes statuses and alert names at runtime", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{"  FIRING  "}, "alertNames": []string{"  HighRequestLatency  "}},
@@ -153,7 +153,7 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 	t.Run("webhook auth config read errors fail closed", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{AlertStateFiring}},
@@ -173,7 +173,7 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("Authorization", "Bearer token-1")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       headers,
 			Configuration: map[string]any{"statuses": []string{AlertStateFiring, AlertStateResolved}},

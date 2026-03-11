@@ -622,8 +622,8 @@ func (c *SSHCommand) Actions() []core.Action {
 	}
 }
 
-func (c *SSHCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 404, fmt.Errorf("SSH component does not handle webhooks")
+func (c *SSHCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 404, nil, fmt.Errorf("SSH component does not handle webhooks")
 }
 
 func (c *SSHCommand) Cleanup(ctx core.SetupContext) error {

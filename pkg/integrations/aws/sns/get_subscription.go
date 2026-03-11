@@ -153,8 +153,8 @@ func (c *GetSubscription) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *GetSubscription) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *GetSubscription) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *GetSubscription) Cancel(ctx core.ExecutionContext) error {

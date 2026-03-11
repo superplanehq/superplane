@@ -83,7 +83,7 @@ func Test__OnArtifactUploaded__HandleWebhook(t *testing.T) {
 	trigger := &OnArtifactUploaded{}
 
 	t.Run("missing signature header -> 403", func(t *testing.T) {
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: http.Header{},
 			Body:    []byte(`{}`),
 			Logger:  log.NewEntry(log.New()),
@@ -97,7 +97,7 @@ func Test__OnArtifactUploaded__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-JFrog-Event-Auth", "invalidsignature")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Body:    []byte(`{}`),
 			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
@@ -121,7 +121,7 @@ func Test__OnArtifactUploaded__HandleWebhook(t *testing.T) {
 
 		secret := "test-secret"
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: jfrogHeaders(secret, body),
 			Body:    body,
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},
@@ -149,7 +149,7 @@ func Test__OnArtifactUploaded__HandleWebhook(t *testing.T) {
 
 		secret := "test-secret"
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       jfrogHeaders(secret, body),
 			Body:          body,
 			Configuration: map[string]any{},
@@ -186,7 +186,7 @@ func Test__OnArtifactUploaded__HandleWebhook(t *testing.T) {
 
 		secret := "test-secret"
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       jfrogHeaders(secret, body),
 			Body:          body,
 			Configuration: map[string]any{},
@@ -215,7 +215,7 @@ func Test__OnArtifactUploaded__HandleWebhook(t *testing.T) {
 
 		secret := "test-secret"
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       jfrogHeaders(secret, body),
 			Body:          body,
 			Configuration: map[string]any{"repository": "libs-release-local"},
@@ -244,7 +244,7 @@ func Test__OnArtifactUploaded__HandleWebhook(t *testing.T) {
 
 		secret := "test-secret"
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       jfrogHeaders(secret, body),
 			Body:          body,
 			Configuration: map[string]any{"repository": "libs-release-local"},

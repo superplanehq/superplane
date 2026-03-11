@@ -120,7 +120,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 
 	t.Run("missing webhook header -> 403", func(t *testing.T) {
 		eventCtx := &contexts.EventContext{}
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       http.Header{"Content-Type": []string{"application/json"}},
 			Configuration: map[string]any{},
@@ -140,7 +140,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			"X-Superplane-Webhook-Secret": []string{"wrong-secret"},
 		}
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
@@ -160,7 +160,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			"X-Superplane-Webhook-Secret": []string{secret},
 		}
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
@@ -192,7 +192,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			"X-Superplane-Webhook-Secret": []string{secret},
 		}
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          emptyBody,
 			Headers:       headers,
 			Configuration: map[string]any{},
@@ -224,7 +224,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			"X-Superplane-Webhook-Secret": []string{secret},
 		}
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          nonDeployBody,
 			Headers:       headers,
 			Configuration: map[string]any{},
@@ -244,7 +244,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			"X-Superplane-Webhook-Secret": []string{secret},
 		}
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -266,7 +266,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			"X-Superplane-Webhook-Secret": []string{secret},
 		}
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -289,7 +289,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			"X-Superplane-Webhook-Secret": []string{secret},
 		}
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -312,7 +312,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			"X-Superplane-Webhook-Secret": []string{secret},
 		}
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -349,7 +349,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			"X-Superplane-Webhook-Secret": []string{secret},
 		}
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
@@ -383,7 +383,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			"X-Superplane-Webhook-Secret": []string{secret},
 		}
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    queuedBody,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -406,7 +406,7 @@ func Test__Octopus_OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			"X-Superplane-Webhook-Secret": []string{secret},
 		}
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          []byte("not json"),
 			Headers:       headers,
 			Configuration: map[string]any{},
