@@ -13,7 +13,7 @@ import (
 type RunEvent struct{}
 
 type RunEventConfiguration struct {
-	WorkspaceID string   `mapstructure:"workspaceId"`
+	WorkspaceID string   `mapstructure:"workspace"`
 	Events      []string `mapstructure:"events"`
 }
 
@@ -28,7 +28,7 @@ func (t *RunEvent) Color() string { return "purple" }
 func (t *RunEvent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:     "workspaceId",
+			Name:     "workspace",
 			Label:    "Workspace",
 			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
@@ -94,7 +94,7 @@ func (t *RunEvent) Setup(ctx core.TriggerContext) error {
 	}
 
 	if config.WorkspaceID == "" {
-		return fmt.Errorf("workspaceId is required")
+		return fmt.Errorf("workspace is required")
 	}
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
@@ -107,10 +107,10 @@ func (t *RunEvent) Actions() []core.Action { return []core.Action{} }
 func (t *RunEvent) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
 	return nil, nil
 }
-func (t *RunEvent) ExampleOutput() map[string]any { return nil }
-func (t *RunEvent) ExampleData() map[string]any   { return nil }
-func (t *RunEvent) Documentation() string         { return "" }
-func (t *RunEvent) Triggers() []string            { return []string{} }
+func (t *RunEvent) Documentation() string {
+	return `Triggered whenever a Terraform Run event occurs that matches the configured workspace and selected states.`
+}
+func (t *RunEvent) Triggers() []string { return []string{} }
 
 func (t *RunEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	data, code, err := ParseAndValidateWebhook(ctx)

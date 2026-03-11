@@ -1,0 +1,11 @@
+{
+    "runId": "run-xxxxxx",
+    "workspaceId": "ws-yyyyyy",
+    "action": "run:completed",
+    "runStatus": "applied",
+    "runUrl": "https://app.terraform.io/app/my-org/workspaces/my-ws/runs/run-xxxxxx",
+    "runMessage": "Update infrastructure",
+    "workspaceName": "my-ws",
+    "organizationName": "my-org",
+    "runCreatedBy": "jane.doe"
+}

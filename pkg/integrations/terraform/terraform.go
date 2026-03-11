@@ -44,7 +44,29 @@ To use the Terraform integration, you need an HCP Terraform API Token.
 }
 
 func (i *Integration) Configuration() []configuration.Field {
-	return getConfigurationFields()
+	return []configuration.Field{
+		{
+			Name:        "address",
+			Label:       "Terraform Address",
+			Type:        configuration.FieldTypeString,
+			Default:     "https://app.terraform.io",
+			Required:    true,
+			Description: "The URL of the HCP Terraform or Terraform Enterprise instance.",
+		},
+		{
+			Name:        "apiToken",
+			Label:       "Team API Token",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Sensitive:   true,
+			Description: "Your HCP Terraform Team API Token. This token must belong to a team with appropriate workspace permissions.",
+		},
+	}
+}
+
+type Configuration struct {
+	Address  string `json:"address" mapstructure:"address"`
+	APIToken string `json:"apiToken" mapstructure:"apiToken"`
 }
 
 func (i *Integration) Sync(ctx core.SyncContext) error {
@@ -145,7 +167,7 @@ func (i *Integration) Triggers() []core.Trigger {
 
 func (i *Integration) Components() []core.Component {
 	return []core.Component{
-		&Plan{},
+		&RunPlan{},
 	}
 }
 

@@ -13,11 +13,11 @@ import (
 
 const PollInterval = 10 * time.Second
 
-type Plan struct{}
+type RunPlan struct{}
 
 type PlanSpec struct {
-	WorkspaceID string `mapstructure:"workspaceId"`
-	Message     string `mapstructure:"message"`
+	Workspace string `mapstructure:"workspace"`
+	Message   string `mapstructure:"message"`
 }
 
 type RunStateEntry struct {
@@ -41,19 +41,19 @@ type ExecutionMetadata struct {
 	PlanJSON      string          `json:"planJson,omitempty" mapstructure:"planJson"`
 }
 
-func (c *Plan) Name() string        { return "terraform.plan" }
-func (c *Plan) Label() string       { return "Run plan" }
-func (c *Plan) Description() string { return "Create a Terraform run and wait for its plan" }
-func (c *Plan) Icon() string        { return "file-text" }
-func (c *Plan) Color() string       { return "purple" }
-func (c *Plan) Documentation() string {
+func (c *RunPlan) Name() string        { return "terraform.run_plan" }
+func (c *RunPlan) Label() string       { return "Run plan" }
+func (c *RunPlan) Description() string { return "Create a Terraform run and wait for its plan" }
+func (c *RunPlan) Icon() string        { return "file-text" }
+func (c *RunPlan) Color() string       { return "purple" }
+func (c *RunPlan) Documentation() string {
 	return `Creates a Terraform run, polls its status, and waits for the plan to complete. It creates a plan only and does not allow applying.`
 }
 
-func (c *Plan) Configuration() []configuration.Field {
+func (c *RunPlan) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:  "workspaceId",
+			Name:  "workspace",
 			Label: "Workspace",
 			Type:  configuration.FieldTypeIntegrationResource,
 			TypeOptions: &configuration.TypeOptions{
@@ -70,7 +70,7 @@ func (c *Plan) Configuration() []configuration.Field {
 	}
 }
 
-func (c *Plan) Setup(ctx core.SetupContext) error {
+func (c *RunPlan) Setup(ctx core.SetupContext) error {
 	return ensureWorkspaceInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
@@ -78,7 +78,7 @@ func (c *Plan) Setup(ctx core.SetupContext) error {
 	)
 }
 
-func (c *Plan) Execute(ctx core.ExecutionContext) error {
+func (c *RunPlan) Execute(ctx core.ExecutionContext) error {
 	client, err := getClientFromIntegration(ctx.Integration)
 	if err != nil {
 		return err
@@ -89,7 +89,7 @@ func (c *Plan) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	resolvedWsID, err := client.ResolveWorkspaceID(spec.WorkspaceID)
+	resolvedWsID, err := client.ResolveWorkspaceID(spec.Workspace)
 	if err != nil {
 		return fmt.Errorf("failed to resolve workspace: %w", err)
 	}
@@ -124,11 +124,11 @@ func (c *Plan) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 }
 
-func (c *Plan) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+func (c *RunPlan) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (c *Plan) Actions() []core.Action {
+func (c *RunPlan) Actions() []core.Action {
 	return []core.Action{
 		{
 			Name:           "poll",
@@ -138,7 +138,7 @@ func (c *Plan) Actions() []core.Action {
 	}
 }
 
-func (c *Plan) HandleAction(ctx core.ActionContext) error {
+func (c *RunPlan) HandleAction(ctx core.ActionContext) error {
 	switch ctx.Name {
 	case "poll":
 		return c.poll(ctx)
@@ -147,7 +147,7 @@ func (c *Plan) HandleAction(ctx core.ActionContext) error {
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (c *Plan) poll(ctx core.ActionContext) error {
+func (c *RunPlan) poll(ctx core.ActionContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
@@ -214,7 +214,7 @@ func (c *Plan) poll(ctx core.ActionContext) error {
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 }
 
-func (c *Plan) emitFinalState(ctx core.ActionContext, metadata ExecutionMetadata, run *RunPayload) error {
+func (c *RunPlan) emitFinalState(ctx core.ActionContext, metadata ExecutionMetadata, run *RunPayload) error {
 	payload := map[string]any{
 		"runId":        metadata.RunID,
 		"finalStatus":  metadata.CurrentStatus,
@@ -269,9 +269,11 @@ func (c *Plan) emitFinalState(ctx core.ActionContext, metadata ExecutionMetadata
 	return ctx.ExecutionState.Emit(channel, "terraform.run.planned", []any{payload})
 }
 
-func (c *Plan) HandleWebhook(ctx core.WebhookRequestContext) (int, error) { return http.StatusOK, nil }
+func (c *RunPlan) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
+}
 
-func (c *Plan) Cancel(ctx core.ExecutionContext) error {
+func (c *RunPlan) Cancel(ctx core.ExecutionContext) error {
 	var metadata ExecutionMetadata
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return err
@@ -292,16 +294,16 @@ func (c *Plan) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *Plan) Cleanup(ctx core.SetupContext) error { return nil }
+func (c *RunPlan) Cleanup(ctx core.SetupContext) error { return nil }
 
-func (c *Plan) OutputChannels(configuration any) []core.OutputChannel {
+func (c *RunPlan) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
 		{Name: "passed", Label: "Passed", Description: "Run completed successfully or paused at planned"},
 		{Name: "failed", Label: "Failed", Description: "Run failed, errored, or was canceled"},
 	}
 }
 
-func (c *Plan) DefaultOutputChannel() core.OutputChannel {
+func (c *RunPlan) DefaultOutputChannel() core.OutputChannel {
 	return core.OutputChannel{Name: "passed", Label: "Passed"}
 }
 
@@ -311,13 +313,6 @@ func isFailedState(status string) bool {
 		return true
 	}
 	return false
-}
-
-func (c *Plan) ExampleOutput() map[string]any {
-	return map[string]any{
-		"runId":       "run-xxxxx",
-		"finalStatus": "planned",
-	}
 }
 
 func isTerminalStatePlanTarget(status string) bool {

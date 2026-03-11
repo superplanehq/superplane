@@ -69,6 +69,16 @@ func (c *Client) newRequest(method, path string, body any) (*http.Request, error
 	return req, nil
 }
 
+func (c *Client) readBody(resp *http.Response) ([]byte, error) {
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("bad status %d", resp.StatusCode)
+	}
+
+	return io.ReadAll(resp.Body)
+}
+
 func (c *Client) Validate() error {
 	req, err := c.newRequest(http.MethodGet, "/api/v2/account/details", nil)
 	if err != nil {
@@ -96,40 +106,41 @@ func (c *Client) ResolveWorkspaceID(identifier string) (string, error) {
 		return identifier, nil
 	}
 	parts := strings.Split(identifier, "/")
-	if len(parts) == 2 {
-		orgName := parts[0]
-		wsName := parts[1]
-
-		path := fmt.Sprintf("/api/v2/organizations/%s/workspaces/%s", url.PathEscape(orgName), url.PathEscape(wsName))
-		req, err := c.newRequest(http.MethodGet, path, nil)
-		if err != nil {
-			return "", fmt.Errorf("failed to create resolve workspace request: %w", err)
-		}
-
-		resp, err := c.HTTPClient.Do(req)
-		if err != nil {
-			return "", fmt.Errorf("failed to lookup workspace %s: %w", identifier, err)
-		}
-		defer func() { _ = resp.Body.Close() }()
-
-		if resp.StatusCode != http.StatusOK {
-			return "", fmt.Errorf("failed to lookup workspace %s: expected 200 OK, got %d", identifier, resp.StatusCode)
-		}
-
-		var payload struct {
-			Data struct {
-				ID string `json:"id"`
-			} `json:"data"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			return "", fmt.Errorf("failed to decode workspace response: %w", err)
-		}
-
-		if payload.Data.ID == "" {
-			return "", fmt.Errorf("workspace ID missing from response")
-		}
-
-		return payload.Data.ID, nil
+	if len(parts) != 2 {
+		return "", fmt.Errorf("invalid workspace identifier format. Expected 'ws-xxx' or 'org_name/workspace_name'")
 	}
-	return "", fmt.Errorf("invalid workspace identifier format. Expected 'ws-xxx' or 'org_name/workspace_name'")
+
+	orgName := parts[0]
+	wsName := parts[1]
+
+	path := fmt.Sprintf("/api/v2/organizations/%s/workspaces/%s", url.PathEscape(orgName), url.PathEscape(wsName))
+	req, err := c.newRequest(http.MethodGet, path, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create resolve workspace request: %w", err)
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to lookup workspace %s: %w", identifier, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to lookup workspace %s: expected 200 OK, got %d", identifier, resp.StatusCode)
+	}
+
+	var payload struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return "", fmt.Errorf("failed to decode workspace response: %w", err)
+	}
+
+	if payload.Data.ID == "" {
+		return "", fmt.Errorf("workspace ID missing from response")
+	}
+
+	return payload.Data.ID, nil
 }

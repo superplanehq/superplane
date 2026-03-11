@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -32,17 +33,17 @@ func (h *WebhookHandler) CompareConfig(a, b any) (bool, error) {
 		return false, nil
 	}
 
-	if len(configA.Events) != len(configB.Events) {
+	eventsA := append([]string{}, configA.Events...)
+	eventsB := append([]string{}, configB.Events...)
+
+	slices.Sort(eventsA)
+	eventsA = slices.Compact(eventsA)
+
+	slices.Sort(eventsB)
+	eventsB = slices.Compact(eventsB)
+
+	if !slices.Equal(eventsA, eventsB) {
 		return false, nil
-	}
-	eventsA := make(map[string]bool)
-	for _, e := range configA.Events {
-		eventsA[e] = true
-	}
-	for _, e := range configB.Events {
-		if !eventsA[e] {
-			return false, nil
-		}
 	}
 
 	return true, nil
@@ -60,7 +61,7 @@ func (h *WebhookHandler) Merge(current, requested any) (any, bool, error) {
 	}
 
 	mergedConfig := WebhookConfiguration{
-		WorkspaceID: currentConfig.WorkspaceID,
+		WorkspaceID: requestedConfig.WorkspaceID,
 		Events:      requestedConfig.Events,
 	}
 
@@ -103,13 +104,16 @@ func (h *WebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	}
 	webhookSecret := strings.TrimSpace(string(webhookSecretBytes))
 
-	triggers := []string{
-		"run:created",
-		"run:planning",
-		"run:needs_attention",
-		"run:applying",
-		"run:completed",
-		"run:errored",
+	triggers := config.Events
+	if len(triggers) == 0 {
+		triggers = []string{
+			"run:created",
+			"run:planning",
+			"run:needs_attention",
+			"run:applying",
+			"run:completed",
+			"run:errored",
+		}
 	}
 
 	listPath := fmt.Sprintf("/api/v2/workspaces/%s/notification-configurations", resolvedWsId)

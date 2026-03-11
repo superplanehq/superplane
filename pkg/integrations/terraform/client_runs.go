@@ -3,7 +3,6 @@ package terraform
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 )
@@ -70,13 +69,7 @@ func (c *Client) ReadRun(runID string) (*RunPayload, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read run: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("failed to read run: bad status %d", resp.StatusCode)
-	}
-
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := c.readBody(resp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read run response: %w", err)
 	}
@@ -171,16 +164,15 @@ func (c *Client) CreateRun(workspaceID, message string, isPlanOnly bool) (*RunPa
 	if err != nil {
 		return nil, fmt.Errorf("failed to create run: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("failed to create run: bad status %d", resp.StatusCode)
+	bodyBytes, err := c.readBody(resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read created run response: %w", err)
 	}
 
 	var payload struct {
 		Data RunPayload `json:"data"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
 		return nil, fmt.Errorf("failed to decode created run: %w", err)
 	}
 
@@ -202,10 +194,9 @@ func (c *Client) CancelRun(runID, comment string) error {
 	if err != nil {
 		return fmt.Errorf("failed to cancel run: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("failed to cancel run: bad status %d", resp.StatusCode)
+	_, err = c.readBody(resp)
+	if err != nil {
+		return fmt.Errorf("failed to cancel run: %w", err)
 	}
 	return nil
 }
@@ -221,13 +212,7 @@ func (c *Client) ReadPlan(planID string) (*PlanPayload, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read plan: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("failed to read plan: bad status %d", resp.StatusCode)
-	}
-
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := c.readBody(resp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read plan body: %w", err)
 	}
@@ -251,13 +236,7 @@ func (c *Client) DownloadLog(logURL string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to download log: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("failed to download log: bad status %d", resp.StatusCode)
-	}
-
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := c.readBody(resp)
 	if err != nil {
 		return "", fmt.Errorf("failed to read log body: %w", err)
 	}
@@ -275,13 +254,7 @@ func (c *Client) DownloadJSONOutput(apiPath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to download json output: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("failed to download json output: bad status %d", resp.StatusCode)
-	}
-
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := c.readBody(resp)
 	if err != nil {
 		return "", fmt.Errorf("failed to read json output body: %w", err)
 	}

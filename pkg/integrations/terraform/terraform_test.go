@@ -195,8 +195,8 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
-				"workspaceId": "ws-DIFFERENT",
-				"events":      []any{"run:created"},
+				"workspace": "ws-DIFFERENT",
+				"events":    []any{"run:created"},
 			},
 			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 			Events:      eventContext,
@@ -219,8 +219,8 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
-				"workspaceId": "my-org/my-ws",
-				"events":      []any{"run:created"},
+				"workspace": "my-org/my-ws",
+				"events":    []any{"run:created"},
 			},
 			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 			Events:      eventContext,
@@ -243,8 +243,8 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
-				"workspaceId": "ws-222",
-				"events":      []any{"run:completed", "run:errored"},
+				"workspace": "ws-222",
+				"events":    []any{"run:completed", "run:errored"},
 			},
 			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 			Events:      eventContext,
@@ -267,8 +267,8 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
-				"workspaceId": "ws-222",
-				"events":      []any{"run:completed"},
+				"workspace": "ws-222",
+				"events":    []any{"run:completed"},
 			},
 			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 			Events:      eventContext,
@@ -299,8 +299,8 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
-				"workspaceId": "ws-222",
-				"events":      []any{"run:created"},
+				"workspace": "ws-222",
+				"events":    []any{"run:created"},
 			},
 			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 			Events:      eventContext,
@@ -323,8 +323,8 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
-				"workspaceId": "ws-222",
-				"events":      []any{"run:created", "run:errored", "run:completed"},
+				"workspace": "ws-222",
+				"events":    []any{"run:created", "run:errored", "run:completed"},
 			},
 			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{"webhookSecret": {Name: "webhookSecret", Value: []byte(secret)}}},
 			Events:      eventContext,
@@ -340,7 +340,7 @@ func Test__TerraformRunEvent__HandleWebhook(t *testing.T) {
 func Test__TerraformRunEvent__Setup(t *testing.T) {
 	trigger := &RunEvent{}
 
-	t.Run("workspaceId is required", func(t *testing.T) {
+	t.Run("workspace is required", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			WebhookRequests: []any{},
 			Configuration:   map[string]any{"apiToken": "test-token"},
@@ -349,11 +349,11 @@ func Test__TerraformRunEvent__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"workspaceId": "", "events": []string{"run:created"}},
+			Configuration: map[string]any{"workspace": "", "events": []string{"run:created"}},
 		})
 
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "workspaceId is required")
+		assert.ErrorContains(t, err, "workspace is required")
 	})
 
 	t.Run("valid configuration -> webhook requested", func(t *testing.T) {
@@ -375,7 +375,7 @@ func Test__TerraformRunEvent__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"workspaceId": "ws-123", "events": []string{"run:created"}},
+			Configuration: map[string]any{"workspace": "ws-123", "events": []string{"run:created"}},
 		})
 
 		require.NoError(t, err)
@@ -386,8 +386,8 @@ func Test__TerraformRunEvent__Setup(t *testing.T) {
 	})
 }
 
-func Test__TerraformPlan__Cancel(t *testing.T) {
-	plan := &Plan{}
+func Test__TerraformRunPlan__Cancel(t *testing.T) {
+	plan := &RunPlan{}
 
 	t.Run("successfully cancels the running plan via API", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
