@@ -183,6 +183,7 @@ export interface CanvasPageProps {
   autoLayoutOnUpdateDisabledTooltip?: string;
   topViewMode?: "canvas" | "yaml" | "memory" | "settings" | "versioning";
   onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings" | "versioning") => void;
+  canvasStateMode?: "default" | "editing" | "previewing-previous-version";
   showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;
@@ -864,6 +865,26 @@ function CanvasPage(props: CanvasPageProps) {
     );
   }, [state, templateNodeId]);
 
+  const canvasStateMode = props.canvasStateMode || "default";
+  const canvasStateBorderClass =
+    canvasStateMode === "editing"
+      ? "border-amber-500"
+      : canvasStateMode === "previewing-previous-version"
+        ? "border-sky-500"
+        : "border-transparent";
+  const canvasStateBadgeClass =
+    canvasStateMode === "editing"
+      ? "bg-amber-500"
+      : canvasStateMode === "previewing-previous-version"
+        ? "bg-sky-500"
+        : "";
+  const canvasStateLabel =
+    canvasStateMode === "editing"
+      ? "Edit Mode"
+      : canvasStateMode === "previewing-previous-version"
+        ? "Previewing Previous Version"
+        : "";
+
   return (
     <div ref={canvasWrapperRef} className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
@@ -939,7 +960,14 @@ function CanvasPage(props: CanvasPageProps) {
             onAddNote={handleAddNote}
           />
 
-          <div className="flex-1 relative">
+          <div className={`flex-1 relative border-3 ${canvasStateBorderClass}`}>
+            {canvasStateLabel ? (
+              <div
+                className={`uppercase absolute bottom-0 right-0 z-20 px-3 py-1 text-xs font-semibold text-white ${canvasStateBadgeClass}`}
+              >
+                {canvasStateLabel}
+              </div>
+            ) : null}
             <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
               <CanvasContent
                 state={state}
@@ -1266,7 +1294,7 @@ function Sidebar({
 
     return (
       <div
-        className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white"
+        className="border-l-1 border-border absolute right-0 top-0 h-full z-21 overflow-y-auto overflow-x-hidden bg-white"
         style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
       >
         <div className="flex items-center justify-center h-full">

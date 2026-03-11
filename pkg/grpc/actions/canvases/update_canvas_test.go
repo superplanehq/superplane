@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -20,7 +21,7 @@ func Test__UpdateCanvas(t *testing.T) {
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		name := "name"
 		description := "description"
-		_, err := UpdateCanvas(context.Background(), r.Organization.ID.String(), "invalid-id", &name, &description, nil)
+		_, err := UpdateCanvas(context.Background(), r.AuthService, r.Organization.ID.String(), "invalid-id", &name, &description, nil, nil)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -29,10 +30,12 @@ func Test__UpdateCanvas(t *testing.T) {
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		_, err := UpdateCanvas(
 			context.Background(),
+			r.AuthService,
 			r.Organization.ID.String(),
 			uuid.New().String(),
 			stringPointer("updated-name"),
 			stringPointer("updated-description"),
+			nil,
 			nil,
 		)
 		s, ok := status.FromError(err)
@@ -45,10 +48,12 @@ func Test__UpdateCanvas(t *testing.T) {
 
 		_, err := UpdateCanvas(
 			context.Background(),
+			r.AuthService,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
 			stringPointer("   "),
 			stringPointer("description"),
+			nil,
 			nil,
 		)
 		s, ok := status.FromError(err)
@@ -63,10 +68,12 @@ func Test__UpdateCanvas(t *testing.T) {
 
 		response, err := UpdateCanvas(
 			context.Background(),
+			r.AuthService,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
 			&newName,
 			&newDescription,
+			nil,
 			nil,
 		)
 		require.NoError(t, err)
@@ -89,10 +96,12 @@ func Test__UpdateCanvas(t *testing.T) {
 
 		_, err := UpdateCanvas(
 			context.Background(),
+			r.AuthService,
 			r.Organization.ID.String(),
 			targetCanvas.ID.String(),
 			&existingCanvas.Name,
 			&targetCanvas.Description,
+			nil,
 			nil,
 		)
 		s, ok := status.FromError(err)
@@ -110,11 +119,13 @@ func Test__UpdateCanvas(t *testing.T) {
 
 		response, err := UpdateCanvas(
 			context.Background(),
+			r.AuthService,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
 			nil,
 			nil,
 			&enabled,
+			nil,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -137,22 +148,26 @@ func Test__UpdateCanvas(t *testing.T) {
 		enabled := true
 		_, err := UpdateCanvas(
 			context.Background(),
+			r.AuthService,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
 			nil,
 			nil,
 			&enabled,
+			nil,
 		)
 		require.NoError(t, err)
 
 		disabled := false
 		response, err := UpdateCanvas(
 			context.Background(),
+			r.AuthService,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
 			nil,
 			nil,
 			&disabled,
+			nil,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -175,11 +190,13 @@ func Test__UpdateCanvas(t *testing.T) {
 		enabled := true
 		response, err := UpdateCanvas(
 			context.Background(),
+			r.AuthService,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
 			nil,
 			nil,
 			&enabled,
+			nil,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -190,6 +207,86 @@ func Test__UpdateCanvas(t *testing.T) {
 		updatedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
 		require.NoError(t, findErr)
 		assert.True(t, updatedCanvas.CanvasVersioningEnabled)
+	})
+
+	t.Run("updates change request approval config", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+		user := support.CreateUser(t, r, r.Organization.ID)
+
+		response, err := UpdateCanvas(
+			context.Background(),
+			r.AuthService,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			nil,
+			nil,
+			nil,
+			&pb.CanvasChangeRequestApprovalConfig{
+				Items: []*pb.CanvasChangeRequestApprover{
+					{
+						Type:   pb.CanvasChangeRequestApprover_TYPE_USER,
+						UserId: user.ID.String(),
+					},
+				},
+			},
+		)
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.Canvas)
+		require.NotNil(t, response.Canvas.Metadata)
+		require.NotNil(t, response.Canvas.Metadata.ChangeRequestApprovalConfig)
+		require.Len(t, response.Canvas.Metadata.ChangeRequestApprovalConfig.Items, 1)
+		assert.Equal(t, pb.CanvasChangeRequestApprover_TYPE_USER, response.Canvas.Metadata.ChangeRequestApprovalConfig.Items[0].Type)
+		assert.Equal(t, user.ID.String(), response.Canvas.Metadata.ChangeRequestApprovalConfig.Items[0].UserId)
+	})
+
+	t.Run("invalid change request approval config user returns invalid argument", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+		_, err := UpdateCanvas(
+			context.Background(),
+			r.AuthService,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			nil,
+			nil,
+			nil,
+			&pb.CanvasChangeRequestApprovalConfig{
+				Items: []*pb.CanvasChangeRequestApprover{
+					{
+						Type:   pb.CanvasChangeRequestApprover_TYPE_USER,
+						UserId: uuid.New().String(),
+					},
+				},
+			},
+		)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+	})
+
+	t.Run("duplicate any-user approver returns invalid argument", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+		_, err := UpdateCanvas(
+			context.Background(),
+			r.AuthService,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			nil,
+			nil,
+			nil,
+			&pb.CanvasChangeRequestApprovalConfig{
+				Items: []*pb.CanvasChangeRequestApprover{
+					{Type: pb.CanvasChangeRequestApprover_TYPE_ANYONE},
+					{Type: pb.CanvasChangeRequestApprover_TYPE_ANYONE},
+				},
+			},
+		)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Contains(t, s.Message(), "duplicate any-user approver")
 	})
 }
 
