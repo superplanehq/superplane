@@ -1,8 +1,56 @@
 package dash0
 
 import (
+	"fmt"
+	"strings"
+
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 )
+
+type CheckRuleNodeMetadata struct {
+	CheckRule     string `json:"checkRule" mapstructure:"checkRule"`
+	CheckRuleName string `json:"checkRuleName" mapstructure:"checkRuleName"`
+}
+
+func resolveCheckRuleMetadata(ctx core.SetupContext, checkRule, dataset string) error {
+	// If the check rule is an expression placeholder, skip metadata resolution
+	if strings.Contains(checkRule, "{{") {
+		return nil
+	}
+
+	// If metadata is already set for the same check rule, skip the API call.
+	var existing CheckRuleNodeMetadata
+	err := mapstructure.Decode(ctx.Metadata.Get(), &existing)
+	if err == nil && existing.CheckRule == checkRule && existing.CheckRuleName != "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("error creating client during setup: %w", err)
+	}
+
+	data, err := client.GetCheckRule(checkRule, dataset)
+	if err != nil {
+		return fmt.Errorf("failed to get check rule during setup: %w", err)
+	}
+
+	var name string
+	if spec, ok := data["spec"].(map[string]any); ok {
+		name, _ = spec["name"].(string)
+	}
+
+	if name == "" {
+		name, _ = data["name"].(string)
+	}
+
+	return ctx.Metadata.Set(CheckRuleNodeMetadata{
+		CheckRule:     checkRule,
+		CheckRuleName: name,
+	})
+}
 
 // requestObjectSchema returns the request object fields for Create and Update HTTP synthetic check components.
 func requestObjectSchema() []configuration.Field {
@@ -155,5 +203,64 @@ func retriesObjectSchema() []configuration.Field {
 	return []configuration.Field{
 		{Name: "attempts", Label: "Attempts", Type: configuration.FieldTypeNumber, Required: true, Default: "3", Description: "Number of retry attempts on failure"},
 		{Name: "delay", Label: "Delay", Type: configuration.FieldTypeString, Required: true, Default: "1s", Description: "Delay between retries", Placeholder: "1s"},
+	}
+}
+
+// checkRuleThresholdsSchema returns the thresholds object fields for check rules.
+func checkRuleThresholdsSchema() []configuration.Field {
+	return []configuration.Field{
+		{
+			Name:        "degraded",
+			Label:       "Degraded Threshold",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Togglable:   false,
+			Description: "Threshold value for degraded state",
+			Placeholder: "50",
+		},
+		{
+			Name:        "critical",
+			Label:       "Critical Threshold",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Togglable:   false,
+			Description: "Threshold value for critical state",
+			Placeholder: "100",
+		},
+	}
+}
+
+// checkRuleIntervalOptions returns the evaluation interval options for check rules.
+func checkRuleIntervalOptions() []configuration.FieldOption {
+	return []configuration.FieldOption{
+		{Label: "1 minute", Value: "1m"},
+		{Label: "2 minutes", Value: "2m"},
+		{Label: "3 minutes", Value: "3m"},
+		{Label: "4 minutes", Value: "4m"},
+		{Label: "5 minutes", Value: "5m"},
+		{Label: "10 minutes", Value: "10m"},
+		{Label: "15 minutes", Value: "15m"},
+		{Label: "1 hour", Value: "1h"},
+	}
+}
+
+// checkRuleGracePeriodOptions returns the grace period multiplier options for check rules.
+// The grace period is computed as multiplier × evaluation interval.
+func checkRuleGracePeriodOptions() []configuration.FieldOption {
+	return []configuration.FieldOption{
+		{Label: "None", Value: "0"},
+		{Label: "1× evaluation interval", Value: "1"},
+		{Label: "2× evaluation interval", Value: "2"},
+		{Label: "3× evaluation interval", Value: "3"},
+		{Label: "4× evaluation interval", Value: "4"},
+		{Label: "5× evaluation interval", Value: "5"},
+	}
+}
+
+// keyValueListSchema returns the list fields for labels/annotations (key-value pairs).
+func keyValueListSchema() []configuration.Field {
+	return []configuration.Field{
+		{Name: "key", Label: "Key", Type: configuration.FieldTypeString, Required: true, DisallowExpression: true, Placeholder: "environment"},
+		{Name: "value", Label: "Value", Type: configuration.FieldTypeString, Required: true, Placeholder: "production"},
 	}
 }
