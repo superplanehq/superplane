@@ -102,6 +102,17 @@ type SemaphoreBlocksValue = {
   blocks: SemaphoreBlockEntry[];
 };
 
+type TerraformStateEntry = {
+  status: string;
+  timestamp?: string;
+  message?: string;
+};
+
+type TerraformStatesValue = {
+  __type: "terraformStates";
+  states: TerraformStateEntry[];
+};
+
 type PagerDutyIncidentEntry = {
   id: string;
   title: string;
@@ -240,6 +251,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
     if (!value || typeof value !== "object") return false;
     return "__type" in value && (value as SemaphoreBlocksValue).__type === "semaphoreBlocks";
   };
+  const isTerraformStates = (value: unknown): value is TerraformStatesValue => {
+    if (!value || typeof value !== "object") return false;
+    return "__type" in value && (value as TerraformStatesValue).__type === "terraformStates";
+  };
   const isPagerDutyIncidentsList = (value: unknown): value is PagerDutyIncidentEntry[] => {
     if (!Array.isArray(value)) return false;
     if (value.length === 0) return false;
@@ -268,6 +283,15 @@ export const ChainItem: React.FC<ChainItemProps> = ({
     if (normalized === "rejected") return "bg-red-500";
     if (normalized === "critical") return "bg-red-500";
     if (normalized === "degraded") return "bg-yellow-500";
+    return "bg-gray-400";
+  };
+  const getTerraformStateColor = (status: string) => {
+    const normalized = status.toLowerCase();
+    if (normalized === "applied" || normalized === "planned_and_finished") return "bg-emerald-500";
+    if (normalized === "planned") return "bg-emerald-500";
+    if (normalized === "errored" || normalized === "failed") return "bg-red-500";
+    if (normalized === "canceled" || normalized === "discarded") return "bg-gray-500";
+    if (normalized.includes("ing") || normalized === "pending") return "bg-blue-500"; // running states
     return "bg-gray-400";
   };
 
@@ -667,6 +691,46 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                 </div>
                               );
                             })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (isTerraformStates(value)) {
+                    return (
+                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                        <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                          {key}:
+                        </span>
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
+                          <div className="flex flex-col gap-3">
+                            {value.states.map((entry, entryIndex) => (
+                              <div key={`${entry.status}-${entryIndex}`} className="relative pl-4">
+                                <div
+                                  className={`absolute left-0 top-1.5 h-2 w-2 rounded-full ${getTerraformStateColor(
+                                    entry.status,
+                                  )}`}
+                                />
+                                {entryIndex < value.states.length - 1 && (
+                                  <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200" />
+                                )}
+                                <div
+                                  className="text-[13px] text-gray-800 font-medium capitalize truncate"
+                                  title={entry.status}
+                                >
+                                  {entry.status}
+                                </div>
+                                {entry.timestamp && (
+                                  <div className="text-[12px] text-gray-600 truncate" title={entry.timestamp}>
+                                    {new Date(entry.timestamp).toLocaleString()}
+                                  </div>
+                                )}
+                                {entry.message && (
+                                  <div className="text-[12px] text-gray-500 italic break-words">"{entry.message}"</div>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         </div>
                       </div>
