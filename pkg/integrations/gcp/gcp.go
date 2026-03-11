@@ -680,7 +680,7 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	case gcppubsub.ResourceTypeTopic:
 		return gcppubsub.ListTopicResources(reqCtx, client)
 	case gcppubsub.ResourceTypeSubscription:
-		return gcppubsub.ListSubscriptionResources(reqCtx, client)
+		return gcppubsub.ListSubscriptionResources(reqCtx, client, p["topic"])
 	default:
 		return nil, nil
 	}
