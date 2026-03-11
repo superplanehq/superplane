@@ -163,6 +163,7 @@ The On Message trigger starts a workflow execution when a message is published t
 ### Configuration
 
 - **Topic**: Select the Pub/Sub topic to listen to.
+- **Subscription (optional)**: Reuse an existing subscription name. Leave empty to let SuperPlane create one.
 
 ### Event Data
 
@@ -415,8 +416,8 @@ The Create Subscription component creates a new GCP Pub/Sub subscription on a to
 {
   "data": {
     "name": "projects/my-project/subscriptions/my-subscription",
-    "subscriptionId": "my-subscription",
-    "topicId": "my-topic",
+    "subscription": "my-subscription",
+    "topic": "my-topic",
     "type": "pull"
   },
   "timestamp": "2025-01-01T00:00:00Z",
@@ -442,7 +443,7 @@ The Create Topic component creates a new GCP Pub/Sub topic.
 {
   "data": {
     "name": "projects/my-project/topics/my-topic",
-    "topicId": "my-topic"
+    "topic": "my-topic"
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "gcp.pubsub.topic"
@@ -467,7 +468,7 @@ The Delete Subscription component deletes a GCP Pub/Sub subscription.
 {
   "data": {
     "deleted": true,
-    "subscriptionId": "my-subscription"
+    "subscription": "my-subscription"
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "gcp.pubsub.subscription.deleted"
@@ -492,7 +493,7 @@ The Delete Topic component deletes a GCP Pub/Sub topic.
 {
   "data": {
     "deleted": true,
-    "topicId": "my-topic"
+    "topic": "my-topic"
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "gcp.pubsub.topic.deleted"
@@ -517,7 +518,7 @@ The Publish Message component sends a message to a GCP Pub/Sub topic.
 {
   "data": {
     "messageId": "1234567890",
-    "topicId": "my-topic"
+    "topic": "my-topic"
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "gcp.pubsub.message.published"
