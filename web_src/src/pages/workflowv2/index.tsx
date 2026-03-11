@@ -79,16 +79,7 @@ import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import { CreateCanvasModal } from "@/components/CreateCanvasModal";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   getComponentAdditionalDataBuilder,
   getComponentBaseMapper,
@@ -132,9 +123,9 @@ import { SidebarEvent } from "@/ui/componentSidebar/types";
 import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
 import { buildDraftNodeDiffSummary } from "./draftNodeDiff";
-import { CreateChangeRequestModal } from "./CreateChangeRequestModal";
 import { CanvasChangeRequestsView } from "./CanvasChangeRequestsView";
 import { CanvasSettingsView } from "./CanvasSettingsView";
+import { CanvasPageModals } from "./CanvasPageModals";
 
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
@@ -193,6 +184,14 @@ function versionSortValue(raw?: string): number {
   const parsed = Date.parse(raw);
   return Number.isNaN(parsed) ? 0 : parsed;
 }
+
+function resolveApiErrorMessage(error: unknown, fallback: string): string {
+  const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+  const runtimeMessage = (error as { message?: string })?.message;
+  return responseMessage || runtimeMessage || fallback;
+}
+
+type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
 
 export function WorkflowPageV2() {
   const { organizationId, canvasId } = useParams<{
@@ -3646,10 +3645,7 @@ export function WorkflowPageV2() {
         setTopViewMode("versioning");
         showSuccessToast("Change request created");
       } catch (error) {
-        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        const errorMessage =
-          responseMessage || (error as { message?: string })?.message || "Failed to create change request";
-        showErrorToast(errorMessage);
+        showErrorToast(resolveApiErrorMessage(error, "Failed to create change request"));
       }
     },
     [
@@ -3664,8 +3660,20 @@ export function WorkflowPageV2() {
     ],
   );
 
-  const handleApproveChangeRequest = useCallback(
-    async (changeRequestId: string) => {
+  const handleActOnChangeRequest = useCallback(
+    async ({
+      changeRequestId,
+      action,
+      successMessage,
+      fallbackErrorMessage,
+      onSuccess,
+    }: {
+      changeRequestId: string;
+      action: ChangeRequestAction;
+      successMessage: string;
+      fallbackErrorMessage: string;
+      onSuccess?: (actedChangeRequestId: string) => void;
+    }) => {
       if (!organizationId || !canvasId || !changeRequestId) {
         return;
       }
@@ -3673,122 +3681,87 @@ export function WorkflowPageV2() {
       try {
         const response = await actOnCanvasChangeRequestMutation.mutateAsync({
           changeRequestId,
-          action: "ACTION_APPROVE",
+          action,
         });
 
         const actedChangeRequestId = response?.data?.changeRequest?.metadata?.id || changeRequestId;
         setSelectedChangeRequestId(actedChangeRequestId);
-        showSuccessToast("Change request approved");
+        onSuccess?.(actedChangeRequestId);
+        showSuccessToast(successMessage);
       } catch (error) {
-        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to approve";
-        showErrorToast(errorMessage);
+        showErrorToast(resolveApiErrorMessage(error, fallbackErrorMessage));
       }
     },
     [organizationId, canvasId, actOnCanvasChangeRequestMutation],
+  );
+
+  const handleApproveChangeRequest = useCallback(
+    async (changeRequestId: string) => {
+      await handleActOnChangeRequest({
+        changeRequestId,
+        action: "ACTION_APPROVE",
+        successMessage: "Change request approved",
+        fallbackErrorMessage: "Failed to approve",
+      });
+    },
+    [handleActOnChangeRequest],
   );
 
   const handleUnapproveChangeRequest = useCallback(
     async (changeRequestId: string) => {
-      if (!organizationId || !canvasId || !changeRequestId) {
-        return;
-      }
-
-      try {
-        const response = await actOnCanvasChangeRequestMutation.mutateAsync({
-          changeRequestId,
-          action: "ACTION_UNAPPROVE",
-        });
-
-        const actedChangeRequestId = response?.data?.changeRequest?.metadata?.id || changeRequestId;
-        setSelectedChangeRequestId(actedChangeRequestId);
-        showSuccessToast("Approval removed");
-      } catch (error) {
-        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to unapprove";
-        showErrorToast(errorMessage);
-      }
+      await handleActOnChangeRequest({
+        changeRequestId,
+        action: "ACTION_UNAPPROVE",
+        successMessage: "Approval removed",
+        fallbackErrorMessage: "Failed to unapprove",
+      });
     },
-    [organizationId, canvasId, actOnCanvasChangeRequestMutation],
+    [handleActOnChangeRequest],
   );
 
   const handlePublishChangeRequest = useCallback(
     async (changeRequestId: string) => {
-      if (!organizationId || !canvasId || !changeRequestId) {
-        return;
-      }
-
-      try {
-        const response = await actOnCanvasChangeRequestMutation.mutateAsync({
-          changeRequestId,
-          action: "ACTION_PUBLISH",
-        });
-
-        const actedChangeRequestId = response?.data?.changeRequest?.metadata?.id || changeRequestId;
-        setSelectedChangeRequestId(actedChangeRequestId);
-        setActiveCanvasVersion(null);
-        setSearchParams((current) => {
-          const next = new URLSearchParams(current);
-          next.delete("version");
-          return next;
-        });
-        setTopViewMode("canvas");
-        showSuccessToast("Change request published");
-      } catch (error) {
-        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to publish";
-        showErrorToast(errorMessage);
-      }
+      await handleActOnChangeRequest({
+        changeRequestId,
+        action: "ACTION_PUBLISH",
+        successMessage: "Change request published",
+        fallbackErrorMessage: "Failed to publish",
+        onSuccess: () => {
+          setActiveCanvasVersion(null);
+          setSearchParams((current) => {
+            const next = new URLSearchParams(current);
+            next.delete("version");
+            return next;
+          });
+          setTopViewMode("canvas");
+        },
+      });
     },
-    [organizationId, canvasId, actOnCanvasChangeRequestMutation, setSearchParams],
+    [handleActOnChangeRequest, setSearchParams],
   );
 
   const handleRejectChangeRequest = useCallback(
     async (changeRequestId: string) => {
-      if (!organizationId || !canvasId || !changeRequestId) {
-        return;
-      }
-
-      try {
-        const response = await actOnCanvasChangeRequestMutation.mutateAsync({
-          changeRequestId,
-          action: "ACTION_REJECT",
-        });
-
-        const actedChangeRequestId = response?.data?.changeRequest?.metadata?.id || changeRequestId;
-        setSelectedChangeRequestId(actedChangeRequestId);
-        showSuccessToast("Change request rejected");
-      } catch (error) {
-        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to reject";
-        showErrorToast(errorMessage);
-      }
+      await handleActOnChangeRequest({
+        changeRequestId,
+        action: "ACTION_REJECT",
+        successMessage: "Change request rejected",
+        fallbackErrorMessage: "Failed to reject",
+      });
     },
-    [organizationId, canvasId, actOnCanvasChangeRequestMutation],
+    [handleActOnChangeRequest],
   );
 
   const handleReopenChangeRequest = useCallback(
     async (changeRequestId: string) => {
-      if (!organizationId || !canvasId || !changeRequestId) {
-        return;
-      }
-
-      try {
-        const response = await actOnCanvasChangeRequestMutation.mutateAsync({
-          changeRequestId,
-          action: "ACTION_REOPEN",
-        });
-
-        const actedChangeRequestId = response?.data?.changeRequest?.metadata?.id || changeRequestId;
-        setSelectedChangeRequestId(actedChangeRequestId);
-        showSuccessToast("Change request reopened");
-      } catch (error) {
-        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to reopen";
-        showErrorToast(errorMessage);
-      }
+      await handleActOnChangeRequest({
+        changeRequestId,
+        action: "ACTION_REOPEN",
+        successMessage: "Change request reopened",
+        fallbackErrorMessage: "Failed to reopen",
+      });
     },
-    [organizationId, canvasId, actOnCanvasChangeRequestMutation],
+    [handleActOnChangeRequest],
   );
 
   const handleResolveChangeRequest = useCallback(
@@ -3821,9 +3794,7 @@ export function WorkflowPageV2() {
         setSelectedChangeRequestId(resolvedChangeRequestID);
         showSuccessToast("Change request conflicts resolved");
       } catch (error) {
-        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to resolve";
-        showErrorToast(errorMessage);
+        showErrorToast(resolveApiErrorMessage(error, "Failed to resolve"));
       }
     },
     [
@@ -4870,69 +4841,41 @@ export function WorkflowPageV2() {
           }
         />
       </div>
-      {canvas ? (
-        <CreateCanvasModal
-          isOpen={isUseTemplateOpen}
-          onClose={() => setIsUseTemplateOpen(false)}
-          onSubmit={handleUseTemplateSubmit}
-          isLoading={createWorkflowMutation.isPending}
-          templates={[
-            {
-              id: canvas.metadata?.id || "",
-              name: canvas.metadata?.name || "Untitled template",
-              description: canvas.metadata?.description,
-            },
-          ]}
-          defaultTemplateId={canvas.metadata?.id || ""}
-          mode="create"
-          fromTemplate
-        />
-      ) : null}
-      <CreateChangeRequestModal
-        open={isCreateChangeRequestMode}
-        onOpenChange={(open) => {
+      <CanvasPageModals
+        canvas={canvas}
+        isUseTemplateOpen={isUseTemplateOpen}
+        onCloseUseTemplate={() => setIsUseTemplateOpen(false)}
+        onUseTemplateSubmit={handleUseTemplateSubmit}
+        isCreateCanvasPending={createWorkflowMutation.isPending}
+        isCreateChangeRequestMode={isCreateChangeRequestMode}
+        onCreateChangeRequestModeChange={(open) => {
           if (!createCanvasChangeRequestMutation.isPending) {
             setIsCreateChangeRequestMode(open);
           }
         }}
-        pending={createCanvasChangeRequestMutation.isPending}
-        version={createChangeRequestVersion}
-        title={createChangeRequestTitle}
-        description={createChangeRequestDescription}
-        descriptionMode={createChangeRequestDescriptionMode}
-        onTitleChange={setCreateChangeRequestTitle}
-        onDescriptionChange={setCreateChangeRequestDescription}
-        onDescriptionModeChange={setCreateChangeRequestDescriptionMode}
-        diffSummary={createChangeRequestNodeDiffSummary}
-        isDraftOutdated={isCreateChangeRequestDraftOutdated}
-        onPublish={() =>
+        isCreateChangeRequestPending={createCanvasChangeRequestMutation.isPending}
+        createChangeRequestVersion={createChangeRequestVersion}
+        createChangeRequestTitle={createChangeRequestTitle}
+        createChangeRequestDescription={createChangeRequestDescription}
+        createChangeRequestDescriptionMode={createChangeRequestDescriptionMode}
+        onCreateChangeRequestTitleChange={setCreateChangeRequestTitle}
+        onCreateChangeRequestDescriptionChange={setCreateChangeRequestDescription}
+        onCreateChangeRequestDescriptionModeChange={setCreateChangeRequestDescriptionMode}
+        createChangeRequestNodeDiffSummary={createChangeRequestNodeDiffSummary}
+        isCreateChangeRequestDraftOutdated={isCreateChangeRequestDraftOutdated}
+        onSubmitCreateChangeRequest={() =>
           handleSubmitCreateChangeRequest({
             title: createChangeRequestTitle.trim(),
             description: createChangeRequestDescription,
           })
         }
+        canvasDeletedRemotely={canvasDeletedRemotely}
+        onGoToCanvases={() => {
+          if (organizationId) {
+            navigate(`/${organizationId}`, { replace: true });
+          }
+        }}
       />
-      <Dialog open={canvasDeletedRemotely} onOpenChange={() => {}}>
-        <DialogContent showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>Canvas deleted</DialogTitle>
-            <DialogDescription>
-              This canvas was deleted from another session. You can no longer edit or run it.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              onClick={() => {
-                if (organizationId) {
-                  navigate(`/${organizationId}`, { replace: true });
-                }
-              }}
-            >
-              Go to canvases
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
