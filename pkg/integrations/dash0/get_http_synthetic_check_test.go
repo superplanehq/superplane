@@ -57,9 +57,17 @@ func Test__GetHTTPSyntheticCheck__Setup(t *testing.T) {
 
 	t.Run("valid setup skips API when metadata already set", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Integration: &contexts.IntegrationContext{},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "token123",
+					"baseURL":  "https://api.us-west-2.aws.dash0.com",
+				},
+			},
 			Metadata: &contexts.MetadataContext{
-				Metadata: map[string]any{"checkName": "Already Set"},
+				Metadata: map[string]any{
+					"checkName": "Already Set",
+					"checkId":   "64617368-3073-796e-7468-73599f287bf4",
+				},
 			},
 			Configuration: map[string]any{
 				"checkId": "64617368-3073-796e-7468-73599f287bf4",
@@ -577,9 +585,27 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 		assert.True(t, execCtx.Finished)
 		assert.True(t, execCtx.Passed)
 
-		// Empty outcome means Pass() is called — no payloads emitted
-		assert.Empty(t, execCtx.Payloads)
-		assert.Empty(t, execCtx.Channel)
+		// Empty outcome means emit to empty channel with payload but no metrics
+		assert.Equal(t, "", execCtx.Channel)
+		assert.Equal(t, "dash0.syntheticCheck.fetched", execCtx.Type)
+		require.Len(t, execCtx.Payloads, 1)
+
+		// Payloads are wrapped in a structure with type, timestamp, and data
+		wrappedPayload := execCtx.Payloads[0].(map[string]any)
+		payload := wrappedPayload["data"].(map[string]any)
+		assert.NotNil(t, payload["configuration"])
+		assert.NotNil(t, payload["metrics"])
+
+		config := payload["configuration"].(*SyntheticCheckResponse)
+		assert.Equal(t, "Dash0SyntheticCheck", config.Kind)
+		assert.Equal(t, "Test Check", config.Metadata.Name)
+
+		metrics := payload["metrics"].(*SyntheticCheckMetrics)
+		// Verify metrics are empty/zero values when no data is available
+		assert.Equal(t, 0, metrics.TotalRuns24h)
+		assert.Equal(t, 0, metrics.HealthyRuns24h)
+		assert.Equal(t, 0, metrics.CriticalRuns24h)
+		assert.Equal(t, "", metrics.LastOutcome)
 	})
 
 	t.Run("uses default dataset when not provided", func(t *testing.T) {

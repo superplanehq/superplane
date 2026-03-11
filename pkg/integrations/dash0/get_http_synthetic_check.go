@@ -21,6 +21,7 @@ type GetHTTPSyntheticCheckSpec struct {
 
 type GetHTTPSyntheticCheckNodeMetadata struct {
 	CheckName string `json:"checkName" mapstructure:"checkName"`
+	CheckID   string `json:"checkId" mapstructure:"checkId"`
 }
 
 func (c *GetHTTPSyntheticCheck) Name() string {
@@ -138,7 +139,7 @@ func (c *GetHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return fmt.Errorf("error decoding metadata: %v", err)
 	}
-	if nodeMetadata.CheckName != "" {
+	if nodeMetadata.CheckName != "" && nodeMetadata.CheckID == spec.CheckID {
 		return nil
 	}
 
@@ -159,6 +160,7 @@ func (c *GetHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
 
 	return ctx.Metadata.Set(GetHTTPSyntheticCheckNodeMetadata{
 		CheckName: checkName,
+		CheckID:   spec.CheckID,
 	})
 }
 
@@ -190,11 +192,6 @@ func (c *GetHTTPSyntheticCheck) Execute(ctx core.ExecutionContext) error {
 
 	// Determine the output channel from the last run outcome.
 	channel := outcomeToChannel(metrics.LastOutcome)
-
-	// If no outcome data is available, pass without emitting.
-	if channel == "" {
-		return ctx.ExecutionState.Pass()
-	}
 
 	output := map[string]any{
 		"configuration": checkConfig,

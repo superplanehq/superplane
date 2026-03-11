@@ -115,20 +115,13 @@ export const getHttpSyntheticCheckMapper: ComponentBaseMapper = {
       details["Scheduling"] = parts.join(" ");
     }
 
-    if (metrics?.lastOutcome != null) {
-      details["Last Outcome"] = String(metrics.lastOutcome);
-    }
-
-    if (metrics?.totalRuns24h != null) {
-      details["Total Runs (24h)"] = String(metrics.totalRuns24h);
-    }
-
-    if (metrics?.healthyRuns24h != null) {
-      details["Healthy Runs (24h)"] = String(metrics.healthyRuns24h);
-    }
-
-    if (metrics?.criticalRuns24h != null) {
-      details["Critical Runs (24h)"] = String(metrics.criticalRuns24h);
+    // Show metrics or mark as Not Available
+    if (metrics) {
+      details["Last Outcome"] = metrics.lastOutcome != null ? String(metrics.lastOutcome) : "Not Available";
+      details["Total Runs (24h)"] = metrics.totalRuns24h != null ? String(metrics.totalRuns24h) : "Not Available";
+      details["Healthy Runs (24h)"] = metrics.healthyRuns24h != null ? String(metrics.healthyRuns24h) : "Not Available";
+      details["Critical Runs (24h)"] =
+        metrics.criticalRuns24h != null ? String(metrics.criticalRuns24h) : "Not Available";
     }
 
     if (configSpec?.enabled != null) {
@@ -204,6 +197,12 @@ function getFirstPayload(execution: ExecutionInfo): OutputPayload | null {
     }
   }
 
+  // Check empty channel (no status case)
+  const emptyChannel = outputs["" as keyof GetHttpSyntheticCheckOutputs];
+  if (emptyChannel && emptyChannel.length > 0) {
+    return emptyChannel[0];
+  }
+
   // Fallback to default channel for backwards compatibility
   if (outputs.default && outputs.default.length > 0) {
     return outputs.default[0];
@@ -214,6 +213,7 @@ function getFirstPayload(execution: ExecutionInfo): OutputPayload | null {
 
 /**
  * Determines which output channel has data, indicating the check state.
+ * Returns empty string for no status case (empty channel from backend).
  */
 function getActiveChannel(execution: ExecutionInfo): string | null {
   const outputs = execution.outputs as GetHttpSyntheticCheckOutputs | undefined;
@@ -222,6 +222,11 @@ function getActiveChannel(execution: ExecutionInfo): string | null {
   if (outputs.critical && outputs.critical.length > 0) return CHANNEL_CRITICAL;
   if (outputs.healthy && outputs.healthy.length > 0) return CHANNEL_HEALTHY;
   if (outputs.default && outputs.default.length > 0) return "default";
+
+  // Check for empty channel (no status case)
+  // When backend emits to empty channel, it appears as a channel with empty string key
+  const emptyChannel = outputs["" as keyof GetHttpSyntheticCheckOutputs];
+  if (emptyChannel && emptyChannel.length > 0) return "";
 
   return null;
 }
@@ -232,6 +237,8 @@ function channelLabel(channel: string): string {
       return "failing";
     case CHANNEL_HEALTHY:
       return "passing";
+    case "":
+      return "no status";
     default:
       return "";
   }
@@ -252,6 +259,12 @@ export const GET_HTTP_SYNTHETIC_CHECK_STATE_MAP: EventStateMap = {
     textColor: "text-gray-800",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-500",
+  },
+  noStatus: {
+    icon: "alert-circle",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-gray-100",
+    badgeColor: "bg-gray-400",
   },
 };
 
@@ -279,6 +292,7 @@ export const getHttpSyntheticCheckStateFunction: StateFunction = (execution: Exe
 
     if (activeChannel === CHANNEL_CRITICAL) return "critical";
     if (activeChannel === CHANNEL_HEALTHY) return "healthy";
+    if (activeChannel === "") return "noStatus";
 
     return "healthy";
   }
