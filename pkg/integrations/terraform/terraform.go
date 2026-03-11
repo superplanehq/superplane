@@ -70,15 +70,6 @@ type Configuration struct {
 }
 
 func (i *Integration) Sync(ctx core.SyncContext) error {
-	client, err := getClientFromIntegration(ctx.Integration)
-	if err != nil {
-		return err
-	}
-
-	if err := client.Validate(); err != nil {
-		return err
-	}
-
 	// Auto-generate a webhook secret if one does not exist
 	var webhookSecret []byte
 	secrets, err := ctx.Integration.GetSecrets()

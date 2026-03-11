@@ -79,28 +79,6 @@ func (c *Client) readBody(resp *http.Response) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-func (c *Client) Validate() error {
-	req, err := c.newRequest(http.MethodGet, "/api/v2/account/details", nil)
-	if err != nil {
-		return fmt.Errorf("failed to create validation request: %w", err)
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to validate api token: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("invalid or expired API Token (Unauthorized)")
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("unexpected status code during validation: %d", resp.StatusCode)
-	}
-
-	return nil
-}
-
 func (c *Client) ResolveWorkspaceID(identifier string) (string, error) {
 	if strings.HasPrefix(identifier, "ws-") {
 		return identifier, nil
