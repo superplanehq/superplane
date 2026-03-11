@@ -81,18 +81,14 @@ func (w *WebhookProvisioner) Start(ctx context.Context) {
 //   - Phase 3 (short tx): Set state to "ready" or handle errors
 func (w *WebhookProvisioner) LockAndProcessWebhook(webhook models.Webhook) error {
 	// Phase 1: Lock and mark as provisioning in a short transaction.
+	// Non-integration webhooks are marked ready directly in this phase.
 	lockedWebhook, err := w.lockAndMarkProvisioning(webhook)
 	if err != nil {
 		return err
 	}
 	if lockedWebhook == nil {
-		// Already being processed or no longer pending.
+		// Already being processed, no longer pending, or non-integration (already ready).
 		return nil
-	}
-
-	// Non-integration webhooks don't need external calls — mark ready directly.
-	if lockedWebhook.AppInstallationID == nil {
-		return w.markReady(lockedWebhook, nil)
 	}
 
 	// Phase 2: Run handler.Setup() outside any transaction.
@@ -116,6 +112,11 @@ func (w *WebhookProvisioner) lockAndMarkProvisioning(webhook models.Webhook) (*m
 		r, err := models.LockWebhook(tx, webhook.ID)
 		if err != nil {
 			return err
+		}
+
+		// Non-integration webhooks don't need external calls — mark ready directly.
+		if r.AppInstallationID == nil {
+			return r.Ready(tx)
 		}
 
 		if err := r.MarkProvisioning(tx); err != nil {
