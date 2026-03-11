@@ -40,6 +40,10 @@ export const runNRQLQueryMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
 
+    if (context.execution.state === "STATE_PENDING" || context.execution.state === "STATE_STARTED") {
+      return {};
+    }
+
     if (context.execution.createdAt) {
       details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
     }

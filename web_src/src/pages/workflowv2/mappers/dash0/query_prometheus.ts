@@ -32,6 +32,10 @@ export const queryPrometheusMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    if (context.execution.state === "STATE_PENDING" || context.execution.state === "STATE_STARTED") {
+      return {};
+    }
+
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
 
     if (!outputs || !outputs.default || outputs.default.length === 0) {

@@ -34,6 +34,10 @@ export const baseMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    if (context.execution.state === "STATE_PENDING" || context.execution.state === "STATE_STARTED") {
+      return {};
+    }
+
     const payload = getFirstOutputPayload(context.execution.outputs);
 
     if (!payload) {

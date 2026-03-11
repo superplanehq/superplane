@@ -51,6 +51,10 @@ export const getHttpSyntheticCheckMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    if (context.execution.state === "STATE_PENDING" || context.execution.state === "STATE_STARTED") {
+      return {};
+    }
+
     const payload = getFirstPayload(context.execution);
 
     if (!payload) {
