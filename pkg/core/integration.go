@@ -83,15 +83,6 @@ type Integration interface {
 	HandleRequest(ctx HTTPRequestContext)
 }
 
-// OIDCAwareIntegration is an optional interface for integrations that
-// require an OIDC provider for authentication (e.g. workload identity
-// federation with cloud providers). The registry calls SetOIDCProvider
-// once during startup so the integration can lazily initialize
-// authenticated clients without waiting for a manual Sync.
-type OIDCAwareIntegration interface {
-	SetOIDCProvider(oidc.Provider)
-}
-
 type WebhookHandler interface {
 
 	/*

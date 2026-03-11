@@ -24,9 +24,8 @@ type AzureIntegration struct {
 	mu       sync.Mutex
 	provider *AzureProvider
 
-	// oidcProvider is injected at startup via SetOIDCProvider (called by
-	// the registry). It is used to lazily initialize the Azure provider
-	// on the first request, without requiring a manual Sync.
+	// oidcProvider is populated during Sync from SyncContext.OIDC and
+	// reused by ensureProvider to lazily create Azure clients.
 	oidcProvider oidc.Provider
 
 	// Cached from the last ensureProvider / Sync call so the provider
@@ -150,15 +149,8 @@ func (a *AzureIntegration) Sync(ctx core.SyncContext) error {
 
 	integrationID := ctx.Integration.ID().String()
 
-	// Prefer the OIDC provider from the SyncContext (always fresh),
-	// but fall back to the one injected at startup via SetOIDCProvider.
-	oidcProv := ctx.OIDC
-	if oidcProv == nil {
-		oidcProv = a.oidcProvider
-	}
-
 	a.mu.Lock()
-	a.oidcProvider = oidcProv
+	a.oidcProvider = ctx.OIDC
 	a.integrationID = integrationID
 	a.config = &config
 
@@ -280,20 +272,11 @@ func (a *AzureIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Response.Write([]byte("not found"))
 }
 
-// SetOIDCProvider implements core.OIDCAwareIntegration. The registry calls
-// this once during startup so that the integration can lazily create
-// authenticated Azure clients without waiting for a manual Sync.
-func (a *AzureIntegration) SetOIDCProvider(p oidc.Provider) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.oidcProvider = p
-}
-
 // ensureProvider returns the cached Azure provider, or lazily creates one
 // by reading the integration configuration from the database and using the
-// OIDC provider that was injected at startup. This is the single entry
-// point for all code paths that need an authenticated Azure client
-// (ListResources, Execute, WebhookHandler).
+// OIDC provider stored during Sync. This is the single entry point for all
+// code paths that need an authenticated Azure client (ListResources,
+// Execute, WebhookHandler).
 func (a *AzureIntegration) ensureProvider(integrationCtx core.IntegrationContext) (*AzureProvider, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()

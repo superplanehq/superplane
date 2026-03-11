@@ -383,7 +383,6 @@ func Start() {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
 
-	registry.SetOIDCProvider(oidcProvider)
 	templates.Setup(registry)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {

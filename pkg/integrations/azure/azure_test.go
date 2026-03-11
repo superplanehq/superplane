@@ -15,19 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/oidc"
 )
-
-// mockOIDCProvider implements oidc.Provider for testing.
-type mockOIDCProvider struct{}
-
-func (m *mockOIDCProvider) Sign(subject string, duration time.Duration, audience string, additionalClaims map[string]any) (string, error) {
-	return "mock-jwt-token", nil
-}
-
-func (m *mockOIDCProvider) PublicJWKs() []oidc.PublicJWK {
-	return nil
-}
 
 // mockIntegrationContext implements core.IntegrationContext for testing.
 type mockIntegrationContext struct {
@@ -245,18 +233,6 @@ func TestAzureIntegration_HandleRequest_Unknown(t *testing.T) {
 	integration.HandleRequest(ctx)
 
 	assert.Equal(t, http.StatusNotFound, rec.Code)
-}
-
-func TestAzureIntegration_SetOIDCProvider(t *testing.T) {
-	integration := &AzureIntegration{}
-
-	assert.Nil(t, integration.oidcProvider)
-
-	mockOIDC := &mockOIDCProvider{}
-	integration.SetOIDCProvider(mockOIDC)
-
-	assert.NotNil(t, integration.oidcProvider)
-	assert.Equal(t, mockOIDC, integration.oidcProvider)
 }
 
 func TestAzureIntegration_EnsureProvider_ReturnsCachedProvider(t *testing.T) {

@@ -8,7 +8,6 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/oidc"
 )
 
 var (
@@ -122,21 +121,6 @@ func (r *Registry) Init() {
 
 func (r *Registry) HTTPContext() *HTTPContext {
 	return r.httpCtx
-}
-
-// SetOIDCProvider stores the OIDC provider on the registry and injects it
-// into any registered integration that implements core.OIDCAwareIntegration.
-// This must be called once during server startup, after both the registry and
-// the OIDC provider have been created.
-func (r *Registry) SetOIDCProvider(p oidc.Provider) {
-	mu.RLock()
-	defer mu.RUnlock()
-
-	for _, integration := range registeredIntegrations {
-		if aware, ok := integration.(core.OIDCAwareIntegration); ok {
-			aware.SetOIDCProvider(p)
-		}
-	}
 }
 
 func (r *Registry) ListTriggers() []core.Trigger {
