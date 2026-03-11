@@ -18,6 +18,80 @@ type comparableCanvasNode struct {
 	IntegrationID *string
 }
 
+type canvasChangeRequestDiff struct {
+	ChangedNodeIDs     []string
+	ConflictingNodeIDs []string
+}
+
+func computeCanvasChangeRequestDiff(
+	baseNodes []models.Node,
+	baseEdges []models.Edge,
+	liveNodes []models.Node,
+	liveEdges []models.Edge,
+	versionNodes []models.Node,
+	versionEdges []models.Edge,
+) canvasChangeRequestDiff {
+	changedInVersion := resolveChangedNodeIDSet(baseNodes, baseEdges, versionNodes, versionEdges)
+	changedInLive := resolveChangedNodeIDSet(baseNodes, baseEdges, liveNodes, liveEdges)
+	liveNodesByID := mapNodesByID(liveNodes)
+	versionNodesByID := mapNodesByID(versionNodes)
+	liveEdgesByKey := mapEdgesByKey(liveEdges)
+	versionEdgesByKey := mapEdgesByKey(versionEdges)
+
+	conflictingSet := make(map[string]struct{})
+	for nodeID := range changedInVersion {
+		if _, ok := changedInLive[nodeID]; ok {
+			if hasStructuralConflictBetweenLiveAndVersion(
+				nodeID,
+				liveNodesByID,
+				versionNodesByID,
+				liveEdgesByKey,
+				versionEdgesByKey,
+			) {
+				conflictingSet[nodeID] = struct{}{}
+			}
+		}
+	}
+
+	return canvasChangeRequestDiff{
+		ChangedNodeIDs:     resolveOrderedNodeIDs(changedInVersion, versionNodes, liveNodes, baseNodes),
+		ConflictingNodeIDs: resolveOrderedNodeIDs(conflictingSet, versionNodes, liveNodes, baseNodes),
+	}
+}
+
+func hasStructuralConflictBetweenLiveAndVersion(
+	nodeID string,
+	liveNodesByID map[string]models.Node,
+	versionNodesByID map[string]models.Node,
+	liveEdgesByKey map[string]models.Edge,
+	versionEdgesByKey map[string]models.Edge,
+) bool {
+	liveNode, liveExists := liveNodesByID[nodeID]
+	versionNode, versionExists := versionNodesByID[nodeID]
+	if liveExists != versionExists {
+		return true
+	}
+	if liveExists && !reflect.DeepEqual(toComparableCanvasNode(liveNode), toComparableCanvasNode(versionNode)) {
+		return true
+	}
+
+	liveIncidentEdgeKeys := collectIncidentEdgeKeySet(nodeID, liveEdgesByKey)
+	versionIncidentEdgeKeys := collectIncidentEdgeKeySet(nodeID, versionEdgesByKey)
+	return !reflect.DeepEqual(liveIncidentEdgeKeys, versionIncidentEdgeKeys)
+}
+
+func collectIncidentEdgeKeySet(nodeID string, edgesByKey map[string]models.Edge) map[string]struct{} {
+	result := make(map[string]struct{})
+	for edgeKey, edge := range edgesByKey {
+		if edge.SourceID != nodeID && edge.TargetID != nodeID {
+			continue
+		}
+
+		result[edgeKey] = struct{}{}
+	}
+	return result
+}
+
 func resolveChangedNodeIDSet(
 	baseNodes []models.Node,
 	baseEdges []models.Edge,

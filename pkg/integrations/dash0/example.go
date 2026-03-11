@@ -55,6 +55,30 @@ var exampleDataOnSyntheticCheckNotificationBytes []byte
 var exampleDataOnSyntheticCheckNotificationOnce sync.Once
 var exampleDataOnSyntheticCheckNotification map[string]any
 
+//go:embed example_output_create_check_rule.json
+var exampleOutputCreateCheckRuleBytes []byte
+
+var exampleOutputCreateCheckRuleOnce sync.Once
+var exampleOutputCreateCheckRule map[string]any
+
+//go:embed example_output_get_check_rule.json
+var exampleOutputGetCheckRuleBytes []byte
+
+var exampleOutputGetCheckRuleOnce sync.Once
+var exampleOutputGetCheckRule map[string]any
+
+//go:embed example_output_update_check_rule.json
+var exampleOutputUpdateCheckRuleBytes []byte
+
+var exampleOutputUpdateCheckRuleOnce sync.Once
+var exampleOutputUpdateCheckRule map[string]any
+
+//go:embed example_output_delete_check_rule.json
+var exampleOutputDeleteCheckRuleBytes []byte
+
+var exampleOutputDeleteCheckRuleOnce sync.Once
+var exampleOutputDeleteCheckRule map[string]any
+
 func (c *QueryPrometheus) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryPrometheusOnce, exampleOutputQueryPrometheusBytes, &exampleOutputQueryPrometheus)
 }
@@ -85,4 +109,20 @@ func onAlertNotificationExampleData() map[string]any {
 
 func onSyntheticCheckNotificationExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnSyntheticCheckNotificationOnce, exampleDataOnSyntheticCheckNotificationBytes, &exampleDataOnSyntheticCheckNotification)
+}
+
+func (c *CreateCheckRule) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateCheckRuleOnce, exampleOutputCreateCheckRuleBytes, &exampleOutputCreateCheckRule)
+}
+
+func (c *GetCheckRule) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetCheckRuleOnce, exampleOutputGetCheckRuleBytes, &exampleOutputGetCheckRule)
+}
+
+func (c *UpdateCheckRule) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateCheckRuleOnce, exampleOutputUpdateCheckRuleBytes, &exampleOutputUpdateCheckRule)
+}
+
+func (c *DeleteCheckRule) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteCheckRuleOnce, exampleOutputDeleteCheckRuleBytes, &exampleOutputDeleteCheckRule)
 }

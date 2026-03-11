@@ -83,6 +83,9 @@ func PublishCanvasChangeRequest(
 		if request.Status == models.CanvasChangeRequestStatusPublished {
 			return status.Error(codes.FailedPrecondition, "change request was already merged")
 		}
+		if request.Status == models.CanvasChangeRequestStatusRejected {
+			return status.Error(codes.FailedPrecondition, "change request is rejected")
+		}
 
 		version, err = models.FindCanvasVersionInTransaction(tx, canvasUUID, request.VersionID)
 		if err != nil {
@@ -92,8 +95,41 @@ func PublishCanvasChangeRequest(
 			return err
 		}
 
-		mergedNodes := append([]models.Node(nil), version.Nodes...)
-		mergedEdges := append([]models.Edge(nil), version.Edges...)
+		if err := refreshCanvasChangeRequestDiffInTransaction(tx, canvasForUpdate, version, request); err != nil {
+			return err
+		}
+		if len(request.ConflictingNodeIDs) > 0 {
+			return status.Error(codes.FailedPrecondition, "change request has conflicts")
+		}
+		if !isOpenCanvasChangeRequestStatus(request.Status) {
+			return status.Error(codes.FailedPrecondition, "change request cannot be published in its current status")
+		}
+		approvals, approvalsErr := models.ListCanvasChangeRequestApprovalsInTransaction(tx, canvasUUID, request.ID)
+		if approvalsErr != nil {
+			return approvalsErr
+		}
+		if publishCheckErr := ensureCanvasChangeRequestReadyToPublish(canvasForUpdate, approvals); publishCheckErr != nil {
+			return publishCheckErr
+		}
+
+		baseNodes, baseEdges, liveNodes, liveEdges, resolveErr := resolveCanvasChangeRequestBaseAndLiveInTransaction(
+			tx,
+			canvasForUpdate,
+			request,
+		)
+		if resolveErr != nil {
+			return resolveErr
+		}
+
+		mergedNodes, mergedEdges := mergeCanvasVersionIntoLive(
+			baseNodes,
+			baseEdges,
+			liveNodes,
+			liveEdges,
+			version.Nodes,
+			version.Edges,
+			request.ChangedNodeIDs,
+		)
 
 		existingNodesUnscoped, findNodesErr := models.FindCanvasNodesUnscopedInTransaction(tx, canvasUUID)
 		if findNodesErr != nil {
@@ -187,6 +223,10 @@ func PublishCanvasChangeRequest(
 		request.UpdatedAt = &now
 		if saveErr := tx.Save(request).Error; saveErr != nil {
 			return saveErr
+		}
+
+		if refreshErr := refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, request.ID); refreshErr != nil {
+			return refreshErr
 		}
 
 		if request.OwnerID != nil {
