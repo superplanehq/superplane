@@ -24,6 +24,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -502,6 +503,11 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
 	integration.HandleRequest(core.HTTPRequestContext{
 		Logger:          logging.ForIntegration(*integrationInstance),
 		Request:         r,
@@ -516,6 +522,7 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 			integrationInstance,
 			s.encryptor,
 			s.registry,
+			onNewEvents,
 		),
 	})
 
@@ -523,6 +530,10 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		http.Error(w, "integration not found", http.StatusNotFound)
 		return
+	}
+
+	for _, event := range newEvents {
+		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
 	}
 }
 
@@ -768,26 +779,35 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
 	for _, node := range nodes {
-		code, err := s.executeWebhookNode(r.Context(), body, r.Header, node)
+		code, err := s.executeWebhookNode(r.Context(), body, r.Header, node, onNewEvents)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
 			return
 		}
 	}
 
+	for _, event := range newEvents {
+		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode) (int, error) {
+func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, error) {
 	if node.Type == models.NodeTypeTrigger {
-		return s.executeTriggerNode(ctx, body, headers, node)
+		return s.executeTriggerNode(ctx, body, headers, node, onNewEvents)
 	}
 
-	return s.executeComponentNode(ctx, body, headers, node)
+	return s.executeComponentNode(ctx, body, headers, node, onNewEvents)
 }
 
-func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode) (int, error) {
+func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, error) {
 	ref := node.Ref.Data()
 	trigger, err := s.registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
@@ -804,7 +824,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
-		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry)
+		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry, onNewEvents)
 	}
 
 	return trigger.HandleWebhook(core.WebhookRequestContext{
@@ -817,12 +837,12 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		Logger:        logger,
 		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
-		Events:        contexts.NewEventContext(tx, &node),
+		Events:        contexts.NewEventContext(tx, &node, onNewEvents),
 		Integration:   integrationCtx,
 	})
 }
 
-func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode) (int, error) {
+func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, error) {
 	ref := node.Ref.Data()
 	component, err := s.registry.GetComponent(ref.Component.Name)
 	if err != nil {
@@ -839,7 +859,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
-		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry)
+		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry, onNewEvents)
 	}
 
 	return component.HandleWebhook(core.WebhookRequestContext{
@@ -852,7 +872,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 		Logger:        logger,
 		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
-		Events:        contexts.NewEventContext(tx, &node),
+		Events:        contexts.NewEventContext(tx, &node, onNewEvents),
 		Integration:   integrationCtx,
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
@@ -869,7 +889,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 				HTTP:           s.registry.HTTPContext(),
 				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
-				ExecutionState: contexts.NewExecutionStateContext(tx, execution),
+				ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
 				Logger:         logging.ForExecution(execution, nil),
 				Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),

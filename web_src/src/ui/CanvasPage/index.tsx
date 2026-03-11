@@ -181,8 +181,8 @@ export interface CanvasPageProps {
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
-  topViewMode?: "canvas" | "memory" | "settings" | "versioning";
-  onTopViewModeChange?: (mode: "canvas" | "memory" | "settings" | "versioning") => void;
+  topViewMode?: "canvas" | "yaml" | "memory" | "settings" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings" | "versioning") => void;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version";
   showVersioningTab?: boolean;
   memoryItemCount?: number;
@@ -1476,8 +1476,8 @@ function CanvasContentHeader({
   exitEditModeDisabledTooltip?: string;
   versioningDisabledTooltip?: string;
   showPendingDraftBadge?: boolean;
-  topViewMode?: "canvas" | "memory" | "settings" | "versioning";
-  onTopViewModeChange?: (mode: "canvas" | "memory" | "settings" | "versioning") => void;
+  topViewMode?: "canvas" | "yaml" | "memory" | "settings" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings" | "versioning") => void;
   showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;

@@ -24,15 +24,24 @@ type IntegrationContext struct {
 	integration *models.Integration
 	encryptor   crypto.Encryptor
 	registry    *registry.Registry
+	onNewEvents func([]models.CanvasEvent)
 }
 
-func NewIntegrationContext(tx *gorm.DB, node *models.CanvasNode, integration *models.Integration, encryptor crypto.Encryptor, registry *registry.Registry) *IntegrationContext {
+func NewIntegrationContext(
+	tx *gorm.DB,
+	node *models.CanvasNode,
+	integration *models.Integration,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	onNewEvents func([]models.CanvasEvent),
+) *IntegrationContext {
 	return &IntegrationContext{
 		tx:          tx,
 		node:        node,
 		integration: integration,
 		encryptor:   encryptor,
 		registry:    registry,
+		onNewEvents: onNewEvents,
 	}
 }
 
@@ -417,6 +426,7 @@ func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscription
 			node,
 			c.integration,
 			c,
+			c.onNewEvents,
 		))
 	}
 

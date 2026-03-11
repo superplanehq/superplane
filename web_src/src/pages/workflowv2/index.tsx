@@ -90,6 +90,8 @@ import {
 } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
 import { CanvasMemoryView } from "./CanvasMemoryView";
+import { CanvasYamlView } from "./CanvasYamlView";
+import { useCanvasYaml } from "./useCanvasYaml";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
@@ -469,7 +471,7 @@ export function WorkflowPageV2() {
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
   const isDev = import.meta.env.DEV;
-  const [topViewMode, setTopViewMode] = useState<"canvas" | "memory" | "settings" | "versioning">("canvas");
+  const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "memory" | "settings" | "versioning">("canvas");
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
@@ -4396,6 +4398,11 @@ export function WorkflowPageV2() {
     [canvasId, updateCanvasMutation],
   );
 
+  const { yamlPayload, handleYamlViewCopy, handleYamlViewDownload } = useCanvasYaml({
+    nodes,
+    getYamlExportPayload,
+  });
+
   const isInitialCanvasBootstrapLoading =
     !canvas &&
     (canvasLoading ||
@@ -4609,8 +4616,16 @@ export function WorkflowPageV2() {
             : hasRunBlockingChanges
               ? "Save canvas changes before running"
               : undefined;
+
   const dataViewContent =
-    topViewMode === "memory" ? (
+    topViewMode === "yaml" && yamlPayload ? (
+      <CanvasYamlView
+        yamlText={yamlPayload.yamlText}
+        filename={yamlPayload.filename}
+        onCopy={handleYamlViewCopy}
+        onDownload={handleYamlViewDownload}
+      />
+    ) : topViewMode === "memory" ? (
       <CanvasMemoryView
         entries={isViewingDraftVersion ? [] : canvasMemoryEntries}
         isLoading={isViewingDraftVersion ? false : canvasMemoryLoading}

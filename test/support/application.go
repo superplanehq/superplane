@@ -10,6 +10,8 @@ import (
 //
 
 type DummyIntegration struct {
+	components   []core.Component
+	triggers     []core.Trigger
 	actions      []core.Action
 	handleAction func(ctx core.IntegrationActionContext) error
 	onSync       func(ctx core.SyncContext) error
@@ -17,6 +19,8 @@ type DummyIntegration struct {
 }
 
 type DummyIntegrationOptions struct {
+	Components   []core.Component
+	Triggers     []core.Trigger
 	Actions      []core.Action
 	HandleAction func(ctx core.IntegrationActionContext) error
 	OnSync       func(ctx core.SyncContext) error
@@ -25,6 +29,8 @@ type DummyIntegrationOptions struct {
 
 func NewDummyIntegration(options DummyIntegrationOptions) *DummyIntegration {
 	return &DummyIntegration{
+		components:   options.Components,
+		triggers:     options.Triggers,
 		actions:      options.Actions,
 		handleAction: options.HandleAction,
 		onSync:       options.OnSync,
@@ -57,11 +63,11 @@ func (t *DummyIntegration) Configuration() []configuration.Field {
 }
 
 func (t *DummyIntegration) Components() []core.Component {
-	return []core.Component{}
+	return t.components
 }
 
 func (t *DummyIntegration) Triggers() []core.Trigger {
-	return []core.Trigger{}
+	return t.triggers
 }
 
 func (t *DummyIntegration) Actions() []core.Action {
@@ -94,6 +100,83 @@ func (t *DummyIntegration) ListResources(resourceType string, ctx core.ListResou
 }
 
 func (t *DummyIntegration) HandleRequest(ctx core.HTTPRequestContext) {
+}
+
+type DummyIntegrationTriggerOptions struct {
+	Name                 string
+	OnIntegrationMessage func(ctx core.IntegrationMessageContext) error
+}
+
+type DummyIntegrationTrigger struct {
+	name                 string
+	onIntegrationMessage func(ctx core.IntegrationMessageContext) error
+}
+
+func NewDummyIntegrationTrigger(options DummyIntegrationTriggerOptions) *DummyIntegrationTrigger {
+	return &DummyIntegrationTrigger{
+		name:                 options.Name,
+		onIntegrationMessage: options.OnIntegrationMessage,
+	}
+}
+
+func (t *DummyIntegrationTrigger) Name() string {
+	return t.name
+}
+
+func (t *DummyIntegrationTrigger) Label() string {
+	return t.name
+}
+
+func (t *DummyIntegrationTrigger) Description() string {
+	return t.name
+}
+
+func (t *DummyIntegrationTrigger) Documentation() string {
+	return t.name
+}
+
+func (t *DummyIntegrationTrigger) Icon() string {
+	return "dummy"
+}
+
+func (t *DummyIntegrationTrigger) Color() string {
+	return "dummy"
+}
+
+func (t *DummyIntegrationTrigger) ExampleData() map[string]any {
+	return map[string]any{}
+}
+
+func (t *DummyIntegrationTrigger) Configuration() []configuration.Field {
+	return []configuration.Field{}
+}
+
+func (t *DummyIntegrationTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return 200, nil
+}
+
+func (t *DummyIntegrationTrigger) Setup(ctx core.TriggerContext) error {
+	return nil
+}
+
+func (t *DummyIntegrationTrigger) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (t *DummyIntegrationTrigger) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return map[string]any{}, nil
+}
+
+func (t *DummyIntegrationTrigger) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}
+
+func (t *DummyIntegrationTrigger) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {
+	if t.onIntegrationMessage == nil {
+		return nil
+	}
+
+	return t.onIntegrationMessage(ctx)
 }
 
 type DummyWebhookHandlerOptions struct {
