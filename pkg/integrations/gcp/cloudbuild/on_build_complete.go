@@ -200,8 +200,8 @@ func (t *OnBuildComplete) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func (t *OnBuildComplete) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (t *OnBuildComplete) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func decodeOnBuildCompleteConfiguration(raw any) (OnBuildCompleteConfiguration, error) {

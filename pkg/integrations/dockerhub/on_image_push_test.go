@@ -66,7 +66,7 @@ func Test__OnImagePush__HandleWebhook(t *testing.T) {
 	trigger := &OnImagePush{}
 
 	t.Run("invalid JSON -> 400", func(t *testing.T) {
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          []byte(`invalid`),
 			Events:        &contexts.EventContext{},
 			Configuration: map[string]any{"repository": "superplane/demo"},
@@ -88,7 +88,7 @@ func Test__OnImagePush__HandleWebhook(t *testing.T) {
 	t.Run("repository mismatch -> ignored", func(t *testing.T) {
 		body := []byte(`{"repository":{"name":"other", "namespace":"superplane"},"push_data":{"tag":"latest"}}`)
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Events:        events,
 			Configuration: map[string]any{"repository": "superplane/demo"},
@@ -111,7 +111,7 @@ func Test__OnImagePush__HandleWebhook(t *testing.T) {
 	t.Run("tag filter mismatch -> ignored", func(t *testing.T) {
 		body := []byte(`{"repository":{"name":"demo", "namespace":"superplane"},"push_data":{"tag":"latest"}}`)
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:   body,
 			Logger: log.NewEntry(log.New()),
 			Events: events,
@@ -142,7 +142,7 @@ func Test__OnImagePush__HandleWebhook(t *testing.T) {
 	t.Run("match -> event emitted", func(t *testing.T) {
 		body := []byte(`{"repository":{"name":"demo", "namespace":"superplane"},"push_data":{"tag":"v1.2.3"}}`)
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:   body,
 			Events: events,
 			Logger: log.NewEntry(log.New()),

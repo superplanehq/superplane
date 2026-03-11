@@ -57,7 +57,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 	t.Run("valid payload -> emits event", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}},
@@ -79,7 +79,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 	t.Run("filtered by status -> skipped", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{"CLOSED"}},
@@ -96,7 +96,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 	t.Run("filtered by priority -> skipped", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}, "priorities": []string{"LOW"}},
@@ -113,7 +113,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 	t.Run("malformed JSON -> 400 error", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          []byte("not-json"),
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}},
@@ -130,7 +130,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 	t.Run("matching priority -> emits event", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}, "priorities": []string{"CRITICAL", "HIGH"}},
@@ -147,7 +147,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 	t.Run("missing bearer token when secret configured -> 403", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}},
@@ -166,7 +166,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("Authorization", "Bearer wrong-token")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       headers,
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}},
@@ -183,7 +183,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 	t.Run("empty secret -> no auth required", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}},
@@ -202,7 +202,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("Authorization", "Bearer my-secret")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       headers,
 			Configuration: map[string]any{"statuses": []string{"ACTIVATED"}},

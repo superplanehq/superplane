@@ -137,8 +137,8 @@ func (c *GetDeploy) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *GetDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *GetDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *GetDeploy) Actions() []core.Action {

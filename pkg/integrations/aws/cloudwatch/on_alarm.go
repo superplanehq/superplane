@@ -293,10 +293,10 @@ func (p *OnAlarm) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 	return ctx.Events.Emit("aws.cloudwatch.alarm", ctx.Message)
 }
 
-func (p *OnAlarm) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (p *OnAlarm) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	// no-op, since events are received through the integration
 	// and routed to OnIntegrationMessage()
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (p *OnAlarm) Cleanup(ctx core.TriggerContext) error {

@@ -82,44 +82,44 @@ func (p *OnPRReviewComment) HandleAction(ctx core.TriggerActionContext) (map[str
 	return nil, nil
 }
 
-func (p *OnPRReviewComment) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (p *OnPRReviewComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	config, err := decodePRCommentConfiguration(ctx.Configuration)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, nil, err
 	}
 
 	eventType, err := extractGitHubEventType(ctx.Headers)
 	if err != nil {
-		return http.StatusBadRequest, err
+		return http.StatusBadRequest, nil, err
 	}
 
 	if eventType != "pull_request_review_comment" && eventType != "pull_request_review" {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	data, code, err := verifyAndParseWebhookData(ctx)
 	if err != nil {
-		return code, err
+		return code, nil, err
 	}
 
 	if !isExpectedPRCommentAction(eventType, data) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	matched, code, err := applyPRCommentContentFilter(config.ContentFilter, eventType, data)
 	if err != nil {
-		return code, err
+		return code, nil, err
 	}
 
 	if !matched {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if err := ctx.Events.Emit("github.prReviewComment", data); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (p *OnPRReviewComment) Cleanup(ctx core.TriggerContext) error {

@@ -17,7 +17,7 @@ func Test__OnWorkflowCompleted__HandleWebhook(t *testing.T) {
 	trigger := &OnWorkflowCompleted{}
 
 	t.Run("no circleci-signature -> 403", func(t *testing.T) {
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: http.Header{},
 		})
 
@@ -31,7 +31,7 @@ func Test__OnWorkflowCompleted__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("circleci-signature", "invalidsignature")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    []byte(`{"type":"workflow-completed","workflow":{"status":"success"}}`),
 			Headers: headers,
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},
@@ -54,7 +54,7 @@ func Test__OnWorkflowCompleted__HandleWebhook(t *testing.T) {
 		headers.Set("circleci-signature", signature)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},
@@ -81,7 +81,7 @@ func Test__OnWorkflowCompleted__HandleWebhook(t *testing.T) {
 		headers.Set("circleci-signature", signature)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},
@@ -105,7 +105,7 @@ func Test__OnWorkflowCompleted__HandleWebhook(t *testing.T) {
 		headers.Set("circleci-signature", signature)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},

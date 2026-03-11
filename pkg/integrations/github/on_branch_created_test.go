@@ -21,7 +21,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-GitHub-Event", "create")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 		})
 
@@ -33,7 +33,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-Hub-Signature-256", "sha256=asdasd")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Events:  &contexts.EventContext{},
 			Webhook: &contexts.NodeWebhookContext{},
@@ -50,7 +50,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers.Set("X-Hub-Signature-256", "sha256=asdasd")
 		headers.Set("X-GitHub-Event", "create")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    []byte(`{"ref":"feature-branch","ref_type":"branch"}`),
 			Headers: headers,
 			Configuration: OnBranchCreatedConfiguration{
@@ -80,7 +80,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "create")
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: OnBranchCreatedConfiguration{
@@ -111,7 +111,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "create")
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: OnBranchCreatedConfiguration{
@@ -142,7 +142,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "create")
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: OnBranchCreatedConfiguration{
@@ -173,7 +173,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "create")
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: OnBranchCreatedConfiguration{
@@ -204,7 +204,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "create")
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: OnBranchCreatedConfiguration{
@@ -235,7 +235,7 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "create")
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: OnBranchCreatedConfiguration{

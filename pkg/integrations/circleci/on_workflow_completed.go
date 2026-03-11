@@ -144,40 +144,40 @@ func (p *OnWorkflowCompleted) HandleAction(ctx core.TriggerActionContext) (map[s
 	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (p *OnWorkflowCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (p *OnWorkflowCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	signatureHeader := ctx.Headers.Get("circleci-signature")
 	if signatureHeader == "" {
-		return http.StatusForbidden, fmt.Errorf("missing signature")
+		return http.StatusForbidden, nil, fmt.Errorf("missing signature")
 	}
 
 	signature, _ := strings.CutPrefix(signatureHeader, "v1=")
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
+		return http.StatusInternalServerError, nil, fmt.Errorf("error authenticating request")
 	}
 
 	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
 	}
 
 	data := map[string]any{}
 	err = json.Unmarshal(ctx.Body, &data)
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	eventType, ok := data["type"].(string)
 	if !ok || eventType != "workflow-completed" {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	err = ctx.Events.Emit("circleci.workflow.completed", data)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to emit event: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to emit event: %w", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (p *OnWorkflowCompleted) Cleanup(ctx core.TriggerContext) error {

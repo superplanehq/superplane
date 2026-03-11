@@ -200,8 +200,8 @@ func (c *GetImage) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *GetImage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *GetImage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *GetImage) Cancel(ctx core.ExecutionContext) error {

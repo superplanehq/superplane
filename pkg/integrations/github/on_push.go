@@ -130,61 +130,61 @@ func (p *OnPush) HandleAction(ctx core.TriggerActionContext) (map[string]any, er
 	return nil, nil
 }
 
-func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	config := OnPushConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	eventType := ctx.Headers.Get("X-GitHub-Event")
 	if eventType == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing X-GitHub-Event header")
 	}
 
 	if eventType != "push" {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	code, err := verifySignature(ctx)
 	if err != nil {
-		return code, err
+		return code, nil, err
 	}
 
 	data := map[string]any{}
 	err = json.Unmarshal(ctx.Body, &data)
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	//
 	// If the event is a push event for branch deletion, ignore it.
 	//
 	if isBranchDeletionEvent(data) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	ref, ok := data["ref"]
 	if !ok {
-		return http.StatusBadRequest, fmt.Errorf("missing ref")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing ref")
 	}
 
 	r, ok := ref.(string)
 	if !ok {
-		return http.StatusBadRequest, fmt.Errorf("invalid ref")
+		return http.StatusBadRequest, nil, fmt.Errorf("invalid ref")
 	}
 
 	if !configuration.MatchesAnyPredicate(config.Refs, r) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	err = ctx.Events.Emit("github.push", data)
 
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func isBranchDeletionEvent(data map[string]any) bool {
