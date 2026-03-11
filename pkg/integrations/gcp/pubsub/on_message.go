@@ -102,8 +102,10 @@ func (t *OnMessage) Configuration() []configuration.Field {
 			},
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type:       ResourceTypeSubscription,
-					Parameters: []configuration.ParameterRef{},
+					Type: ResourceTypeSubscription,
+					Parameters: []configuration.ParameterRef{
+						{Name: "topic", ValueFrom: &configuration.ParameterValueFrom{Field: "topic"}},
+					},
 				},
 			},
 		},
