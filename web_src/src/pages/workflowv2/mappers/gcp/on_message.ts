@@ -9,13 +9,10 @@ export const onMessageTriggerRenderer: TriggerRenderer = {
 
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     const data = context.event?.data as Record<string, any> | undefined;
-    const title = buildMessageTitle(data);
+    const messageId = data?.messageId ? shortID(String(data.messageId)) : "";
+    const title = messageId ? `Received Pub/Sub message · ${messageId}` : "Received Pub/Sub message";
 
     const subtitleParts: string[] = [];
-    const messageId = data?.messageId ? shortID(String(data.messageId)) : "";
-    if (messageId) {
-      subtitleParts.push(`#${messageId}`);
-    }
     if (context.event?.createdAt) {
       subtitleParts.push(formatTimeAgo(new Date(context.event.createdAt)));
     }
@@ -34,8 +31,18 @@ export const onMessageTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
-    const configuration = node.configuration as { topicId?: string } | undefined;
-    const topicId = configuration?.topicId;
+    const configuration = node.configuration as
+      | { topic?: string; topicId?: string; subscription?: string; subscriptionId?: string }
+      | undefined;
+    const topic = configuration?.topic || configuration?.topicId;
+    const subscription = configuration?.subscription || configuration?.subscriptionId;
+    const metadata = [];
+    if (topic) {
+      metadata.push({ icon: "message-square", label: topic });
+    }
+    if (subscription) {
+      metadata.push({ icon: "radio", label: subscription });
+    }
     const eventTitleAndSubtitle = lastEvent
       ? onMessageTriggerRenderer.getTitleAndSubtitle({ event: lastEvent })
       : undefined;
@@ -45,10 +52,10 @@ export const onMessageTriggerRenderer: TriggerRenderer = {
       iconSlug: definition.icon || "gcp",
       iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass(definition.color ?? "gray"),
-      metadata: topicId ? [{ icon: "message-square", label: topicId }] : [],
+      metadata,
       ...(lastEvent && {
         lastEventData: {
-          title: eventTitleAndSubtitle?.title ?? "Pub/Sub message",
+          title: eventTitleAndSubtitle?.title ?? "Received Pub/Sub message",
           subtitle: eventTitleAndSubtitle?.subtitle ?? formatTimeAgo(new Date(lastEvent.createdAt)),
           receivedAt: new Date(lastEvent.createdAt),
           state: "triggered",
@@ -59,35 +66,6 @@ export const onMessageTriggerRenderer: TriggerRenderer = {
   },
 };
 
-function buildMessageTitle(data?: Record<string, any>): string {
-  const payload = data?.data;
-
-  if (typeof payload === "string") {
-    return truncate(payload, 72) || "Pub/Sub message";
-  }
-
-  if (payload && typeof payload === "object") {
-    const record = payload as Record<string, unknown>;
-    const labelCandidates = [record.title, record.name, record.message, record.action, record.type];
-    const label = labelCandidates.find(
-      (value): value is string => typeof value === "string" && value.trim().length > 0,
-    );
-    if (label) {
-      return truncate(label, 72);
-    }
-  }
-
-  const messageId = data?.messageId ? shortID(String(data.messageId)) : "";
-  return messageId ? `Message ${messageId}` : "Pub/Sub message";
-}
-
 function shortID(value: string): string {
   return value.slice(0, 8);
-}
-
-function truncate(value: string, maxLength: number): string {
-  if (value.length <= maxLength) {
-    return value;
-  }
-  return `${value.slice(0, maxLength)}...`;
 }

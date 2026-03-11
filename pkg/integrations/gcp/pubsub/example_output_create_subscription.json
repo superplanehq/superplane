@@ -1,7 +1,7 @@
 {
   "data": {
-    "subscriptionId": "my-subscription",
-    "topicId": "my-topic",
+    "subscription": "my-subscription",
+    "topic": "my-topic",
     "type": "pull",
     "name": "projects/my-project/subscriptions/my-subscription"
   },

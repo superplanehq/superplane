@@ -42,7 +42,7 @@ export const publishMessageMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const payload = context.execution.outputs as
-      | PubSubOutputs<{ messageId?: string; topicId?: string; publishTime?: string }>
+      | PubSubOutputs<{ messageId?: string; topic?: string; topicId?: string; publishTime?: string }>
       | undefined;
     const item = payload?.default?.[0]?.data;
     const details: Record<string, string> = {};
@@ -51,7 +51,8 @@ export const publishMessageMapper: ComponentBaseMapper = {
       item?.publishTime || context.execution.updatedAt || context.execution.createdAt,
     );
     if (publishedAt) details["Published At"] = publishedAt;
-    if (item?.topicId) details["Topic"] = item.topicId;
+    const topic = item?.topic || item?.topicId;
+    if (topic) details["Topic"] = topic;
     if (item?.messageId) details["Message ID"] = item.messageId;
 
     return details;
@@ -64,11 +65,14 @@ export const createTopicMapper: ComponentBaseMapper = {
   props: pubsubProps,
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const payload = context.execution.outputs as PubSubOutputs<{ topicId?: string; name?: string }> | undefined;
+    const payload = context.execution.outputs as
+      | PubSubOutputs<{ topic?: string; topicId?: string; name?: string }>
+      | undefined;
     const item = payload?.default?.[0]?.data;
     const details: Record<string, string> = {};
     addCompletedAt(details, context);
-    if (item?.topicId) details["Topic ID"] = item.topicId;
+    const topic = item?.topic || item?.topicId;
+    if (topic) details["Topic"] = topic;
     return details;
   },
 
@@ -79,11 +83,12 @@ export const deleteTopicMapper: ComponentBaseMapper = {
   props: pubsubProps,
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const payload = context.execution.outputs as PubSubOutputs<{ topicId?: string }> | undefined;
+    const payload = context.execution.outputs as PubSubOutputs<{ topic?: string; topicId?: string }> | undefined;
     const item = payload?.default?.[0]?.data;
     const details: Record<string, string> = {};
     addCompletedAt(details, context);
-    if (item?.topicId) details["Topic ID"] = item.topicId;
+    const topic = item?.topic || item?.topicId;
+    if (topic) details["Topic"] = topic;
     return details;
   },
 
@@ -96,7 +101,9 @@ export const createSubscriptionMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const payload = context.execution.outputs as
       | PubSubOutputs<{
+          subscription?: string;
           subscriptionId?: string;
+          topic?: string;
           topicId?: string;
           type?: string;
           name?: string;
@@ -105,8 +112,10 @@ export const createSubscriptionMapper: ComponentBaseMapper = {
     const item = payload?.default?.[0]?.data;
     const details: Record<string, string> = {};
     addCompletedAt(details, context);
-    if (item?.subscriptionId) details["Subscription ID"] = item.subscriptionId;
-    if (item?.topicId) details["Topic"] = item.topicId;
+    const subscription = item?.subscription || item?.subscriptionId;
+    const topic = item?.topic || item?.topicId;
+    if (subscription) details["Subscription"] = subscription;
+    if (topic) details["Topic"] = topic;
     if (item?.type) details["Type"] = formatSubscriptionType(item.type);
     return details;
   },
@@ -118,11 +127,14 @@ export const deleteSubscriptionMapper: ComponentBaseMapper = {
   props: pubsubProps,
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const payload = context.execution.outputs as PubSubOutputs<{ subscriptionId?: string }> | undefined;
+    const payload = context.execution.outputs as
+      | PubSubOutputs<{ subscription?: string; subscriptionId?: string }>
+      | undefined;
     const item = payload?.default?.[0]?.data;
     const details: Record<string, string> = {};
     addCompletedAt(details, context);
-    if (item?.subscriptionId) details["Subscription ID"] = item.subscriptionId;
+    const subscription = item?.subscription || item?.subscriptionId;
+    if (subscription) details["Subscription"] = subscription;
     return details;
   },
 
@@ -146,12 +158,14 @@ function pubsubMetadataList(node: NodeInfo): MetadataItem[] {
   const config = (node.configuration as Record<string, any> | undefined) ?? {};
   const metadata: MetadataItem[] = [];
 
-  if (config.topicId) {
-    metadata.push({ icon: "message-square", label: String(config.topicId) });
+  const topic = config.topic || config.topicId;
+  if (topic) {
+    metadata.push({ icon: "message-square", label: String(topic) });
   }
 
-  if (config.subscriptionId) {
-    metadata.push({ icon: "radio", label: String(config.subscriptionId) });
+  const subscription = config.subscription || config.subscriptionId;
+  if (subscription) {
+    metadata.push({ icon: "radio", label: String(subscription) });
   }
 
   if (config.type) {

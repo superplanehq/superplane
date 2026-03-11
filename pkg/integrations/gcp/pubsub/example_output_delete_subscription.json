@@ -1,6 +1,6 @@
 {
   "data": {
-    "subscriptionId": "my-subscription",
+    "subscription": "my-subscription",
     "deleted": true
   },
   "timestamp": "2025-01-01T00:00:00Z",

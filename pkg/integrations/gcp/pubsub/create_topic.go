@@ -21,7 +21,7 @@ const (
 type CreateTopicComponent struct{}
 
 type CreateTopicConfiguration struct {
-	TopicID string `json:"topicId" mapstructure:"topicId"`
+	Topic string `json:"topic" mapstructure:"topic"`
 }
 
 func (c *CreateTopicComponent) Name() string        { return "gcp.pubsub.createTopic" }
@@ -47,11 +47,11 @@ func (c *CreateTopicComponent) OutputChannels(_ any) []core.OutputChannel {
 func (c *CreateTopicComponent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "topicId",
-			Label:       "Topic ID",
+			Name:        "topic",
+			Label:       "Topic",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "The ID for the new Pub/Sub topic (e.g. my-topic).",
+			Description: "The name for the new Pub/Sub topic (e.g. my-topic).",
 			Placeholder: "my-topic",
 		},
 	}
@@ -62,8 +62,8 @@ func (c *CreateTopicComponent) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if strings.TrimSpace(config.TopicID) == "" {
-		return fmt.Errorf("topicId is required")
+	if strings.TrimSpace(config.Topic) == "" {
+		return fmt.Errorf("topic is required")
 	}
 	return nil
 }
@@ -74,9 +74,9 @@ func (c *CreateTopicComponent) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
-	config.TopicID = strings.TrimSpace(config.TopicID)
-	if config.TopicID == "" {
-		return ctx.ExecutionState.Fail("error", "topicId is required")
+	config.Topic = strings.TrimSpace(config.Topic)
+	if config.Topic == "" {
+		return ctx.ExecutionState.Fail("error", "topic is required")
 	}
 
 	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
@@ -85,14 +85,14 @@ func (c *CreateTopicComponent) Execute(ctx core.ExecutionContext) error {
 	}
 
 	projectID := client.ProjectID()
-	if err := CreateTopic(context.Background(), client, projectID, config.TopicID); err != nil {
+	if err := CreateTopic(context.Background(), client, projectID, config.Topic); err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create topic: %v", err))
 	}
 
 	return ctx.ExecutionState.Emit(createTopicOutputChannel, createTopicPayloadType, []any{
 		map[string]any{
-			"topicId": config.TopicID,
-			"name":    fmt.Sprintf("projects/%s/topics/%s", projectID, config.TopicID),
+			"topic": config.Topic,
+			"name":  fmt.Sprintf("projects/%s/topics/%s", projectID, config.Topic),
 		},
 	})
 }
