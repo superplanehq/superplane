@@ -21,7 +21,7 @@ const (
 type DeleteSubscriptionComponent struct{}
 
 type DeleteSubscriptionConfiguration struct {
-	SubscriptionID string `json:"subscriptionId" mapstructure:"subscriptionId"`
+	Subscription string `json:"subscription" mapstructure:"subscription"`
 }
 
 func (c *DeleteSubscriptionComponent) Name() string  { return "gcp.pubsub.deleteSubscription" }
@@ -49,7 +49,7 @@ func (c *DeleteSubscriptionComponent) OutputChannels(_ any) []core.OutputChannel
 func (c *DeleteSubscriptionComponent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "subscriptionId",
+			Name:        "subscription",
 			Label:       "Subscription",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -69,8 +69,8 @@ func (c *DeleteSubscriptionComponent) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if strings.TrimSpace(config.SubscriptionID) == "" {
-		return fmt.Errorf("subscriptionId is required")
+	if strings.TrimSpace(config.Subscription) == "" {
+		return fmt.Errorf("subscription is required")
 	}
 	return nil
 }
@@ -81,9 +81,9 @@ func (c *DeleteSubscriptionComponent) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
-	config.SubscriptionID = strings.TrimSpace(config.SubscriptionID)
-	if config.SubscriptionID == "" {
-		return ctx.ExecutionState.Fail("error", "subscriptionId is required")
+	config.Subscription = strings.TrimSpace(config.Subscription)
+	if config.Subscription == "" {
+		return ctx.ExecutionState.Fail("error", "subscription is required")
 	}
 
 	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
@@ -92,14 +92,14 @@ func (c *DeleteSubscriptionComponent) Execute(ctx core.ExecutionContext) error {
 	}
 
 	projectID := client.ProjectID()
-	if err := DeleteSubscription(context.Background(), client, projectID, config.SubscriptionID); err != nil {
+	if err := DeleteSubscription(context.Background(), client, projectID, config.Subscription); err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to delete subscription: %v", err))
 	}
 
 	return ctx.ExecutionState.Emit(deleteSubscriptionOutputChannel, deleteSubscriptionPayloadType, []any{
 		map[string]any{
-			"subscriptionId": config.SubscriptionID,
-			"deleted":        true,
+			"subscription": config.Subscription,
+			"deleted":      true,
 		},
 	})
 }

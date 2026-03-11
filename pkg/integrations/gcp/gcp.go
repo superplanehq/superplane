@@ -793,6 +793,46 @@ func (g *GCP) HandleAction(ctx core.IntegrationActionContext) error {
 	}
 }
 
+func (g *GCP) handleEnsurePubSubOnMessage(ctx core.IntegrationActionContext) error {
+	var params struct {
+		Topic      string `mapstructure:"topic"`
+		GCPSubName string `mapstructure:"gcpSubName"`
+	}
+	if err := mapstructure.Decode(ctx.Parameters, &params); err != nil {
+		return fmt.Errorf("failed to decode action params: %w", err)
+	}
+	if params.Topic == "" || params.GCPSubName == "" {
+		return fmt.Errorf("topic and gcpSubName are required")
+	}
+
+	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create GCP client: %w", err)
+	}
+
+	projectID := client.ProjectID()
+	secret, err := g.eventsSecret(ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("get events secret: %w", err)
+	}
+
+	reqCtx := context.Background()
+
+	// Delete existing subscription (handles topic changes and idempotency)
+	_ = gcppubsub.DeleteSubscription(reqCtx, client, projectID, params.GCPSubName)
+
+	pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/pubsub-events?token=%s&gcpSubName=%s",
+		ctx.WebhooksBaseURL, ctx.Integration.ID(), secret, params.GCPSubName)
+
+	if err := gcppubsub.CreatePushSubscription(reqCtx, client, projectID, params.GCPSubName, params.Topic, pushEndpoint); err != nil {
+		return fmt.Errorf("create push subscription on topic %q: %w", params.Topic, err)
+	}
+
+	ctx.Logger.Infof("Created Pub/Sub push subscription %s on topic %s", params.GCPSubName, params.Topic)
+	return nil
+}
+
+
 func (g *GCP) handleEnsureCloudBuild(ctx core.IntegrationActionContext) error {
 	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
@@ -1336,45 +1376,6 @@ func (g *GCP) containerAnalysisSubscriptionApplies(subscription core.Integration
 		return false
 	}
 	return pattern.Type == artifactregistry.ArtifactAnalysisSubscriptionType
-}
-
-func (g *GCP) handleEnsurePubSubOnMessage(ctx core.IntegrationActionContext) error {
-	var params struct {
-		TopicID    string `mapstructure:"topicId"`
-		GCPSubName string `mapstructure:"gcpSubName"`
-	}
-	if err := mapstructure.Decode(ctx.Parameters, &params); err != nil {
-		return fmt.Errorf("failed to decode action params: %w", err)
-	}
-	if params.TopicID == "" || params.GCPSubName == "" {
-		return fmt.Errorf("topicId and gcpSubName are required")
-	}
-
-	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create GCP client: %w", err)
-	}
-
-	projectID := client.ProjectID()
-	secret, err := g.eventsSecret(ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("get events secret: %w", err)
-	}
-
-	reqCtx := context.Background()
-
-	// Delete existing subscription (handles topic changes and idempotency)
-	_ = gcppubsub.DeleteSubscription(reqCtx, client, projectID, params.GCPSubName)
-
-	pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/pubsub-events?token=%s&gcpSubName=%s",
-		ctx.WebhooksBaseURL, ctx.Integration.ID(), secret, params.GCPSubName)
-
-	if err := gcppubsub.CreatePushSubscription(reqCtx, client, projectID, params.GCPSubName, params.TopicID, pushEndpoint); err != nil {
-		return fmt.Errorf("create push subscription on topic %q: %w", params.TopicID, err)
-	}
-
-	ctx.Logger.Infof("Created Pub/Sub push subscription %s on topic %s", params.GCPSubName, params.TopicID)
-	return nil
 }
 
 func (g *GCP) handlePubSubEvent(ctx core.HTTPRequestContext) {

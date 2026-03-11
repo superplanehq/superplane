@@ -21,12 +21,13 @@ const (
 type OnMessage struct{}
 
 type OnMessageConfiguration struct {
-	TopicID string `json:"topicId" mapstructure:"topicId"`
+	Topic        string `json:"topic" mapstructure:"topic"`
+	Subscription string `json:"subscription" mapstructure:"subscription"`
 }
 
 type OnMessageMetadata struct {
-	InternalSubscriptionID string `json:"subscriptionId"`
-	TopicID                string `json:"topicId"`
+	InternalSubscriptionID string `json:"internalSubscription"`
+	Topic                  string `json:"topic"`
 	GCPSubName             string `json:"gcpSubName"`
 }
 
@@ -60,6 +61,7 @@ func (t *OnMessage) Documentation() string {
 ## Configuration
 
 - **Topic**: Select the Pub/Sub topic to listen to.
+- **Subscription (optional)**: Reuse an existing subscription name. Leave empty to let SuperPlane create one.
 
 ## Event Data
 
@@ -77,7 +79,7 @@ func (t *OnMessage) Color() string { return "gray" }
 func (t *OnMessage) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "topicId",
+			Name:        "topic",
 			Label:       "Topic",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -85,6 +87,22 @@ func (t *OnMessage) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:       ResourceTypeTopic,
+					Parameters: []configuration.ParameterRef{},
+				},
+			},
+		},
+		{
+			Name:        "subscription",
+			Label:       "Subscription",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Optional existing subscription to reuse. If empty, SuperPlane creates one.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "topic", Values: []string{"*"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:       ResourceTypeSubscription,
 					Parameters: []configuration.ParameterRef{},
 				},
 			},
@@ -98,9 +116,10 @@ func (t *OnMessage) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode trigger configuration: %w", err)
 	}
 
-	config.TopicID = strings.TrimSpace(config.TopicID)
-	if config.TopicID == "" {
-		return fmt.Errorf("topicId is required")
+	config.Topic = strings.TrimSpace(config.Topic)
+	config.Subscription = strings.TrimSpace(config.Subscription)
+	if config.Topic == "" {
+		return fmt.Errorf("topic is required")
 	}
 
 	if ctx.Integration == nil {
@@ -110,16 +129,18 @@ func (t *OnMessage) Setup(ctx core.TriggerContext) error {
 	var metadata OnMessageMetadata
 	_ = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 
-	// Assign a stable GCP subscription name on first setup
-	if metadata.GCPSubName == "" {
+	if config.Subscription != "" {
+		metadata.GCPSubName = config.Subscription
+	} else if metadata.GCPSubName == "" {
+		// Assign a stable GCP subscription name on first setup
 		metadata.GCPSubName = "sp-pubsub-" + uuid.New().String()
 	}
-	metadata.TopicID = config.TopicID
+	metadata.Topic = config.Topic
 
 	// Subscribe to integration event routing
 	subscriptionID, err := ctx.Integration.Subscribe(map[string]any{
 		"type":       OnMessageSubscriptionType,
-		"topicId":    config.TopicID,
+		"topic":      config.Topic,
 		"gcpSubName": metadata.GCPSubName,
 	})
 	if err != nil {
@@ -134,7 +155,7 @@ func (t *OnMessage) Setup(ctx core.TriggerContext) error {
 
 	// Schedule integration action to create the GCP push subscription
 	return ctx.Integration.ScheduleActionCall(gcpcommon.ActionNameEnsurePubSubOnMessage, map[string]any{
-		"topicId":    config.TopicID,
+		"topic":      config.Topic,
 		"gcpSubName": metadata.GCPSubName,
 	}, 2*time.Second)
 }

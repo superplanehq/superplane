@@ -21,7 +21,7 @@ const (
 type DeleteTopicComponent struct{}
 
 type DeleteTopicConfiguration struct {
-	TopicID string `json:"topicId" mapstructure:"topicId"`
+	Topic string `json:"topic" mapstructure:"topic"`
 }
 
 func (c *DeleteTopicComponent) Name() string        { return "gcp.pubsub.deleteTopic" }
@@ -47,7 +47,7 @@ func (c *DeleteTopicComponent) OutputChannels(_ any) []core.OutputChannel {
 func (c *DeleteTopicComponent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "topicId",
+			Name:        "topic",
 			Label:       "Topic",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -67,8 +67,8 @@ func (c *DeleteTopicComponent) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if strings.TrimSpace(config.TopicID) == "" {
-		return fmt.Errorf("topicId is required")
+	if strings.TrimSpace(config.Topic) == "" {
+		return fmt.Errorf("topic is required")
 	}
 	return nil
 }
@@ -79,9 +79,9 @@ func (c *DeleteTopicComponent) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
-	config.TopicID = strings.TrimSpace(config.TopicID)
-	if config.TopicID == "" {
-		return ctx.ExecutionState.Fail("error", "topicId is required")
+	config.Topic = strings.TrimSpace(config.Topic)
+	if config.Topic == "" {
+		return ctx.ExecutionState.Fail("error", "topic is required")
 	}
 
 	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
@@ -90,13 +90,13 @@ func (c *DeleteTopicComponent) Execute(ctx core.ExecutionContext) error {
 	}
 
 	projectID := client.ProjectID()
-	if err := DeleteTopic(context.Background(), client, projectID, config.TopicID); err != nil {
+	if err := DeleteTopic(context.Background(), client, projectID, config.Topic); err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to delete topic: %v", err))
 	}
 
 	return ctx.ExecutionState.Emit(deleteTopicOutputChannel, deleteTopicPayloadType, []any{
 		map[string]any{
-			"topicId": config.TopicID,
+			"topic":   config.Topic,
 			"deleted": true,
 		},
 	})

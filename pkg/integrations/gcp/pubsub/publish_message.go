@@ -23,10 +23,10 @@ const (
 type PublishMessage struct{}
 
 type PublishMessageConfiguration struct {
-	TopicID string  `json:"topicId" mapstructure:"topicId"`
-	Format  string  `json:"format" mapstructure:"format"`
-	JSON    *any    `json:"json" mapstructure:"json"`
-	Text    *string `json:"text" mapstructure:"text"`
+	Topic  string  `json:"topic" mapstructure:"topic"`
+	Format string  `json:"format" mapstructure:"format"`
+	JSON   *any    `json:"json" mapstructure:"json"`
+	Text   *string `json:"text" mapstructure:"text"`
 }
 
 func (c *PublishMessage) Name() string        { return "gcp.pubsub.publishMessage" }
@@ -52,7 +52,7 @@ func (c *PublishMessage) OutputChannels(_ any) []core.OutputChannel {
 func (c *PublishMessage) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "topicId",
+			Name:        "topic",
 			Label:       "Topic",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -86,7 +86,7 @@ func (c *PublishMessage) Configuration() []configuration.Field {
 			Required: false,
 			Default:  map[string]any{},
 			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "topicId", Values: []string{"*"}},
+				{Field: "topic", Values: []string{"*"}},
 				{Field: "format", Values: []string{"json"}},
 			},
 		},
@@ -107,8 +107,8 @@ func (c *PublishMessage) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if strings.TrimSpace(config.TopicID) == "" {
-		return fmt.Errorf("topicId is required")
+	if strings.TrimSpace(config.Topic) == "" {
+		return fmt.Errorf("topic is required")
 	}
 	if config.Format == "" {
 		return fmt.Errorf("format is required")
@@ -120,6 +120,10 @@ func (c *PublishMessage) Execute(ctx core.ExecutionContext) error {
 	var config PublishMessageConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
+	}
+	config.Topic = strings.TrimSpace(config.Topic)
+	if config.Topic == "" {
+		return ctx.ExecutionState.Fail("error", "topic is required")
 	}
 
 	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
@@ -133,7 +137,7 @@ func (c *PublishMessage) Execute(ctx core.ExecutionContext) error {
 	}
 
 	projectID := client.ProjectID()
-	messageID, err := PublishMessageToTopic(context.Background(), client, projectID, config.TopicID, data, nil)
+	messageID, err := PublishMessageToTopic(context.Background(), client, projectID, config.Topic, data, nil)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to publish message: %v", err))
 	}
@@ -141,7 +145,7 @@ func (c *PublishMessage) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(publishMessageOutputChannel, publishMessagePayloadType, []any{
 		map[string]any{
 			"messageId": messageID,
-			"topicId":   config.TopicID,
+			"topic":     config.Topic,
 		},
 	})
 }
