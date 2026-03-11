@@ -462,62 +462,85 @@ func (g *GCP) ensureArtifactRegistrySetup(
 	projectID := client.ProjectID()
 
 	if metadata.ArtifactPushSubscription != "" {
-		secret, err := g.artifactPushSecret(integration)
+		synced, err := g.syncArtifactRegistrySubscriptions(reqCtx, client, integration, webhooksBaseURL, metadata, projectID)
 		if err != nil {
-			return fmt.Errorf("generate artifact push secret: %w", err)
+			return err
 		}
-		pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-push-events?token=%s", webhooksBaseURL, integration.ID(), secret)
-		updateErr := gcppubsub.UpdatePushEndpoint(reqCtx, client, projectID, metadata.ArtifactPushSubscription, pushEndpoint)
-		if updateErr != nil {
-			if !gcpcommon.IsNotFoundError(updateErr) {
-				return fmt.Errorf("update artifact push endpoint: %w", updateErr)
-			}
-			// Subscription no longer exists in GCP — fall through to recreate everything
-			metadata.ArtifactPushSubscription = ""
-			metadata.ContainerAnalysisSubscription = ""
-		} else {
-			if metadata.ContainerAnalysisSubscription != "" {
-				caSecret, err := g.containerAnalysisSecret(integration)
-				if err != nil {
-					return fmt.Errorf("generate container analysis secret: %w", err)
-				}
-				caPushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-analysis-events?token=%s", webhooksBaseURL, integration.ID(), caSecret)
-				caUpdateErr := gcppubsub.UpdatePushEndpoint(reqCtx, client, projectID, metadata.ContainerAnalysisSubscription, caPushEndpoint)
-				if caUpdateErr == nil {
-					return nil
-				}
-				if !gcpcommon.IsNotFoundError(caUpdateErr) {
-					return fmt.Errorf("update container analysis endpoint: %w", caUpdateErr)
-				}
-				// Subscription no longer exists in GCP — fall through to recreate it
-				metadata.ContainerAnalysisSubscription = ""
-			}
-			// CA subscription doesn't exist yet — create it if the API is enabled
-			caEnabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "containeranalysis.googleapis.com")
-			if err != nil {
-				return fmt.Errorf("check Container Analysis API: %w", err)
-			}
-			if !caEnabled {
-				return nil
-			}
-			sanitized := sanitizeID(integration.ID().String())
-			caSecret, err := g.containerAnalysisSecret(integration)
-			if err != nil {
-				return fmt.Errorf("generate container analysis secret: %w", err)
-			}
-			caSubscriptionID := "sp-ca-sub-" + sanitized
-			caPushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-analysis-events?token=%s", webhooksBaseURL, integration.ID(), caSecret)
-			if err := gcppubsub.CreateTopic(reqCtx, client, projectID, ContainerAnalysisTopicID); err != nil {
-				return fmt.Errorf("create Container Analysis topic: %w", err)
-			}
-			if err := gcppubsub.CreatePushSubscription(reqCtx, client, projectID, caSubscriptionID, ContainerAnalysisTopicID, caPushEndpoint); err != nil {
-				return fmt.Errorf("create Container Analysis push subscription: %w", err)
-			}
-			metadata.ContainerAnalysisSubscription = caSubscriptionID
+		if synced {
 			return nil
 		}
 	}
 
+	return g.bootstrapArtifactRegistrySubscriptions(reqCtx, client, integration, webhooksBaseURL, metadata, projectID)
+}
+
+func (g *GCP) syncArtifactRegistrySubscriptions(
+	reqCtx context.Context,
+	client *gcpcommon.Client,
+	integration core.IntegrationContext,
+	webhooksBaseURL string,
+	metadata *gcpcommon.Metadata,
+	projectID string,
+) (bool, error) {
+	secret, err := g.artifactPushSecret(integration)
+	if err != nil {
+		return false, fmt.Errorf("generate artifact push secret: %w", err)
+	}
+
+	pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-push-events?token=%s", webhooksBaseURL, integration.ID(), secret)
+	updateErr := gcppubsub.UpdatePushEndpoint(reqCtx, client, projectID, metadata.ArtifactPushSubscription, pushEndpoint)
+	if updateErr != nil {
+		if !gcpcommon.IsNotFoundError(updateErr) {
+			return false, fmt.Errorf("update artifact push endpoint: %w", updateErr)
+		}
+		// Subscription no longer exists in GCP — recreate everything.
+		metadata.ArtifactPushSubscription = ""
+		metadata.ContainerAnalysisSubscription = ""
+		return false, nil
+	}
+
+	if metadata.ContainerAnalysisSubscription != "" {
+		caSecret, err := g.containerAnalysisSecret(integration)
+		if err != nil {
+			return false, fmt.Errorf("generate container analysis secret: %w", err)
+		}
+		caPushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-analysis-events?token=%s", webhooksBaseURL, integration.ID(), caSecret)
+		caUpdateErr := gcppubsub.UpdatePushEndpoint(reqCtx, client, projectID, metadata.ContainerAnalysisSubscription, caPushEndpoint)
+		if caUpdateErr == nil {
+			return true, nil
+		}
+		if !gcpcommon.IsNotFoundError(caUpdateErr) {
+			return false, fmt.Errorf("update container analysis endpoint: %w", caUpdateErr)
+		}
+		// Subscription no longer exists in GCP — recreate it below.
+		metadata.ContainerAnalysisSubscription = ""
+	}
+
+	caEnabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "containeranalysis.googleapis.com")
+	if err != nil {
+		return false, fmt.Errorf("check Container Analysis API: %w", err)
+	}
+	if !caEnabled {
+		return true, nil
+	}
+
+	sanitized := sanitizeID(integration.ID().String())
+	caSubscriptionID := "sp-ca-sub-" + sanitized
+	if err := g.createContainerAnalysisSubscription(reqCtx, client, projectID, integration, webhooksBaseURL, caSubscriptionID); err != nil {
+		return false, err
+	}
+	metadata.ContainerAnalysisSubscription = caSubscriptionID
+	return true, nil
+}
+
+func (g *GCP) bootstrapArtifactRegistrySubscriptions(
+	reqCtx context.Context,
+	client *gcpcommon.Client,
+	integration core.IntegrationContext,
+	webhooksBaseURL string,
+	metadata *gcpcommon.Metadata,
+	projectID string,
+) error {
 	enabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "pubsub.googleapis.com")
 	if err != nil {
 		return fmt.Errorf("check Pub/Sub API: %w", err)
@@ -567,20 +590,35 @@ func (g *GCP) ensureArtifactRegistrySetup(
 		return nil
 	}
 
+	caSubscriptionID := "sp-ca-sub-" + sanitized
+	if err := g.createContainerAnalysisSubscription(reqCtx, client, projectID, integration, webhooksBaseURL, caSubscriptionID); err != nil {
+		return err
+	}
+	metadata.ContainerAnalysisSubscription = caSubscriptionID
+
+	return nil
+}
+
+func (g *GCP) createContainerAnalysisSubscription(
+	reqCtx context.Context,
+	client *gcpcommon.Client,
+	projectID string,
+	integration core.IntegrationContext,
+	webhooksBaseURL string,
+	subscriptionID string,
+) error {
 	caSecret, err := g.containerAnalysisSecret(integration)
 	if err != nil {
 		return fmt.Errorf("generate container analysis secret: %w", err)
 	}
-	caSubscriptionID := "sp-ca-sub-" + sanitized
 	caPushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-analysis-events?token=%s", webhooksBaseURL, integration.ID(), caSecret)
 
 	if err := gcppubsub.CreateTopic(reqCtx, client, projectID, ContainerAnalysisTopicID); err != nil {
 		return fmt.Errorf("create Container Analysis topic: %w", err)
 	}
-	if err := gcppubsub.CreatePushSubscription(reqCtx, client, projectID, caSubscriptionID, ContainerAnalysisTopicID, caPushEndpoint); err != nil {
+	if err := gcppubsub.CreatePushSubscription(reqCtx, client, projectID, subscriptionID, ContainerAnalysisTopicID, caPushEndpoint); err != nil {
 		return fmt.Errorf("create Container Analysis push subscription: %w", err)
 	}
-	metadata.ContainerAnalysisSubscription = caSubscriptionID
 
 	return nil
 }
