@@ -3,6 +3,7 @@ import {
   ComponentBaseContext,
   EventStateRegistry,
   ExecutionDetailsContext,
+  NodeInfo,
   SubtitleContext,
 } from "../types";
 import { ComponentBaseProps } from "@/ui/componentBase";
@@ -10,9 +11,14 @@ import { baseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
 import { formatTimeAgo } from "@/utils/date";
 import gcpPubSubIcon from "@/assets/icons/integrations/gcp.pubsub.svg";
+import { MetadataItem } from "@/ui/metadataList";
 
 function pubsubProps(context: ComponentBaseContext): ComponentBaseProps {
-  return { ...baseMapper.props(context), iconSrc: gcpPubSubIcon };
+  return {
+    ...baseMapper.props(context),
+    iconSrc: gcpPubSubIcon,
+    metadata: pubsubMetadataList(context.node),
+  };
 }
 
 function pubsubSubtitle(context: SubtitleContext): string {
@@ -63,7 +69,6 @@ export const createTopicMapper: ComponentBaseMapper = {
     const details: Record<string, string> = {};
     addCompletedAt(details, context);
     if (item?.topicId) details["Topic ID"] = item.topicId;
-    if (item?.name) details["Resource Name"] = item.name;
     return details;
   },
 
@@ -102,8 +107,7 @@ export const createSubscriptionMapper: ComponentBaseMapper = {
     addCompletedAt(details, context);
     if (item?.subscriptionId) details["Subscription ID"] = item.subscriptionId;
     if (item?.topicId) details["Topic"] = item.topicId;
-    if (item?.type) details["Type"] = item.type;
-    if (item?.name) details["Resource Name"] = item.name;
+    if (item?.type) details["Type"] = formatSubscriptionType(item.type);
     return details;
   },
 
@@ -126,3 +130,45 @@ export const deleteSubscriptionMapper: ComponentBaseMapper = {
 };
 
 export const PUBSUB_ACTION_STATE_REGISTRY: EventStateRegistry = buildActionStateRegistry("completed");
+
+function formatSubscriptionType(value: string): string {
+  switch (value.toUpperCase()) {
+    case "PUSH":
+      return "Push";
+    case "PULL":
+      return "Pull";
+    default:
+      return value;
+  }
+}
+
+function pubsubMetadataList(node: NodeInfo): MetadataItem[] {
+  const config = (node.configuration as Record<string, any> | undefined) ?? {};
+  const metadata: MetadataItem[] = [];
+
+  if (config.topicId) {
+    metadata.push({ icon: "message-square", label: String(config.topicId) });
+  }
+
+  if (config.subscriptionId) {
+    metadata.push({ icon: "radio", label: String(config.subscriptionId) });
+  }
+
+  if (config.type) {
+    metadata.push({ icon: "funnel", label: formatSubscriptionType(String(config.type)) });
+  }
+
+  if (config.pushEndpoint) {
+    metadata.push({ icon: "link", label: compactURL(String(config.pushEndpoint)) });
+  }
+
+  return metadata;
+}
+
+function compactURL(value: string): string {
+  if (value.length <= 64) {
+    return value;
+  }
+
+  return `${value.slice(0, 64)}...`;
+}
