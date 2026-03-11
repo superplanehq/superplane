@@ -229,8 +229,8 @@ func (c *UpdateIssue) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 	return ctx.DefaultProcessing()
 }
 
-func (c *UpdateIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (c *UpdateIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (c *UpdateIssue) Actions() []core.Action {

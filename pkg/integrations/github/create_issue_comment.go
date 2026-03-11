@@ -175,8 +175,8 @@ func (c *CreateIssueComment) ProcessQueueItem(ctx core.ProcessQueueContext) (*uu
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (c *CreateIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (c *CreateIssueComment) Actions() []core.Action {

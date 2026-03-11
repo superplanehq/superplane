@@ -244,8 +244,8 @@ func (t *OnVMInstance) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func (t *OnVMInstance) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (t *OnVMInstance) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func subscriptionPattern() map[string]any {

@@ -180,40 +180,40 @@ func (t *OnIncident) HandleAction(ctx core.TriggerActionContext) (map[string]any
 	return nil, nil
 }
 
-func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	config := OnIncidentConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	// Verify signature
 	signature := ctx.Headers.Get("X-PagerDuty-Signature")
 	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("missing signature")
+		return http.StatusForbidden, nil, fmt.Errorf("missing signature")
 	}
 
 	// Extract version and signature value (format: v1=<signature>)
 	parts := strings.SplitN(signature, "=", 2)
 	if len(parts) != 2 || parts[0] != "v1" {
-		return http.StatusForbidden, fmt.Errorf("invalid signature format")
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature format")
 	}
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error getting secret: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error getting secret: %v", err)
 	}
 
 	// Verify signature using HMAC SHA256
 	if err := crypto.VerifySignature(secret, ctx.Body, parts[1]); err != nil {
-		return http.StatusForbidden, fmt.Errorf("invalid signature: %v", err)
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature: %v", err)
 	}
 
 	// Parse webhook payload
 	var webhook Webhook
 	err = json.Unmarshal(ctx.Body, &webhook)
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	eventType := webhook.Event.EventType
@@ -223,11 +223,11 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	// we need to filter events by their type here.
 	//
 	if !slices.Contains(config.Events, eventType) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if !allowedUrgency(webhook.Event.Data, config.Urgencies) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	err = ctx.Events.Emit(
@@ -236,10 +236,10 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	)
 
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 type Webhook struct {

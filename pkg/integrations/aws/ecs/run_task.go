@@ -761,8 +761,8 @@ func (c *RunTask) HandleAction(ctx core.ActionContext) error {
 	}
 }
 
-func (c *RunTask) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *RunTask) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *RunTask) Cancel(ctx core.ExecutionContext) error {

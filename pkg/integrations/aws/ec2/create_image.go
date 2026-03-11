@@ -374,8 +374,8 @@ func (c *CreateImage) checkRuleAvailability(ctx core.ActionContext) error {
 	return ctx.Metadata.Set(nodeMetadata)
 }
 
-func (c *CreateImage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *CreateImage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *CreateImage) subscriptionPattern(region string) *common.EventBridgeEvent {

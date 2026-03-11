@@ -204,8 +204,8 @@ func (c *GetLastWorkflow) Execute(ctx core.ExecutionContext) error {
 	return fmt.Errorf("no matching workflow found")
 }
 
-func (c *GetLastWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *GetLastWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *GetLastWorkflow) Actions() []core.Action {

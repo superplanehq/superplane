@@ -115,7 +115,7 @@ func (s *PanicableComponent) HandleAction(ctx core.ActionContext) (err error) {
 	return s.underlying.HandleAction(ctx)
 }
 
-func (s *PanicableComponent) HandleWebhook(ctx core.WebhookRequestContext) (status int, err error) {
+func (s *PanicableComponent) HandleWebhook(ctx core.WebhookRequestContext) (status int, response *core.WebhookResponseBody, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			status = 500

@@ -97,8 +97,8 @@ func (s *Start) Configuration() []configuration.Field {
 	}
 }
 
-func (s *Start) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (s *Start) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (s *Start) Setup(ctx core.TriggerContext) error {

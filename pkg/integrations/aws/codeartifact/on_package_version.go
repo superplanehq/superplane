@@ -323,8 +323,8 @@ func (p *OnPackageVersion) OnIntegrationMessage(ctx core.IntegrationMessageConte
 	return ctx.Events.Emit("aws.codeartifact.package.version", ctx.Message)
 }
 
-func (p *OnPackageVersion) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (p *OnPackageVersion) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (p *OnPackageVersion) Cleanup(ctx core.TriggerContext) error {

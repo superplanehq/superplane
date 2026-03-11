@@ -325,23 +325,23 @@ func handleOnResourceEventWebhook(
 	allowedEventTypes []string,
 	defaultEventTypes []string,
 	requiredResourceIDField string,
-) (int, error) {
+) (int, *core.WebhookResponseBody, error) {
 	if err := verifyWebhookSignature(ctx); err != nil {
-		return http.StatusForbidden, err
+		return http.StatusForbidden, nil, err
 	}
 
 	payload := map[string]any{}
 	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %w", err)
 	}
 
 	eventType := readString(payload["type"])
 	if eventType == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing event type")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing event type")
 	}
 
 	if !slices.Contains(allowedEventTypes, eventType) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	data := readMap(payload["data"])
@@ -360,7 +360,7 @@ func handleOnResourceEventWebhook(
 
 	serviceID := readString(data["serviceId"])
 	if config.Service == "" || serviceID == "" || config.Service != serviceID {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	selectedEventTypes := filterAllowedEventTypes(config.EventTypes, allowedEventTypes)
@@ -369,17 +369,17 @@ func handleOnResourceEventWebhook(
 	}
 
 	if !slices.Contains(selectedEventTypes, eventType) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	ensureResourceIDField(data, eventID, requiredResourceIDField)
 	removeAmbiguousIDField(data, eventID, requiredResourceIDField)
 
 	if err := ctx.Events.Emit(payloadType(eventType), data); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %w", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func eventIDFromWebhookPayload(payload map[string]any, data map[string]any) string {

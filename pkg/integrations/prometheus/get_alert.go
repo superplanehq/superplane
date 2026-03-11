@@ -158,8 +158,8 @@ func (c *GetAlert) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, e
 	return ctx.DefaultProcessing()
 }
 
-func (c *GetAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *GetAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *GetAlert) Actions() []core.Action {
