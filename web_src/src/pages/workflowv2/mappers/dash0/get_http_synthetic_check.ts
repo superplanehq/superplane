@@ -24,12 +24,14 @@ import { formatTimeAgo } from "@/utils/date";
 
 // Output channel names matching the backend constants
 const CHANNEL_HEALTHY = "healthy";
+const CHANNEL_DEGRADED = "degraded";
 const CHANNEL_CRITICAL = "critical";
 
 // Type for outputs with channel structure
 type GetHttpSyntheticCheckOutputs = {
   default?: OutputPayload[];
   healthy?: OutputPayload[];
+  degraded?: OutputPayload[];
   critical?: OutputPayload[];
 };
 
@@ -190,7 +192,7 @@ function getFirstPayload(execution: ExecutionInfo): OutputPayload | null {
   const outputs = execution.outputs as GetHttpSyntheticCheckOutputs | undefined;
   if (!outputs) return null;
 
-  for (const channel of [CHANNEL_CRITICAL, CHANNEL_HEALTHY]) {
+  for (const channel of [CHANNEL_CRITICAL, CHANNEL_DEGRADED, CHANNEL_HEALTHY]) {
     const channelOutputs = outputs[channel as keyof GetHttpSyntheticCheckOutputs];
     if (channelOutputs && channelOutputs.length > 0) {
       return channelOutputs[0];
@@ -220,6 +222,7 @@ function getActiveChannel(execution: ExecutionInfo): string | null {
   if (!outputs) return null;
 
   if (outputs.critical && outputs.critical.length > 0) return CHANNEL_CRITICAL;
+  if (outputs.degraded && outputs.degraded.length > 0) return CHANNEL_DEGRADED;
   if (outputs.healthy && outputs.healthy.length > 0) return CHANNEL_HEALTHY;
   if (outputs.default && outputs.default.length > 0) return "default";
 
@@ -235,6 +238,8 @@ function channelLabel(channel: string): string {
   switch (channel) {
     case CHANNEL_CRITICAL:
       return "failing";
+    case CHANNEL_DEGRADED:
+      return "degraded";
     case CHANNEL_HEALTHY:
       return "passing";
     case "":
@@ -253,6 +258,12 @@ export const GET_HTTP_SYNTHETIC_CHECK_STATE_MAP: EventStateMap = {
     textColor: "text-gray-800",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-green-500",
+  },
+  degraded: {
+    icon: "alert-triangle",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-amber-100",
+    badgeColor: "bg-amber-500",
   },
   critical: {
     icon: "circle-x",
@@ -291,6 +302,7 @@ export const getHttpSyntheticCheckStateFunction: StateFunction = (execution: Exe
     const activeChannel = getActiveChannel(execution);
 
     if (activeChannel === CHANNEL_CRITICAL) return "critical";
+    if (activeChannel === CHANNEL_DEGRADED) return "degraded";
     if (activeChannel === CHANNEL_HEALTHY) return "healthy";
     if (activeChannel === "") return "noStatus";
 

@@ -15,41 +15,41 @@ import (
 func Test__GetHTTPSyntheticCheck__Setup(t *testing.T) {
 	component := GetHTTPSyntheticCheck{}
 
-	t.Run("checkId is required", func(t *testing.T) {
+	t.Run("syntheticCheck is required", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: map[string]any{},
 		})
 
-		require.ErrorContains(t, err, "checkId is required")
+		require.ErrorContains(t, err, "syntheticCheck is required")
 	})
 
-	t.Run("checkId cannot be empty", func(t *testing.T) {
+	t.Run("syntheticCheck cannot be empty", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"checkId": ""},
+			Configuration: map[string]any{"syntheticCheck": ""},
 		})
 
-		require.ErrorContains(t, err, "checkId is required")
+		require.ErrorContains(t, err, "syntheticCheck is required")
 	})
 
-	t.Run("checkId cannot be whitespace", func(t *testing.T) {
+	t.Run("syntheticCheck cannot be whitespace", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"checkId": "   "},
+			Configuration: map[string]any{"syntheticCheck": "   "},
 		})
 
-		require.ErrorContains(t, err, "checkId is required")
+		require.ErrorContains(t, err, "syntheticCheck is required")
 	})
 
 	t.Run("dataset is required", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"checkId": "64617368-3073-796e-7468-73599f287bf4"},
+			Configuration: map[string]any{"syntheticCheck": "64617368-3073-796e-7468-73599f287bf4"},
 		})
 
 		require.ErrorContains(t, err, "dataset is required")
@@ -65,13 +65,13 @@ func Test__GetHTTPSyntheticCheck__Setup(t *testing.T) {
 			},
 			Metadata: &contexts.MetadataContext{
 				Metadata: map[string]any{
-					"checkName": "Already Set",
-					"checkId":   "64617368-3073-796e-7468-73599f287bf4",
+					"checkName":      "Already Set",
+					"syntheticCheck": "64617368-3073-796e-7468-73599f287bf4",
 				},
 			},
 			Configuration: map[string]any{
-				"checkId": "64617368-3073-796e-7468-73599f287bf4",
-				"dataset": "default",
+				"syntheticCheck": "64617368-3073-796e-7468-73599f287bf4",
+				"dataset":        "default",
 			},
 		})
 
@@ -111,8 +111,8 @@ func Test__GetHTTPSyntheticCheck__Setup(t *testing.T) {
 			},
 			Metadata: metadata,
 			Configuration: map[string]any{
-				"checkId": "64617368-3073-796e-7468-73599f287bf4",
-				"dataset": "production",
+				"syntheticCheck": "64617368-3073-796e-7468-73599f287bf4",
+				"dataset":        "production",
 			},
 		})
 
@@ -366,8 +366,8 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"checkId": "64617368-3073-796e-7468-73599f287bf4",
-				"dataset": "default",
+				"syntheticCheck": "64617368-3073-796e-7468-73599f287bf4",
+				"dataset":        "default",
 			},
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -568,8 +568,8 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"checkId": "test-check-id",
-				"dataset": "default",
+				"syntheticCheck": "test-check-id",
+				"dataset":        "default",
 			},
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -657,7 +657,7 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"checkId": "test-check-id",
+				"syntheticCheck": "test-check-id",
 				// dataset not provided
 			},
 			HTTP: httpContext,
@@ -688,8 +688,8 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"checkId": "non-existent-id",
-				"dataset": "default",
+				"syntheticCheck": "non-existent-id",
+				"dataset":        "default",
 			},
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -709,8 +709,8 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"checkId": "test-id",
-				"dataset": "default",
+				"syntheticCheck": "test-id",
+				"dataset":        "default",
 			},
 			HTTP: &contexts.HTTPContext{},
 			Integration: &contexts.IntegrationContext{
@@ -784,8 +784,8 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"checkId": "failing-check-id",
-				"dataset": "default",
+				"syntheticCheck": "failing-check-id",
+				"dataset":        "default",
 			},
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -801,6 +801,88 @@ func Test__GetHTTPSyntheticCheck__Execute(t *testing.T) {
 		assert.True(t, execCtx.Finished)
 		assert.True(t, execCtx.Passed)
 		assert.Equal(t, ChannelNameCritical, execCtx.Channel)
+		assert.Equal(t, "dash0.syntheticCheck.fetched", execCtx.Type)
+		require.Len(t, execCtx.Payloads, 1)
+	})
+
+	t.Run("emits on degraded channel when outcome is Degraded", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// GetSyntheticCheck response
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"kind": "Dash0SyntheticCheck",
+							"metadata": {"name": "Degraded Check"},
+							"spec": {
+								"display": {"name": "Degraded Check"},
+								"enabled": true,
+								"labels": {},
+								"notifications": {"channels": [], "onlyCriticalChannels": []},
+								"plugin": {
+									"kind": "http",
+									"spec": {
+										"assertions": {"criticalAssertions": [], "degradedAssertions": []},
+										"request": {"url": "https://slow.example.com", "method": "get"}
+									}
+								},
+								"retries": {"kind": "off", "spec": {}},
+								"schedule": {"interval": "1m", "locations": ["us-east-1"], "strategy": "all_locations"}
+							}
+						}
+					`)),
+				},
+				// 8 scalar metric responses (empty)
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "success", "data": {"resultType": "vector", "result": []}}`))},
+				// lastOutcome - Degraded
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"status": "success",
+							"data": {
+								"resultType": "vector",
+								"result": [
+									{
+										"metric": {"dash0_synthetic_check_outcome": "Degraded"},
+										"value": [1234567890, "1234567890"]
+									}
+								]
+							}
+						}
+					`)),
+				},
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"syntheticCheck": "degraded-check-id",
+				"dataset":        "default",
+			},
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "token123",
+					"baseURL":  "https://api.us-west-2.aws.dash0.com",
+				},
+			},
+			ExecutionState: execCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+		assert.Equal(t, ChannelNameDegraded, execCtx.Channel)
 		assert.Equal(t, "dash0.syntheticCheck.fetched", execCtx.Type)
 		require.Len(t, execCtx.Payloads, 1)
 	})
