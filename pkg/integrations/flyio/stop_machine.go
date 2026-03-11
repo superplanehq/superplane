@@ -194,7 +194,7 @@ func (c *StopMachine) Execute(ctx core.ExecutionContext) error {
 	}
 
 	ctx.Logger.Infof("Stop requested for machine %s/%s, polling for state", spec.App, machineID)
-	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, stopMachinePollInterval)
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1}, stopMachinePollInterval)
 }
 
 func (c *StopMachine) Actions() []core.Action {
@@ -217,6 +217,25 @@ func (c *StopMachine) poll(ctx core.ActionContext) error {
 		return nil
 	}
 
+	attempt := 1
+	if v, ok := ctx.Parameters["attempt"].(float64); ok {
+		attempt = int(v)
+	}
+
+	if attempt > maxMachinePollAttempts {
+		ctx.Logger.Errorf("Machine stop exceeded maximum poll attempts (%d), giving up", maxMachinePollAttempts)
+		// Best-effort: fetch current state for the payload; ignore error.
+		spec, _ := decodeStopMachineSpec(ctx.Configuration)
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err == nil {
+			if machine, err := client.GetMachine(spec.App, parseMachineID(spec.Machine)); err == nil {
+				payload := machinePayload(spec.App, machine)
+				return ctx.ExecutionState.Emit(StopMachineFailedOutputChannel, StopMachinePayloadType, []any{payload})
+			}
+		}
+		return ctx.ExecutionState.Emit(StopMachineFailedOutputChannel, StopMachinePayloadType, []any{map[string]any{"reason": "timeout"}})
+	}
+
 	spec, err := decodeStopMachineSpec(ctx.Configuration)
 	if err != nil {
 		return err
@@ -230,11 +249,11 @@ func (c *StopMachine) poll(ctx core.ActionContext) error {
 	machineID := parseMachineID(spec.Machine)
 	machine, err := client.GetMachine(spec.App, machineID)
 	if err != nil {
-		ctx.Logger.Warnf("Failed to get machine state, will retry: %v", err)
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, stopMachinePollInterval)
+		ctx.Logger.Warnf("Failed to get machine state (attempt %d), will retry: %v", attempt, err)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": attempt + 1}, stopMachinePollInterval)
 	}
 
-	ctx.Logger.Infof("Machine %s state: %s", machineID, machine.State)
+	ctx.Logger.Infof("Machine %s state: %s (attempt %d/%d)", machineID, machine.State, attempt, maxMachinePollAttempts)
 
 	switch machine.State {
 	case "stopped":
@@ -246,7 +265,7 @@ func (c *StopMachine) poll(ctx core.ActionContext) error {
 		return ctx.ExecutionState.Emit(StopMachineFailedOutputChannel, StopMachinePayloadType, []any{payload})
 	default:
 		// still transitioning (stopping, etc.) — keep polling
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, stopMachinePollInterval)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": attempt + 1}, stopMachinePollInterval)
 	}
 }
 
@@ -261,4 +280,3 @@ func (c *StopMachine) Cleanup(_ core.SetupContext) error {
 func (c *StopMachine) HandleWebhook(_ core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
-

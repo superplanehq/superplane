@@ -95,7 +95,9 @@ func (f *FlyIO) Components() []core.Component {
 }
 
 func (f *FlyIO) Triggers() []core.Trigger {
-	return []core.Trigger{}
+	return []core.Trigger{
+		&OnAppStateChange{},
+	}
 }
 
 func (f *FlyIO) Sync(ctx core.SyncContext) error {
@@ -198,7 +200,6 @@ func (f *FlyIO) ListResources(resourceType string, ctx core.ListResourcesContext
 			}
 		}
 		return resources, nil
-
 
 	default:
 		return []core.IntegrationResource{}, nil

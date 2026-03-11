@@ -16,7 +16,6 @@ const (
 	StartMachinePayloadType          = "flyio.machine"
 	StartMachineSuccessOutputChannel = "success"
 	StartMachineFailedOutputChannel  = "failed"
-	startMachinePollInterval         = 30 * time.Second
 )
 
 type StartMachine struct{}
@@ -145,18 +144,6 @@ func decodeStartMachineSpec(configuration any) (StartMachineSpec, error) {
 	return spec, nil
 }
 
-// parseMachineID extracts the bare machine ID from a composite "appName/machineID"
-// string that the IntegrationResource picker stores as the resource ID.
-// If the string isn't compound, it is returned as-is.
-func parseMachineID(compound string) string {
-	parts := strings.SplitN(compound, "/", 2)
-	if len(parts) == 2 {
-		return parts[1]
-	}
-
-	return compound
-}
-
 func (c *StartMachine) Setup(ctx core.SetupContext) error {
 	_, err := decodeStartMachineSpec(ctx.Configuration)
 	return err
@@ -183,7 +170,7 @@ func (c *StartMachine) Execute(ctx core.ExecutionContext) error {
 	}
 
 	ctx.Logger.Infof("Start requested for machine %s/%s, polling for state", spec.App, machineID)
-	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, startMachinePollInterval)
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1}, machinePollInterval*time.Second)
 }
 
 func (c *StartMachine) Actions() []core.Action {
@@ -206,6 +193,25 @@ func (c *StartMachine) poll(ctx core.ActionContext) error {
 		return nil
 	}
 
+	attempt := 1
+	if v, ok := ctx.Parameters["attempt"].(float64); ok {
+		attempt = int(v)
+	}
+
+	if attempt > maxMachinePollAttempts {
+		ctx.Logger.Errorf("Machine start exceeded maximum poll attempts (%d), giving up", maxMachinePollAttempts)
+		// Best-effort: fetch current state for the payload; ignore error.
+		spec, _ := decodeStartMachineSpec(ctx.Configuration)
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err == nil {
+			if machine, err := client.GetMachine(spec.App, parseMachineID(spec.Machine)); err == nil {
+				payload := machinePayload(spec.App, machine)
+				return ctx.ExecutionState.Emit(StartMachineFailedOutputChannel, StartMachinePayloadType, []any{payload})
+			}
+		}
+		return ctx.ExecutionState.Emit(StartMachineFailedOutputChannel, StartMachinePayloadType, []any{map[string]any{"reason": "timeout"}})
+	}
+
 	spec, err := decodeStartMachineSpec(ctx.Configuration)
 	if err != nil {
 		return err
@@ -219,11 +225,11 @@ func (c *StartMachine) poll(ctx core.ActionContext) error {
 	machineID := parseMachineID(spec.Machine)
 	machine, err := client.GetMachine(spec.App, machineID)
 	if err != nil {
-		ctx.Logger.Warnf("Failed to get machine state, will retry: %v", err)
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, startMachinePollInterval)
+		ctx.Logger.Warnf("Failed to get machine state (attempt %d), will retry: %v", attempt, err)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": attempt + 1}, machinePollInterval*time.Second)
 	}
 
-	ctx.Logger.Infof("Machine %s state: %s", machineID, machine.State)
+	ctx.Logger.Infof("Machine %s state: %s (attempt %d/%d)", machineID, machine.State, attempt, maxMachinePollAttempts)
 
 	switch machine.State {
 	case "started":
@@ -234,7 +240,7 @@ func (c *StartMachine) poll(ctx core.ActionContext) error {
 		return ctx.ExecutionState.Emit(StartMachineFailedOutputChannel, StartMachinePayloadType, []any{payload})
 	default:
 		// still transitioning — keep polling
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, startMachinePollInterval)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": attempt + 1}, machinePollInterval*time.Second)
 	}
 }
 
@@ -248,20 +254,4 @@ func (c *StartMachine) Cleanup(_ core.SetupContext) error {
 
 func (c *StartMachine) HandleWebhook(_ core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
-}
-
-// machinePayload converts a Machine into a workflow output payload map.
-func machinePayload(appName string, m *Machine) map[string]any {
-	payload := map[string]any{
-		"machineId": m.ID,
-		"appName":   appName,
-		"state":     m.State,
-		"region":    m.Region,
-	}
-
-	if m.Config != nil {
-		payload["image"] = m.Config.Image
-	}
-
-	return payload
 }

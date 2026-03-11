@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -83,7 +84,7 @@ func Test__StartMachine__Execute__SchedulesPoll(t *testing.T) {
 
 	// A poll action must have been scheduled
 	assert.Equal(t, "poll", requests.Action)
-	assert.Equal(t, startMachinePollInterval, requests.Duration)
+	assert.Equal(t, machinePollInterval*time.Second, requests.Duration)
 
 	// Verify the start request was sent correctly
 	require.Len(t, mockHTTP.Requests, 1)

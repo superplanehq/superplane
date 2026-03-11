@@ -20,7 +20,8 @@ type Client struct {
 }
 
 type FlyIOError struct {
-	Message string `json:"error"`
+	Error   string `json:"error"`
+	Message string `json:"message"`
 }
 
 type FlyIOAPIError struct {
@@ -89,8 +90,15 @@ func newFlyIOAPIError(statusCode int, responseBody []byte) *FlyIOAPIError {
 	}
 
 	var payload FlyIOError
-	if err := json.Unmarshal(responseBody, &payload); err == nil && payload.Message != "" {
-		apiError.Message = payload.Message
+	if err := json.Unmarshal(responseBody, &payload); err == nil {
+		switch {
+		case payload.Error != "":
+			apiError.Message = payload.Error
+		case payload.Message != "":
+			apiError.Message = payload.Message
+		default:
+			apiError.Message = string(responseBody)
+		}
 	} else {
 		apiError.Message = string(responseBody)
 	}

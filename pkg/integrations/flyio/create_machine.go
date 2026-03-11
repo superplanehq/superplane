@@ -268,7 +268,7 @@ func (c *CreateMachine) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to store machine metadata: %w", err)
 	}
 
-	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, createMachinePollInterval)
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1}, createMachinePollInterval)
 }
 
 func (c *CreateMachine) Actions() []core.Action {
@@ -289,6 +289,28 @@ func (c *CreateMachine) HandleAction(ctx core.ActionContext) error {
 func (c *CreateMachine) poll(ctx core.ActionContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
+	}
+
+	attempt := 1
+	if v, ok := ctx.Parameters["attempt"].(float64); ok {
+		attempt = int(v)
+	}
+
+	if attempt > maxMachinePollAttempts {
+		ctx.Logger.Errorf("Machine create exceeded maximum poll attempts (%d), giving up", maxMachinePollAttempts)
+		// Best-effort: fetch current state for the payload; ignore error.
+		spec, _ := decodeCreateMachineSpec(ctx.Configuration)
+		metadata := CreateMachineExecutionMetadata{}
+		if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err == nil && metadata.MachineID != "" {
+			client, err := NewClient(ctx.HTTP, ctx.Integration)
+			if err == nil {
+				if machine, err := client.GetMachine(spec.App, metadata.MachineID); err == nil {
+					payload := machinePayload(spec.App, machine)
+					return ctx.ExecutionState.Emit(CreateMachineFailedOutputChannel, CreateMachinePayloadType, []any{payload})
+				}
+			}
+		}
+		return ctx.ExecutionState.Emit(CreateMachineFailedOutputChannel, CreateMachinePayloadType, []any{map[string]any{"reason": "timeout"}})
 	}
 
 	spec, err := decodeCreateMachineSpec(ctx.Configuration)
@@ -314,11 +336,11 @@ func (c *CreateMachine) poll(ctx core.ActionContext) error {
 
 	machine, err := client.GetMachine(spec.App, machineID)
 	if err != nil {
-		ctx.Logger.Warnf("Failed to get machine state, will retry: %v", err)
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, createMachinePollInterval)
+		ctx.Logger.Warnf("Failed to get machine state (attempt %d), will retry: %v", attempt, err)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": attempt + 1}, createMachinePollInterval)
 	}
 
-	ctx.Logger.Infof("Machine %s state: %s", machineID, machine.State)
+	ctx.Logger.Infof("Machine %s state: %s (attempt %d/%d)", machineID, machine.State, attempt, maxMachinePollAttempts)
 
 	switch machine.State {
 	case "started":
@@ -328,11 +350,35 @@ func (c *CreateMachine) poll(ctx core.ActionContext) error {
 		payload := machinePayload(spec.App, machine)
 		return ctx.ExecutionState.Emit(CreateMachineFailedOutputChannel, CreateMachinePayloadType, []any{payload})
 	default:
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, createMachinePollInterval)
+		// still transitioning — keep polling
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": attempt + 1}, createMachinePollInterval)
 	}
 }
 
-func (c *CreateMachine) Cancel(_ core.ExecutionContext) error {
+func (c *CreateMachine) Cancel(ctx core.ExecutionContext) error {
+	// Clean up the created machine to prevent resource leaks.
+	spec, err := decodeCreateMachineSpec(ctx.Configuration)
+	if err != nil {
+		return nil // Can't clean up without config; best-effort.
+	}
+
+	metadata := CreateMachineExecutionMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil || metadata.MachineID == "" {
+		return nil // Machine was never created; nothing to clean up.
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		ctx.Logger.Warnf("Cancel: failed to create client for cleanup: %v", err)
+		return nil
+	}
+
+	// Best-effort: stop the machine first, then delete.
+	_ = client.StopMachine(spec.App, metadata.MachineID, nil)
+	if err := client.DeleteMachine(spec.App, metadata.MachineID, true); err != nil {
+		ctx.Logger.Warnf("Cancel: failed to delete orphaned machine %s/%s: %v", spec.App, metadata.MachineID, err)
+	}
+
 	return nil
 }
 
