@@ -273,8 +273,8 @@ func (t *OnArtifactAnalysis) OnIntegrationMessage(ctx core.IntegrationMessageCon
 
 func (t *OnArtifactAnalysis) Cleanup(_ core.TriggerContext) error { return nil }
 
-func (t *OnArtifactAnalysis) HandleWebhook(_ core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (t *OnArtifactAnalysis) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func decodeOnArtifactAnalysisConfiguration(raw any) (OnArtifactAnalysisConfiguration, error) {

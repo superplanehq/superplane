@@ -277,8 +277,8 @@ func (c *GetArtifact) Execute(ctx core.ExecutionContext) error {
 
 func (c *GetArtifact) Actions() []core.Action                  { return nil }
 func (c *GetArtifact) HandleAction(_ core.ActionContext) error { return nil }
-func (c *GetArtifact) HandleWebhook(_ core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *GetArtifact) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 func (c *GetArtifact) Cancel(_ core.ExecutionContext) error { return nil }
 func (c *GetArtifact) Cleanup(_ core.SetupContext) error    { return nil }
