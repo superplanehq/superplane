@@ -1,0 +1,26 @@
+{
+  "id": "123456789",
+  "shortId": "FRONTEND-123",
+  "title": "TypeError: Cannot read property 'map' of undefined",
+  "culprit": "app/components/Dashboard.tsx",
+  "level": "error",
+  "status": "resolved",
+  "isPublic": false,
+  "isBookmarked": false,
+  "hasSeen": true,
+  "project": {
+    "id": "5678",
+    "slug": "frontend-app",
+    "name": "Frontend App"
+  },
+  "assignedTo": {
+    "id": "user123",
+    "name": "John Doe",
+    "email": "john.doe@example.com"
+  },
+  "firstSeen": "2024-01-28T10:00:00.000Z",
+  "lastSeen": "2024-01-28T15:30:00.000Z",
+  "count": "42",
+  "userCount": 15,
+  "permalink": "https://sentry.io/organizations/acme-corp/issues/123456789/"
+}
