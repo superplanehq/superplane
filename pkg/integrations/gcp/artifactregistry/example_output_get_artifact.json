@@ -1,0 +1,22 @@
+{
+  "data": {
+    "name": "projects/my-project/locations/us-central1/repositories/my-repo/packages/my-image/versions/sha256:abc123def456",
+    "createTime": "2025-01-01T00:00:00Z",
+    "updateTime": "2025-01-01T00:05:00Z",
+    "description": "my-image:latest",
+    "fingerprints": [
+      {
+        "type": "DIRSUM_SHA256",
+        "value": "Ac2PwnIxFXnnS6DfUou2JchB7F+krMAKv4f6sJr8VzM="
+      }
+    ],
+    "metadata": {
+      "buildTime": "1980-01-01T00:00:01Z",
+      "imageSizeBytes": "20971520",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "name": "projects/my-project/locations/us-central1/repositories/my-repo/dockerImages/my-image@sha256:abc123def456"
+    }
+  },
+  "timestamp": "2025-01-01T00:05:00Z",
+  "type": "gcp.artifactregistry.version"
+}
