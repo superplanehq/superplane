@@ -1,0 +1,22 @@
+{
+  "runId": "run-xxxxxx",
+  "finalStatus": "planned",
+  "runUrl": "https://app.terraform.io/app/my-org/workspaces/my-ws/runs/run-xxxxxx",
+  "additions": 2,
+  "changes": 1,
+  "destructions": 0,
+  "stateHistory": [
+    {
+      "status": "pending",
+      "timestamp": "2023-10-01T12:00:00Z"
+    },
+    {
+      "status": "planning",
+      "timestamp": "2023-10-01T12:01:00Z"
+    },
+    {
+      "status": "planned",
+      "timestamp": "2023-10-01T12:02:00Z"
+    }
+  ]
+}
