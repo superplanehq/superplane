@@ -171,8 +171,8 @@ func (c *PublishMessage) Actions() []core.Action                  { return nil }
 func (c *PublishMessage) HandleAction(_ core.ActionContext) error { return nil }
 func (c *PublishMessage) Cancel(_ core.ExecutionContext) error    { return nil }
 func (c *PublishMessage) Cleanup(_ core.SetupContext) error       { return nil }
-func (c *PublishMessage) HandleWebhook(_ core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *PublishMessage) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 func (c *PublishMessage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()

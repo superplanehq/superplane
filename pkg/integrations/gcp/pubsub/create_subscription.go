@@ -177,8 +177,8 @@ func (c *CreateSubscriptionComponent) Actions() []core.Action                  {
 func (c *CreateSubscriptionComponent) HandleAction(_ core.ActionContext) error { return nil }
 func (c *CreateSubscriptionComponent) Cancel(_ core.ExecutionContext) error    { return nil }
 func (c *CreateSubscriptionComponent) Cleanup(_ core.SetupContext) error       { return nil }
-func (c *CreateSubscriptionComponent) HandleWebhook(_ core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *CreateSubscriptionComponent) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 func (c *CreateSubscriptionComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
