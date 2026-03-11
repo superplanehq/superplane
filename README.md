@@ -95,10 +95,14 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 <td align="center" width="150"><a href="https://docs.superplane.com/components/aws/#sns-•-on-topic-message" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/aws.sns.svg" alt="AWS SNS"/><br/>AWS SNS</a></td>
 </tr>
 <tr>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/gcp/#cloud-build-•-create-build" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/cloud_build.svg" alt="GCP Cloud Build"/><br/>GCP Cloud Build</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/gcp/#cloud-functions-•-invoke-function" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/gcp.cloudrun.svg" alt="GCP Cloud Functions"/><br/>GCP Cloud Functions</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/gcp/#compute-•-on-vm-instance" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/gcp.svg" alt="GCP Compute"/><br/>GCP Compute</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/cloudflare/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/cloudflare.svg" alt="Cloudflare"/><br/>Cloudflare</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/digitalocean/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/digitalocean.svg" alt="DigitalOcean"/><br/>DigitalOcean</a></td>
+</tr>
+<tr>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/dockerhub/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/docker.svg" alt="DockerHub"/><br/>DockerHub</a></td>
-<td align="center" width="150"><a href="https://docs.superplane.com/components/gcp/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/gcp.svg" alt="Google Cloud"/><br/>Google Cloud</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/hetzner-cloud/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/hetzner.svg" alt="Hetzner Cloud"/><br/>Hetzner Cloud</a></td>
 </tr>
 </table>
@@ -111,6 +115,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 <td align="center" width="150"><a href="https://docs.superplane.com/components/dash0/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/dash0.svg" alt="Dash0"/><br/>Dash0</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/grafana/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/grafana.svg" alt="Grafana"/><br/>Grafana</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/honeycomb/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/honeycomb.svg" alt="Honeycomb"/><br/>Honeycomb</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/newrelic/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/newrelic.svg" alt="New Relic"/><br/>New Relic</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/prometheus/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/prometheus.svg" alt="Prometheus"/><br/>Prometheus</a></td>
 </tr>
 </table>
@@ -119,6 +124,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 
 <table>
 <tr>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/firehydrant/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/firehydrant.svg" alt="FireHydrant"/><br/>FireHydrant</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/incident/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/incident.svg" alt="Incident.io"/><br/>Incident.io</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/pagerduty/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/pagerduty.svg" alt="PagerDuty"/><br/>PagerDuty</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/rootly/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/rootly.svg" alt="Rootly"/><br/>Rootly</a></td>
@@ -134,6 +140,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 <td align="center" width="150"><a href="https://docs.superplane.com/components/sendgrid/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/sendgrid.svg" alt="SendGrid"/><br/>SendGrid</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/slack/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/slack.svg" alt="Slack"/><br/>Slack</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/smtp/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/smtp.svg" alt="SMTP"/><br/>SMTP</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/teams/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/teams.svg" alt="Microsoft Teams"/><br/>Microsoft Teams</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/telegram/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/telegram.svg" alt="Telegram"/><br/>Telegram</a></td>
 </tr>
 </table>
