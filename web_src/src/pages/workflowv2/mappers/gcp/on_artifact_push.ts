@@ -17,7 +17,7 @@ export const onArtifactPushTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     const data = context.event?.data as ArtifactPushData | undefined;
     const imageRef = shortArtifactRef(data?.digest) ?? shortArtifactRef(data?.tag);
-    const title = imageRef || "Artifact image";
+    const title = imageRef ? `Pushed ${imageRef}` : "Pushed artifact image";
 
     const subtitleParts: string[] = [];
     if (data?.action) {
