@@ -154,6 +154,11 @@ func (g *GCP) Components() []core.Component {
 		&cloudbuild.GetBuild{},
 		&cloudbuild.RunTrigger{},
 		&cloudfunctions.InvokeFunction{},
+		&gcppubsub.PublishMessage{},
+		&gcppubsub.CreateTopicComponent{},
+		&gcppubsub.DeleteTopicComponent{},
+		&gcppubsub.CreateSubscriptionComponent{},
+		&gcppubsub.DeleteSubscriptionComponent{},
 	}
 }
 
@@ -161,6 +166,7 @@ func (g *GCP) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&compute.OnVMInstance{},
 		&cloudbuild.OnBuildComplete{},
+		&gcppubsub.OnMessage{},
 	}
 }
 
@@ -526,6 +532,7 @@ func (g *GCP) Cleanup(ctx core.IntegrationCleanupContext) error {
 func (g *GCP) Actions() []core.Action {
 	return []core.Action{
 		{Name: gcpcommon.ActionNameEnsureCloudBuild},
+		{Name: gcpcommon.ActionNameEnsurePubSubOnMessage},
 	}
 }
 
@@ -533,9 +540,50 @@ func (g *GCP) HandleAction(ctx core.IntegrationActionContext) error {
 	switch ctx.Name {
 	case gcpcommon.ActionNameEnsureCloudBuild:
 		return g.handleEnsureCloudBuild(ctx)
+	case gcpcommon.ActionNameEnsurePubSubOnMessage:
+		return g.handleEnsurePubSubOnMessage(ctx)
 	default:
 		return fmt.Errorf("unknown action: %s", ctx.Name)
 	}
+}
+
+func (g *GCP) handleEnsurePubSubOnMessage(ctx core.IntegrationActionContext) error {
+	var params struct {
+		Topic      string `mapstructure:"topic"`
+		GCPSubName string `mapstructure:"gcpSubName"`
+	}
+	if err := mapstructure.Decode(ctx.Parameters, &params); err != nil {
+		return fmt.Errorf("failed to decode action params: %w", err)
+	}
+	if params.Topic == "" || params.GCPSubName == "" {
+		return fmt.Errorf("topic and gcpSubName are required")
+	}
+
+	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create GCP client: %w", err)
+	}
+
+	projectID := client.ProjectID()
+	secret, err := g.eventsSecret(ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("get events secret: %w", err)
+	}
+
+	reqCtx := context.Background()
+
+	// Delete existing subscription (handles topic changes and idempotency)
+	_ = gcppubsub.DeleteSubscription(reqCtx, client, projectID, params.GCPSubName)
+
+	pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/pubsub-events?token=%s&gcpSubName=%s",
+		ctx.WebhooksBaseURL, ctx.Integration.ID(), secret, params.GCPSubName)
+
+	if err := gcppubsub.CreatePushSubscription(reqCtx, client, projectID, params.GCPSubName, params.Topic, pushEndpoint); err != nil {
+		return fmt.Errorf("create push subscription on topic %q: %w", params.Topic, err)
+	}
+
+	ctx.Logger.Infof("Created Pub/Sub push subscription %s on topic %s", params.GCPSubName, params.Topic)
+	return nil
 }
 
 func (g *GCP) handleEnsureCloudBuild(ctx core.IntegrationActionContext) error {
@@ -629,6 +677,10 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return cloudbuild.ListBranchResources(reqCtx, client, p["repository"])
 	case cloudbuild.ResourceTypeTag:
 		return cloudbuild.ListTagResources(reqCtx, client, p["repository"])
+	case gcppubsub.ResourceTypeTopic:
+		return gcppubsub.ListTopicResources(reqCtx, client)
+	case gcppubsub.ResourceTypeSubscription:
+		return gcppubsub.ListSubscriptionResources(reqCtx, client, p["topic"])
 	default:
 		return nil, nil
 	}
@@ -642,6 +694,11 @@ func (g *GCP) HandleRequest(ctx core.HTTPRequestContext) {
 
 	if strings.HasSuffix(ctx.Request.URL.Path, "/cloud-build-events") {
 		g.handleCloudBuildEvent(ctx)
+		return
+	}
+
+	if strings.HasSuffix(ctx.Request.URL.Path, "/pubsub-events") {
+		g.handlePubSubEvent(ctx)
 		return
 	}
 
@@ -670,8 +727,10 @@ type AuditLogEventPattern struct {
 
 type pubsubPushMessage struct {
 	Message struct {
-		Data      string `json:"data"`
-		MessageID string `json:"messageId"`
+		Data        string            `json:"data"`
+		MessageID   string            `json:"messageId"`
+		PublishTime string            `json:"publishTime"`
+		Attributes  map[string]string `json:"attributes"`
 	} `json:"message"`
 	Subscription string `json:"subscription"`
 }
@@ -871,6 +930,100 @@ func (g *GCP) cloudBuildSubscriptionApplies(subscription core.IntegrationSubscri
 		return false
 	}
 	return pattern.Type == cloudbuild.SubscriptionType
+}
+
+func (g *GCP) handlePubSubEvent(ctx core.HTTPRequestContext) {
+	token := ctx.Request.URL.Query().Get("token")
+	if token == "" {
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	secrets, err := ctx.Integration.GetSecrets()
+	if err != nil {
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var secret string
+	for _, s := range secrets {
+		if s.Name == PubSubSecretName {
+			secret = string(s.Value)
+			break
+		}
+	}
+
+	if token != secret {
+		ctx.Response.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	gcpSubName := ctx.Request.URL.Query().Get("gcpSubName")
+	if gcpSubName == "" {
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var pushMsg pubsubPushMessage
+	if err := json.Unmarshal(body, &pushMsg); err != nil {
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	decoded, err := base64Decode(pushMsg.Message.Data)
+	if err != nil {
+		ctx.Logger.Warnf("failed to decode Pub/Sub user message data: %v", err)
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
+	}
+
+	var msgData any
+	if err := json.Unmarshal(decoded, &msgData); err != nil {
+		// Non-JSON payloads: deliver as raw string
+		msgData = string(decoded)
+	}
+
+	message := map[string]any{
+		"messageId":   pushMsg.Message.MessageID,
+		"publishTime": pushMsg.Message.PublishTime,
+		"data":        msgData,
+		"attributes":  pushMsg.Message.Attributes,
+	}
+
+	subscriptions, err := ctx.Integration.ListSubscriptions()
+	if err != nil {
+		ctx.Logger.Errorf("error listing subscriptions: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	for _, subscription := range subscriptions {
+		if !g.pubsubOnMessageSubscriptionApplies(subscription, gcpSubName) {
+			continue
+		}
+		if err := subscription.SendMessage(message); err != nil {
+			ctx.Logger.Errorf("error sending pub/sub message to subscription: %v", err)
+		}
+	}
+
+	ctx.Response.WriteHeader(http.StatusOK)
+}
+
+func (g *GCP) pubsubOnMessageSubscriptionApplies(subscription core.IntegrationSubscriptionContext, gcpSubName string) bool {
+	var pattern struct {
+		Type       string `mapstructure:"type"`
+		GCPSubName string `mapstructure:"gcpSubName"`
+	}
+	if err := mapstructure.Decode(subscription.Configuration(), &pattern); err != nil {
+		return false
+	}
+	return pattern.Type == gcppubsub.OnMessageSubscriptionType && pattern.GCPSubName == gcpSubName
 }
 
 func base64Decode(s string) ([]byte, error) {
