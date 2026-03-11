@@ -101,8 +101,8 @@ func (c *CreateTopicComponent) Actions() []core.Action                  { return
 func (c *CreateTopicComponent) HandleAction(_ core.ActionContext) error { return nil }
 func (c *CreateTopicComponent) Cancel(_ core.ExecutionContext) error    { return nil }
 func (c *CreateTopicComponent) Cleanup(_ core.SetupContext) error       { return nil }
-func (c *CreateTopicComponent) HandleWebhook(_ core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *CreateTopicComponent) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 func (c *CreateTopicComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()

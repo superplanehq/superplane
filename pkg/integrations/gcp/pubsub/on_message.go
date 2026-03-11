@@ -191,6 +191,6 @@ func (t *OnMessage) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func (t *OnMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (t *OnMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
