@@ -65,11 +65,6 @@ If both sides changed the same node but resulting structure is identical (same J
 
 ## CLI Commands
 
-`superplane canvases publish [name-or-id]`
-
-- Creates a change request from your current draft version.
-- Does not auto-approve or auto-publish.
-
 `superplane canvases change-requests list [name-or-id] [--status <filter>] [--mine] [--query <text>] [--limit <n>] [--before <rfc3339>]`
 
 `superplane canvases change-requests get <change-request-id> [name-or-id]`

@@ -67,20 +67,6 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		autoLayoutNodes: &updateAutoLayoutNodes,
 	}, options)
 
-	var publishTitle string
-	var publishDescription string
-	publishCmd := &cobra.Command{
-		Use:   "publish [name-or-id]",
-		Short: "Create a change request from the current draft version",
-		Args:  cobra.MaximumNArgs(1),
-	}
-	publishCmd.Flags().StringVar(&publishTitle, "title", "", "change request title")
-	publishCmd.Flags().StringVar(&publishDescription, "description", "", "change request description")
-	core.Bind(publishCmd, &publishCommand{
-		title:       &publishTitle,
-		description: &publishDescription,
-	}, options)
-
 	var changeRequestsListStatusFilter string
 	var changeRequestsListOnlyMine bool
 	var changeRequestsListQuery string
@@ -215,7 +201,6 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	root.AddCommand(activeCmd)
 	root.AddCommand(createCmd)
 	root.AddCommand(updateCmd)
-	root.AddCommand(publishCmd)
 	root.AddCommand(changeRequestsCmd)
 
 	return root
