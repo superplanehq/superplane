@@ -198,53 +198,53 @@ func (p *OnImagePush) HandleAction(ctx core.TriggerActionContext) (map[string]an
 	return nil, nil
 }
 
-func (p *OnImagePush) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (p *OnImagePush) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	config := OnImagePushConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	metadata := OnImagePushMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode metadata: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
 	payload := ImagePushPayload{}
 	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %w", err)
 	}
 
 	if metadata.Repository == nil {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if metadata.Repository.Namespace != payload.Repository.Namespace {
 		ctx.Logger.Infof("Ignoring event for namespace %s", payload.Repository.Namespace)
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if metadata.Repository.Name != payload.Repository.Name {
 		ctx.Logger.Infof("Ignoring event for repository %s", payload.Repository.Name)
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if len(config.Tags) > 0 {
 		tag := strings.TrimSpace(payload.PushData.Tag)
 		if tag == "" {
-			return http.StatusOK, nil
+			return http.StatusOK, nil, nil
 		}
 
 		if !configuration.MatchesAnyPredicate(config.Tags, tag) {
 			ctx.Logger.Infof("Ignoring event with non-matching tag %s", tag)
-			return http.StatusOK, nil
+			return http.StatusOK, nil, nil
 		}
 	}
 
 	if err := ctx.Events.Emit("dockerhub.image.push", payload); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %w", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (p *OnImagePush) Cleanup(ctx core.TriggerContext) error {

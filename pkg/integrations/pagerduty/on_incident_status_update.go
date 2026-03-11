@@ -141,33 +141,33 @@ func (t *OnIncidentStatusUpdate) HandleAction(ctx core.TriggerActionContext) (ma
 	return nil, nil
 }
 
-func (t *OnIncidentStatusUpdate) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnIncidentStatusUpdate) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	log.Printf("[OnIncidentStatusUpdate] Received webhook request, body length: %d", len(ctx.Body))
 
 	// Verify signature
 	signature := ctx.Headers.Get("X-PagerDuty-Signature")
 	if signature == "" {
 		log.Printf("[OnIncidentStatusUpdate] Missing signature header")
-		return http.StatusForbidden, fmt.Errorf("missing signature")
+		return http.StatusForbidden, nil, fmt.Errorf("missing signature")
 	}
 
 	// Extract version and signature value (format: v1=<signature>)
 	parts := strings.SplitN(signature, "=", 2)
 	if len(parts) != 2 || parts[0] != "v1" {
 		log.Printf("[OnIncidentStatusUpdate] Invalid signature format: %s", signature)
-		return http.StatusForbidden, fmt.Errorf("invalid signature format")
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature format")
 	}
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		log.Printf("[OnIncidentStatusUpdate] Error getting secret: %v", err)
-		return http.StatusInternalServerError, fmt.Errorf("error getting secret: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error getting secret: %v", err)
 	}
 
 	// Verify signature using HMAC SHA256
 	if err := crypto.VerifySignature(secret, ctx.Body, parts[1]); err != nil {
 		log.Printf("[OnIncidentStatusUpdate] Invalid signature: %v", err)
-		return http.StatusForbidden, fmt.Errorf("invalid signature: %v", err)
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature: %v", err)
 	}
 
 	log.Printf("[OnIncidentStatusUpdate] Signature verified successfully")
@@ -177,7 +177,7 @@ func (t *OnIncidentStatusUpdate) HandleWebhook(ctx core.WebhookRequestContext) (
 	err = json.Unmarshal(ctx.Body, &webhook)
 	if err != nil {
 		log.Printf("[OnIncidentStatusUpdate] Error parsing request body: %v", err)
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	eventType := webhook.Event.EventType
@@ -188,7 +188,7 @@ func (t *OnIncidentStatusUpdate) HandleWebhook(ctx core.WebhookRequestContext) (
 	//
 	if eventType != "incident.status_update_published" {
 		log.Printf("[OnIncidentStatusUpdate] Ignoring event type: %s (expected incident.status_update_published)", eventType)
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	//
@@ -205,11 +205,11 @@ func (t *OnIncidentStatusUpdate) HandleWebhook(ctx core.WebhookRequestContext) (
 
 	if err != nil {
 		log.Printf("[OnIncidentStatusUpdate] Error emitting event: %v", err)
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
 	log.Printf("[OnIncidentStatusUpdate] Event emitted successfully")
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 // extractIncident extracts the incident reference from the status update data.

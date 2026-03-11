@@ -360,8 +360,8 @@ func (c *ReadMemory) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *ReadMemory) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *ReadMemory) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *ReadMemory) Cleanup(ctx core.SetupContext) error {

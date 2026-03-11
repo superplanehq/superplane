@@ -15,7 +15,7 @@ func Test__OnPipeline__HandleWebhook__StatusMatch(t *testing.T) {
 	body := []byte(`{"object_attributes":{"id":123,"status":"success"}}`)
 	events := &contexts.EventContext{}
 
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Pipeline Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "statuses": []string{"success"}},
@@ -35,7 +35,7 @@ func Test__OnPipeline__HandleWebhook__StatusMismatch(t *testing.T) {
 	body := []byte(`{"object_attributes":{"id":123,"status":"running"}}`)
 	events := &contexts.EventContext{}
 
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Pipeline Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "statuses": []string{"success"}},
@@ -54,7 +54,7 @@ func Test__OnPipeline__HandleWebhook__MissingStatus(t *testing.T) {
 	body := []byte(`{"object_attributes":{"id":123}}`)
 	events := &contexts.EventContext{}
 
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Pipeline Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "statuses": []string{"success"}},

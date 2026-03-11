@@ -224,7 +224,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 	component := &RunPipeline{}
 
 	t.Run("invalid body -> error", func(t *testing.T) {
-		status, err := component.HandleWebhook(core.WebhookRequestContext{
+		status, _, err := component.HandleWebhook(core.WebhookRequestContext{
 			Body: []byte("invalid json"),
 		})
 
@@ -234,7 +234,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 
 	t.Run("missing detail -> error", func(t *testing.T) {
 		body, _ := json.Marshal(map[string]any{})
-		status, err := component.HandleWebhook(core.WebhookRequestContext{
+		status, _, err := component.HandleWebhook(core.WebhookRequestContext{
 			Body: body,
 		})
 
@@ -264,7 +264,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		status, err := component.HandleWebhook(core.WebhookRequestContext{
+		status, _, err := component.HandleWebhook(core.WebhookRequestContext{
 			Body: body,
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
@@ -316,7 +316,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		status, err := component.HandleWebhook(core.WebhookRequestContext{
+		status, _, err := component.HandleWebhook(core.WebhookRequestContext{
 			Body: body,
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
@@ -354,7 +354,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		status, err := component.HandleWebhook(core.WebhookRequestContext{
+		status, _, err := component.HandleWebhook(core.WebhookRequestContext{
 			Body: body,
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
@@ -378,7 +378,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 			},
 		})
 
-		status, err := component.HandleWebhook(core.WebhookRequestContext{
+		status, _, err := component.HandleWebhook(core.WebhookRequestContext{
 			Body: body,
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return nil, assert.AnError
@@ -411,7 +411,7 @@ func Test__RunPipeline__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		status, err := component.HandleWebhook(core.WebhookRequestContext{
+		status, _, err := component.HandleWebhook(core.WebhookRequestContext{
 			Body: body,
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{

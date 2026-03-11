@@ -403,8 +403,8 @@ func (c *CreateCheckRule) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *CreateCheckRule) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *CreateCheckRule) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *CreateCheckRule) Cleanup(ctx core.SetupContext) error {

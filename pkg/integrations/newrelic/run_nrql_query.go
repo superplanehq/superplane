@@ -164,8 +164,8 @@ func (c *RunNRQLQuery) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *RunNRQLQuery) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *RunNRQLQuery) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *RunNRQLQuery) Cleanup(ctx core.SetupContext) error {

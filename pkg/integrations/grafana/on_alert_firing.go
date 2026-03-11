@@ -126,45 +126,45 @@ func (t *OnAlertFiring) HandleAction(ctx core.TriggerActionContext) (map[string]
 	return nil, nil
 }
 
-func (t *OnAlertFiring) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnAlertFiring) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	sharedSecret, err := resolveWebhookSharedSecret(ctx)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, nil, err
 	}
 
 	if sharedSecret != "" {
 		authHeader := strings.TrimSpace(ctx.Headers.Get("Authorization"))
 		if authHeader == "" {
-			return http.StatusUnauthorized, fmt.Errorf("missing Authorization header")
+			return http.StatusUnauthorized, nil, fmt.Errorf("missing Authorization header")
 		}
 		if !strings.HasPrefix(authHeader, "Bearer ") {
-			return http.StatusUnauthorized, fmt.Errorf("invalid Authorization header")
+			return http.StatusUnauthorized, nil, fmt.Errorf("invalid Authorization header")
 		}
 
 		token := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
 		if subtle.ConstantTimeCompare([]byte(token), []byte(sharedSecret)) != 1 {
-			return http.StatusUnauthorized, fmt.Errorf("invalid Authorization token")
+			return http.StatusUnauthorized, nil, fmt.Errorf("invalid Authorization token")
 		}
 	}
 
 	if len(ctx.Body) == 0 {
-		return http.StatusBadRequest, fmt.Errorf("empty body")
+		return http.StatusBadRequest, nil, fmt.Errorf("empty body")
 	}
 
 	var payload map[string]any
 	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	if !isFiringAlert(payload) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if err := ctx.Events.Emit("grafana.alert.firing", payload); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (t *OnAlertFiring) Cleanup(ctx core.TriggerContext) error {

@@ -996,8 +996,8 @@ func (c *CreateBuild) OnIntegrationMessage(ctx core.IntegrationMessageContext) e
 	return completeCreateBuildExecution(executionCtx.ExecutionState, build)
 }
 
-func (c *CreateBuild) HandleWebhook(_ core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *CreateBuild) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 func (c *CreateBuild) Cancel(ctx core.ExecutionContext) error {
 	var metadata CreateBuildExecutionMetadata
