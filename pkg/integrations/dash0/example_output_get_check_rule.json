@@ -1,0 +1,28 @@
+{
+  "type": "dash0.checkRule.fetched",
+  "data": {
+    "id": "high-error-rate-alert",
+    "name": "High error rate alert",
+    "expression": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) > $__threshold",
+    "thresholds": {
+      "degraded": 10,
+      "critical": 50
+    },
+    "summary": "Error rate is high",
+    "description": "The error rate has exceeded the configured threshold",
+    "interval": "1m",
+    "for": "0s",
+    "keepFiringFor": "0s",
+    "labels": {
+      "severity": "high",
+      "team": "backend"
+    },
+    "annotations": {
+      "runbook": "https://wiki.example.com/runbooks/high-error-rate",
+      "summary": "Error rate is {{ $value }} errors/sec"
+    },
+    "enabled": true,
+    "dataset": "default"
+  },
+  "timestamp": "2026-03-06T12:00:00Z"
+}
