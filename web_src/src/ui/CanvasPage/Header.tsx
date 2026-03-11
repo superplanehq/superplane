@@ -200,6 +200,21 @@ export function Header({
     ) : (
       <CloudCheck className="h-4 w-4 text-emerald-600" />
     );
+  const pendingDraftBadge = showPendingDraftBadge ? (
+    <div className="flex items-center relative">
+      <span className="rounded border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900">
+        Unpublished Changes
+      </span>
+      <span
+        aria-hidden="true"
+        className="h-0 w-0 border-y-[6px] border-y-transparent border-l-[9px] border-l-amber-300"
+      />
+      <span
+        aria-hidden="true"
+        className="absolute bottom-1.8 right-0.5 h-0 w-0 border-y-[6.5px] border-y-transparent border-l-[9px] border-l-amber-100"
+      />
+    </div>
+  ) : null;
 
   return (
     <>
@@ -460,6 +475,8 @@ export function Header({
               </Tooltip>
             ) : null}
 
+            {pendingDraftBadge}
+
             {showEditingDropdown ? (
               <DropdownMenu open={isEditingMenuOpen} onOpenChange={setIsEditingMenuOpen}>
                 <DropdownMenuTrigger asChild>
@@ -469,7 +486,7 @@ export function Header({
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-33 p-2">
+                <DropdownMenuContent align="end" className="w-44 p-2">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="w-full">
@@ -488,14 +505,12 @@ export function Header({
                             disabled={publishVersionDisabled || !onPublishVersion}
                           >
                             <Rocket className="h-4 w-4" />
-                            Publish
+                            Propose Change
                           </Button>,
                         )}
                       </div>
                     </TooltipTrigger>
-                    <TooltipContent side="left">
-                      Create and publish a change request from your current draft.
-                    </TooltipContent>
+                    <TooltipContent side="left">Create a change request from your current draft.</TooltipContent>
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -626,17 +641,6 @@ export function Header({
                   enterEditModeDisabled,
                   enterEditModeDisabledTooltip,
                   <div className="flex items-center gap-2">
-                    {showPendingDraftBadge ? (
-                      <div className="flex items-center">
-                        <span className="rounded border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900">
-                          Unpublished Changes
-                        </span>
-                        <span
-                          aria-hidden="true"
-                          className="h-0 w-0 border-y-[6px] border-y-transparent border-l-[9px] border-l-amber-300"
-                        />
-                      </div>
-                    ) : null}
                     <Button
                       size="sm"
                       variant="outline"

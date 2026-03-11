@@ -157,6 +157,30 @@ service Canvases {
     };
   }
 
+  rpc ActOnCanvasChangeRequest(ActOnCanvasChangeRequestRequest) returns (ActOnCanvasChangeRequestResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}/actions"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Act on canvas change request";
+      description: "Applies an action (approve, unapprove, reject, reopen, publish) to a change request";
+      tags: "CanvasChangeRequest";
+    };
+  }
+
+  rpc ResolveCanvasChangeRequest(ResolveCanvasChangeRequestRequest) returns (ResolveCanvasChangeRequestResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}/resolve"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Resolve canvas change request conflicts";
+      description: "Updates a change request version with a conflict-resolved result";
+      tags: "CanvasChangeRequest";
+    };
+  }
+
   rpc DeleteCanvas(DeleteCanvasRequest) returns (DeleteCanvasResponse) {
     option (google.api.http) = {
       delete: "/api/v1/canvases/{id}"
@@ -374,6 +398,7 @@ message UpdateCanvasRequest {
   optional string name = 2;
   optional string description = 3;
   optional bool canvas_versioning_enabled = 4;
+  optional CanvasChangeRequestApprovalConfig change_request_approval_config = 5;
 }
 
 message UpdateCanvasResponse {
@@ -483,6 +508,37 @@ message DescribeCanvasChangeRequestResponse {
   CanvasChangeRequest change_request = 1;
 }
 
+message ActOnCanvasChangeRequestRequest {
+  enum Action {
+    ACTION_UNSPECIFIED = 0;
+    ACTION_APPROVE = 1;
+    ACTION_REJECT = 2;
+    ACTION_REOPEN = 3;
+    ACTION_PUBLISH = 4;
+    ACTION_UNAPPROVE = 5;
+  }
+
+  string canvas_id = 1;
+  string change_request_id = 2;
+  Action action = 3;
+}
+
+message ActOnCanvasChangeRequestResponse {
+  CanvasChangeRequest change_request = 1;
+}
+
+message ResolveCanvasChangeRequestRequest {
+  string canvas_id = 1;
+  string change_request_id = 2;
+  Canvas canvas = 3;
+  CanvasAutoLayout auto_layout = 4;
+}
+
+message ResolveCanvasChangeRequestResponse {
+  CanvasVersion version = 1;
+  CanvasChangeRequest change_request = 2;
+}
+
 message DeleteCanvasRequest {
   string id = 1;
 }
@@ -505,6 +561,7 @@ message Canvas {
     UserRef created_by = 7;
     bool is_template = 8;
     bool canvas_versioning_enabled = 9;
+    CanvasChangeRequestApprovalConfig change_request_approval_config = 10;
   }
 
   message Spec {
@@ -540,6 +597,39 @@ message CanvasVersion {
 
 message CanvasChangeRequestDiff {
   repeated string changed_node_ids = 1;
+  repeated string conflicting_node_ids = 2;
+}
+
+message CanvasChangeRequestApprover {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    TYPE_ANYONE = 1;
+    TYPE_USER = 2;
+    TYPE_ROLE = 3;
+  }
+
+  Type type = 1;
+  string user_id = 2;
+  string role_name = 3;
+}
+
+message CanvasChangeRequestApprovalConfig {
+  repeated CanvasChangeRequestApprover items = 1;
+}
+
+message CanvasChangeRequestApproval {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_APPROVED = 1;
+    STATE_REJECTED = 2;
+    STATE_UNAPPROVED = 3;
+  }
+
+  UserRef actor = 1;
+  CanvasChangeRequestApprover approver = 2;
+  State state = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp invalidated_at = 5;
 }
 
 message CanvasChangeRequest {
@@ -547,6 +637,7 @@ message CanvasChangeRequest {
     STATUS_UNSPECIFIED = 0;
     STATUS_OPEN = 1;
     STATUS_PUBLISHED = 2;
+    STATUS_REJECTED = 3;
   }
 
   message Metadata {
@@ -554,17 +645,20 @@ message CanvasChangeRequest {
     string canvas_id = 2;
     string version_id = 3;
     UserRef owner = 4;
+    string based_on_version_id = 5;
     Status status = 6;
     google.protobuf.Timestamp published_at = 7;
     google.protobuf.Timestamp created_at = 8;
     google.protobuf.Timestamp updated_at = 9;
     string title = 10;
     string description = 11;
+    bool is_conflicted = 12;
   }
 
   Metadata metadata = 1;
   CanvasVersion version = 2;
   CanvasChangeRequestDiff diff = 3;
+  repeated CanvasChangeRequestApproval approvals = 4;
 }
 
 message ListNodeEventsRequest {

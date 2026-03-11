@@ -16,6 +16,11 @@ import (
 	"gorm.io/gorm"
 )
 
+type changeRequestStatusFilter struct {
+	statuses     []string
+	isConflicted *bool
+}
+
 func ListCanvasChangeRequests(
 	ctx context.Context,
 	organizationID string,
@@ -46,7 +51,7 @@ func ListCanvasChangeRequests(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid user id: %v", err)
 	}
 
-	resolvedStatuses, err := resolveChangeRequestStatusFilter(statusFilter)
+	resolvedFilter, err := resolveChangeRequestStatusFilter(statusFilter)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid status filter: %v", err)
 	}
@@ -54,10 +59,11 @@ func ListCanvasChangeRequests(
 	limit = getLimit(limit)
 	beforeTime := getBefore(before)
 	listOptions := models.CanvasChangeRequestListOptions{
-		Limit:    int(limit),
-		Before:   beforeTime,
-		Statuses: resolvedStatuses,
-		Query:    strings.TrimSpace(query),
+		Limit:        int(limit),
+		Before:       beforeTime,
+		Statuses:     resolvedFilter.statuses,
+		IsConflicted: resolvedFilter.isConflicted,
+		Query:        strings.TrimSpace(query),
 	}
 	if onlyMine {
 		listOptions.OwnerID = &userUUID
@@ -105,17 +111,33 @@ func ListCanvasChangeRequests(
 	}, nil
 }
 
-func resolveChangeRequestStatusFilter(filter string) ([]string, error) {
+func resolveChangeRequestStatusFilter(filter string) (changeRequestStatusFilter, error) {
 	switch strings.ToLower(strings.TrimSpace(filter)) {
 	case "", "all":
-		return nil, nil
+		return changeRequestStatusFilter{}, nil
 	case "open":
-		return []string{models.CanvasChangeRequestStatusOpen}, nil
+		return changeRequestStatusFilter{
+			statuses: []string{models.CanvasChangeRequestStatusOpen},
+		}, nil
+	case "conflicted":
+		return changeRequestStatusFilter{
+			isConflicted: boolPtr(true),
+		}, nil
+	case "rejected":
+		return changeRequestStatusFilter{
+			statuses: []string{models.CanvasChangeRequestStatusRejected},
+		}, nil
 	case "merged", "published":
-		return []string{models.CanvasChangeRequestStatusPublished}, nil
+		return changeRequestStatusFilter{
+			statuses: []string{models.CanvasChangeRequestStatusPublished},
+		}, nil
 	default:
-		return nil, fmt.Errorf("unsupported filter %q", filter)
+		return changeRequestStatusFilter{}, fmt.Errorf("unsupported filter %q", filter)
 	}
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }
 
 func getLastCanvasChangeRequestTimestamp(requests []models.CanvasChangeRequest) *timestamppb.Timestamp {

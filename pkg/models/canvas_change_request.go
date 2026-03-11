@@ -13,28 +13,66 @@ import (
 const (
 	CanvasChangeRequestStatusOpen      = "open"
 	CanvasChangeRequestStatusPublished = "published"
+	CanvasChangeRequestStatusRejected  = "rejected"
+
+	CanvasChangeRequestApproverTypeAnyone = "anyone"
+	CanvasChangeRequestApproverTypeUser   = "user"
+	CanvasChangeRequestApproverTypeRole   = "role"
+
+	CanvasChangeRequestApprovalStateApproved   = "approved"
+	CanvasChangeRequestApprovalStateRejected   = "rejected"
+	CanvasChangeRequestApprovalStateUnapproved = "unapproved"
 )
 
+type CanvasChangeRequestApprover struct {
+	Type string `json:"type"`
+	User string `json:"user,omitempty"`
+	Role string `json:"role,omitempty"`
+}
+
+func DefaultCanvasChangeRequestApprovers() []CanvasChangeRequestApprover {
+	return []CanvasChangeRequestApprover{
+		{
+			Type: CanvasChangeRequestApproverTypeAnyone,
+		},
+	}
+}
+
 type CanvasChangeRequest struct {
-	ID             uuid.UUID
-	WorkflowID     uuid.UUID
-	VersionID      uuid.UUID
-	OwnerID        *uuid.UUID
-	Title          string
-	Description    string
-	Status         string
-	ChangedNodeIDs datatypes.JSONSlice[string]
-	PublishedAt    *time.Time
-	CreatedAt      *time.Time
-	UpdatedAt      *time.Time
+	ID                 uuid.UUID
+	WorkflowID         uuid.UUID
+	VersionID          uuid.UUID
+	OwnerID            *uuid.UUID
+	BasedOnVersionID   *uuid.UUID
+	Title              string
+	Description        string
+	Status             string
+	ChangedNodeIDs     datatypes.JSONSlice[string]
+	ConflictingNodeIDs datatypes.JSONSlice[string]
+	PublishedAt        *time.Time
+	CreatedAt          *time.Time
+	UpdatedAt          *time.Time
+}
+
+func (c *CanvasChangeRequest) IsConflicted() bool {
+	if c == nil {
+		return false
+	}
+
+	if c.Status == CanvasChangeRequestStatusPublished {
+		return false
+	}
+
+	return len(c.ConflictingNodeIDs) > 0
 }
 
 type CanvasChangeRequestListOptions struct {
-	Limit    int
-	Before   *time.Time
-	OwnerID  *uuid.UUID
-	Statuses []string
-	Query    string
+	Limit        int
+	Before       *time.Time
+	OwnerID      *uuid.UUID
+	Statuses     []string
+	IsConflicted *bool
+	Query        string
 }
 
 func (c *CanvasChangeRequest) TableName() string {
@@ -135,6 +173,14 @@ func applyCanvasChangeRequestListFilters(
 
 	if len(options.Statuses) > 0 {
 		query = query.Where("workflow_change_requests.status IN ?", options.Statuses)
+	}
+
+	if options.IsConflicted != nil {
+		if *options.IsConflicted {
+			query = query.Where("jsonb_array_length(workflow_change_requests.conflicting_node_ids) > 0")
+		} else {
+			query = query.Where("jsonb_array_length(workflow_change_requests.conflicting_node_ids) = 0")
+		}
 	}
 
 	if includeBefore && options.Before != nil {
