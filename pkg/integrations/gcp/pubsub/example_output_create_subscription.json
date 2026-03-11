@@ -1,0 +1,10 @@
+{
+  "data": {
+    "subscription": "my-subscription",
+    "topic": "my-topic",
+    "type": "pull",
+    "name": "projects/my-project/subscriptions/my-subscription"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.subscription"
+}
