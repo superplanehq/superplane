@@ -127,8 +127,8 @@ func (c *PurgeCache) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *PurgeCache) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *PurgeCache) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *PurgeCache) Actions() []core.Action {

@@ -177,15 +177,15 @@ func (t *OnAlertFired) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func (t *OnAlertFired) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnAlertFired) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	cfg := OnAlertFiredConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &cfg); err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, nil, err
 	}
 
 	secretBytes, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, nil, err
 	}
 	secret := string(secretBytes)
 
@@ -198,11 +198,11 @@ func (t *OnAlertFired) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 	}
 
 	if provided == "" {
-		return http.StatusUnauthorized, fmt.Errorf("missing webhook token")
+		return http.StatusUnauthorized, nil, fmt.Errorf("missing webhook token")
 	}
 
 	if subtle.ConstantTimeCompare([]byte(provided), []byte(secret)) != 1 {
-		return http.StatusForbidden, fmt.Errorf("invalid webhook token")
+		return http.StatusForbidden, nil, fmt.Errorf("invalid webhook token")
 	}
 
 	var payload map[string]any
@@ -214,15 +214,15 @@ func (t *OnAlertFired) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 	raw := ctx.Metadata.Get()
 	if err := mapstructure.Decode(raw, &meta); err == nil && meta.TriggerID != "" {
 		if !payloadHasTriggerID(payload, meta.TriggerID) {
-			return http.StatusOK, nil
+			return http.StatusOK, nil, nil
 		}
 	}
 
 	if err := ctx.Events.Emit("honeycomb.alert.fired", payload); err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, nil, err
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func payloadHasTriggerID(payload map[string]any, want string) bool {

@@ -77,7 +77,7 @@ func (s *PanicableTrigger) Setup(ctx core.TriggerContext) (err error) {
 	return s.underlying.Setup(ctx)
 }
 
-func (s *PanicableTrigger) HandleWebhook(ctx core.WebhookRequestContext) (status int, err error) {
+func (s *PanicableTrigger) HandleWebhook(ctx core.WebhookRequestContext) (status int, response *core.WebhookResponseBody, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			status = 500

@@ -359,50 +359,50 @@ func (r *RunPipeline) poll(ctx core.ActionContext) error {
 	return r.emitResult(ctx.ExecutionState, metadata, summary.Status, nil)
 }
 
-func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	if err := authorizeWebhook(ctx); err != nil {
-		return http.StatusForbidden, err
+		return http.StatusForbidden, nil, err
 	}
 
 	if ctx.FindExecutionByKV == nil {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	payload := map[string]any{}
 	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("failed to parse webhook payload: %w", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("failed to parse webhook payload: %w", err)
 	}
 
 	event := extractPipelineWebhookEvent(payload)
 	if !isPipelineCompletedEventType(event.EventType) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if !isTerminalStatus(event.Status) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	executionID := strings.TrimSpace(event.ExecutionID)
 	if executionID == "" {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	executionCtx, err := ctx.FindExecutionByKV("execution", executionID)
 	if err != nil {
 		// Ignore unrelated webhook events for executions not created by SuperPlane.
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if executionCtx.ExecutionState != nil && executionCtx.ExecutionState.IsFinished() {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 	if executionCtx.Metadata == nil {
-		return http.StatusInternalServerError, fmt.Errorf("missing metadata context")
+		return http.StatusInternalServerError, nil, fmt.Errorf("missing metadata context")
 	}
 
 	metadata := RunPipelineExecutionMetadata{}
 	if err := mapstructure.Decode(executionCtx.Metadata.Get(), &metadata); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode metadata: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
 	webhookSummary := executionSummaryFromWebhookPayload(event, payload)
@@ -415,14 +415,14 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	metadata.PollErrorCount = 0
 
 	if err := executionCtx.Metadata.Set(metadata); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to update metadata: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to update metadata: %w", err)
 	}
 
 	if err := r.emitResult(executionCtx.ExecutionState, metadata, metadata.Status, payload); err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, nil, err
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (r *RunPipeline) Cancel(ctx core.ExecutionContext) error {

@@ -422,8 +422,8 @@ func (w *Wait) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (w *Wait) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (w *Wait) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (w *Wait) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {

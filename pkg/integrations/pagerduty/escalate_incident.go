@@ -205,8 +205,8 @@ func (c *EscalateIncident) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *EscalateIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *EscalateIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *EscalateIncident) Cleanup(ctx core.SetupContext) error {

@@ -243,8 +243,8 @@ func (c *GetDailyUsageData) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *GetDailyUsageData) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (c *GetDailyUsageData) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (c *GetDailyUsageData) Cancel(ctx core.ExecutionContext) error {

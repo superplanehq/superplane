@@ -94,37 +94,37 @@ func (t *OnArtifactUploaded) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *OnArtifactUploaded) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnArtifactUploaded) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	signature := ctx.Headers.Get("X-JFrog-Event-Auth")
 	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("missing X-JFrog-Event-Auth header")
+		return http.StatusForbidden, nil, fmt.Errorf("missing X-JFrog-Event-Auth header")
 	}
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error getting webhook secret: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error getting webhook secret: %v", err)
 	}
 
 	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
-		return http.StatusForbidden, fmt.Errorf("invalid webhook signature: %v", err)
+		return http.StatusForbidden, nil, fmt.Errorf("invalid webhook signature: %v", err)
 	}
 
 	var payload OnArtifactUploadedPayload
 	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	if payload.EventType != "deployed" {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	var config OnArtifactUploadedConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	if config.Repository != "" && payload.Data.RepoKey != config.Repository {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	flatPayload := map[string]any{
@@ -136,10 +136,10 @@ func (t *OnArtifactUploaded) HandleWebhook(ctx core.WebhookRequestContext) (int,
 	}
 
 	if err := ctx.Events.Emit("jfrogArtifactory.artifactUploaded", flatPayload); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (t *OnArtifactUploaded) Actions() []core.Action {

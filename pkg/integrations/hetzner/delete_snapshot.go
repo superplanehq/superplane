@@ -127,8 +127,8 @@ func (c *DeleteSnapshot) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *DeleteSnapshot) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (c *DeleteSnapshot) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (c *DeleteSnapshot) Cancel(ctx core.ExecutionContext) error {
