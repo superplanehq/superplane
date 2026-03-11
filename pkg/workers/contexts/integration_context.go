@@ -152,7 +152,11 @@ func (c *IntegrationContext) mergeWebhookConfiguration(
 		return err
 	}
 
-	if !changed {
+	// Always reset failed webhooks to pending so they can be re-provisioned,
+	// even if the configuration hasn't changed. This handles the case where
+	// a webhook failed during initial setup (e.g. provider not ready) and
+	// a subsequent trigger setup should retry provisioning.
+	if !changed && webhook.State != models.WebhookStateFailed {
 		return nil
 	}
 
