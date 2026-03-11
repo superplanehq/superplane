@@ -129,8 +129,8 @@ func (c *GetTestReportSummary) ProcessQueueItem(ctx core.ProcessQueueContext) (*
 	return ctx.DefaultProcessing()
 }
 
-func (c *GetTestReportSummary) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *GetTestReportSummary) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *GetTestReportSummary) Actions() []core.Action {

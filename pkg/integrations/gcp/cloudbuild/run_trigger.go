@@ -357,8 +357,8 @@ func (c *RunTrigger) OnIntegrationMessage(ctx core.IntegrationMessageContext) er
 	return completeCreateBuildExecution(executionCtx.ExecutionState, build)
 }
 
-func (c *RunTrigger) HandleWebhook(_ core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *RunTrigger) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *RunTrigger) Cancel(ctx core.ExecutionContext) error {

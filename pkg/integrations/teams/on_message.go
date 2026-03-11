@@ -232,8 +232,8 @@ func (t *OnMessage) HandleAction(ctx core.TriggerActionContext) (map[string]any,
 	return nil, nil
 }
 
-func (t *OnMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (t *OnMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (t *OnMessage) Cleanup(ctx core.TriggerContext) error {

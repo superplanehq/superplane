@@ -108,40 +108,40 @@ func (r *OnRelease) HandleAction(ctx core.TriggerActionContext) (map[string]any,
 	return nil, nil
 }
 
-func (r *OnRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (r *OnRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	var config OnReleaseConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	eventType := ctx.Headers.Get("X-Gitlab-Event")
 	if eventType == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing X-Gitlab-Event header")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing X-Gitlab-Event header")
 	}
 
 	if eventType != "Release Hook" {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	code, err := verifyWebhookToken(ctx)
 	if err != nil {
-		return code, err
+		return code, nil, err
 	}
 
 	data := map[string]any{}
 	if err := json.Unmarshal(ctx.Body, &data); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	if len(config.Actions) > 0 && !r.whitelistedAction(ctx.Logger, data, config.Actions) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if err := ctx.Events.Emit("gitlab.release", data); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (r *OnRelease) Cleanup(ctx core.TriggerContext) error {

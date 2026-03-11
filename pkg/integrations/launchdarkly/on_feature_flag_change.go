@@ -171,46 +171,46 @@ func (t *OnFeatureFlagChange) HandleAction(ctx core.TriggerActionContext) (map[s
 	return nil, fmt.Errorf("action %s not supported", ctx.Name)
 }
 
-func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	ctx.Logger.Infof("launchdarkly webhook: received for workflow %s", ctx.WorkflowID)
 
 	config := OnFeatureFlagChangeConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	// Verify webhook signature
 	signingSecret := resolveSigningSecret(ctx)
 	if signingSecret == "" {
-		return http.StatusForbidden, fmt.Errorf("signing secret is required for webhook verification; the webhook may still be provisioning")
+		return http.StatusForbidden, nil, fmt.Errorf("signing secret is required for webhook verification; the webhook may still be provisioning")
 	}
 
 	signature := ctx.Headers.Get("X-LD-Signature")
 	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("missing X-LD-Signature header")
+		return http.StatusForbidden, nil, fmt.Errorf("missing X-LD-Signature header")
 	}
 
 	if err := crypto.VerifySignature([]byte(signingSecret), ctx.Body, signature); err != nil {
-		return http.StatusForbidden, fmt.Errorf("invalid signature: %w", err)
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature: %w", err)
 	}
 
 	// Parse the webhook payload
 	var payload map[string]any
 	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %w", err)
 	}
 
 	// LaunchDarkly webhook payloads have a "kind" field (e.g., "flag", "project", "environment")
 	// and an "accesses" array with specific actions (e.g., "createFlag", "updateOn", "deleteFlag").
 	kind, _ := payload["kind"].(string)
 	if kind == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing kind in payload")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing kind in payload")
 	}
 
 	// Only handle flag events
 	if kind != KindFlag {
 		ctx.Logger.Infof("launchdarkly webhook: event kind %q is not a flag event, acknowledging without emitting", kind)
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	// Extract action, environment key, and flag key from the accesses array.
@@ -231,20 +231,20 @@ func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int
 	// actions like createFlag use proj/<proj>:env/*:flag/<flag> and are not environment-specific).
 	if len(config.Environments) > 0 && envKey != "" && envKey != "*" && !slices.Contains(config.Environments, envKey) {
 		ctx.Logger.Infof("launchdarkly webhook: environment %q does not match configured environments, acknowledging without emitting", envKey)
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	// Filter by configured flags.
 	// Skip if: flag key could not be extracted (no accesses).
 	if len(config.Flags) > 0 && flagKey != "" && !configuration.MatchesAnyPredicate(config.Flags, flagKey) {
 		ctx.Logger.Infof("launchdarkly webhook: flag %q does not match configured flags, acknowledging without emitting", flagKey)
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	// Filter by configured actions (optional — empty means accept all)
 	if len(config.Actions) > 0 && !slices.Contains(config.Actions, action) {
 		ctx.Logger.Infof("launchdarkly webhook: action %q not in trigger config (configured: %v), acknowledging without emitting", action, config.Actions)
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	// Inject extracted keys into the payload so consumers can access them directly.
@@ -263,11 +263,11 @@ func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int
 	}
 
 	if err := ctx.Events.Emit(payloadType, payload); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %w", err)
 	}
 
 	ctx.Logger.Infof("launchdarkly webhook: emitted %s for workflow %s", payloadType, ctx.WorkflowID)
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (t *OnFeatureFlagChange) Cleanup(ctx core.TriggerContext) error {
