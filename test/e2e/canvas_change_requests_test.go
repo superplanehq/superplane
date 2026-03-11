@@ -41,6 +41,22 @@ func TestCanvasChangeRequests(t *testing.T) {
 		steps.publishChangeRequest()
 		steps.assertChangeRequestStatusInDB(models.CanvasChangeRequestStatusPublished)
 	})
+
+	t.Run("rejecting and reopening an existing change request", func(t *testing.T) {
+		steps := &canvasChangeRequestSteps{t: t}
+		steps.start()
+		steps.givenCanvasWithOrganizationVersioningEnabled("E2E CR Reject")
+		steps.enterEditMode()
+		steps.addNoopNode("Noop Reject", models.Position{X: 500, Y: 220})
+		steps.waitForCanvasSaved()
+		steps.proposeChange()
+		steps.createChangeRequest()
+		steps.openCreatedChangeRequestFromList()
+		steps.rejectChangeRequest()
+		steps.assertChangeRequestStatusInDB(models.CanvasChangeRequestStatusRejected)
+		steps.reopenChangeRequest()
+		steps.assertChangeRequestStatusInDB(models.CanvasChangeRequestStatusOpen)
+	})
 }
 
 type canvasChangeRequestSteps struct {
@@ -166,6 +182,18 @@ func (s *canvasChangeRequestSteps) approveChangeRequest() {
 func (s *canvasChangeRequestSteps) publishChangeRequest() {
 	s.session.AssertVisible(q.Locator(`aside button:has-text("Publish")`))
 	s.session.Click(q.Locator(`aside button:has-text("Publish")`))
+}
+
+func (s *canvasChangeRequestSteps) rejectChangeRequest() {
+	s.session.AssertVisible(q.Locator(`aside button:has-text("Reject")`))
+	s.session.Click(q.Locator(`aside button:has-text("Reject")`))
+	s.session.AssertText("Change request rejected")
+}
+
+func (s *canvasChangeRequestSteps) reopenChangeRequest() {
+	s.session.AssertVisible(q.Locator(`aside button:has-text("Reopen")`))
+	s.session.Click(q.Locator(`aside button:has-text("Reopen")`))
+	s.session.AssertText("Change request reopened")
 }
 
 func (s *canvasChangeRequestSteps) assertChangeRequestStatusInDB(expectedStatus string) {
