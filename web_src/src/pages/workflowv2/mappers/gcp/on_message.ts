@@ -22,13 +22,15 @@ export const onMessageTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
+    const configuration = node.configuration as { topicId?: string } | undefined;
+    const topicId = configuration?.topicId;
     return {
       title: node.name || definition.label || "On Message",
       iconSrc: gcpPubSubIcon,
       iconSlug: definition.icon || "gcp",
       iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass(definition.color ?? "gray"),
-      metadata: [],
+      metadata: topicId ? [{ icon: "message-square", label: topicId }] : [],
       ...(lastEvent && {
         lastEventData: {
           title: "Pub/Sub message",

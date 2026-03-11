@@ -22,18 +22,32 @@ function pubsubSubtitle(context: SubtitleContext): string {
 
 type PubSubOutputs<T> = { default?: Array<{ data?: T }> };
 
+function formatLocalDateTime(value?: string): string | undefined {
+  return value ? new Date(value).toLocaleString() : undefined;
+}
+
+function addCompletedAt(details: Record<string, string>, context: ExecutionDetailsContext): void {
+  const completedAt = formatLocalDateTime(context.execution.updatedAt || context.execution.createdAt);
+  if (completedAt) details["Completed At"] = completedAt;
+}
+
 export const publishMessageMapper: ComponentBaseMapper = {
   props: pubsubProps,
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const payload = context.execution.outputs as PubSubOutputs<{ messageId?: string; topicId?: string }> | undefined;
+    const payload = context.execution.outputs as
+      | PubSubOutputs<{ messageId?: string; topicId?: string; publishTime?: string }>
+      | undefined;
     const item = payload?.default?.[0]?.data;
     const details: Record<string, string> = {};
+
+    const publishedAt = formatLocalDateTime(
+      item?.publishTime || context.execution.updatedAt || context.execution.createdAt,
+    );
+    if (publishedAt) details["Published At"] = publishedAt;
     if (item?.topicId) details["Topic"] = item.topicId;
     if (item?.messageId) details["Message ID"] = item.messageId;
-    if (context.execution.updatedAt) {
-      details["Published At"] = new Date(context.execution.updatedAt).toLocaleString();
-    }
+
     return details;
   },
 
@@ -47,6 +61,7 @@ export const createTopicMapper: ComponentBaseMapper = {
     const payload = context.execution.outputs as PubSubOutputs<{ topicId?: string; name?: string }> | undefined;
     const item = payload?.default?.[0]?.data;
     const details: Record<string, string> = {};
+    addCompletedAt(details, context);
     if (item?.topicId) details["Topic ID"] = item.topicId;
     if (item?.name) details["Resource Name"] = item.name;
     return details;
@@ -62,6 +77,7 @@ export const deleteTopicMapper: ComponentBaseMapper = {
     const payload = context.execution.outputs as PubSubOutputs<{ topicId?: string }> | undefined;
     const item = payload?.default?.[0]?.data;
     const details: Record<string, string> = {};
+    addCompletedAt(details, context);
     if (item?.topicId) details["Topic ID"] = item.topicId;
     return details;
   },
@@ -83,6 +99,7 @@ export const createSubscriptionMapper: ComponentBaseMapper = {
       | undefined;
     const item = payload?.default?.[0]?.data;
     const details: Record<string, string> = {};
+    addCompletedAt(details, context);
     if (item?.subscriptionId) details["Subscription ID"] = item.subscriptionId;
     if (item?.topicId) details["Topic"] = item.topicId;
     if (item?.type) details["Type"] = item.type;
@@ -100,6 +117,7 @@ export const deleteSubscriptionMapper: ComponentBaseMapper = {
     const payload = context.execution.outputs as PubSubOutputs<{ subscriptionId?: string }> | undefined;
     const item = payload?.default?.[0]?.data;
     const details: Record<string, string> = {};
+    addCompletedAt(details, context);
     if (item?.subscriptionId) details["Subscription ID"] = item.subscriptionId;
     return details;
   },
