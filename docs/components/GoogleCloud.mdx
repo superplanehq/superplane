@@ -13,6 +13,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Artifact Registry • On Artifact Push" href="#artifact-registry-•-on-artifact-push" description="Trigger a workflow when an artifact is pushed to GCP Artifact Registry" />
   <LinkCard title="Cloud Build • On Build Complete" href="#cloud-build-•-on-build-complete" description="Trigger a workflow when a GCP Cloud Build build reaches a terminal status" />
   <LinkCard title="Compute • On VM Instance" href="#compute-•-on-vm-instance" description="Listen to GCP Compute Engine VM instance lifecycle events" />
+  <LinkCard title="Pub/Sub • On Message" href="#pub/sub-•-on-message" description="Trigger a workflow when a message is published to a GCP Pub/Sub topic" />
 </CardGrid>
 
 ## Actions
@@ -25,6 +26,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cloud Build • Run Trigger" href="#cloud-build-•-run-trigger" description="Run a Cloud Build trigger and wait for the build to finish" />
   <LinkCard title="Cloud Functions • Invoke Function" href="#cloud-functions-•-invoke-function" description="Invoke a Google Cloud Function and return the response" />
   <LinkCard title="Compute • Create Virtual Machine" href="#compute-•-create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
+  <LinkCard title="Pub/Sub • Create Subscription" href="#pub/sub-•-create-subscription" description="Create a GCP Pub/Sub subscription" />
+  <LinkCard title="Pub/Sub • Create Topic" href="#pub/sub-•-create-topic" description="Create a GCP Pub/Sub topic" />
+  <LinkCard title="Pub/Sub • Delete Subscription" href="#pub/sub-•-delete-subscription" description="Delete a GCP Pub/Sub subscription" />
+  <LinkCard title="Pub/Sub • Delete Topic" href="#pub/sub-•-delete-topic" description="Delete a GCP Pub/Sub topic" />
+  <LinkCard title="Pub/Sub • Publish Message" href="#pub/sub-•-publish-message" description="Publish a message to a GCP Pub/Sub topic" />
 </CardGrid>
 
 ## Instructions
@@ -240,6 +246,55 @@ Each event includes the audit log entry with resourceName (e.g. projects/my-proj
   "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
   "serviceName": "compute.googleapis.com",
   "timestamp": "2025-02-14T12:00:00Z"
+}
+```
+
+<a id="pub/sub-•-on-message"></a>
+
+## Pub/Sub • On Message
+
+The On Message trigger starts a workflow execution when a message is published to a GCP Pub/Sub topic.
+
+**Trigger behavior:** SuperPlane creates a push subscription on the selected topic. Published messages are pushed to SuperPlane and delivered to this trigger.
+
+### Use Cases
+
+- **Event-driven workflows**: React to messages published by your applications
+- **Queue processing**: Process tasks published to Pub/Sub topics
+- **System integration**: Connect Pub/Sub events to downstream workflow steps
+
+### Setup
+
+**Required GCP setup:** Ensure the **Pub/Sub API** is enabled in your project. The service account used by the integration must have `roles/pubsub.admin` to create push subscriptions on your topics.
+
+### Configuration
+
+- **Topic**: Select the Pub/Sub topic to listen to.
+- **Subscription (optional)**: Reuse an existing subscription name. Leave empty to let SuperPlane create one.
+
+### Event Data
+
+Each event contains the decoded message payload plus Pub/Sub metadata:
+
+- `data`: The decoded message body
+- `messageId`: The Pub/Sub message ID
+- `publishTime`: When the message was published
+- `attributes`: Any message attributes
+
+### Example Data
+
+```json
+{
+  "data": {
+    "attributes": {
+      "eventType": "order.created"
+    },
+    "data": "{\"event\":\"order.created\",\"orderId\":\"ord_abc123\"}",
+    "messageId": "1234567890",
+    "publishTime": "2025-01-01T00:00:00Z"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.message"
 }
 ```
 
@@ -549,6 +604,133 @@ Emits a payload with instance details: instanceId, selfLink, internalIP, externa
   "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
   "status": "RUNNING",
   "zone": "us-central1-a"
+}
+```
+
+<a id="pub/sub-•-create-subscription"></a>
+
+## Pub/Sub • Create Subscription
+
+The Create Subscription component creates a new GCP Pub/Sub subscription on a topic.
+
+### Use Cases
+
+- **Provisioning workflows**: Wire up subscriptions as part of service deployment
+- **Pull queue setup**: Create pull subscriptions for batch processing workflows
+- **Push integration**: Create push subscriptions that deliver messages to an HTTP endpoint
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "projects/my-project/subscriptions/my-subscription",
+    "subscription": "my-subscription",
+    "topic": "my-topic",
+    "type": "pull"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.subscription"
+}
+```
+
+<a id="pub/sub-•-create-topic"></a>
+
+## Pub/Sub • Create Topic
+
+The Create Topic component creates a new GCP Pub/Sub topic.
+
+### Use Cases
+
+- **Provisioning workflows**: Create topics as part of environment setup
+- **Dynamic routing**: Create topics on demand for new services or tenants
+- **Automation bootstrap**: Prepare messaging infrastructure before publishing
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "projects/my-project/topics/my-topic",
+    "topic": "my-topic"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.topic"
+}
+```
+
+<a id="pub/sub-•-delete-subscription"></a>
+
+## Pub/Sub • Delete Subscription
+
+The Delete Subscription component deletes a GCP Pub/Sub subscription.
+
+### Use Cases
+
+- **Cleanup workflows**: Remove subscriptions as part of service teardown
+- **Lifecycle management**: Decommission subscriptions that are no longer needed
+- **Rollback automation**: Remove subscriptions created in failed provisioning runs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "subscription": "my-subscription"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.subscription.deleted"
+}
+```
+
+<a id="pub/sub-•-delete-topic"></a>
+
+## Pub/Sub • Delete Topic
+
+The Delete Topic component deletes a GCP Pub/Sub topic.
+
+### Use Cases
+
+- **Cleanup workflows**: Remove temporary topics after execution
+- **Lifecycle management**: Decommission unused messaging resources
+- **Rollback automation**: Remove topics created in failed provisioning runs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "topic": "my-topic"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.topic.deleted"
+}
+```
+
+<a id="pub/sub-•-publish-message"></a>
+
+## Pub/Sub • Publish Message
+
+The Publish Message component sends a message to a GCP Pub/Sub topic.
+
+### Use Cases
+
+- **Event fan-out**: Broadcast workflow results to multiple subscribers
+- **Notifications**: Publish operational updates to downstream systems
+- **Automation**: Trigger Pub/Sub-based pipelines from workflows
+
+### Example Output
+
+```json
+{
+  "data": {
+    "messageId": "1234567890",
+    "topic": "my-topic"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.message.published"
 }
 ```
 
