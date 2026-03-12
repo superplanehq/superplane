@@ -51,7 +51,19 @@ func Test__GetDroplet__Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"droplet": "98765432",
 			},
-			HTTP: &contexts.HTTPContext{},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"droplet": {
+								"id": 98765432,
+								"name": "test-droplet"
+							}
+						}`)),
+					},
+				},
+			},
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
 					"apiToken": "test-token",
