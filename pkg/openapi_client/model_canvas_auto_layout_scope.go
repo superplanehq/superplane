@@ -24,7 +24,6 @@ const (
 	CANVASAUTOLAYOUTSCOPE_SCOPE_UNSPECIFIED         CanvasAutoLayoutScope = "SCOPE_UNSPECIFIED"
 	CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS         CanvasAutoLayoutScope = "SCOPE_FULL_CANVAS"
 	CANVASAUTOLAYOUTSCOPE_SCOPE_CONNECTED_COMPONENT CanvasAutoLayoutScope = "SCOPE_CONNECTED_COMPONENT"
-	CANVASAUTOLAYOUTSCOPE_SCOPE_EXACT_SET           CanvasAutoLayoutScope = "SCOPE_EXACT_SET"
 )
 
 // All allowed values of CanvasAutoLayoutScope enum
@@ -32,7 +31,6 @@ var AllowedCanvasAutoLayoutScopeEnumValues = []CanvasAutoLayoutScope{
 	"SCOPE_UNSPECIFIED",
 	"SCOPE_FULL_CANVAS",
 	"SCOPE_CONNECTED_COMPONENT",
-	"SCOPE_EXACT_SET",
 }
 
 func (v *CanvasAutoLayoutScope) UnmarshalJSON(src []byte) error {

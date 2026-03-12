@@ -2960,7 +2960,7 @@ export function WorkflowPageV2() {
 
       const updatedWorkflow = await applyHorizontalAutoLayout(canvas, {
         nodeIds,
-        scope: "exact-set",
+        scope: "connected-component",
         channelsByNodeId: buildChannelsByNodeId(canvas, components, blueprints),
       });
 

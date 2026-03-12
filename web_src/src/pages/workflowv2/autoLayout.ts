@@ -10,7 +10,7 @@ const ANNOTATION_NODE_HEIGHT = 200;
 
 type ApplyHorizontalAutoLayoutOptions = {
   nodeIds?: string[];
-  scope?: "full-canvas" | "connected-component" | "exact-set";
+  scope?: "full-canvas" | "connected-component";
   channelsByNodeId?: Map<string, string[]>;
 };
 
@@ -118,10 +118,6 @@ function resolveScopedNodeIDs(
 ): string[] {
   const seedNodeIDs = normalizeRequestedNodeIDs(flowNodes, options?.nodeIds || []);
   const scope = resolveLayoutScope(options, seedNodeIDs.length > 0);
-
-  if (scope === "exact-set") {
-    return seedNodeIDs;
-  }
 
   if (scope === "connected-component") {
     return resolveConnectedComponentNodeIDs(workflow, flowNodes, seedNodeIDs);

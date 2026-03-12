@@ -61,11 +61,11 @@ type nodeLayerPriority struct {
 
 // layoutContext holds shared state used across the layout pipeline.
 type layoutContext struct {
-	nodes                         []models.Node
-	edges                         []models.Edge
-	nodeIndexByID                 map[string]int
-	selectedNodeSet               map[string]struct{}
-	channelRankByNodeID           map[string]map[string]int
+	nodes                          []models.Node
+	edges                          []models.Edge
+	nodeIndexByID                  map[string]int
+	selectedNodeSet                map[string]struct{}
+	channelRankByNodeID            map[string]map[string]int
 	incomingEdgeOrderingByTargetID map[string][]incomingEdgeOrdering
 }
 
@@ -120,11 +120,11 @@ func applyHorizontalAutoLayout(
 	}
 
 	lctx := &layoutContext{
-		nodes:                         nodes,
-		edges:                         edges,
-		nodeIndexByID:                 nodeIndexByID,
-		selectedNodeSet:               make(map[string]struct{}, len(selectedNodeIDs)),
-		channelRankByNodeID:           buildOutputChannelRankByNodeID(nodes, nodeIndexByID, registry),
+		nodes:                          nodes,
+		edges:                          edges,
+		nodeIndexByID:                  nodeIndexByID,
+		selectedNodeSet:                make(map[string]struct{}, len(selectedNodeIDs)),
+		channelRankByNodeID:            buildOutputChannelRankByNodeID(nodes, nodeIndexByID, registry),
 		incomingEdgeOrderingByTargetID: make(map[string][]incomingEdgeOrdering, len(selectedNodeIDs)),
 	}
 
@@ -606,8 +606,6 @@ func resolveScopedNodeIDs(
 		return cloneNodeIDs(flowNodeIDs), nil
 	case pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT:
 		return resolveConnectedComponentNodeIDs(seedNodeIDs, flowNodeIDs, flowNodeSet, nodeIndexByID, nodes, edges), nil
-	case pb.CanvasAutoLayout_SCOPE_EXACT_SET:
-		return resolveExactSetNodeIDs(seedNodeIDs)
 	default:
 		return nil, status.Errorf(codes.InvalidArgument, "unsupported auto layout scope: %s", scope.String())
 	}
@@ -615,14 +613,6 @@ func resolveScopedNodeIDs(
 
 func cloneNodeIDs(nodeIDs []string) []string {
 	return append([]string(nil), nodeIDs...)
-}
-
-func resolveExactSetNodeIDs(seedNodeIDs []string) ([]string, error) {
-	if len(seedNodeIDs) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "auto_layout.node_ids is required when scope is EXACT_SET")
-	}
-
-	return cloneNodeIDs(seedNodeIDs), nil
 }
 
 func resolveConnectedComponentNodeIDs(
