@@ -57,7 +57,7 @@ type Trigger interface {
 	/*
 	 * Handler for webhooks
 	 */
-	HandleWebhook(ctx WebhookRequestContext) (int, error)
+	HandleWebhook(ctx WebhookRequestContext) (int, *WebhookResponseBody, error)
 
 	/*
 	 * Setup the trigger.
@@ -130,6 +130,14 @@ type WebhookRequestContext struct {
 	// Do not make HTTP calls as part of handling the webhook. This is useful for
 	// retrieving more data that is not part of the webhook payload.
 	HTTP HTTPContext
+}
+
+// WebhookResponseBody allows a HandleWebhook implementation to return a custom
+// response body. If non-nil and Body is non-empty, the server writes it back
+// to the caller instead of the default empty 200 OK.
+type WebhookResponseBody struct {
+	Body        []byte
+	ContentType string
 }
 
 type NodeWebhookContext interface {

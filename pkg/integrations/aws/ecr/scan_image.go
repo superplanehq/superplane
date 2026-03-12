@@ -276,8 +276,8 @@ func (c *ScanImage) pollFindings(ctx core.ActionContext) error {
 	)
 }
 
-func (c *ScanImage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *ScanImage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *ScanImage) Cancel(ctx core.ExecutionContext) error {

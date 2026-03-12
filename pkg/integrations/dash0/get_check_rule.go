@@ -160,8 +160,8 @@ func (c *GetCheckRule) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *GetCheckRule) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *GetCheckRule) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *GetCheckRule) Cleanup(ctx core.SetupContext) error {

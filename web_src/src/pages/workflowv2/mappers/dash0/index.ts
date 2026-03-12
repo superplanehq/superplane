@@ -11,6 +11,7 @@ import { createCheckRuleMapper } from "./create_check_rule";
 import { getCheckRuleMapper } from "./get_check_rule";
 import { updateCheckRuleMapper } from "./update_check_rule";
 import { deleteCheckRuleMapper } from "./delete_check_rule";
+import { sendLogEventMapper } from "./send_log_event";
 import { buildActionStateRegistry } from "../utils";
 import { onAlertNotificationTriggerRenderer } from "./on_alert_notification";
 import { onSyntheticCheckNotificationTriggerRenderer } from "./on_synthetic_check_notification";
@@ -26,6 +27,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getCheckRule: getCheckRuleMapper,
   updateCheckRule: updateCheckRuleMapper,
   deleteCheckRule: deleteCheckRuleMapper,
+  sendLogEvent: sendLogEventMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -44,6 +46,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getCheckRule: buildActionStateRegistry("fetched"),
   updateCheckRule: buildActionStateRegistry("updated"),
   deleteCheckRule: buildActionStateRegistry("deleted"),
+  sendLogEvent: buildActionStateRegistry("sent"),
 };
 
 export async function resolveExecutionErrors(canvasId: string, executionIds: string[]) {

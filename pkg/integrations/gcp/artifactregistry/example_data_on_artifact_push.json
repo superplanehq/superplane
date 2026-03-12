@@ -1,0 +1,9 @@
+{
+  "data": {
+    "action": "INSERT",
+    "digest": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123def456",
+    "tag": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image:latest"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.artifactregistry.artifact.push"
+}

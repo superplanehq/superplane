@@ -154,7 +154,7 @@ func Test__Render_CancelDeploy__HandleWebhook(t *testing.T) {
 		}
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
 			Body:        body,
 			Headers:     headers,
 			HTTP:        httpCtx,

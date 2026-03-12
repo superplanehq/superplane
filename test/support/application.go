@@ -151,8 +151,8 @@ func (t *DummyIntegrationTrigger) Configuration() []configuration.Field {
 	return []configuration.Field{}
 }
 
-func (t *DummyIntegrationTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (t *DummyIntegrationTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (t *DummyIntegrationTrigger) Setup(ctx core.TriggerContext) error {

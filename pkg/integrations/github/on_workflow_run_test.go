@@ -20,7 +20,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 	t.Run("no X-Hub-Signature-256 -> 403", func(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-GitHub-Event", eventType)
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 		})
 
@@ -32,7 +32,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-Hub-Signature-256", "sha256=asdasd")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Events:  &contexts.EventContext{},
 			Webhook: &contexts.NodeWebhookContext{},
@@ -49,7 +49,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		headers.Set("X-Hub-Signature-256", "sha256=asdasd")
 		headers.Set("X-GitHub-Event", eventType)
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    []byte(`{"action":"completed","workflow_run":{"conclusion":"success","path":".github/workflows/ci.yml"}}`),
 			Headers: headers,
 			Configuration: map[string]any{
@@ -76,7 +76,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", eventType)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -105,7 +105,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", eventType)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -134,7 +134,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", eventType)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -163,7 +163,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", eventType)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -192,7 +192,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", eventType)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -220,7 +220,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", eventType)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{

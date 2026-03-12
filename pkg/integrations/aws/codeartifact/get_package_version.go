@@ -278,8 +278,8 @@ func (c *GetPackageVersion) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *GetPackageVersion) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *GetPackageVersion) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *GetPackageVersion) Cancel(ctx core.ExecutionContext) error {

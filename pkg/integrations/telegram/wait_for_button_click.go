@@ -309,8 +309,8 @@ func (c *WaitForButtonClick) Execute(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *WaitForButtonClick) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *WaitForButtonClick) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *WaitForButtonClick) Actions() []core.Action {

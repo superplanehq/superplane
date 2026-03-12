@@ -1,0 +1,8 @@
+{
+  "data": {
+    "topic": "my-topic",
+    "name": "projects/my-project/topics/my-topic"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.topic"
+}

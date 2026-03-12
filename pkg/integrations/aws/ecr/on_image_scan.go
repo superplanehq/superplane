@@ -286,10 +286,10 @@ func (p *OnImageScan) OnIntegrationMessage(ctx core.IntegrationMessageContext) e
 	return ctx.Events.Emit("aws.ecr.image.scan", ctx.Message)
 }
 
-func (p *OnImageScan) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (p *OnImageScan) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	// no-op, since events are received through the integration
 	// and routed to OnIntegrationMessage()
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (p *OnImageScan) Cleanup(ctx core.TriggerContext) error {

@@ -127,8 +127,8 @@ func (c *DeleteLoadBalancer) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *DeleteLoadBalancer) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (c *DeleteLoadBalancer) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (c *DeleteLoadBalancer) Cancel(ctx core.ExecutionContext) error {

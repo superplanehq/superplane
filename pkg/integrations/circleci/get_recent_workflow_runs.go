@@ -183,8 +183,8 @@ func (c *GetRecentWorkflowRuns) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *GetRecentWorkflowRuns) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *GetRecentWorkflowRuns) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *GetRecentWorkflowRuns) Actions() []core.Action {

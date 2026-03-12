@@ -74,7 +74,6 @@ interface HeaderProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  versioningDisabledTooltip?: string;
   showPendingDraftBadge?: boolean;
 }
 
@@ -115,7 +114,6 @@ export function Header({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  versioningDisabledTooltip,
   showPendingDraftBadge,
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
@@ -187,7 +185,6 @@ export function Header({
   const isDefaultMode = mode === "default";
   const showEditButton = mode === "version-live";
   const showEditingDropdown = mode === "version-edit";
-  const showVersioningDisabledBadge = mode === "versioning-disabled";
   const showSaveDropdown = mode === "version-edit" || mode === "versioning-disabled";
   const showSaveUndoActions = showSaveDropdown && !isAutoSaveEnabled && saveState === "unsaved";
   const autoSaveToggleDisabled = autoSaveDisabled || !onToggleAutoSave;
@@ -462,21 +459,7 @@ export function Header({
               </>
             ) : null}
 
-            {showVersioningDisabledBadge ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="rounded border border-amber-300 bg-amber-100 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-900">
-                    VERSIONING OFF
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  {versioningDisabledTooltip || "Versioning is disabled. Enable canvas versioning in canvas settings."}
-                </TooltipContent>
-              </Tooltip>
-            ) : null}
-
             {pendingDraftBadge}
-
             {showEditingDropdown ? (
               <DropdownMenu open={isEditingMenuOpen} onOpenChange={setIsEditingMenuOpen}>
                 <DropdownMenuTrigger asChild>

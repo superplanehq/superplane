@@ -24,6 +24,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get HTTP Synthetic Check" href="#get-http-synthetic-check" description="Retrieve an HTTP synthetic check configuration and operational metrics from Dash0" />
   <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
   <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
+  <LinkCard title="Send Log Event" href="#send-log-event" description="Send a log record to Dash0 via OTLP HTTP ingestion for audit trails and observability correlation" />
   <LinkCard title="Update Check Rule" href="#update-check-rule" description="Update an existing check rule (Prometheus alert rule) in Dash0" />
   <LinkCard title="Update HTTP Synthetic Check" href="#update-http-synthetic-check" description="Update an existing HTTP synthetic check in Dash0 by ID" />
 </CardGrid>
@@ -824,6 +825,66 @@ Returns the Prometheus query response including:
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "dash0.prometheus.response"
+}
+```
+
+<a id="send-log-event"></a>
+
+## Send Log Event
+
+The Send Log Event component sends log records from workflows to Dash0 via OTLP HTTP ingestion.
+
+### Use Cases
+
+- **Audit trails**: Record workflow events (deployments, approvals, alerts) as log lines
+- **Observability correlation**: Tie workflow activity to traces and metrics in Dash0
+- **Event tracking**: Create searchable log entries for workflow milestones
+- **Debugging**: Send diagnostic information from workflows to Dash0 Logs Explorer
+
+### Configuration
+
+- **Severity**: Log severity level (TRACE, DEBUG, INFO, WARN, ERROR, FATAL)
+- **Event Name**: Optional name for this log event (e.g. deployment.completed)
+- **Service Name**: Optional service identifier (becomes OTLP resource attribute 'service.name')
+- **Body**: The log message content (plain text or JSON string)
+- **Attributes**: Optional key-value pairs for additional log metadata
+- **Dataset**: Optional dataset name for log organization (defaults to "default")
+
+### Output
+
+Returns a confirmation that the log was sent along with the log record details:
+- **sent**: Boolean indicating success
+- **severityText**: The log severity level
+- **body**: The log message content
+- **eventName**: The event name (if provided)
+- **serviceName**: The service name (if provided)
+- **attributes**: Additional metadata (if provided)
+- **dataset**: The dataset name
+- **timestamp**: When the log was sent
+
+### Notes
+
+- Requires Dash0 API token and base URL configured in application settings
+- Logs appear in Dash0 Logs Explorer and can be correlated with traces and metrics
+- Use INFO severity for normal workflow events, WARN/ERROR for issues
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attributes": {
+      "env": "production"
+    },
+    "body": "Deployment started",
+    "dataset": "default",
+    "eventName": "deployment.created",
+    "sent": true,
+    "serviceName": "api-gateway",
+    "severityText": "INFO"
+  },
+  "timestamp": "2026-03-11T16:05:54.753430237Z",
+  "type": "dash0.log.sent"
 }
 ```
 

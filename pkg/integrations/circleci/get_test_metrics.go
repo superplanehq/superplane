@@ -189,8 +189,8 @@ func (c *GetTestMetrics) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *GetTestMetrics) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *GetTestMetrics) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *GetTestMetrics) Actions() []core.Action {

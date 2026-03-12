@@ -191,7 +191,7 @@ func (t *OnIncident) setSecret(ctx core.TriggerActionContext) (map[string]any, e
 	return map[string]any{"ok": true, "signingSecretConfigured": configured}, nil
 }
 
-func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	if ctx.Logger != nil {
 		ctx.Logger.Infof("incident webhook: received for workflow %s", ctx.WorkflowID)
 	}
@@ -199,12 +199,12 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	config := OnIncidentConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	signingSecret := resolveSigningSecret(ctx)
 	if signingSecret == "" {
-		return http.StatusForbidden, fmt.Errorf("signing secret is required for webhook verification; use the Set signing secret action for this trigger")
+		return http.StatusForbidden, nil, fmt.Errorf("signing secret is required for webhook verification; use the Set signing secret action for this trigger")
 	}
 
 	webhookID := ctx.Headers.Get("webhook-id")
@@ -221,12 +221,12 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	}
 
 	if err := VerifySvixSignature(webhookID, webhookTimestamp, webhookSignature, ctx.Body, []byte(signingSecret)); err != nil {
-		return http.StatusForbidden, fmt.Errorf("invalid signature: %w", err)
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature: %w", err)
 	}
 
 	var payload map[string]any
 	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %w", err)
 	}
 
 	// incident.io payload is either:
@@ -240,7 +240,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 
 	eventType, _ := source["event_type"].(string)
 	if eventType == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing event_type in payload")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing event_type in payload")
 	}
 
 	// Accept if event type is in config; if config.Events is empty (e.g. old node), accept both known event types so we don't silently drop
@@ -252,7 +252,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 		if ctx.Logger != nil {
 			ctx.Logger.Infof("incident webhook: event type %q not in trigger config (configured: %v), acknowledging without emitting", eventType, config.Events)
 		}
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	// incident.io puts incident data under the event type key; some docs also show "incident" key.
@@ -268,12 +268,12 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	eventName := eventTypeToEventName(eventType)
 	payloadType := "incident." + eventName
 	if err := ctx.Events.Emit(payloadType, emitPayload); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %w", err)
 	}
 	if ctx.Logger != nil {
 		ctx.Logger.Infof("incident webhook: emitted %s for workflow %s", payloadType, ctx.WorkflowID)
 	}
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func eventTypeToEventName(eventType string) string {
