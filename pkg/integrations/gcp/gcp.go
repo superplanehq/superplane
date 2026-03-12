@@ -832,7 +832,6 @@ func (g *GCP) handleEnsurePubSubOnMessage(ctx core.IntegrationActionContext) err
 	return nil
 }
 
-
 func (g *GCP) handleEnsureCloudBuild(ctx core.IntegrationActionContext) error {
 	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {

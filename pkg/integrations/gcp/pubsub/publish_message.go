@@ -167,7 +167,7 @@ func (c *PublishMessage) buildMessageData(config PublishMessageConfiguration) (s
 	return base64.StdEncoding.EncodeToString(raw), nil
 }
 
-func (c *PublishMessage) Actions() []core.Action                 { return nil }
+func (c *PublishMessage) Actions() []core.Action                  { return nil }
 func (c *PublishMessage) HandleAction(_ core.ActionContext) error { return nil }
 func (c *PublishMessage) Cancel(_ core.ExecutionContext) error    { return nil }
 func (c *PublishMessage) Cleanup(_ core.SetupContext) error       { return nil }
