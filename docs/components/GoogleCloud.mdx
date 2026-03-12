@@ -9,6 +9,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Triggers
 
 <CardGrid>
+  <LinkCard title="Artifact Registry • On Artifact Analysis" href="#artifact-registry-•-on-artifact-analysis" description="Trigger a workflow when a Container Analysis occurrence is published for an artifact" />
+  <LinkCard title="Artifact Registry • On Artifact Push" href="#artifact-registry-•-on-artifact-push" description="Trigger a workflow when an artifact is pushed to GCP Artifact Registry" />
   <LinkCard title="Cloud Build • On Build Complete" href="#cloud-build-•-on-build-complete" description="Trigger a workflow when a GCP Cloud Build build reaches a terminal status" />
   <LinkCard title="Compute • On VM Instance" href="#compute-•-on-vm-instance" description="Listen to GCP Compute Engine VM instance lifecycle events" />
 </CardGrid>
@@ -16,11 +18,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Artifact Registry • Get Artifact" href="#artifact-registry-•-get-artifact" description="Retrieve artifact version details from GCP Artifact Registry" />
+  <LinkCard title="Artifact Registry • Get Artifact Analysis" href="#artifact-registry-•-get-artifact-analysis" description="Retrieve Container Analysis occurrences (vulnerabilities, build provenance, attestations) for an artifact" />
   <LinkCard title="Cloud Build • Create Build" href="#cloud-build-•-create-build" description="Create a Cloud Build build and wait for it to finish" />
   <LinkCard title="Cloud Build • Get Build" href="#cloud-build-•-get-build" description="Retrieve a Cloud Build build by ID" />
   <LinkCard title="Cloud Build • Run Trigger" href="#cloud-build-•-run-trigger" description="Run a Cloud Build trigger and wait for the build to finish" />
   <LinkCard title="Cloud Functions • Invoke Function" href="#cloud-functions-•-invoke-function" description="Invoke a Google Cloud Function and return the response" />
-  <LinkCard title="Create Virtual Machine" href="#create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
+  <LinkCard title="Compute • Create Virtual Machine" href="#compute-•-create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
 </CardGrid>
 
 ## Instructions
@@ -46,6 +50,109 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 - `roles/logging.configWriter` — create logging sinks for event triggers
 - `roles/pubsub.admin` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
 - Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management)
+
+<a id="artifact-registry-•-on-artifact-analysis"></a>
+
+## Artifact Registry • On Artifact Analysis
+
+The On Artifact Analysis trigger starts a workflow execution when Google Container Analysis publishes a new occurrence (e.g. vulnerability finding, build provenance, or attestation) for an artifact.
+
+**Trigger behavior:** SuperPlane subscribes to the `container-analysis-occurrences-v1` Pub/Sub topic that Container Analysis automatically publishes to.
+
+### Use Cases
+
+- **Security automation**: React to new vulnerability findings for your container images
+- **Compliance workflows**: Trigger policy enforcement when attestations are created
+- **Build provenance**: React to new build provenance records
+
+### Setup
+
+**Required GCP setup:** Ensure the **Container Analysis API** (`containeranalysis.googleapis.com`) and **Pub/Sub API** are enabled in your project. The service account must have `roles/pubsub.admin` and `roles/containeranalysis.occurrences.viewer`.
+
+### Configuration
+
+- **Occurrence Kinds**: Filter by occurrence type. Leave empty to receive only **DISCOVERY** occurrences (one event per completed scan — recommended). Set explicitly to receive other types such as VULNERABILITY (one event per CVE found).
+- **Location / Repository / Package**: Optional filters to scope events to a specific artifact.
+
+### Event Data
+
+Each event contains the full Container Analysis Occurrence resource, including `kind`, `resourceUri`, `noteName`, and the occurrence-specific data (e.g. `vulnerability` for vulnerability findings).
+
+### Example Data
+
+```json
+{
+  "data": {
+    "kind": "VULNERABILITY",
+    "name": "projects/my-project/occurrences/vuln-001",
+    "noteName": "projects/goog-vulnz/notes/CVE-2023-1234",
+    "resourceUri": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
+    "vulnerability": {
+      "cvssScore": 7.5,
+      "packageIssue": [
+        {
+          "affectedPackage": "libssl1.1",
+          "affectedVersion": {
+            "kind": "NORMAL",
+            "name": "1.1.1n-0+deb11u3"
+          },
+          "fixedVersion": {
+            "kind": "NORMAL",
+            "name": "1.1.1n-0+deb11u5"
+          }
+        }
+      ],
+      "severity": "HIGH"
+    }
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.artifactregistry.artifact.analysis"
+}
+```
+
+<a id="artifact-registry-•-on-artifact-push"></a>
+
+## Artifact Registry • On Artifact Push
+
+The On Artifact Push trigger starts a workflow execution when a Docker image or other container artifact is pushed to Artifact Registry.
+
+**Trigger behavior:** SuperPlane subscribes to the `gcr` Pub/Sub topic that Artifact Registry automatically publishes to for container image push events.
+
+### Use Cases
+
+- **Post-push automation**: Trigger vulnerability scans, deployments, or notifications when a new image is pushed
+- **Release workflows**: Promote artifacts through environments when a new tag is published
+- **Security automation**: Kick off container analysis on every new push
+
+### Setup
+
+**Required GCP setup:** Ensure the **Artifact Registry API** and **Pub/Sub API** are enabled in your project. The service account must have `roles/pubsub.admin` so SuperPlane can create the push subscription.
+
+### Configuration
+
+- **Location**: Optional filter by Artifact Registry location. Leave empty to receive events for all locations.
+- **Repository**: Optional filter by repository name. Leave empty to receive events for all repositories.
+
+### Event Data
+
+Each event contains:
+- `action`: Always `INSERT` for pushes
+- `digest`: Full image digest URI (e.g. `us-central1-docker.pkg.dev/project/repo/image@sha256:abc`)
+- `tag`: Full image tag URI (e.g. `us-central1-docker.pkg.dev/project/repo/image:latest`)
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "INSERT",
+    "digest": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123def456",
+    "tag": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image:latest"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.artifactregistry.artifact.push"
+}
+```
 
 <a id="cloud-build-•-on-build-complete"></a>
 
@@ -133,6 +240,108 @@ Each event includes the audit log entry with resourceName (e.g. projects/my-proj
   "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
   "serviceName": "compute.googleapis.com",
   "timestamp": "2025-02-14T12:00:00Z"
+}
+```
+
+<a id="artifact-registry-•-get-artifact"></a>
+
+## Artifact Registry • Get Artifact
+
+Retrieves the details of a specific artifact version from Google Artifact Registry.
+
+### Configuration
+
+Provide either a **Resource URL** or the four fields below:
+
+- **Resource URL**: Full resource URL of the image (e.g. `https://us-central1-docker.pkg.dev/project/repo/image@sha256:abc`). Use this to pass a digest directly from an upstream event such as On Artifact Push.
+- **Location**: The GCP region where the repository is located.
+- **Repository**: The Artifact Registry repository containing the artifact.
+- **Package**: The package (image, library, etc.) within the repository.
+- **Version**: The version or tag to retrieve.
+
+### Output
+
+The full Version resource, including `name`, `createTime`, `updateTime`, `description`, `relatedTags`, and `metadata`.
+
+### Supported Formats
+
+Artifact Registry supports all package formats when using **Select from Registry** mode.
+**Resource URL** mode is intended for container image URLs (for example from On Artifact Push events).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createTime": "2025-01-01T00:00:00Z",
+    "description": "my-image:latest",
+    "fingerprints": [
+      {
+        "type": "DIRSUM_SHA256",
+        "value": "Ac2PwnIxFXnnS6DfUou2JchB7F+krMAKv4f6sJr8VzM="
+      }
+    ],
+    "metadata": {
+      "buildTime": "1980-01-01T00:00:01Z",
+      "imageSizeBytes": "20971520",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "name": "projects/my-project/locations/us-central1/repositories/my-repo/dockerImages/my-image@sha256:abc123def456"
+    },
+    "name": "projects/my-project/locations/us-central1/repositories/my-repo/packages/my-image/versions/sha256:abc123def456",
+    "updateTime": "2025-01-01T00:05:00Z"
+  },
+  "timestamp": "2025-01-01T00:05:00Z",
+  "type": "gcp.artifactregistry.version"
+}
+```
+
+<a id="artifact-registry-•-get-artifact-analysis"></a>
+
+## Artifact Registry • Get Artifact Analysis
+
+Retrieves existing Container Analysis occurrences for an artifact from Google Container Analysis.
+
+### Configuration
+
+Provide either a **Resource URL** or the four fields below:
+
+- **Resource URL**: Full resource URL of the image (e.g. `https://us-central1-docker.pkg.dev/project/repo/image@sha256:abc`). Use this to pass a digest directly from an upstream event such as On Artifact Push.
+- **Location**: The GCP region where the repository is located.
+- **Repository**: The Artifact Registry repository containing the artifact.
+- **Package**: The package (image) within the repository.
+- **Version**: The version (digest) to query.
+
+### Output
+
+An analysis summary for the artifact, including:
+- `resourceUri`: The analyzed artifact URI
+- `scanStatus`: Discovery scan status (if available)
+- Severity counts: `critical`, `high`, `medium`, `low`
+- `vulnerabilities`: Total vulnerability occurrences
+- `fixAvailable`: Count of vulnerabilities with fixes
+
+### Notes
+
+- The **Container Analysis API** (`containeranalysis.googleapis.com`) must be enabled.
+- The service account needs `roles/containeranalysis.occurrences.viewer`.
+- This summarizes existing occurrences for the selected artifact.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "critical": 0,
+    "fixAvailable": 1,
+    "high": 1,
+    "low": 0,
+    "medium": 2,
+    "resourceUri": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
+    "scanStatus": "FINISHED_SUCCESS",
+    "vulnerabilities": 3
+  },
+  "timestamp": "2025-01-01T00:05:00Z",
+  "type": "gcp.containeranalysis.occurrences"
 }
 ```
 
@@ -308,9 +517,9 @@ The invocation result, including:
 }
 ```
 
-<a id="create-virtual-machine"></a>
+<a id="compute-•-create-virtual-machine"></a>
 
-## Create Virtual Machine
+## Compute • Create Virtual Machine
 
 Creates a new Google Compute Engine VM.
 
