@@ -443,7 +443,7 @@ export function Header({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : null}
-                {unsavedMessage ? (
+                {!isVersioningDisabledMode && unsavedMessage ? (
                   <span className="text-xs font-medium text-yellow-700 bg-orange-100 px-2 py-1 rounded hidden sm:inline">
                     {unsavedMessage}
                   </span>
