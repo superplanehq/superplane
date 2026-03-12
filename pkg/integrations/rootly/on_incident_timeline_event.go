@@ -219,55 +219,55 @@ func (t *OnIncidentTimelineEvent) HandleAction(ctx core.TriggerActionContext) (m
 	return nil, nil
 }
 
-func (t *OnIncidentTimelineEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (t *OnIncidentTimelineEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	config := OnIncidentTimelineEventConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	signature := ctx.Headers.Get("X-Rootly-Signature")
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error getting secret: %v", err)
+		return http.StatusInternalServerError, fmt.Errorf("error getting secret: %v", err)
 	}
 
 	if err := verifyWebhookSignature(signature, ctx.Body, secret); err != nil {
-		return http.StatusForbidden, nil, fmt.Errorf("invalid signature: %v", err)
+		return http.StatusForbidden, fmt.Errorf("invalid signature: %v", err)
 	}
 
 	var webhook WebhookPayload
 	if err := json.Unmarshal(ctx.Body, &webhook); err != nil {
-		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	if !slices.Contains(rootlyIncidentTimelineEventWebhookTypes, webhook.Event.Type) {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	data := webhook.Data
 	if data == nil {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	incidentEvent := extractEventFromData(data)
 	if incidentEvent == nil {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	// Apply event-level filters directly from the webhook payload.
 	if !matchesEventFilter(config.EventSource, extractString(incidentEvent, "source")) {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	if config.Visibility != "" && !strings.EqualFold(config.Visibility, extractString(incidentEvent, "visibility")) {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	incidentID := extractString(incidentEvent, "incident_id", "incidentId")
 
 	// Only process events with kind "event" to avoid emitting for non-timeline events like "trail/start/close".
 	if !strings.EqualFold(extractString(incidentEvent, "kind"), "event") {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	incidentFiltersEnabled := len(config.IncidentStatus) > 0 || len(config.Severity) > 0 || len(config.Service) > 0 || len(config.Team) > 0
@@ -277,26 +277,26 @@ func (t *OnIncidentTimelineEvent) HandleWebhook(ctx core.WebhookRequestContext) 
 		// and enrich the emitted payload with incident context.
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err != nil {
-			return http.StatusInternalServerError, nil, fmt.Errorf("error creating client: %v", err)
+			return http.StatusInternalServerError, fmt.Errorf("error creating client: %v", err)
 		}
 
 		incidentDetails, err = client.GetIncidentDetailed(incidentID)
 		if err != nil {
-			return http.StatusInternalServerError, nil, fmt.Errorf("error fetching incident: %v", err)
+			return http.StatusInternalServerError, fmt.Errorf("error fetching incident: %v", err)
 		}
 	}
 
 	if incidentFiltersEnabled {
 		if incidentID == "" {
-			return http.StatusOK, nil, nil
+			return http.StatusOK, nil
 		}
 
 		if incidentDetails == nil {
-			return http.StatusInternalServerError, nil, fmt.Errorf("incident details unavailable for filtering")
+			return http.StatusInternalServerError, fmt.Errorf("incident details unavailable for filtering")
 		}
 
 		if !matchesIncidentFilters(incidentDetails, config) {
-			return http.StatusOK, nil, nil
+			return http.StatusOK, nil
 		}
 	}
 
@@ -316,27 +316,27 @@ func (t *OnIncidentTimelineEvent) HandleWebhook(ctx core.WebhookRequestContext) 
 
 	if eventID != "" {
 		if previous, exists := metadata.EventStates[eventID]; exists && previous == fingerprint {
-			return http.StatusOK, nil, nil
+			return http.StatusOK, nil
 		}
 	}
 
 	payload := buildIncidentTimelineEventPayload(incidentDetails, incidentEvent, webhook.Event)
 	if err := ctx.Events.Emit(rootlyIncidentTimelineEventPayloadType, payload); err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}
 	emitted++
 
 	if ctx.Metadata != nil {
 		if err := ctx.Metadata.Set(OnIncidentTimelineEventMetadata{EventStates: updatedStates}); err != nil {
-			return http.StatusInternalServerError, nil, fmt.Errorf("error updating metadata: %v", err)
+			return http.StatusInternalServerError, fmt.Errorf("error updating metadata: %v", err)
 		}
 	}
 
 	if emitted == 0 {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
-	return http.StatusOK, nil, nil
+	return http.StatusOK, nil
 }
 
 func (t *OnIncidentTimelineEvent) Cleanup(ctx core.TriggerContext) error {

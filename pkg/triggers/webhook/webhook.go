@@ -224,46 +224,46 @@ func (w *Webhook) resetAuthentication(ctx core.TriggerActionContext) (map[string
 	return result, nil
 }
 
-func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	if len(ctx.Body) > MaxEventSize {
-		return http.StatusRequestEntityTooLarge, nil, fmt.Errorf("payload too large")
+		return http.StatusRequestEntityTooLarge, fmt.Errorf("payload too large")
 	}
 
 	var config Configuration
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to parse configuration: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("failed to parse configuration: %w", err)
 	}
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error authenticating request")
+		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
 	}
 
 	switch config.Authentication {
 	case "signature":
 		signature := ctx.Headers.Get("X-Signature-256")
 		if signature == "" {
-			return http.StatusForbidden, nil, fmt.Errorf("missing signature header")
+			return http.StatusForbidden, fmt.Errorf("missing signature header")
 		}
 
 		signature = strings.TrimPrefix(signature, "sha256=")
 		if signature == "" {
-			return http.StatusForbidden, nil, fmt.Errorf("invalid signature format")
+			return http.StatusForbidden, fmt.Errorf("invalid signature format")
 		}
 
 		if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
-			return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
+			return http.StatusForbidden, fmt.Errorf("invalid signature")
 		}
 	case "bearer":
 		authHeader := ctx.Headers.Get("Authorization")
 		if authHeader == "" {
-			return http.StatusUnauthorized, nil, fmt.Errorf("missing Authorization header")
+			return http.StatusUnauthorized, fmt.Errorf("missing Authorization header")
 		}
 
 		expectedToken := "Bearer " + string(secret)
 		if authHeader != expectedToken {
-			return http.StatusUnauthorized, nil, fmt.Errorf("invalid Bearer token")
+			return http.StatusUnauthorized, fmt.Errorf("invalid Bearer token")
 		}
 
 		ctx.Headers.Set("Authorization", "Bearer ********")
@@ -271,11 +271,11 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 		headerName := config.HeaderTokenName()
 		headerToken := ctx.Headers.Get(headerName)
 		if headerToken == "" {
-			return http.StatusUnauthorized, nil, fmt.Errorf("missing %s header", headerName)
+			return http.StatusUnauthorized, fmt.Errorf("missing %s header", headerName)
 		}
 
 		if headerToken != string(secret) {
-			return http.StatusUnauthorized, nil, fmt.Errorf("invalid header token")
+			return http.StatusUnauthorized, fmt.Errorf("invalid header token")
 		}
 
 		ctx.Headers.Set(headerName, "********")
@@ -284,7 +284,7 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 	var parsedData any
 	err = json.Unmarshal(ctx.Body, &parsedData)
 	if err != nil {
-		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	output := map[string]any{
@@ -294,10 +294,10 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 
 	err = ctx.Events.Emit("webhook", output)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil, nil
+	return http.StatusOK, nil
 }
 
 func (w *Webhook) Cleanup(ctx core.TriggerContext) error {

@@ -784,17 +784,11 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		newEvents = append(newEvents, events...)
 	}
 
-	var firstResponse *core.WebhookResponseBody
-
 	for _, node := range nodes {
-		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, node, onNewEvents)
+		code, err := s.executeWebhookNode(r.Context(), body, r.Header, node, onNewEvents)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
 			return
-		}
-
-		if firstResponse == nil && response != nil && len(response.Body) > 0 {
-			firstResponse = response
 		}
 	}
 
@@ -802,18 +796,10 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
 	}
 
-	if firstResponse != nil {
-		if firstResponse.ContentType != "" {
-			w.Header().Set("Content-Type", firstResponse.ContentType)
-		}
-		w.WriteHeader(http.StatusOK)
-		w.Write(firstResponse.Body)
-	} else {
-		w.WriteHeader(http.StatusOK)
-	}
+	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, error) {
 	if node.Type == models.NodeTypeTrigger {
 		return s.executeTriggerNode(ctx, body, headers, node, onNewEvents)
 	}
@@ -821,11 +807,11 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 	return s.executeComponentNode(ctx, body, headers, node, onNewEvents)
 }
 
-func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, error) {
 	ref := node.Ref.Data()
 	trigger, err := s.registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("trigger not found: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("trigger not found: %w", err)
 	}
 
 	logger := logging.ForNode(node)
@@ -834,7 +820,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	if node.AppInstallationID != nil {
 		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if integrationErr != nil {
-			return http.StatusInternalServerError, nil, integrationErr
+			return http.StatusInternalServerError, integrationErr
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
@@ -856,11 +842,11 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	})
 }
 
-func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, error) {
 	ref := node.Ref.Data()
 	component, err := s.registry.GetComponent(ref.Component.Name)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("component not found: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("component not found: %w", err)
 	}
 
 	logger := logging.ForNode(node)
@@ -869,7 +855,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 	if node.AppInstallationID != nil {
 		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if integrationErr != nil {
-			return http.StatusInternalServerError, nil, integrationErr
+			return http.StatusInternalServerError, integrationErr
 		}
 
 		logger = logging.WithIntegration(logger, *integration)

@@ -129,31 +129,31 @@ func (t *OnBranchCreated) HandleAction(ctx core.TriggerActionContext) (map[strin
 	return nil, nil
 }
 
-func (t *OnBranchCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (t *OnBranchCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	config := OnBranchCreatedConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	eventType := ctx.Headers.Get("X-GitHub-Event")
 	if eventType == "" {
-		return http.StatusBadRequest, nil, fmt.Errorf("missing X-GitHub-Event header")
+		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
 	}
 
 	if eventType != "create" {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	code, err := verifySignature(ctx)
 	if err != nil {
-		return code, nil, err
+		return code, err
 	}
 
 	data := map[string]any{}
 	err = json.Unmarshal(ctx.Body, &data)
 	if err != nil {
-		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	//
@@ -161,39 +161,39 @@ func (t *OnBranchCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 	//
 	refType, ok := data["ref_type"]
 	if !ok {
-		return http.StatusBadRequest, nil, fmt.Errorf("missing ref_type")
+		return http.StatusBadRequest, fmt.Errorf("missing ref_type")
 	}
 
 	rt, ok := refType.(string)
 	if !ok {
-		return http.StatusBadRequest, nil, fmt.Errorf("invalid ref_type")
+		return http.StatusBadRequest, fmt.Errorf("invalid ref_type")
 	}
 
 	if rt != "branch" {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	ref, ok := data["ref"]
 	if !ok {
-		return http.StatusBadRequest, nil, fmt.Errorf("missing ref")
+		return http.StatusBadRequest, fmt.Errorf("missing ref")
 	}
 
 	r, ok := ref.(string)
 	if !ok {
-		return http.StatusBadRequest, nil, fmt.Errorf("invalid ref")
+		return http.StatusBadRequest, fmt.Errorf("invalid ref")
 	}
 
 	if !configuration.MatchesAnyPredicate(config.Branches, r) {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	err = ctx.Events.Emit("github.branchCreated", data)
 
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil, nil
+	return http.StatusOK, nil
 }
 
 func (t *OnBranchCreated) Cleanup(ctx core.TriggerContext) error {

@@ -81,7 +81,6 @@ func (d *Dash0) Components() []core.Component {
 		&GetCheckRule{},
 		&UpdateCheckRule{},
 		&DeleteCheckRule{},
-		&SendLogEvent{},
 	}
 }
 

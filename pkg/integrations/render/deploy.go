@@ -298,7 +298,7 @@ func (c *Deploy) poll(ctx core.ActionContext) error {
 	}, payload)
 }
 
-func (c *Deploy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (c *Deploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return handleDeployEndedWebhook(ctx, deployEndedWebhookConfig{
 		executionKey:    deployExecutionKey,
 		successStatuses: []string{"live", "succeeded"},
@@ -474,58 +474,58 @@ func deployPayloadFromWebhookResult(result deployWebhookResult) map[string]any {
 func handleDeployEndedWebhook(
 	ctx core.WebhookRequestContext,
 	config deployEndedWebhookConfig,
-) (int, *core.WebhookResponseBody, error) {
+) (int, error) {
 	if err := verifyWebhookSignature(ctx); err != nil {
-		return http.StatusForbidden, nil, err
+		return http.StatusForbidden, err
 	}
 
 	payload, err := parseDeployWebhookPayload(ctx.Body)
 	if err != nil {
-		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %w", err)
+		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
 	}
 
 	if readString(payload.Type) != "deploy_ended" {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	result, err := resolveDeployEndedWebhookResult(ctx, payload)
 	if err != nil {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 	if result.DeployID == "" || result.Status == "" {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	executionCtx, err := findExecutionByDeployID(ctx, config.executionKey, result.DeployID)
 	if err != nil {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 	if executionCtx == nil {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	metadata := DeployExecutionMetadata{}
 	if err := mapstructure.Decode(executionCtx.Metadata.Get(), &metadata); err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error decoding metadata: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %w", err)
 	}
 
 	if metadata.Deploy != nil && metadata.Deploy.FinishedAt != "" {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	applyDeployWebhookResultToMetadata(&metadata, result)
 	if err := executionCtx.Metadata.Set(metadata); err != nil {
-		return http.StatusInternalServerError, nil, err
+		return http.StatusInternalServerError, err
 	}
 
 	data := deployPayloadFromWebhookResult(result)
 	enrichPayloadFromMetadata(data, &metadata)
 
 	if err := emitDeployStatusResult(executionCtx.ExecutionState, readString(data["status"]), config, data); err != nil {
-		return http.StatusInternalServerError, nil, err
+		return http.StatusInternalServerError, err
 	}
 
-	return http.StatusOK, nil, nil
+	return http.StatusOK, nil
 }
 
 // emitDeployStatusResult emits to the success or failed channel based on status.

@@ -176,26 +176,26 @@ func (t *OnAlert) HandleAction(ctx core.TriggerActionContext) (map[string]any, e
 	return nil, nil
 }
 
-func (t *OnAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (t *OnAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	config, statusCode, err := parseOnAlertWebhookConfiguration(ctx.Configuration)
 	if err != nil {
-		return statusCode, nil, err
+		return statusCode, err
 	}
 
 	if statusCode, err = authorizeOnAlertWebhook(ctx); err != nil {
-		return statusCode, nil, err
+		return statusCode, err
 	}
 
 	payload, statusCode, err := parseAlertmanagerWebhookPayload(ctx.Body)
 	if err != nil {
-		return statusCode, nil, err
+		return statusCode, err
 	}
 
 	if err := emitMatchingAlerts(ctx.Events, config, payload); err != nil {
-		return http.StatusInternalServerError, nil, err
+		return http.StatusInternalServerError, err
 	}
 
-	return http.StatusOK, nil, nil
+	return http.StatusOK, nil
 }
 
 func (t *OnAlert) Cleanup(ctx core.TriggerContext) error {

@@ -115,10 +115,10 @@ func (t *OnSyntheticCheckNotification) HandleAction(ctx core.TriggerActionContex
 	return nil, nil
 }
 
-func (t *OnSyntheticCheckNotification) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (t *OnSyntheticCheckNotification) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	// no-op, since events are received through the integration
 	// and routed to OnIntegrationMessage()
-	return http.StatusOK, nil, nil
+	return http.StatusOK, nil
 }
 
 type SyntheticCheckNotificationEvent struct {

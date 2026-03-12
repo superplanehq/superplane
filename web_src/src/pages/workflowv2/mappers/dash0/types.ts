@@ -7,13 +7,6 @@ export interface QueryPrometheusConfiguration {
   step?: string;
 }
 
-export interface SendLogEventConfiguration {
-  body: string;
-  severityText?: string;
-  dataset?: string;
-  attributes?: Record<string, string>;
-}
-
 export interface QueryPrometheusMetadata {
   // No metadata needed initially
 }

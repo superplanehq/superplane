@@ -256,7 +256,7 @@ func (c *RollbackDeploy) poll(ctx core.ActionContext) error {
 	return emitDeployStatusResult(ctx.ExecutionState, deploy.Status, rollbackDeployWebhookConfig(), payload)
 }
 
-func (c *RollbackDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (c *RollbackDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return handleDeployEndedWebhook(ctx, rollbackDeployWebhookConfig())
 }
 

@@ -272,34 +272,34 @@ func (r *RunPipeline) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	spec := RunPipelineSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	eventType := ctx.Headers.Get("X-Gitlab-Event")
 	if eventType == "" {
-		return http.StatusBadRequest, nil, fmt.Errorf("missing X-Gitlab-Event header")
+		return http.StatusBadRequest, fmt.Errorf("missing X-Gitlab-Event header")
 	}
 
 	if eventType != "Pipeline Hook" {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	code, err := verifyWebhookToken(ctx)
 	if err != nil {
-		return code, nil, err
+		return code, err
 	}
 
 	var payload map[string]any
 	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
-		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	newMetadata, err := metadataFromWebhook(payload)
 	if err != nil {
-		return http.StatusBadRequest, nil, err
+		return http.StatusBadRequest, err
 	}
 
 	executionCtx, err := ctx.FindExecutionByKV(RunPipelineKVPipelineID, strconv.Itoa(newMetadata.Pipeline.ID))
@@ -308,12 +308,12 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	// Ignore hooks for pipelines not started by SuperPlane
 	//
 	if err != nil {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	metadata := RunPipelineExecutionMetadata{}
 	if err := mapstructure.Decode(executionCtx.Metadata.Get(), &metadata); err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode metadata: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
 	//
@@ -321,14 +321,14 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	//
 	if metadata.Pipeline != nil && isPipelineDone(metadata.Pipeline.Status) {
 		ctx.Logger.Infof("Pipeline %d is already done - %s", newMetadata.Pipeline.ID, metadata.Pipeline.Status)
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	//
 	// Set new metadata
 	//
 	if err := executionCtx.Metadata.Set(newMetadata); err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to set metadata: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("failed to set metadata: %w", err)
 	}
 
 	//
@@ -336,7 +336,7 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	//
 	if !isPipelineDone(newMetadata.Pipeline.Status) {
 		ctx.Logger.Infof("Pipeline %d is not done - %s", newMetadata.Pipeline.ID, newMetadata.Pipeline.Status)
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	//
@@ -345,12 +345,12 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	//
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to create client: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("failed to create client: %w", err)
 	}
 
 	pipeline, err := client.GetPipeline(spec.Project, newMetadata.Pipeline.ID)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to get pipeline: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("failed to get pipeline: %w", err)
 	}
 
 	//
@@ -368,11 +368,11 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	})
 
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to emit pipeline result: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("failed to emit pipeline result: %w", err)
 	}
 
 	ctx.Logger.Infof("Pipeline %d completed - %s", pipeline.ID, pipeline.Status)
-	return http.StatusOK, nil, nil
+	return http.StatusOK, nil
 }
 
 func (r *RunPipeline) Actions() []core.Action {

@@ -363,26 +363,26 @@ func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
 	)
 }
 
-func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	statusCode, err := verifySignature(ctx)
 	if err != nil {
-		return statusCode, nil, err
+		return statusCode, err
 	}
 
 	eventType := ctx.Headers.Get("X-GitHub-Event")
 	if eventType == "" {
-		return http.StatusBadRequest, nil, fmt.Errorf("missing X-GitHub-Event header")
+		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
 	}
 
 	if eventType != "workflow_run" {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	// If statusCode is 200 but not the right event type, just ignore
 	if statusCode == http.StatusOK {
 		eventType := ctx.Headers.Get("X-GitHub-Event")
 		if eventType != "workflow_run" {
-			return http.StatusOK, nil, nil
+			return http.StatusOK, nil
 		}
 	}
 
@@ -390,18 +390,18 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	var payload map[string]any
 	err = json.Unmarshal(ctx.Body, &payload)
 	if err != nil {
-		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	// We only care about completed workflow runs
 	action, ok := payload["action"].(string)
 	if !ok || action != "completed" {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	newMetadata, data, err := metadataFromPayload(payload)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error determing new metadata: %v", err)
+		return http.StatusInternalServerError, fmt.Errorf("error determing new metadata: %v", err)
 	}
 
 	//
@@ -411,23 +411,23 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	//
 	executionCtx, err := ctx.FindExecutionByKV("workflow_run_id", fmt.Sprintf("%d", newMetadata.WorkflowRun.ID))
 	if err != nil {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	metadata := RunWorkflowExecutionMetadata{}
 	err = mapstructure.Decode(executionCtx.Metadata.Get(), &metadata)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error decoding metadata: %v", err)
+		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %v", err)
 	}
 
 	// Already finished, do not do anything
 	if metadata.WorkflowRun != nil && metadata.WorkflowRun.Status == WorkflowRunStatusCompleted {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	err = executionCtx.Metadata.Set(newMetadata)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error setting metadata: %v", err)
+		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
 	}
 
 	if newMetadata.WorkflowRun.Conclusion == WorkflowRunConclusionSuccess {
@@ -437,10 +437,10 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	}
 
 	if err != nil {
-		return http.StatusInternalServerError, nil, err
+		return http.StatusInternalServerError, err
 	}
 
-	return http.StatusOK, nil, nil
+	return http.StatusOK, nil
 }
 
 func metadataFromPayload(payload map[string]any) (*RunWorkflowExecutionMetadata, map[string]any, error) {

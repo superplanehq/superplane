@@ -298,35 +298,35 @@ func (t *OnPipelineCompleted) HandleAction(ctx core.TriggerActionContext) (map[s
 	}
 }
 
-func (t *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (t *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	if err := authorizeWebhook(ctx); err != nil {
-		return http.StatusForbidden, nil, err
+		return http.StatusForbidden, err
 	}
 
 	config, err := decodeOnPipelineCompletedConfiguration(ctx.Configuration)
 	if err != nil {
-		return http.StatusBadRequest, nil, err
+		return http.StatusBadRequest, err
 	}
 
 	payload := map[string]any{}
 	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
-		return http.StatusBadRequest, nil, fmt.Errorf("failed to parse webhook payload: %w", err)
+		return http.StatusBadRequest, fmt.Errorf("failed to parse webhook payload: %w", err)
 	}
 
 	event := extractPipelineWebhookEvent(payload)
 	if !isPipelineCompletedEventType(event.EventType) {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	if !isTerminalStatus(event.Status) {
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	webhookExecution := executionSummaryFromWebhookPayload(event, payload)
 
 	if config.PipelineIdentifier != "" {
 		if event.PipelineIdentifier == "" || config.PipelineIdentifier != event.PipelineIdentifier {
-			return http.StatusOK, nil, nil
+			return http.StatusOK, nil
 		}
 	}
 
@@ -337,18 +337,18 @@ func (t *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int
 	if ctx.Metadata != nil {
 		metadata, decodeErr := decodeOnPipelineCompletedMetadata(ctx.Metadata.Get())
 		if decodeErr != nil {
-			return http.StatusInternalServerError, nil, decodeErr
+			return http.StatusInternalServerError, decodeErr
 		}
 		if !isNewerExecution(metadata, webhookExecution) {
-			return http.StatusOK, nil, nil
+			return http.StatusOK, nil
 		}
 	}
 
 	if len(config.Statuses) > 0 && !statusSelected(config.Statuses, event.Status) {
 		if updateErr := t.updateCheckpointFromExecutionUnlocked(ctx.Metadata, webhookExecution); updateErr != nil {
-			return http.StatusInternalServerError, nil, updateErr
+			return http.StatusInternalServerError, updateErr
 		}
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	emittedPayload := map[string]any{
@@ -360,14 +360,14 @@ func (t *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int
 	}
 
 	if err := ctx.Events.Emit(OnPipelineCompletedPayloadType, emittedPayload); err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to emit event: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("failed to emit event: %w", err)
 	}
 
 	if updateErr := t.updateCheckpointFromExecutionUnlocked(ctx.Metadata, webhookExecution); updateErr != nil {
-		return http.StatusInternalServerError, nil, updateErr
+		return http.StatusInternalServerError, updateErr
 	}
 
-	return http.StatusOK, nil, nil
+	return http.StatusOK, nil
 }
 
 func (t *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
