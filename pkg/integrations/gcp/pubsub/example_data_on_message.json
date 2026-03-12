@@ -1,0 +1,12 @@
+{
+  "data": {
+    "messageId": "1234567890",
+    "publishTime": "2025-01-01T00:00:00Z",
+    "data": "{\"event\":\"order.created\",\"orderId\":\"ord_abc123\"}",
+    "attributes": {
+      "eventType": "order.created"
+    }
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.message"
+}

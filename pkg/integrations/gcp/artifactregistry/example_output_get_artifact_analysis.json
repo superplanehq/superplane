@@ -1,0 +1,14 @@
+{
+  "data": {
+    "resourceUri": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
+    "scanStatus": "FINISHED_SUCCESS",
+    "vulnerabilities": 3,
+    "critical": 0,
+    "high": 1,
+    "medium": 2,
+    "low": 0,
+    "fixAvailable": 1
+  },
+  "timestamp": "2025-01-01T00:05:00Z",
+  "type": "gcp.containeranalysis.occurrences"
+}
