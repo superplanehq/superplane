@@ -18,6 +18,7 @@ import {
   PUBSUB_ACTION_STATE_REGISTRY,
 } from "./pubsub_mapper";
 import { onMessageTriggerRenderer } from "./on_message";
+import { cloudDNSMapper } from "./clouddns";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createVM: baseMapper,
@@ -32,6 +33,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "pubsub.deleteTopic": deleteTopicMapper,
   "pubsub.createSubscription": createSubscriptionMapper,
   "pubsub.deleteSubscription": deleteSubscriptionMapper,
+  "clouddns.createRecord": cloudDNSMapper,
+  "clouddns.deleteRecord": cloudDNSMapper,
+  "clouddns.updateRecord": cloudDNSMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -55,6 +59,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "pubsub.deleteTopic": PUBSUB_ACTION_STATE_REGISTRY,
   "pubsub.createSubscription": PUBSUB_ACTION_STATE_REGISTRY,
   "pubsub.deleteSubscription": PUBSUB_ACTION_STATE_REGISTRY,
+  "clouddns.createRecord": buildActionStateRegistry("completed"),
+  "clouddns.deleteRecord": buildActionStateRegistry("completed"),
+  "clouddns.updateRecord": buildActionStateRegistry("completed"),
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};
