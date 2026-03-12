@@ -7,6 +7,7 @@ import {
   ViewportPortal,
   useOnSelectionChange,
   useReactFlow,
+  useViewport,
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
   type NodeChange,
@@ -1720,6 +1721,7 @@ function CanvasContent({
   title?: string;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
+  const { zoom } = useViewport();
   const isReadOnly = readOnly ?? false;
 
   // Determine selection key code to support both Control (Windows/Linux) and Meta (Mac)
@@ -1787,20 +1789,23 @@ function CanvasContent({
     }, []),
   });
 
+  const multiSelectedNodeIds = useMemo(() => new Set(multiSelectedNodes.map((n) => n.id)), [multiSelectedNodes]);
+
   const selectionToolbarFlowPos = useMemo(() => {
-    if (multiSelectedNodes.length < 2) return null;
+    if (multiSelectedNodeIds.size < 2) return null;
 
     let minY = Infinity;
     let maxX = -Infinity;
 
-    for (const node of multiSelectedNodes) {
+    for (const node of state.nodes) {
+      if (!multiSelectedNodeIds.has(node.id)) continue;
       const w = node.measured?.width ?? node.width ?? 240;
       if (node.position.y < minY) minY = node.position.y;
       if (node.position.x + w > maxX) maxX = node.position.x + w;
     }
 
     return { x: maxX, y: minY };
-  }, [multiSelectedNodes]);
+  }, [multiSelectedNodeIds, state.nodes]);
 
   useEffect(() => {
     const activeNoteId = getActiveNoteId();
@@ -2660,66 +2665,73 @@ function CanvasContent({
               (onNodesDelete || onNodeDelete || onAutoLayoutNodes || onDuplicateNodes) && (
                 <ViewportPortal>
                   <div
-                    className="nodrag nopan flex items-center gap-2"
                     style={{
                       position: "absolute",
                       left: selectionToolbarFlowPos.x,
                       top: selectionToolbarFlowPos.y,
                       transform: "translate(-100%, -100%) translateY(-24px)",
-                      pointerEvents: "all",
                     }}
                   >
-                    {onAutoLayoutNodes && (
-                      <button
-                        type="button"
-                        data-testid="multi-select-auto-layout"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          onAutoLayoutNodes(multiSelectedNodes.map((n) => n.id));
-                        }}
-                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                      >
-                        <LayoutGrid className="h-4 w-4" />
-                      </button>
-                    )}
-                    {onDuplicateNodes && (
-                      <button
-                        type="button"
-                        data-testid="multi-select-duplicate"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          onDuplicateNodes(multiSelectedNodes.map((n) => n.id));
-                        }}
-                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </button>
-                    )}
-                    {(onNodesDelete || onNodeDelete) && (
-                      <button
-                        type="button"
-                        data-testid="multi-select-delete"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          const nodeIds = multiSelectedNodes.map((n) => n.id);
-                          if (onNodesDelete) {
-                            onNodesDelete(nodeIds);
-                          } else {
-                            for (const id of nodeIds) {
-                              onNodeDelete?.(id);
+                    <div
+                      className="nodrag nopan flex items-center gap-2"
+                      style={{
+                        transform: `scale(${1 / zoom})`,
+                        transformOrigin: "bottom right",
+                        pointerEvents: "all",
+                      }}
+                    >
+                      {onAutoLayoutNodes && (
+                        <button
+                          type="button"
+                          data-testid="multi-select-auto-layout"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            onAutoLayoutNodes(multiSelectedNodes.map((n) => n.id));
+                          }}
+                          className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                        >
+                          <LayoutGrid className="h-4 w-4" />
+                        </button>
+                      )}
+                      {onDuplicateNodes && (
+                        <button
+                          type="button"
+                          data-testid="multi-select-duplicate"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            onDuplicateNodes(multiSelectedNodes.map((n) => n.id));
+                          }}
+                          className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      )}
+                      {(onNodesDelete || onNodeDelete) && (
+                        <button
+                          type="button"
+                          data-testid="multi-select-delete"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            const nodeIds = multiSelectedNodes.map((n) => n.id);
+                            if (onNodesDelete) {
+                              onNodesDelete(nodeIds);
+                            } else {
+                              for (const id of nodeIds) {
+                                onNodeDelete?.(id);
+                              }
                             }
-                          }
-                          stateRef.current.setNodes((nodes) => nodes.map((node) => ({ ...node, selected: false })));
-                          setMultiSelectedNodes([]);
-                        }}
-                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
+                            stateRef.current.setNodes((nodes) => nodes.map((node) => ({ ...node, selected: false })));
+                            setMultiSelectedNodes([]);
+                          }}
+                          className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </ViewportPortal>
               )}
