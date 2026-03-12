@@ -12,7 +12,7 @@
     "networks": {
       "v4": [
         {
-          "ip_address": "68.183.156.218",
+          "ip_address": "192.0.2.1",
           "type": "public"
         },
         {

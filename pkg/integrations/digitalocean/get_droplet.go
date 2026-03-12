@@ -124,7 +124,7 @@ func (g *GetDroplet) Execute(ctx core.ExecutionContext) error {
 
 	dropletID, err := strconv.Atoi(spec.Droplet)
 	if err != nil {
-		return fmt.Errorf("invalid droplet ID must be a number")
+		return fmt.Errorf("invalid droplet ID")
 	}
 
 	droplet, err := client.GetDroplet(dropletID)
