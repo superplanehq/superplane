@@ -234,3 +234,22 @@ func getRecordSet(ctx context.Context, client Client, projectID, managedZone, na
 	}
 	return &resp.Rrsets[0], nil
 }
+
+// listRecordSetsByName fetches all record sets for a given name regardless of type.
+func listRecordSetsByName(ctx context.Context, client Client, projectID, managedZone, name string) ([]ResourceRecordSet, error) {
+	url := fmt.Sprintf(
+		"%s/projects/%s/managedZones/%s/rrsets?name=%s",
+		cloudDNSBaseURL, projectID, managedZone, name,
+	)
+	data, err := client.GetURL(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp rrsetListResponse
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, fmt.Errorf("failed to parse rrsets response: %w", err)
+	}
+
+	return resp.Rrsets, nil
+}

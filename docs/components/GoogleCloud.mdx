@@ -530,7 +530,7 @@ The Delete Record component deletes a DNS record set from a Google Cloud DNS man
 
 - **Managed Zone** (required): The Cloud DNS managed zone containing the record.
 - **Record Name** (required): The DNS name of the record to delete (e.g. `api.example.com`).
-- **Record Type** (required): The DNS record type (A, AAAA, CNAME, TXT, MX, etc.).
+- **Record Type** (optional): The DNS record type to delete (A, AAAA, CNAME, TXT, MX, etc.). If not specified, all record sets with the given name are deleted.
 
 ### Required IAM roles
 
@@ -542,7 +542,7 @@ The service account must have `roles/dns.admin` or `roles/dns.editor` on the pro
 - `change.status`: The change status (`done`).
 - `change.startTime`: When the change was submitted.
 - `record.name`: The DNS record name.
-- `record.type`: The DNS record type.
+- `record.type`: The DNS record type (comma-separated when multiple types were deleted).
 
 ### Example Output
 

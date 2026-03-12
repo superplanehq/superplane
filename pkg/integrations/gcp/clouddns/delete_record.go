@@ -39,7 +39,7 @@ func (c *DeleteRecord) Documentation() string {
 
 - **Managed Zone** (required): The Cloud DNS managed zone containing the record.
 - **Record Name** (required): The DNS name of the record to delete (e.g. ` + "`api.example.com`" + `).
-- **Record Type** (required): The DNS record type (A, AAAA, CNAME, TXT, MX, etc.).
+- **Record Type** (optional): The DNS record type to delete (A, AAAA, CNAME, TXT, MX, etc.). If not specified, all record sets with the given name are deleted.
 
 ## Required IAM roles
 
@@ -51,7 +51,7 @@ The service account must have ` + "`roles/dns.admin`" + ` or ` + "`roles/dns.edi
 - ` + "`change.status`" + `: The change status (` + "`done`" + `).
 - ` + "`change.startTime`" + `: When the change was submitted.
 - ` + "`record.name`" + `: The DNS record name.
-- ` + "`record.type`" + `: The DNS record type.`
+- ` + "`record.type`" + `: The DNS record type (comma-separated when multiple types were deleted).`
 }
 
 func (c *DeleteRecord) Icon() string  { return "gcp" }
@@ -62,7 +62,50 @@ func (c *DeleteRecord) OutputChannels(_ any) []core.OutputChannel {
 }
 
 func (c *DeleteRecord) Configuration() []configuration.Field {
-	return baseRecordConfigurationFields()
+	return deleteRecordConfigurationFields()
+}
+
+func deleteRecordConfigurationFields() []configuration.Field {
+	return []configuration.Field{
+		{
+			Name:        "managedZone",
+			Label:       "Managed Zone",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "The Cloud DNS managed zone to manage records in.",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:       ResourceTypeManagedZone,
+					Parameters: []configuration.ParameterRef{},
+				},
+			},
+		},
+		{
+			Name:        "name",
+			Label:       "Record Name",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Description: "The DNS record name (e.g. api.example.com). A trailing dot will be added automatically.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "managedZone", Values: []string{"*"}},
+			},
+		},
+		{
+			Name:        "type",
+			Label:       "Record Type",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Description: "The DNS record type to delete. If not specified, all record sets with this name are deleted.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "managedZone", Values: []string{"*"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: RecordTypeOptions,
+				},
+			},
+		},
+	}
 }
 
 func decodeDeleteRecordConfig(raw any) (DeleteRecordConfiguration, error) {
@@ -81,7 +124,13 @@ func (c *DeleteRecord) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return err
 	}
-	return validateBaseConfig(config.ManagedZone, config.Name, config.Type)
+	if config.ManagedZone == "" {
+		return fmt.Errorf("managed zone is required")
+	}
+	if config.Name == "" {
+		return fmt.Errorf("record name is required")
+	}
+	return nil
 }
 
 func (c *DeleteRecord) Execute(ctx core.ExecutionContext) error {
@@ -96,22 +145,45 @@ func (c *DeleteRecord) Execute(ctx core.ExecutionContext) error {
 	}
 
 	projectID := client.ProjectID()
-	existing, err := getRecordSet(context.Background(), client, projectID, config.ManagedZone, config.Name, config.Type)
-	if err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to look up existing record: %v", err))
-	}
-	if existing == nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("record %s %s not found in zone %s", config.Name, config.Type, config.ManagedZone))
+	var deletions []ResourceRecordSet
+	var recordType string
+
+	if config.Type != "" {
+		// Delete a specific record type.
+		existing, err := getRecordSet(context.Background(), client, projectID, config.ManagedZone, config.Name, config.Type)
+		if err != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to look up existing record: %v", err))
+		}
+		if existing == nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("record %s %s not found in zone %s", config.Name, config.Type, config.ManagedZone))
+		}
+		deletions = []ResourceRecordSet{*existing}
+		recordType = config.Type
+	} else {
+		// No type specified — delete all record sets with this name.
+		all, err := listRecordSetsByName(context.Background(), client, projectID, config.ManagedZone, config.Name)
+		if err != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to look up existing records: %v", err))
+		}
+		if len(all) == 0 {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("no records found for %s in zone %s", config.Name, config.ManagedZone))
+		}
+		deletions = all
+		types := make([]string, 0, len(all))
+		for _, r := range all {
+			types = append(types, r.Type)
+		}
+		recordType = strings.Join(types, ",")
 	}
 
-	change, err := applyChange(context.Background(), client, projectID, config.ManagedZone, nil, []ResourceRecordSet{*existing})
+	change, err := applyChange(context.Background(), client, projectID, config.ManagedZone, nil, deletions)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to delete DNS record: %v", err))
 	}
 
 	if change.Status == "done" {
 		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "gcp.clouddns.change", []any{
-			buildChangeOutput(change, config.Name, config.Type),
+			buildChangeOutput(change, config.Name, recordType),
 		})
 	}
 
@@ -119,7 +191,7 @@ func (c *DeleteRecord) Execute(ctx core.ExecutionContext) error {
 		ChangeID:    change.ID,
 		ManagedZone: config.ManagedZone,
 		RecordName:  config.Name,
-		RecordType:  config.Type,
+		RecordType:  recordType,
 		StartTime:   change.StartTime,
 	}); err != nil {
 		return fmt.Errorf("failed to set poll metadata: %w", err)
