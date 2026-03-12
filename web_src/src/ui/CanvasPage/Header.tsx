@@ -217,6 +217,35 @@ export function Header({
       />
     </div>
   ) : null;
+  const autoSaveToggle = onToggleAutoSave
+    ? wrapWithTooltip(
+        autoSaveDisabled,
+        autoSaveDisabledTooltip,
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor="auto-save-toggle"
+            className={`text-sm hidden sm:inline ${autoSaveDisabled ? "text-gray-400" : "text-gray-800"}`}
+          >
+            Auto-save
+          </label>
+          <Switch
+            id="auto-save-toggle"
+            checked={isAutoSaveEnabled}
+            onCheckedChange={
+              isVersioningDisabledMode
+                ? onToggleAutoSave
+                : (checked) => {
+                    if (checked) {
+                      onSave?.();
+                    }
+                    onToggleAutoSave?.();
+                  }
+            }
+            disabled={autoSaveDisabled}
+          />
+        </div>,
+      )
+    : null;
 
   return (
     <>
@@ -448,35 +477,7 @@ export function Header({
                     {unsavedMessage}
                   </span>
                 ) : null}
-                {onToggleAutoSave
-                  ? wrapWithTooltip(
-                      autoSaveDisabled,
-                      autoSaveDisabledTooltip,
-                      <div className="flex items-center gap-2">
-                        <label
-                          htmlFor="auto-save-toggle"
-                          className={`text-sm hidden sm:inline ${autoSaveDisabled ? "text-gray-400" : "text-gray-800"}`}
-                        >
-                          Auto-save
-                        </label>
-                        <Switch
-                          id="auto-save-toggle"
-                          checked={isAutoSaveEnabled}
-                          onCheckedChange={
-                            isVersioningDisabledMode
-                              ? onToggleAutoSave
-                              : (checked) => {
-                                  if (checked) {
-                                    onSave?.();
-                                  }
-                                  onToggleAutoSave?.();
-                                }
-                          }
-                          disabled={autoSaveDisabled}
-                        />
-                      </div>,
-                    )
-                  : null}
+                {!isVersioningDisabledMode ? autoSaveToggle : null}
                 {onUndo && canUndo ? (
                   <Button onClick={onUndo} size="sm" variant="outline">
                     <Undo2 />
@@ -498,6 +499,7 @@ export function Header({
                       </Button>,
                     )
                   : null}
+                {isVersioningDisabledMode ? autoSaveToggle : null}
               </>
             ) : null}
 
