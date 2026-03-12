@@ -288,8 +288,8 @@ func (e *ExecuteCode) poll(ctx core.ActionContext) error {
 	)
 }
 
-func (e *ExecuteCode) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (e *ExecuteCode) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (e *ExecuteCode) Cleanup(ctx core.SetupContext) error {

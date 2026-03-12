@@ -20,7 +20,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 	logger := logrus.NewEntry(logrus.New())
 
 	t.Run("no X-Semaphore-Signature-256 -> 403", func(t *testing.T) {
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: http.Header{},
 			Logger:  logger,
 		})
@@ -33,7 +33,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-Semaphore-Signature-256", "invalidsignature")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Events:  &contexts.EventContext{},
 			Webhook: &contexts.NodeWebhookContext{},
@@ -50,7 +50,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-Semaphore-Signature-256", "sha256=invalidsignature")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    []byte(`{"pipeline":{"state":"done"}}`),
 			Headers: headers,
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},
@@ -68,7 +68,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		headers := buildSemaphoreHeaders(secret, body)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},
@@ -89,7 +89,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		headers := buildSemaphoreHeaders(secret, body)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},
@@ -107,7 +107,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		headers := buildSemaphoreHeaders(secret, body)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -131,7 +131,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		headers := buildSemaphoreHeaders(secret, body)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -155,7 +155,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		headers := buildSemaphoreHeaders(secret, body)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -177,7 +177,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		headers := buildSemaphoreHeaders(secret, body)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -201,7 +201,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		headers := buildSemaphoreHeaders(secret, body)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{

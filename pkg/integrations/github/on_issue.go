@@ -141,44 +141,44 @@ func (i *OnIssue) HandleAction(ctx core.TriggerActionContext) (map[string]any, e
 	return nil, nil
 }
 
-func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	config := OnIssueConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	eventType := ctx.Headers.Get("X-GitHub-Event")
 	if eventType == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing X-GitHub-Event header")
 	}
 
 	if eventType != "issues" {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	code, err := verifySignature(ctx)
 	if err != nil {
-		return code, err
+		return code, nil, err
 	}
 
 	data := map[string]any{}
 	err = json.Unmarshal(ctx.Body, &data)
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	if !whitelistedAction(data, config.Actions) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	err = ctx.Events.Emit("github.issue", data)
 
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (i *OnIssue) Cleanup(ctx core.TriggerContext) error {

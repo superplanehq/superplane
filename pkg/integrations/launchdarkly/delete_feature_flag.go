@@ -156,8 +156,8 @@ func (c *DeleteFeatureFlag) ProcessQueueItem(ctx core.ProcessQueueContext) (*uui
 	return ctx.DefaultProcessing()
 }
 
-func (c *DeleteFeatureFlag) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *DeleteFeatureFlag) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *DeleteFeatureFlag) Actions() []core.Action {

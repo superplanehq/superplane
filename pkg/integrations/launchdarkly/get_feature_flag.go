@@ -157,8 +157,8 @@ func (c *GetFeatureFlag) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.U
 	return ctx.DefaultProcessing()
 }
 
-func (c *GetFeatureFlag) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *GetFeatureFlag) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *GetFeatureFlag) Actions() []core.Action {

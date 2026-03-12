@@ -461,6 +461,98 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/actions": {
+      "patch": {
+        "summary": "Act on canvas change request",
+        "description": "Applies an action (approve, unapprove, reject, reopen, publish) to a change request",
+        "operationId": "Canvases_ActOnCanvasChangeRequest",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesActOnCanvasChangeRequestResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "changeRequestId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesActOnCanvasChangeRequestBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasChangeRequest"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/resolve": {
+      "patch": {
+        "summary": "Resolve canvas change request conflicts",
+        "description": "Updates a change request version with a conflict-resolved result",
+        "operationId": "Canvases_ResolveCanvasChangeRequest",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesResolveCanvasChangeRequestResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "changeRequestId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesResolveCanvasChangeRequestBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasChangeRequest"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasId}/events": {
       "get": {
         "summary": "List canvas events",
@@ -3811,6 +3903,18 @@
     }
   },
   "definitions": {
+    "ActOnCanvasChangeRequestRequestAction": {
+      "type": "string",
+      "enum": [
+        "ACTION_UNSPECIFIED",
+        "ACTION_APPROVE",
+        "ACTION_REJECT",
+        "ACTION_REOPEN",
+        "ACTION_PUBLISH",
+        "ACTION_UNAPPROVE"
+      ],
+      "default": "ACTION_UNSPECIFIED"
+    },
     "AuthorizationDomainType": {
       "type": "string",
       "enum": [
@@ -3989,15 +4093,21 @@
       ],
       "default": "RESULT_REASON_OK"
     },
-    "CanvasNodeExecutionState": {
-      "type": "string",
-      "enum": [
-        "STATE_UNKNOWN",
-        "STATE_PENDING",
-        "STATE_STARTED",
-        "STATE_FINISHED"
-      ],
-      "default": "STATE_UNKNOWN"
+    "CanvasesActOnCanvasChangeRequestBody": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/ActOnCanvasChangeRequestRequestAction"
+        }
+      }
+    },
+    "CanvasesActOnCanvasChangeRequestResponse": {
+      "type": "object",
+      "properties": {
+        "changeRequest": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequest"
+        }
+      }
     },
     "CanvasesCancelExecutionBody": {
       "type": "object"
@@ -4097,13 +4207,94 @@
         },
         "diff": {
           "$ref": "#/definitions/CanvasesCanvasChangeRequestDiff"
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasChangeRequestApproval"
+          }
         }
       }
+    },
+    "CanvasesCanvasChangeRequestApproval": {
+      "type": "object",
+      "properties": {
+        "actor": {
+          "$ref": "#/definitions/SuperplaneCanvasesUserRef"
+        },
+        "approver": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequestApprover"
+        },
+        "state": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequestApprovalState"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "invalidatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "CanvasesCanvasChangeRequestApprovalConfig": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasChangeRequestApprover"
+          }
+        }
+      }
+    },
+    "CanvasesCanvasChangeRequestApprovalState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNSPECIFIED",
+        "STATE_APPROVED",
+        "STATE_REJECTED",
+        "STATE_UNAPPROVED"
+      ],
+      "default": "STATE_UNSPECIFIED"
+    },
+    "CanvasesCanvasChangeRequestApprover": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequestApproverType"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "roleName": {
+          "type": "string"
+        }
+      }
+    },
+    "CanvasesCanvasChangeRequestApproverType": {
+      "type": "string",
+      "enum": [
+        "TYPE_UNSPECIFIED",
+        "TYPE_ANYONE",
+        "TYPE_USER",
+        "TYPE_ROLE"
+      ],
+      "default": "TYPE_UNSPECIFIED"
     },
     "CanvasesCanvasChangeRequestDiff": {
       "type": "object",
       "properties": {
         "changedNodeIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "conflictingNodeIds": {
           "type": "array",
           "items": {
             "type": "string"
@@ -4126,6 +4317,9 @@
         "owner": {
           "$ref": "#/definitions/SuperplaneCanvasesUserRef"
         },
+        "basedOnVersionId": {
+          "type": "string"
+        },
         "status": {
           "$ref": "#/definitions/CanvasesCanvasChangeRequestStatus"
         },
@@ -4146,6 +4340,9 @@
         },
         "description": {
           "type": "string"
+        },
+        "isConflicted": {
+          "type": "boolean"
         }
       }
     },
@@ -4154,7 +4351,8 @@
       "enum": [
         "STATUS_UNSPECIFIED",
         "STATUS_OPEN",
-        "STATUS_PUBLISHED"
+        "STATUS_PUBLISHED",
+        "STATUS_REJECTED"
       ],
       "default": "STATUS_UNSPECIFIED"
     },
@@ -4262,6 +4460,9 @@
         },
         "canvasVersioningEnabled": {
           "type": "boolean"
+        },
+        "changeRequestApprovalConfig": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequestApprovalConfig"
         }
       }
     },
@@ -4284,7 +4485,7 @@
           "type": "string"
         },
         "state": {
-          "$ref": "#/definitions/CanvasNodeExecutionState"
+          "$ref": "#/definitions/CanvasesCanvasNodeExecutionState"
         },
         "result": {
           "$ref": "#/definitions/CanvasNodeExecutionResult"
@@ -4329,6 +4530,16 @@
           "$ref": "#/definitions/SuperplaneCanvasesUserRef"
         }
       }
+    },
+    "CanvasesCanvasNodeExecutionState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNKNOWN",
+        "STATE_PENDING",
+        "STATE_STARTED",
+        "STATE_FINISHED"
+      ],
+      "default": "STATE_UNKNOWN"
     },
     "CanvasesCanvasNodeQueueItem": {
       "type": "object",
@@ -4756,6 +4967,28 @@
         }
       }
     },
+    "CanvasesResolveCanvasChangeRequestBody": {
+      "type": "object",
+      "properties": {
+        "canvas": {
+          "$ref": "#/definitions/CanvasesCanvas"
+        },
+        "autoLayout": {
+          "$ref": "#/definitions/CanvasesCanvasAutoLayout"
+        }
+      }
+    },
+    "CanvasesResolveCanvasChangeRequestResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "$ref": "#/definitions/CanvasesCanvasVersion"
+        },
+        "changeRequest": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequest"
+        }
+      }
+    },
     "CanvasesResolveExecutionErrorsBody": {
       "type": "object",
       "properties": {
@@ -4806,6 +5039,9 @@
         },
         "canvasVersioningEnabled": {
           "type": "boolean"
+        },
+        "changeRequestApprovalConfig": {
+          "$ref": "#/definitions/CanvasesCanvasChangeRequestApprovalConfig"
         }
       }
     },

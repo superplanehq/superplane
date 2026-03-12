@@ -102,7 +102,15 @@ The database model follows a hierarchical structure that enables multi-tenancy a
 - Effective behavior:
   - Organization versioning enabled: all canvases are effectively versioned
   - Organization versioning disabled: each canvas uses its own `canvas_versioning_enabled` value
-- When effective canvas versioning is enabled, users edit draft versions and publish via change requests; when disabled, users edit the live canvas directly
+- When effective canvas versioning is enabled, users edit draft versions and submit change requests; when disabled, users edit the live canvas directly
+- Change request lifecycle:
+  - `STATUS_OPEN`: active change request
+  - `STATUS_REJECTED`: closed without publish
+  - `STATUS_PUBLISHED`: approved and merged into live version
+- Conflicts are represented by metadata flag `is_conflicted` (not by status). A change request can be `STATUS_OPEN` and conflicted at the same time.
+- Conflict detection marks nodes as conflicted only when there is a structural difference between the change request version and live canvas for overlapping changes.
+- Only non-conflicted open change requests can be approved. Conflicted open change requests can be rejected or resolved. Only rejected change requests can be reopened.
+- See [Canvas Change Requests](./canvas-change-requests.md) for CLI workflow details.
 
 **Integration:**
 

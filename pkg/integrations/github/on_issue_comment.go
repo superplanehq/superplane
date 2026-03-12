@@ -121,37 +121,37 @@ func (i *OnIssueComment) HandleAction(ctx core.TriggerActionContext) (map[string
 	return nil, nil
 }
 
-func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	config := OnIssueCommentConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	eventType := ctx.Headers.Get("X-GitHub-Event")
 	if eventType == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing X-GitHub-Event header")
 	}
 
 	if eventType != "issue_comment" {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	code, err := verifySignature(ctx)
 	if err != nil {
-		return code, err
+		return code, nil, err
 	}
 
 	data := map[string]any{}
 	err = json.Unmarshal(ctx.Body, &data)
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	// Only process "created" actions
 	action, ok := data["action"]
 	if !ok || action != "created" {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	// Skip PR comments - they should be handled by OnPRComment
@@ -159,7 +159,7 @@ func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 	// but includes a pull_request field in the issue object to identify them
 	if issue, ok := data["issue"].(map[string]any); ok {
 		if _, hasPR := issue["pull_request"]; hasPR {
-			return http.StatusOK, nil
+			return http.StatusOK, nil, nil
 		}
 	}
 
@@ -167,31 +167,31 @@ func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 	if config.ContentFilter != "" {
 		comment, ok := data["comment"].(map[string]any)
 		if !ok {
-			return http.StatusBadRequest, fmt.Errorf("invalid comment structure")
+			return http.StatusBadRequest, nil, fmt.Errorf("invalid comment structure")
 		}
 
 		body, ok := comment["body"].(string)
 		if !ok {
-			return http.StatusBadRequest, fmt.Errorf("invalid comment body")
+			return http.StatusBadRequest, nil, fmt.Errorf("invalid comment body")
 		}
 
 		matched, err := regexp.MatchString(config.ContentFilter, body)
 		if err != nil {
-			return http.StatusBadRequest, fmt.Errorf("invalid regex pattern: %w", err)
+			return http.StatusBadRequest, nil, fmt.Errorf("invalid regex pattern: %w", err)
 		}
 
 		if !matched {
-			return http.StatusOK, nil
+			return http.StatusOK, nil, nil
 		}
 	}
 
 	err = ctx.Events.Emit("github.issueComment", data)
 
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (i *OnIssueComment) Cleanup(ctx core.TriggerContext) error {

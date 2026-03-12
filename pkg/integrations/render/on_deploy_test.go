@@ -130,7 +130,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 
 	t.Run("missing signature headers -> 403", func(t *testing.T) {
 		eventCtx := &contexts.EventContext{}
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
@@ -151,7 +151,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 			strconv.FormatInt(time.Now().Add(-10*time.Minute).Unix(), 10),
 		)
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       expiredHeaders,
 			Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
@@ -169,7 +169,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 		invalidHeaders := buildSignedHeaders(secret, body)
 		invalidHeaders.Set("webhook-signature", "v1,invalid")
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       invalidHeaders,
 			Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
@@ -193,7 +193,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 		require.NoError(t, marshalErr)
 		buildHeaders := buildSignedHeaders(secret, buildBody)
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          buildBody,
 			Headers:       buildHeaders,
 			Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
@@ -208,7 +208,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 
 	t.Run("service filter mismatch -> ignored", func(t *testing.T) {
 		eventCtx := &contexts.EventContext{}
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{"service": "srv-other"},
@@ -223,7 +223,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 
 	t.Run("event type filter does not match -> ignored", func(t *testing.T) {
 		eventCtx := &contexts.EventContext{}
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
@@ -251,7 +251,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 				},
 			},
 		}
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			HTTP:          httpCtx,
@@ -297,7 +297,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 		headersWithMultipleSignatures.Set("webhook-timestamp", validHeaders.Get("webhook-timestamp"))
 		headersWithMultipleSignatures.Set("webhook-signature", "v1,invalid v1,"+validSignature)
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headersWithMultipleSignatures,
 			HTTP:          httpCtx,
@@ -336,7 +336,7 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			HTTP:          httpCtx,
@@ -381,7 +381,7 @@ func Test__Render_OnDeploy__HandleWebhook__WithoutEventResolution(t *testing.T) 
 	headers := buildSignedHeaders(secret, body)
 	eventCtx := &contexts.EventContext{}
 
-	status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+	status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
 		Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},

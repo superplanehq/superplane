@@ -122,8 +122,8 @@ func (c *DeleteTopic) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *DeleteTopic) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *DeleteTopic) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *DeleteTopic) Cancel(ctx core.ExecutionContext) error {

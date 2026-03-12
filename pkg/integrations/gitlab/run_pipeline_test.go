@@ -84,7 +84,7 @@ func Test__RunPipeline__HandleWebhook__FinishedPipeline(t *testing.T) {
 		KVs: map[string]string{},
 	}
 
-	code, err := component.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := component.HandleWebhook(core.WebhookRequestContext{
 		Headers: gitlabHeaders("Pipeline Hook", "token"),
 		Body: []byte(`{
 			"object_kind": "pipeline",

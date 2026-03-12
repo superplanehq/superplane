@@ -429,6 +429,26 @@ CREATE TABLE public.webhooks (
 
 
 --
+-- Name: workflow_change_request_approvals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_change_request_approvals (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    workflow_id uuid NOT NULL,
+    workflow_change_request_id uuid NOT NULL,
+    approver_index integer NOT NULL,
+    approver_type character varying(32) NOT NULL,
+    approver_user_id uuid,
+    approver_role character varying(255),
+    actor_user_id uuid,
+    state character varying(32) NOT NULL,
+    invalidated_at timestamp without time zone,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: workflow_change_requests; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -443,7 +463,9 @@ CREATE TABLE public.workflow_change_requests (
     description text DEFAULT ''::text NOT NULL,
     published_at timestamp without time zone,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    based_on_version_id uuid,
+    conflicting_node_ids jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -605,7 +627,8 @@ CREATE TABLE public.workflows (
     deleted_at timestamp without time zone,
     is_template boolean DEFAULT false NOT NULL,
     live_version_id uuid NOT NULL,
-    canvas_versioning_enabled boolean DEFAULT false NOT NULL
+    canvas_versioning_enabled boolean DEFAULT false NOT NULL,
+    change_request_approvers jsonb DEFAULT '[{"type": "anyone"}]'::jsonb NOT NULL
 );
 
 
@@ -913,6 +936,14 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
+-- Name: workflow_change_request_approvals workflow_change_request_approvals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_request_approvals
+    ADD CONSTRAINT workflow_change_request_approvals_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: workflow_change_requests workflow_change_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1196,6 +1227,27 @@ CREATE INDEX idx_webhooks_app_installation_id ON public.webhooks USING btree (ap
 --
 
 CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at);
+
+
+--
+-- Name: idx_workflow_change_request_approvals_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_change_request_approvals_active ON public.workflow_change_request_approvals USING btree (workflow_change_request_id, invalidated_at, approver_index);
+
+
+--
+-- Name: idx_workflow_change_request_approvals_change_request; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_change_request_approvals_change_request ON public.workflow_change_request_approvals USING btree (workflow_change_request_id, created_at DESC);
+
+
+--
+-- Name: idx_workflow_change_requests_based_on_version; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_change_requests_based_on_version ON public.workflow_change_requests USING btree (workflow_id, based_on_version_id);
 
 
 --
@@ -1616,6 +1668,46 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
+-- Name: workflow_change_request_approvals workflow_change_request_approvals_actor_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_request_approvals
+    ADD CONSTRAINT workflow_change_request_approvals_actor_user_id_fkey FOREIGN KEY (actor_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: workflow_change_request_approvals workflow_change_request_approvals_approver_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_request_approvals
+    ADD CONSTRAINT workflow_change_request_approvals_approver_user_id_fkey FOREIGN KEY (approver_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: workflow_change_request_approvals workflow_change_request_approvals_change_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_request_approvals
+    ADD CONSTRAINT workflow_change_request_approvals_change_request_id_fkey FOREIGN KEY (workflow_change_request_id) REFERENCES public.workflow_change_requests(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_change_request_approvals workflow_change_request_approvals_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_request_approvals
+    ADD CONSTRAINT workflow_change_request_approvals_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_change_requests workflow_change_requests_based_on_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_change_requests
+    ADD CONSTRAINT workflow_change_requests_based_on_version_id_fkey FOREIGN KEY (based_on_version_id) REFERENCES public.workflow_versions(id) ON DELETE SET NULL;
+
+
+--
 -- Name: workflow_change_requests workflow_change_requests_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1847,7 +1939,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260306201921	f
+20260310154909	f
 \.
 
 

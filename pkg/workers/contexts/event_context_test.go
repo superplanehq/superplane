@@ -34,7 +34,7 @@ func Test__EventContext__Emit(t *testing.T) {
 	)
 
 	t.Run("rejects large payload", func(t *testing.T) {
-		ctx := NewEventContext(database.Conn(), &nodes[0])
+		ctx := NewEventContext(database.Conn(), &nodes[0], nil)
 		largePayload := map[string]any{
 			"value": strings.Repeat("a", DefaultMaxPayloadSize+100),
 		}
@@ -43,5 +43,17 @@ func Test__EventContext__Emit(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "event payload too large")
 		support.VerifyCanvasEventsCount(t, canvas.ID, 0)
+	})
+
+	t.Run("uses callback", func(t *testing.T) {
+		newEvents := []models.CanvasEvent{}
+		onNewEvents := func(events []models.CanvasEvent) {
+			newEvents = append(newEvents, events...)
+		}
+
+		ctx := NewEventContext(database.Conn(), &nodes[0], onNewEvents)
+		require.NoError(t, ctx.Emit("test.payload", map[string]any{"n": 1}))
+		require.NoError(t, ctx.Emit("test.payload", map[string]any{"n": 2}))
+		assert.Len(t, newEvents, 2)
 	})
 }

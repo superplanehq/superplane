@@ -116,6 +116,12 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
+		pbCanvases.Canvases_ActOnCanvasChangeRequest_FullMethodName: {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ResolveCanvasChangeRequest_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
 		pbCanvases.Canvases_DeleteCanvas_FullMethodName:              {Resource: "canvases", Action: "delete", DomainType: models.DomainTypeOrganization},
 		pbCanvases.Canvases_ListNodeExecutions_FullMethodName:        {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbCanvases.Canvases_ListNodeQueueItems_FullMethodName:        {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},

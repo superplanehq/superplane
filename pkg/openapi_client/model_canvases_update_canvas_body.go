@@ -20,9 +20,10 @@ var _ MappedNullable = &CanvasesUpdateCanvasBody{}
 
 // CanvasesUpdateCanvasBody struct for CanvasesUpdateCanvasBody
 type CanvasesUpdateCanvasBody struct {
-	Name                    *string `json:"name,omitempty"`
-	Description             *string `json:"description,omitempty"`
-	CanvasVersioningEnabled *bool   `json:"canvasVersioningEnabled,omitempty"`
+	Name                        *string                                    `json:"name,omitempty"`
+	Description                 *string                                    `json:"description,omitempty"`
+	CanvasVersioningEnabled     *bool                                      `json:"canvasVersioningEnabled,omitempty"`
+	ChangeRequestApprovalConfig *CanvasesCanvasChangeRequestApprovalConfig `json:"changeRequestApprovalConfig,omitempty"`
 }
 
 // NewCanvasesUpdateCanvasBody instantiates a new CanvasesUpdateCanvasBody object
@@ -138,6 +139,38 @@ func (o *CanvasesUpdateCanvasBody) SetCanvasVersioningEnabled(v bool) {
 	o.CanvasVersioningEnabled = &v
 }
 
+// GetChangeRequestApprovalConfig returns the ChangeRequestApprovalConfig field value if set, zero value otherwise.
+func (o *CanvasesUpdateCanvasBody) GetChangeRequestApprovalConfig() CanvasesCanvasChangeRequestApprovalConfig {
+	if o == nil || IsNil(o.ChangeRequestApprovalConfig) {
+		var ret CanvasesCanvasChangeRequestApprovalConfig
+		return ret
+	}
+	return *o.ChangeRequestApprovalConfig
+}
+
+// GetChangeRequestApprovalConfigOk returns a tuple with the ChangeRequestApprovalConfig field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesUpdateCanvasBody) GetChangeRequestApprovalConfigOk() (*CanvasesCanvasChangeRequestApprovalConfig, bool) {
+	if o == nil || IsNil(o.ChangeRequestApprovalConfig) {
+		return nil, false
+	}
+	return o.ChangeRequestApprovalConfig, true
+}
+
+// HasChangeRequestApprovalConfig returns a boolean if a field has been set.
+func (o *CanvasesUpdateCanvasBody) HasChangeRequestApprovalConfig() bool {
+	if o != nil && !IsNil(o.ChangeRequestApprovalConfig) {
+		return true
+	}
+
+	return false
+}
+
+// SetChangeRequestApprovalConfig gets a reference to the given CanvasesCanvasChangeRequestApprovalConfig and assigns it to the ChangeRequestApprovalConfig field.
+func (o *CanvasesUpdateCanvasBody) SetChangeRequestApprovalConfig(v CanvasesCanvasChangeRequestApprovalConfig) {
+	o.ChangeRequestApprovalConfig = &v
+}
+
 func (o CanvasesUpdateCanvasBody) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -156,6 +189,9 @@ func (o CanvasesUpdateCanvasBody) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.CanvasVersioningEnabled) {
 		toSerialize["canvasVersioningEnabled"] = o.CanvasVersioningEnabled
+	}
+	if !IsNil(o.ChangeRequestApprovalConfig) {
+		toSerialize["changeRequestApprovalConfig"] = o.ChangeRequestApprovalConfig
 	}
 	return toSerialize, nil
 }

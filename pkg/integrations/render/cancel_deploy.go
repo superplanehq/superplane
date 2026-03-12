@@ -259,7 +259,7 @@ func (c *CancelDeploy) poll(ctx core.ActionContext) error {
 	return emitDeployStatusResult(ctx.ExecutionState, deploy.Status, cancelDeployWebhookConfig(), payload)
 }
 
-func (c *CancelDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (c *CancelDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return handleDeployEndedWebhook(ctx, cancelDeployWebhookConfig())
 }
 

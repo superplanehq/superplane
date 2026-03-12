@@ -1,4 +1,8 @@
-import { CanvasNodeExecutionResult, CanvasNodeExecutionResultReason, CanvasNodeExecutionState } from "@/api-client";
+import {
+  CanvasNodeExecutionResult,
+  CanvasNodeExecutionResultReason,
+  CanvasesCanvasNodeExecutionState,
+} from "@/api-client";
 import { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
 import { TriggerProps } from "@/ui/trigger";
 import { QueryClient } from "@tanstack/react-query";
@@ -68,7 +72,7 @@ export type ExecutionInfo = {
   id: string;
   createdAt: string;
   updatedAt: string;
-  state: CanvasNodeExecutionState;
+  state: CanvasesCanvasNodeExecutionState;
   result: CanvasNodeExecutionResult;
   resultReason: CanvasNodeExecutionResultReason;
   resultMessage: string;

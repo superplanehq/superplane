@@ -195,8 +195,8 @@ func (c *RemoveIssueLabel) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid
 	return ctx.DefaultProcessing()
 }
 
-func (c *RemoveIssueLabel) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (c *RemoveIssueLabel) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (c *RemoveIssueLabel) Actions() []core.Action {

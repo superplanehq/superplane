@@ -188,9 +188,9 @@ func (t *OnDeploymentEvent) HandleAction(ctx core.TriggerActionContext) (map[str
 	return nil, nil
 }
 
-func (t *OnDeploymentEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnDeploymentEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	if err := verifyWebhookHeader(ctx); err != nil {
-		return http.StatusForbidden, err
+		return http.StatusForbidden, nil, err
 	}
 
 	if !webhookRequestIsJSON(ctx) {

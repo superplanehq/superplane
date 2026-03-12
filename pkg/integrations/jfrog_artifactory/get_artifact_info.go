@@ -159,8 +159,8 @@ func (g *GetArtifactInfo) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (g *GetArtifactInfo) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 0, nil
+func (g *GetArtifactInfo) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 0, nil, nil
 }
 
 func (g *GetArtifactInfo) Actions() []core.Action {

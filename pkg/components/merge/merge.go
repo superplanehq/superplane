@@ -522,8 +522,8 @@ func (m *Merge) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (m *Merge) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (m *Merge) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func durationFrom(value int, unit string) time.Duration {

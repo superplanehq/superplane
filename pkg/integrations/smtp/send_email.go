@@ -277,8 +277,8 @@ func (c *SendEmail) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *SendEmail) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (c *SendEmail) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (c *SendEmail) Actions() []core.Action {

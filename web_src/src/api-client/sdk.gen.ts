@@ -18,6 +18,9 @@ import type {
   BlueprintsUpdateBlueprintData,
   BlueprintsUpdateBlueprintErrors,
   BlueprintsUpdateBlueprintResponses,
+  CanvasesActOnCanvasChangeRequestData,
+  CanvasesActOnCanvasChangeRequestErrors,
+  CanvasesActOnCanvasChangeRequestResponses,
   CanvasesCancelExecutionData,
   CanvasesCancelExecutionErrors,
   CanvasesCancelExecutionResponses,
@@ -87,6 +90,9 @@ import type {
   CanvasesListNodeQueueItemsData,
   CanvasesListNodeQueueItemsErrors,
   CanvasesListNodeQueueItemsResponses,
+  CanvasesResolveCanvasChangeRequestData,
+  CanvasesResolveCanvasChangeRequestErrors,
+  CanvasesResolveCanvasChangeRequestResponses,
   CanvasesResolveExecutionErrorsData,
   CanvasesResolveExecutionErrorsErrors,
   CanvasesResolveExecutionErrorsResponses,
@@ -477,6 +483,48 @@ export const canvasesDescribeCanvasChangeRequest = <ThrowOnError extends boolean
     CanvasesDescribeCanvasChangeRequestErrors,
     ThrowOnError
   >({ url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}", ...options });
+
+/**
+ * Act on canvas change request
+ *
+ * Applies an action (approve, unapprove, reject, reopen, publish) to a change request
+ */
+export const canvasesActOnCanvasChangeRequest = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesActOnCanvasChangeRequestData, ThrowOnError>,
+) =>
+  (options.client ?? client).patch<
+    CanvasesActOnCanvasChangeRequestResponses,
+    CanvasesActOnCanvasChangeRequestErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/actions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Resolve canvas change request conflicts
+ *
+ * Updates a change request version with a conflict-resolved result
+ */
+export const canvasesResolveCanvasChangeRequest = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesResolveCanvasChangeRequestData, ThrowOnError>,
+) =>
+  (options.client ?? client).patch<
+    CanvasesResolveCanvasChangeRequestResponses,
+    CanvasesResolveCanvasChangeRequestErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/resolve",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
 
 /**
  * List canvas events
