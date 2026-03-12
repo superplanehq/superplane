@@ -18,6 +18,9 @@ import type {
   BlueprintsUpdateBlueprintData,
   BlueprintsUpdateBlueprintErrors,
   BlueprintsUpdateBlueprintResponses,
+  CanvasesActOnCanvasChangeRequestData,
+  CanvasesActOnCanvasChangeRequestErrors,
+  CanvasesActOnCanvasChangeRequestResponses,
   CanvasesCancelExecutionData,
   CanvasesCancelExecutionErrors,
   CanvasesCancelExecutionResponses,
@@ -87,12 +90,18 @@ import type {
   CanvasesListNodeQueueItemsData,
   CanvasesListNodeQueueItemsErrors,
   CanvasesListNodeQueueItemsResponses,
+  CanvasesResolveCanvasChangeRequestData,
+  CanvasesResolveCanvasChangeRequestErrors,
+  CanvasesResolveCanvasChangeRequestResponses,
   CanvasesResolveExecutionErrorsData,
   CanvasesResolveExecutionErrorsErrors,
   CanvasesResolveExecutionErrorsResponses,
   CanvasesSendAiMessageData,
   CanvasesSendAiMessageErrors,
   CanvasesSendAiMessageResponses,
+  CanvasesUpdateCanvasData,
+  CanvasesUpdateCanvasErrors,
+  CanvasesUpdateCanvasResponses,
   CanvasesUpdateCanvasVersion2Data,
   CanvasesUpdateCanvasVersion2Errors,
   CanvasesUpdateCanvasVersion2Responses,
@@ -476,6 +485,48 @@ export const canvasesDescribeCanvasChangeRequest = <ThrowOnError extends boolean
   >({ url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}", ...options });
 
 /**
+ * Act on canvas change request
+ *
+ * Applies an action (approve, unapprove, reject, reopen, publish) to a change request
+ */
+export const canvasesActOnCanvasChangeRequest = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesActOnCanvasChangeRequestData, ThrowOnError>,
+) =>
+  (options.client ?? client).patch<
+    CanvasesActOnCanvasChangeRequestResponses,
+    CanvasesActOnCanvasChangeRequestErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/actions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Resolve canvas change request conflicts
+ *
+ * Updates a change request version with a conflict-resolved result
+ */
+export const canvasesResolveCanvasChangeRequest = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesResolveCanvasChangeRequestData, ThrowOnError>,
+) =>
+  (options.client ?? client).patch<
+    CanvasesResolveCanvasChangeRequestResponses,
+    CanvasesResolveCanvasChangeRequestErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/resolve",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
  * List canvas events
  *
  * Returns a list of root events that triggered executions in a canvas
@@ -752,7 +803,7 @@ export const canvasesCreateCanvasVersion = <ThrowOnError extends boolean = true>
 /**
  * Update canvas version
  *
- * Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode
+ * Updates a user-owned canvas version; if version_id is omitted, updates the live canvas when versioning is disabled
  */
 export const canvasesUpdateCanvasVersion2 = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesUpdateCanvasVersion2Data, ThrowOnError>,
@@ -787,7 +838,7 @@ export const canvasesDescribeCanvasVersion = <ThrowOnError extends boolean = tru
 /**
  * Update canvas version
  *
- * Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode
+ * Updates a user-owned canvas version; if version_id is omitted, updates the live canvas when versioning is disabled
  */
 export const canvasesUpdateCanvasVersion = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesUpdateCanvasVersionData, ThrowOnError>,
@@ -827,6 +878,23 @@ export const canvasesDescribeCanvas = <ThrowOnError extends boolean = true>(
   (options.client ?? client).get<CanvasesDescribeCanvasResponses, CanvasesDescribeCanvasErrors, ThrowOnError>({
     url: "/api/v1/canvases/{id}",
     ...options,
+  });
+
+/**
+ * Update canvas
+ *
+ * Updates canvas metadata
+ */
+export const canvasesUpdateCanvas = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesUpdateCanvasData, ThrowOnError>,
+) =>
+  (options.client ?? client).put<CanvasesUpdateCanvasResponses, CanvasesUpdateCanvasErrors, ThrowOnError>({
+    url: "/api/v1/canvases/{id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**

@@ -24,6 +24,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -502,6 +503,11 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
 	integration.HandleRequest(core.HTTPRequestContext{
 		Logger:          logging.ForIntegration(*integrationInstance),
 		Request:         r,
@@ -516,6 +522,7 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 			integrationInstance,
 			s.encryptor,
 			s.registry,
+			onNewEvents,
 		),
 	})
 
@@ -523,6 +530,10 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		http.Error(w, "integration not found", http.StatusNotFound)
 		return
+	}
+
+	for _, event := range newEvents {
+		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
 	}
 }
 
@@ -768,40 +779,53 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := &core.WebhookResponseBody{}
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
+	var firstResponse *core.WebhookResponseBody
 
 	for _, node := range nodes {
-		code, err := s.executeWebhookNode(r.Context(), body, r.Header, node, response)
+		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, node, onNewEvents)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
 			return
 		}
+
+		if firstResponse == nil && response != nil && len(response.Body) > 0 {
+			firstResponse = response
+		}
 	}
 
-	if len(response.Body) > 0 {
-		if response.ContentType != "" {
-			w.Header().Set("Content-Type", response.ContentType)
+	for _, event := range newEvents {
+		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+	}
+
+	if firstResponse != nil {
+		if firstResponse.ContentType != "" {
+			w.Header().Set("Content-Type", firstResponse.ContentType)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write(response.Body)
+		w.Write(firstResponse.Body)
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}
 }
 
-func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, response *core.WebhookResponseBody) (int, error) {
+func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
 	if node.Type == models.NodeTypeTrigger {
-		return s.executeTriggerNode(ctx, body, headers, node, response)
+		return s.executeTriggerNode(ctx, body, headers, node, onNewEvents)
 	}
 
-	return s.executeComponentNode(ctx, body, headers, node, response)
+	return s.executeComponentNode(ctx, body, headers, node, onNewEvents)
 }
 
-func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, response *core.WebhookResponseBody) (int, error) {
+func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
 	ref := node.Ref.Data()
 	trigger, err := s.registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("trigger not found: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("trigger not found: %w", err)
 	}
 
 	logger := logging.ForNode(node)
@@ -810,11 +834,11 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	if node.AppInstallationID != nil {
 		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if integrationErr != nil {
-			return http.StatusInternalServerError, integrationErr
+			return http.StatusInternalServerError, nil, integrationErr
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
-		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry)
+		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry, onNewEvents)
 	}
 
 	return trigger.HandleWebhook(core.WebhookRequestContext{
@@ -827,17 +851,17 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		Logger:        logger,
 		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
-		Events:        contexts.NewEventContext(tx, &node),
+		Events:        contexts.NewEventContext(tx, &node, onNewEvents),
 		Integration:   integrationCtx,
-		Response:      response,
+		Response:      &core.WebhookResponseBody{},
 	})
 }
 
-func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, response *core.WebhookResponseBody) (int, error) {
+func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
 	ref := node.Ref.Data()
 	component, err := s.registry.GetComponent(ref.Component.Name)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("component not found: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("component not found: %w", err)
 	}
 
 	logger := logging.ForNode(node)
@@ -846,11 +870,11 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 	if node.AppInstallationID != nil {
 		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if integrationErr != nil {
-			return http.StatusInternalServerError, integrationErr
+			return http.StatusInternalServerError, nil, integrationErr
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
-		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry)
+		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry, onNewEvents)
 	}
 
 	return component.HandleWebhook(core.WebhookRequestContext{
@@ -863,9 +887,9 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 		Logger:        logger,
 		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
-		Events:        contexts.NewEventContext(tx, &node),
+		Events:        contexts.NewEventContext(tx, &node, onNewEvents),
 		Integration:   integrationCtx,
-		Response:      response,
+		Response:      &core.WebhookResponseBody{},
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
 			if err != nil {
@@ -881,7 +905,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 				HTTP:           s.registry.HTTPContext(),
 				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
-				ExecutionState: contexts.NewExecutionStateContext(tx, execution),
+				ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
 				Logger:         logging.ForExecution(execution, nil),
 				Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),

@@ -21,14 +21,16 @@ var _ MappedNullable = &CanvasesCanvasMetadata{}
 
 // CanvasesCanvasMetadata struct for CanvasesCanvasMetadata
 type CanvasesCanvasMetadata struct {
-	Id             *string                    `json:"id,omitempty"`
-	OrganizationId *string                    `json:"organizationId,omitempty"`
-	Name           *string                    `json:"name,omitempty"`
-	Description    *string                    `json:"description,omitempty"`
-	CreatedAt      *time.Time                 `json:"createdAt,omitempty"`
-	UpdatedAt      *time.Time                 `json:"updatedAt,omitempty"`
-	CreatedBy      *SuperplaneCanvasesUserRef `json:"createdBy,omitempty"`
-	IsTemplate     *bool                      `json:"isTemplate,omitempty"`
+	Id                          *string                                    `json:"id,omitempty"`
+	OrganizationId              *string                                    `json:"organizationId,omitempty"`
+	Name                        *string                                    `json:"name,omitempty"`
+	Description                 *string                                    `json:"description,omitempty"`
+	CreatedAt                   *time.Time                                 `json:"createdAt,omitempty"`
+	UpdatedAt                   *time.Time                                 `json:"updatedAt,omitempty"`
+	CreatedBy                   *SuperplaneCanvasesUserRef                 `json:"createdBy,omitempty"`
+	IsTemplate                  *bool                                      `json:"isTemplate,omitempty"`
+	CanvasVersioningEnabled     *bool                                      `json:"canvasVersioningEnabled,omitempty"`
+	ChangeRequestApprovalConfig *CanvasesCanvasChangeRequestApprovalConfig `json:"changeRequestApprovalConfig,omitempty"`
 }
 
 // NewCanvasesCanvasMetadata instantiates a new CanvasesCanvasMetadata object
@@ -304,6 +306,70 @@ func (o *CanvasesCanvasMetadata) SetIsTemplate(v bool) {
 	o.IsTemplate = &v
 }
 
+// GetCanvasVersioningEnabled returns the CanvasVersioningEnabled field value if set, zero value otherwise.
+func (o *CanvasesCanvasMetadata) GetCanvasVersioningEnabled() bool {
+	if o == nil || IsNil(o.CanvasVersioningEnabled) {
+		var ret bool
+		return ret
+	}
+	return *o.CanvasVersioningEnabled
+}
+
+// GetCanvasVersioningEnabledOk returns a tuple with the CanvasVersioningEnabled field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasMetadata) GetCanvasVersioningEnabledOk() (*bool, bool) {
+	if o == nil || IsNil(o.CanvasVersioningEnabled) {
+		return nil, false
+	}
+	return o.CanvasVersioningEnabled, true
+}
+
+// HasCanvasVersioningEnabled returns a boolean if a field has been set.
+func (o *CanvasesCanvasMetadata) HasCanvasVersioningEnabled() bool {
+	if o != nil && !IsNil(o.CanvasVersioningEnabled) {
+		return true
+	}
+
+	return false
+}
+
+// SetCanvasVersioningEnabled gets a reference to the given bool and assigns it to the CanvasVersioningEnabled field.
+func (o *CanvasesCanvasMetadata) SetCanvasVersioningEnabled(v bool) {
+	o.CanvasVersioningEnabled = &v
+}
+
+// GetChangeRequestApprovalConfig returns the ChangeRequestApprovalConfig field value if set, zero value otherwise.
+func (o *CanvasesCanvasMetadata) GetChangeRequestApprovalConfig() CanvasesCanvasChangeRequestApprovalConfig {
+	if o == nil || IsNil(o.ChangeRequestApprovalConfig) {
+		var ret CanvasesCanvasChangeRequestApprovalConfig
+		return ret
+	}
+	return *o.ChangeRequestApprovalConfig
+}
+
+// GetChangeRequestApprovalConfigOk returns a tuple with the ChangeRequestApprovalConfig field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasMetadata) GetChangeRequestApprovalConfigOk() (*CanvasesCanvasChangeRequestApprovalConfig, bool) {
+	if o == nil || IsNil(o.ChangeRequestApprovalConfig) {
+		return nil, false
+	}
+	return o.ChangeRequestApprovalConfig, true
+}
+
+// HasChangeRequestApprovalConfig returns a boolean if a field has been set.
+func (o *CanvasesCanvasMetadata) HasChangeRequestApprovalConfig() bool {
+	if o != nil && !IsNil(o.ChangeRequestApprovalConfig) {
+		return true
+	}
+
+	return false
+}
+
+// SetChangeRequestApprovalConfig gets a reference to the given CanvasesCanvasChangeRequestApprovalConfig and assigns it to the ChangeRequestApprovalConfig field.
+func (o *CanvasesCanvasMetadata) SetChangeRequestApprovalConfig(v CanvasesCanvasChangeRequestApprovalConfig) {
+	o.ChangeRequestApprovalConfig = &v
+}
+
 func (o CanvasesCanvasMetadata) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -337,6 +403,12 @@ func (o CanvasesCanvasMetadata) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.IsTemplate) {
 		toSerialize["isTemplate"] = o.IsTemplate
+	}
+	if !IsNil(o.CanvasVersioningEnabled) {
+		toSerialize["canvasVersioningEnabled"] = o.CanvasVersioningEnabled
+	}
+	if !IsNil(o.ChangeRequestApprovalConfig) {
+		toSerialize["changeRequestApprovalConfig"] = o.ChangeRequestApprovalConfig
 	}
 	return toSerialize, nil
 }

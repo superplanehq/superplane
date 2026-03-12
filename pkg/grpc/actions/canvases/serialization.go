@@ -24,6 +24,11 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 		return nil, err
 	}
 
+	canvasVersioningEnabled, err := isCanvasVersioningEnabledForCanvas(canvas)
+	if err != nil {
+		return nil, err
+	}
+
 	serializedNodes, err := serializeCanvasNodes(canvas.ID, liveVersion.Nodes)
 	if err != nil {
 		return nil, err
@@ -42,14 +47,18 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 	if !includeStatus {
 		return &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{
-				Id:             canvas.ID.String(),
-				OrganizationId: canvas.OrganizationID.String(),
-				Name:           canvas.Name,
-				Description:    canvas.Description,
-				CreatedAt:      timestamppb.New(*canvas.CreatedAt),
-				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
-				CreatedBy:      createdBy,
-				IsTemplate:     canvas.IsTemplate,
+				Id:                      canvas.ID.String(),
+				OrganizationId:          canvas.OrganizationID.String(),
+				Name:                    canvas.Name,
+				Description:             canvas.Description,
+				CreatedAt:               timestamppb.New(*canvas.CreatedAt),
+				UpdatedAt:               timestamppb.New(*canvas.UpdatedAt),
+				CreatedBy:               createdBy,
+				IsTemplate:              canvas.IsTemplate,
+				CanvasVersioningEnabled: canvasVersioningEnabled,
+				ChangeRequestApprovalConfig: serializeCanvasChangeRequestApprovalConfig(
+					canvas.EffectiveChangeRequestApprovers(),
+				),
 			},
 			Spec: &pb.Canvas_Spec{
 				Nodes: serializedNodes,
@@ -104,14 +113,18 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 
 	return &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Id:             canvas.ID.String(),
-			OrganizationId: canvas.OrganizationID.String(),
-			Name:           canvas.Name,
-			Description:    canvas.Description,
-			CreatedAt:      timestamppb.New(*canvas.CreatedAt),
-			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
-			CreatedBy:      createdBy,
-			IsTemplate:     canvas.IsTemplate,
+			Id:                      canvas.ID.String(),
+			OrganizationId:          canvas.OrganizationID.String(),
+			Name:                    canvas.Name,
+			Description:             canvas.Description,
+			CreatedAt:               timestamppb.New(*canvas.CreatedAt),
+			UpdatedAt:               timestamppb.New(*canvas.UpdatedAt),
+			CreatedBy:               createdBy,
+			IsTemplate:              canvas.IsTemplate,
+			CanvasVersioningEnabled: canvasVersioningEnabled,
+			ChangeRequestApprovalConfig: serializeCanvasChangeRequestApprovalConfig(
+				canvas.EffectiveChangeRequestApprovers(),
+			),
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: serializedNodes,
@@ -123,6 +136,37 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 			LastEvents:     serializedEvents,
 		},
 	}, nil
+}
+
+func serializeCanvasChangeRequestApprovalConfig(
+	approvers []models.CanvasChangeRequestApprover,
+) *pb.CanvasChangeRequestApprovalConfig {
+	config := &pb.CanvasChangeRequestApprovalConfig{
+		Items: make([]*pb.CanvasChangeRequestApprover, 0, len(approvers)),
+	}
+
+	for _, approver := range approvers {
+		config.Items = append(config.Items, &pb.CanvasChangeRequestApprover{
+			Type:     canvasChangeRequestApproverTypeToProto(approver.Type),
+			UserId:   approver.User,
+			RoleName: approver.Role,
+		})
+	}
+
+	return config
+}
+
+func canvasChangeRequestApproverTypeToProto(value string) pb.CanvasChangeRequestApprover_Type {
+	switch value {
+	case models.CanvasChangeRequestApproverTypeAnyone:
+		return pb.CanvasChangeRequestApprover_TYPE_ANYONE
+	case models.CanvasChangeRequestApproverTypeUser:
+		return pb.CanvasChangeRequestApprover_TYPE_USER
+	case models.CanvasChangeRequestApproverTypeRole:
+		return pb.CanvasChangeRequestApprover_TYPE_ROLE
+	default:
+		return pb.CanvasChangeRequestApprover_TYPE_UNSPECIFIED
+	}
 }
 
 func serializeCanvasNodes(canvasID uuid.UUID, nodes []models.Node) ([]*compb.Node, error) {

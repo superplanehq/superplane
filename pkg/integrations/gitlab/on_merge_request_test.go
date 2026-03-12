@@ -14,7 +14,7 @@ import (
 func Test__OnMergeRequest__HandleWebhook__MissingEventHeader(t *testing.T) {
 	trigger := &OnMergeRequest{}
 
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       http.Header{},
 		Body:          []byte(`{}`),
 		Configuration: map[string]any{"project": "123", "actions": []string{"open"}},
@@ -29,7 +29,7 @@ func Test__OnMergeRequest__HandleWebhook__WrongEventType(t *testing.T) {
 	trigger := &OnMergeRequest{}
 	events := &contexts.EventContext{}
 
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Issue Hook", "token"),
 		Body:          []byte(`{}`),
 		Configuration: map[string]any{"project": "123", "actions": []string{"open"}},
@@ -45,7 +45,7 @@ func Test__OnMergeRequest__HandleWebhook__WrongEventType(t *testing.T) {
 func Test__OnMergeRequest__HandleWebhook__InvalidToken(t *testing.T) {
 	trigger := &OnMergeRequest{}
 
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Merge Request Hook", "wrong"),
 		Body:          []byte(`{}`),
 		Configuration: map[string]any{"project": "123", "actions": []string{"open"}},
@@ -68,7 +68,7 @@ func Test__OnMergeRequest__HandleWebhook__ActionMatch(t *testing.T) {
 	})
 
 	events := &contexts.EventContext{}
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers: gitlabHeaders("Merge Request Hook", "token"),
 		Body:    body,
 		Configuration: map[string]any{
@@ -96,7 +96,7 @@ func Test__OnMergeRequest__HandleWebhook__ActionMismatch(t *testing.T) {
 	})
 
 	events := &contexts.EventContext{}
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Merge Request Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "actions": []string{"open"}},

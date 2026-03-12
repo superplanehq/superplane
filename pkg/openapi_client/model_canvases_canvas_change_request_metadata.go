@@ -21,16 +21,18 @@ var _ MappedNullable = &CanvasesCanvasChangeRequestMetadata{}
 
 // CanvasesCanvasChangeRequestMetadata struct for CanvasesCanvasChangeRequestMetadata
 type CanvasesCanvasChangeRequestMetadata struct {
-	Id          *string                            `json:"id,omitempty"`
-	CanvasId    *string                            `json:"canvasId,omitempty"`
-	VersionId   *string                            `json:"versionId,omitempty"`
-	Owner       *SuperplaneCanvasesUserRef         `json:"owner,omitempty"`
-	Status      *CanvasesCanvasChangeRequestStatus `json:"status,omitempty"`
-	PublishedAt *time.Time                         `json:"publishedAt,omitempty"`
-	CreatedAt   *time.Time                         `json:"createdAt,omitempty"`
-	UpdatedAt   *time.Time                         `json:"updatedAt,omitempty"`
-	Title       *string                            `json:"title,omitempty"`
-	Description *string                            `json:"description,omitempty"`
+	Id               *string                            `json:"id,omitempty"`
+	CanvasId         *string                            `json:"canvasId,omitempty"`
+	VersionId        *string                            `json:"versionId,omitempty"`
+	Owner            *SuperplaneCanvasesUserRef         `json:"owner,omitempty"`
+	BasedOnVersionId *string                            `json:"basedOnVersionId,omitempty"`
+	Status           *CanvasesCanvasChangeRequestStatus `json:"status,omitempty"`
+	PublishedAt      *time.Time                         `json:"publishedAt,omitempty"`
+	CreatedAt        *time.Time                         `json:"createdAt,omitempty"`
+	UpdatedAt        *time.Time                         `json:"updatedAt,omitempty"`
+	Title            *string                            `json:"title,omitempty"`
+	Description      *string                            `json:"description,omitempty"`
+	IsConflicted     *bool                              `json:"isConflicted,omitempty"`
 }
 
 // NewCanvasesCanvasChangeRequestMetadata instantiates a new CanvasesCanvasChangeRequestMetadata object
@@ -180,6 +182,38 @@ func (o *CanvasesCanvasChangeRequestMetadata) HasOwner() bool {
 // SetOwner gets a reference to the given SuperplaneCanvasesUserRef and assigns it to the Owner field.
 func (o *CanvasesCanvasChangeRequestMetadata) SetOwner(v SuperplaneCanvasesUserRef) {
 	o.Owner = &v
+}
+
+// GetBasedOnVersionId returns the BasedOnVersionId field value if set, zero value otherwise.
+func (o *CanvasesCanvasChangeRequestMetadata) GetBasedOnVersionId() string {
+	if o == nil || IsNil(o.BasedOnVersionId) {
+		var ret string
+		return ret
+	}
+	return *o.BasedOnVersionId
+}
+
+// GetBasedOnVersionIdOk returns a tuple with the BasedOnVersionId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasChangeRequestMetadata) GetBasedOnVersionIdOk() (*string, bool) {
+	if o == nil || IsNil(o.BasedOnVersionId) {
+		return nil, false
+	}
+	return o.BasedOnVersionId, true
+}
+
+// HasBasedOnVersionId returns a boolean if a field has been set.
+func (o *CanvasesCanvasChangeRequestMetadata) HasBasedOnVersionId() bool {
+	if o != nil && !IsNil(o.BasedOnVersionId) {
+		return true
+	}
+
+	return false
+}
+
+// SetBasedOnVersionId gets a reference to the given string and assigns it to the BasedOnVersionId field.
+func (o *CanvasesCanvasChangeRequestMetadata) SetBasedOnVersionId(v string) {
+	o.BasedOnVersionId = &v
 }
 
 // GetStatus returns the Status field value if set, zero value otherwise.
@@ -374,6 +408,38 @@ func (o *CanvasesCanvasChangeRequestMetadata) SetDescription(v string) {
 	o.Description = &v
 }
 
+// GetIsConflicted returns the IsConflicted field value if set, zero value otherwise.
+func (o *CanvasesCanvasChangeRequestMetadata) GetIsConflicted() bool {
+	if o == nil || IsNil(o.IsConflicted) {
+		var ret bool
+		return ret
+	}
+	return *o.IsConflicted
+}
+
+// GetIsConflictedOk returns a tuple with the IsConflicted field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasChangeRequestMetadata) GetIsConflictedOk() (*bool, bool) {
+	if o == nil || IsNil(o.IsConflicted) {
+		return nil, false
+	}
+	return o.IsConflicted, true
+}
+
+// HasIsConflicted returns a boolean if a field has been set.
+func (o *CanvasesCanvasChangeRequestMetadata) HasIsConflicted() bool {
+	if o != nil && !IsNil(o.IsConflicted) {
+		return true
+	}
+
+	return false
+}
+
+// SetIsConflicted gets a reference to the given bool and assigns it to the IsConflicted field.
+func (o *CanvasesCanvasChangeRequestMetadata) SetIsConflicted(v bool) {
+	o.IsConflicted = &v
+}
+
 func (o CanvasesCanvasChangeRequestMetadata) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -396,6 +462,9 @@ func (o CanvasesCanvasChangeRequestMetadata) ToMap() (map[string]interface{}, er
 	if !IsNil(o.Owner) {
 		toSerialize["owner"] = o.Owner
 	}
+	if !IsNil(o.BasedOnVersionId) {
+		toSerialize["basedOnVersionId"] = o.BasedOnVersionId
+	}
 	if !IsNil(o.Status) {
 		toSerialize["status"] = o.Status
 	}
@@ -413,6 +482,9 @@ func (o CanvasesCanvasChangeRequestMetadata) ToMap() (map[string]interface{}, er
 	}
 	if !IsNil(o.Description) {
 		toSerialize["description"] = o.Description
+	}
+	if !IsNil(o.IsConflicted) {
+		toSerialize["isConflicted"] = o.IsConflicted
 	}
 	return toSerialize, nil
 }

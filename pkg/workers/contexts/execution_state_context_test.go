@@ -46,12 +46,28 @@ func Test__ExecutionStateContext__Emit(t *testing.T) {
 		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNodeID, "default", nil, rootData)
 		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID, nil)
 
-		ctx := NewExecutionStateContext(database.Conn(), execution)
+		ctx := NewExecutionStateContext(database.Conn(), execution, nil)
 		largePayload := strings.Repeat("a", DefaultMaxPayloadSize+100)
 
 		err := ctx.Emit("default", "test.payload", []any{largePayload})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "event payload too large")
 		support.VerifyCanvasNodeEventsCount(t, canvas.ID, componentNodeID, 0)
+	})
+
+	t.Run("uses callback", func(t *testing.T) {
+		newEvents := []models.CanvasEvent{}
+		onNewEvents := func(events []models.CanvasEvent) {
+			newEvents = append(newEvents, events...)
+		}
+
+		rootData := map[string]any{"root": "event"}
+		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNodeID, "default", nil, rootData)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID, nil)
+
+		ctx := NewExecutionStateContext(database.Conn(), execution, onNewEvents)
+		err := ctx.Emit("default", "test.payload", []any{map[string]any{"n": 1}})
+		require.NoError(t, err)
+		assert.Len(t, newEvents, 1)
 	})
 }

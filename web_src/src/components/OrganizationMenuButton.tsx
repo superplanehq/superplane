@@ -17,6 +17,7 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
 
@@ -165,42 +166,50 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
                 const MenuIcon = link.Icon;
                 const allowed =
                   !link.permission || permissionsLoading || canAct(link.permission.resource, link.permission.action);
-                const linkButton = (
-                  <button
+
+                if (!allowed) {
+                  return (
+                    <PermissionTooltip
+                      key={link.label}
+                      allowed={false}
+                      message={`You don't have permission to view ${link.label.toLowerCase()}.`}
+                      className="w-full"
+                    >
+                      <button
+                        type="button"
+                        className={cn(
+                          "group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800",
+                          "opacity-60 cursor-not-allowed hover:bg-transparent hover:text-gray-500",
+                        )}
+                        disabled
+                      >
+                        <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                        <span>{link.label}</span>
+                        <Lock size={12} className="ml-auto text-gray-400" />
+                      </button>
+                    </PermissionTooltip>
+                  );
+                }
+
+                return link.href ? (
+                  <Link
                     key={link.label}
-                    type="button"
-                    onClick={() => {
-                      if (!allowed) return;
-                      setIsMenuOpen(false);
-                      if (link.href) {
-                        window.location.href = link.href;
-                      }
-                    }}
-                    className={cn(
-                      "group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800",
-                      !allowed && "opacity-60 cursor-not-allowed hover:bg-transparent hover:text-gray-500",
-                    )}
-                    disabled={!allowed}
+                    to={link.href}
+                    onClick={() => setIsMenuOpen(false)}
+                    className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
                   >
                     <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
                     <span>{link.label}</span>
-                    {!allowed && <Lock size={12} className="ml-auto text-gray-400" />}
-                  </button>
-                );
-
-                if (allowed) {
-                  return linkButton;
-                }
-
-                return (
-                  <PermissionTooltip
+                  </Link>
+                ) : (
+                  <button
                     key={link.label}
-                    allowed={false}
-                    message={`You don't have permission to view ${link.label.toLowerCase()}.`}
-                    className="w-full"
+                    type="button"
+                    className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
                   >
-                    {linkButton}
-                  </PermissionTooltip>
+                    <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                    <span>{link.label}</span>
+                  </button>
                 );
               })}
             </div>
@@ -219,15 +228,15 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
               {sidebarUserLinks.map((link) => {
                 const MenuIcon = link.Icon;
                 return link.href ? (
-                  <a
+                  <Link
                     key={link.label}
-                    href={link.href}
+                    to={link.href}
                     className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
                     <span>{link.label}</span>
-                  </a>
+                  </Link>
                 ) : (
                   <button
                     key={link.label}

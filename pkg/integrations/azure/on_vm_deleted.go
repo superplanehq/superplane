@@ -175,28 +175,28 @@ func (t *OnVMDeleted) Setup(ctx core.TriggerContext) error {
 }
 
 // HandleWebhook processes Event Grid webhook requests.
-func (t *OnVMDeleted) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnVMDeleted) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	if err := t.authenticateWebhook(ctx); err != nil {
 		ctx.Logger.Warnf("Webhook authentication failed: %v", err)
-		return http.StatusUnauthorized, err
+		return http.StatusUnauthorized, nil, err
 	}
 
 	config := OnVMDeletedConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	// Parse as typed structs for filtering logic.
 	var events []EventGridEvent
 	if err := json.Unmarshal(ctx.Body, &events); err != nil {
 		ctx.Logger.Errorf("Failed to parse Event Grid events: %v", err)
-		return http.StatusBadRequest, fmt.Errorf("failed to parse events: %w", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("failed to parse events: %w", err)
 	}
 
 	// Also parse as raw maps so we can emit the full, unmodified event data.
 	var rawEvents []map[string]any
 	if err := json.Unmarshal(ctx.Body, &rawEvents); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("failed to parse raw events: %w", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("failed to parse raw events: %w", err)
 	}
 
 	ctx.Logger.Infof("Received %d Event Grid event(s), raw body length: %d bytes", len(events), len(ctx.Body))
@@ -206,9 +206,9 @@ func (t *OnVMDeleted) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 
 		if event.EventType == EventTypeSubscriptionValidation {
 			if err := t.handleSubscriptionValidation(ctx, event); err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, nil, err
 			}
-			return http.StatusOK, nil
+			return http.StatusOK, nil, nil
 		}
 
 		if event.EventType == EventTypeResourceDeleteSuccess {
@@ -219,7 +219,7 @@ func (t *OnVMDeleted) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		}
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 // handleSubscriptionValidation validates Event Grid subscription using the

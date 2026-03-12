@@ -157,7 +157,7 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		body := make([]byte, MaxEventSize+1)
 		ctx, _ := webhookRequestContext(body, "none", "secret")
 
-		status, err := webhook.HandleWebhook(ctx)
+		status, _, err := webhook.HandleWebhook(ctx)
 		require.Equal(t, http.StatusRequestEntityTooLarge, status)
 		require.Error(t, err)
 	})
@@ -166,7 +166,7 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		webhook := &Webhook{}
 		ctx, _ := webhookRequestContext([]byte("not-json"), "none", "secret")
 
-		status, err := webhook.HandleWebhook(ctx)
+		status, _, err := webhook.HandleWebhook(ctx)
 		require.Equal(t, http.StatusBadRequest, status)
 		require.Error(t, err)
 	})
@@ -175,7 +175,7 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		webhook := &Webhook{}
 		ctx, _ := webhookRequestContext([]byte(`{"ok":true}`), "signature", "secret")
 
-		status, err := webhook.HandleWebhook(ctx)
+		status, _, err := webhook.HandleWebhook(ctx)
 		require.Equal(t, http.StatusForbidden, status)
 		require.Error(t, err)
 	})
@@ -185,7 +185,7 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		ctx, _ := webhookRequestContext([]byte(`{"ok":true}`), "signature", "secret")
 		ctx.Headers.Set("X-Signature-256", "sha256=")
 
-		status, err := webhook.HandleWebhook(ctx)
+		status, _, err := webhook.HandleWebhook(ctx)
 		require.Equal(t, http.StatusForbidden, status)
 		require.Error(t, err)
 	})
@@ -195,7 +195,7 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		ctx, _ := webhookRequestContext([]byte(`{"ok":true}`), "signature", "secret")
 		ctx.Headers.Set("X-Signature-256", "sha256=invalid")
 
-		status, err := webhook.HandleWebhook(ctx)
+		status, _, err := webhook.HandleWebhook(ctx)
 		require.Equal(t, http.StatusForbidden, status)
 		require.Error(t, err)
 	})
@@ -207,7 +207,7 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		signature := computeSignature("secret", body)
 		ctx.Headers.Set("X-Signature-256", "sha256="+signature)
 
-		status, err := webhook.HandleWebhook(ctx)
+		status, _, err := webhook.HandleWebhook(ctx)
 		require.Equal(t, http.StatusOK, status)
 		require.NoError(t, err)
 
@@ -225,7 +225,7 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		webhook := &Webhook{}
 		ctx, _ := webhookRequestContext([]byte(`{"ok":true}`), "bearer", "secret")
 
-		status, err := webhook.HandleWebhook(ctx)
+		status, _, err := webhook.HandleWebhook(ctx)
 		require.Equal(t, http.StatusUnauthorized, status)
 		require.Error(t, err)
 	})
@@ -235,7 +235,7 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		ctx, _ := webhookRequestContext([]byte(`{"ok":true}`), "bearer", "secret")
 		ctx.Headers.Set("Authorization", "Bearer wrong")
 
-		status, err := webhook.HandleWebhook(ctx)
+		status, _, err := webhook.HandleWebhook(ctx)
 		require.Equal(t, http.StatusUnauthorized, status)
 		require.Error(t, err)
 	})
@@ -245,7 +245,7 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		ctx, eventCtx := webhookRequestContext([]byte(`{"ok":true}`), "bearer", "secret")
 		ctx.Headers.Set("Authorization", "Bearer secret")
 
-		status, err := webhook.HandleWebhook(ctx)
+		status, _, err := webhook.HandleWebhook(ctx)
 		require.Equal(t, http.StatusOK, status)
 		require.NoError(t, err)
 
@@ -268,7 +268,7 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		require.True(t, ok)
 		config["headerName"] = "X-Test-Token"
 
-		status, err := webhook.HandleWebhook(ctx)
+		status, _, err := webhook.HandleWebhook(ctx)
 		require.Equal(t, http.StatusUnauthorized, status)
 		require.Error(t, err)
 	})
@@ -281,7 +281,7 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		config["headerName"] = "X-Test-Token"
 		ctx.Headers.Set("X-Test-Token", "wrong")
 
-		status, err := webhook.HandleWebhook(ctx)
+		status, _, err := webhook.HandleWebhook(ctx)
 		require.Equal(t, http.StatusUnauthorized, status)
 		require.Error(t, err)
 	})
@@ -294,7 +294,7 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		config["headerName"] = "X-Test-Token"
 		ctx.Headers.Set("X-Test-Token", "secret")
 
-		status, err := webhook.HandleWebhook(ctx)
+		status, _, err := webhook.HandleWebhook(ctx)
 		require.Equal(t, http.StatusOK, status)
 		require.NoError(t, err)
 
@@ -315,7 +315,7 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		ctx, eventCtx := webhookRequestContext([]byte(`{"ok":true}`), "header_token", "secret")
 		ctx.Headers.Set(DefaultHeaderTokenName, "secret")
 
-		status, err := webhook.HandleWebhook(ctx)
+		status, _, err := webhook.HandleWebhook(ctx)
 		require.Equal(t, http.StatusOK, status)
 		require.NoError(t, err)
 

@@ -33,13 +33,13 @@ func Test__UpdateOrganization(t *testing.T) {
 	})
 
 	t.Run("update organization by ID -> success", func(t *testing.T) {
-		canvasSandboxModeEnabled := false
+		canvasVersioningEnabled := true
 
 		updatedOrg := &protos.Organization{
 			Metadata: &protos.Organization_Metadata{
-				Name:                     "updated-org",
-				Description:              "Updated description",
-				CanvasSandboxModeEnabled: &canvasSandboxModeEnabled,
+				Name:                    "updated-org",
+				Description:             "Updated description",
+				CanvasVersioningEnabled: &canvasVersioningEnabled,
 			},
 		}
 
@@ -53,12 +53,12 @@ func Test__UpdateOrganization(t *testing.T) {
 		assert.Equal(t, "Updated description", response.Organization.Metadata.Description)
 		assert.Equal(t, *r.Organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime())
 		assert.True(t, response.Organization.Metadata.UpdatedAt.AsTime().After(*r.Organization.UpdatedAt))
-		require.NotNil(t, response.Organization.Metadata.CanvasSandboxModeEnabled)
-		assert.Equal(t, canvasSandboxModeEnabled, response.Organization.Metadata.GetCanvasSandboxModeEnabled())
+		require.NotNil(t, response.Organization.Metadata.CanvasVersioningEnabled)
+		assert.Equal(t, canvasVersioningEnabled, response.Organization.Metadata.GetCanvasVersioningEnabled())
 
 		organization, err := models.FindOrganizationByID(r.Organization.ID.String())
 		require.NoError(t, err)
-		assert.Equal(t, canvasSandboxModeEnabled, organization.CanvasSandboxModeEnabled)
+		assert.Equal(t, canvasVersioningEnabled, organization.CanvasVersioningEnabled)
 	})
 
 	t.Run("nil organization -> error", func(t *testing.T) {

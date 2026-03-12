@@ -16,7 +16,7 @@ func Test__OnTag__HandleWebhook__FullRefMatch(t *testing.T) {
 	body := []byte(`{"ref":"refs/tags/v1.0.0","event_name":"tag_push"}`)
 	events := &contexts.EventContext{}
 
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers: gitlabHeaders("Tag Push Hook", "token"),
 		Body:    body,
 		Configuration: map[string]any{
@@ -41,7 +41,7 @@ func Test__OnTag__HandleWebhook__TagNameMatch(t *testing.T) {
 	body := []byte(`{"ref":"refs/tags/v1.0.0","event_name":"tag_push"}`)
 	events := &contexts.EventContext{}
 
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers: gitlabHeaders("Tag Push Hook", "token"),
 		Body:    body,
 		Configuration: map[string]any{
@@ -66,7 +66,7 @@ func Test__OnTag__HandleWebhook__TagMismatch(t *testing.T) {
 	body := []byte(`{"ref":"refs/tags/v2.0.0","event_name":"tag_push"}`)
 	events := &contexts.EventContext{}
 
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers: gitlabHeaders("Tag Push Hook", "token"),
 		Body:    body,
 		Configuration: map[string]any{

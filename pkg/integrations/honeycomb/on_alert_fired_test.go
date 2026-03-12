@@ -59,7 +59,7 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 	body := []byte(`{"id":"trigger-abc","name":"High Error Rate","status":"TRIGGERED"}`)
 
 	t.Run("missing token -> 401", func(t *testing.T) {
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       http.Header{},
 			Body:          body,
 			Configuration: validConfig,
@@ -75,7 +75,7 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 		h := http.Header{}
 		h.Set("X-Honeycomb-Webhook-Token", "wrong-secret-xx")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       h,
 			Body:          body,
 			Configuration: validConfig,
@@ -92,7 +92,7 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 		h.Set("X-Honeycomb-Webhook-Token", "test-secret")
 
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       h,
 			Body:          []byte(`not valid json`),
 			Configuration: validConfig,
@@ -113,7 +113,7 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 		_ = meta.Set(OnAlertFiredNodeMetadata{TriggerID: "trigger-abc"})
 
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       h,
 			Body:          body,
 			Configuration: validConfig,
@@ -135,7 +135,7 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 		_ = meta.Set(OnAlertFiredNodeMetadata{TriggerID: "different-trigger"})
 
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       h,
 			Body:          body,
 			Configuration: validConfig,
@@ -153,7 +153,7 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 		h.Set("X-Honeycomb-Webhook-Token", "test-secret")
 
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       h,
 			Body:          body,
 			Configuration: validConfig,
@@ -174,7 +174,7 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 		_ = meta.Set(OnAlertFiredNodeMetadata{TriggerID: "trigger-abc"})
 
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       h,
 			Body:          body,
 			Configuration: validConfig,

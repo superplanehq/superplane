@@ -9,39 +9,22 @@ import (
 )
 
 type canvasVersioningContext struct {
-	currentUserID      string
-	sandboxModeEnabled bool
+	versioningEnabled bool
 }
 
-func resolveCanvasVersioningContext(ctx core.CommandContext) (*canvasVersioningContext, error) {
-	me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
-	if err != nil {
-		return nil, err
-	}
-
-	currentUserID := strings.TrimSpace(me.GetId())
-	if currentUserID == "" {
-		return nil, fmt.Errorf("user id not found for authenticated user")
-	}
-
-	organizationID := strings.TrimSpace(me.GetOrganizationId())
-	if organizationID == "" {
-		return nil, fmt.Errorf("organization id not found for authenticated user")
-	}
-
-	organizationResponse, _, err := ctx.API.OrganizationAPI.
-		OrganizationsDescribeOrganization(ctx.Context, organizationID).
+func resolveCanvasVersioningContext(ctx core.CommandContext, canvasID string) (*canvasVersioningContext, error) {
+	canvasResponse, _, err := ctx.API.CanvasAPI.
+		CanvasesDescribeCanvas(ctx.Context, canvasID).
 		Execute()
 	if err != nil {
 		return nil, err
 	}
-	if organizationResponse.Organization == nil || organizationResponse.Organization.Metadata == nil {
-		return nil, fmt.Errorf("organization metadata not found")
+	if canvasResponse.Canvas == nil || canvasResponse.Canvas.Metadata == nil {
+		return nil, fmt.Errorf("canvas metadata not found")
 	}
 
 	return &canvasVersioningContext{
-		currentUserID:      currentUserID,
-		sandboxModeEnabled: organizationResponse.Organization.Metadata.GetCanvasSandboxModeEnabled(),
+		versioningEnabled: canvasResponse.Canvas.Metadata.GetCanvasVersioningEnabled(),
 	}, nil
 }
 

@@ -385,8 +385,8 @@ func (c *CreateVMComponent) HandleAction(ctx core.ActionContext) error {
 	return fmt.Errorf("no actions defined for this component")
 }
 
-func (c *CreateVMComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *CreateVMComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *CreateVMComponent) Cleanup(ctx core.SetupContext) error {

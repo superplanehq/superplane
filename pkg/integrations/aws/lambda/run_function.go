@@ -211,8 +211,8 @@ func (c *RunFunction) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *RunFunction) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *RunFunction) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func resolveLambdaRegion(appRegion string, functionArn string) (string, error) {

@@ -186,8 +186,8 @@ func (c *DeleteVMComponent) HandleAction(ctx core.ActionContext) error {
 	return fmt.Errorf("no actions defined for this component")
 }
 
-func (c *DeleteVMComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *DeleteVMComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *DeleteVMComponent) Cleanup(ctx core.SetupContext) error {

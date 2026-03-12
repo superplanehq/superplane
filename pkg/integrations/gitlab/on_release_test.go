@@ -15,7 +15,7 @@ func Test__OnRelease__HandleWebhook__ActionMatch(t *testing.T) {
 	body := []byte(`{"action":"create","name":"v1.2.0"}`)
 	events := &contexts.EventContext{}
 
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Release Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "actions": []string{"create"}},
@@ -35,7 +35,7 @@ func Test__OnRelease__HandleWebhook__ActionMismatch(t *testing.T) {
 	body := []byte(`{"action":"delete","name":"v1.2.0"}`)
 	events := &contexts.EventContext{}
 
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Release Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "actions": []string{"create"}},

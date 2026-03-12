@@ -66,12 +66,12 @@ func CreateCanvasChangeRequestWithMetadata(
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	sandboxModeEnabled, modeErr := isCanvasSandboxModeEnabled(organizationID)
+	versioningEnabled, modeErr := isCanvasVersioningEnabledForCanvas(canvas)
 	if modeErr != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load organization sandbox mode: %v", modeErr)
+		return nil, status.Errorf(codes.Internal, "failed to load canvas versioning: %v", modeErr)
 	}
-	if sandboxModeEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled in sandbox mode")
+	if !versioningEnabled {
+		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this canvas")
 	}
 
 	userUUID := uuid.MustParse(userID)
@@ -113,14 +113,6 @@ func CreateCanvasChangeRequestWithMetadata(
 			return status.Error(codes.FailedPrecondition, "published versions cannot create change requests")
 		}
 
-		liveVersion, findLiveVersionErr := models.FindCanvasVersionInTransaction(tx, canvasUUID, *canvasInTx.LiveVersionID)
-		if findLiveVersionErr != nil {
-			if errors.Is(findLiveVersionErr, gorm.ErrRecordNotFound) {
-				return status.Error(codes.FailedPrecondition, "canvas live version not found")
-			}
-			return findLiveVersionErr
-		}
-
 		version, err = models.CreateCanvasSnapshotVersionInTransaction(
 			tx,
 			canvasUUID,
@@ -134,24 +126,26 @@ func CreateCanvasChangeRequestWithMetadata(
 
 		now := time.Now()
 		request = &models.CanvasChangeRequest{
-			ID:          uuid.New(),
-			WorkflowID:  canvasUUID,
-			VersionID:   version.ID,
-			OwnerID:     &userUUID,
-			Title:       requestedTitle,
-			Description: requestedDescription,
-			Status:      models.CanvasChangeRequestStatusOpen,
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+			ID:               uuid.New(),
+			WorkflowID:       canvasUUID,
+			VersionID:        version.ID,
+			OwnerID:          &userUUID,
+			BasedOnVersionID: canvasInTx.LiveVersionID,
+			Title:            requestedTitle,
+			Description:      requestedDescription,
+			Status:           models.CanvasChangeRequestStatusOpen,
+			CreatedAt:        &now,
+			UpdatedAt:        &now,
 		}
 		if request.Title == "" {
 			request.Title = "Update " + canvasInTx.Name
 		}
 
-		changedSet := resolveChangedNodeIDSet(liveVersion.Nodes, liveVersion.Edges, version.Nodes, version.Edges)
-		request.ChangedNodeIDs = resolveOrderedNodeIDs(changedSet, version.Nodes, liveVersion.Nodes)
+		if createErr := tx.Create(request).Error; createErr != nil {
+			return createErr
+		}
 
-		return tx.Create(request).Error
+		return refreshCanvasChangeRequestDiffInTransaction(tx, canvasInTx, version, request)
 	})
 	if err != nil {
 		if status.Code(err) != codes.Unknown {

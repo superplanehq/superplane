@@ -57,7 +57,7 @@ type Trigger interface {
 	/*
 	 * Handler for webhooks
 	 */
-	HandleWebhook(ctx WebhookRequestContext) (int, error)
+	HandleWebhook(ctx WebhookRequestContext) (int, *WebhookResponseBody, error)
 
 	/*
 	 * Setup the trigger.

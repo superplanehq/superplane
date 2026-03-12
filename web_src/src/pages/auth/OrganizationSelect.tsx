@@ -1,7 +1,7 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { Building, Palette, User } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
 
@@ -69,11 +69,6 @@ const OrganizationSelect: React.FC = () => {
     }
   };
 
-  const handleOrganizationSelect = (org: Organization) => {
-    // Redirect to the organization's app route
-    window.location.href = `/${org.id}`;
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-100 p-8">
@@ -118,10 +113,10 @@ const OrganizationSelect: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {organizations.map((org) => (
-              <div
+              <Link
                 key={org.id}
+                to={`/${org.id}`}
                 className="h-48 bg-white dark:bg-gray-900 rounded-md shadow-sm p-6 outline outline-slate-950/10 hover:outline-slate-950/20 hover:shadow-md transition-colors cursor-pointer"
-                onClick={() => handleOrganizationSelect(org)}
               >
                 <div className="flex flex-col h-full justify-between">
                   <div>
@@ -142,12 +137,12 @@ const OrganizationSelect: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
 
-            <div
+            <Link
+              to="/create"
               className="h-48 bg-white/50 hover:bg-white border-1 border-dashed border-gray-400 rounded-lg p-6 flex flex-col items-center justify-center transition-colors cursor-pointer"
-              onClick={() => navigate("/create")}
             >
               <div className="flex items-center">
                 <h4 className="text-lg font-medium text-gray-800 text-center">+ Create new</h4>
@@ -155,7 +150,7 @@ const OrganizationSelect: React.FC = () => {
               <Text className="text-[13px] text-gray-500 font-medium text-center">
                 Start fresh with a new organization
               </Text>
-            </div>
+            </Link>
           </div>
         </div>
       </div>

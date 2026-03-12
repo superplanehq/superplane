@@ -182,7 +182,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		HTTP:          registry.HTTPContext(),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
-		Events:        contexts.NewEventContext(tx, node),
+		Events:        contexts.NewEventContext(tx, node, nil),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
 	}
 
@@ -199,6 +199,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 			integration,
 			encryptor,
 			registry,
+			nil,
 		)
 	}
 
@@ -239,6 +240,7 @@ func setupComponent(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor
 			integration,
 			encryptor,
 			registry,
+			nil,
 		)
 	}
 

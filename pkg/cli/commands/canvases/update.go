@@ -59,19 +59,19 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		current = &canvas
 	}
 
-	versioningContext, err := resolveCanvasVersioningContext(ctx)
+	versioningContext, err := resolveCanvasVersioningContext(ctx, canvasID)
 	if err != nil {
 		return err
 	}
 
 	targetVersionID := ""
-	if versioningContext.sandboxModeEnabled {
+	if !versioningContext.versioningEnabled {
 		if draftMode {
-			return fmt.Errorf("--draft cannot be used when canvas sandbox mode is enabled")
+			return fmt.Errorf("--draft cannot be used when effective canvas versioning is disabled")
 		}
 	} else {
 		if !draftMode {
-			return fmt.Errorf("canvas versioning is enabled for this organization; use --draft to update your edit version")
+			return fmt.Errorf("effective canvas versioning is enabled for this canvas; use --draft")
 		}
 
 		targetVersionID, err = ensureCurrentUserDraftVersionID(ctx, canvasID)

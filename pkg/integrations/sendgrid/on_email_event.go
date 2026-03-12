@@ -149,19 +149,19 @@ func (t *OnEmailEvent) HandleAction(ctx core.TriggerActionContext) (map[string]a
 	return nil, nil
 }
 
-func (t *OnEmailEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnEmailEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	config := OnEmailEventConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	if err := verifySignedWebhook(ctx); err != nil {
-		return http.StatusForbidden, err
+		return http.StatusForbidden, nil, err
 	}
 
 	events, err := parseWebhookEvents(ctx.Body)
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	emitted := 0
@@ -180,16 +180,16 @@ func (t *OnEmailEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 		}
 
 		if err := ctx.Events.Emit(EmailEventPayloadType, event); err != nil {
-			return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+			return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 		}
 		emitted++
 	}
 
 	if emitted == 0 {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (t *OnEmailEvent) Cleanup(ctx core.TriggerContext) error {

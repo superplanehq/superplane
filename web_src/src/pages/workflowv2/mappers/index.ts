@@ -92,6 +92,12 @@ import {
   customFieldRenderers as incidentCustomFieldRenderers,
 } from "./incident/index";
 import {
+  componentMappers as newrelicComponentMappers,
+  customFieldRenderers as newrelicCustomFieldRenderers,
+  triggerRenderers as newrelicTriggerRenderers,
+  eventStateRegistry as newrelicEventStateRegistry,
+} from "./newrelic/index";
+import {
   componentMappers as firehydrantComponentMappers,
   triggerRenderers as firehydrantTriggerRenderers,
   eventStateRegistry as firehydrantEventStateRegistry,
@@ -264,6 +270,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   render: renderComponentMappers,
   rootly: rootlyComponentMappers,
   incident: incidentComponentMappers,
+  newrelic: newrelicComponentMappers,
   firehydrant: firehydrantComponentMappers,
   launchdarkly: launchdarklyComponentMappers,
   aws: awsComponentMappers,
@@ -303,6 +310,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   render: renderTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   incident: incidentTriggerRenderers,
+  newrelic: newrelicTriggerRenderers,
   firehydrant: firehydrantTriggerRenderers,
   launchdarkly: launchdarklyTriggerRenderers,
   aws: awsTriggerRenderers,
@@ -345,6 +353,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   teams: teamsEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   incident: incidentEventStateRegistry,
+  newrelic: newrelicEventStateRegistry,
   octopus: octopusEventStateRegistry,
   firehydrant: firehydrantEventStateRegistry,
   launchdarkly: launchdarklyEventStateRegistry,
@@ -390,6 +399,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
   grafana: grafanaCustomFieldRenderers,
+  newrelic: newrelicCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
   incident: incidentCustomFieldRenderers,

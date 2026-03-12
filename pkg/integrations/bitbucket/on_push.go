@@ -125,17 +125,17 @@ func (p *OnPush) HandleAction(ctx core.TriggerActionContext) (map[string]any, er
 	return nil, nil
 }
 
-func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	//
 	// Verify the event type.
 	//
 	eventKey := ctx.Headers.Get("X-Event-Key")
 	if eventKey == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing X-Event-Key header")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing X-Event-Key header")
 	}
 
 	if eventKey != "repo:push" {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	//
@@ -143,21 +143,21 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	//
 	signature := ctx.Headers.Get("X-Hub-Signature")
 	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("missing X-Hub-Signature header")
+		return http.StatusForbidden, nil, fmt.Errorf("missing X-Hub-Signature header")
 	}
 
 	signature = strings.TrimPrefix(signature, "sha256=")
 	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("invalid signature format")
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature format")
 	}
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error getting webhook secret")
+		return http.StatusInternalServerError, nil, fmt.Errorf("error getting webhook secret")
 	}
 
 	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
 	}
 
 	//
@@ -166,7 +166,7 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	data := map[string]any{}
 	err = json.Unmarshal(ctx.Body, &data)
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	//
@@ -175,24 +175,24 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	config := OnPushConfiguration{}
 	err = mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	ref := extractRef(data)
 	if ref == "" {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	if !configuration.MatchesAnyPredicate(config.Refs, ref) {
-		return http.StatusOK, nil
+		return http.StatusOK, nil, nil
 	}
 
 	err = ctx.Events.Emit("bitbucket.push", data)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (p *OnPush) Cleanup(ctx core.TriggerContext) error {

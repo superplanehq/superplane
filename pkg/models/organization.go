@@ -13,14 +13,14 @@ import (
 )
 
 type Organization struct {
-	ID                       uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Name                     string    `gorm:"uniqueIndex"`
-	Description              string
-	AllowedProviders         datatypes.JSONSlice[string]
-	CanvasSandboxModeEnabled bool
-	CreatedAt                *time.Time
-	UpdatedAt                *time.Time
-	DeletedAt                gorm.DeletedAt `gorm:"index"`
+	ID                      uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Name                    string    `gorm:"uniqueIndex"`
+	Description             string
+	AllowedProviders        datatypes.JSONSlice[string]
+	CanvasVersioningEnabled bool
+	CreatedAt               *time.Time
+	UpdatedAt               *time.Time
+	DeletedAt               gorm.DeletedAt `gorm:"index"`
 }
 
 func (o *Organization) IsProviderAllowed(provider string) bool {
@@ -84,12 +84,12 @@ func CreateOrganization(name, description string) (*Organization, error) {
 func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Organization, error) {
 	now := time.Now()
 	organization := Organization{
-		Name:                     name,
-		Description:              description,
-		AllowedProviders:         datatypes.JSONSlice[string]{ProviderGitHub},
-		CanvasSandboxModeEnabled: true,
-		CreatedAt:                &now,
-		UpdatedAt:                &now,
+		Name:                    name,
+		Description:             description,
+		AllowedProviders:        datatypes.JSONSlice[string]{ProviderGitHub},
+		CanvasVersioningEnabled: false,
+		CreatedAt:               &now,
+		UpdatedAt:               &now,
 	}
 
 	err := tx.
@@ -146,14 +146,14 @@ func GetActiveOrganizationIDs() ([]string, error) {
 	return orgIDs, nil
 }
 
-func IsCanvasSandboxModeEnabled(organizationID uuid.UUID) (bool, error) {
-	return IsCanvasSandboxModeEnabledInTransaction(database.Conn(), organizationID)
+func IsCanvasVersioningEnabled(organizationID uuid.UUID) (bool, error) {
+	return IsCanvasVersioningEnabledInTransaction(database.Conn(), organizationID)
 }
 
-func IsCanvasSandboxModeEnabledInTransaction(tx *gorm.DB, organizationID uuid.UUID) (bool, error) {
+func IsCanvasVersioningEnabledInTransaction(tx *gorm.DB, organizationID uuid.UUID) (bool, error) {
 	var organization Organization
 	err := tx.
-		Select("canvas_sandbox_mode_enabled").
+		Select("canvas_versioning_enabled").
 		Where("id = ?", organizationID).
 		First(&organization).
 		Error
@@ -161,5 +161,5 @@ func IsCanvasSandboxModeEnabledInTransaction(tx *gorm.DB, organizationID uuid.UU
 		return false, err
 	}
 
-	return organization.CanvasSandboxModeEnabled, nil
+	return organization.CanvasVersioningEnabled, nil
 }
