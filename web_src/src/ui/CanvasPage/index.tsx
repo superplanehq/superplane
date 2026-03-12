@@ -1795,20 +1795,23 @@ function CanvasContent({
     }, []),
   });
 
+  const multiSelectedNodeIds = useMemo(() => new Set(multiSelectedNodes.map((n) => n.id)), [multiSelectedNodes]);
+
   const selectionToolbarFlowPos = useMemo(() => {
-    if (multiSelectedNodes.length < 2) return null;
+    if (multiSelectedNodeIds.size < 2) return null;
 
     let minY = Infinity;
     let maxX = -Infinity;
 
-    for (const node of multiSelectedNodes) {
+    for (const node of state.nodes) {
+      if (!multiSelectedNodeIds.has(node.id)) continue;
       const w = node.measured?.width ?? node.width ?? 240;
       if (node.position.y < minY) minY = node.position.y;
       if (node.position.x + w > maxX) maxX = node.position.x + w;
     }
 
     return { x: maxX, y: minY };
-  }, [multiSelectedNodes]);
+  }, [multiSelectedNodeIds, state.nodes]);
 
   useEffect(() => {
     const activeNoteId = getActiveNoteId();
