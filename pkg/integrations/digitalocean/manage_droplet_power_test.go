@@ -56,7 +56,19 @@ func Test__ManageDropletPower__Setup(t *testing.T) {
 				"droplet":   "98765432",
 				"operation": "power_on",
 			},
-			HTTP: &contexts.HTTPContext{},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"droplet": {
+								"id": 98765432,
+								"name": "test-droplet"
+							}
+						}`)),
+					},
+				},
+			},
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
 					"apiToken": "test-token",
@@ -74,7 +86,19 @@ func Test__ManageDropletPower__Setup(t *testing.T) {
 				"droplet":   "98765432",
 				"operation": "shutdown",
 			},
-			HTTP: &contexts.HTTPContext{},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"droplet": {
+								"id": 98765432,
+								"name": "test-droplet"
+							}
+						}`)),
+					},
+				},
+			},
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
 					"apiToken": "test-token",
