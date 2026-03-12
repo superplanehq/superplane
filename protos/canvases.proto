@@ -423,7 +423,6 @@ message CanvasAutoLayout {
     SCOPE_UNSPECIFIED = 0;
     SCOPE_FULL_CANVAS = 1;
     SCOPE_CONNECTED_COMPONENT = 2;
-    SCOPE_EXACT_SET = 3;
   }
 
   Algorithm algorithm = 1;

@@ -78,7 +78,6 @@ const (
 	CanvasAutoLayout_SCOPE_UNSPECIFIED         CanvasAutoLayout_Scope = 0
 	CanvasAutoLayout_SCOPE_FULL_CANVAS         CanvasAutoLayout_Scope = 1
 	CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT CanvasAutoLayout_Scope = 2
-	CanvasAutoLayout_SCOPE_EXACT_SET           CanvasAutoLayout_Scope = 3
 )
 
 // Enum value maps for CanvasAutoLayout_Scope.
@@ -87,13 +86,11 @@ var (
 		0: "SCOPE_UNSPECIFIED",
 		1: "SCOPE_FULL_CANVAS",
 		2: "SCOPE_CONNECTED_COMPONENT",
-		3: "SCOPE_EXACT_SET",
 	}
 	CanvasAutoLayout_Scope_value = map[string]int32{
 		"SCOPE_UNSPECIFIED":         0,
 		"SCOPE_FULL_CANVAS":         1,
 		"SCOPE_CONNECTED_COMPONENT": 2,
-		"SCOPE_EXACT_SET":           3,
 	}
 )
 
@@ -5723,19 +5720,18 @@ const file_canvases_proto_rawDesc = "" +
 	"\x13CreateCanvasRequest\x123\n" +
 	"\x06canvas\x18\x01 \x01(\v2\x1b.Superplane.Canvases.CanvasR\x06canvas\"K\n" +
 	"\x14CreateCanvasResponse\x123\n" +
-	"\x06canvas\x18\x01 \x01(\v2\x1b.Superplane.Canvases.CanvasR\x06canvas\"\xec\x02\n" +
+	"\x06canvas\x18\x01 \x01(\v2\x1b.Superplane.Canvases.CanvasR\x06canvas\"\xd7\x02\n" +
 	"\x10CanvasAutoLayout\x12M\n" +
 	"\talgorithm\x18\x01 \x01(\x0e2/.Superplane.Canvases.CanvasAutoLayout.AlgorithmR\talgorithm\x12\x19\n" +
 	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\x12A\n" +
 	"\x05scope\x18\x03 \x01(\x0e2+.Superplane.Canvases.CanvasAutoLayout.ScopeR\x05scope\"@\n" +
 	"\tAlgorithm\x12\x19\n" +
 	"\x15ALGORITHM_UNSPECIFIED\x10\x00\x12\x18\n" +
-	"\x14ALGORITHM_HORIZONTAL\x10\x01\"i\n" +
+	"\x14ALGORITHM_HORIZONTAL\x10\x01\"T\n" +
 	"\x05Scope\x12\x15\n" +
 	"\x11SCOPE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11SCOPE_FULL_CANVAS\x10\x01\x12\x1d\n" +
-	"\x19SCOPE_CONNECTED_COMPONENT\x10\x02\x12\x13\n" +
-	"\x0fSCOPE_EXACT_SET\x10\x03\"9\n" +
+	"\x19SCOPE_CONNECTED_COMPONENT\x10\x02\"9\n" +
 	"\x1aCreateCanvasVersionRequest\x12\x1b\n" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\"[\n" +
 	"\x1bCreateCanvasVersionResponse\x12<\n" +

@@ -1,10 +1,11 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 
-	"github.com/ghodss/yaml"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -19,9 +20,19 @@ type Canvas struct {
 }
 
 func ParseCanvas(raw []byte) (*Canvas, error) {
-	var resource Canvas
-	if err := yaml.Unmarshal(raw, &resource); err != nil {
+	var yamlObject any
+	if err := yaml.Unmarshal(raw, &yamlObject); err != nil {
 		return nil, fmt.Errorf("failed to parse canvas resource: %w", err)
+	}
+
+	jsonData, err := json.Marshal(yamlObject)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert canvas resource to json: %w", err)
+	}
+
+	var resource Canvas
+	if err := json.Unmarshal(jsonData, &resource); err != nil {
+		return nil, fmt.Errorf("failed to parse canvas json payload: %w", err)
 	}
 
 	if resource.Kind != CanvasKind {
