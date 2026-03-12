@@ -24,6 +24,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cloud Build • Create Build" href="#cloud-build-•-create-build" description="Create a Cloud Build build and wait for it to finish" />
   <LinkCard title="Cloud Build • Get Build" href="#cloud-build-•-get-build" description="Retrieve a Cloud Build build by ID" />
   <LinkCard title="Cloud Build • Run Trigger" href="#cloud-build-•-run-trigger" description="Run a Cloud Build trigger and wait for the build to finish" />
+  <LinkCard title="Cloud DNS • Create Record" href="#cloud-dns-•-create-record" description="Create a DNS record in a Google Cloud DNS managed zone" />
+  <LinkCard title="Cloud DNS • Delete Record" href="#cloud-dns-•-delete-record" description="Delete a DNS record from a Google Cloud DNS managed zone" />
+  <LinkCard title="Cloud DNS • Update Record" href="#cloud-dns-•-update-record" description="Update an existing DNS record in a Google Cloud DNS managed zone" />
   <LinkCard title="Cloud Functions • Invoke Function" href="#cloud-functions-•-invoke-function" description="Invoke a Google Cloud Function and return the response" />
   <LinkCard title="Compute • Create Virtual Machine" href="#compute-•-create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
   <LinkCard title="Pub/Sub • Create Subscription" href="#pub/sub-•-create-subscription" description="Create a GCP Pub/Sub subscription" />
@@ -523,6 +526,142 @@ The terminal Build resource, including `id`, `status`, `logUrl`, `createTime`, `
   },
   "timestamp": "2025-01-01T00:05:00Z",
   "type": "gcp.cloudbuild.build"
+}
+```
+
+<a id="cloud-dns-•-create-record"></a>
+
+## Cloud DNS • Create Record
+
+The Create Record component creates a new DNS record set in a Google Cloud DNS managed zone.
+
+### Configuration
+
+- **Managed Zone** (required): The Cloud DNS managed zone where the record will be created.
+- **Record Name** (required): The DNS name for the record (e.g. `api.example.com`). A trailing dot is added automatically.
+- **Record Type** (required): The DNS record type (A, AAAA, CNAME, TXT, MX, etc.).
+- **TTL** (required): Time to live in seconds. Defaults to 300.
+- **Record Values** (required): The values for the record (e.g. IP addresses for A records).
+
+### Required IAM roles
+
+The service account must have `roles/dns.admin` or `roles/dns.editor` on the project.
+
+### Output
+
+- `change.id`: The Cloud DNS change ID.
+- `change.status`: The change status (`done`).
+- `change.startTime`: When the change was submitted.
+- `record.name`: The DNS record name.
+- `record.type`: The DNS record type.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "change": {
+      "id": "1",
+      "startTime": "2026-01-28T10:30:00.000Z",
+      "status": "done"
+    },
+    "record": {
+      "name": "api.example.com.",
+      "type": "A"
+    }
+  },
+  "timestamp": "2026-01-28T10:30:00.000Z",
+  "type": "gcp.clouddns.change"
+}
+```
+
+<a id="cloud-dns-•-delete-record"></a>
+
+## Cloud DNS • Delete Record
+
+The Delete Record component deletes a DNS record set from a Google Cloud DNS managed zone.
+
+### Configuration
+
+- **Managed Zone** (required): The Cloud DNS managed zone containing the record.
+- **Record Name** (required): The DNS name of the record to delete (e.g. `api.example.com`).
+- **Record Type** (optional): The DNS record type to delete (A, AAAA, CNAME, TXT, MX, etc.). If not specified, all record sets with the given name are deleted.
+
+### Required IAM roles
+
+The service account must have `roles/dns.admin` or `roles/dns.editor` on the project.
+
+### Output
+
+- `change.id`: The Cloud DNS change ID.
+- `change.status`: The change status (`done`).
+- `change.startTime`: When the change was submitted.
+- `record.name`: The DNS record name.
+- `record.type`: The DNS record type (comma-separated when multiple types were deleted).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "change": {
+      "id": "2",
+      "startTime": "2026-01-28T10:31:00.000Z",
+      "status": "done"
+    },
+    "record": {
+      "name": "old.example.com.",
+      "type": "A"
+    }
+  },
+  "timestamp": "2026-01-28T10:31:00.000Z",
+  "type": "gcp.clouddns.change"
+}
+```
+
+<a id="cloud-dns-•-update-record"></a>
+
+## Cloud DNS • Update Record
+
+The Update Record component updates an existing DNS record set in a Google Cloud DNS managed zone.
+
+### Configuration
+
+- **Managed Zone** (required): The Cloud DNS managed zone containing the record.
+- **Record Name** (required): The DNS name of the record to update (e.g. `api.example.com`).
+- **Record Type** (required): The DNS record type (A, AAAA, CNAME, TXT, MX, etc.).
+- **TTL** (required): New time to live in seconds.
+- **Record Values** (required): The new values for the record.
+
+### Required IAM roles
+
+The service account must have `roles/dns.admin` or `roles/dns.editor` on the project.
+
+### Output
+
+- `change.id`: The Cloud DNS change ID.
+- `change.status`: The change status (`done`).
+- `change.startTime`: When the change was submitted.
+- `record.name`: The DNS record name.
+- `record.type`: The DNS record type.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "change": {
+      "id": "3",
+      "startTime": "2026-01-28T10:32:00.000Z",
+      "status": "done"
+    },
+    "record": {
+      "name": "api.example.com.",
+      "type": "A"
+    }
+  },
+  "timestamp": "2026-01-28T10:32:00.000Z",
+  "type": "gcp.clouddns.change"
 }
 ```
 
