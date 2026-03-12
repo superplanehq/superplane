@@ -1,0 +1,8 @@
+{
+  "data": {
+    "messageId": "1234567890",
+    "topic": "my-topic"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.message.published"
+}

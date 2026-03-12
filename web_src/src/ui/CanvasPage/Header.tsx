@@ -3,8 +3,10 @@ import {
   CloudAlert,
   CloudCheck,
   CloudUpload,
+  Copy,
   Home,
   ChevronDown,
+  Download,
   LogOut,
   Palette,
   RotateCcw,
@@ -20,6 +22,7 @@ import { Link, useParams } from "react-router-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 export interface BreadcrumbItem {
   label: string;
@@ -74,7 +77,6 @@ interface HeaderProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  versioningDisabledTooltip?: string;
   showPendingDraftBadge?: boolean;
 }
 
@@ -115,7 +117,6 @@ export function Header({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  versioningDisabledTooltip,
   showPendingDraftBadge,
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
@@ -124,6 +125,7 @@ export function Header({
   const [isYamlMenuOpen, setIsYamlMenuOpen] = useState(false);
   const [isEditingMenuOpen, setIsEditingMenuOpen] = useState(false);
   const [isSaveMenuOpen, setIsSaveMenuOpen] = useState(false);
+  const [exportAction, setExportAction] = useState<string>("");
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   // Get the workflow name from the workflows list if workflowId is available
@@ -184,11 +186,11 @@ export function Header({
     );
   };
 
-  const isDefaultMode = mode === "default";
+  const isVersioningDisabledMode = mode === "versioning-disabled";
+  const isDefaultMode = mode === "default" || isVersioningDisabledMode;
   const showEditButton = mode === "version-live";
   const showEditingDropdown = mode === "version-edit";
-  const showVersioningDisabledBadge = mode === "versioning-disabled";
-  const showSaveDropdown = mode === "version-edit" || mode === "versioning-disabled";
+  const showSaveDropdown = mode === "version-edit";
   const showSaveUndoActions = showSaveDropdown && !isAutoSaveEnabled && saveState === "unsaved";
   const autoSaveToggleDisabled = autoSaveDisabled || !onToggleAutoSave;
   const saveStatusLabel = saveState === "saving" ? "Saving..." : saveState === "unsaved" ? "Unsaved" : "Saved";
@@ -372,7 +374,40 @@ export function Header({
           <div className="flex items-center gap-2 justify-self-end">
             {isDefaultMode ? (
               <>
-                {onExportYamlCopy && onExportYamlDownload ? (
+                {isVersioningDisabledMode && onExportYamlCopy && onExportYamlDownload ? (
+                  <Select
+                    value={exportAction || undefined}
+                    onValueChange={(value) => {
+                      setExportAction(value);
+                      if (value === "copy") {
+                        onExportYamlCopy();
+                      }
+                      if (value === "download") {
+                        onExportYamlDownload();
+                      }
+                      setExportAction("");
+                    }}
+                  >
+                    <SelectTrigger className="h-5 w-fit min-w-0 rounded-md border-gray-300 px-1 py-0 text-xs font-mono text-gray-500 data-[placeholder]:text-gray-500 shadow-none [&>svg]:hidden">
+                      <SelectValue placeholder=".yaml" />
+                    </SelectTrigger>
+                    <SelectContent align="end">
+                      <SelectItem value="copy">
+                        <span className="flex items-center gap-2">
+                          <Copy className="h-3.5 w-3.5" />
+                          Copy to Clipboard
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="download">
+                        <span className="flex items-center gap-2">
+                          <Download className="h-3.5 w-3.5" />
+                          Download File
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : null}
+                {!isVersioningDisabledMode && onExportYamlCopy && onExportYamlDownload ? (
                   <DropdownMenu open={isYamlMenuOpen} onOpenChange={setIsYamlMenuOpen}>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm" className="h-8 px-2 text-xs font-mono">
@@ -408,7 +443,7 @@ export function Header({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : null}
-                {unsavedMessage ? (
+                {!isVersioningDisabledMode && unsavedMessage ? (
                   <span className="text-xs font-medium text-yellow-700 bg-orange-100 px-2 py-1 rounded hidden sm:inline">
                     {unsavedMessage}
                   </span>
@@ -427,12 +462,16 @@ export function Header({
                         <Switch
                           id="auto-save-toggle"
                           checked={isAutoSaveEnabled}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              onSave?.();
-                            }
-                            onToggleAutoSave?.();
-                          }}
+                          onCheckedChange={
+                            isVersioningDisabledMode
+                              ? onToggleAutoSave
+                              : (checked) => {
+                                  if (checked) {
+                                    onSave?.();
+                                  }
+                                  onToggleAutoSave?.();
+                                }
+                          }
                           disabled={autoSaveDisabled}
                         />
                       </div>,
@@ -462,21 +501,7 @@ export function Header({
               </>
             ) : null}
 
-            {showVersioningDisabledBadge ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="rounded border border-amber-300 bg-amber-100 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-900">
-                    VERSIONING OFF
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  {versioningDisabledTooltip || "Versioning is disabled. Enable canvas versioning in canvas settings."}
-                </TooltipContent>
-              </Tooltip>
-            ) : null}
-
             {pendingDraftBadge}
-
             {showEditingDropdown ? (
               <DropdownMenu open={isEditingMenuOpen} onOpenChange={setIsEditingMenuOpen}>
                 <DropdownMenuTrigger asChild>

@@ -1,4 +1,4 @@
-import type { CanvasesCanvas, ComponentsNode } from "@/api-client";
+import type { BlueprintsBlueprint, CanvasesCanvas, ComponentsComponent, ComponentsNode } from "@/api-client";
 import ELK from "elkjs/lib/elk.bundled.js";
 
 const elk = new ELK();
@@ -10,7 +10,8 @@ const ANNOTATION_NODE_HEIGHT = 200;
 
 type ApplyHorizontalAutoLayoutOptions = {
   nodeIds?: string[];
-  scope?: "full-canvas" | "connected-component" | "exact-set";
+  scope?: "full-canvas" | "connected-component";
+  channelsByNodeId?: Map<string, string[]>;
 };
 
 type LayoutPosition = {
@@ -118,10 +119,6 @@ function resolveScopedNodeIDs(
   const seedNodeIDs = normalizeRequestedNodeIDs(flowNodes, options?.nodeIds || []);
   const scope = resolveLayoutScope(options, seedNodeIDs.length > 0);
 
-  if (scope === "exact-set") {
-    return seedNodeIDs;
-  }
-
   if (scope === "connected-component") {
     return resolveConnectedComponentNodeIDs(workflow, flowNodes, seedNodeIDs);
   }
@@ -147,7 +144,11 @@ function resolveLayoutEdges(workflow: CanvasesCanvas, layoutNodes: ComponentsNod
   );
 }
 
-function buildElkGraph(workflow: CanvasesCanvas, layoutNodes: ComponentsNode[]) {
+function buildElkGraph(
+  workflow: CanvasesCanvas,
+  layoutNodes: ComponentsNode[],
+  channelsByNodeId?: Map<string, string[]>,
+) {
   const layoutEdges = resolveLayoutEdges(workflow, layoutNodes);
 
   return {
@@ -158,19 +159,43 @@ function buildElkGraph(workflow: CanvasesCanvas, layoutNodes: ComponentsNode[]) 
       "elk.spacing.nodeNode": "100",
       "elk.layered.spacing.nodeNodeBetweenLayers": "180",
       "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
+      "elk.contentAlignment": "V_CENTER",
     },
     children: layoutNodes.map((node) => {
       const { width, height } = estimateNodeSize(node);
+      const nodeId = node.id!;
+      const outputChannels = channelsByNodeId?.get(nodeId) || ["default"];
+
+      const ports = [
+        {
+          id: `${nodeId}__input`,
+          properties: {
+            "elk.port.side": "WEST",
+          },
+        },
+        ...outputChannels.map((channel, index) => ({
+          id: `${nodeId}__${channel}`,
+          properties: {
+            "elk.port.side": "EAST",
+            "elk.port.index": `${index}`,
+          },
+        })),
+      ];
+
       return {
-        id: node.id!,
+        id: nodeId,
         width,
         height,
+        properties: {
+          "elk.portConstraints": "FIXED_ORDER",
+        },
+        ports,
       };
     }),
     edges: layoutEdges.map((edge) => ({
       id: `${edge.sourceId}->${edge.targetId}->${edge.channel || "default"}`,
-      sources: [edge.sourceId!],
-      targets: [edge.targetId!],
+      sources: [`${edge.sourceId}__${edge.channel || "default"}`],
+      targets: [`${edge.targetId}__input`],
     })),
   };
 }
@@ -243,6 +268,36 @@ function applyLayoutedPositions(
   });
 }
 
+export function buildChannelsByNodeId(
+  workflow: CanvasesCanvas,
+  components: ComponentsComponent[],
+  blueprints: BlueprintsBlueprint[],
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+
+  for (const node of workflow.spec?.nodes || []) {
+    if (!node.id) continue;
+
+    let channels: string[] = ["default"];
+
+    if (node.type === "TYPE_TRIGGER") {
+      channels = ["default"];
+    } else if (node.type === "TYPE_BLUEPRINT") {
+      const componentMeta = components.find((c) => c.name === node.component?.name);
+      const bp = blueprints.find((b) => b.id === node.blueprint?.id);
+      channels = componentMeta?.outputChannels?.map((c) => c.name!).filter(Boolean) ||
+        bp?.outputChannels?.map((c) => c.name!).filter(Boolean) || ["default"];
+    } else if (node.type === "TYPE_COMPONENT" && node.component?.name) {
+      const meta = components.find((c) => c.name === node.component?.name);
+      channels = meta?.outputChannels?.map((c) => c.name!).filter(Boolean) || ["default"];
+    }
+
+    map.set(node.id, channels);
+  }
+
+  return map;
+}
+
 export async function applyHorizontalAutoLayout(
   workflow: CanvasesCanvas,
   options?: ApplyHorizontalAutoLayoutOptions,
@@ -263,7 +318,7 @@ export async function applyHorizontalAutoLayout(
     return workflow;
   }
 
-  const graph = buildElkGraph(workflow, layoutNodes);
+  const graph = buildElkGraph(workflow, layoutNodes, options?.channelsByNodeId);
   const layoutedGraph = await elk.layout(graph);
   const layoutedPositions = extractLayoutedPositions(layoutedGraph);
 
