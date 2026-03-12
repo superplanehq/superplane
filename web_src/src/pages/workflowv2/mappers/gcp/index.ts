@@ -9,6 +9,7 @@ import { onArtifactAnalysisTriggerRenderer } from "./on_artifact_analysis";
 import { runTriggerMapper } from "./run_trigger";
 import { invokeFunctionMapper } from "./invoke_function";
 import { getArtifactMapper, getArtifactAnalysisMapper } from "./artifact_registry_mapper";
+import { cloudDNSMapper } from "./clouddns";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createVM: baseMapper,
@@ -18,6 +19,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "cloudfunctions.invokeFunction": invokeFunctionMapper,
   "artifactregistry.getArtifact": getArtifactMapper,
   "artifactregistry.getArtifactAnalysis": getArtifactAnalysisMapper,
+  "clouddns.createRecord": cloudDNSMapper,
+  "clouddns.deleteRecord": cloudDNSMapper,
+  "clouddns.updateRecord": cloudDNSMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -35,6 +39,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "cloudfunctions.invokeFunction": buildActionStateRegistry("completed"),
   "artifactregistry.getArtifact": buildActionStateRegistry("completed"),
   "artifactregistry.getArtifactAnalysis": buildActionStateRegistry("completed"),
+  "clouddns.createRecord": buildActionStateRegistry("completed"),
+  "clouddns.deleteRecord": buildActionStateRegistry("completed"),
+  "clouddns.updateRecord": buildActionStateRegistry("completed"),
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};
