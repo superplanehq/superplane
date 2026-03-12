@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudbuild"
+	"github.com/superplanehq/superplane/pkg/integrations/gcp/clouddns"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudfunctions"
 	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/compute"
@@ -31,6 +32,9 @@ func init() {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 	cloudfunctions.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (cloudfunctions.Client, error) {
+		return gcpcommon.NewClient(httpCtx, integration)
+	})
+	clouddns.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (clouddns.Client, error) {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 }
@@ -154,6 +158,9 @@ func (g *GCP) Components() []core.Component {
 		&cloudbuild.GetBuild{},
 		&cloudbuild.RunTrigger{},
 		&cloudfunctions.InvokeFunction{},
+		&clouddns.CreateRecord{},
+		&clouddns.DeleteRecord{},
+		&clouddns.UpdateRecord{},
 	}
 }
 
@@ -615,6 +622,8 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return compute.ListAddressResources(reqCtx, client, p["project"], p["region"])
 	case compute.ResourceTypeFirewall:
 		return compute.ListFirewallResources(reqCtx, client, p["project"])
+	case clouddns.ResourceTypeManagedZone:
+		return clouddns.ListManagedZoneResources(reqCtx, client, p["projectId"])
 	case cloudbuild.ResourceTypeTrigger:
 		return cloudbuild.ListTriggerResources(reqCtx, client, p["projectId"])
 	case cloudbuild.ResourceTypeBuild:
