@@ -416,12 +416,12 @@ func resolveDropletMetadata(ctx core.SetupContext, dropletStr string) error {
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return nil
+		return fmt.Errorf("failed to create client for metadata resolution: %w", err)
 	}
 
 	droplet, err := client.GetDroplet(dropletID)
 	if err != nil {
-		return nil
+		return fmt.Errorf("failed to fetch droplet %d for metadata: %w", dropletID, err)
 	}
 
 	return ctx.Metadata.Set(DropletNodeMetadata{

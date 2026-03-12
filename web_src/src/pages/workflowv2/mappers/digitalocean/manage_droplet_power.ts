@@ -27,8 +27,8 @@ const powerStateMap: EventStateMap = {
   "digitalocean.droplet.power.power_off": {
     icon: "power-off",
     textColor: "text-gray-800",
-    backgroundColor: "bg-red-100",
-    badgeColor: "bg-red-500",
+    backgroundColor: "bg-gray-100",
+    badgeColor: "bg-gray-500",
     label: "POWERED OFF",
   },
   "digitalocean.droplet.power.shutdown": {
