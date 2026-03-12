@@ -1,0 +1,12 @@
+{
+  "data": {
+    "id": 987654321,
+    "status": "completed",
+    "type": "reboot",
+    "started_at": "2024-03-12T10:15:00Z",
+    "completed_at": "2024-03-12T10:17:30Z",
+    "resource_id": 98765432,
+    "resource_type": "droplet",
+    "region_slug": "nyc3"
+  }
+}
