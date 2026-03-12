@@ -171,7 +171,7 @@ func TestOnVMDeleted_HandleWebhook_SubscriptionValidation(t *testing.T) {
 		Logger:        logger,
 	}
 
-	code, err := trigger.HandleWebhook(ctx)
+	code, _, err := trigger.HandleWebhook(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code)
 
@@ -217,7 +217,7 @@ func TestOnVMDeleted_HandleWebhook_VMDeleteSuccess(t *testing.T) {
 			Logger:        logger,
 		}
 
-		code, err := trigger.HandleWebhook(ctx)
+		code, _, err := trigger.HandleWebhook(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 
@@ -273,7 +273,7 @@ func TestOnVMDeleted_HandleWebhook_VMDeleteSuccess(t *testing.T) {
 			Logger:  logger,
 		}
 
-		code, err := trigger.HandleWebhook(ctx)
+		code, _, err := trigger.HandleWebhook(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 
@@ -325,7 +325,7 @@ func TestOnVMDeleted_HandleWebhook_FilterMismatch(t *testing.T) {
 		Logger:  logger,
 	}
 
-	code, err := trigger.HandleWebhook(ctx)
+	code, _, err := trigger.HandleWebhook(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code)
 
@@ -372,7 +372,7 @@ func TestOnVMDeleted_HandleWebhook_NameFilter(t *testing.T) {
 			Logger:  logger,
 		}
 
-		code, err := trigger.HandleWebhook(ctx)
+		code, _, err := trigger.HandleWebhook(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 
@@ -418,7 +418,7 @@ func TestOnVMDeleted_HandleWebhook_NameFilter(t *testing.T) {
 			Logger:  logger,
 		}
 
-		code, err := trigger.HandleWebhook(ctx)
+		code, _, err := trigger.HandleWebhook(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 
@@ -459,7 +459,7 @@ func TestOnVMDeleted_HandleWebhook_NameFilter(t *testing.T) {
 			Logger:        logger,
 		}
 
-		code, err := trigger.HandleWebhook(ctx)
+		code, _, err := trigger.HandleWebhook(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 
@@ -505,7 +505,7 @@ func TestOnVMDeleted_HandleWebhook_NonVMResource(t *testing.T) {
 			Logger:        logger,
 		}
 
-		code, err := trigger.HandleWebhook(ctx)
+		code, _, err := trigger.HandleWebhook(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 
@@ -546,7 +546,7 @@ func TestOnVMDeleted_HandleWebhook_NonVMResource(t *testing.T) {
 			Logger:        logger,
 		}
 
-		code, err := trigger.HandleWebhook(ctx)
+		code, _, err := trigger.HandleWebhook(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 
@@ -591,7 +591,7 @@ func TestOnVMDeleted_HandleWebhook_FailedStatus(t *testing.T) {
 		Logger:        logger,
 	}
 
-	code, err := trigger.HandleWebhook(ctx)
+	code, _, err := trigger.HandleWebhook(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code)
 
@@ -660,7 +660,7 @@ func TestOnVMDeleted_HandleWebhook_MultipleEvents(t *testing.T) {
 		Logger:        logger,
 	}
 
-	code, err := trigger.HandleWebhook(ctx)
+	code, _, err := trigger.HandleWebhook(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code)
 
@@ -686,7 +686,7 @@ func TestOnVMDeleted_HandleWebhook_InvalidJSON(t *testing.T) {
 		Logger:        logger,
 	}
 
-	code, err := trigger.HandleWebhook(ctx)
+	code, _, err := trigger.HandleWebhook(ctx)
 	assert.Error(t, err)
 	assert.Equal(t, http.StatusBadRequest, code)
 	assert.Equal(t, 0, eventsCtx.Count())
@@ -729,7 +729,7 @@ func TestOnVMDeleted_HandleWebhook_InvalidConfiguration(t *testing.T) {
 		Logger:  logger,
 	}
 
-	code, err := trigger.HandleWebhook(ctx)
+	code, _, err := trigger.HandleWebhook(ctx)
 	assert.Error(t, err)
 	assert.Equal(t, http.StatusInternalServerError, code)
 }
@@ -771,7 +771,7 @@ func TestOnVMDeleted_HandleWebhook_IgnoresWriteEvents(t *testing.T) {
 		Logger:        logger,
 	}
 
-	code, err := trigger.HandleWebhook(ctx)
+	code, _, err := trigger.HandleWebhook(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code)
 

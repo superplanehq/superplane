@@ -348,23 +348,10 @@ func (c *CreateVMComponent) Execute(ctx core.ExecutionContext) error {
 	}
 
 	ctx.Logger.Infof("Creating Azure VM: %s in resource group %s", config.Name, config.ResourceGroup)
-	response, err := CreateVM(context.Background(), provider, req, ctx.Logger)
+	output, err := CreateVM(context.Background(), provider, req, ctx.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to create VM: %w", err)
 	}
-
-	output := map[string]any{
-		"id":                response.VMID,
-		"name":              response.Name,
-		"provisioningState": response.ProvisioningState,
-		"location":          response.Location,
-		"size":              response.Size,
-		"publicIp":          response.PublicIP,
-		"privateIp":         response.PrivateIP,
-		"adminUsername":     response.AdminUsername,
-	}
-
-	ctx.Logger.Infof("VM created successfully: %s (ID: %s)", response.Name, response.VMID)
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,

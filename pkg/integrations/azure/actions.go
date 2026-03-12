@@ -30,18 +30,6 @@ type CreateVMRequest struct {
 	CustomData         string
 }
 
-// CreateVMResponse contains created VM details.
-type CreateVMResponse struct {
-	VMID              string
-	Name              string
-	ProvisioningState string
-	Location          string
-	Size              string
-	PublicIP          string
-	PrivateIP         string
-	AdminUsername     string
-}
-
 // ARM REST response structs for unmarshaling
 
 type armVM struct {
@@ -105,7 +93,7 @@ type armSubnetResponse struct {
 }
 
 // CreateVM creates a VM and waits for provisioning completion.
-func CreateVM(ctx context.Context, provider *AzureProvider, req CreateVMRequest, logger *logrus.Entry) (*CreateVMResponse, error) {
+func CreateVM(ctx context.Context, provider *AzureProvider, req CreateVMRequest, logger *logrus.Entry) (map[string]any, error) {
 	if err := validateCreateVMRequest(req); err != nil {
 		return nil, fmt.Errorf("invalid request: %w", err)
 	}
@@ -177,6 +165,7 @@ func CreateVM(ctx context.Context, provider *AzureProvider, req CreateVMRequest,
 		return nil, fmt.Errorf("VM creation failed: %w", err)
 	}
 
+	// Parse into the typed struct for validation and IP resolution.
 	var vm armVM
 	if err := json.Unmarshal(result, &vm); err != nil {
 		return nil, fmt.Errorf("failed to parse VM response: %w", err)
@@ -186,38 +175,25 @@ func CreateVM(ctx context.Context, provider *AzureProvider, req CreateVMRequest,
 		return nil, fmt.Errorf("invalid VM response: missing ID or Name")
 	}
 
-	provisioningState := "Unknown"
-	location := ""
-	size := ""
-	if vm.Properties != nil {
-		provisioningState = vm.Properties.ProvisioningState
-		if vm.Properties.HardwareProfile != nil {
-			size = vm.Properties.HardwareProfile.VMSize
-		}
-	}
-	if vm.Location != "" {
-		location = vm.Location
+	// Unmarshal into a raw map so we emit the full, unmodified ARM response.
+	var raw map[string]any
+	if err := json.Unmarshal(result, &raw); err != nil {
+		return nil, fmt.Errorf("failed to parse raw VM response: %w", err)
 	}
 
+	// Enrich with resolved IP addresses and the admin username (not in ARM response).
 	privateIP, publicIP, err := getPrimaryNICIPAddresses(ctx, provider, vm)
 	if err != nil {
 		logger.WithError(err).Warn("VM created but failed to resolve NIC IP addresses")
 	}
 
-	response := &CreateVMResponse{
-		VMID:              vm.ID,
-		Name:              vm.Name,
-		ProvisioningState: provisioningState,
-		Location:          location,
-		Size:              size,
-		PublicIP:          publicIP,
-		PrivateIP:         privateIP,
-		AdminUsername:     req.AdminUsername,
-	}
+	raw["publicIp"] = publicIP
+	raw["privateIp"] = privateIP
+	raw["adminUsername"] = req.AdminUsername
 
-	logger.Infof("VM created successfully: id=%s, state=%s", response.VMID, response.ProvisioningState)
+	logger.Infof("VM created successfully: id=%s", vm.ID)
 
-	return response, nil
+	return raw, nil
 }
 
 func ensureNetworkInterface(ctx context.Context, provider *AzureProvider, req CreateVMRequest, logger *logrus.Entry) (string, error) {
@@ -442,15 +418,8 @@ type DeleteVMRequest struct {
 	VMName        string
 }
 
-// DeleteVMResponse contains the result of a VM deletion.
-type DeleteVMResponse struct {
-	VMID          string
-	Name          string
-	ResourceGroup string
-}
-
 // DeleteVM deletes a VM and waits for the operation to complete.
-func DeleteVM(ctx context.Context, provider *AzureProvider, req DeleteVMRequest, logger *logrus.Entry) (*DeleteVMResponse, error) {
+func DeleteVM(ctx context.Context, provider *AzureProvider, req DeleteVMRequest, logger *logrus.Entry) (map[string]any, error) {
 	if err := validateDeleteVMRequest(req); err != nil {
 		return nil, fmt.Errorf("invalid request: %w", err)
 	}
@@ -467,13 +436,13 @@ func DeleteVM(ctx context.Context, provider *AzureProvider, req DeleteVMRequest,
 	vmID := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s",
 		provider.GetSubscriptionID(), req.ResourceGroup, req.VMName)
 
-	response := &DeleteVMResponse{
-		VMID:          vmID,
-		Name:          req.VMName,
-		ResourceGroup: req.ResourceGroup,
+	response := map[string]any{
+		"id":            vmID,
+		"name":          req.VMName,
+		"resourceGroup": req.ResourceGroup,
 	}
 
-	logger.Infof("VM deleted successfully: name=%s, id=%s", response.Name, response.VMID)
+	logger.Infof("VM deleted successfully: name=%s, id=%s", req.VMName, vmID)
 	return response, nil
 }
 

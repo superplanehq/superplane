@@ -164,28 +164,6 @@ func TestCreateVMRequest_AllFields(t *testing.T) {
 	assert.Equal(t, "latest", req.ImageVersion)
 }
 
-func TestCreateVMResponse_AllFields(t *testing.T) {
-	resp := CreateVMResponse{
-		VMID:              "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute/virtualMachines/vm1",
-		Name:              "vm1",
-		ProvisioningState: "Succeeded",
-		Location:          "eastus",
-		Size:              "Standard_B1s",
-		PublicIP:          "20.10.10.10",
-		PrivateIP:         "10.0.0.4",
-		AdminUsername:     "azureuser",
-	}
-
-	assert.Contains(t, resp.VMID, "virtualMachines/vm1")
-	assert.Equal(t, "vm1", resp.Name)
-	assert.Equal(t, "Succeeded", resp.ProvisioningState)
-	assert.Equal(t, "eastus", resp.Location)
-	assert.Equal(t, "Standard_B1s", resp.Size)
-	assert.Equal(t, "20.10.10.10", resp.PublicIP)
-	assert.Equal(t, "10.0.0.4", resp.PrivateIP)
-	assert.Equal(t, "azureuser", resp.AdminUsername)
-}
-
 func TestImageReferenceConstants(t *testing.T) {
 	assert.Equal(t, "Canonical", ImageUbuntu2004LTS.Publisher)
 	assert.Equal(t, "0001-com-ubuntu-server-focal", ImageUbuntu2004LTS.Offer)
@@ -285,18 +263,6 @@ func TestDeleteVMRequest_AllFields(t *testing.T) {
 
 	assert.Equal(t, "my-rg", req.ResourceGroup)
 	assert.Equal(t, "my-vm", req.VMName)
-}
-
-func TestDeleteVMResponse_AllFields(t *testing.T) {
-	resp := DeleteVMResponse{
-		VMID:          "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute/virtualMachines/vm1",
-		Name:          "vm1",
-		ResourceGroup: "rg1",
-	}
-
-	assert.Contains(t, resp.VMID, "virtualMachines/vm1")
-	assert.Equal(t, "vm1", resp.Name)
-	assert.Equal(t, "rg1", resp.ResourceGroup)
 }
 
 func TestCreateVMRequest_WithUbuntuImage(t *testing.T) {

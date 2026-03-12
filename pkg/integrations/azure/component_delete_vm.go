@@ -154,18 +154,10 @@ func (c *DeleteVMComponent) Execute(ctx core.ExecutionContext) error {
 	}
 
 	ctx.Logger.Infof("Deleting Azure VM: %s in resource group %s", config.Name, config.ResourceGroup)
-	response, err := DeleteVM(context.Background(), provider, req, ctx.Logger)
+	output, err := DeleteVM(context.Background(), provider, req, ctx.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to delete VM: %w", err)
 	}
-
-	output := map[string]any{
-		"id":            response.VMID,
-		"name":          response.Name,
-		"resourceGroup": response.ResourceGroup,
-	}
-
-	ctx.Logger.Infof("VM deleted successfully: %s (ID: %s)", response.Name, response.VMID)
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
