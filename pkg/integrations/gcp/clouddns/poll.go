@@ -11,11 +11,12 @@ import (
 
 const (
 	pollChangeActionName = "pollChange"
-	pollInterval         = time.Minute
+	pollInterval         = 5 * time.Second
 )
 
-// pollChangeUntilDone polls for a Cloud DNS change status. When "done" it emits
-// the result and finishes; otherwise schedules another poll.
+// pollChangeUntilDone polls for a Cloud DNS change status.
+// When "done" it emits the result and finishes, when "pending" it schedules
+// another poll, and any other status fails the execution.
 func pollChangeUntilDone(ctx core.ActionContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
@@ -58,6 +59,13 @@ func pollChangeUntilDone(ctx core.ActionContext) error {
 			core.DefaultOutputChannel.Name,
 			"gcp.clouddns.change",
 			[]any{output},
+		)
+	}
+
+	if change.Status != "pending" {
+		return ctx.ExecutionState.Fail(
+			"error",
+			fmt.Sprintf("unexpected Cloud DNS change status %q for change %q", change.Status, change.ID),
 		)
 	}
 

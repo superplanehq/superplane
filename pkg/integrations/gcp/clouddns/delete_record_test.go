@@ -197,4 +197,41 @@ func TestDeleteRecord_Execute(t *testing.T) {
 		record := data["record"].(map[string]any)
 		assert.Equal(t, "A,TXT", record["type"])
 	})
+
+	t.Run("fails when change status is unexpected", func(t *testing.T) {
+		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+			return &mockClient{
+				projectID: "my-project",
+				getURL: func(_ context.Context, _ string) ([]byte, error) {
+					return json.Marshal(existingRecord)
+				},
+				postURL: func(_ context.Context, _ string, _ any) ([]byte, error) {
+					return json.Marshal(map[string]any{
+						"id":        "12",
+						"status":    "failed",
+						"startTime": "2026-01-28T10:30:00.000Z",
+					})
+				},
+			}, nil
+		})
+
+		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
+		requests := &testcontexts.RequestContext{}
+		err := (&DeleteRecord{}).Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"managedZone": "my-zone",
+				"name":        "api.example.com",
+				"type":        "A",
+			},
+			ExecutionState: state,
+			Metadata:       &testcontexts.MetadataContext{},
+			Requests:       requests,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Finished)
+		assert.False(t, state.Passed)
+		assert.Contains(t, state.FailureMessage, "unexpected Cloud DNS change status")
+		assert.Empty(t, requests.Action)
+	})
 }

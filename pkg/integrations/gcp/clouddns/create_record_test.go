@@ -176,6 +176,42 @@ func TestCreateRecord_Execute(t *testing.T) {
 		assert.Equal(t, "my-zone", stored.ManagedZone)
 	})
 
+	t.Run("fails when change status is unexpected", func(t *testing.T) {
+		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+			return &mockClient{
+				projectID: "my-project",
+				postURL: func(_ context.Context, _ string, _ any) ([]byte, error) {
+					return json.Marshal(map[string]any{
+						"id":        "3",
+						"status":    "failed",
+						"startTime": "2026-01-28T10:30:00.000Z",
+					})
+				},
+			}, nil
+		})
+
+		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
+		requests := &testcontexts.RequestContext{}
+		err := (&CreateRecord{}).Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"managedZone": "my-zone",
+				"name":        "api.example.com",
+				"type":        "A",
+				"ttl":         300,
+				"rrdatas":     []string{"1.2.3.4"},
+			},
+			ExecutionState: state,
+			Metadata:       &testcontexts.MetadataContext{},
+			Requests:       requests,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Finished)
+		assert.False(t, state.Passed)
+		assert.Contains(t, state.FailureMessage, "unexpected Cloud DNS change status")
+		assert.Empty(t, requests.Action)
+	})
+
 	t.Run("normalizes record name to add trailing dot", func(t *testing.T) {
 		var capturedBody any
 		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {

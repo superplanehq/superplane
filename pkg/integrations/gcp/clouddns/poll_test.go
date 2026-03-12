@@ -95,4 +95,39 @@ func TestPollChangeUntilDone(t *testing.T) {
 		assert.Equal(t, "api.example.com.", record["name"])
 		assert.Equal(t, "A", record["type"])
 	})
+
+	t.Run("fails when change status is unexpected", func(t *testing.T) {
+		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+			return &mockClient{
+				projectID: "my-project",
+				getURL: func(_ context.Context, _ string) ([]byte, error) {
+					return json.Marshal(map[string]any{
+						"id":        "3",
+						"status":    "failed",
+						"startTime": "2026-01-28T10:30:00.000Z",
+					})
+				},
+			}, nil
+		})
+
+		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
+		requests := &testcontexts.RequestContext{}
+		err := pollChangeUntilDone(core.ActionContext{
+			ExecutionState: state,
+			Requests:       requests,
+			Metadata: &testcontexts.MetadataContext{Metadata: RecordSetPollMetadata{
+				ChangeID:    "3",
+				ManagedZone: "my-zone",
+				RecordName:  "api.example.com.",
+				RecordType:  "A",
+				StartTime:   "2026-01-28T10:30:00.000Z",
+			}},
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Finished)
+		assert.False(t, state.Passed)
+		assert.Contains(t, state.FailureMessage, "unexpected Cloud DNS change status")
+		assert.Empty(t, requests.Action)
+	})
 }

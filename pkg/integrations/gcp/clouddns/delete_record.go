@@ -187,6 +187,13 @@ func (c *DeleteRecord) Execute(ctx core.ExecutionContext) error {
 		})
 	}
 
+	if change.Status != "pending" {
+		return ctx.ExecutionState.Fail(
+			"error",
+			fmt.Sprintf("unexpected Cloud DNS change status %q for change %q", change.Status, change.ID),
+		)
+	}
+
 	if err := ctx.Metadata.Set(RecordSetPollMetadata{
 		ChangeID:    change.ID,
 		ManagedZone: config.ManagedZone,
