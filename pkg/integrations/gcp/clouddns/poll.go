@@ -11,12 +11,16 @@ import (
 
 const (
 	pollChangeActionName = "pollChange"
-	pollInterval         = 5 * time.Second
+	pollInterval         = time.Minute
 )
 
 // pollChangeUntilDone polls for a Cloud DNS change status. When "done" it emits
 // the result and finishes; otherwise schedules another poll.
 func pollChangeUntilDone(ctx core.ActionContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
 	var meta RecordSetPollMetadata
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &meta); err != nil {
 		return fmt.Errorf("failed to decode poll metadata: %w", err)

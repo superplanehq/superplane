@@ -75,6 +75,22 @@ func TestDeleteRecord_Execute(t *testing.T) {
 			},
 		},
 	}
+	existingRecordsMultipleTypes := map[string]any{
+		"rrsets": []any{
+			map[string]any{
+				"name":    "api.example.com.",
+				"type":    "A",
+				"ttl":     float64(300),
+				"rrdatas": []any{"1.2.3.4"},
+			},
+			map[string]any{
+				"name":    "api.example.com.",
+				"type":    "TXT",
+				"ttl":     float64(300),
+				"rrdatas": []any{"v=spf1 include:_spf.example.com ~all"},
+			},
+		},
+	}
 
 	t.Run("looks up existing record and emits output when done", func(t *testing.T) {
 		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
@@ -134,5 +150,51 @@ func TestDeleteRecord_Execute(t *testing.T) {
 		assert.True(t, state.Finished)
 		assert.False(t, state.Passed)
 		assert.Contains(t, state.FailureMessage, "not found")
+	})
+
+	t.Run("deletes all record types when type is omitted", func(t *testing.T) {
+		var capturedBody any
+		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+			return &mockClient{
+				projectID: "my-project",
+				getURL: func(_ context.Context, _ string) ([]byte, error) {
+					return json.Marshal(existingRecordsMultipleTypes)
+				},
+				postURL: func(_ context.Context, _ string, body any) ([]byte, error) {
+					capturedBody = body
+					return json.Marshal(map[string]any{
+						"id":        "8",
+						"status":    "done",
+						"startTime": "2026-01-28T10:30:00.000Z",
+					})
+				},
+			}, nil
+		})
+
+		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := (&DeleteRecord{}).Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"managedZone": "my-zone",
+				"name":        "api.example.com",
+			},
+			ExecutionState: state,
+			Metadata:       &testcontexts.MetadataContext{},
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Finished)
+		assert.True(t, state.Passed)
+
+		bodyMap := capturedBody.(map[string]any)
+		deletions := bodyMap["deletions"].([]ResourceRecordSet)
+		require.Len(t, deletions, 2)
+		assert.Equal(t, "A", deletions[0].Type)
+		assert.Equal(t, "TXT", deletions[1].Type)
+
+		require.Len(t, state.Payloads, 1)
+		wrapper := state.Payloads[0].(map[string]any)
+		data := wrapper["data"].(map[string]any)
+		record := data["record"].(map[string]any)
+		assert.Equal(t, "A,TXT", record["type"])
 	})
 }

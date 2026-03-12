@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -215,11 +216,15 @@ type rrsetListResponse struct {
 }
 
 func getRecordSet(ctx context.Context, client Client, projectID, managedZone, name, recordType string) (*ResourceRecordSet, error) {
-	url := fmt.Sprintf(
-		"%s/projects/%s/managedZones/%s/rrsets?name=%s&type=%s",
-		cloudDNSBaseURL, projectID, managedZone, name, recordType,
+	query := url.Values{
+		"name": {name},
+		"type": {recordType},
+	}
+	fullURL := fmt.Sprintf(
+		"%s/projects/%s/managedZones/%s/rrsets?%s",
+		cloudDNSBaseURL, projectID, managedZone, query.Encode(),
 	)
-	data, err := client.GetURL(ctx, url)
+	data, err := client.GetURL(ctx, fullURL)
 	if err != nil {
 		return nil, err
 	}
@@ -237,11 +242,14 @@ func getRecordSet(ctx context.Context, client Client, projectID, managedZone, na
 
 // listRecordSetsByName fetches all record sets for a given name regardless of type.
 func listRecordSetsByName(ctx context.Context, client Client, projectID, managedZone, name string) ([]ResourceRecordSet, error) {
-	url := fmt.Sprintf(
-		"%s/projects/%s/managedZones/%s/rrsets?name=%s",
-		cloudDNSBaseURL, projectID, managedZone, name,
+	query := url.Values{
+		"name": {name},
+	}
+	fullURL := fmt.Sprintf(
+		"%s/projects/%s/managedZones/%s/rrsets?%s",
+		cloudDNSBaseURL, projectID, managedZone, query.Encode(),
 	)
-	data, err := client.GetURL(ctx, url)
+	data, err := client.GetURL(ctx, fullURL)
 	if err != nil {
 		return nil, err
 	}
