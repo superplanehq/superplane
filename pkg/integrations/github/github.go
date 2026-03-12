@@ -153,6 +153,14 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 		return nil
 	}
 
+	//
+	// App has been created but not yet installed - preserve existing state
+	// so the pending installation callback can validate it.
+	//
+	if metadata.GitHubApp.ID != 0 {
+		return nil
+	}
+
 	state, err := crypto.Base64String(32)
 	if err != nil {
 		return fmt.Errorf("Failed to generate GitHub App state: %v", err)
@@ -340,13 +348,16 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext, metadata Metadata
 	}
 
 	//
-	// Save installation metadata
+	// Save installation metadata.
+	// Preserve the state from the redirect so afterAppInstallation can validate it,
+	// even if Sync regenerated a different state while the user was on GitHub.
 	//
 	metadata.GitHubApp = GitHubAppMetadata{
 		ID:       appData.ID,
 		Slug:     appData.Slug,
 		ClientID: appData.ClientID,
 	}
+	metadata.State = state
 
 	ctx.Integration.SetMetadata(metadata)
 

@@ -12,6 +12,21 @@ import (
 func Test__GitHub__Setup(t *testing.T) {
 	g := &GitHub{}
 
+	t.Run("app created but not yet installed", func(t *testing.T) {
+		existingMetadata := Metadata{
+			State:     "some-state",
+			GitHubApp: GitHubAppMetadata{ID: 99},
+		}
+		integrationCtx := &contexts.IntegrationContext{Metadata: existingMetadata}
+		require.NoError(t, g.Sync(core.SyncContext{Integration: integrationCtx}))
+
+		//
+		// State is preserved - no new browser action or state generated
+		//
+		assert.Nil(t, integrationCtx.BrowserAction)
+		assert.Equal(t, existingMetadata, integrationCtx.Metadata)
+	})
+
 	t.Run("personal scope", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
 		require.NoError(t, g.Sync(core.SyncContext{Integration: integrationCtx}))
