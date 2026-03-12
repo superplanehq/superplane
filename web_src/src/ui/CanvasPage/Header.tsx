@@ -182,10 +182,10 @@ export function Header({
     );
   };
 
-  const isDefaultMode = mode === "default";
+  const isDefaultMode = mode === "default" || mode === "versioning-disabled";
   const showEditButton = mode === "version-live";
   const showEditingDropdown = mode === "version-edit";
-  const showSaveDropdown = mode === "version-edit" || mode === "versioning-disabled";
+  const showSaveDropdown = mode === "version-edit";
   const showSaveUndoActions = showSaveDropdown && !isAutoSaveEnabled && saveState === "unsaved";
   const autoSaveToggleDisabled = autoSaveDisabled || !onToggleAutoSave;
   const saveStatusLabel = saveState === "saving" ? "Saving..." : saveState === "unsaved" ? "Unsaved" : "Saved";
