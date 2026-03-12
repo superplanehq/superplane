@@ -65,6 +65,7 @@ func TestOnVMDeleted_Setup(t *testing.T) {
 			Logger:        logger,
 			Configuration: map[string]any{},
 			Metadata:      metadataCtx,
+			Integration:   &mockIntegrationContext{},
 		}
 
 		err := trigger.Setup(ctx)
@@ -80,7 +81,8 @@ func TestOnVMDeleted_Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"resourceGroup": "my-rg",
 			},
-			Metadata: metadataCtx,
+			Metadata:    metadataCtx,
+			Integration: &mockIntegrationContext{},
 		}
 
 		err := trigger.Setup(ctx)
