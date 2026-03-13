@@ -19,6 +19,11 @@ type LayoutPosition = {
   y: number;
 };
 
+function normalizeChannel(channel?: string): string {
+  const normalizedChannel = (channel || "").trim();
+  return normalizedChannel.length > 0 ? normalizedChannel : "default";
+}
+
 function estimateNodeSize(node: ComponentsNode): { width: number; height: number } {
   if (node.type === "TYPE_WIDGET") {
     return {
@@ -150,6 +155,17 @@ function buildElkGraph(
   channelsByNodeId?: Map<string, string[]>,
 ) {
   const layoutEdges = resolveLayoutEdges(workflow, layoutNodes);
+  const edgeChannelsBySourceNodeID = new Map<string, Set<string>>();
+
+  for (const edge of layoutEdges) {
+    if (!edge.sourceId) {
+      continue;
+    }
+
+    const sourceChannels = edgeChannelsBySourceNodeID.get(edge.sourceId) || new Set<string>();
+    sourceChannels.add(normalizeChannel(edge.channel));
+    edgeChannelsBySourceNodeID.set(edge.sourceId, sourceChannels);
+  }
 
   return {
     id: "root",
@@ -164,7 +180,14 @@ function buildElkGraph(
     children: layoutNodes.map((node) => {
       const { width, height } = estimateNodeSize(node);
       const nodeId = node.id!;
-      const outputChannels = channelsByNodeId?.get(nodeId) || ["default"];
+      const metadataOutputChannels = (channelsByNodeId?.get(nodeId) || [])
+        .map((channel) => normalizeChannel(channel))
+        .filter((channel, index, channels) => channels.indexOf(channel) === index);
+      const edgeOutputChannels = Array.from(edgeChannelsBySourceNodeID.get(nodeId) || []);
+      const outputChannels = Array.from(new Set([...metadataOutputChannels, ...edgeOutputChannels]));
+      if (outputChannels.length === 0) {
+        outputChannels.push("default");
+      }
 
       const ports = [
         {
@@ -193,8 +216,8 @@ function buildElkGraph(
       };
     }),
     edges: layoutEdges.map((edge) => ({
-      id: `${edge.sourceId}->${edge.targetId}->${edge.channel || "default"}`,
-      sources: [`${edge.sourceId}__${edge.channel || "default"}`],
+      id: `${edge.sourceId}->${edge.targetId}->${normalizeChannel(edge.channel)}`,
+      sources: [`${edge.sourceId}__${normalizeChannel(edge.channel)}`],
       targets: [`${edge.targetId}__input`],
     })),
   };
