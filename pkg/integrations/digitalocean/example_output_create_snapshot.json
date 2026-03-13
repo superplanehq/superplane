@@ -1,12 +1,14 @@
 {
   "data": {
-    "id": "12345678",
-    "name": "my-droplet-snapshot",
-    "created_at": "2024-06-15T10:30:00Z",
-    "resource_id": "98765432",
+    "created_at": "2026-03-13T13:35:43Z",
+    "id": 220464921,
+    "min_disk_size": 10,
+    "name": "omg-this-again",
+    "regions": ["blr1"],
+    "resource_id": "98145763",
     "resource_type": "droplet",
-    "regions": ["nyc3"],
-    "min_disk_size": 25,
-    "size_gigabytes": 2.36
-  }
+    "size_gigabytes": 2.04
+  },
+  "timestamp": "2026-03-13T13:36:14.803060936Z",
+  "type": "digitalocean.snapshot.created"
 }
