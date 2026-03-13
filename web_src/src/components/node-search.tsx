@@ -6,6 +6,7 @@ import { BuiltInEdge, useReactFlow, type Node, type PanelProps } from "@xyflow/r
 import { CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { resolveIcon } from "@/lib/utils";
 
 export interface NodeSearchProps extends Omit<PanelProps, "children"> {
   // The function to search for nodes, should return an array of nodes that match the search string
@@ -16,6 +17,32 @@ export interface NodeSearchProps extends Omit<PanelProps, "children"> {
   onSelectNode?: (node: Node) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+}
+
+// Helper function to extract icon slug from node data
+function getNodeIconSlug(node: Node): string {
+  const nodeType = node.data?.type as string | undefined;
+  const isAnnotationNode = nodeType === "annotation";
+
+  if (isAnnotationNode) {
+    return "sticky-note";
+  }
+
+  // Try to get icon from component/trigger/composite data
+  if (nodeType === "component" && node.data.component) {
+    return (node.data.component as { iconSlug?: string }).iconSlug || "box";
+  }
+
+  if (nodeType === "trigger" && node.data.trigger) {
+    return (node.data.trigger as { iconSlug?: string }).iconSlug || "play";
+  }
+
+  if (nodeType === "composite" && node.data.composite) {
+    return (node.data.composite as { iconSlug?: string }).iconSlug || "boxes";
+  }
+
+  // Default fallback
+  return "box";
 }
 
 export function NodeSearchInternal({ onSearch, onSelectNode, open, onOpenChange }: NodeSearchProps) {
@@ -81,11 +108,27 @@ export function NodeSearchInternal({ onSearch, onSelectNode, open, onOpenChange 
                 const fallbackLabel =
                   (node.data as { nodeName?: string })?.nodeName || (node.data as { label?: string })?.label;
                 const displayLabel = isAnnotationNode ? "Note" : fallbackLabel || node.id;
+                const iconSlug = getNodeIconSlug(node);
+                const IconComponent = resolveIcon(iconSlug);
+
                 return (
                   <CommandItem key={node.id} onSelect={() => onSelect(node)}>
-                    <div className="flex items-center gap-2 w-full">
-                      <span>{displayLabel}</span>
-                      <span className="text-muted-foreground text-xs ml-auto">{node.id}</span>
+                    <div className="flex items-center gap-2 w-full min-w-0">
+                      <IconComponent className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="truncate">{displayLabel}</span>
+                        </TooltipTrigger>
+                        {displayLabel.length > 40 && <TooltipContent>{displayLabel}</TooltipContent>}
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-muted-foreground text-xs ml-auto truncate max-w-[200px] shrink-0">
+                            {node.id}
+                          </span>
+                        </TooltipTrigger>
+                        {node.id.length > 25 && <TooltipContent>{node.id}</TooltipContent>}
+                      </Tooltip>
                     </div>
                   </CommandItem>
                 );
@@ -123,7 +166,7 @@ export function NodeSearch({ onSearch, onSelectNode }: NodeSearchProps) {
         </TooltipTrigger>
         <TooltipContent>Search components (Ctrl/Cmd + K)</TooltipContent>
       </Tooltip>
-      <CommandDialog open={open} onOpenChange={setOpen}>
+      <CommandDialog open={open} onOpenChange={setOpen} className="max-w-xl sm:max-w-2xl md:max-w-3xl">
         <NodeSearchInternal onSearch={onSearch} onSelectNode={onSelectNode} open={open} onOpenChange={setOpen} />
       </CommandDialog>
     </>
@@ -136,7 +179,7 @@ export interface NodeSearchDialogProps extends NodeSearchProps {
 
 export function NodeSearchDialog({ onSearch, onSelectNode, open, onOpenChange }: NodeSearchDialogProps) {
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange}>
+    <CommandDialog open={open} onOpenChange={onOpenChange} className="max-w-xl sm:max-w-2xl md:max-w-3xl">
       <NodeSearchInternal onSearch={onSearch} onSelectNode={onSelectNode} open={open} onOpenChange={onOpenChange} />
     </CommandDialog>
   );
