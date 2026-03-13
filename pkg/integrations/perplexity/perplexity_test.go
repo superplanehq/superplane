@@ -18,7 +18,7 @@ func TestSync_Success(t *testing.T) {
 		Responses: []*http.Response{
 			{
 				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(`{"id":"s1","results":[]}`)),
+				Body:       io.NopCloser(strings.NewReader(`{"object":"list","data":[]}`)),
 			},
 		},
 	}
@@ -37,8 +37,8 @@ func TestSync_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "ready", integrationCtx.State)
 	require.Len(t, httpCtx.Requests, 1)
-	assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
-	assert.Contains(t, httpCtx.Requests[0].URL.String(), "/search")
+	assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+	assert.Contains(t, httpCtx.Requests[0].URL.String(), "/v1/models")
 }
 
 func TestSync_InvalidKey(t *testing.T) {
