@@ -31,10 +31,11 @@ interface PermissionsProviderProps {
 
 export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ children }) => {
   const organizationId = useOrganizationId();
-  const { data: me, isLoading: meLoading } = useMe();
+  const { data: me, isLoading: meLoading, isFetching: meFetching } = useMe();
 
   const userId = me?.id;
 
+  const permissionsQueryEnabled = !!organizationId && !!userId;
   const permissionsQuery = useQuery({
     queryKey: ["permissions", organizationId, userId],
     queryFn: async () => {
@@ -46,7 +47,7 @@ export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ childr
       );
       return response.data?.permissions || [];
     },
-    enabled: !!organizationId && !!userId,
+    enabled: permissionsQueryEnabled,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
@@ -74,7 +75,14 @@ export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ childr
     [permissionSet],
   );
 
-  const isLoading = meLoading || permissionsQuery.isLoading;
+  // Consider loading if:
+  // 1. organizationId is not yet available (waiting for route params)
+  // 2. me query is loading or fetching
+  // 3. permissions query is loading or fetching
+  // When queries are disabled (enabled=false), isLoading/isFetching are false,
+  // so we need to explicitly check if organizationId is available.
+  const isLoading =
+    !organizationId || meLoading || meFetching || permissionsQuery.isLoading || permissionsQuery.isFetching;
 
   return (
     <PermissionsContext.Provider value={{ permissions, isLoading, canAct }}>{children}</PermissionsContext.Provider>
