@@ -4069,8 +4069,7 @@
       "enum": [
         "SCOPE_UNSPECIFIED",
         "SCOPE_FULL_CANVAS",
-        "SCOPE_CONNECTED_COMPONENT",
-        "SCOPE_EXACT_SET"
+        "SCOPE_CONNECTED_COMPONENT"
       ],
       "default": "SCOPE_UNSPECIFIED"
     },

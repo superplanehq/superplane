@@ -219,10 +219,8 @@ func parseAutoLayout(value string, scopeValue string, nodeIDs []string) (*openap
 		autoLayout.SetScope(openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS)
 	case "connected-component", "connected_component", "connected":
 		autoLayout.SetScope(openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_CONNECTED_COMPONENT)
-	case "exact-set", "exact_set", "exact":
-		autoLayout.SetScope(openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_EXACT_SET)
 	default:
-		return nil, fmt.Errorf("unsupported auto layout scope %q (supported: full-canvas, connected-component, exact-set)", scopeValue)
+		return nil, fmt.Errorf("unsupported auto layout scope %q (supported: full-canvas, connected-component)", scopeValue)
 	}
 
 	return &autoLayout, nil

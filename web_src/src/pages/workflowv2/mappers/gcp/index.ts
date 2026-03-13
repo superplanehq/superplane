@@ -9,6 +9,16 @@ import { onArtifactAnalysisTriggerRenderer } from "./on_artifact_analysis";
 import { runTriggerMapper } from "./run_trigger";
 import { invokeFunctionMapper } from "./invoke_function";
 import { getArtifactMapper, getArtifactAnalysisMapper } from "./artifact_registry_mapper";
+import {
+  publishMessageMapper,
+  createTopicMapper,
+  deleteTopicMapper,
+  createSubscriptionMapper,
+  deleteSubscriptionMapper,
+  PUBSUB_ACTION_STATE_REGISTRY,
+} from "./pubsub_mapper";
+import { onMessageTriggerRenderer } from "./on_message";
+import { cloudDNSMapper } from "./clouddns";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createVM: baseMapper,
@@ -18,6 +28,14 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "cloudfunctions.invokeFunction": invokeFunctionMapper,
   "artifactregistry.getArtifact": getArtifactMapper,
   "artifactregistry.getArtifactAnalysis": getArtifactAnalysisMapper,
+  "pubsub.publishMessage": publishMessageMapper,
+  "pubsub.createTopic": createTopicMapper,
+  "pubsub.deleteTopic": deleteTopicMapper,
+  "pubsub.createSubscription": createSubscriptionMapper,
+  "pubsub.deleteSubscription": deleteSubscriptionMapper,
+  "clouddns.createRecord": cloudDNSMapper,
+  "clouddns.deleteRecord": cloudDNSMapper,
+  "clouddns.updateRecord": cloudDNSMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -25,6 +43,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   "cloudbuild.onBuildComplete": onBuildCompleteTriggerRenderer,
   "artifactregistry.onArtifactPush": onArtifactPushTriggerRenderer,
   "artifactregistry.onArtifactAnalysis": onArtifactAnalysisTriggerRenderer,
+  "pubsub.onMessage": onMessageTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
@@ -35,6 +54,14 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "cloudfunctions.invokeFunction": buildActionStateRegistry("completed"),
   "artifactregistry.getArtifact": buildActionStateRegistry("completed"),
   "artifactregistry.getArtifactAnalysis": buildActionStateRegistry("completed"),
+  "pubsub.publishMessage": PUBSUB_ACTION_STATE_REGISTRY,
+  "pubsub.createTopic": PUBSUB_ACTION_STATE_REGISTRY,
+  "pubsub.deleteTopic": PUBSUB_ACTION_STATE_REGISTRY,
+  "pubsub.createSubscription": PUBSUB_ACTION_STATE_REGISTRY,
+  "pubsub.deleteSubscription": PUBSUB_ACTION_STATE_REGISTRY,
+  "clouddns.createRecord": buildActionStateRegistry("completed"),
+  "clouddns.deleteRecord": buildActionStateRegistry("completed"),
+  "clouddns.updateRecord": buildActionStateRegistry("completed"),
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};

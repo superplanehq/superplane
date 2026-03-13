@@ -13,6 +13,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Artifact Registry • On Artifact Push" href="#artifact-registry-•-on-artifact-push" description="Trigger a workflow when an artifact is pushed to GCP Artifact Registry" />
   <LinkCard title="Cloud Build • On Build Complete" href="#cloud-build-•-on-build-complete" description="Trigger a workflow when a GCP Cloud Build build reaches a terminal status" />
   <LinkCard title="Compute • On VM Instance" href="#compute-•-on-vm-instance" description="Listen to GCP Compute Engine VM instance lifecycle events" />
+  <LinkCard title="Pub/Sub • On Message" href="#pub/sub-•-on-message" description="Trigger a workflow when a message is published to a GCP Pub/Sub topic" />
 </CardGrid>
 
 ## Actions
@@ -23,8 +24,16 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cloud Build • Create Build" href="#cloud-build-•-create-build" description="Create a Cloud Build build and wait for it to finish" />
   <LinkCard title="Cloud Build • Get Build" href="#cloud-build-•-get-build" description="Retrieve a Cloud Build build by ID" />
   <LinkCard title="Cloud Build • Run Trigger" href="#cloud-build-•-run-trigger" description="Run a Cloud Build trigger and wait for the build to finish" />
+  <LinkCard title="Cloud DNS • Create Record" href="#cloud-dns-•-create-record" description="Create a DNS record in a Google Cloud DNS managed zone" />
+  <LinkCard title="Cloud DNS • Delete Record" href="#cloud-dns-•-delete-record" description="Delete a DNS record from a Google Cloud DNS managed zone" />
+  <LinkCard title="Cloud DNS • Update Record" href="#cloud-dns-•-update-record" description="Update an existing DNS record in a Google Cloud DNS managed zone" />
   <LinkCard title="Cloud Functions • Invoke Function" href="#cloud-functions-•-invoke-function" description="Invoke a Google Cloud Function and return the response" />
   <LinkCard title="Compute • Create Virtual Machine" href="#compute-•-create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
+  <LinkCard title="Pub/Sub • Create Subscription" href="#pub/sub-•-create-subscription" description="Create a GCP Pub/Sub subscription" />
+  <LinkCard title="Pub/Sub • Create Topic" href="#pub/sub-•-create-topic" description="Create a GCP Pub/Sub topic" />
+  <LinkCard title="Pub/Sub • Delete Subscription" href="#pub/sub-•-delete-subscription" description="Delete a GCP Pub/Sub subscription" />
+  <LinkCard title="Pub/Sub • Delete Topic" href="#pub/sub-•-delete-topic" description="Delete a GCP Pub/Sub topic" />
+  <LinkCard title="Pub/Sub • Publish Message" href="#pub/sub-•-publish-message" description="Publish a message to a GCP Pub/Sub topic" />
 </CardGrid>
 
 ## Instructions
@@ -240,6 +249,55 @@ Each event includes the audit log entry with resourceName (e.g. projects/my-proj
   "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
   "serviceName": "compute.googleapis.com",
   "timestamp": "2025-02-14T12:00:00Z"
+}
+```
+
+<a id="pub/sub-•-on-message"></a>
+
+## Pub/Sub • On Message
+
+The On Message trigger starts a workflow execution when a message is published to a GCP Pub/Sub topic.
+
+**Trigger behavior:** SuperPlane creates a push subscription on the selected topic. Published messages are pushed to SuperPlane and delivered to this trigger.
+
+### Use Cases
+
+- **Event-driven workflows**: React to messages published by your applications
+- **Queue processing**: Process tasks published to Pub/Sub topics
+- **System integration**: Connect Pub/Sub events to downstream workflow steps
+
+### Setup
+
+**Required GCP setup:** Ensure the **Pub/Sub API** is enabled in your project. The service account used by the integration must have `roles/pubsub.admin` to create push subscriptions on your topics.
+
+### Configuration
+
+- **Topic**: Select the Pub/Sub topic to listen to.
+- **Subscription (optional)**: Reuse an existing subscription name. Leave empty to let SuperPlane create one.
+
+### Event Data
+
+Each event contains the decoded message payload plus Pub/Sub metadata:
+
+- `data`: The decoded message body
+- `messageId`: The Pub/Sub message ID
+- `publishTime`: When the message was published
+- `attributes`: Any message attributes
+
+### Example Data
+
+```json
+{
+  "data": {
+    "attributes": {
+      "eventType": "order.created"
+    },
+    "data": "{\"event\":\"order.created\",\"orderId\":\"ord_abc123\"}",
+    "messageId": "1234567890",
+    "publishTime": "2025-01-01T00:00:00Z"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.message"
 }
 ```
 
@@ -471,6 +529,142 @@ The terminal Build resource, including `id`, `status`, `logUrl`, `createTime`, `
 }
 ```
 
+<a id="cloud-dns-•-create-record"></a>
+
+## Cloud DNS • Create Record
+
+The Create Record component creates a new DNS record set in a Google Cloud DNS managed zone.
+
+### Configuration
+
+- **Managed Zone** (required): The Cloud DNS managed zone where the record will be created.
+- **Record Name** (required): The DNS name for the record (e.g. `api.example.com`). A trailing dot is added automatically.
+- **Record Type** (required): The DNS record type (A, AAAA, CNAME, TXT, MX, etc.).
+- **TTL** (required): Time to live in seconds. Defaults to 300.
+- **Record Values** (required): The values for the record (e.g. IP addresses for A records).
+
+### Required IAM roles
+
+The service account must have `roles/dns.admin` or `roles/dns.editor` on the project.
+
+### Output
+
+- `change.id`: The Cloud DNS change ID.
+- `change.status`: The change status (`done`).
+- `change.startTime`: When the change was submitted.
+- `record.name`: The DNS record name.
+- `record.type`: The DNS record type.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "change": {
+      "id": "1",
+      "startTime": "2026-01-28T10:30:00.000Z",
+      "status": "done"
+    },
+    "record": {
+      "name": "api.example.com.",
+      "type": "A"
+    }
+  },
+  "timestamp": "2026-01-28T10:30:00.000Z",
+  "type": "gcp.clouddns.change"
+}
+```
+
+<a id="cloud-dns-•-delete-record"></a>
+
+## Cloud DNS • Delete Record
+
+The Delete Record component deletes a DNS record set from a Google Cloud DNS managed zone.
+
+### Configuration
+
+- **Managed Zone** (required): The Cloud DNS managed zone containing the record.
+- **Record Name** (required): The DNS name of the record to delete (e.g. `api.example.com`).
+- **Record Type** (optional): The DNS record type to delete (A, AAAA, CNAME, TXT, MX, etc.). If not specified, all record sets with the given name are deleted.
+
+### Required IAM roles
+
+The service account must have `roles/dns.admin` or `roles/dns.editor` on the project.
+
+### Output
+
+- `change.id`: The Cloud DNS change ID.
+- `change.status`: The change status (`done`).
+- `change.startTime`: When the change was submitted.
+- `record.name`: The DNS record name.
+- `record.type`: The DNS record type (comma-separated when multiple types were deleted).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "change": {
+      "id": "2",
+      "startTime": "2026-01-28T10:31:00.000Z",
+      "status": "done"
+    },
+    "record": {
+      "name": "old.example.com.",
+      "type": "A"
+    }
+  },
+  "timestamp": "2026-01-28T10:31:00.000Z",
+  "type": "gcp.clouddns.change"
+}
+```
+
+<a id="cloud-dns-•-update-record"></a>
+
+## Cloud DNS • Update Record
+
+The Update Record component updates an existing DNS record set in a Google Cloud DNS managed zone.
+
+### Configuration
+
+- **Managed Zone** (required): The Cloud DNS managed zone containing the record.
+- **Record Name** (required): The DNS name of the record to update (e.g. `api.example.com`).
+- **Record Type** (required): The DNS record type (A, AAAA, CNAME, TXT, MX, etc.).
+- **TTL** (required): New time to live in seconds.
+- **Record Values** (required): The new values for the record.
+
+### Required IAM roles
+
+The service account must have `roles/dns.admin` or `roles/dns.editor` on the project.
+
+### Output
+
+- `change.id`: The Cloud DNS change ID.
+- `change.status`: The change status (`done`).
+- `change.startTime`: When the change was submitted.
+- `record.name`: The DNS record name.
+- `record.type`: The DNS record type.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "change": {
+      "id": "3",
+      "startTime": "2026-01-28T10:32:00.000Z",
+      "status": "done"
+    },
+    "record": {
+      "name": "api.example.com.",
+      "type": "A"
+    }
+  },
+  "timestamp": "2026-01-28T10:32:00.000Z",
+  "type": "gcp.clouddns.change"
+}
+```
+
 <a id="cloud-functions-•-invoke-function"></a>
 
 ## Cloud Functions • Invoke Function
@@ -549,6 +743,133 @@ Emits a payload with instance details: instanceId, selfLink, internalIP, externa
   "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
   "status": "RUNNING",
   "zone": "us-central1-a"
+}
+```
+
+<a id="pub/sub-•-create-subscription"></a>
+
+## Pub/Sub • Create Subscription
+
+The Create Subscription component creates a new GCP Pub/Sub subscription on a topic.
+
+### Use Cases
+
+- **Provisioning workflows**: Wire up subscriptions as part of service deployment
+- **Pull queue setup**: Create pull subscriptions for batch processing workflows
+- **Push integration**: Create push subscriptions that deliver messages to an HTTP endpoint
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "projects/my-project/subscriptions/my-subscription",
+    "subscription": "my-subscription",
+    "topic": "my-topic",
+    "type": "pull"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.subscription"
+}
+```
+
+<a id="pub/sub-•-create-topic"></a>
+
+## Pub/Sub • Create Topic
+
+The Create Topic component creates a new GCP Pub/Sub topic.
+
+### Use Cases
+
+- **Provisioning workflows**: Create topics as part of environment setup
+- **Dynamic routing**: Create topics on demand for new services or tenants
+- **Automation bootstrap**: Prepare messaging infrastructure before publishing
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "projects/my-project/topics/my-topic",
+    "topic": "my-topic"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.topic"
+}
+```
+
+<a id="pub/sub-•-delete-subscription"></a>
+
+## Pub/Sub • Delete Subscription
+
+The Delete Subscription component deletes a GCP Pub/Sub subscription.
+
+### Use Cases
+
+- **Cleanup workflows**: Remove subscriptions as part of service teardown
+- **Lifecycle management**: Decommission subscriptions that are no longer needed
+- **Rollback automation**: Remove subscriptions created in failed provisioning runs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "subscription": "my-subscription"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.subscription.deleted"
+}
+```
+
+<a id="pub/sub-•-delete-topic"></a>
+
+## Pub/Sub • Delete Topic
+
+The Delete Topic component deletes a GCP Pub/Sub topic.
+
+### Use Cases
+
+- **Cleanup workflows**: Remove temporary topics after execution
+- **Lifecycle management**: Decommission unused messaging resources
+- **Rollback automation**: Remove topics created in failed provisioning runs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "topic": "my-topic"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.topic.deleted"
+}
+```
+
+<a id="pub/sub-•-publish-message"></a>
+
+## Pub/Sub • Publish Message
+
+The Publish Message component sends a message to a GCP Pub/Sub topic.
+
+### Use Cases
+
+- **Event fan-out**: Broadcast workflow results to multiple subscribers
+- **Notifications**: Publish operational updates to downstream systems
+- **Automation**: Trigger Pub/Sub-based pipelines from workflows
+
+### Example Output
+
+```json
+{
+  "data": {
+    "messageId": "1234567890",
+    "topic": "my-topic"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.pubsub.message.published"
 }
 ```
 

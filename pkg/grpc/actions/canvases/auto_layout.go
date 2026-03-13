@@ -1,9 +1,12 @@
 package canvases
 
 import (
+	"math"
 	"sort"
 	"strings"
 
+	"github.com/nulab/autog"
+	"github.com/nulab/autog/graph"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -13,8 +16,10 @@ import (
 )
 
 const (
-	autoLayoutHorizontalSpacing  = 560
-	autoLayoutVerticalSpacing    = 260
+	autoLayoutNodeWidth          = 420.0
+	autoLayoutNodeHeight         = 180.0
+	autoLayoutLayerGap           = 180.0
+	autoLayoutNodeGap            = 100.0
 	autoLayoutUnknownChannelRank = 1 << 20
 )
 
@@ -52,6 +57,16 @@ type nodeLayerPriority struct {
 	parentOrder int
 	channelRank int
 	channel     string
+}
+
+// layoutContext holds shared state used across the layout pipeline.
+type layoutContext struct {
+	nodes                          []models.Node
+	edges                          []models.Edge
+	nodeIndexByID                  map[string]int
+	selectedNodeSet                map[string]struct{}
+	channelRankByNodeID            map[string]map[string]int
+	incomingEdgeOrderingByTargetID map[string][]incomingEdgeOrdering
 }
 
 func applyHorizontalAutoLayout(
@@ -104,28 +119,97 @@ func applyHorizontalAutoLayout(
 		return nodes, nil
 	}
 
-	selectedNodeSet := make(map[string]struct{}, len(selectedNodeIDs))
-	indegreeByID := make(map[string]int, len(selectedNodeIDs))
-	outgoingByID := make(map[string][]string, len(selectedNodeIDs))
-	incomingByID := make(map[string][]string, len(selectedNodeIDs))
-	incomingEdgeOrderingByTargetID := make(map[string][]incomingEdgeOrdering, len(selectedNodeIDs))
-	channelRankByNodeID := buildOutputChannelRankByNodeID(nodes, nodeIndexByID, registry)
+	lctx := &layoutContext{
+		nodes:                          nodes,
+		edges:                          edges,
+		nodeIndexByID:                  nodeIndexByID,
+		selectedNodeSet:                make(map[string]struct{}, len(selectedNodeIDs)),
+		channelRankByNodeID:            buildOutputChannelRankByNodeID(nodes, nodeIndexByID, registry),
+		incomingEdgeOrderingByTargetID: make(map[string][]incomingEdgeOrdering, len(selectedNodeIDs)),
+	}
+
+	originalMin := resolveOriginalMinPosition(lctx, selectedNodeIDs)
+	autogEdges, connectedNodes := buildAutogEdges(lctx)
+	isolatedNodeIDs := resolveIsolatedNodeIDs(selectedNodeIDs, connectedNodes)
+
+	positions := computeAutogPositions(autogEdges)
+	nodeOrderIndexByID := buildNodeOrderIndex(positions)
+	applyChannelRankOrdering(lctx, positions, nodeOrderIndexByID)
+	placeIsolatedNodes(lctx, positions, isolatedNodeIDs)
+	applyPositionOffset(positions, originalMin)
+
+	return positions.applyTo(nodes, nodeIndexByID), nil
+}
+
+// layoutPositions wraps the position map with helper methods.
+type layoutPositions struct {
+	byNodeID map[string]models.Position
+}
+
+func newLayoutPositions(capacity int) *layoutPositions {
+	return &layoutPositions{byNodeID: make(map[string]models.Position, capacity)}
+}
+
+func (lp *layoutPositions) applyTo(nodes []models.Node, nodeIndexByID map[string]int) []models.Node {
+	updatedNodes := make([]models.Node, len(nodes))
+	copy(updatedNodes, nodes)
+
+	for nodeID, position := range lp.byNodeID {
+		index := nodeIndexByID[nodeID]
+		updatedNodes[index].Position = position
+	}
+
+	return updatedNodes
+}
+
+func (lp *layoutPositions) minPosition() models.Position {
+	minX := 0
+	minY := 0
+	first := true
+
+	for _, pos := range lp.byNodeID {
+		if first {
+			minX = pos.X
+			minY = pos.Y
+			first = false
+			continue
+		}
+
+		if pos.X < minX {
+			minX = pos.X
+		}
+		if pos.Y < minY {
+			minY = pos.Y
+		}
+	}
+
+	return models.Position{X: minX, Y: minY}
+}
+
+func (lp *layoutPositions) maxX() int {
+	maxX := 0
+	for _, pos := range lp.byNodeID {
+		if pos.X > maxX {
+			maxX = pos.X
+		}
+	}
+	return maxX
+}
+
+func resolveOriginalMinPosition(lctx *layoutContext, selectedNodeIDs []string) models.Position {
 	originalMinX := 0
 	originalMinY := 0
-	hasSelectedNodes := false
+	first := true
 
 	for _, nodeID := range selectedNodeIDs {
-		selectedNodeSet[nodeID] = struct{}{}
-		indegreeByID[nodeID] = 0
-		outgoingByID[nodeID] = []string{}
-		incomingByID[nodeID] = []string{}
-		incomingEdgeOrderingByTargetID[nodeID] = []incomingEdgeOrdering{}
+		lctx.selectedNodeSet[nodeID] = struct{}{}
+		lctx.incomingEdgeOrderingByTargetID[nodeID] = []incomingEdgeOrdering{}
 
-		node := nodes[nodeIndexByID[nodeID]]
-		if !hasSelectedNodes {
+		node := lctx.nodes[lctx.nodeIndexByID[nodeID]]
+		if first {
 			originalMinX = node.Position.X
 			originalMinY = node.Position.Y
-			hasSelectedNodes = true
+			first = false
 			continue
 		}
 
@@ -137,189 +221,224 @@ func applyHorizontalAutoLayout(
 		}
 	}
 
-	for _, edge := range edges {
-		if _, ok := selectedNodeSet[edge.SourceID]; !ok {
+	return models.Position{X: originalMinX, Y: originalMinY}
+}
+
+func buildAutogEdges(lctx *layoutContext) ([][]string, map[string]struct{}) {
+	var autogEdges [][]string
+	connectedNodes := make(map[string]struct{})
+
+	for _, edge := range lctx.edges {
+		if _, ok := lctx.selectedNodeSet[edge.SourceID]; !ok {
 			continue
 		}
-		if _, ok := selectedNodeSet[edge.TargetID]; !ok {
+		if _, ok := lctx.selectedNodeSet[edge.TargetID]; !ok {
 			continue
 		}
 
-		outgoingByID[edge.SourceID] = append(outgoingByID[edge.SourceID], edge.TargetID)
-		incomingByID[edge.TargetID] = append(incomingByID[edge.TargetID], edge.SourceID)
-		incomingEdgeOrderingByTargetID[edge.TargetID] = append(
-			incomingEdgeOrderingByTargetID[edge.TargetID],
+		autogEdges = append(autogEdges, []string{edge.SourceID, edge.TargetID})
+		connectedNodes[edge.SourceID] = struct{}{}
+		connectedNodes[edge.TargetID] = struct{}{}
+
+		lctx.incomingEdgeOrderingByTargetID[edge.TargetID] = append(
+			lctx.incomingEdgeOrderingByTargetID[edge.TargetID],
 			incomingEdgeOrdering{
 				parentID:    edge.SourceID,
 				channel:     edge.Channel,
-				channelRank: resolveEdgeChannelRank(edge.SourceID, edge.Channel, channelRankByNodeID),
+				channelRank: resolveEdgeChannelRank(edge.SourceID, edge.Channel, lctx.channelRankByNodeID),
 			},
 		)
-		indegreeByID[edge.TargetID]++
 	}
 
-	for nodeID := range outgoingByID {
-		sort.SliceStable(outgoingByID[nodeID], func(i, j int) bool {
-			return nodeOrderLess(outgoingByID[nodeID][i], outgoingByID[nodeID][j], nodes, nodeIndexByID)
-		})
-	}
+	return autogEdges, connectedNodes
+}
 
-	queue := make([]string, 0, len(selectedNodeIDs))
-	for _, nodeID := range selectedNodeIDs {
-		if indegreeByID[nodeID] == 0 {
-			queue = append(queue, nodeID)
+func resolveIsolatedNodeIDs(selectedNodeIDs []string, connectedNodes map[string]struct{}) []string {
+	var isolated []string
+	for _, id := range selectedNodeIDs {
+		if _, ok := connectedNodes[id]; !ok {
+			isolated = append(isolated, id)
 		}
 	}
-	sort.SliceStable(queue, func(i, j int) bool {
-		return nodeOrderLess(queue[i], queue[j], nodes, nodeIndexByID)
+	return isolated
+}
+
+// computeAutogPositions runs the Sugiyama layout via autog.
+// autog is top-to-bottom, so we swap W↔H on input and X↔Y on output
+// to produce a left-to-right horizontal layout.
+func computeAutogPositions(autogEdges [][]string) *layoutPositions {
+	positions := newLayoutPositions(0)
+
+	if len(autogEdges) == 0 {
+		return positions
+	}
+
+	result := autog.Layout(
+		graph.EdgeSlice(autogEdges),
+		autog.WithNodeFixedSize(autoLayoutNodeHeight, autoLayoutNodeWidth),
+		autog.WithLayerSpacing(autoLayoutLayerGap),
+		autog.WithNodeSpacing(autoLayoutNodeGap),
+		autog.WithPositioning(autog.PositioningVAlign),
+		autog.WithEdgeRouting(autog.EdgeRoutingNoop),
+	)
+
+	positions.byNodeID = make(map[string]models.Position, len(result.Nodes))
+	for _, n := range result.Nodes {
+		positions.byNodeID[n.ID] = models.Position{
+			X: int(math.Round(n.Y)),
+			Y: int(math.Round(n.X)),
+		}
+	}
+
+	return positions
+}
+
+// buildNodeOrderIndex derives a topological order from autog's positions.
+func buildNodeOrderIndex(positions *layoutPositions) map[string]int {
+	type positionedNode struct {
+		id string
+		x  int
+		y  int
+	}
+
+	ordered := make([]positionedNode, 0, len(positions.byNodeID))
+	for id, pos := range positions.byNodeID {
+		ordered = append(ordered, positionedNode{id: id, x: pos.X, y: pos.Y})
+	}
+
+	sort.SliceStable(ordered, func(i, j int) bool {
+		if ordered[i].x != ordered[j].x {
+			return ordered[i].x < ordered[j].x
+		}
+		return ordered[i].y < ordered[j].y
 	})
 
-	order := make([]string, 0, len(selectedNodeIDs))
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
-		order = append(order, current)
+	indexByID := make(map[string]int, len(ordered))
+	for idx, pn := range ordered {
+		indexByID[pn.id] = idx
+	}
+	return indexByID
+}
 
-		for _, target := range outgoingByID[current] {
-			indegreeByID[target]--
-			if indegreeByID[target] == 0 {
-				queue = append(queue, target)
-			}
-		}
-
-		sort.SliceStable(queue, func(i, j int) bool {
-			return nodeOrderLess(queue[i], queue[j], nodes, nodeIndexByID)
-		})
+// applyChannelRankOrdering re-sorts nodes within each layer by channel priority,
+// then reassigns Y positions centered around 0.
+func applyChannelRankOrdering(
+	lctx *layoutContext,
+	positions *layoutPositions,
+	nodeOrderIndexByID map[string]int,
+) {
+	type layerGroup struct {
+		x       int
+		nodeIDs []string
 	}
 
-	if len(order) < len(selectedNodeIDs) {
-		inOrder := make(map[string]bool, len(order))
-		for _, nodeID := range order {
-			inOrder[nodeID] = true
+	layersByX := make(map[int]*layerGroup)
+	for id, pos := range positions.byNodeID {
+		lg, ok := layersByX[pos.X]
+		if !ok {
+			lg = &layerGroup{x: pos.X}
+			layersByX[pos.X] = lg
 		}
-
-		remaining := make([]string, 0, len(selectedNodeIDs)-len(order))
-		for _, nodeID := range selectedNodeIDs {
-			if !inOrder[nodeID] {
-				remaining = append(remaining, nodeID)
-			}
-		}
-
-		sort.SliceStable(remaining, func(i, j int) bool {
-			return nodeOrderLess(remaining[i], remaining[j], nodes, nodeIndexByID)
-		})
-		order = append(order, remaining...)
+		lg.nodeIDs = append(lg.nodeIDs, id)
 	}
 
-	nodeOrderIndexByID := make(map[string]int, len(order))
-	for idx, nodeID := range order {
-		nodeOrderIndexByID[nodeID] = idx
-	}
-
-	layerByID := make(map[string]int, len(selectedNodeIDs))
-	maxLayer := 0
-	for _, nodeID := range order {
-		layer := 0
-		for _, parentID := range incomingByID[nodeID] {
-			parentLayer := layerByID[parentID] + 1
-			if parentLayer > layer {
-				layer = parentLayer
-			}
-		}
-		layerByID[nodeID] = layer
-		if layer > maxLayer {
-			maxLayer = layer
-		}
-	}
-
-	nodesByLayer := make([][]string, maxLayer+1)
-	for _, nodeID := range order {
-		layer := layerByID[nodeID]
-		nodesByLayer[layer] = append(nodesByLayer[layer], nodeID)
-	}
-
-	for layer := range nodesByLayer {
-		sort.SliceStable(nodesByLayer[layer], func(i, j int) bool {
-			nodeIDA := nodesByLayer[layer][i]
-			nodeIDB := nodesByLayer[layer][j]
-
-			priorityA := resolveNodeLayerPriority(
-				nodeIDA,
-				incomingEdgeOrderingByTargetID,
+	spacing := int(autoLayoutNodeHeight + autoLayoutNodeGap)
+	for _, lg := range layersByX {
+		sort.SliceStable(lg.nodeIDs, func(i, j int) bool {
+			return layerNodeLess(
+				lg.nodeIDs[i], lg.nodeIDs[j],
+				lctx.incomingEdgeOrderingByTargetID,
 				nodeOrderIndexByID,
+				lctx.nodes, lctx.nodeIndexByID,
 			)
-			priorityB := resolveNodeLayerPriority(
-				nodeIDB,
-				incomingEdgeOrderingByTargetID,
-				nodeOrderIndexByID,
-			)
-
-			if priorityA.parentOrder != priorityB.parentOrder {
-				return priorityA.parentOrder < priorityB.parentOrder
-			}
-			if priorityA.channelRank != priorityB.channelRank {
-				return priorityA.channelRank < priorityB.channelRank
-			}
-			if priorityA.channel != priorityB.channel {
-				return strings.Compare(priorityA.channel, priorityB.channel) < 0
-			}
-
-			return nodeOrderLess(nodeIDA, nodeIDB, nodes, nodeIndexByID)
 		})
-	}
 
-	layoutedPositionByNodeID := make(map[string]models.Position, len(selectedNodeIDs))
-	layoutMinX := 0
-	layoutMinY := 0
-	hasLayoutedNode := false
-
-	for layer, layerNodeIDs := range nodesByLayer {
-		x := layer * autoLayoutHorizontalSpacing
-		for row, nodeID := range layerNodeIDs {
-			position := models.Position{
-				X: x,
-				Y: row * autoLayoutVerticalSpacing,
-			}
-			layoutedPositionByNodeID[nodeID] = position
-
-			if !hasLayoutedNode {
-				layoutMinX = position.X
-				layoutMinY = position.Y
-				hasLayoutedNode = true
-				continue
-			}
-
-			if position.X < layoutMinX {
-				layoutMinX = position.X
-			}
-			if position.Y < layoutMinY {
-				layoutMinY = position.Y
+		totalHeight := (len(lg.nodeIDs) - 1) * spacing
+		startY := -totalHeight / 2
+		for i, id := range lg.nodeIDs {
+			positions.byNodeID[id] = models.Position{
+				X: lg.x,
+				Y: startY + i*spacing,
 			}
 		}
 	}
+}
 
-	offsetX := originalMinX - layoutMinX
-	offsetY := originalMinY - layoutMinY
+func layerNodeLess(
+	nodeIDA, nodeIDB string,
+	incomingEdgeOrderingByTargetID map[string][]incomingEdgeOrdering,
+	nodeOrderIndexByID map[string]int,
+	nodes []models.Node,
+	nodeIndexByID map[string]int,
+) bool {
+	priorityA := resolveNodeLayerPriority(nodeIDA, incomingEdgeOrderingByTargetID, nodeOrderIndexByID)
+	priorityB := resolveNodeLayerPriority(nodeIDB, incomingEdgeOrderingByTargetID, nodeOrderIndexByID)
 
-	updatedNodes := make([]models.Node, len(nodes))
-	copy(updatedNodes, nodes)
-
-	for nodeID, position := range layoutedPositionByNodeID {
-		index := nodeIndexByID[nodeID]
-		updatedNodes[index].Position = models.Position{
-			X: position.X + offsetX,
-			Y: position.Y + offsetY,
-		}
+	if priorityA.parentOrder != priorityB.parentOrder {
+		return priorityA.parentOrder < priorityB.parentOrder
+	}
+	if priorityA.channelRank != priorityB.channelRank {
+		return priorityA.channelRank < priorityB.channelRank
+	}
+	if priorityA.channel != priorityB.channel {
+		return strings.Compare(priorityA.channel, priorityB.channel) < 0
 	}
 
-	return updatedNodes, nil
+	return nodeOrderLess(nodeIDA, nodeIDB, nodes, nodeIndexByID)
+}
+
+func placeIsolatedNodes(
+	lctx *layoutContext,
+	positions *layoutPositions,
+	isolatedNodeIDs []string,
+) {
+	if len(isolatedNodeIDs) == 0 {
+		return
+	}
+
+	sort.SliceStable(isolatedNodeIDs, func(i, j int) bool {
+		return nodeOrderLess(isolatedNodeIDs[i], isolatedNodeIDs[j], lctx.nodes, lctx.nodeIndexByID)
+	})
+
+	isolatedX := 0
+	if len(positions.byNodeID) > 0 {
+		isolatedX = positions.maxX() + int(autoLayoutNodeWidth+autoLayoutLayerGap)
+	}
+
+	spacing := int(autoLayoutNodeHeight + autoLayoutNodeGap)
+	totalHeight := (len(isolatedNodeIDs) - 1) * spacing
+	startY := -totalHeight / 2
+	for i, id := range isolatedNodeIDs {
+		positions.byNodeID[id] = models.Position{
+			X: isolatedX,
+			Y: startY + i*spacing,
+		}
+	}
+}
+
+func applyPositionOffset(
+	positions *layoutPositions,
+	originalMin models.Position,
+) {
+	if len(positions.byNodeID) == 0 {
+		return
+	}
+
+	layoutMin := positions.minPosition()
+	offsetX := originalMin.X - layoutMin.X
+	offsetY := originalMin.Y - layoutMin.Y
+
+	for id, pos := range positions.byNodeID {
+		positions.byNodeID[id] = models.Position{
+			X: pos.X + offsetX,
+			Y: pos.Y + offsetY,
+		}
+	}
 }
 
 func nodeOrderLess(nodeIDA string, nodeIDB string, nodes []models.Node, nodeIndexByID map[string]int) bool {
-	indexA := nodeIndexByID[nodeIDA]
-	indexB := nodeIndexByID[nodeIDB]
-	nodeA := nodes[indexA]
-	nodeB := nodes[indexB]
+	nodeA := nodes[nodeIndexByID[nodeIDA]]
+	nodeB := nodes[nodeIndexByID[nodeIDB]]
 
 	if nodeA.Position.Y != nodeB.Position.Y {
 		return nodeA.Position.Y < nodeB.Position.Y
@@ -487,8 +606,6 @@ func resolveScopedNodeIDs(
 		return cloneNodeIDs(flowNodeIDs), nil
 	case pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT:
 		return resolveConnectedComponentNodeIDs(seedNodeIDs, flowNodeIDs, flowNodeSet, nodeIndexByID, nodes, edges), nil
-	case pb.CanvasAutoLayout_SCOPE_EXACT_SET:
-		return resolveExactSetNodeIDs(seedNodeIDs)
 	default:
 		return nil, status.Errorf(codes.InvalidArgument, "unsupported auto layout scope: %s", scope.String())
 	}
@@ -496,14 +613,6 @@ func resolveScopedNodeIDs(
 
 func cloneNodeIDs(nodeIDs []string) []string {
 	return append([]string(nil), nodeIDs...)
-}
-
-func resolveExactSetNodeIDs(seedNodeIDs []string) ([]string, error) {
-	if len(seedNodeIDs) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "auto_layout.node_ids is required when scope is EXACT_SET")
-	}
-
-	return cloneNodeIDs(seedNodeIDs), nil
 }
 
 func resolveConnectedComponentNodeIDs(
