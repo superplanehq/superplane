@@ -35,6 +35,7 @@ import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactreg
 import gcpPubSubIcon from "@/assets/icons/integrations/gcp.pubsub.svg";
 import gcpCloudDNSIcon from "@/assets/icons/integrations/gcp.clouddns.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
+import perplexityIcon from "@/assets/icons/integrations/perplexity.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
@@ -79,6 +80,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   "open-ai": openAiIcon,
   claude: claudeIcon,
   cursor: cursorIcon,
+  perplexity: perplexityIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   incident: incidentIcon,
@@ -122,6 +124,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   "open-ai": openAiIcon,
   claude: claudeIcon,
   cursor: cursorIcon,
+  perplexity: perplexityIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   incident: incidentIcon,
