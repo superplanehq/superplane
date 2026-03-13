@@ -539,10 +539,6 @@ export const SimpleDeployment: Story = {
           edges={edges}
           onNodeExpand={handleNodeExpand}
           getSidebarData={getSidebarData}
-          onRun={(nodeId) => {
-            console.log("Run action for node:", nodeId);
-            alert(`Running node: ${nodeId}`);
-          }}
           onDuplicate={(nodeId) => {
             console.log("Duplicate action for node:", nodeId);
             alert(`Duplicating node: ${nodeId}`);

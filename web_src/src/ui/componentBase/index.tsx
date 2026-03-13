@@ -224,7 +224,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   selected?: boolean;
   metadata?: MetadataItem[];
   /** Custom content rendered on the node */
-  customField?: React.ReactNode | ((onRun?: () => void, nodeId?: string) => React.ReactNode);
+  customField?: React.ReactNode | (() => React.ReactNode);
   /** Where to render customField: "before" (before events) or "after" (after events, default) */
   customFieldPosition?: "before" | "after";
   eventStateMap?: EventStateMap;
@@ -250,8 +250,8 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   eventSections,
   selected = false,
   onToggleCollapse,
-  onRun,
-  runDisabled,
+  onRun: _onRun,
+  runDisabled: _runDisabled,
   runDisabledTooltip: _runDisabledTooltip,
   onTogglePause,
   onEdit: _onEdit,
@@ -444,7 +444,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
             )}
 
             {customFieldPosition === "before" &&
-              (typeof customField === "function" ? customField(runDisabled ? undefined : onRun) : customField || null)}
+              (typeof customField === "function" ? customField() : customField || null)}
 
             {eventSections?.map((section, index) => (
               <EventSectionDisplay
@@ -470,7 +470,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
             {includeEmptyState && <EmptyState {...emptyStateProps} />}
 
             {customFieldPosition === "after" &&
-              (typeof customField === "function" ? customField(runDisabled ? undefined : onRun) : customField || null)}
+              (typeof customField === "function" ? customField() : customField || null)}
           </>
         )}
       </div>

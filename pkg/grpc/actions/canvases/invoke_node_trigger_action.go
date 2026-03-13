@@ -80,6 +80,11 @@ func InvokeNodeTriggerAction(
 	tx := database.Conn()
 	logger := logging.ForNode(*node)
 
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
 	actionCtx := core.TriggerActionContext{
 		Name:          actionName,
 		Parameters:    parameters,
@@ -87,12 +92,8 @@ func InvokeNodeTriggerAction(
 		HTTP:          registry.HTTPContext(),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
+		Events:        contexts.NewEventContext(tx, node, onNewEvents),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
-	}
-
-	newEvents := []models.CanvasEvent{}
-	onNewEvents := func(events []models.CanvasEvent) {
-		newEvents = append(newEvents, events...)
 	}
 
 	if node.AppInstallationID != nil {
@@ -114,6 +115,10 @@ func InvokeNodeTriggerAction(
 
 	for _, event := range newEvents {
 		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+	}
+
+	if result == nil {
+		result = map[string]any{}
 	}
 
 	// Convert result to protobuf struct

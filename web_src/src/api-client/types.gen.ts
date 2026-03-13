@@ -348,17 +348,6 @@ export type CanvasesDescribeCanvasVersionResponse = {
   version?: CanvasesCanvasVersion;
 };
 
-export type CanvasesEmitNodeEventBody = {
-  channel?: string;
-  data?: {
-    [key: string]: unknown;
-  };
-};
-
-export type CanvasesEmitNodeEventResponse = {
-  eventId?: string;
-};
-
 export type CanvasesInvokeNodeExecutionActionBody = {
   parameters?: {
     [key: string]: unknown;
@@ -2018,34 +2007,6 @@ export type CanvasesListNodeEventsResponses = {
 };
 
 export type CanvasesListNodeEventsResponse2 = CanvasesListNodeEventsResponses[keyof CanvasesListNodeEventsResponses];
-
-export type CanvasesEmitNodeEventData = {
-  body: CanvasesEmitNodeEventBody;
-  path: {
-    canvasId: string;
-    nodeId: string;
-  };
-  query?: never;
-  url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events";
-};
-
-export type CanvasesEmitNodeEventErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type CanvasesEmitNodeEventError = CanvasesEmitNodeEventErrors[keyof CanvasesEmitNodeEventErrors];
-
-export type CanvasesEmitNodeEventResponses = {
-  /**
-   * A successful response.
-   */
-  200: CanvasesEmitNodeEventResponse;
-};
-
-export type CanvasesEmitNodeEventResponse2 = CanvasesEmitNodeEventResponses[keyof CanvasesEmitNodeEventResponses];
 
 export type CanvasesListNodeExecutionsData = {
   body?: never;

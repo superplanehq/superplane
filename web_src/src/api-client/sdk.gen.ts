@@ -51,9 +51,6 @@ import type {
   CanvasesDescribeCanvasVersionData,
   CanvasesDescribeCanvasVersionErrors,
   CanvasesDescribeCanvasVersionResponses,
-  CanvasesEmitNodeEventData,
-  CanvasesEmitNodeEventErrors,
-  CanvasesEmitNodeEventResponses,
   CanvasesInvokeNodeExecutionActionData,
   CanvasesInvokeNodeExecutionActionErrors,
   CanvasesInvokeNodeExecutionActionResponses,
@@ -669,23 +666,6 @@ export const canvasesListNodeEvents = <ThrowOnError extends boolean = true>(
   (options.client ?? client).get<CanvasesListNodeEventsResponses, CanvasesListNodeEventsErrors, ThrowOnError>({
     url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events",
     ...options,
-  });
-
-/**
- * Emit output event for canvas node
- *
- * Emit output event for canvas node
- */
-export const canvasesEmitNodeEvent = <ThrowOnError extends boolean = true>(
-  options: Options<CanvasesEmitNodeEventData, ThrowOnError>,
-) =>
-  (options.client ?? client).post<CanvasesEmitNodeEventResponses, CanvasesEmitNodeEventErrors, ThrowOnError>({
-    url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
   });
 
 /**

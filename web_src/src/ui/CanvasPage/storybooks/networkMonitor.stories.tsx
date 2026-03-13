@@ -230,9 +230,6 @@ export const Monitor: Story = {
           nodes={nodes}
           edges={edges}
           getSidebarData={getSidebarData}
-          onRun={(nodeId) => {
-            console.log("Run action for node:", nodeId);
-          }}
           onDuplicate={(nodeId) => {
             console.log("Duplicate action for node:", nodeId);
           }}

@@ -192,32 +192,6 @@ func (s *CanvasService) ListNodeEvents(ctx context.Context, req *pb.ListNodeEven
 	return canvases.ListNodeEvents(ctx, s.registry, canvasID, req.NodeId, req.Limit, req.Before)
 }
 
-func (s *CanvasService) EmitNodeEvent(ctx context.Context, req *pb.EmitNodeEventRequest) (*pb.EmitNodeEventResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-
-	canvasID, err := uuid.Parse(req.CanvasId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
-	}
-
-	if req.NodeId == "" {
-		return nil, status.Error(codes.InvalidArgument, "node_id is required")
-	}
-
-	if req.Channel == "" {
-		return nil, status.Error(codes.InvalidArgument, "channel is required")
-	}
-
-	return canvases.EmitNodeEvent(
-		ctx,
-		uuid.MustParse(organizationID),
-		canvasID,
-		req.NodeId,
-		req.Channel,
-		req.Data.AsMap(),
-	)
-}
-
 func (s *CanvasService) InvokeNodeExecutionAction(ctx context.Context, req *pb.InvokeNodeExecutionActionRequest) (*pb.InvokeNodeExecutionActionResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 

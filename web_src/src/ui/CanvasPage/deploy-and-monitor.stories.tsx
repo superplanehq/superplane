@@ -573,9 +573,6 @@ export const DeployAndMonitor: Story = {
           nodes={simulationNodes}
           edges={simulationEdges}
           getSidebarData={getSidebarData}
-          onRun={(nodeId) => {
-            console.log("Run action for node:", nodeId);
-          }}
           onDuplicate={(nodeId) => {
             console.log("Duplicate action for node:", nodeId);
           }}
