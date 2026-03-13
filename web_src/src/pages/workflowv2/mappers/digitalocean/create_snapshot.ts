@@ -13,6 +13,7 @@ import {
 import { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { formatTimeAgo } from "@/utils/date";
+import { DropletNodeMetadata } from "./types";
 
 export const createSnapshotMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -78,10 +79,13 @@ export const createSnapshotMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
+  const nodeMetadata = node.metadata as DropletNodeMetadata | undefined;
   const configuration = node.configuration as any;
 
-  if (configuration?.dropletId) {
-    metadata.push({ icon: "server", label: `Droplet: ${configuration.dropletId}` });
+  if (nodeMetadata?.dropletName) {
+    metadata.push({ icon: "server", label: nodeMetadata.dropletName });
+  } else if (configuration?.droplet) {
+    metadata.push({ icon: "server", label: `Droplet ID: ${configuration.droplet}` });
   }
 
   if (configuration?.name) {

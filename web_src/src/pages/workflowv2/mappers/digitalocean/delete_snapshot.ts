@@ -13,6 +13,7 @@ import {
 import { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { formatTimeAgo } from "@/utils/date";
+import { SnapshotNodeMetadata, DeleteSnapshotConfiguration } from "./types";
 
 export const deleteSnapshotMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -56,10 +57,13 @@ export const deleteSnapshotMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const nodeMetadata = node.metadata as SnapshotNodeMetadata | undefined;
+  const configuration = node.configuration as DeleteSnapshotConfiguration;
 
-  if (configuration?.snapshotId) {
-    metadata.push({ icon: "trash", label: `Snapshot: ${configuration.snapshotId}` });
+  if (nodeMetadata?.snapshotName) {
+    metadata.push({ icon: "trash", label: nodeMetadata.snapshotName });
+  } else if (configuration?.snapshot) {
+    metadata.push({ icon: "trash", label: `Snapshot ID: ${configuration.snapshot}` });
   }
 
   return metadata;

@@ -14,7 +14,7 @@ import (
 type DeleteSnapshot struct{}
 
 type DeleteSnapshotSpec struct {
-	SnapshotID string `json:"snapshotId" mapstructure:"snapshotId"`
+	Snapshot string `json:"snapshot" mapstructure:"snapshot"`
 }
 
 func (c *DeleteSnapshot) Name() string {
@@ -40,7 +40,7 @@ func (c *DeleteSnapshot) Documentation() string {
 
 ## Configuration
 
-- **Snapshot ID**: The ID of the snapshot to delete (required)
+- **Snapshot**: The snapshot to delete (required)
 
 ## Output
 
@@ -64,11 +64,17 @@ func (c *DeleteSnapshot) OutputChannels(configuration any) []core.OutputChannel 
 func (c *DeleteSnapshot) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "snapshotId",
-			Label:       "Snapshot ID",
-			Type:        configuration.FieldTypeString,
+			Name:        "snapshot",
+			Label:       "Snapshot",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The ID of the snapshot to delete",
+			Description: "The snapshot to delete",
+			Placeholder: "Select a snapshot",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "snapshot",
+				},
+			},
 		},
 	}
 }
@@ -80,8 +86,13 @@ func (c *DeleteSnapshot) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if spec.SnapshotID == "" {
-		return errors.New("snapshot ID is required")
+	if spec.Snapshot == "" {
+		return errors.New("snapshot is required")
+	}
+
+	err = resolveSnapshotMetadata(ctx, spec.Snapshot)
+	if err != nil {
+		return fmt.Errorf("error resolving snapshot metadata: %v", err)
 	}
 
 	return nil
@@ -99,13 +110,13 @@ func (c *DeleteSnapshot) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	err = client.DeleteSnapshot(spec.SnapshotID)
+	err = client.DeleteSnapshot(spec.Snapshot)
 	if err != nil {
 		return fmt.Errorf("failed to delete snapshot: %v", err)
 	}
 
 	result := map[string]any{
-		"snapshotId": spec.SnapshotID,
+		"snapshotId": spec.Snapshot,
 		"deleted":    true,
 	}
 

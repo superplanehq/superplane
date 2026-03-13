@@ -16,20 +16,20 @@ import (
 func Test__CreateSnapshot__Setup(t *testing.T) {
 	component := &CreateSnapshot{}
 
-	t.Run("missing droplet ID returns error", func(t *testing.T) {
+	t.Run("missing droplet returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"name": "my-snapshot",
 			},
 		})
 
-		require.ErrorContains(t, err, "droplet ID is required")
+		require.ErrorContains(t, err, "droplet is required")
 	})
 
 	t.Run("missing name returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"dropletId": 98765432,
+				"droplet": "98765432",
 			},
 		})
 
@@ -37,11 +37,35 @@ func Test__CreateSnapshot__Setup(t *testing.T) {
 	})
 
 	t.Run("valid configuration -> no error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"droplet": {
+							"id": 98765432,
+							"name": "my-droplet",
+							"status": "active"
+						}
+					}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "test-token",
+			},
+		}
+
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"dropletId": 98765432,
-				"name":      "my-snapshot",
+				"droplet": "98765432",
+				"name":    "my-snapshot",
 			},
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			Metadata:    &contexts.MetadataContext{},
 		})
 
 		require.NoError(t, err)
@@ -86,8 +110,8 @@ func Test__CreateSnapshot__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"dropletId": 98765432,
-				"name":      "my-snapshot",
+				"droplet": "98765432",
+				"name":    "my-snapshot",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -102,11 +126,11 @@ func Test__CreateSnapshot__Execute(t *testing.T) {
 		metadata, ok := metadataCtx.Metadata.(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, 11223344, metadata["actionID"])
-		assert.Equal(t, 98765432, metadata["dropletID"])
+		assert.Equal(t, 98765432, metadata["droplet"])
 
 		// Should schedule a poll action
 		assert.Equal(t, "poll", requestCtx.Action)
-		assert.Equal(t, 15*time.Second, requestCtx.Duration)
+		assert.Equal(t, 5*time.Second, requestCtx.Duration)
 
 		// Should NOT emit yet (waiting for action to complete)
 		assert.False(t, executionState.Passed)
@@ -134,8 +158,8 @@ func Test__CreateSnapshot__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"dropletId": 99999999,
-				"name":      "my-snapshot",
+				"droplet": "99999999",
+				"name":    "my-snapshot",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -198,8 +222,8 @@ func Test__CreateSnapshot__HandleAction(t *testing.T) {
 
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: map[string]any{
-				"actionID":  11223344,
-				"dropletID": 98765432,
+				"actionID": 11223344,
+				"droplet":  98765432,
 			},
 		}
 
@@ -251,8 +275,8 @@ func Test__CreateSnapshot__HandleAction(t *testing.T) {
 
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: map[string]any{
-				"actionID":  11223344,
-				"dropletID": 98765432,
+				"actionID": 11223344,
+				"droplet":  98765432,
 			},
 		}
 
@@ -273,7 +297,7 @@ func Test__CreateSnapshot__HandleAction(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, executionState.Passed)
 		assert.Equal(t, "poll", requestCtx.Action)
-		assert.Equal(t, 15*time.Second, requestCtx.Duration)
+		assert.Equal(t, 5*time.Second, requestCtx.Duration)
 	})
 
 	t.Run("action errored -> returns error", func(t *testing.T) {
@@ -305,8 +329,8 @@ func Test__CreateSnapshot__HandleAction(t *testing.T) {
 
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: map[string]any{
-				"actionID":  11223344,
-				"dropletID": 98765432,
+				"actionID": 11223344,
+				"droplet":  98765432,
 			},
 		}
 

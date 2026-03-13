@@ -430,6 +430,45 @@ func resolveDropletMetadata(ctx core.SetupContext, dropletStr string) error {
 	})
 }
 
+// SnapshotNodeMetadata stores metadata about a snapshot for display in the UI
+type SnapshotNodeMetadata struct {
+	SnapshotID   string `json:"snapshotId" mapstructure:"snapshotId"`
+	SnapshotName string `json:"snapshotName" mapstructure:"snapshotName"`
+}
+
+// resolveSnapshotMetadata fetches the snapshot name from the API and stores it in metadata
+// This allows the UI to display the snapshot name instead of just the ID
+func resolveSnapshotMetadata(ctx core.SetupContext, snapshotStr string) error {
+	// If the snapshot ID is an expression placeholder, skip metadata resolution
+	if strings.Contains(snapshotStr, "{{") {
+		return ctx.Metadata.Set(SnapshotNodeMetadata{
+			SnapshotName: snapshotStr,
+		})
+	}
+
+	// If metadata is already set for the same snapshot, skip the API call
+	var existing SnapshotNodeMetadata
+	err := mapstructure.Decode(ctx.Metadata.Get(), &existing)
+	if err == nil && existing.SnapshotID == snapshotStr && existing.SnapshotName != "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client for metadata resolution: %w", err)
+	}
+
+	snapshot, err := client.GetSnapshot(snapshotStr)
+	if err != nil {
+		return fmt.Errorf("failed to fetch snapshot %s for metadata: %w", snapshotStr, err)
+	}
+
+	return ctx.Metadata.Set(SnapshotNodeMetadata{
+		SnapshotID:   snapshotStr,
+		SnapshotName: snapshot.Name,
+	})
+}
+
 // CreateDropletSnapshot creates a snapshot of a droplet
 func (c *Client) CreateDropletSnapshot(dropletID int, name string) (*DOAction, error) {
 	url := fmt.Sprintf("%s/droplets/%d/actions", c.BaseURL, dropletID)
@@ -460,14 +499,14 @@ func (c *Client) CreateDropletSnapshot(dropletID int, name string) (*DOAction, e
 
 // Snapshot represents a DigitalOcean snapshot
 type Snapshot struct {
-	ID            string   `json:"id"`
-	Name          string   `json:"name"`
-	CreatedAt     string   `json:"created_at"`
-	ResourceID    string   `json:"resource_id"`
-	ResourceType  string   `json:"resource_type"`
-	Regions       []string `json:"regions"`
-	MinDiskSize   int      `json:"min_disk_size"`
-	SizeGigabytes float64  `json:"size_gigabytes"`
+	ID            json.Number `json:"id"`
+	Name          string      `json:"name"`
+	CreatedAt     string      `json:"created_at"`
+	ResourceID    string      `json:"resource_id"`
+	ResourceType  string      `json:"resource_type"`
+	Regions       []string    `json:"regions"`
+	MinDiskSize   int         `json:"min_disk_size"`
+	SizeGigabytes float64     `json:"size_gigabytes"`
 }
 
 // GetDropletSnapshots lists snapshots for a given droplet
@@ -489,9 +528,47 @@ func (c *Client) GetDropletSnapshots(dropletID int) ([]Snapshot, error) {
 	return response.Snapshots, nil
 }
 
+// GetSnapshot retrieves a single snapshot by ID
+func (c *Client) GetSnapshot(snapshotID string) (*Snapshot, error) {
+	url := fmt.Sprintf("%s/snapshots/%s", c.BaseURL, snapshotID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Snapshot Snapshot `json:"snapshot"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Snapshot, nil
+}
+
 // DeleteSnapshot deletes a snapshot by ID
 func (c *Client) DeleteSnapshot(snapshotID string) error {
 	url := fmt.Sprintf("%s/snapshots/%s", c.BaseURL, snapshotID)
 	_, err := c.execRequest(http.MethodDelete, url, nil)
 	return err
+}
+
+// ListSnapshots retrieves all droplet snapshots
+func (c *Client) ListSnapshots() ([]Snapshot, error) {
+	url := fmt.Sprintf("%s/snapshots?resource_type=droplet&per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Snapshots []Snapshot `json:"snapshots"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Snapshots, nil
 }

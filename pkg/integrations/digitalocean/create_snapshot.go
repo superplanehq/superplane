@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,12 +13,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const snapshotPollInterval = 15 * time.Second
+const snapshotPollInterval = 5 * time.Second
 
 type CreateSnapshot struct{}
 
 type CreateSnapshotSpec struct {
-	Droplet int    `json:"droplet" mapstructure:"droplet"`
+	Droplet string `json:"droplet" mapstructure:"droplet"`
 	Name    string `json:"name" mapstructure:"name"`
 }
 
@@ -76,9 +77,16 @@ func (c *CreateSnapshot) Configuration() []configuration.Field {
 		{
 			Name:        "droplet",
 			Label:       "Droplet",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The droplet to snapshot",
+			Placeholder: "Select droplet",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "droplet",
+					UseNameAsValue: false,
+				},
+			},
 		},
 		{
 			Name:        "name",
@@ -97,12 +105,17 @@ func (c *CreateSnapshot) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if spec.Droplet == 0 {
+	if spec.Droplet == "" {
 		return errors.New("droplet is required")
 	}
 
 	if spec.Name == "" {
 		return errors.New("name is required")
+	}
+
+	err = resolveDropletMetadata(ctx, spec.Droplet)
+	if err != nil {
+		return fmt.Errorf("error resolving droplet metadata: %v", err)
 	}
 
 	return nil
@@ -120,14 +133,18 @@ func (c *CreateSnapshot) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	action, err := client.CreateDropletSnapshot(spec.Droplet, spec.Name)
+	dropletID, err := strconv.Atoi(spec.Droplet)
+	if err != nil {
+		return fmt.Errorf("invalid droplet ID %q: must be a number", spec.Droplet)
+	}
+	action, err := client.CreateDropletSnapshot(dropletID, spec.Name)
 	if err != nil {
 		return fmt.Errorf("failed to create snapshot: %v", err)
 	}
 
 	err = ctx.Metadata.Set(map[string]any{
 		"actionID": action.ID,
-		"droplet":  spec.Droplet,
+		"droplet":  dropletID,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to store metadata: %v", err)
@@ -163,8 +180,8 @@ func (c *CreateSnapshot) HandleAction(ctx core.ActionContext) error {
 	}
 
 	var metadata struct {
-		ActionID  int `mapstructure:"actionID"`
-		DropletID int `mapstructure:"dropletID"`
+		ActionID int `mapstructure:"actionID"`
+		Droplet  int `mapstructure:"droplet"`
 	}
 
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
@@ -184,13 +201,13 @@ func (c *CreateSnapshot) HandleAction(ctx core.ActionContext) error {
 	switch action.Status {
 	case "completed":
 		// Fetch the most recent snapshot for this droplet to get full details
-		snapshots, err := client.GetDropletSnapshots(metadata.DropletID)
+		snapshots, err := client.GetDropletSnapshots(metadata.Droplet)
 		if err != nil {
 			return fmt.Errorf("failed to get droplet snapshots: %v", err)
 		}
 
 		if len(snapshots) == 0 {
-			return fmt.Errorf("no snapshots found for droplet %d after action completed", metadata.DropletID)
+			return fmt.Errorf("no snapshots found for droplet %d after action completed", metadata.Droplet)
 		}
 
 		snapshot := snapshots[len(snapshots)-1]
