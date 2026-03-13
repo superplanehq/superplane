@@ -210,7 +210,10 @@ func (c *CreateSnapshot) HandleAction(ctx core.ActionContext) error {
 			return fmt.Errorf("no snapshots found for droplet %d after action completed", metadata.Droplet)
 		}
 
-		snapshot := snapshots[len(snapshots)-1]
+		snapshot, err := latestSnapshot(snapshots)
+		if err != nil {
+			return fmt.Errorf("failed to determine latest snapshot: %v", err)
+		}
 
 		return ctx.ExecutionState.Emit(
 			core.DefaultOutputChannel.Name,
@@ -224,6 +227,28 @@ func (c *CreateSnapshot) HandleAction(ctx core.ActionContext) error {
 	default:
 		return fmt.Errorf("snapshot action reached unexpected status %q", action.Status)
 	}
+}
+
+func latestSnapshot(snapshots []Snapshot) (Snapshot, error) {
+	latest := snapshots[0]
+	latestTime, err := time.Parse(time.RFC3339, latest.CreatedAt)
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("failed to parse created_at for snapshot %s: %v", latest.ID, err)
+	}
+
+	for _, s := range snapshots[1:] {
+		t, err := time.Parse(time.RFC3339, s.CreatedAt)
+		if err != nil {
+			return Snapshot{}, fmt.Errorf("failed to parse created_at for snapshot %s: %v", s.ID, err)
+		}
+
+		if t.After(latestTime) {
+			latest = s
+			latestTime = t
+		}
+	}
+
+	return latest, nil
 }
 
 func (c *CreateSnapshot) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

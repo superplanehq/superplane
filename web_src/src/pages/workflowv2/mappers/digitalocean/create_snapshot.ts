@@ -46,10 +46,6 @@ export const createSnapshotMapper: ComponentBaseMapper = {
     details["Snapshot ID"] = snapshot.id?.toString() || "-";
     details["Name"] = snapshot.name || "-";
 
-    if (snapshot.created_at) {
-      details["Snapshot Created At"] = new Date(snapshot.created_at).toLocaleString();
-    }
-
     details["Resource ID"] = snapshot.resource_id?.toString() || "-";
 
     if (snapshot.regions?.length > 0) {
