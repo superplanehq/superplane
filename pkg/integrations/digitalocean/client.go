@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -282,6 +285,80 @@ type DOAction struct {
 	RegionSlug   string `json:"region_slug"`
 }
 
+// ListDroplets retrieves all droplets in the account
+func (c *Client) ListDroplets() ([]Droplet, error) {
+	url := fmt.Sprintf("%s/droplets", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Droplets []Droplet `json:"droplets"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Droplets, nil
+}
+
+// DeleteDroplet deletes a droplet by its ID
+func (c *Client) DeleteDroplet(dropletID int) error {
+	url := fmt.Sprintf("%s/droplets/%d", c.BaseURL, dropletID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// PostDropletAction initiates a power action on a droplet
+func (c *Client) PostDropletAction(dropletID int, actionType string) (*DOAction, error) {
+	url := fmt.Sprintf("%s/droplets/%d/actions", c.BaseURL, dropletID)
+
+	body, err := json.Marshal(map[string]string{"type": actionType})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Action DOAction `json:"action"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Action, nil
+}
+
+// GetAction retrieves an action by its ID
+func (c *Client) GetAction(actionID int) (*DOAction, error) {
+	url := fmt.Sprintf("%s/actions/%d", c.BaseURL, actionID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Action DOAction `json:"action"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Action, nil
+}
+
 // ListActions retrieves actions filtered by resource type.
 // The DigitalOcean /v2/actions API does not support resource_type as a query
 // parameter, so we fetch all recent actions and filter client-side.
@@ -308,4 +385,224 @@ func (c *Client) ListActions(resourceType string) ([]DOAction, error) {
 	}
 
 	return filtered, nil
+}
+
+// Domain represents a DigitalOcean domain
+type Domain struct {
+	Name string `json:"name"`
+}
+
+// ListDomains retrieves all domains in the account
+func (c *Client) ListDomains() ([]Domain, error) {
+	url := fmt.Sprintf("%s/domains?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Domains []Domain `json:"domains"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Domains, nil
+}
+
+// DNSRecord represents a DigitalOcean DNS record
+type DNSRecord struct {
+	ID       int    `json:"id"`
+	Type     string `json:"type"`
+	Name     string `json:"name"`
+	Data     string `json:"data"`
+	Priority *int   `json:"priority"`
+	Port     *int   `json:"port"`
+	TTL      int    `json:"ttl"`
+	Weight   *int   `json:"weight"`
+}
+
+// DNSRecordRequest is the payload for creating or updating a DNS record
+type DNSRecordRequest struct {
+	Type     string `json:"type"`
+	Name     string `json:"name"`
+	Data     string `json:"data"`
+	TTL      int    `json:"ttl,omitempty"`
+	Priority *int   `json:"priority,omitempty"`
+	Port     *int   `json:"port,omitempty"`
+	Weight   *int   `json:"weight,omitempty"`
+}
+
+// CreateDNSRecord creates a new DNS record for a domain
+func (c *Client) CreateDNSRecord(domain string, req DNSRecordRequest) (*DNSRecord, error) {
+	url := fmt.Sprintf("%s/domains/%s/records", c.BaseURL, domain)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		DomainRecord DNSRecord `json:"domain_record"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.DomainRecord, nil
+}
+
+// DeleteDNSRecord deletes a DNS record by its ID
+func (c *Client) DeleteDNSRecord(domain string, recordID int) error {
+	url := fmt.Sprintf("%s/domains/%s/records/%d", c.BaseURL, domain, recordID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
+// ListDNSRecords retrieves all DNS records for a domain
+func (c *Client) ListDNSRecords(domain string) ([]DNSRecord, error) {
+	url := fmt.Sprintf("%s/domains/%s/records?per_page=200", c.BaseURL, domain)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		DomainRecords []DNSRecord `json:"domain_records"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.DomainRecords, nil
+}
+
+// UpdateDNSRecord updates an existing DNS record
+func (c *Client) UpdateDNSRecord(domain string, recordID int, req DNSRecordRequest) (*DNSRecord, error) {
+	url := fmt.Sprintf("%s/domains/%s/records/%d", c.BaseURL, domain, recordID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPatch, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		DomainRecord DNSRecord `json:"domain_record"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.DomainRecord, nil
+}
+
+// DropletNodeMetadata stores metadata about a droplet for display in the UI
+type DropletNodeMetadata struct {
+	DropletID   int    `json:"dropletId" mapstructure:"dropletId"`
+	DropletName string `json:"dropletName" mapstructure:"dropletName"`
+}
+
+// DNSRecordNodeMetadata stores metadata about a DNS record for display in the UI
+type DNSRecordNodeMetadata struct {
+	RecordID   int    `json:"recordId" mapstructure:"recordId"`
+	RecordName string `json:"recordName" mapstructure:"recordName"`
+}
+
+// resolveDNSRecordMetadata fetches the DNS record name from the API and stores it in metadata
+// This allows the UI to display the record name instead of just the ID
+func resolveDNSRecordMetadata(ctx core.SetupContext, domain, recordIDStr string) error {
+	// If the record ID is an expression placeholder, skip metadata resolution
+	if strings.Contains(recordIDStr, "{{") {
+		return ctx.Metadata.Set(DNSRecordNodeMetadata{
+			RecordName: recordIDStr,
+		})
+	}
+
+	recordID, err := strconv.Atoi(recordIDStr)
+	if err != nil {
+		return fmt.Errorf("invalid record ID %q: must be a number", recordIDStr)
+	}
+
+	// If metadata is already set for the same record, skip the API call
+	var existing DNSRecordNodeMetadata
+	err = mapstructure.Decode(ctx.Metadata.Get(), &existing)
+	if err == nil && existing.RecordID == recordID && existing.RecordName != "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client for metadata resolution: %w", err)
+	}
+
+	records, err := client.ListDNSRecords(domain)
+	if err != nil {
+		return fmt.Errorf("failed to list DNS records for metadata: %w", err)
+	}
+
+	for _, record := range records {
+		if record.ID == recordID {
+			return ctx.Metadata.Set(DNSRecordNodeMetadata{
+				RecordID:   recordID,
+				RecordName: fmt.Sprintf("%s (%s)", record.Name, record.Type),
+			})
+		}
+	}
+
+	// Record not found — store the ID as the name as a fallback
+	return ctx.Metadata.Set(DNSRecordNodeMetadata{
+		RecordID:   recordID,
+		RecordName: recordIDStr,
+	})
+}
+
+// resolveDropletMetadata fetches the droplet name from the API and stores it in metadata
+// This allows the UI to display the droplet name instead of just the ID
+func resolveDropletMetadata(ctx core.SetupContext, dropletStr string) error {
+	// If the droplet ID is an expression placeholder, skip metadata resolution
+	if strings.Contains(dropletStr, "{{") {
+		return ctx.Metadata.Set(DropletNodeMetadata{
+			DropletName: dropletStr,
+		})
+	}
+	dropletID, err := strconv.Atoi(dropletStr)
+	if err != nil {
+		return fmt.Errorf("invalid droplet ID %q: must be a number", dropletStr)
+	}
+
+	// If metadata is already set for the same droplet, skip the API call
+	var existing DropletNodeMetadata
+	err = mapstructure.Decode(ctx.Metadata.Get(), &existing)
+	if err == nil && existing.DropletID == dropletID && existing.DropletName != "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client for metadata resolution: %w", err)
+	}
+
+	droplet, err := client.GetDroplet(dropletID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch droplet %d for metadata: %w", dropletID, err)
+	}
+
+	return ctx.Metadata.Set(DropletNodeMetadata{
+		DropletID:   dropletID,
+		DropletName: droplet.Name,
+	})
 }
