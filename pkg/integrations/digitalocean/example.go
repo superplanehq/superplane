@@ -46,3 +46,23 @@ var exampleOutputManageDropletPower map[string]any
 func (m *ManageDropletPower) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputManageDropletPowerOnce, exampleOutputManageDropletPowerBytes, &exampleOutputManageDropletPower)
 }
+
+//go:embed example_output_create_snapshot.json
+var exampleOutputCreateSnapshotBytes []byte
+
+var exampleOutputCreateSnapshotOnce sync.Once
+var exampleOutputCreateSnapshot map[string]any
+
+func (c *CreateSnapshot) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateSnapshotOnce, exampleOutputCreateSnapshotBytes, &exampleOutputCreateSnapshot)
+}
+
+//go:embed example_output_delete_snapshot.json
+var exampleOutputDeleteSnapshotBytes []byte
+
+var exampleOutputDeleteSnapshotOnce sync.Once
+var exampleOutputDeleteSnapshot map[string]any
+
+func (c *DeleteSnapshot) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteSnapshotOnce, exampleOutputDeleteSnapshotBytes, &exampleOutputDeleteSnapshot)
+}
