@@ -207,15 +207,15 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   };
   const isExpressionBadges = (value: unknown): value is ExpressionBadges => {
     if (!value || typeof value !== "object") return false;
-    return "_type" in value && (value as ExpressionBadges)._type === "expressionBadges";
+    return "__type" in value && (value as ExpressionBadges).__type === "expressionBadges";
   };
   const isEvaluationBadges = (value: unknown): value is EvaluationBadges => {
     if (!value || typeof value !== "object") return false;
-    return "_type" in value && (value as EvaluationBadges)._type === "evaluationBadges";
+    return "__type" in value && (value as EvaluationBadges).__type === "evaluationBadges";
   };
   const isErrorValue = (value: unknown): value is ErrorValue => {
     if (!value || typeof value !== "object") return false;
-    return "_type" in value && (value as ErrorValue)._type === "error";
+    return "__type" in value && (value as ErrorValue).__type === "error";
   };
   const isApprovalTimeline = (value: unknown): value is ApprovalTimelineEntry[] => {
     if (!Array.isArray(value)) return false;
@@ -243,7 +243,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   };
   const isSemaphoreBlocks = (value: unknown): value is SemaphoreBlocksValue => {
     if (!value || typeof value !== "object") return false;
-    return "_type" in value && (value as SemaphoreBlocksValue)._type === "semaphoreBlocks";
+    return "__type" in value && (value as SemaphoreBlocksValue).__type === "semaphoreBlocks";
   };
   const isPagerDutyIncidentsList = (value: unknown): value is PagerDutyIncidentEntry[] => {
     if (!Array.isArray(value)) return false;
@@ -310,7 +310,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             {/* Component subtitle */}
             {componentSubtitle && <span className="text-sm text-gray-500 truncate">{componentSubtitle}</span>}
             <div
-              className={uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${EventBadgeColor}}
+              className={`uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${EventBadgeColor}`}
             >
               <span>{eventStateStyle.label || state}</span>
             </div>
@@ -350,7 +350,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         {item.childExecutions && item.childExecutions.length > 0 && (
           <div className="ml-8 mt-1 space-y-1">
             {item.childExecutions.map((child, childIndex) => (
-              <div key={${item.id}-child-${childIndex}} className="flex items-center justify-between gap-2 text-sm">
+              <div key={`${item.id}-child-${childIndex}`} className="flex items-center justify-between gap-2 text-sm">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <div className="flex-shrink-0">
                     {React.createElement(resolveIcon("corner-down-right"), {
@@ -432,7 +432,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                         <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
                           <div className="flex flex-col gap-3">
                             {value.map((entry, entryIndex) => (
-                              <div key={${entry.label}-${entryIndex}} className="relative pl-4">
+                              <div key={`${entry.label}-${entryIndex}`} className="relative pl-4">
                                 <div
                                   className={`absolute left-0 top-1.5 h-2 w-2 rounded-full ${getApprovalStatusColor(
                                     entry.status,
@@ -466,7 +466,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                     {entry.status && (
                                       <div
                                         className="text-[12px] text-gray-600 truncate"
-                                        title={${entry.status}${entry.timestamp ? ` ${entry.timestamp} : ""}`}
+                                        title={`${entry.status}${entry.timestamp ? ` ${entry.timestamp}` : ""}`}
                                       >
                                         {entry.status}
                                         {entry.timestamp ? ` ${entry.timestamp}` : ""}
@@ -494,7 +494,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                         <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
                           <div className="flex flex-col gap-4">
                             {value.map((issue, issueIndex) => (
-                              <div key={${issue.checkName}-${issueIndex}} className="flex flex-col">
+                              <div key={`${issue.checkName}-${issueIndex}`} className="flex flex-col">
                                 <div className="flex items-start gap-2">
                                   {/* Status badge replaces the dot */}
                                   <span
@@ -559,10 +559,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                           ) : (
                             <div className="flex flex-col gap-3">
                               {value.map((incident, incidentIndex) => (
-                                <div key={${incident.id}-${incidentIndex}} className="relative pl-4">
+                                <div key={`${incident.id}-${incidentIndex}`} className="relative pl-4">
                                   {/* Timeline dot - colored by urgency */}
                                   <div
-                                    className={absolute left-0 top-1.5 h-2 w-2 rounded-full ${getUrgencyDotColor(incident.urgency)}}
+                                    className={`absolute left-0 top-1.5 h-2 w-2 rounded-full ${getUrgencyDotColor(incident.urgency)}`}
                                   />
                                   {/* Timeline connecting line */}
                                   {incidentIndex < value.length - 1 && (
@@ -610,7 +610,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                     {incident.priority && (
                                       <>
                                         {" · "}
-                                        <span title={Priority: ${incident.priority}}>{incident.priority}</span>
+                                        <span title={`Priority: ${incident.priority}`}>{incident.priority}</span>
                                       </>
                                     )}
                                   </div>
@@ -632,10 +632,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                         <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
                           <div className="flex flex-col gap-3">
                             {value.blocks.map((block, blockIndex) => {
-                              const blockTitle = block.name || Block ${blockIndex + 1};
+                              const blockTitle = block.name || `Block ${blockIndex + 1}`;
                               const blockStatusParts = [block.result, block.state, block.resultReason].filter(Boolean);
                               return (
-                                <div key={${blockTitle}-${blockIndex}} className="flex flex-col gap-1">
+                                <div key={`${blockTitle}-${blockIndex}`} className="flex flex-col gap-1">
                                   <div className="text-[13px] text-gray-800 font-medium truncate" title={blockTitle}>
                                     {blockTitle}
                                     {blockStatusParts.length > 0 && (
@@ -648,15 +648,15 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                   {(block.jobs || []).length > 0 && (
                                     <div className="flex flex-col gap-1 pl-2">
                                       {block.jobs!.map((job, jobIndex) => {
-                                        const jobTitle = job.name || Job ${jobIndex + 1};
+                                        const jobTitle = job.name || `Job ${jobIndex + 1}`;
                                         const jobStatusParts = [job.result, job.status].filter(Boolean);
                                         return (
                                           <div
-                                            key={${jobTitle}-${jobIndex}}
+                                            key={`${jobTitle}-${jobIndex}`}
                                             className="text-[12px] text-gray-600 truncate"
                                             title={
                                               jobStatusParts.length > 0
-                                                ? ${jobTitle} · ${jobStatusParts.join(" · ")}
+                                                ? `${jobTitle} · ${jobStatusParts.join(" · ")}`
                                                 : jobTitle
                                             }
                                           >
@@ -705,7 +705,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                       {badges.slice(0, -1).map((badge, badgeIndex) => (
                                         <span
                                           key={badgeIndex}
-                                          className={px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${badge.bgColor} ${badge.textColor}}
+                                          className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${badge.bgColor} ${badge.textColor}`}
                                         >
                                           {badge.label}
                                         </span>
@@ -713,7 +713,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <span
-                                        className={px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${lastBadge.bgColor} ${lastBadge.textColor}}
+                                        className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${lastBadge.bgColor} ${lastBadge.textColor}`}
                                       >
                                         {lastBadge.label}
                                       </span>
@@ -728,7 +728,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                   {badges.map((badge, badgeIndex) => (
                                     <span
                                       key={badgeIndex}
-                                      className={px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${badge.bgColor} ${badge.textColor}}
+                                      className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${badge.bgColor} ${badge.textColor}`}
                                     >
                                       {badge.label}
                                     </span>
@@ -819,7 +819,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                         return (
                                           <span
                                             key={badgeIndex}
-                                            className={px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${badgeBg} ${badgeText}}
+                                            className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${badgeBg} ${badgeText}`}
                                           >
                                             {badge.label}
                                           </span>
@@ -828,7 +828,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <span
-                                        className={px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${lastBadge.bgColor} ${lastBadge.textColor}}
+                                        className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${lastBadge.bgColor} ${lastBadge.textColor}`}
                                       >
                                         {lastBadge.label}
                                       </span>
@@ -848,7 +848,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                     return (
                                       <span
                                         key={badgeIndex}
-                                        className={px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${badgeBg} ${badgeText}}
+                                        className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${badgeBg} ${badgeText}`}
                                       >
                                         {badge.label}
                                       </span>
