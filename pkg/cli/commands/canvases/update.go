@@ -59,19 +59,19 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		current = &canvas
 	}
 
-	versioningContext, err := resolveCanvasVersioningContext(ctx)
+	versioningContext, err := resolveCanvasVersioningContext(ctx, canvasID)
 	if err != nil {
 		return err
 	}
 
 	targetVersionID := ""
-	if versioningContext.sandboxModeEnabled {
+	if !versioningContext.versioningEnabled {
 		if draftMode {
-			return fmt.Errorf("--draft cannot be used when canvas sandbox mode is enabled")
+			return fmt.Errorf("--draft cannot be used when effective canvas versioning is disabled")
 		}
 	} else {
 		if !draftMode {
-			return fmt.Errorf("canvas versioning is enabled for this organization; use --draft to update your edit version")
+			return fmt.Errorf("effective canvas versioning is enabled for this canvas; use --draft")
 		}
 
 		targetVersionID, err = ensureCurrentUserDraftVersionID(ctx, canvasID)
@@ -219,10 +219,8 @@ func parseAutoLayout(value string, scopeValue string, nodeIDs []string) (*openap
 		autoLayout.SetScope(openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS)
 	case "connected-component", "connected_component", "connected":
 		autoLayout.SetScope(openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_CONNECTED_COMPONENT)
-	case "exact-set", "exact_set", "exact":
-		autoLayout.SetScope(openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_EXACT_SET)
 	default:
-		return nil, fmt.Errorf("unsupported auto layout scope %q (supported: full-canvas, connected-component, exact-set)", scopeValue)
+		return nil, fmt.Errorf("unsupported auto layout scope %q (supported: full-canvas, connected-component)", scopeValue)
 	}
 
 	return &autoLayout, nil

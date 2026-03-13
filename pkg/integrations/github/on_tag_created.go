@@ -129,31 +129,39 @@ func (t *OnTagCreated) HandleAction(ctx core.TriggerActionContext) (map[string]a
 	return nil, nil
 }
 
-func (t *OnTagCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *OnTagCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	ctx = withWebhookLogger(ctx, t.Name())
+	ctx.Logger.Infof("Received GitHub webhook")
+
 	config := OnTagCreatedConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		ctx.Logger.Errorf("Failed to decode configuration: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	eventType := ctx.Headers.Get("X-GitHub-Event")
 	if eventType == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
+		ctx.Logger.Errorf("Missing X-GitHub-Event header")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing X-GitHub-Event header")
 	}
 
 	if eventType != "create" {
-		return http.StatusOK, nil
+		ctx.Logger.Infof("Ignoring event - event type %q is not a create event", eventType)
+		return http.StatusOK, nil, nil
 	}
 
 	code, err := verifySignature(ctx)
 	if err != nil {
-		return code, err
+		ctx.Logger.Errorf("Failed to verify signature: %v", err)
+		return code, nil, err
 	}
 
 	data := map[string]any{}
 	err = json.Unmarshal(ctx.Body, &data)
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+		ctx.Logger.Errorf("Failed to parse request body: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("failed to parse request body: %w", err)
 	}
 
 	//
@@ -161,39 +169,45 @@ func (t *OnTagCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 	//
 	refType, ok := data["ref_type"]
 	if !ok {
-		return http.StatusBadRequest, fmt.Errorf("missing ref_type")
+		ctx.Logger.Errorf("Missing ref_type")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing ref_type")
 	}
 
 	rt, ok := refType.(string)
 	if !ok {
-		return http.StatusBadRequest, fmt.Errorf("invalid ref_type")
+		ctx.Logger.Errorf("Invalid ref_type")
+		return http.StatusBadRequest, nil, fmt.Errorf("invalid ref_type")
 	}
 
 	if rt != "tag" {
-		return http.StatusOK, nil
+		ctx.Logger.Infof("Ignoring event - ref_type %q is not a tag", rt)
+		return http.StatusOK, nil, nil
 	}
 
 	ref, ok := data["ref"]
 	if !ok {
-		return http.StatusBadRequest, fmt.Errorf("missing ref")
+		ctx.Logger.Errorf("Missing ref")
+		return http.StatusBadRequest, nil, fmt.Errorf("missing ref")
 	}
 
 	r, ok := ref.(string)
 	if !ok {
-		return http.StatusBadRequest, fmt.Errorf("invalid ref")
+		ctx.Logger.Errorf("Invalid ref")
+		return http.StatusBadRequest, nil, fmt.Errorf("invalid ref")
 	}
 
 	if !configuration.MatchesAnyPredicate(config.Tags, r) {
-		return http.StatusOK, nil
+		ctx.Logger.Infof("Ignoring event - ref %q did not match configured filters", r)
+		return http.StatusOK, nil, nil
 	}
 
 	err = ctx.Events.Emit("github.tagCreated", data)
-
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		ctx.Logger.Errorf("Failed to emit event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (t *OnTagCreated) Cleanup(ctx core.TriggerContext) error {

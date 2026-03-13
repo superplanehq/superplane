@@ -9,7 +9,7 @@ import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { Bot, Copy, Loader2, ArrowLeft } from "lucide-react";
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   useServiceAccount,
   useUpdateServiceAccount,
@@ -128,18 +128,19 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
   }
 
   const createdAt = serviceAccount.createdAt ? new Date(serviceAccount.createdAt).toLocaleDateString() : "—";
+  const serviceAccountsHref = `/${organizationId}/settings/service-accounts`;
 
   return (
     <div className="space-y-6 pt-6">
       {/* Back button */}
-      <button
-        type="button"
-        onClick={() => navigate(`/${organizationId}/settings/service-accounts`)}
+      <Link
+        to={serviceAccountsHref}
         className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition"
+        aria-label="Back to service accounts"
       >
         <ArrowLeft size={14} />
         Back to service accounts
-      </button>
+      </Link>
 
       {/* Details */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">

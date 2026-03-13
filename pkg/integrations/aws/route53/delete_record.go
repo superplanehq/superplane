@@ -157,8 +157,8 @@ func (c *DeleteRecord) HandleAction(ctx core.ActionContext) error {
 	}
 }
 
-func (c *DeleteRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *DeleteRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *DeleteRecord) Cancel(ctx core.ExecutionContext) error {

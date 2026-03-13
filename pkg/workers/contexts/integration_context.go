@@ -24,15 +24,24 @@ type IntegrationContext struct {
 	integration *models.Integration
 	encryptor   crypto.Encryptor
 	registry    *registry.Registry
+	onNewEvents func([]models.CanvasEvent)
 }
 
-func NewIntegrationContext(tx *gorm.DB, node *models.CanvasNode, integration *models.Integration, encryptor crypto.Encryptor, registry *registry.Registry) *IntegrationContext {
+func NewIntegrationContext(
+	tx *gorm.DB,
+	node *models.CanvasNode,
+	integration *models.Integration,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	onNewEvents func([]models.CanvasEvent),
+) *IntegrationContext {
 	return &IntegrationContext{
 		tx:          tx,
 		node:        node,
 		integration: integration,
 		encryptor:   encryptor,
 		registry:    registry,
+		onNewEvents: onNewEvents,
 	}
 }
 
@@ -143,7 +152,11 @@ func (c *IntegrationContext) mergeWebhookConfiguration(
 		return err
 	}
 
-	if !changed {
+	// Always reset failed webhooks to pending so they can be re-provisioned,
+	// even if the configuration hasn't changed. This handles the case where
+	// a webhook failed during initial setup (e.g. provider not ready) and
+	// a subsequent trigger setup should retry provisioning.
+	if !changed && webhook.State != models.WebhookStateFailed {
 		return nil
 	}
 
@@ -417,6 +430,7 @@ func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscription
 			node,
 			c.integration,
 			c,
+			c.onNewEvents,
 		))
 	}
 

@@ -45,8 +45,6 @@ export function useCreateCanvasModalState() {
       await updateMutation.mutateAsync({
         name: data.name,
         description: data.description,
-        nodes: modalState.workflow?.nodes,
-        edges: modalState.workflow?.edges,
       });
       onClose();
       return;

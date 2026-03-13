@@ -86,6 +86,7 @@ func UpdateIntegration(
 		instance,
 		registry.Encryptor,
 		registry,
+		nil,
 	)
 
 	syncErr := integration.Sync(core.SyncContext{

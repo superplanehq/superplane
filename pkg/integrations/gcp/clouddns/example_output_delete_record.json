@@ -1,0 +1,15 @@
+{
+  "data": {
+    "change": {
+      "id": "2",
+      "status": "done",
+      "startTime": "2026-01-28T10:31:00.000Z"
+    },
+    "record": {
+      "name": "old.example.com.",
+      "type": "A"
+    }
+  },
+  "timestamp": "2026-01-28T10:31:00.000Z",
+  "type": "gcp.clouddns.change"
+}

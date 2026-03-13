@@ -31,6 +31,9 @@ import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import cloudBuildIcon from "@/assets/icons/integrations/cloud_build.svg";
 import gcpCloudRunIcon from "@/assets/icons/integrations/gcp.cloudrun.svg";
+import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactregistry.svg";
+import gcpPubSubIcon from "@/assets/icons/integrations/gcp.pubsub.svg";
+import gcpCloudDNSIcon from "@/assets/icons/integrations/gcp.clouddns.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
@@ -46,6 +49,7 @@ import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
 import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
+import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
@@ -88,6 +92,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   honeycomb: honeycombIcon,
   gcp: gcpIcon,
   harness: harnessIcon,
+  newrelic: newrelicIcon,
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
   launchdarkly: launchdarklyIcon,
@@ -128,6 +133,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   render: renderIcon,
   dockerhub: dockerIcon,
   harness: harnessIcon,
+  newrelic: newrelicIcon,
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
   launchdarkly: launchdarklyIcon,
@@ -148,6 +154,9 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   gcp: {
     cloudbuild: cloudBuildIcon,
     cloudfunctions: gcpCloudRunIcon,
+    artifactregistry: gcpArtifactRegistryIcon,
+    pubsub: gcpPubSubIcon,
+    clouddns: gcpCloudDNSIcon,
   },
 };
 

@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -282,6 +285,80 @@ type DOAction struct {
 	RegionSlug   string `json:"region_slug"`
 }
 
+// ListDroplets retrieves all droplets in the account
+func (c *Client) ListDroplets() ([]Droplet, error) {
+	url := fmt.Sprintf("%s/droplets", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Droplets []Droplet `json:"droplets"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Droplets, nil
+}
+
+// DeleteDroplet deletes a droplet by its ID
+func (c *Client) DeleteDroplet(dropletID int) error {
+	url := fmt.Sprintf("%s/droplets/%d", c.BaseURL, dropletID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// PostDropletAction initiates a power action on a droplet
+func (c *Client) PostDropletAction(dropletID int, actionType string) (*DOAction, error) {
+	url := fmt.Sprintf("%s/droplets/%d/actions", c.BaseURL, dropletID)
+
+	body, err := json.Marshal(map[string]string{"type": actionType})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Action DOAction `json:"action"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Action, nil
+}
+
+// GetAction retrieves an action by its ID
+func (c *Client) GetAction(actionID int) (*DOAction, error) {
+	url := fmt.Sprintf("%s/actions/%d", c.BaseURL, actionID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Action DOAction `json:"action"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Action, nil
+}
+
 // ListActions retrieves actions filtered by resource type.
 // The DigitalOcean /v2/actions API does not support resource_type as a query
 // parameter, so we fetch all recent actions and filter client-side.
@@ -308,4 +385,47 @@ func (c *Client) ListActions(resourceType string) ([]DOAction, error) {
 	}
 
 	return filtered, nil
+}
+
+// DropletNodeMetadata stores metadata about a droplet for display in the UI
+type DropletNodeMetadata struct {
+	DropletID   int    `json:"dropletId" mapstructure:"dropletId"`
+	DropletName string `json:"dropletName" mapstructure:"dropletName"`
+}
+
+// resolveDropletMetadata fetches the droplet name from the API and stores it in metadata
+// This allows the UI to display the droplet name instead of just the ID
+func resolveDropletMetadata(ctx core.SetupContext, dropletStr string) error {
+	// If the droplet ID is an expression placeholder, skip metadata resolution
+	if strings.Contains(dropletStr, "{{") {
+		return ctx.Metadata.Set(DropletNodeMetadata{
+			DropletName: dropletStr,
+		})
+	}
+	dropletID, err := strconv.Atoi(dropletStr)
+	if err != nil {
+		return fmt.Errorf("invalid droplet ID %q: must be a number", dropletStr)
+	}
+
+	// If metadata is already set for the same droplet, skip the API call
+	var existing DropletNodeMetadata
+	err = mapstructure.Decode(ctx.Metadata.Get(), &existing)
+	if err == nil && existing.DropletID == dropletID && existing.DropletName != "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client for metadata resolution: %w", err)
+	}
+
+	droplet, err := client.GetDroplet(dropletID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch droplet %d for metadata: %w", dropletID, err)
+	}
+
+	return ctx.Metadata.Set(DropletNodeMetadata{
+		DropletID:   dropletID,
+		DropletName: droplet.Name,
+	})
 }

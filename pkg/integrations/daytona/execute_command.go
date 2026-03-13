@@ -342,8 +342,8 @@ func (e *ExecuteCommand) poll(ctx core.ActionContext) error {
 	)
 }
 
-func (e *ExecuteCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (e *ExecuteCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func shellQuote(value string) string {

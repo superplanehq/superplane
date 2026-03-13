@@ -137,8 +137,8 @@ func (l *ListNotes) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (l *ListNotes) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (l *ListNotes) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (l *ListNotes) Cleanup(ctx core.SetupContext) error {

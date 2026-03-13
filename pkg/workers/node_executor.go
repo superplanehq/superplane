@@ -7,11 +7,14 @@ import (
 	"time"
 
 	"golang.org/x/sync/semaphore"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	"github.com/google/uuid"
+	"github.com/renderedtext/go-tackle"
 	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -19,6 +22,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -33,9 +37,12 @@ type NodeExecutor struct {
 	webhookBaseURL string
 	semaphore      *semaphore.Weighted
 	logger         *logrus.Entry
+
+	rabbitMQURL string
+	consumer    *tackle.Consumer
 }
 
-func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, webhookBaseURL string) *NodeExecutor {
+func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, webhookBaseURL string, rabbitMQURL string) *NodeExecutor {
 	return &NodeExecutor{
 		encryptor:      encryptor,
 		registry:       registry,
@@ -43,11 +50,18 @@ func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, ba
 		webhookBaseURL: webhookBaseURL,
 		semaphore:      semaphore.NewWeighted(25),
 		logger:         logrus.WithFields(logrus.Fields{"worker": "NodeExecutor"}),
+		rabbitMQURL:    rabbitMQURL,
 	}
 }
 
+func (w *NodeExecutor) Name() string {
+	return "NodeExecutor"
+}
+
 func (w *NodeExecutor) Start(ctx context.Context) {
-	ticker := time.NewTicker(1 * time.Second)
+	go w.StartRabbitMQConsumer(ctx)
+
+	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
 	for {
@@ -69,8 +83,6 @@ func (w *NodeExecutor) Start(ctx context.Context) {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
-
-				messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).Publish()
 
 				go func(execution models.CanvasNodeExecution) {
 					defer w.semaphore.Release(1)
@@ -94,8 +106,69 @@ func (w *NodeExecutor) Start(ctx context.Context) {
 	}
 }
 
+func (w *NodeExecutor) StartRabbitMQConsumer(ctx context.Context) {
+	options := tackle.Options{
+		URL:            w.rabbitMQURL,
+		ConnectionName: w.Name(),
+		RemoteExchange: messages.WorkflowExchange,
+		Service:        messages.WorkflowExchange + "." + messages.WorkflowExecutionRoutingKey + "." + w.Name(),
+		RoutingKey:     messages.WorkflowExecutionRoutingKey,
+	}
+
+	consumer := tackle.NewConsumer()
+	consumer.SetLogger(logging.NewTackleLogger(w.logger))
+	w.consumer = consumer
+
+	for {
+		log.Infof("Connecting to RabbitMQ queue for %s events", messages.WorkflowExecutionRoutingKey)
+
+		err := w.consumer.Start(&options, w.Consume)
+		if err != nil {
+			w.logger.Errorf("Error consuming messages from %s: %v", messages.WorkflowExecutionRoutingKey, err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.WorkflowExecutionRoutingKey)
+		time.Sleep(5 * time.Second)
+	}
+}
+
+func (w *NodeExecutor) Consume(delivery tackle.Delivery) error {
+	data := &pb.CanvasNodeExecutionMessage{}
+	err := proto.Unmarshal(delivery.Body(), data)
+	if err != nil {
+		w.logger.Errorf("Error unmarshaling canvas execution message: %v", err)
+		return err
+	}
+
+	executionID, err := uuid.Parse(data.Id)
+	if err != nil {
+		w.logger.Errorf("Error parsing execution id: %v", err)
+		return err
+	}
+
+	err = w.LockAndProcessNodeExecution(executionID)
+	if err == nil {
+		messages.NewCanvasExecutionMessage(data.CanvasId, data.Id, data.NodeId).Publish()
+		return nil
+	}
+
+	if err == ErrRecordLocked {
+		return nil
+	}
+
+	w.logger.Errorf("Error processing node execution - execution=%s: %v", executionID, err)
+	return err
+}
+
 func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var execution models.CanvasNodeExecution
 
 		//
@@ -129,11 +202,21 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 			return ErrRecordLocked
 		}
 
-		return w.processNodeExecution(tx, &execution)
+		return w.processNodeExecution(tx, &execution, onNewEvents)
 	})
+
+	if err != nil {
+		return err
+	}
+
+	for _, event := range newEvents {
+		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+	}
+
+	return nil
 }
 
-func (w *NodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.CanvasNodeExecution) error {
+func (w *NodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.CanvasNodeExecution, onNewEvents func([]models.CanvasEvent)) error {
 	node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
 		return err
@@ -143,7 +226,7 @@ func (w *NodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.Canva
 		return w.executeBlueprintNode(tx, execution, node)
 	}
 
-	return w.executeComponentNode(tx, execution, node)
+	return w.executeComponentNode(tx, execution, node, onNewEvents)
 }
 
 func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode) error {
@@ -241,7 +324,7 @@ func (w *NodeExecutor) configurationFieldsForBlueprintNode(tx *gorm.DB, node mod
 	}
 }
 
-func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode) error {
+func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
 		execution,
@@ -287,7 +370,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		HTTP:           w.registry.HTTPContext(),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		NodeMetadata:   contexts.NewNodeMetadataContext(tx, node),
-		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
+		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
 		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
@@ -319,7 +402,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		}
 
 		logger = logging.WithIntegration(logger, *instance)
-		ctx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry)
+		ctx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
 	}
 
 	ctx.Logger = logger

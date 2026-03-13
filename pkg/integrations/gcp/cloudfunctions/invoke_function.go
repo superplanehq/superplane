@@ -235,8 +235,8 @@ type callFunctionResponse struct {
 
 func (c *InvokeFunction) Actions() []core.Action                  { return nil }
 func (c *InvokeFunction) HandleAction(_ core.ActionContext) error { return nil }
-func (c *InvokeFunction) HandleWebhook(_ core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *InvokeFunction) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 func (c *InvokeFunction) Cancel(_ core.ExecutionContext) error { return nil }
 func (c *InvokeFunction) Cleanup(_ core.SetupContext) error    { return nil }

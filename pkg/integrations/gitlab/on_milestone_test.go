@@ -15,7 +15,7 @@ func Test__OnMilestone__HandleWebhook__TopLevelAction(t *testing.T) {
 	body := []byte(`{"action":"create","object_attributes":{"title":"v1.0"}}`)
 	events := &contexts.EventContext{}
 
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Milestone Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "actions": []string{"create"}},
@@ -35,7 +35,7 @@ func Test__OnMilestone__HandleWebhook__ObjectAttributesAction(t *testing.T) {
 	body := []byte(`{"object_attributes":{"action":"reopen","title":"v1.0"}}`)
 	events := &contexts.EventContext{}
 
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Milestone Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "actions": []string{"reopen"}},
@@ -55,7 +55,7 @@ func Test__OnMilestone__HandleWebhook__NonWhitelistedAction(t *testing.T) {
 	body := []byte(`{"action":"close"}`)
 	events := &contexts.EventContext{}
 
-	code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Milestone Hook", "token"),
 		Body:          body,
 		Configuration: map[string]any{"project": "123", "actions": []string{"create"}},

@@ -15,10 +15,11 @@ type EventContext struct {
 	tx             *gorm.DB
 	node           *models.CanvasNode
 	maxPayloadSize int
+	onNewEvents    func([]models.CanvasEvent)
 }
 
-func NewEventContext(tx *gorm.DB, node *models.CanvasNode) *EventContext {
-	return &EventContext{tx: tx, node: node, maxPayloadSize: DefaultMaxPayloadSize}
+func NewEventContext(tx *gorm.DB, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) *EventContext {
+	return &EventContext{tx: tx, node: node, maxPayloadSize: DefaultMaxPayloadSize, onNewEvents: onNewEvents}
 }
 
 func (s *EventContext) Emit(payloadType string, payload any) error {
@@ -57,7 +58,16 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 		event.CustomName = customName
 	}
 
-	return s.tx.Create(&event).Error
+	err = s.tx.Create(&event).Error
+	if err != nil {
+		return err
+	}
+
+	if s.onNewEvents != nil {
+		s.onNewEvents([]models.CanvasEvent{event})
+	}
+
+	return nil
 }
 
 func (s *EventContext) resolveCustomName(payload any) (*string, error) {

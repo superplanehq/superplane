@@ -140,8 +140,8 @@ func (c *DeleteHTTPSyntheticCheck) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *DeleteHTTPSyntheticCheck) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *DeleteHTTPSyntheticCheck) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *DeleteHTTPSyntheticCheck) Cleanup(ctx core.SetupContext) error {

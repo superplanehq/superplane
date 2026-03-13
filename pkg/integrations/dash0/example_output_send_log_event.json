@@ -1,0 +1,15 @@
+{
+  "data": {
+    "attributes": {
+      "env": "production"
+    },
+    "body": "Deployment started",
+    "dataset": "default",
+    "eventName": "deployment.created",
+    "sent": true,
+    "serviceName": "api-gateway",
+    "severityText": "INFO"
+  },
+  "timestamp": "2026-03-11T16:05:54.753430237Z",
+  "type": "dash0.log.sent"
+}

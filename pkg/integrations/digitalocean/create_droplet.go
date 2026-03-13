@@ -301,8 +301,8 @@ func (c *CreateDroplet) HandleAction(ctx core.ActionContext) error {
 	}
 }
 
-func (c *CreateDroplet) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *CreateDroplet) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *CreateDroplet) Cleanup(ctx core.SetupContext) error {

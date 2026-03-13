@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -20,7 +21,7 @@ func Test__OnPRComment__HandleWebhook(t *testing.T) {
 	t.Run("no X-Hub-Signature-256 -> 403", func(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-GitHub-Event", eventType)
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{Headers: headers})
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{Headers: headers, Logger: logrus.NewEntry(logrus.New())})
 
 		assert.Equal(t, http.StatusForbidden, code)
 		assert.ErrorContains(t, err, "invalid signature")
@@ -30,8 +31,9 @@ func Test__OnPRComment__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-Hub-Signature-256", "sha256=asdasd")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Events:  &contexts.EventContext{},
 			Webhook: &contexts.NodeWebhookContext{},
 		})
@@ -42,9 +44,10 @@ func Test__OnPRComment__HandleWebhook(t *testing.T) {
 
 	t.Run("invalid signature -> 403", func(t *testing.T) {
 		headers := signedHeaders([]byte(`{"action":"created"}`), "wrong", eventType)
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    []byte(`{"action":"created"}`),
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 			},
@@ -61,9 +64,10 @@ func Test__OnPRComment__HandleWebhook(t *testing.T) {
 		headers := signedHeaders(body, "test-secret", eventType)
 
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 			},
@@ -81,9 +85,10 @@ func Test__OnPRComment__HandleWebhook(t *testing.T) {
 		headers := signedHeaders(body, "test-secret", eventType)
 
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 			},
@@ -101,9 +106,10 @@ func Test__OnPRComment__HandleWebhook(t *testing.T) {
 		headers := signedHeaders(body, "test-secret", eventType)
 
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 			},
@@ -121,9 +127,10 @@ func Test__OnPRComment__HandleWebhook(t *testing.T) {
 		headers := signedHeaders(body, "test-secret", eventType)
 
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository":    "test",
 				"contentFilter": "/solve",
@@ -142,9 +149,10 @@ func Test__OnPRComment__HandleWebhook(t *testing.T) {
 		headers := signedHeaders(body, "test-secret", eventType)
 
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository":    "test",
 				"contentFilter": "/solve",
@@ -163,9 +171,10 @@ func Test__OnPRComment__HandleWebhook(t *testing.T) {
 		headers := signedHeaders(body, "test-secret", "pull_request_review_comment")
 
 		events := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 			},

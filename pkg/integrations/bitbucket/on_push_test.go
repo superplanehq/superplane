@@ -116,7 +116,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 	trigger := &OnPush{}
 
 	t.Run("no X-Event-Key -> 400", func(t *testing.T) {
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: http.Header{},
 		})
 
@@ -129,7 +129,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		headers.Set("X-Event-Key", "repo:fork")
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Events:  eventContext,
 		})
@@ -143,7 +143,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-Event-Key", "repo:push")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 		})
 
@@ -156,7 +156,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		headers.Set("X-Event-Key", "repo:push")
 		headers.Set("X-Hub-Signature", "sha256=")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 		})
 
@@ -169,7 +169,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		headers.Set("X-Event-Key", "repo:push")
 		headers.Set("X-Hub-Signature", "sha256=invalid")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    []byte(`{}`),
 			Headers: headers,
 			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
@@ -187,7 +187,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		headers.Set("X-Event-Key", "repo:push")
 		headers.Set("X-Hub-Signature", "sha256="+signature)
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
@@ -213,7 +213,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		headers.Set("X-Hub-Signature", "sha256="+signature)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
@@ -240,7 +240,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		headers.Set("X-Hub-Signature", "sha256="+signature)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
 			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},

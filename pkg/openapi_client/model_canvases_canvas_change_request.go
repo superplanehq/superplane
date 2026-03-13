@@ -20,9 +20,10 @@ var _ MappedNullable = &CanvasesCanvasChangeRequest{}
 
 // CanvasesCanvasChangeRequest struct for CanvasesCanvasChangeRequest
 type CanvasesCanvasChangeRequest struct {
-	Metadata *CanvasesCanvasChangeRequestMetadata `json:"metadata,omitempty"`
-	Version  *CanvasesCanvasVersion               `json:"version,omitempty"`
-	Diff     *CanvasesCanvasChangeRequestDiff     `json:"diff,omitempty"`
+	Metadata  *CanvasesCanvasChangeRequestMetadata  `json:"metadata,omitempty"`
+	Version   *CanvasesCanvasVersion                `json:"version,omitempty"`
+	Diff      *CanvasesCanvasChangeRequestDiff      `json:"diff,omitempty"`
+	Approvals []CanvasesCanvasChangeRequestApproval `json:"approvals,omitempty"`
 }
 
 // NewCanvasesCanvasChangeRequest instantiates a new CanvasesCanvasChangeRequest object
@@ -138,6 +139,38 @@ func (o *CanvasesCanvasChangeRequest) SetDiff(v CanvasesCanvasChangeRequestDiff)
 	o.Diff = &v
 }
 
+// GetApprovals returns the Approvals field value if set, zero value otherwise.
+func (o *CanvasesCanvasChangeRequest) GetApprovals() []CanvasesCanvasChangeRequestApproval {
+	if o == nil || IsNil(o.Approvals) {
+		var ret []CanvasesCanvasChangeRequestApproval
+		return ret
+	}
+	return o.Approvals
+}
+
+// GetApprovalsOk returns a tuple with the Approvals field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasChangeRequest) GetApprovalsOk() ([]CanvasesCanvasChangeRequestApproval, bool) {
+	if o == nil || IsNil(o.Approvals) {
+		return nil, false
+	}
+	return o.Approvals, true
+}
+
+// HasApprovals returns a boolean if a field has been set.
+func (o *CanvasesCanvasChangeRequest) HasApprovals() bool {
+	if o != nil && !IsNil(o.Approvals) {
+		return true
+	}
+
+	return false
+}
+
+// SetApprovals gets a reference to the given []CanvasesCanvasChangeRequestApproval and assigns it to the Approvals field.
+func (o *CanvasesCanvasChangeRequest) SetApprovals(v []CanvasesCanvasChangeRequestApproval) {
+	o.Approvals = v
+}
+
 func (o CanvasesCanvasChangeRequest) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -156,6 +189,9 @@ func (o CanvasesCanvasChangeRequest) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Diff) {
 		toSerialize["diff"] = o.Diff
+	}
+	if !IsNil(o.Approvals) {
+		toSerialize["approvals"] = o.Approvals
 	}
 	return toSerialize, nil
 }

@@ -197,8 +197,8 @@ func (c *ExecuteCommand) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *ExecuteCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *ExecuteCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *ExecuteCommand) Cancel(ctx core.ExecutionContext) error {

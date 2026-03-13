@@ -3,7 +3,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { Box, GitBranch, MoreVertical, Palette, Pencil, Plus, Rainbow, Search, Trash2 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { CreateCanvasModal } from "../../components/CreateCanvasModal";
 import { CreateCustomComponentModal } from "../../components/CreateCustomComponentModal";
 import { Dialog, DialogActions, DialogDescription, DialogTitle } from "../../components/Dialog/dialog";
@@ -492,8 +492,6 @@ function CanvasGridView({
   canDeleteCanvases,
   permissionsLoading,
 }: CanvasGridViewProps) {
-  const navigate = useNavigate();
-
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {filteredCanvases.map((canvas) => (
@@ -501,7 +499,6 @@ function CanvasGridView({
           key={canvas.id}
           canvas={canvas}
           organizationId={organizationId}
-          navigate={navigate}
           onEdit={onEditCanvas}
           canUpdateCanvases={canUpdateCanvases}
           canDeleteCanvases={canDeleteCanvases}
@@ -515,7 +512,6 @@ function CanvasGridView({
 interface CanvasCardProps {
   canvas: CanvasCardData;
   organizationId: string;
-  navigate: any;
   onEdit: (canvas: CanvasCardData) => void;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
@@ -525,34 +521,19 @@ interface CanvasCardProps {
 function CanvasCard({
   canvas,
   organizationId,
-  navigate,
   onEdit,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
 }: CanvasCardProps) {
-  const handleNavigate = () => navigate(`/${organizationId}/canvases/${canvas.id}`);
+  const canvasHref = `/${organizationId}/canvases/${canvas.id}`;
   const previewNodes = canvas.nodes || [];
   const previewEdges = canvas.edges || [];
 
   return (
-    <div
-      key={canvas.id}
-      role="button"
-      tabIndex={0}
-      onClick={(event) => {
-        if (event.defaultPrevented) return;
-        handleNavigate();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          handleNavigate();
-        }
-      }}
-      className="min-h-48 bg-white dark:bg-gray-800 rounded-md outline outline-gray-950/15 hover:shadow-md transition-shadow cursor-pointer"
-    >
-      <div className="flex flex-col h-full">
+    <div className="relative min-h-48 bg-white dark:bg-gray-800 rounded-md outline outline-gray-950/15 hover:shadow-md transition-shadow cursor-pointer">
+      <Link to={canvasHref} aria-label={`Open canvas ${canvas.name}`} className="absolute inset-0 rounded-md" />
+      <div className="pointer-events-none relative flex flex-col h-full">
         <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
 
         <div className="p-4 border-t border-gray-200">
@@ -565,14 +546,16 @@ function CanvasCard({
                 <span className="truncate">{canvas.name}</span>
               </Heading>
             </div>
-            <CanvasActionsMenu
-              canvas={canvas}
-              organizationId={organizationId}
-              onEdit={onEdit}
-              canUpdateCanvases={canUpdateCanvases}
-              canDeleteCanvases={canDeleteCanvases}
-              permissionsLoading={permissionsLoading}
-            />
+            <div className="pointer-events-auto">
+              <CanvasActionsMenu
+                canvas={canvas}
+                organizationId={organizationId}
+                onEdit={onEdit}
+                canUpdateCanvases={canUpdateCanvases}
+                canDeleteCanvases={canDeleteCanvases}
+                permissionsLoading={permissionsLoading}
+              />
+            </div>
           </div>
 
           {canvas.description ? (
@@ -721,6 +704,7 @@ function CanvasActionsMenu({
   };
 
   const openDialog = (event: MouseEvent<HTMLElement>) => {
+    event.preventDefault();
     event.stopPropagation();
     setIsDialogOpen(true);
   };
@@ -761,7 +745,13 @@ function CanvasActionsMenu({
 
   return (
     <>
-      <div className="flex-shrink-0" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
+      <div
+        className="flex-shrink-0"
+        onClick={(event: MouseEvent<HTMLDivElement>) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+      >
         {!canManage ? (
           <PermissionTooltip
             allowed={canManage || permissionsLoading}
@@ -777,7 +767,13 @@ function CanvasActionsMenu({
           </PermissionTooltip>
         ) : (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}>
+            <DropdownMenuTrigger
+              asChild
+              onClick={(event: MouseEvent<HTMLButtonElement>) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+            >
               <button
                 className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Canvas actions"
@@ -793,6 +789,7 @@ function CanvasActionsMenu({
               >
                 <DropdownMenuItem
                   onClick={(event: MouseEvent<HTMLElement>) => {
+                    event.preventDefault();
                     event.stopPropagation();
                     if (!canUpdateCanvases) return;
                     onEdit(canvas);
@@ -829,7 +826,10 @@ function CanvasActionsMenu({
         <DialogActions>
           <Button
             variant="destructive"
-            onClick={handleDelete}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleDelete();
+            }}
             disabled={deleteCanvasMutation.isPending || !canDeleteCanvases}
             className="flex items-center gap-2"
           >
@@ -876,6 +876,7 @@ function BlueprintActionsMenu({
   };
 
   const openDialog = (event: MouseEvent<HTMLElement>) => {
+    event.preventDefault();
     event.stopPropagation();
     setIsDialogOpen(true);
   };
@@ -893,7 +894,13 @@ function BlueprintActionsMenu({
 
   return (
     <>
-      <div className="flex-shrink-0" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
+      <div
+        className="flex-shrink-0"
+        onClick={(event: MouseEvent<HTMLDivElement>) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+      >
         {!canManage ? (
           <PermissionTooltip
             allowed={canManage || permissionsLoading}
@@ -909,7 +916,13 @@ function BlueprintActionsMenu({
           </PermissionTooltip>
         ) : (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}>
+            <DropdownMenuTrigger
+              asChild
+              onClick={(event: MouseEvent<HTMLButtonElement>) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+            >
               <button
                 className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Component actions"
@@ -925,6 +938,7 @@ function BlueprintActionsMenu({
               >
                 <DropdownMenuItem
                   onClick={(event: MouseEvent<HTMLElement>) => {
+                    event.preventDefault();
                     event.stopPropagation();
                     if (!canUpdateBlueprints) return;
                     navigate(`/${organizationId}/custom-components/${blueprint.id}`);
@@ -992,31 +1006,22 @@ function BlueprintGridView({
   canDeleteBlueprints,
   permissionsLoading,
 }: BlueprintGridViewProps) {
-  const navigate = useNavigate();
-
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {filteredBlueprints.map((blueprint) => {
         const IconComponent = resolveIcon("component");
-        const handleNavigate = () => navigate(`/${organizationId}/custom-components/${blueprint.id}`);
+        const blueprintHref = `/${organizationId}/custom-components/${blueprint.id}`;
         return (
           <div
             key={blueprint.id}
-            role="button"
-            tabIndex={0}
-            onClick={(event) => {
-              if (event.defaultPrevented) return;
-              handleNavigate();
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                handleNavigate();
-              }
-            }}
-            className="min-h-48 bg-white dark:bg-gray-800 rounded-md outline outline-slate-950/10 dark:border-gray-800 hover:shadow-md transition-shadow cursor-pointer"
+            className="relative min-h-48 bg-white dark:bg-gray-800 rounded-md outline outline-slate-950/10 dark:border-gray-800 hover:shadow-md transition-shadow cursor-pointer"
           >
-            <div className="p-6 flex flex-col justify-between h-full">
+            <Link
+              to={blueprintHref}
+              aria-label={`Open bundle ${blueprint.name}`}
+              className="absolute inset-0 rounded-md"
+            />
+            <div className="pointer-events-none relative p-6 flex flex-col justify-between h-full">
               <div>
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div className="flex items-center space-x-3 flex-1 min-w-0">
@@ -1030,13 +1035,15 @@ function BlueprintGridView({
                       </Heading>
                     </div>
                   </div>
-                  <BlueprintActionsMenu
-                    blueprint={blueprint}
-                    organizationId={organizationId}
-                    canUpdateBlueprints={canUpdateBlueprints}
-                    canDeleteBlueprints={canDeleteBlueprints}
-                    permissionsLoading={permissionsLoading}
-                  />
+                  <div className="pointer-events-auto">
+                    <BlueprintActionsMenu
+                      blueprint={blueprint}
+                      organizationId={organizationId}
+                      canUpdateBlueprints={canUpdateBlueprints}
+                      canDeleteBlueprints={canDeleteBlueprints}
+                      permissionsLoading={permissionsLoading}
+                    />
+                  </div>
                 </div>
 
                 {blueprint.description ? (

@@ -413,7 +413,7 @@ func (r ApiCanvasesUpdateCanvasVersionRequest) Execute() (*CanvasesUpdateCanvasV
 /*
 CanvasesUpdateCanvasVersion Update canvas version
 
-Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode
+Updates a user-owned canvas version; if version_id is omitted, updates the live canvas when versioning is disabled
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param canvasId
@@ -539,7 +539,7 @@ func (r ApiCanvasesUpdateCanvasVersion2Request) Execute() (*CanvasesUpdateCanvas
 /*
 CanvasesUpdateCanvasVersion2 Update canvas version
 
-Updates a user-owned canvas version; if version_id is omitted, updates the live canvas in sandbox mode
+Updates a user-owned canvas version; if version_id is omitted, updates the live canvas when versioning is disabled
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param canvasId

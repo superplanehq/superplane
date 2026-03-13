@@ -90,7 +90,7 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 				Configuration:  execution.Configuration.Data(),
 				HTTP:           registry.HTTPContext(),
 				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
-				ExecutionState: contexts.NewExecutionStateContext(tx, execution),
+				ExecutionState: contexts.NewExecutionStateContext(tx, execution, nil),
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
 				Auth:           contexts.NewAuthContext(tx, orgUUID, authService, user),
 				Notifications:  contexts.NewNotificationContext(tx, orgUUID, execution.WorkflowID),
@@ -105,7 +105,7 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 				}
 
 				logger = logging.WithIntegration(logger, *integration)
-				ctx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry)
+				ctx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry, nil)
 			}
 
 			ctx.Logger = logger

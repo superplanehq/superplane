@@ -35,7 +35,7 @@ export function General({ organization }: GeneralProps) {
   const { organizationId } = useParams<{ organizationId: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [sandboxModeMessage, setSandboxModeMessage] = useState<string | null>(null);
+  const [versioningMessage, setVersioningMessage] = useState<string | null>(null);
   const [name, setName] = useState(organization.metadata?.name || "");
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -43,8 +43,8 @@ export function General({ organization }: GeneralProps) {
   const [agentApiKey, setAgentApiKey] = useState("");
   const [agentApiKeyError, setAgentApiKeyError] = useState<string | null>(null);
   const [showAgentConfigureModal, setShowAgentConfigureModal] = useState(false);
-  const [canvasSandboxModeEnabled, setCanvasSandboxModeEnabled] = useState(
-    organization.metadata?.canvasSandboxModeEnabled ?? true,
+  const [canvasVersioningEnabled, setCanvasVersioningEnabled] = useState(
+    organization.metadata?.canvasVersioningEnabled ?? false,
   );
 
   // Use React Query mutation hook
@@ -58,8 +58,8 @@ export function General({ organization }: GeneralProps) {
   const canDeleteOrg = canAct("org", "delete");
 
   useEffect(() => {
-    setCanvasSandboxModeEnabled(organization.metadata?.canvasSandboxModeEnabled ?? true);
-  }, [organization.metadata?.canvasSandboxModeEnabled]);
+    setCanvasVersioningEnabled(organization.metadata?.canvasVersioningEnabled ?? false);
+  }, [organization.metadata?.canvasVersioningEnabled]);
 
   const agentModeEnabled = agentSettings?.agentModeEnabled ?? false;
   const openAIKey = agentSettings?.openaiKey;
@@ -169,25 +169,25 @@ export function General({ organization }: GeneralProps) {
     }
   };
 
-  const handleCanvasSandboxModeToggle = async (enabled: boolean) => {
+  const handleCanvasVersioningToggle = async (enabled: boolean) => {
     if (!canUpdateOrg || !organizationId) {
       return;
     }
 
-    const previous = canvasSandboxModeEnabled;
-    setCanvasSandboxModeEnabled(enabled);
-    setSandboxModeMessage(null);
+    const previous = canvasVersioningEnabled;
+    setCanvasVersioningEnabled(enabled);
+    setVersioningMessage(null);
 
     try {
       await updateOrganizationMutation.mutateAsync({
-        canvasSandboxModeEnabled: enabled,
+        canvasVersioningEnabled: enabled,
       });
-      setSandboxModeMessage(`Canvas sandbox mode ${enabled ? "enabled" : "disabled"}`);
-      setTimeout(() => setSandboxModeMessage(null), 3000);
+      setVersioningMessage(`Canvas versioning ${enabled ? "enabled" : "disabled"}`);
+      setTimeout(() => setVersioningMessage(null), 3000);
     } catch {
-      setCanvasSandboxModeEnabled(previous);
-      setSandboxModeMessage("Failed to update canvas sandbox mode");
-      setTimeout(() => setSandboxModeMessage(null), 3000);
+      setCanvasVersioningEnabled(previous);
+      setVersioningMessage("Failed to update canvas versioning");
+      setTimeout(() => setVersioningMessage(null), 3000);
     }
   };
 
@@ -348,28 +348,32 @@ export function General({ organization }: GeneralProps) {
           <div className="flex items-start justify-between gap-6">
             <div>
               <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Canvas Sandbox Mode
+                Canvas Versioning
               </Label>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Edit the live canvas directly. Versioning and change request actions are disabled while sandbox mode is
-                enabled.
+                Manage canvas edits with drafts and publish flow. When enabled at the organization level, versioning is
+                enforced for every canvas and cannot be turned off per canvas.
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                When disabled here, each canvas can choose its own versioning setting. New canvases inherit this
+                organization setting by default.
               </p>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                {canvasSandboxModeEnabled ? "Enabled" : "Disabled"}
+                {canvasVersioningEnabled ? "Enabled" : "Disabled"}
               </span>
               <Switch
-                checked={canvasSandboxModeEnabled}
-                onCheckedChange={handleCanvasSandboxModeToggle}
+                checked={canvasVersioningEnabled}
+                onCheckedChange={handleCanvasVersioningToggle}
                 disabled={updateOrganizationMutation.isPending || !canUpdateOrg}
-                aria-label="Toggle canvas sandbox mode"
+                aria-label="Toggle canvas versioning"
               />
             </div>
           </div>
-          {sandboxModeMessage ? (
-            <p className={`mt-3 text-sm ${sandboxModeMessage.includes("Failed") ? "text-red-600" : "text-green-600"}`}>
-              {sandboxModeMessage}
+          {versioningMessage ? (
+            <p className={`mt-3 text-sm ${versioningMessage.includes("Failed") ? "text-red-600" : "text-green-600"}`}>
+              {versioningMessage}
             </p>
           ) : null}
         </Fieldset>
