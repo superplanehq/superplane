@@ -64,6 +64,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/newrelic"
 	_ "github.com/superplanehq/superplane/pkg/integrations/octopus"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
+	_ "github.com/superplanehq/superplane/pkg/integrations/opencost"
 	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
 	_ "github.com/superplanehq/superplane/pkg/integrations/prometheus"
 	_ "github.com/superplanehq/superplane/pkg/integrations/render"
