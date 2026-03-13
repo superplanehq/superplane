@@ -1,0 +1,9 @@
+{
+  "data": {
+    "deleted": true,
+    "domain": "example.com",
+    "recordId": 12345678
+  },
+  "timestamp": "2026-03-13T10:05:00.000000000Z",
+  "type": "digitalocean.dns.record.deleted"
+}
