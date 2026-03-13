@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -14,6 +15,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -65,9 +68,9 @@ func remapNodeIDsForConflicts(
 }
 
 func findNode(nodes []models.CanvasNode, nodeID string) *models.CanvasNode {
-	for _, node := range nodes {
-		if node.NodeID == nodeID {
-			return &node
+	for i := range nodes {
+		if nodes[i].NodeID == nodeID {
+			return &nodes[i]
 		}
 	}
 	return nil
@@ -87,6 +90,19 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 
 	existingNode := findNode(existingNodes, node.ID)
 	if existingNode != nil {
+		if appInstallationID != nil {
+			integration, err := models.FindMaybeDeletedIntegrationInTransaction(tx, *appInstallationID)
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return nil, status.Error(codes.InvalidArgument, "app installation not found")
+				}
+				return nil, err
+			}
+			if integration.DeletedAt.Valid {
+				return nil, status.Error(codes.InvalidArgument, "app installation is deleted")
+			}
+		}
+
 		existingNode.Name = node.Name
 		existingNode.Type = node.Type
 		existingNode.Ref = datatypes.NewJSONType(node.Ref)
@@ -111,7 +127,7 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 		}
 
 		existingNode.UpdatedAt = &now
-		if err := tx.Save(&existingNode).Error; err != nil {
+		if err := tx.Save(existingNode).Error; err != nil {
 			return nil, err
 		}
 
@@ -129,6 +145,19 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 	if node.ErrorMessage != nil && *node.ErrorMessage != "" {
 		initialState = models.CanvasNodeStateError
 		stateReason = node.ErrorMessage
+	}
+
+	if appInstallationID != nil {
+		integration, err := models.FindMaybeDeletedIntegrationInTransaction(tx, *appInstallationID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, status.Error(codes.InvalidArgument, "app installation not found")
+			}
+			return nil, err
+		}
+		if integration.DeletedAt.Valid {
+			return nil, status.Error(codes.InvalidArgument, "app installation is deleted")
+		}
 	}
 
 	canvasNode := models.CanvasNode{
