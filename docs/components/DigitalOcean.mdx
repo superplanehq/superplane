@@ -10,6 +10,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create Droplet" href="#create-droplet" description="Create a new DigitalOcean Droplet" />
+  <LinkCard title="Delete Droplet" href="#delete-droplet" description="Delete a DigitalOcean Droplet by ID" />
+  <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
+  <LinkCard title="Manage Droplet Power" href="#manage-droplet-power" description="Perform power operations on a DigitalOcean Droplet" />
 </CardGrid>
 
 ## Instructions
@@ -91,6 +94,179 @@ Returns the created droplet object including:
     ],
     "vcpus": 1
   }
+}
+```
+
+<a id="delete-droplet"></a>
+
+## Delete Droplet
+
+The Delete Droplet component permanently deletes a droplet from your DigitalOcean account.
+
+### Use Cases
+
+- **Cleanup**: Remove temporary or test droplets after use
+- **Cost optimization**: Automatically tear down unused infrastructure
+- **Automated workflows**: Delete droplets as part of deployment rollback or cleanup processes
+- **Environment management**: Remove ephemeral environments after testing
+
+### Configuration
+
+- **Droplet**: The droplet to delete (required, supports expressions)
+
+### Output
+
+Returns information about the deleted droplet:
+- **dropletId**: The ID of the droplet that was deleted
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone
+- All data on the droplet will be lost
+- The droplet will be shut down if it's running before deletion
+- Any snapshots of the droplet will remain in your account
+
+### Example Output
+
+```json
+{
+  "data": {
+    "dropletId": 557784760
+  },
+  "timestamp": "2026-03-12T21:25:45.688697002Z",
+  "type": "digitalocean.droplet.deleted"
+}
+```
+
+<a id="get-droplet"></a>
+
+## Get Droplet
+
+The Get Droplet component retrieves detailed information about a specific droplet.
+
+### Use Cases
+
+- **Status checks**: Verify droplet state before performing operations
+- **Information retrieval**: Get current IP addresses, configuration, and status
+- **Pre-flight validation**: Check droplet exists before operations like snapshot or power management
+- **Monitoring**: Track droplet configuration and network details
+
+### Configuration
+
+- **Droplet**: The droplet to retrieve (required, supports expressions)
+
+### Output
+
+Returns the droplet object including:
+- **id**: Droplet ID
+- **name**: Droplet hostname
+- **status**: Current droplet status (new, active, off, archive)
+- **memory**: RAM in MB
+- **vcpus**: Number of virtual CPUs
+- **disk**: Disk size in GB
+- **region**: Region information
+- **image**: Image information
+- **size_slug**: Size identifier
+- **networks**: Network information including IP addresses
+- **tags**: Applied tags
+
+### Example Output
+
+```json
+{
+  "data": {
+    "disk": 25,
+    "id": 557784760,
+    "image": {
+      "id": 220345895,
+      "name": "superplane-1773328904",
+      "slug": ""
+    },
+    "memory": 1024,
+    "name": "superplane-1773328904-s-1vcpu-1gb-nyc3-01",
+    "networks": {
+      "v4": [
+        {
+          "ip_address": "192.0.2.1",
+          "type": "public"
+        },
+        {
+          "ip_address": "10.108.0.3",
+          "type": "private"
+        }
+      ]
+    },
+    "region": {
+      "name": "New York 3",
+      "slug": "nyc3"
+    },
+    "size_slug": "s-1vcpu-1gb",
+    "status": "active",
+    "tags": [],
+    "vcpus": 1
+  },
+  "timestamp": "2026-03-12T21:13:32.946693411Z",
+  "type": "digitalocean.droplet.fetched"
+}
+```
+
+<a id="manage-droplet-power"></a>
+
+## Manage Droplet Power
+
+The Manage Droplet Power component performs power management operations on a droplet.
+
+### Use Cases
+
+- **Automated restarts**: Reboot droplets on a schedule or in response to alerts
+- **Cost optimization**: Power off droplets during non-business hours
+- **Maintenance workflows**: Shutdown droplets before updates, power on after completion
+- **Recovery procedures**: Power cycle droplets experiencing issues
+
+### Configuration
+
+- **Droplet**: The droplet to manage (required, supports expressions)
+- **Operation**: The power operation to perform (required):
+  - **power_on**: Power on a powered-off droplet
+  - **power_off**: Power off a running droplet (forced shutdown)
+  - **shutdown**: Gracefully shutdown a running droplet
+  - **reboot**: Gracefully reboot a running droplet
+  - **power_cycle**: Power cycle a droplet (forced reboot)
+
+### Output
+
+Returns the action result including:
+- **id**: Action ID
+- **status**: Final action status (completed or errored)
+- **type**: Type of action performed
+- **started_at**: When the action started
+- **completed_at**: When the action completed
+- **resource_id**: Droplet ID
+- **region**: Region slug
+
+### Important Notes
+
+- **power_off** and **power_cycle** are forced operations and may cause data loss
+- **shutdown** and **reboot** are graceful and wait for the OS to complete the operation
+- The component waits for the action to complete before emitting
+- Actions may take several minutes depending on the droplet state
+
+### Example Output
+
+```json
+{
+  "data": {
+    "completed_at": "2026-03-12T22:27:14Z",
+    "id": 3087531973,
+    "region_slug": "fra1",
+    "resource_id": 557861237,
+    "resource_type": "droplet",
+    "started_at": "2026-03-12T22:27:07Z",
+    "status": "completed",
+    "type": "power_off"
+  },
+  "timestamp": "2026-03-12T22:27:20.613332846Z",
+  "type": "digitalocean.droplet.power.power_off"
 }
 ```
 
