@@ -264,30 +264,14 @@ function getHTTPMetadataList(node: NodeInfo): MetadataItem[] {
     });
   }
 
-  // Headers count
-  const headers = configuration.headers as Array<{ name: string; value: string }> | undefined;
-  if (headers && headers.length > 0) {
-    metadata.push({
-      icon: "code",
-      label: `${headers.length} header${headers.length === 1 ? "" : "s"}`,
-    });
-  }
-
   // Retry configuration
-  const timeoutStrategy = configuration.timeoutStrategy;
-  const retries = configuration.retries as number | undefined;
-  const timeoutSeconds = configuration.timeoutSeconds as number | undefined;
-
-  if (timeoutStrategy && retries !== undefined && timeoutSeconds !== undefined) {
-    const retriesText = retries === 0 ? "No retries" : `${retries} ${retries === 1 ? "retry" : "retries"}`;
+  if (configuration.retry && configuration.retry.enabled) {
+    const strategy = configuration.retry.strategy;
+    const retries = configuration.retry.maxAttempts;
+    const interval = configuration.retry.intervalSeconds
     metadata.push({
       icon: "bolt",
-      label: `${retriesText}, with ${timeoutSeconds}s timeout`,
-    });
-  } else if (retries !== undefined && retries > 0) {
-    metadata.push({
-      icon: "bolt",
-      label: `${retries} ${retries === 1 ? "retry" : "retries"}`,
+      label: `${retries} retries, ${strategy}, ${interval}s`,
     });
   }
 
@@ -299,14 +283,21 @@ type HTTPConfiguration = {
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   contentType: "application/json" | "application/xml" | "text/plain" | "application/x-www-form-urlencoded";
   headers: Array<{ name: string; value: string }>;
+  queryParams: Array<{ key: string; value: string}>;
   json?: any;
   formData?: Array<{ key: string; value: string }>;
   text?: string;
   xml?: string;
-  timeoutStrategy: "fixed" | "exponential";
   timeoutSeconds: number;
-  retries: number;
+  retry?: RetrySpec;
 };
+
+type RetrySpec = {
+  enabled: boolean;
+  strategy: "fixed" | "exponential";
+  maxAttempts: number;
+  intervalSeconds: number;
+}
 
 function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
@@ -388,13 +379,12 @@ function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
     }
   }
 
-  const headers = configuration.headers as Array<{ name: string; value: string }> | undefined;
-  if (headers && headers.length > 0) {
+  if (configuration.headers && configuration.headers.length > 0) {
     specs.push({
       title: "header",
       tooltipTitle: "request headers",
       iconSlug: "list",
-      values: headers.map((header) => ({
+      values: configuration.headers.map((header) => ({
         badges: [
           {
             label: header.name,
@@ -403,6 +393,28 @@ function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
           },
           {
             label: header.value,
+            bgColor: "bg-gray-100",
+            textColor: "text-gray-800",
+          },
+        ],
+      })),
+    });
+  }
+
+  if (configuration.queryParams && configuration.queryParams.length > 0) {
+    specs.push({
+      title: "query param",
+      tooltipTitle: "query params",
+      iconSlug: "list",
+      values: configuration.queryParams.map((param) => ({
+        badges: [
+          {
+            label: param.key,
+            bgColor: "bg-blue-100",
+            textColor: "text-blue-800",
+          },
+          {
+            label: param.value,
             bgColor: "bg-gray-100",
             textColor: "text-gray-800",
           },
