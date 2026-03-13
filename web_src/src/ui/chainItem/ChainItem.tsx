@@ -12,7 +12,12 @@ import { CanvasesCanvasNodeExecution, ComponentsNode, CanvasesCanvasEvent } from
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { formatTimeAgo } from "@/utils/date";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import {
+  ResizableDialog,
+  ResizableDialogContent,
+  ResizableDialogDescription,
+  ResizableDialogTitle,
+} from "@/components/ui/resizable-dialog";
 import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
 import { buildExecutionInfo, buildNodeInfo } from "@/pages/workflowv2/utils";
 
@@ -918,7 +923,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                         </a>
                       ) : (
                         <span
-                          className="text-[13px] flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                          className="text-[13px] flex-1 truncate text-left w-[70%] hover:underline text-gray-800"
                           title={stringValue}
                         >
                           {stringValue}
@@ -979,23 +984,27 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         )}
 
         {/* Payload Modal */}
-        <Dialog
+        <ResizableDialog
           open={isPayloadModalOpen}
-          onOpenChange={(open) => {
+          onOpenChange={(open: boolean) => {
             if (!open) {
               setIsPayloadModalOpen(false);
               setModalPayload(null);
             }
           }}
         >
-          <DialogContent
-            size="large"
-            className="w-[80vw] max-w-[80vw] h-[80vh] max-h-[80vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
+          <ResizableDialogContent
+            className="flex flex-col"
+            defaultWidth="80vw"
+            defaultHeight="80vh"
+            minWidth={500}
+            minHeight={400}
+            storageKey="payload-viewer"
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between">
-              <DialogTitle>Payload</DialogTitle>
-              <DialogDescription className="sr-only">Expanded payload viewer.</DialogDescription>
+            <div className="flex items-center justify-between mb-4">
+              <ResizableDialogTitle>Payload</ResizableDialogTitle>
+              <ResizableDialogDescription className="sr-only">Expanded payload viewer.</ResizableDialogDescription>
               <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy"} hideOnClick={false}>
                 <button
                   onClick={(e) => {
@@ -1009,7 +1018,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                 </button>
               </SimpleTooltip>
             </div>
-            <div className="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-md">
+            <div className="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-md min-h-0">
               <div className="p-4">
                 {modalPayload && (
                   <JsonView
@@ -1028,8 +1037,8 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                 )}
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
+          </ResizableDialogContent>
+        </ResizableDialog>
       </div>
 
       {/* Connecting line */}
