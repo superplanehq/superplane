@@ -153,41 +153,51 @@ func (w *OnWorkflowRun) HandleAction(ctx core.TriggerActionContext) (map[string]
 }
 
 func (w *OnWorkflowRun) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	ctx = withWebhookLogger(ctx, w.Name())
+	ctx.Logger.Infof("Received GitHub webhook")
+
 	config := OnWorkflowRunConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
+		ctx.Logger.Errorf("Failed to decode configuration: %v", err)
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	eventType := ctx.Headers.Get("X-GitHub-Event")
 	if eventType == "" {
+		ctx.Logger.Errorf("Missing X-GitHub-Event header")
 		return http.StatusBadRequest, nil, fmt.Errorf("missing X-GitHub-Event header")
 	}
 
 	if eventType != "workflow_run" {
+		ctx.Logger.Infof("Ignoring event - event type %q is not a workflow_run event", eventType)
 		return http.StatusOK, nil, nil
 	}
 
 	code, err := verifySignature(ctx)
 	if err != nil {
+		ctx.Logger.Errorf("Failed to verify signature: %v", err)
 		return code, nil, err
 	}
 
 	data := map[string]any{}
 	err = json.Unmarshal(ctx.Body, &data)
 	if err != nil {
+		ctx.Logger.Errorf("Failed to parse request body: %v", err)
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	// Only emit events for completed workflow runs
 	action, ok := data["action"].(string)
 	if !ok || action != "completed" {
+		ctx.Logger.Infof("Ignoring event - action %q is not completed", action)
 		return http.StatusOK, nil, nil
 	}
 
 	// Filter by conclusion if specified
 	if len(config.Conclusions) > 0 {
 		if !matchesConclusion(data, config.Conclusions) {
+			ctx.Logger.Info("Ignoring event - conclusion did not match configured filters")
 			return http.StatusOK, nil, nil
 		}
 	}
@@ -195,13 +205,14 @@ func (w *OnWorkflowRun) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 	// Filter by workflow file if specified
 	if len(config.WorkflowFiles) > 0 {
 		if !matchesWorkflowFile(data, config.WorkflowFiles) {
+			ctx.Logger.Info("Ignoring event - workflow file did not match configured filters")
 			return http.StatusOK, nil, nil
 		}
 	}
 
 	err = ctx.Events.Emit("github.workflowRun", data)
-
 	if err != nil {
+		ctx.Logger.Errorf("Failed to emit event: %v", err)
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 

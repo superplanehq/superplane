@@ -82,43 +82,56 @@ func (p *OnPRComment) HandleAction(ctx core.TriggerActionContext) (map[string]an
 }
 
 func (p *OnPRComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	ctx = withWebhookLogger(ctx, p.Name())
+	ctx.Logger.Infof("Received GitHub webhook")
+
 	config, err := decodePRCommentConfiguration(ctx.Configuration)
 	if err != nil {
+		ctx.Logger.Errorf("Failed to decode configuration: %v", err)
 		return http.StatusInternalServerError, nil, err
 	}
 
 	eventType, err := extractGitHubEventType(ctx.Headers)
 	if err != nil {
-		return http.StatusBadRequest, nil, err
+		ctx.Logger.Errorf("Failed to extract GitHub event type: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("failed to extract GitHub event type: %w", err)
 	}
 
 	if eventType != "issue_comment" {
+		ctx.Logger.Infof("Ignoring event - event type %q is not a issue_comment event", eventType)
 		return http.StatusOK, nil, nil
 	}
 
 	data, code, err := verifyAndParseWebhookData(ctx)
 	if err != nil {
+		ctx.Logger.Errorf("Failed to verify and parse webhook data: %v", err)
 		return code, nil, err
 	}
 
 	if !isPRIssueComment(data) {
+		ctx.Logger.Info("Ignoring event - it is not attached to a pull request")
 		return http.StatusOK, nil, nil
 	}
 
 	if !isExpectedPRCommentAction(eventType, data) {
+		action, _ := extractAction(data)
+		ctx.Logger.Infof("Ignoring event - action %q is not supported", action)
 		return http.StatusOK, nil, nil
 	}
 
 	matched, code, err := applyPRCommentContentFilter(config.ContentFilter, eventType, data)
 	if err != nil {
+		ctx.Logger.Errorf("Failed to apply PR comment content filter: %v", err)
 		return code, nil, err
 	}
 
 	if !matched {
+		ctx.Logger.Info("Ignoring event - content filter did not match")
 		return http.StatusOK, nil, nil
 	}
 
 	if err := ctx.Events.Emit("github.prComment", data); err != nil {
+		ctx.Logger.Errorf("Failed to emit event: %v", err)
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
