@@ -42,7 +42,7 @@ func (d *DeleteDroplet) Documentation() string {
 
 ## Configuration
 
-- **Droplet ID**: The ID of the droplet to delete (required, supports expressions)
+- **Droplet**: The droplet to delete (required, supports expressions)
 
 ## Output
 
