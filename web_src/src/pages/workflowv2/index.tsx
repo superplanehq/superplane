@@ -4796,8 +4796,6 @@ export function WorkflowPageV2() {
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
           onExportYamlCopy={isDev ? handleExportYamlCopy : undefined}
           onExportYamlDownload={isDev ? handleExportYamlDownload : undefined}
-          runDisabled={runDisabled}
-          runDisabledTooltip={runDisabledTooltip}
           onCancelQueueItem={onCancelQueueItem}
           onPushThrough={isViewingLiveVersion ? onPushThrough : undefined}
           supportsPushThrough={isViewingLiveVersion ? supportsPushThrough : undefined}

@@ -72,9 +72,6 @@ interface ComponentSidebarProps {
   onSeeQueue?: () => void;
 
   // Action handlers
-  onRun?: () => void;
-  runDisabled?: boolean;
-  runDisabledTooltip?: string;
   onDuplicate?: () => void;
   onDocs?: () => void;
   onEdit?: () => void;
@@ -181,9 +178,6 @@ export const ComponentSidebar = ({
   hideQueueEvents = false,
   onSeeQueue,
   onSeeFullHistory,
-  onRun: _onRun,
-  runDisabled: _runDisabled,
-  runDisabledTooltip: _runDisabledTooltip,
   onDuplicate: _onDuplicate,
   onDocs: _onDocs,
   onEdit: _onEdit,

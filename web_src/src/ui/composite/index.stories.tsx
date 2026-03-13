@@ -6,7 +6,6 @@ const createCompositeProps = (
   baseProps: Omit<CompositeProps, keyof import("../types/componentActions").ComponentActionsProps>,
 ): CompositeProps => ({
   ...baseProps,
-  onRun: () => console.log("Run clicked!"),
   onDuplicate: () => console.log("Duplicate clicked!"),
   onEdit: () => console.log("Edit clicked!"),
   onDeactivate: () => console.log("Deactivate clicked!"),

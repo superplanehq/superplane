@@ -202,10 +202,6 @@ export interface CanvasPageProps {
   // Undo functionality
   onUndo?: () => void;
   canUndo?: boolean;
-  // Disable running nodes when there are unsaved changes (with tooltip)
-  runDisabled?: boolean;
-  runDisabledTooltip?: string;
-
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
   loadSidebarData?: (nodeId: string) => void;
@@ -348,8 +344,6 @@ const nodeTypes = {
         data={blockData}
         nodeId={nodeProps.id}
         selected={nodeProps.selected}
-        runDisabled={callbacks?.runDisabled}
-        runDisabledTooltip={callbacks?.runDisabledTooltip}
         showHeader={callbacks?.showHeader && !callbacks?.hasMultiSelection}
         onExpand={callbacks.handleNodeExpand}
         onClick={() => callbacks.handleNodeClick(nodeProps.id)}
@@ -932,8 +926,6 @@ function CanvasPage(props: CanvasPageProps) {
                 onAnnotationUpdate={props.onAnnotationUpdate}
                 onAnnotationBlur={props.onAnnotationBlur}
                 onTogglePause={props.onTogglePause}
-                runDisabled={props.runDisabled}
-                runDisabledTooltip={props.runDisabledTooltip}
                 onBuildingBlockDrop={handleBuildingBlockDrop}
                 onBuildingBlocksSidebarToggle={handleSidebarToggle}
                 onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
@@ -1018,8 +1010,6 @@ function CanvasPage(props: CanvasPageProps) {
               onDeactivate={props.onDeactivate}
               onToggleView={handleToggleView}
               onDelete={handleNodeDelete}
-              runDisabled={props.runDisabled}
-              runDisabledTooltip={props.runDisabledTooltip}
               getAllHistoryEvents={props.getAllHistoryEvents}
               onLoadMoreHistory={props.onLoadMoreHistory}
               getHasMoreHistory={props.getHasMoreHistory}
@@ -1078,8 +1068,6 @@ function Sidebar({
   onToggleView,
   onDelete,
   onReEmit,
-  runDisabled,
-  runDisabledTooltip,
   getAllHistoryEvents,
   onLoadMoreHistory,
   getHasMoreHistory,
@@ -1127,8 +1115,6 @@ function Sidebar({
   onToggleView?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
-  runDisabled?: boolean;
-  runDisabledTooltip?: string;
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
   onLoadMoreHistory?: (nodeId: string) => void;
   getHasMoreHistory?: (nodeId: string) => boolean;
@@ -1249,8 +1235,6 @@ function Sidebar({
       onPushThrough={onPushThrough}
       onCancelExecution={onCancelExecution}
       supportsPushThrough={supportsPushThrough?.(state.componentSidebar.selectedNodeId!)}
-      runDisabled={runDisabled}
-      runDisabledTooltip={runDisabledTooltip}
       onDuplicate={onDuplicate ? () => onDuplicate(state.componentSidebar.selectedNodeId!) : undefined}
       onDocs={onDocs ? () => onDocs(state.componentSidebar.selectedNodeId!) : undefined}
       onConfigure={
@@ -1500,8 +1484,6 @@ function CanvasContent({
   hasFitToViewRef,
   viewportRefProp,
   templateNodeId,
-  runDisabled,
-  runDisabledTooltip,
   onPendingConnectionNodeClick,
   onTemplateNodeClick,
   highlightedNodeIds,
@@ -1584,8 +1566,6 @@ function CanvasContent({
   hasFitToViewRef: React.MutableRefObject<boolean>;
   viewportRefProp?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
   templateNodeId?: string | null;
-  runDisabled?: boolean;
-  runDisabledTooltip?: string;
   onPendingConnectionNodeClick?: (nodeId: string) => void;
   onTemplateNodeClick?: (nodeId: string) => void;
   highlightedNodeIds: Set<string>;
@@ -2063,8 +2043,6 @@ function CanvasContent({
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     aiState: state.ai,
-    runDisabled,
-    runDisabledTooltip,
     showHeader,
     hasMultiSelection,
   });
@@ -2081,8 +2059,6 @@ function CanvasContent({
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     aiState: state.ai,
-    runDisabled,
-    runDisabledTooltip,
     showHeader,
     hasMultiSelection,
   };

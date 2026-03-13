@@ -226,7 +226,6 @@ export const Default: Story = {
     nodeName: "Listen to code changes",
     iconSrc: GithubIcon,
     onClose: () => console.log("Close sidebar"),
-    onRun: () => console.log("Run action"),
     onDuplicate: () => console.log("Duplicate action"),
     onDocs: () => console.log("Documentation action"),
     onEdit: () => console.log("Edit action"),
@@ -287,7 +286,6 @@ export const WithInteractiveEvents: Story = {
     nodeName: "Interactive Event Sidebar",
     iconSrc: GithubIcon,
     onClose: () => console.log("Close sidebar"),
-    onRun: () => console.log("Run action"),
     onDuplicate: () => console.log("Duplicate action"),
     onDocs: () => console.log("Documentation action"),
     onToggleView: () => console.log("Toggle view action"),
@@ -354,7 +352,6 @@ export const WithDifferentIcon: Story = {
     iconSlug: "database",
     iconColor: "text-blue-700",
     onClose: () => console.log("Close sidebar"),
-    onRun: () => console.log("Run action"),
     onDeactivate: () => console.log("Deactivate action"),
     onDelete: () => console.log("Delete action"),
     getExecutionState: () => ({
@@ -428,7 +425,6 @@ export const ExtendedMetadata: Story = {
     iconSlug: "eye",
     iconColor: "text-purple-800",
     onClose: () => console.log("Close sidebar"),
-    onRun: () => console.log("Run action"),
     onDuplicate: () => console.log("Duplicate action"),
     onDocs: () => console.log("Documentation action"),
     onEdit: () => console.log("Edit action"),
@@ -494,9 +490,6 @@ export const WithActionsDropdown: Story = {
     nodeName: "Component with All Actions",
     iconSrc: GithubIcon,
     onClose: () => console.log("Close sidebar"),
-    onRun: () => {
-      console.log("Run action triggered");
-    },
     onDuplicate: () => {
       console.log("Duplicate action triggered");
     },
@@ -597,7 +590,6 @@ export const WithFullHistory: Story = {
     nodeName: "Full History Demo",
     iconSrc: GithubIcon,
     onClose: () => console.log("Close sidebar"),
-    onRun: () => console.log("Run action"),
     onDuplicate: () => console.log("Duplicate action"),
     onDocs: () => console.log("Documentation action"),
     onEdit: () => console.log("Edit action"),
@@ -648,6 +640,5 @@ export const HistoryCountDemo: Story = {
     nodeName: "History vs Queue Counts Demo",
     iconSrc: GithubIcon,
     onClose: () => console.log("Close sidebar"),
-    onRun: () => console.log("Run action"),
   },
 };
