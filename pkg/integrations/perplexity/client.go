@@ -44,30 +44,6 @@ type Model struct {
 	OwnedBy string `json:"owned_by"`
 }
 
-// SearchRequest represents the request body for POST /search.
-type SearchRequest struct {
-	Query               string   `json:"query"`
-	MaxResults          int      `json:"max_results,omitempty"`
-	MaxTokensPerPage    int      `json:"max_tokens_per_page,omitempty"`
-	SearchDomainFilter  []string `json:"search_domain_filter,omitempty"`
-	SearchRecencyFilter string   `json:"search_recency_filter,omitempty"`
-}
-
-// SearchResult is a single result returned by the Search API.
-type SearchResult struct {
-	Title       string `json:"title"`
-	URL         string `json:"url"`
-	Snippet     string `json:"snippet"`
-	Date        string `json:"date"`
-	LastUpdated string `json:"last_updated"`
-}
-
-// SearchResponse represents the response from POST /search.
-type SearchResponse struct {
-	ID      string         `json:"id"`
-	Results []SearchResult `json:"results"`
-}
-
 // AgentTool represents a tool in an agent request.
 type AgentTool struct {
 	Type string `json:"type"`
@@ -124,8 +100,7 @@ type AgentResponse struct {
 }
 
 func (c *Client) Verify() error {
-	req := SearchRequest{Query: "test", MaxResults: 1}
-	_, err := c.Search(req)
+	_, err := c.ListModels()
 	return err
 }
 
@@ -141,25 +116,6 @@ func (c *Client) ListModels() ([]Model, error) {
 	}
 
 	return response.Data, nil
-}
-
-func (c *Client) Search(req SearchRequest) (*SearchResponse, error) {
-	body, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal search request: %v", err)
-	}
-
-	responseBody, err := c.execRequest(http.MethodPost, baseURL+"/search", bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	var response SearchResponse
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal search response: %v", err)
-	}
-
-	return &response, nil
 }
 
 func (c *Client) CreateAgentResponse(req AgentRequest) (*AgentResponse, error) {

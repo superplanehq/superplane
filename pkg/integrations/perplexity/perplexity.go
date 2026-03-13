@@ -34,7 +34,7 @@ func (p *Perplexity) Icon() string {
 }
 
 func (p *Perplexity) Description() string {
-	return "Search the web and run AI agents with Perplexity"
+	return "Run AI agents with Perplexity"
 }
 
 func (p *Perplexity) Configuration() []configuration.Field {
@@ -52,7 +52,6 @@ func (p *Perplexity) Configuration() []configuration.Field {
 
 func (p *Perplexity) Components() []core.Component {
 	return []core.Component{
-		&webSearch{},
 		&runAgent{},
 	}
 }
