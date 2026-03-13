@@ -36,13 +36,24 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	core.Bind(activeCmd, &ActiveCommand{}, options)
 
 	var createFile string
+	var createAutoLayout string
+	var createAutoLayoutScope string
+	var createAutoLayoutNodes []string
 	createCmd := &cobra.Command{
 		Use:   "create [canvas-name]",
 		Short: "Create a canvas",
 		Args:  cobra.MaximumNArgs(1),
 	}
 	createCmd.Flags().StringVarP(&createFile, "file", "f", "", "filename, directory, or URL to files to use to create the resource")
-	core.Bind(createCmd, &createCommand{file: &createFile}, options)
+	createCmd.Flags().StringVar(&createAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal)")
+	createCmd.Flags().StringVar(&createAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
+	createCmd.Flags().StringArrayVar(&createAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
+	core.Bind(createCmd, &createCommand{
+		file:            &createFile,
+		autoLayout:      &createAutoLayout,
+		autoLayoutScope: &createAutoLayoutScope,
+		autoLayoutNodes: &createAutoLayoutNodes,
+	}, options)
 
 	var updateFile string
 	var updateDraft bool

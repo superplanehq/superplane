@@ -4676,6 +4676,9 @@
       "properties": {
         "canvas": {
           "$ref": "#/definitions/CanvasesCanvas"
+        },
+        "autoLayout": {
+          "$ref": "#/definitions/CanvasesCanvasAutoLayout"
         }
       }
     },

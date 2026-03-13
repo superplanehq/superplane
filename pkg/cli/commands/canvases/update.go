@@ -2,11 +2,9 @@ package canvases
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -125,33 +123,6 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		Body(body).
 		Execute()
 	return err
-}
-
-func loadCanvasFromFile(filePath string) (string, openapi_client.CanvasesCanvas, error) {
-	// #nosec
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("failed to read resource file: %w", err)
-	}
-
-	_, kind, err := core.ParseYamlResourceHeaders(data)
-	if err != nil {
-		return "", openapi_client.CanvasesCanvas{}, err
-	}
-
-	if kind != models.CanvasKind {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("unsupported resource kind %q for update", kind)
-	}
-
-	resource, err := models.ParseCanvas(data)
-	if err != nil {
-		return "", openapi_client.CanvasesCanvas{}, err
-	}
-	if resource.Metadata == nil || resource.Metadata.Id == nil || resource.Metadata.GetId() == "" {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas metadata.id is required for update")
-	}
-
-	return resource.Metadata.GetId(), models.CanvasFromCanvas(*resource), nil
 }
 
 func loadCanvasFromExisting(ctx core.CommandContext) (string, openapi_client.CanvasesCanvas, error) {
