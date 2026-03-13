@@ -458,25 +458,6 @@ func (c *Client) CreateDropletSnapshot(dropletID int, name string) (*DOAction, e
 	return &response.Action, nil
 }
 
-// GetAction retrieves a single action by ID
-func (c *Client) GetAction(actionID int) (*DOAction, error) {
-	url := fmt.Sprintf("%s/actions/%d", c.BaseURL, actionID)
-	responseBody, err := c.execRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var response struct {
-		Action DOAction `json:"action"`
-	}
-
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return &response.Action, nil
-}
-
 // Snapshot represents a DigitalOcean snapshot
 type Snapshot struct {
 	ID            string   `json:"id"`
