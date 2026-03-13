@@ -100,6 +100,27 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		}
 		return resources, nil
 
+	case "snapshot":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		snapshots, err := client.ListSnapshots()
+		if err != nil {
+			return nil, fmt.Errorf("error listing snapshots: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(snapshots))
+		for _, snapshot := range snapshots {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: snapshot.Name,
+				ID:   snapshot.ID.String(),
+			})
+		}
+		return resources, nil
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}
