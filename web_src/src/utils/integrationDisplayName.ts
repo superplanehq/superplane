@@ -23,6 +23,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   dash0: "Dash0",
   aws: "AWS",
   gcp: "GCP",
+  azure: "Azure",
   smtp: "SMTP",
   sendgrid: "SendGrid",
   dockerhub: "DockerHub",
