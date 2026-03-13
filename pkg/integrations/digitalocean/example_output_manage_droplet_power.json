@@ -1,0 +1,14 @@
+{
+  "data": {
+    "completed_at": "2026-03-12T22:27:14Z",
+    "id": 3087531973,
+    "region_slug": "fra1",
+    "resource_id": 557861237,
+    "resource_type": "droplet",
+    "started_at": "2026-03-12T22:27:07Z",
+    "status": "completed",
+    "type": "power_off"
+  },
+  "timestamp": "2026-03-12T22:27:20.613332846Z",
+  "type": "digitalocean.droplet.power.power_off"
+}
