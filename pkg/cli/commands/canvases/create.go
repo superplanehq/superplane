@@ -66,6 +66,8 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 			}
 			request.SetAutoLayout(*autoLayout)
 		}
+	} else {
+		request.SetAutoLayout(buildDefaultAutoLayout(openapi_client.CanvasesCanvas{}, request.GetCanvas()))
 	}
 
 	_, _, err := ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
@@ -105,6 +107,10 @@ func (c *createCommand) createFromFile(
 				return parseErr
 			}
 			request.SetAutoLayout(*autoLayout)
+		}
+	} else {
+		if fileAutoLayout == nil {
+			request.SetAutoLayout(buildDefaultAutoLayout(openapi_client.CanvasesCanvas{}, canvas))
 		}
 	}
 
