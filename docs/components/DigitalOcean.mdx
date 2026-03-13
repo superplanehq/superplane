@@ -115,6 +115,7 @@ The Create Droplet component creates a new droplet in DigitalOcean.
 ### Output
 
 Returns the created droplet object including:
+
 - **id**: Droplet ID
 - **name**: Droplet hostname
 - **status**: Current droplet status
@@ -149,9 +150,7 @@ Returns the created droplet object including:
     },
     "size_slug": "s-1vcpu-1gb",
     "status": "new",
-    "tags": [
-      "web"
-    ],
+    "tags": ["web"],
     "vcpus": 1
   },
   "timestamp": "2026-03-12T21:10:00.000000000Z",
@@ -271,6 +270,7 @@ The Delete Droplet component permanently deletes a droplet from your DigitalOcea
 ### Output
 
 Returns information about the deleted droplet:
+
 - **dropletId**: The ID of the droplet that was deleted
 
 ### Important Notes
@@ -347,6 +347,7 @@ The Get Droplet component retrieves detailed information about a specific drople
 ### Output
 
 Returns the droplet object including:
+
 - **id**: Droplet ID
 - **name**: Droplet hostname
 - **status**: Current droplet status (new, active, off, archive)
@@ -425,6 +426,7 @@ The Manage Droplet Power component performs power management operations on a dro
 ### Output
 
 Returns the action result including:
+
 - **id**: Action ID
 - **status**: Final action status (completed or errored)
 - **type**: Type of action performed
