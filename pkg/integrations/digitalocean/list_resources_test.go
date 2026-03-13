@@ -384,6 +384,114 @@ func Test__ListResources__UnknownResourceType(t *testing.T) {
 	})
 }
 
+func Test__ListResources__Snapshots(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("successful snapshot listing -> returns resources", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"snapshots": [
+							{
+								"id": "12345678",
+								"name": "my-droplet-snapshot",
+								"created_at": "2024-06-15T10:30:00Z",
+								"resource_id": "98765432",
+								"resource_type": "droplet",
+								"regions": ["nyc3"],
+								"min_disk_size": 25,
+								"size_gigabytes": 2.36
+							},
+							{
+								"id": "87654321",
+								"name": "backup-snapshot",
+								"created_at": "2024-06-14T08:00:00Z",
+								"resource_id": "11111111",
+								"resource_type": "droplet",
+								"regions": ["sfo3"],
+								"min_disk_size": 50,
+								"size_gigabytes": 5.12
+							}
+						]
+					}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "test-token",
+			},
+		}
+
+		resources, err := integration.ListResources("snapshot", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 2)
+		assert.Equal(t, "snapshot", resources[0].Type)
+		assert.Equal(t, "my-droplet-snapshot", resources[0].Name)
+		assert.Equal(t, "12345678", resources[0].ID)
+		assert.Equal(t, "backup-snapshot", resources[1].Name)
+		assert.Equal(t, "87654321", resources[1].ID)
+	})
+
+	t.Run("empty snapshot list -> returns empty array", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"snapshots": []}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "test-token",
+			},
+		}
+
+		resources, err := integration.ListResources("snapshot", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 0)
+	})
+
+	t.Run("API error -> returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"server_error","message":"Internal server error"}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "test-token",
+			},
+		}
+
+		resources, err := integration.ListResources("snapshot", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "error listing snapshots")
+		assert.Nil(t, resources)
+	})
+}
+
 func Test__ListResources__ClientCreationError(t *testing.T) {
 	integration := &DigitalOcean{}
 
