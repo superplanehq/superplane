@@ -55,19 +55,15 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 
 	request := models.CreateCanvasRequestFromCanvas(resource)
 	if autoLayoutFlagsWereSet(ctx) {
-		if autoLayoutValue == "" && (autoLayoutScopeValue != "" || len(autoLayoutNodeIDs) > 0) {
-			return fmt.Errorf("--auto-layout is required when using --auto-layout-scope or --auto-layout-node")
+		autoLayout, parseErr := parseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
+		if parseErr != nil {
+			return parseErr
 		}
-
-		if autoLayoutValue != "" {
-			autoLayout, parseErr := parseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
-			if parseErr != nil {
-				return parseErr
-			}
+		if autoLayout != nil {
 			request.SetAutoLayout(*autoLayout)
 		}
 	} else {
-		request.SetAutoLayout(buildDefaultAutoLayout(openapi_client.CanvasesCanvas{}, request.GetCanvas()))
+		request.SetAutoLayout(buildDefaultAutoLayout())
 	}
 
 	_, _, err := ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
@@ -88,29 +84,23 @@ func (c *createCommand) createFromFile(
 
 	request := openapi_client.CanvasesCreateCanvasRequest{}
 	request.SetCanvas(canvas)
-	if fileAutoLayout != nil {
-		request.SetAutoLayout(*fileAutoLayout)
-	}
 
 	if autoLayoutFlagsWereSet(ctx) {
-		if autoLayoutValue == "" && (autoLayoutScopeValue != "" || len(autoLayoutNodeIDs) > 0) {
-			return fmt.Errorf("--auto-layout is required when using --auto-layout-scope or --auto-layout-node")
+		autoLayout, parseErr := parseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
+		if parseErr != nil {
+			return parseErr
 		}
-
-		if autoLayoutValue != "" {
+		if autoLayout != nil {
 			if fileAutoLayout != nil {
-				return fmt.Errorf("cannot use --auto-layout with --file when file already defines autoLayout")
-			}
-
-			autoLayout, parseErr := parseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
-			if parseErr != nil {
-				return parseErr
+				return fmt.Errorf("cannot use auto-layout flags with --file when file already defines autoLayout")
 			}
 			request.SetAutoLayout(*autoLayout)
 		}
 	} else {
-		if fileAutoLayout == nil {
-			request.SetAutoLayout(buildDefaultAutoLayout(openapi_client.CanvasesCanvas{}, canvas))
+		if fileAutoLayout != nil {
+			request.SetAutoLayout(*fileAutoLayout)
+		} else {
+			request.SetAutoLayout(buildDefaultAutoLayout())
 		}
 	}
 

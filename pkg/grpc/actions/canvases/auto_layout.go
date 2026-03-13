@@ -426,7 +426,7 @@ func computeAutogPositions(componentNodes []models.Node, componentEdges []models
 		autog.WithNodeFixedSize(autoLayoutNodeHeight, autoLayoutNodeWidth),
 		autog.WithLayerSpacing(autoLayoutLayerGap),
 		autog.WithNodeSpacing(autoLayoutNodeGap),
-		autog.WithPositioning(autog.PositioningSinkColoring),
+		autog.WithPositioning(autog.PositioningVAlign),
 		autog.WithEdgeRouting(autog.EdgeRoutingNoop),
 	)
 
