@@ -36,11 +36,7 @@ export const createSnapshotMapper: ComponentBaseMapper = {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
-      details["Started At"] = new Date(context.execution.createdAt).toLocaleString();
-    }
-
-    if (context.execution.updatedAt && context.execution.state === "STATE_FINISHED") {
-      details["Finished At"] = new Date(context.execution.updatedAt).toLocaleString();
+      details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;

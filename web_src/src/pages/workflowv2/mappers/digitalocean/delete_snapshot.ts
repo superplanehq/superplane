@@ -36,7 +36,7 @@ export const deleteSnapshotMapper: ComponentBaseMapper = {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
-      details["Deleted At"] = new Date(context.execution.createdAt).toLocaleString();
+      details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
