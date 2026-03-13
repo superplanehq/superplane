@@ -100,6 +100,53 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		}
 		return resources, nil
 
+	case "domain":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		domains, err := client.ListDomains()
+		if err != nil {
+			return nil, fmt.Errorf("error listing domains: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(domains))
+		for _, domain := range domains {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: domain.Name,
+				ID:   domain.Name,
+			})
+		}
+		return resources, nil
+
+	case "dns_record":
+		domain := ctx.Parameters["domain"]
+		if domain == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		records, err := client.ListDNSRecords(domain)
+		if err != nil {
+			return nil, fmt.Errorf("error listing DNS records: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(records))
+		for _, record := range records {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: fmt.Sprintf("%s (%s)", record.Name, record.Type),
+				ID:   fmt.Sprintf("%d", record.ID),
+			})
+		}
+		return resources, nil
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}

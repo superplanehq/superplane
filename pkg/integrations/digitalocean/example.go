@@ -46,3 +46,33 @@ var exampleOutputManageDropletPower map[string]any
 func (m *ManageDropletPower) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputManageDropletPowerOnce, exampleOutputManageDropletPowerBytes, &exampleOutputManageDropletPower)
 }
+
+//go:embed example_output_create_dns_record.json
+var exampleOutputCreateDNSRecordBytes []byte
+
+var exampleOutputCreateDNSRecordOnce sync.Once
+var exampleOutputCreateDNSRecord map[string]any
+
+func (c *CreateDNSRecord) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateDNSRecordOnce, exampleOutputCreateDNSRecordBytes, &exampleOutputCreateDNSRecord)
+}
+
+//go:embed example_output_delete_dns_record.json
+var exampleOutputDeleteDNSRecordBytes []byte
+
+var exampleOutputDeleteDNSRecordOnce sync.Once
+var exampleOutputDeleteDNSRecord map[string]any
+
+func (d *DeleteDNSRecord) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteDNSRecordOnce, exampleOutputDeleteDNSRecordBytes, &exampleOutputDeleteDNSRecord)
+}
+
+//go:embed example_output_upsert_dns_record.json
+var exampleOutputUpsertDNSRecordBytes []byte
+
+var exampleOutputUpsertDNSRecordOnce sync.Once
+var exampleOutputUpsertDNSRecord map[string]any
+
+func (u *UpsertDNSRecord) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpsertDNSRecordOnce, exampleOutputUpsertDNSRecordBytes, &exampleOutputUpsertDNSRecord)
+}
