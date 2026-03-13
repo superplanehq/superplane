@@ -46,7 +46,7 @@ func (m *ManageDropletPower) Documentation() string {
 
 ## Configuration
 
-- **Droplet ID**: The ID of the droplet to manage (required, supports expressions)
+- **Droplet**: The droplet to manage (required, supports expressions)
 - **Operation**: The power operation to perform (required):
   - **power_on**: Power on a powered-off droplet
   - **power_off**: Power off a running droplet (forced shutdown)

@@ -42,7 +42,7 @@ func (g *GetDroplet) Documentation() string {
 
 ## Configuration
 
-- **Droplet ID**: The ID of the droplet to retrieve (required, supports expressions)
+- **Droplet**: The droplet to retrieve (required, supports expressions)
 
 ## Output
 
