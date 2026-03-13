@@ -8,7 +8,6 @@ import (
 )
 
 type Trigger interface {
-
 	/*
 	 * The unique identifier for the trigger.
 	 * This is how nodes reference it, and is used for registration.
@@ -70,7 +69,7 @@ type Trigger interface {
 	Actions() []Action
 
 	/*
-	 * Execution a custom action - defined in Actions() for a trigger.
+	 * Execute a custom action - defined in Actions() for a trigger.
 	 */
 	HandleAction(ctx TriggerActionContext) (map[string]any, error)
 
@@ -109,14 +108,6 @@ type TriggerActionContext struct {
 	Integration   IntegrationContext
 }
 
-// WebhookResponseBody allows a trigger's HandleWebhook to set a custom
-// response body that will be written back to the caller. If Body is non-empty
-// the server uses it instead of the default empty 200 OK.
-type WebhookResponseBody struct {
-	Body        []byte
-	ContentType string
-}
-
 type WebhookRequestContext struct {
 	Body          []byte
 	Headers       http.Header
@@ -138,10 +129,14 @@ type WebhookRequestContext struct {
 	// Do not make HTTP calls as part of handling the webhook. This is useful for
 	// retrieving more data that is not part of the webhook payload.
 	HTTP HTTPContext
+}
 
-	// Response allows handlers to set a custom response body.
-	// The pointer is allocated by the server; handlers may write to it.
-	Response *WebhookResponseBody
+// WebhookResponseBody allows a HandleWebhook implementation to return a custom
+// response body. If non-nil and Body is non-empty, the server writes it back
+// to the caller instead of the default empty 200 OK.
+type WebhookResponseBody struct {
+	Body        []byte
+	ContentType string
 }
 
 type NodeWebhookContext interface {
