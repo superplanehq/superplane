@@ -257,7 +257,7 @@ export function OrganizationSettings() {
         <SidebarBody>
           <SidebarSection className="px-4 py-2.5">
             <Link to={`/${organizationId}`} className="block w-7 h-7" aria-label="Go to Canvases">
-              <img src={SuperplaneLogo} alt="SuperPlane" className="w-7 h-7 object-contain" />
+              <img src={SuperplaneLogo} alt="SuperPlane" className="w-7 h-7 object-contain dark:invert" />
             </Link>
           </SidebarSection>
           <SidebarSection className="p-4 border-t border-gray-300">
