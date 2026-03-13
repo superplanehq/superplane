@@ -10,7 +10,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create Droplet" href="#create-droplet" description="Create a new DigitalOcean Droplet" />
+  <LinkCard title="Create Snapshot" href="#create-snapshot" description="Create a snapshot of a DigitalOcean Droplet" />
   <LinkCard title="Delete Droplet" href="#delete-droplet" description="Delete a DigitalOcean Droplet by ID" />
+  <LinkCard title="Delete Snapshot" href="#delete-snapshot" description="Delete a DigitalOcean snapshot" />
   <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
   <LinkCard title="Manage Droplet Power" href="#manage-droplet-power" description="Perform power operations on a DigitalOcean Droplet" />
 </CardGrid>
@@ -97,6 +99,55 @@ Returns the created droplet object including:
 }
 ```
 
+<a id="create-snapshot"></a>
+
+## Create Snapshot
+
+The Create Snapshot component creates a point-in-time snapshot of a DigitalOcean Droplet.
+
+### Use Cases
+
+- **Backup**: Create a backup before performing risky operations on a droplet
+- **Image creation**: Create a custom image from an existing droplet for reuse
+- **Migration**: Snapshot a droplet before migrating to a different region or size
+
+### Configuration
+
+- **Droplet**: The ID of the droplet to snapshot (required)
+- **Name**: A human-readable name for the snapshot (required)
+
+### Output
+
+Returns the snapshot details including:
+- **id**: Snapshot ID
+- **name**: Snapshot name
+- **created_at**: When the snapshot was created
+- **resource_id**: The ID of the droplet that was snapshotted
+- **regions**: Regions where the snapshot is available
+- **min_disk_size**: Minimum disk size required to use this snapshot
+- **size_gigabytes**: Size of the snapshot in GB
+
+### Example Output
+
+```json
+{
+  "data": {
+    "created_at": "2026-03-13T13:35:43Z",
+    "id": 220464921,
+    "min_disk_size": 10,
+    "name": "superplane-1773328904",
+    "regions": [
+      "blr1"
+    ],
+    "resource_id": "98145763",
+    "resource_type": "droplet",
+    "size_gigabytes": 2.04
+  },
+  "timestamp": "2026-03-13T13:36:14.803060936Z",
+  "type": "digitalocean.snapshot.created"
+}
+```
+
 <a id="delete-droplet"></a>
 
 ## Delete Droplet
@@ -135,6 +186,41 @@ Returns information about the deleted droplet:
   },
   "timestamp": "2026-03-12T21:25:45.688697002Z",
   "type": "digitalocean.droplet.deleted"
+}
+```
+
+<a id="delete-snapshot"></a>
+
+## Delete Snapshot
+
+The Delete Snapshot component deletes a DigitalOcean snapshot image.
+
+### Use Cases
+
+- **Cleanup**: Remove old snapshots to free up storage and reduce costs
+- **Lifecycle management**: Automatically delete snapshots after they are no longer needed
+- **Rotation**: Delete older snapshots as part of a snapshot rotation policy
+
+### Configuration
+
+- **Snapshot**: The snapshot to delete (required)
+
+### Output
+
+Returns confirmation of the deleted snapshot including:
+- **snapshotId**: The ID of the deleted snapshot
+- **deleted**: Confirmation that the snapshot was deleted
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "snapshotId": "220431883"
+  },
+  "timestamp": "2026-03-13T06:27:06.208635289Z",
+  "type": "digitalocean.snapshot.deleted"
 }
 ```
 
