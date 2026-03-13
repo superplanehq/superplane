@@ -133,39 +133,54 @@ func (r *OnRelease) HandleAction(ctx core.TriggerActionContext) (map[string]any,
 }
 
 func (r *OnRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	ctx = withWebhookLogger(ctx, r.Name())
+	ctx.Logger.Infof("Received GitHub webhook")
+
 	config := OnReleaseConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
+		ctx.Logger.Errorf("Failed to decode configuration: %v", err)
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	eventType := ctx.Headers.Get("X-GitHub-Event")
 	if eventType == "" {
+		ctx.Logger.Errorf("Missing X-GitHub-Event header")
 		return http.StatusBadRequest, nil, fmt.Errorf("missing X-GitHub-Event header")
 	}
 
 	if eventType != "release" {
+		ctx.Logger.Infof("Ignoring event - event type %q is not a release event", eventType)
 		return http.StatusOK, nil, nil
 	}
 
 	code, err := verifySignature(ctx)
 	if err != nil {
+		ctx.Logger.Errorf("Failed to verify signature: %v", err)
 		return code, nil, err
 	}
 
 	data := map[string]any{}
 	err = json.Unmarshal(ctx.Body, &data)
 	if err != nil {
+		ctx.Logger.Errorf("Failed to parse request body: %v", err)
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	if !whitelistedAction(data, config.Actions) {
+		action, ok := extractAction(data)
+		if !ok {
+			ctx.Logger.Info("Ignoring event - without a valid action")
+			return http.StatusOK, nil, nil
+		}
+
+		ctx.Logger.Infof("Ignoring event - action %q is not configured", action)
 		return http.StatusOK, nil, nil
 	}
 
 	err = ctx.Events.Emit("github.release", data)
-
 	if err != nil {
+		ctx.Logger.Errorf("Failed to emit event: %v", err)
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 

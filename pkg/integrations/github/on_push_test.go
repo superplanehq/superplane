@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -22,6 +23,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "push")
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -34,6 +36,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Events:  &contexts.EventContext{},
 			Webhook: &contexts.NodeWebhookContext{},
 		})
@@ -58,6 +61,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 				"refs":       []configuration.Predicate{},
@@ -81,6 +85,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    []byte(`{"ref":"refs/heads/main"}`),
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 				"refs": []configuration.Predicate{
@@ -111,6 +116,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 				"refs": []configuration.Predicate{
@@ -142,6 +148,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 				"refs": []configuration.Predicate{
@@ -173,6 +180,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 				"refs": []configuration.Predicate{
@@ -204,6 +212,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 				"refs": []configuration.Predicate{
@@ -235,6 +244,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 				"refs": []configuration.Predicate{
