@@ -2,7 +2,7 @@ import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../typ
 import { createDropletMapper } from "./create_droplet";
 import { getDropletMapper } from "./get_droplet";
 import { deleteDropletMapper } from "./delete_droplet";
-import { manageDropletPowerMapper } from "./manage_droplet_power";
+import { manageDropletPowerMapper, MANAGE_DROPLET_POWER_STATE_REGISTRY } from "./manage_droplet_power";
 import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -18,5 +18,5 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createDroplet: buildActionStateRegistry("created"),
   getDroplet: buildActionStateRegistry("fetched"),
   deleteDroplet: buildActionStateRegistry("deleted"),
-  manageDropletPower: buildActionStateRegistry("managed"),
+  manageDropletPower: MANAGE_DROPLET_POWER_STATE_REGISTRY,
 };

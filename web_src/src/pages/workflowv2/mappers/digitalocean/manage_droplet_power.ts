@@ -4,6 +4,7 @@ import { getState, getTriggerRenderer } from "..";
 import {
   ComponentBaseContext,
   ComponentBaseMapper,
+  EventStateRegistry,
   ExecutionDetailsContext,
   ExecutionInfo,
   NodeInfo,
@@ -14,14 +15,15 @@ import { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { formatTimeAgo } from "@/utils/date";
 import { DropletNodeMetadata, ManageDropletPowerConfiguration } from "./types";
+import { defaultStateFunction } from "../stateRegistry";
 
-const powerStateMap: EventStateMap = {
+export const powerStateMap: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   "digitalocean.droplet.power.power_on": {
     icon: "power",
     textColor: "text-gray-800",
     backgroundColor: "bg-green-100",
-    badgeColor: "bg-green-500",
+    badgeColor: "bg-emerald-500",
     label: "POWERED ON",
   },
   "digitalocean.droplet.power.power_off": {
@@ -34,23 +36,39 @@ const powerStateMap: EventStateMap = {
   "digitalocean.droplet.power.shutdown": {
     icon: "power-off",
     textColor: "text-gray-800",
-    backgroundColor: "bg-orange-100",
-    badgeColor: "bg-orange-500",
+    backgroundColor: "bg-gray-100",
+    badgeColor: "bg-gray-500",
     label: "SHUTDOWN",
   },
   "digitalocean.droplet.power.reboot": {
     icon: "refresh-cw",
     textColor: "text-gray-800",
-    backgroundColor: "bg-blue-100",
-    badgeColor: "bg-blue-500",
+    backgroundColor: "bg-green-100",
+    badgeColor: "bg-emerald-500",
     label: "REBOOTED",
   },
   "digitalocean.droplet.power.power_cycle": {
     icon: "rotate-cw",
     textColor: "text-gray-800",
-    backgroundColor: "bg-purple-100",
-    badgeColor: "bg-purple-500",
+    backgroundColor: "bg-green-100",
+    badgeColor: "bg-emerald-500",
     label: "POWER CYCLED",
+  },
+};
+
+export const MANAGE_DROPLET_POWER_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: powerStateMap,
+  getState: (execution: ExecutionInfo) => {
+    const state = defaultStateFunction(execution);
+    if (state !== "success") return state;
+
+    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+    const powerEvent = outputs?.default?.find((output) => output.type?.startsWith("digitalocean.droplet.power."));
+    if (powerEvent?.type && powerStateMap[powerEvent.type]) {
+      return powerEvent.type;
+    }
+
+    return "success";
   },
 };
 
@@ -75,7 +93,7 @@ export const manageDropletPowerMapper: ComponentBaseMapper = {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
-      details["Created At"] = new Date(context.execution.createdAt).toLocaleString();
+      details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
@@ -86,14 +104,6 @@ export const manageDropletPowerMapper: ComponentBaseMapper = {
     details["Operation"] = action.type || "-";
     details["Status"] = action.status || "-";
     details["Droplet ID"] = action.resource_id?.toString() || "-";
-
-    if (action.started_at) {
-      details["Started At"] = new Date(action.started_at).toLocaleString();
-    }
-
-    if (action.completed_at) {
-      details["Completed At"] = new Date(action.completed_at).toLocaleString();
-    }
 
     return details;
   },
