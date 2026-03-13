@@ -32,7 +32,7 @@ import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 
 import {
   ConfigurationField,
@@ -1783,6 +1783,11 @@ function CanvasContent({
   const [isSelecting, setIsSelecting] = useState(false);
   const previouslySelectedRef = useRef<Set<string>>(new Set());
 
+  const stopCanvasPointerEvent = useCallback((event: SyntheticEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
+
   useOnSelectionChange({
     onChange: useCallback(({ nodes }: { nodes: ReactFlowNode[] }) => {
       setMultiSelectedNodes(nodes.length >= 2 ? nodes : []);
@@ -2674,6 +2679,8 @@ function CanvasContent({
                   >
                     <div
                       className="nodrag nopan flex items-center gap-2"
+                      onPointerDown={stopCanvasPointerEvent}
+                      onMouseDown={stopCanvasPointerEvent}
                       style={{
                         transform: `scale(${1 / zoom})`,
                         transformOrigin: "bottom right",
@@ -2684,6 +2691,8 @@ function CanvasContent({
                         <button
                           type="button"
                           data-testid="multi-select-auto-layout"
+                          onPointerDown={stopCanvasPointerEvent}
+                          onMouseDown={stopCanvasPointerEvent}
                           onClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
@@ -2698,6 +2707,8 @@ function CanvasContent({
                         <button
                           type="button"
                           data-testid="multi-select-duplicate"
+                          onPointerDown={stopCanvasPointerEvent}
+                          onMouseDown={stopCanvasPointerEvent}
                           onClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
@@ -2712,6 +2723,8 @@ function CanvasContent({
                         <button
                           type="button"
                           data-testid="multi-select-delete"
+                          onPointerDown={stopCanvasPointerEvent}
+                          onMouseDown={stopCanvasPointerEvent}
                           onClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
