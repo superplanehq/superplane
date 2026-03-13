@@ -5,6 +5,7 @@ import {
   ExecutionDetailsContext,
   ExecutionInfo,
   NodeInfo,
+  OutputPayload,
   SubtitleContext,
 } from "./types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventStateMap, EventState } from "@/ui/componentBase";
@@ -12,6 +13,7 @@ import { getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { formatTimeAgo } from "@/utils/date";
 import { getTriggerRenderer } from ".";
+import { stringOrDash } from "./utils";
 
 // Custom state map for HTTP component with error state
 const HTTP_EVENT_STATE_MAP: EventStateMap = {
@@ -86,23 +88,11 @@ const httpStateFunction = (execution: ExecutionInfo): EventState => {
   }
 
   if (execution.state === "STATE_FINISHED") {
-    const metadata = execution.metadata as Record<string, unknown> | undefined;
-
-    if (metadata?.result === "success") {
+    const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
+    if (outputs?.success) {
       return "success";
-    }
-
-    if (metadata?.result === "failed") {
+    } else if (outputs?.failure) {
       return "failed";
-    }
-
-    if (metadata?.result === "error") {
-      return "error";
-    }
-
-    // Fallback to execution result
-    if (execution.result === "RESULT_PASSED") {
-      return "success";
     }
   }
 
@@ -113,6 +103,23 @@ export const HTTP_STATE_REGISTRY: EventStateRegistry = {
   stateMap: HTTP_EVENT_STATE_MAP,
   getState: httpStateFunction,
 };
+
+interface Output {
+  status: number;
+}
+
+interface Metadata {
+  retry: {
+    strategy: string;
+    interval: number;
+    nextRetryAt: string;
+    attempts: number;
+    maxAttempts: number;
+    lastStatus: number | null;
+    lastResponse: string | null;
+    lastError: string | null;
+  };
+}
 
 export const httpMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -138,55 +145,24 @@ export const httpMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
-    const metadata = context.execution.metadata as Record<string, unknown> | undefined;
+    const metadata = context.execution.metadata as Metadata | undefined;
+    const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] }
 
-    if (metadata?.finalStatus !== undefined && metadata.finalStatus !== null) {
-      details["Response"] = metadata.finalStatus.toString();
-    } else {
-      const outputs = context.execution.outputs as Record<string, unknown>;
-      const defaultArray = outputs?.default as unknown[];
-      const response = defaultArray?.[0] as {
-        data?: {
-          status?: number;
-        };
-      };
-      if (response?.data?.status) {
-        details["Response"] = response.data.status.toString();
-      }
+    if (outputs?.success) {
+      const response = outputs.success[0].data as Output;
+      details["Response"] = response.status.toString();
+    } else if (outputs?.failure) {
+      const response = outputs.failure[0].data as Output;
+      details["Response"] = response.status.toString();
     }
 
-    if (metadata?.totalRetries !== undefined && metadata.totalRetries !== null) {
-      details["Retries"] = metadata.totalRetries.toString();
-    }
-
-    if (context.execution.createdAt && context.execution.updatedAt) {
-      const startTime = new Date(context.execution.createdAt);
-      const endTime = new Date(context.execution.updatedAt);
-      const durationMs = endTime.getTime() - startTime.getTime();
-
-      if (durationMs < 1000) {
-        details["Duration"] = `${durationMs}ms`;
-      } else if (durationMs < 60000) {
-        details["Duration"] = `${Math.round(durationMs / 1000)} seconds`;
-      } else {
-        const minutes = Math.floor(durationMs / 60000);
-        const seconds = Math.round((durationMs % 60000) / 1000);
-        details["Duration"] = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
-      }
-    }
-
-    // Time finished
-    if (context.execution.updatedAt) {
-      const finishedTime = new Date(context.execution.updatedAt);
-      details["Time Finished"] = finishedTime.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: true,
-      });
+    if (metadata?.retry) {
+      details["Retries"] = `${metadata.retry.attempts} / ${metadata.retry.maxAttempts}`;
+      details["Retry Strategy"] = metadata.retry.strategy;
+      details["Next Retry At"] = metadata.retry.nextRetryAt;
+      details["Last Status"] = stringOrDash(metadata.retry.lastStatus);
+      details["Last Response"] = stringOrDash(metadata.retry.lastResponse);
+      details["Last Error"] = stringOrDash(metadata.retry.lastError);
     }
 
     return details;
@@ -214,22 +190,14 @@ export const httpMapper: ComponentBaseMapper = {
 
     // For success/failed states, show response code and time
     if (state === "success" || state === "failed") {
-      const metadata = context.execution.metadata as Record<string, unknown> | undefined;
+      const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] }
       let responseCode: string | null = null;
-
-      // Try to get response code from metadata first
-      if (metadata?.finalStatus !== undefined && metadata.finalStatus !== null) {
-        responseCode = metadata.finalStatus.toString();
-      } else {
-        // Fallback to outputs
-        const outputs = context.execution.outputs as Record<string, unknown>;
-        const defaultArray = outputs?.default as unknown[];
-        const response = defaultArray?.[0] as {
-          data?: { status?: number };
-        };
-        if (response?.data?.status) {
-          responseCode = response.data.status.toString();
-        }
+      if (outputs?.success) {
+        const response = outputs.success[0].data as Output;
+        responseCode = response.status.toString();
+      } else if (outputs?.failure) {
+        const response = outputs.failure[0].data as Output;
+        responseCode = response.status.toString();
       }
 
       const timeAgo = context.execution.updatedAt ? formatTimeAgo(new Date(context.execution.updatedAt)) : "";
@@ -481,13 +449,13 @@ function getHTTPEventSections(
       if (metadata?.finalStatus !== undefined && metadata.finalStatus !== null) {
         responseCode = metadata.finalStatus.toString();
       } else {
-        const outputs = execution.outputs as Record<string, unknown>;
-        const defaultArray = outputs?.default as unknown[];
-        const response = defaultArray?.[0] as {
-          data?: { status?: number };
-        };
-        if (response?.data?.status) {
-          responseCode = response.data.status.toString();
+        const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] }
+        if (outputs?.success) {
+          const response = outputs.success[0].data as Output;
+          responseCode = response.status.toString();
+        } else if (outputs?.failure) {
+          const response = outputs.failure[0].data as Output;
+          responseCode = response.status.toString();
         }
       }
 
