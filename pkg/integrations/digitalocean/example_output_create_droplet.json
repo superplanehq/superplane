@@ -13,5 +13,7 @@
       "v4": [{ "ip_address": "104.131.186.241", "type": "public" }]
     },
     "tags": ["web"]
-  }
+  },
+  "timestamp": "2026-03-12T21:10:00.000000000Z",
+  "type": "digitalocean.droplet.created"
 }
