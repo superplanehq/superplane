@@ -310,6 +310,7 @@ export type CanvasesCreateCanvasChangeRequestResponse = {
 
 export type CanvasesCreateCanvasRequest = {
   canvas?: CanvasesCanvas;
+  autoLayout?: CanvasesCanvasAutoLayout;
 };
 
 export type CanvasesCreateCanvasResponse = {
