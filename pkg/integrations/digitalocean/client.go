@@ -524,6 +524,10 @@ func (c *Client) GetDropletSnapshots(dropletID int) ([]Snapshot, error) {
 	if err := json.Unmarshal(responseBody, &response); err != nil {
 		return nil, fmt.Errorf("error parsing response: %v", err)
 	}
+	for i := range response.Snapshots {
+		response.Snapshots[i].ResourceID = strconv.Itoa(dropletID)
+		response.Snapshots[i].ResourceType = "droplet"
+	}
 
 	return response.Snapshots, nil
 }
