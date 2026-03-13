@@ -160,9 +160,22 @@ func PublishCanvasChangeRequest(
 				continue
 			}
 
-			workflowNode, upsertErr := upsertNode(tx, existingNodes, node, canvasUUID)
+			workflowNode, nodeLevelErrorMessage, upsertErr := upsertNode(tx, existingNodes, node, canvasUUID)
 			if upsertErr != nil {
 				return upsertErr
+			}
+
+			if nodeLevelErrorMessage != nil {
+				errorNodeID := node.ID
+				if workflowNode.ParentNodeID != nil {
+					errorNodeID = *workflowNode.ParentNodeID
+				}
+				parentNode, ok := parentNodesByNodeID[errorNodeID]
+				if !ok {
+					log.Errorf("Parent node %s not found for node-level error", errorNodeID)
+				} else {
+					parentNode.ErrorMessage = nodeLevelErrorMessage
+				}
 			}
 
 			if workflowNode.State == models.CanvasNodeStateReady {

@@ -12,8 +12,6 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/test/support"
-	"google.golang.org/grpc/codes"
-	grpcstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -109,7 +107,7 @@ func TestUpdateLiveCanvasWithoutVersioningRejectsMissingAppInstallationID(t *tes
 	emptyStruct, err := structpb.NewStruct(map[string]any{})
 	require.NoError(t, err)
 
-	_, err = UpdateCanvasVersion(
+	resp, err := UpdateCanvasVersion(
 		ctx,
 		r.Encryptor,
 		r.Registry,
@@ -137,8 +135,12 @@ func TestUpdateLiveCanvasWithoutVersioningRejectsMissingAppInstallationID(t *tes
 		nil,
 		testWebhookBaseURL,
 	)
-	require.Error(t, err)
-	require.Equal(t, codes.InvalidArgument, grpcstatus.Code(err))
-	require.NotContains(t, err.Error(), "SQLSTATE")
-	require.NotContains(t, err.Error(), "violates foreign key constraint")
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.Version)
+	require.NotNil(t, resp.Version.Spec)
+	require.Len(t, resp.Version.Spec.Nodes, 1)
+	require.Equal(t, "integration not found", resp.Version.Spec.Nodes[0].ErrorMessage)
+	require.NotContains(t, resp.Version.Spec.Nodes[0].ErrorMessage, "SQLSTATE")
+	require.NotContains(t, resp.Version.Spec.Nodes[0].ErrorMessage, "violates foreign key constraint")
 }

@@ -15,8 +15,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -76,33 +74,41 @@ func findNode(nodes []models.CanvasNode, nodeID string) *models.CanvasNode {
 	return nil
 }
 
-func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node, workflowID uuid.UUID) (*models.CanvasNode, error) {
+func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node, workflowID uuid.UUID) (*models.CanvasNode, *string, error) {
 	now := time.Now()
 
 	var appInstallationID *uuid.UUID
-	if node.IntegrationID != nil && *node.IntegrationID != "" {
-		parsedID, err := uuid.Parse(*node.IntegrationID)
+	var nodeLevelErrorMessage *string
+	if node.IntegrationID != nil && strings.TrimSpace(*node.IntegrationID) != "" {
+		parsedID, err := uuid.Parse(strings.TrimSpace(*node.IntegrationID))
 		if err != nil {
-			return nil, fmt.Errorf("invalid integration ID: %v", err)
+			msg := "invalid integration id"
+			nodeLevelErrorMessage = &msg
+			appInstallationID = nil
+		} else {
+			appInstallationID = &parsedID
 		}
-		appInstallationID = &parsedID
 	}
 
 	existingNode := findNode(existingNodes, node.ID)
-	if existingNode != nil {
-		if appInstallationID != nil {
-			integration, err := models.FindMaybeDeletedIntegrationInTransaction(tx, *appInstallationID)
-			if err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return nil, status.Error(codes.InvalidArgument, "app installation not found")
-				}
-				return nil, err
+	if appInstallationID != nil {
+		integration, err := models.FindMaybeDeletedIntegrationInTransaction(tx, *appInstallationID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				msg := "integration not found"
+				nodeLevelErrorMessage = &msg
+				appInstallationID = nil
+			} else {
+				return nil, nil, err
 			}
-			if integration.DeletedAt.Valid {
-				return nil, status.Error(codes.InvalidArgument, "app installation is deleted")
-			}
+		} else if integration.DeletedAt.Valid {
+			msg := "integration is deleted"
+			nodeLevelErrorMessage = &msg
+			appInstallationID = nil
 		}
+	}
 
+	if existingNode != nil {
 		existingNode.Name = node.Name
 		existingNode.Type = node.Type
 		existingNode.Ref = datatypes.NewJSONType(node.Ref)
@@ -111,9 +117,16 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 		existingNode.IsCollapsed = node.IsCollapsed
 		existingNode.AppInstallationID = appInstallationID
 
-		if node.ErrorMessage != nil && *node.ErrorMessage != "" {
+		var specErrorMessage *string
+		if node.ErrorMessage != nil && strings.TrimSpace(*node.ErrorMessage) != "" {
+			specErrorMessage = node.ErrorMessage
+		} else if nodeLevelErrorMessage != nil {
+			specErrorMessage = nodeLevelErrorMessage
+		}
+
+		if specErrorMessage != nil {
 			existingNode.State = models.CanvasNodeStateError
-			existingNode.StateReason = node.ErrorMessage
+			existingNode.StateReason = specErrorMessage
 		} else if existingNode.State == models.CanvasNodeStateError {
 			existingNode.State = models.CanvasNodeStateReady
 			existingNode.StateReason = nil
@@ -128,10 +141,10 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 
 		existingNode.UpdatedAt = &now
 		if err := tx.Save(existingNode).Error; err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		return existingNode, nil
+		return existingNode, nodeLevelErrorMessage, nil
 	}
 
 	var parentNodeID *string
@@ -142,22 +155,12 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 
 	initialState := models.CanvasNodeStateReady
 	var stateReason *string
-	if node.ErrorMessage != nil && *node.ErrorMessage != "" {
+	if node.ErrorMessage != nil && strings.TrimSpace(*node.ErrorMessage) != "" {
 		initialState = models.CanvasNodeStateError
 		stateReason = node.ErrorMessage
-	}
-
-	if appInstallationID != nil {
-		integration, err := models.FindMaybeDeletedIntegrationInTransaction(tx, *appInstallationID)
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, status.Error(codes.InvalidArgument, "app installation not found")
-			}
-			return nil, err
-		}
-		if integration.DeletedAt.Valid {
-			return nil, status.Error(codes.InvalidArgument, "app installation is deleted")
-		}
+	} else if nodeLevelErrorMessage != nil {
+		initialState = models.CanvasNodeStateError
+		stateReason = nodeLevelErrorMessage
 	}
 
 	canvasNode := models.CanvasNode{
@@ -179,10 +182,10 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 	}
 
 	if err := tx.Create(&canvasNode).Error; err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &canvasNode, nil
+	return &canvasNode, nodeLevelErrorMessage, nil
 }
 
 func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string) error {

@@ -211,9 +211,20 @@ func updateLiveCanvasWithoutVersioning(
 				continue
 			}
 
-			workflowNode, upsertErr := upsertNode(tx, existingNodes, node, canvasID)
+			workflowNode, nodeLevelErrorMessage, upsertErr := upsertNode(tx, existingNodes, node, canvasID)
 			if upsertErr != nil {
 				return upsertErr
+			}
+
+			if nodeLevelErrorMessage != nil {
+				errorNodeID := node.ID
+				if workflowNode.ParentNodeID != nil {
+					errorNodeID = *workflowNode.ParentNodeID
+				}
+				parentNode, ok := parentNodesByNodeID[errorNodeID]
+				if ok {
+					parentNode.ErrorMessage = nodeLevelErrorMessage
+				}
 			}
 
 			if workflowNode.State == models.CanvasNodeStateReady {
