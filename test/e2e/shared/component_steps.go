@@ -190,10 +190,9 @@ func (s *ComponentSteps) StartEditingNode(name string) {
 }
 
 func (s *ComponentSteps) RunManualTrigger(name string) {
-	// Use the Start node's template Run button (in the default payload template) instead of the removed header Run button
+	// Use the Start node's template Run button, which now starts the run directly.
 	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-` + strings.ToLower(name) + `-header"]) [data-testid="start-template-run"]`)
 	s.session.Click(startTemplateRun)
-	s.session.Click(q.TestID("emit-event-submit-button"))
 }
 
 func (s *ComponentSteps) OpenComponentSettings() {
