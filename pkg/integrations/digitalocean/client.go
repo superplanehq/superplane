@@ -429,3 +429,88 @@ func resolveDropletMetadata(ctx core.SetupContext, dropletStr string) error {
 		DropletName: droplet.Name,
 	})
 }
+
+// CreateDropletSnapshot creates a snapshot of a droplet
+func (c *Client) CreateDropletSnapshot(dropletID int, name string) (*DOAction, error) {
+	url := fmt.Sprintf("%s/droplets/%d/actions", c.BaseURL, dropletID)
+
+	body, err := json.Marshal(map[string]string{
+		"type": "snapshot",
+		"name": name,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Action DOAction `json:"action"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Action, nil
+}
+
+// GetAction retrieves a single action by ID
+func (c *Client) GetAction(actionID int) (*DOAction, error) {
+	url := fmt.Sprintf("%s/actions/%d", c.BaseURL, actionID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Action DOAction `json:"action"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Action, nil
+}
+
+// Snapshot represents a DigitalOcean snapshot
+type Snapshot struct {
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	CreatedAt     string   `json:"created_at"`
+	ResourceID    string   `json:"resource_id"`
+	ResourceType  string   `json:"resource_type"`
+	Regions       []string `json:"regions"`
+	MinDiskSize   int      `json:"min_disk_size"`
+	SizeGigabytes float64  `json:"size_gigabytes"`
+}
+
+// GetDropletSnapshots lists snapshots for a given droplet
+func (c *Client) GetDropletSnapshots(dropletID int) ([]Snapshot, error) {
+	url := fmt.Sprintf("%s/droplets/%d/snapshots", c.BaseURL, dropletID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Snapshots []Snapshot `json:"snapshots"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Snapshots, nil
+}
+
+// DeleteSnapshot deletes a snapshot by ID
+func (c *Client) DeleteSnapshot(snapshotID string) error {
+	url := fmt.Sprintf("%s/snapshots/%s", c.BaseURL, snapshotID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
