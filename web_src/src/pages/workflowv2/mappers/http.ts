@@ -146,7 +146,7 @@ export const httpMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
     const metadata = context.execution.metadata as Metadata | undefined;
-    const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] }
+    const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] };
 
     if (outputs?.success) {
       const response = outputs.success[0].data as Output;
@@ -190,7 +190,7 @@ export const httpMapper: ComponentBaseMapper = {
 
     // For success/failed states, show response code and time
     if (state === "success" || state === "failed") {
-      const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] }
+      const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] };
       let responseCode: string | null = null;
       if (outputs?.success) {
         const response = outputs.success[0].data as Output;
@@ -268,7 +268,7 @@ function getHTTPMetadataList(node: NodeInfo): MetadataItem[] {
   if (configuration.retry && configuration.retry.enabled) {
     const strategy = configuration.retry.strategy;
     const retries = configuration.retry.maxAttempts;
-    const interval = configuration.retry.intervalSeconds
+    const interval = configuration.retry.intervalSeconds;
     metadata.push({
       icon: "bolt",
       label: `${retries} retries, ${strategy}, ${interval}s`,
@@ -283,7 +283,7 @@ type HTTPConfiguration = {
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   contentType: "application/json" | "application/xml" | "text/plain" | "application/x-www-form-urlencoded";
   headers: Array<{ name: string; value: string }>;
-  queryParams: Array<{ key: string; value: string}>;
+  queryParams: Array<{ key: string; value: string }>;
   json?: any;
   formData?: Array<{ key: string; value: string }>;
   text?: string;
@@ -297,7 +297,7 @@ type RetrySpec = {
   strategy: "fixed" | "exponential";
   maxAttempts: number;
   intervalSeconds: number;
-}
+};
 
 function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
@@ -461,7 +461,7 @@ function getHTTPEventSections(
       if (metadata?.finalStatus !== undefined && metadata.finalStatus !== null) {
         responseCode = metadata.finalStatus.toString();
       } else {
-        const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] }
+        const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] };
         if (outputs?.success) {
           const response = outputs.success[0].data as Output;
           responseCode = response.status.toString();
