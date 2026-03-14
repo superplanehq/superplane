@@ -1,4 +1,4 @@
-import type { CanvasesCanvas, ComponentsNode } from "@/api-client";
+import type { BlueprintsBlueprint, CanvasesCanvas, ComponentsComponent, ComponentsNode } from "@/api-client";
 import ELK from "elkjs/lib/elk.bundled.js";
 
 const elk = new ELK();
@@ -7,16 +7,23 @@ const DEFAULT_NODE_WIDTH = 420;
 const DEFAULT_NODE_HEIGHT = 180;
 const ANNOTATION_NODE_WIDTH = 320;
 const ANNOTATION_NODE_HEIGHT = 200;
+const DISCONNECTED_COMPONENT_VERTICAL_GAP = 220;
 
 type ApplyHorizontalAutoLayoutOptions = {
   nodeIds?: string[];
-  scope?: "full-canvas" | "connected-component" | "exact-set";
+  scope?: "full-canvas" | "connected-component";
+  channelsByNodeId?: Map<string, string[]>;
 };
 
 type LayoutPosition = {
   x: number;
   y: number;
 };
+
+function normalizeChannel(channel?: string): string {
+  const normalizedChannel = (channel || "").trim();
+  return normalizedChannel.length > 0 ? normalizedChannel : "default";
+}
 
 function estimateNodeSize(node: ComponentsNode): { width: number; height: number } {
   if (node.type === "TYPE_WIDGET") {
@@ -118,10 +125,6 @@ function resolveScopedNodeIDs(
   const seedNodeIDs = normalizeRequestedNodeIDs(flowNodes, options?.nodeIds || []);
   const scope = resolveLayoutScope(options, seedNodeIDs.length > 0);
 
-  if (scope === "exact-set") {
-    return seedNodeIDs;
-  }
-
   if (scope === "connected-component") {
     return resolveConnectedComponentNodeIDs(workflow, flowNodes, seedNodeIDs);
   }
@@ -147,8 +150,102 @@ function resolveLayoutEdges(workflow: CanvasesCanvas, layoutNodes: ComponentsNod
   );
 }
 
-function buildElkGraph(workflow: CanvasesCanvas, layoutNodes: ComponentsNode[]) {
+function buildLayoutAdjacency(
+  layoutNodes: ComponentsNode[],
+  layoutEdges: Array<{ sourceId?: string; targetId?: string }>,
+) {
+  const nodeIDs = new Set(layoutNodes.map((node) => node.id as string));
+  const adjacencyByNodeID = new Map<string, string[]>();
+
+  for (const node of layoutNodes) {
+    adjacencyByNodeID.set(node.id as string, []);
+  }
+
+  for (const edge of layoutEdges) {
+    const sourceID = edge.sourceId;
+    const targetID = edge.targetId;
+    if (!sourceID || !targetID) {
+      continue;
+    }
+
+    if (!nodeIDs.has(sourceID) || !nodeIDs.has(targetID)) {
+      continue;
+    }
+
+    adjacencyByNodeID.get(sourceID)?.push(targetID);
+    adjacencyByNodeID.get(targetID)?.push(sourceID);
+  }
+
+  return adjacencyByNodeID;
+}
+
+function resolveDisconnectedLayoutComponents(
+  layoutNodes: ComponentsNode[],
+  layoutEdges: Array<{ sourceId?: string; targetId?: string }>,
+): ComponentsNode[][] {
+  if (layoutNodes.length === 0) {
+    return [];
+  }
+
+  const adjacencyByNodeID = buildLayoutAdjacency(layoutNodes, layoutEdges);
+  const nodesByID = new Map(layoutNodes.map((node) => [node.id as string, node]));
+  const visitedNodeIDs = new Set<string>();
+  const components: ComponentsNode[][] = [];
+
+  for (const node of layoutNodes) {
+    const seedNodeID = node.id as string;
+    if (visitedNodeIDs.has(seedNodeID)) {
+      continue;
+    }
+
+    const componentNodes: ComponentsNode[] = [];
+    const queue = [seedNodeID];
+
+    while (queue.length > 0) {
+      const currentNodeID = queue.shift();
+      if (!currentNodeID || visitedNodeIDs.has(currentNodeID)) {
+        continue;
+      }
+
+      visitedNodeIDs.add(currentNodeID);
+      const currentNode = nodesByID.get(currentNodeID);
+      if (currentNode) {
+        componentNodes.push(currentNode);
+      }
+
+      const neighbors = adjacencyByNodeID.get(currentNodeID) || [];
+      for (const neighborNodeID of neighbors) {
+        if (!visitedNodeIDs.has(neighborNodeID)) {
+          queue.push(neighborNodeID);
+        }
+      }
+    }
+
+    if (componentNodes.length > 0) {
+      components.push(componentNodes);
+    }
+  }
+
+  return components;
+}
+
+function buildElkGraph(
+  workflow: CanvasesCanvas,
+  layoutNodes: ComponentsNode[],
+  channelsByNodeId?: Map<string, string[]>,
+) {
   const layoutEdges = resolveLayoutEdges(workflow, layoutNodes);
+  const edgeChannelsBySourceNodeID = new Map<string, Set<string>>();
+
+  for (const edge of layoutEdges) {
+    if (!edge.sourceId) {
+      continue;
+    }
+
+    const sourceChannels = edgeChannelsBySourceNodeID.get(edge.sourceId) || new Set<string>();
+    sourceChannels.add(normalizeChannel(edge.channel));
+    edgeChannelsBySourceNodeID.set(edge.sourceId, sourceChannels);
+  }
 
   return {
     id: "root",
@@ -158,19 +255,50 @@ function buildElkGraph(workflow: CanvasesCanvas, layoutNodes: ComponentsNode[]) 
       "elk.spacing.nodeNode": "100",
       "elk.layered.spacing.nodeNodeBetweenLayers": "180",
       "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
+      "elk.contentAlignment": "V_CENTER",
     },
     children: layoutNodes.map((node) => {
       const { width, height } = estimateNodeSize(node);
+      const nodeId = node.id!;
+      const metadataOutputChannels = (channelsByNodeId?.get(nodeId) || [])
+        .map((channel) => normalizeChannel(channel))
+        .filter((channel, index, channels) => channels.indexOf(channel) === index);
+      const edgeOutputChannels = Array.from(edgeChannelsBySourceNodeID.get(nodeId) || []);
+      const outputChannels = Array.from(new Set([...metadataOutputChannels, ...edgeOutputChannels]));
+      if (outputChannels.length === 0) {
+        outputChannels.push("default");
+      }
+
+      const ports = [
+        {
+          id: `${nodeId}__input`,
+          properties: {
+            "elk.port.side": "WEST",
+          },
+        },
+        ...outputChannels.map((channel, index) => ({
+          id: `${nodeId}__${channel}`,
+          properties: {
+            "elk.port.side": "EAST",
+            "elk.port.index": `${index}`,
+          },
+        })),
+      ];
+
       return {
-        id: node.id!,
+        id: nodeId,
         width,
         height,
+        properties: {
+          "elk.portConstraints": "FIXED_ORDER",
+        },
+        ports,
       };
     }),
     edges: layoutEdges.map((edge) => ({
-      id: `${edge.sourceId}->${edge.targetId}->${edge.channel || "default"}`,
-      sources: [edge.sourceId!],
-      targets: [edge.targetId!],
+      id: `${edge.sourceId}->${edge.targetId}->${normalizeChannel(edge.channel)}`,
+      sources: [`${edge.sourceId}__${normalizeChannel(edge.channel)}`],
+      targets: [`${edge.targetId}__input`],
     })),
   };
 }
@@ -185,6 +313,103 @@ function extractLayoutedPositions(layoutedGraph: { children?: Array<{ id: string
   }
 
   return layoutedPositions;
+}
+
+function resolveLayoutBounds(layoutNodes: ComponentsNode[], layoutedPositions: Map<string, LayoutPosition>) {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const node of layoutNodes) {
+    const nodeID = node.id;
+    if (!nodeID) {
+      continue;
+    }
+
+    const position = layoutedPositions.get(nodeID);
+    if (!position) {
+      continue;
+    }
+
+    const { width, height } = estimateNodeSize(node);
+    minX = Math.min(minX, position.x);
+    minY = Math.min(minY, position.y);
+    maxX = Math.max(maxX, position.x + width);
+    maxY = Math.max(maxY, position.y + height);
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return {
+      minX: 0,
+      minY: 0,
+      maxX: 0,
+      maxY: 0,
+      width: 0,
+      height: 0,
+    };
+  }
+
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
+function sortComponentsByCurrentPosition(components: ComponentsNode[][]): ComponentsNode[][] {
+  return [...components].sort((componentA, componentB) => {
+    const a = resolveMinPositionFromNodes(componentA);
+    const b = resolveMinPositionFromNodes(componentB);
+
+    if (a.y !== b.y) {
+      return a.y - b.y;
+    }
+
+    return a.x - b.x;
+  });
+}
+
+async function resolvePackedLayoutedPositions(
+  workflow: CanvasesCanvas,
+  layoutNodes: ComponentsNode[],
+  channelsByNodeId?: Map<string, string[]>,
+): Promise<Map<string, LayoutPosition>> {
+  const layoutEdges = resolveLayoutEdges(workflow, layoutNodes);
+  const components = resolveDisconnectedLayoutComponents(layoutNodes, layoutEdges);
+  if (components.length <= 1) {
+    const graph = buildElkGraph(workflow, layoutNodes, channelsByNodeId);
+    const layoutedGraph = await elk.layout(graph);
+    return extractLayoutedPositions(layoutedGraph);
+  }
+
+  const sortedComponents = sortComponentsByCurrentPosition(components);
+  const packedLayoutedPositions = new Map<string, LayoutPosition>();
+  let currentTopY = 0;
+
+  for (const componentNodes of sortedComponents) {
+    const graph = buildElkGraph(workflow, componentNodes, channelsByNodeId);
+    const layoutedGraph = await elk.layout(graph);
+    const componentPositions = extractLayoutedPositions(layoutedGraph);
+    if (componentPositions.size === 0) {
+      continue;
+    }
+
+    const bounds = resolveLayoutBounds(componentNodes, componentPositions);
+    for (const [nodeID, position] of componentPositions.entries()) {
+      packedLayoutedPositions.set(nodeID, {
+        x: position.x - bounds.minX,
+        y: position.y - bounds.minY + currentTopY,
+      });
+    }
+
+    currentTopY += bounds.height + DISCONNECTED_COMPONENT_VERTICAL_GAP;
+  }
+
+  return packedLayoutedPositions;
 }
 
 function resolveMinPositionFromNodes(nodes: ComponentsNode[]): LayoutPosition {
@@ -243,6 +468,36 @@ function applyLayoutedPositions(
   });
 }
 
+export function buildChannelsByNodeId(
+  workflow: CanvasesCanvas,
+  components: ComponentsComponent[],
+  blueprints: BlueprintsBlueprint[],
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+
+  for (const node of workflow.spec?.nodes || []) {
+    if (!node.id) continue;
+
+    let channels: string[] = ["default"];
+
+    if (node.type === "TYPE_TRIGGER") {
+      channels = ["default"];
+    } else if (node.type === "TYPE_BLUEPRINT") {
+      const componentMeta = components.find((c) => c.name === node.component?.name);
+      const bp = blueprints.find((b) => b.id === node.blueprint?.id);
+      channels = componentMeta?.outputChannels?.map((c) => c.name!).filter(Boolean) ||
+        bp?.outputChannels?.map((c) => c.name!).filter(Boolean) || ["default"];
+    } else if (node.type === "TYPE_COMPONENT" && node.component?.name) {
+      const meta = components.find((c) => c.name === node.component?.name);
+      channels = meta?.outputChannels?.map((c) => c.name!).filter(Boolean) || ["default"];
+    }
+
+    map.set(node.id, channels);
+  }
+
+  return map;
+}
+
 export async function applyHorizontalAutoLayout(
   workflow: CanvasesCanvas,
   options?: ApplyHorizontalAutoLayoutOptions,
@@ -263,9 +518,7 @@ export async function applyHorizontalAutoLayout(
     return workflow;
   }
 
-  const graph = buildElkGraph(workflow, layoutNodes);
-  const layoutedGraph = await elk.layout(graph);
-  const layoutedPositions = extractLayoutedPositions(layoutedGraph);
+  const layoutedPositions = await resolvePackedLayoutedPositions(workflow, layoutNodes, options?.channelsByNodeId);
 
   if (layoutedPositions.size === 0) {
     return workflow;

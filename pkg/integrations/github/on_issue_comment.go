@@ -122,35 +122,45 @@ func (i *OnIssueComment) HandleAction(ctx core.TriggerActionContext) (map[string
 }
 
 func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	ctx = withWebhookLogger(ctx, i.Name())
+	ctx.Logger.Infof("Received GitHub webhook")
+
 	config := OnIssueCommentConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
+		ctx.Logger.Errorf("Failed to decode configuration: %v", err)
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	eventType := ctx.Headers.Get("X-GitHub-Event")
 	if eventType == "" {
+		ctx.Logger.Errorf("Missing X-GitHub-Event header")
 		return http.StatusBadRequest, nil, fmt.Errorf("missing X-GitHub-Event header")
 	}
 
 	if eventType != "issue_comment" {
+		ctx.Logger.Errorf("ignoring event - event type %q is not a issue_comment event", eventType)
+		ctx.Logger.Infof("ignoring webhook for different GitHub event type %q", eventType)
 		return http.StatusOK, nil, nil
 	}
 
 	code, err := verifySignature(ctx)
 	if err != nil {
+		ctx.Logger.Errorf("Failed to verify signature: %v", err)
 		return code, nil, err
 	}
 
 	data := map[string]any{}
 	err = json.Unmarshal(ctx.Body, &data)
 	if err != nil {
+		ctx.Logger.Errorf("Failed to parse request body: %v", err)
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	// Only process "created" actions
 	action, ok := data["action"]
 	if !ok || action != "created" {
+		ctx.Logger.Infof("Ignoring event - action %q is not created", action)
 		return http.StatusOK, nil, nil
 	}
 
@@ -159,6 +169,7 @@ func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 	// but includes a pull_request field in the issue object to identify them
 	if issue, ok := data["issue"].(map[string]any); ok {
 		if _, hasPR := issue["pull_request"]; hasPR {
+			ctx.Logger.Info("Ignoring event - it belongs to a pull request")
 			return http.StatusOK, nil, nil
 		}
 	}
@@ -167,27 +178,31 @@ func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 	if config.ContentFilter != "" {
 		comment, ok := data["comment"].(map[string]any)
 		if !ok {
+			ctx.Logger.Warnf("Invalid comment structure")
 			return http.StatusBadRequest, nil, fmt.Errorf("invalid comment structure")
 		}
 
 		body, ok := comment["body"].(string)
 		if !ok {
+			ctx.Logger.Warnf("Invalid comment body")
 			return http.StatusBadRequest, nil, fmt.Errorf("invalid comment body")
 		}
 
 		matched, err := regexp.MatchString(config.ContentFilter, body)
 		if err != nil {
+			ctx.Logger.Errorf("Failed to match regex pattern: %v", err)
 			return http.StatusBadRequest, nil, fmt.Errorf("invalid regex pattern: %w", err)
 		}
 
 		if !matched {
+			ctx.Logger.Info("Ignoring event - content filter did not match")
 			return http.StatusOK, nil, nil
 		}
 	}
 
 	err = ctx.Events.Emit("github.issueComment", data)
-
 	if err != nil {
+		ctx.Logger.Errorf("Failed to emit event: %v", err)
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 

@@ -72,11 +72,7 @@ export type BlueprintsUpdateBlueprintResponse = {
 
 export type CanvasAutoLayoutAlgorithm = "ALGORITHM_UNSPECIFIED" | "ALGORITHM_HORIZONTAL";
 
-export type CanvasAutoLayoutScope =
-  | "SCOPE_UNSPECIFIED"
-  | "SCOPE_FULL_CANVAS"
-  | "SCOPE_CONNECTED_COMPONENT"
-  | "SCOPE_EXACT_SET";
+export type CanvasAutoLayoutScope = "SCOPE_UNSPECIFIED" | "SCOPE_FULL_CANVAS" | "SCOPE_CONNECTED_COMPONENT";
 
 export type CanvasNodeExecutionResult = "RESULT_UNKNOWN" | "RESULT_PASSED" | "RESULT_FAILED" | "RESULT_CANCELLED";
 
@@ -314,6 +310,7 @@ export type CanvasesCreateCanvasChangeRequestResponse = {
 
 export type CanvasesCreateCanvasRequest = {
   canvas?: CanvasesCanvas;
+  autoLayout?: CanvasesCanvasAutoLayout;
 };
 
 export type CanvasesCreateCanvasResponse = {

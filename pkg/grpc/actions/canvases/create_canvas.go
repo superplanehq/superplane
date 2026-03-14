@@ -21,12 +21,27 @@ import (
 const ErrDuplicateCanvasName = "duplicate key value violates unique constraint"
 
 func CreateCanvas(ctx context.Context, registry *registry.Registry, organizationID string, pbCanvas *pb.Canvas) (*pb.CreateCanvasResponse, error) {
+	return CreateCanvasWithAutoLayout(ctx, registry, organizationID, pbCanvas, nil)
+}
+
+func CreateCanvasWithAutoLayout(
+	ctx context.Context,
+	registry *registry.Registry,
+	organizationID string,
+	pbCanvas *pb.Canvas,
+	autoLayout *pb.CanvasAutoLayout,
+) (*pb.CreateCanvasResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
 	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
+	if err != nil {
+		return nil, err
+	}
+
+	nodes, edges, err = applyCanvasAutoLayout(nodes, edges, autoLayout, registry)
 	if err != nil {
 		return nil, err
 	}

@@ -97,7 +97,7 @@ import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
-import { applyHorizontalAutoLayout } from "./autoLayout";
+import { applyHorizontalAutoLayout, buildChannelsByNodeId } from "./autoLayout";
 import { useAccount } from "@/contexts/AccountContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
@@ -1056,9 +1056,10 @@ export function WorkflowPageV2() {
       return applyHorizontalAutoLayout(workflow, {
         scope: "connected-component",
         nodeIds: [nodeID],
+        channelsByNodeId: buildChannelsByNodeId(workflow, components, blueprints),
       });
     },
-    [isAutoLayoutOnUpdateEnabled],
+    [isAutoLayoutOnUpdateEnabled, components, blueprints],
   );
 
   /**
@@ -2607,7 +2608,9 @@ export function WorkflowPageV2() {
 
       let finalWorkflow = updatedWorkflow;
       if (aiAddedNodeIds.length > 0) {
-        finalWorkflow = await applyHorizontalAutoLayout(updatedWorkflow);
+        finalWorkflow = await applyHorizontalAutoLayout(updatedWorkflow, {
+          channelsByNodeId: buildChannelsByNodeId(updatedWorkflow, components, blueprints),
+        });
       }
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
@@ -2624,6 +2627,8 @@ export function WorkflowPageV2() {
       canAutoSave,
       canvas,
       canvasId,
+      components,
+      blueprints,
       handleSaveWorkflow,
       markUnsavedChange,
       integrations,
@@ -2955,7 +2960,8 @@ export function WorkflowPageV2() {
 
       const updatedWorkflow = await applyHorizontalAutoLayout(canvas, {
         nodeIds,
-        scope: "exact-set",
+        scope: "connected-component",
+        channelsByNodeId: buildChannelsByNodeId(canvas, components, blueprints),
       });
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
@@ -2968,6 +2974,8 @@ export function WorkflowPageV2() {
     },
     [
       canvas,
+      components,
+      blueprints,
       organizationId,
       canvasId,
       queryClient,
@@ -2986,6 +2994,7 @@ export function WorkflowPageV2() {
 
       const existingNodeNames = (canvas.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
       const newNodes: ComponentsNode[] = [];
+      const nodeIdMap: Record<string, string> = {};
 
       for (const nodeId of nodeIds) {
         const nodeToDuplicate = canvas.spec?.nodes?.find((node) => node.id === nodeId);
@@ -3009,6 +3018,8 @@ export function WorkflowPageV2() {
         const uniqueNodeName = generateUniqueNodeName(baseName, allNames);
         const newNodeId = generateNodeId(baseName, uniqueNodeName);
 
+        nodeIdMap[nodeId] = newNodeId;
+
         newNodes.push({
           ...nodeToDuplicate,
           id: newNodeId,
@@ -3023,11 +3034,27 @@ export function WorkflowPageV2() {
 
       if (newNodes.length === 0) return;
 
+      const duplicatedNodeIds = new Set(nodeIds);
+      const newEdges = (canvas.spec?.edges || [])
+        .filter(
+          (edge) =>
+            edge.sourceId != null &&
+            edge.targetId != null &&
+            duplicatedNodeIds.has(edge.sourceId) &&
+            duplicatedNodeIds.has(edge.targetId),
+        )
+        .map((edge) => ({
+          ...edge,
+          sourceId: nodeIdMap[edge.sourceId!],
+          targetId: nodeIdMap[edge.targetId!],
+        }));
+
       const updatedWorkflow = {
         ...canvas,
         spec: {
           ...canvas.spec,
           nodes: [...(canvas.spec?.nodes || []), ...newNodes],
+          edges: [...(canvas.spec?.edges || []), ...newEdges],
         },
       };
 
