@@ -36,13 +36,24 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	core.Bind(activeCmd, &ActiveCommand{}, options)
 
 	var createFile string
+	var createAutoLayout string
+	var createAutoLayoutScope string
+	var createAutoLayoutNodes []string
 	createCmd := &cobra.Command{
 		Use:   "create [canvas-name]",
 		Short: "Create a canvas",
 		Args:  cobra.MaximumNArgs(1),
 	}
 	createCmd.Flags().StringVarP(&createFile, "file", "f", "", "filename, directory, or URL to files to use to create the resource")
-	core.Bind(createCmd, &createCommand{file: &createFile}, options)
+	createCmd.Flags().StringVar(&createAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
+	createCmd.Flags().StringVar(&createAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
+	createCmd.Flags().StringArrayVar(&createAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
+	core.Bind(createCmd, &createCommand{
+		file:            &createFile,
+		autoLayout:      &createAutoLayout,
+		autoLayoutScope: &createAutoLayoutScope,
+		autoLayoutNodes: &createAutoLayoutNodes,
+	}, options)
 
 	var updateFile string
 	var updateDraft bool
@@ -56,7 +67,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	}
 	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
 	updateCmd.Flags().BoolVar(&updateDraft, "draft", false, "update your draft version (required when effective canvas versioning is enabled)")
-	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal)")
+	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
 	updateCmd.Flags().StringVar(&updateAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
 	updateCmd.Flags().StringArrayVar(&updateAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
 	core.Bind(updateCmd, &updateCommand{
@@ -176,7 +187,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	changeRequestsResolveCmd.Flags().StringVarP(&changeRequestsResolveFile, "file", "f", "", "canvas file containing the conflict-resolved version")
-	changeRequestsResolveCmd.Flags().StringVar(&changeRequestsResolveAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal)")
+	changeRequestsResolveCmd.Flags().StringVar(&changeRequestsResolveAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
 	changeRequestsResolveCmd.Flags().StringVar(&changeRequestsResolveAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
 	changeRequestsResolveCmd.Flags().StringArrayVar(&changeRequestsResolveAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
 	core.Bind(changeRequestsResolveCmd, &changeRequestResolveCommand{
