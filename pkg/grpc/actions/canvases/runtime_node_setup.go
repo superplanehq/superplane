@@ -28,7 +28,11 @@ const (
 )
 
 func readdedNodeID(workflowID uuid.UUID, originalNodeID string) string {
-	sum := sha256.Sum256([]byte(workflowID.String() + "\x00" + originalNodeID))
+	return readdedNodeIDWithAttempt(workflowID, originalNodeID, 0)
+}
+
+func readdedNodeIDWithAttempt(workflowID uuid.UUID, originalNodeID string, attempt int) string {
+	sum := sha256.Sum256([]byte(workflowID.String() + "\x00" + originalNodeID + "\x00" + fmt.Sprintf("%d", attempt)))
 	hash := hex.EncodeToString(sum[:])[:readdedNodeIDHashSize]
 
 	available := nodeIDMaxLen - len(readdedNodeIDSuffix) - len(hash)
@@ -53,9 +57,11 @@ func remapNodeIDsForConflicts(
 ) ([]models.Node, []models.Edge, map[string]string) {
 	reservedIDs := make(map[string]bool, len(existingNodes))
 	deletedIDs := make(map[string]bool, len(existingNodes))
+	existingByID := make(map[string]models.CanvasNode, len(existingNodes))
 
 	for _, existing := range existingNodes {
 		reservedIDs[existing.NodeID] = true
+		existingByID[existing.NodeID] = existing
 		if existing.DeletedAt.Valid {
 			deletedIDs[existing.NodeID] = true
 		}
@@ -68,7 +74,28 @@ func remapNodeIDsForConflicts(
 			continue
 		}
 
-		newID := readdedNodeID(workflowID, nodes[i].ID)
+		originalID := nodes[i].ID
+		attempt := 0
+		var newID string
+		for {
+			candidate := readdedNodeIDWithAttempt(workflowID, originalID, attempt)
+
+			if existing, ok := existingByID[candidate]; ok && !existing.DeletedAt.Valid {
+				newID = candidate
+				break
+			}
+			if !reservedIDs[candidate] {
+				newID = candidate
+				break
+			}
+
+			attempt++
+			if attempt > 100 {
+				newID = readdedNodeIDWithAttempt(workflowID, originalID, attempt)
+				break
+			}
+		}
+
 		remappedIDs[nodes[i].ID] = newID
 		nodes[i].ID = newID
 		reservedIDs[newID] = true
