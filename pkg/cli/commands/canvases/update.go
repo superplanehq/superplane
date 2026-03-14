@@ -66,7 +66,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		}
 	} else {
 		if !draftMode {
-			return fmt.Errorf("effective canvas versioning is enabled for this canvas; use --draft to update your draft version, then publish with `superplane canvases publish`")
+			return fmt.Errorf("effective canvas versioning is enabled for this canvas; use --draft to update your draft version, then publish with `superplane canvases change-requests create`")
 		}
 
 		targetVersionID, err = ensureCurrentUserDraftVersionID(ctx, canvasID)
