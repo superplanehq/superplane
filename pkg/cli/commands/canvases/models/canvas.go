@@ -13,10 +13,11 @@ const (
 )
 
 type Canvas struct {
-	APIVersion string                                 `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string                                 `json:"kind" yaml:"kind"`
-	Metadata   *openapi_client.CanvasesCanvasMetadata `json:"metadata" yaml:"metadata"`
-	Spec       *openapi_client.CanvasesCanvasSpec     `json:"spec,omitempty" yaml:"spec,omitempty"`
+	APIVersion string                                   `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string                                   `json:"kind" yaml:"kind"`
+	Metadata   *openapi_client.CanvasesCanvasMetadata   `json:"metadata" yaml:"metadata"`
+	Spec       *openapi_client.CanvasesCanvasSpec       `json:"spec,omitempty" yaml:"spec,omitempty"`
+	AutoLayout *openapi_client.CanvasesCanvasAutoLayout `json:"autoLayout,omitempty" yaml:"autoLayout,omitempty"`
 }
 
 func ParseCanvas(raw []byte) (*Canvas, error) {
@@ -68,6 +69,15 @@ func CanvasResourceFromCanvas(canvas openapi_client.CanvasesCanvas) Canvas {
 		Metadata:   canvas.Metadata,
 		Spec:       canvas.Spec,
 	}
+}
+
+func CreateCanvasRequestFromCanvas(resource Canvas) openapi_client.CanvasesCreateCanvasRequest {
+	request := openapi_client.CanvasesCreateCanvasRequest{}
+	request.SetCanvas(CanvasFromCanvas(resource))
+	if resource.AutoLayout != nil {
+		request.SetAutoLayout(*resource.AutoLayout)
+	}
+	return request
 }
 
 func EmptyCanvasSpec() *openapi_client.CanvasesCanvasSpec {

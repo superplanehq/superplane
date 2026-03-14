@@ -416,19 +416,6 @@ The component emits the response with:
 - **headers**: Response headers
 - **body**: Parsed response body (JSON if possible, otherwise string)
 
-### Error Handling & Retries
-
-Configure timeout and retry behavior:
-- **Fixed timeout**: Same timeout for all retry attempts
-- **Exponential backoff**: Timeout increases with each retry (capped at 120s)
-- **Success codes**: Define which status codes are considered successful (default: 2xx)
-
-### Output Events
-
-- **http.request.finished**: Emitted on successful request
-- **http.request.failed**: Emitted when request fails after all retries
-- **http.request.error**: Emitted on network/parsing errors
-
 ### Example Output
 
 ```json
