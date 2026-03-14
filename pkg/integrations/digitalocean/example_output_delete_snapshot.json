@@ -1,0 +1,8 @@
+{
+  "data": {
+    "deleted": true,
+    "snapshotId": "220431883"
+  },
+  "timestamp": "2026-03-13T06:27:06.208635289Z",
+  "type": "digitalocean.snapshot.deleted"
+}
