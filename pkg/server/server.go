@@ -76,6 +76,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/statuspage"
 	_ "github.com/superplanehq/superplane/pkg/integrations/teams"
 	_ "github.com/superplanehq/superplane/pkg/integrations/telegram"
+	_ "github.com/superplanehq/superplane/pkg/integrations/terraform"
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
