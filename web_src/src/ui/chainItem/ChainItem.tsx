@@ -934,7 +934,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
               <div className="w-full">
                 <div className="flex items-center justify-between mb-2 relative">
                   <div className="flex items-center gap-1 absolute right-1.5 top-1.5">
-                    <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
+                    <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy"} hideOnClick={false}>
                       <button
                         onClick={() => copyPayloadToClipboard(item.tabData!.payload)}
                         className="p-1 rounded text-gray-500 hover:text-gray-800"
