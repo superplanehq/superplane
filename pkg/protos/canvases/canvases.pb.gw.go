@@ -1044,64 +1044,6 @@ func local_request_Canvases_ListNodeEvents_0(ctx context.Context, marshaler runt
 	return msg, metadata, err
 }
 
-func request_Canvases_EmitNodeEvent_0(ctx context.Context, marshaler runtime.Marshaler, client CanvasesClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq EmitNodeEventRequest
-		metadata runtime.ServerMetadata
-		err      error
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	val, ok := pathParams["canvas_id"]
-	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "canvas_id")
-	}
-	protoReq.CanvasId, err = runtime.String(val)
-	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "canvas_id", err)
-	}
-	val, ok = pathParams["node_id"]
-	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "node_id")
-	}
-	protoReq.NodeId, err = runtime.String(val)
-	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "node_id", err)
-	}
-	msg, err := client.EmitNodeEvent(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return msg, metadata, err
-}
-
-func local_request_Canvases_EmitNodeEvent_0(ctx context.Context, marshaler runtime.Marshaler, server CanvasesServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq EmitNodeEventRequest
-		metadata runtime.ServerMetadata
-		err      error
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	val, ok := pathParams["canvas_id"]
-	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "canvas_id")
-	}
-	protoReq.CanvasId, err = runtime.String(val)
-	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "canvas_id", err)
-	}
-	val, ok = pathParams["node_id"]
-	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "node_id")
-	}
-	protoReq.NodeId, err = runtime.String(val)
-	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "node_id", err)
-	}
-	msg, err := server.EmitNodeEvent(ctx, &protoReq)
-	return msg, metadata, err
-}
-
 func request_Canvases_InvokeNodeExecutionAction_0(ctx context.Context, marshaler runtime.Marshaler, client CanvasesClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq InvokeNodeExecutionActionRequest
@@ -2050,26 +1992,6 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		}
 		forward_Canvases_ListNodeEvents_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPost, pattern_Canvases_EmitNodeEvent_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		var stream runtime.ServerTransportStream
-		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
-		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/EmitNodeEvent", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/nodes/{node_id}/events"))
-		if err != nil {
-			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		resp, md, err := local_request_Canvases_EmitNodeEvent_0(annotatedContext, inboundMarshaler, server, req, pathParams)
-		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
-		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		forward_Canvases_EmitNodeEvent_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-	})
 	mux.Handle(http.MethodPost, pattern_Canvases_InvokeNodeExecutionAction_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -2650,23 +2572,6 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		}
 		forward_Canvases_ListNodeEvents_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPost, pattern_Canvases_EmitNodeEvent_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/EmitNodeEvent", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/nodes/{node_id}/events"))
-		if err != nil {
-			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		resp, md, err := request_Canvases_EmitNodeEvent_0(annotatedContext, inboundMarshaler, client, req, pathParams)
-		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		forward_Canvases_EmitNodeEvent_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-	})
 	mux.Handle(http.MethodPost, pattern_Canvases_InvokeNodeExecutionAction_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -2861,7 +2766,6 @@ var (
 	pattern_Canvases_UpdateNodePause_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "pause"}, ""))
 	pattern_Canvases_ListNodeExecutions_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "executions"}, ""))
 	pattern_Canvases_ListNodeEvents_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "events"}, ""))
-	pattern_Canvases_EmitNodeEvent_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "events"}, ""))
 	pattern_Canvases_InvokeNodeExecutionAction_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1", "canvases", "canvas_id", "executions", "execution_id", "actions", "action_name"}, ""))
 	pattern_Canvases_InvokeNodeTriggerAction_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1", "canvases", "canvas_id", "triggers", "node_id", "actions", "action_name"}, ""))
 	pattern_Canvases_ListChildExecutions_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "executions", "execution_id", "children"}, ""))
@@ -2895,7 +2799,6 @@ var (
 	forward_Canvases_UpdateNodePause_0             = runtime.ForwardResponseMessage
 	forward_Canvases_ListNodeExecutions_0          = runtime.ForwardResponseMessage
 	forward_Canvases_ListNodeEvents_0              = runtime.ForwardResponseMessage
-	forward_Canvases_EmitNodeEvent_0               = runtime.ForwardResponseMessage
 	forward_Canvases_InvokeNodeExecutionAction_0   = runtime.ForwardResponseMessage
 	forward_Canvases_InvokeNodeTriggerAction_0     = runtime.ForwardResponseMessage
 	forward_Canvases_ListChildExecutions_0         = runtime.ForwardResponseMessage

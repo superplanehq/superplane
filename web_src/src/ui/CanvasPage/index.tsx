@@ -55,7 +55,6 @@ import {
 } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
 import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
-import { EmitEventModal } from "../EmitEventModal";
 import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
 import { CanvasMiniMap } from "./CanvasMiniMap";
@@ -203,10 +202,6 @@ export interface CanvasPageProps {
   // Undo functionality
   onUndo?: () => void;
   canUndo?: boolean;
-  // Disable running nodes when there are unsaved changes (with tooltip)
-  runDisabled?: boolean;
-  runDisabledTooltip?: string;
-
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
   loadSidebarData?: (nodeId: string) => void;
@@ -224,11 +219,7 @@ export interface CanvasPageProps {
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
   onAnnotationBlur?: () => void;
-  getCustomField?: (
-    nodeId: string,
-    onRun?: (initialData?: string) => void,
-    integration?: OrganizationsIntegration,
-  ) => (() => React.ReactNode) | null;
+  getCustomField?: (nodeId: string, integration?: OrganizationsIntegration) => (() => React.ReactNode) | null;
   onSave?: (nodes: CanvasNode[]) => void;
   integrations?: OrganizationsIntegration[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
@@ -246,7 +237,6 @@ export interface CanvasPageProps {
   supportsPushThrough?: (nodeId: string) => boolean;
   onDirty?: () => void;
 
-  onRun?: (nodeId: string, channel: string, data: any) => void | Promise<void>;
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
   onEdit?: (nodeId: string) => void;
@@ -354,14 +344,11 @@ const nodeTypes = {
         data={blockData}
         nodeId={nodeProps.id}
         selected={nodeProps.selected}
-        runDisabled={callbacks?.runDisabled}
-        runDisabledTooltip={callbacks?.runDisabledTooltip}
         showHeader={callbacks?.showHeader && !callbacks?.hasMultiSelection}
         onExpand={callbacks.handleNodeExpand}
         onClick={() => callbacks.handleNodeClick(nodeProps.id)}
         onEdit={() => callbacks.onNodeEdit.current?.(nodeProps.id)}
         onDelete={callbacks.onNodeDelete.current ? () => callbacks.onNodeDelete.current?.(nodeProps.id) : undefined}
-        onRun={callbacks.onRun.current ? () => callbacks.onRun.current?.(nodeProps.id) : undefined}
         onDuplicate={callbacks.onDuplicate.current ? () => callbacks.onDuplicate.current?.(nodeProps.id) : undefined}
         onConfigure={callbacks.onConfigure.current ? () => callbacks.onConfigure.current?.(nodeProps.id) : undefined}
         onDeactivate={callbacks.onDeactivate.current ? () => callbacks.onDeactivate.current?.(nodeProps.id) : undefined}
@@ -428,12 +415,6 @@ function CanvasPage(props: CanvasPageProps) {
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
-  const [emitModalData, setEmitModalData] = useState<{
-    nodeId: string;
-    nodeName: string;
-    channels: string[];
-    initialData?: string;
-  } | null>(null);
   const canvasNodesForAiContext = useMemo(
     () =>
       (props.workflowNodes || []).map((node) => ({
@@ -501,47 +482,6 @@ function CanvasPage(props: CanvasPageProps) {
       }
     },
     [props],
-  );
-
-  const handleNodeRun = useCallback(
-    (nodeId?: string, initialData?: string) => {
-      // Hard guard: if running is disabled (e.g., unsaved changes), do nothing
-      if (props.runDisabled) return;
-
-      // Check for pending run data from custom field
-      // Note: This uses a window property as a workaround to pass nodeId and initialData
-      // through the onRun callback chain without breaking existing signatures
-      const pendingData = (window as any).__pendingRunData;
-      const actualNodeId = nodeId || pendingData?.nodeId;
-      const actualInitialData = initialData || pendingData?.initialData;
-
-      if (!actualNodeId) return;
-
-      // Find the node to get its name and channels
-      const node = state.nodes.find((n) => n.id === actualNodeId);
-      if (!node) return;
-
-      const nodeName = (node.data as any).label || actualNodeId;
-      const channels = (node.data as any).outputChannels || ["default"];
-
-      setEmitModalData({
-        nodeId: actualNodeId,
-        nodeName,
-        channels,
-        initialData: actualInitialData,
-      });
-    },
-    [state.nodes, props.runDisabled],
-  );
-
-  const handleEmit = useCallback(
-    async (channel: string, data: any) => {
-      if (!emitModalData || !props.onRun) return;
-
-      // Call the onRun prop with nodeId, channel, and data
-      await props.onRun(emitModalData.nodeId, channel, data);
-    },
-    [emitModalData, props],
   );
 
   const handleConnectionDropInEmptySpace = useCallback(
@@ -980,15 +920,12 @@ function CanvasPage(props: CanvasPageProps) {
                 hideHeader={true}
                 onToggleView={handleToggleView}
                 onToggleCollapse={props.onToggleCollapse}
-                onRun={(nodeId) => handleNodeRun(nodeId)}
                 onDuplicate={props.onDuplicate}
                 onConfigure={props.onConfigure}
                 onDeactivate={props.onDeactivate}
                 onAnnotationUpdate={props.onAnnotationUpdate}
                 onAnnotationBlur={props.onAnnotationBlur}
                 onTogglePause={props.onTogglePause}
-                runDisabled={props.runDisabled}
-                runDisabledTooltip={props.runDisabledTooltip}
                 onBuildingBlockDrop={handleBuildingBlockDrop}
                 onBuildingBlocksSidebarToggle={handleSidebarToggle}
                 onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
@@ -1067,15 +1004,12 @@ function CanvasPage(props: CanvasPageProps) {
               onPushThrough={handlePushThrough}
               onCancelExecution={handleCancelExecution}
               supportsPushThrough={props.supportsPushThrough}
-              onRun={handleNodeRun}
               onDuplicate={props.onDuplicate}
               onDocs={props.onDocs}
               onConfigure={props.onConfigure}
               onDeactivate={props.onDeactivate}
               onToggleView={handleToggleView}
               onDelete={handleNodeDelete}
-              runDisabled={props.runDisabled}
-              runDisabledTooltip={props.runDisabledTooltip}
               getAllHistoryEvents={props.getAllHistoryEvents}
               onLoadMoreHistory={props.onLoadMoreHistory}
               getHasMoreHistory={props.getHasMoreHistory}
@@ -1113,21 +1047,6 @@ function CanvasPage(props: CanvasPageProps) {
       )}
 
       {/* Edit existing node modal - now handled by settings sidebar */}
-
-      {/* Emit Event Modal */}
-      {emitModalData && (
-        <EmitEventModal
-          isOpen={true}
-          onClose={() => setEmitModalData(null)}
-          nodeId={emitModalData.nodeId}
-          nodeName={emitModalData.nodeName}
-          workflowId={props.organizationId || ""}
-          organizationId={props.organizationId || ""}
-          channels={emitModalData.channels}
-          onEmit={handleEmit}
-          initialData={emitModalData.initialData}
-        />
-      )}
     </div>
   );
 }
@@ -1142,7 +1061,6 @@ function Sidebar({
   onPushThrough,
   onCancelExecution,
   supportsPushThrough,
-  onRun,
   onDuplicate,
   onDocs,
   onConfigure,
@@ -1150,8 +1068,6 @@ function Sidebar({
   onToggleView,
   onDelete,
   onReEmit,
-  runDisabled,
-  runDisabledTooltip,
   getAllHistoryEvents,
   onLoadMoreHistory,
   getHasMoreHistory,
@@ -1192,7 +1108,6 @@ function Sidebar({
   onPushThrough?: (executionId: string) => void;
   onCancelExecution?: (executionId: string) => void;
   supportsPushThrough?: (nodeId: string) => boolean;
-  onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
   onConfigure?: (nodeId: string) => void;
@@ -1200,8 +1115,6 @@ function Sidebar({
   onToggleView?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
-  runDisabled?: boolean;
-  runDisabledTooltip?: string;
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
   onLoadMoreHistory?: (nodeId: string) => void;
   getHasMoreHistory?: (nodeId: string) => boolean;
@@ -1222,11 +1135,7 @@ function Sidebar({
   currentTab?: "latest" | "settings";
   onTabChange?: (tab: "latest" | "settings") => void;
   organizationId?: string;
-  getCustomField?: (
-    nodeId: string,
-    onRun?: (initialData?: string) => void,
-    integration?: OrganizationsIntegration,
-  ) => (() => React.ReactNode) | null;
+  getCustomField?: (nodeId: string, integration?: OrganizationsIntegration) => (() => React.ReactNode) | null;
   integrations?: OrganizationsIntegration[];
   workflowNodes?: ComponentsNode[];
   components?: ComponentsComponent[];
@@ -1326,9 +1235,6 @@ function Sidebar({
       onPushThrough={onPushThrough}
       onCancelExecution={onCancelExecution}
       supportsPushThrough={supportsPushThrough?.(state.componentSidebar.selectedNodeId!)}
-      onRun={onRun ? () => onRun(state.componentSidebar.selectedNodeId!) : undefined}
-      runDisabled={runDisabled}
-      runDisabledTooltip={runDisabledTooltip}
       onDuplicate={onDuplicate ? () => onDuplicate(state.componentSidebar.selectedNodeId!) : undefined}
       onDocs={onDocs ? () => onDocs(state.componentSidebar.selectedNodeId!) : undefined}
       onConfigure={
@@ -1366,7 +1272,6 @@ function Sidebar({
         getCustomField && state.componentSidebar.selectedNodeId
           ? getCustomField(
               state.componentSidebar.selectedNodeId,
-              undefined,
               integrations?.find((i) => i.metadata?.id === editingNodeData?.integrationRef?.id),
             ) || undefined
           : undefined
@@ -1564,7 +1469,6 @@ function CanvasContent({
   onAutoLayoutNodes,
   onEdgeCreate,
   hideHeader,
-  onRun,
   onDuplicate,
   onConfigure,
   onDeactivate,
@@ -1580,8 +1484,6 @@ function CanvasContent({
   hasFitToViewRef,
   viewportRefProp,
   templateNodeId,
-  runDisabled,
-  runDisabledTooltip,
   onPendingConnectionNodeClick,
   onTemplateNodeClick,
   highlightedNodeIds,
@@ -1642,7 +1544,6 @@ function CanvasContent({
   onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   hideHeader?: boolean;
-  onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
   onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
@@ -1665,8 +1566,6 @@ function CanvasContent({
   hasFitToViewRef: React.MutableRefObject<boolean>;
   viewportRefProp?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
   templateNodeId?: string | null;
-  runDisabled?: boolean;
-  runDisabledTooltip?: string;
   onPendingConnectionNodeClick?: (nodeId: string) => void;
   onTemplateNodeClick?: (nodeId: string) => void;
   highlightedNodeIds: Set<string>;
@@ -1914,9 +1813,6 @@ function CanvasContent({
     ],
   );
 
-  const onRunRef = useRef(onRun);
-  onRunRef.current = onRun;
-
   const onNodeEditRef = useRef(onNodeEdit);
   onNodeEditRef.current = onNodeEdit;
 
@@ -2139,7 +2035,6 @@ function CanvasContent({
     handleNodeClick,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
-    onRun: onRunRef,
     onDuplicate: onDuplicateRef,
     onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
@@ -2148,8 +2043,6 @@ function CanvasContent({
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     aiState: state.ai,
-    runDisabled,
-    runDisabledTooltip,
     showHeader,
     hasMultiSelection,
   });
@@ -2158,7 +2051,6 @@ function CanvasContent({
     handleNodeClick,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
-    onRun: onRunRef,
     onDuplicate: onDuplicateRef,
     onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
@@ -2167,8 +2059,6 @@ function CanvasContent({
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     aiState: state.ai,
-    runDisabled,
-    runDisabledTooltip,
     showHeader,
     hasMultiSelection,
   };

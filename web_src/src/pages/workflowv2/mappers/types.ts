@@ -55,6 +55,10 @@ export type TriggerRendererContext = {
   node: NodeInfo;
   definition: ComponentDefinition;
   lastEvent: EventInfo;
+  canvasId: string;
+  organizationId?: string;
+  runDisabled?: boolean;
+  runDisabledTooltip?: string;
 };
 
 export type EventInfo =
@@ -180,16 +184,19 @@ export interface EventStateRegistry {
  * (via getCustomFieldRenderer) and canvas nodes (via customField prop).
  */
 export interface CustomFieldRendererContext {
-  onRun?: (initialData?: string) => void;
   /** Full integration object when editing an app trigger/component (e.g. for incident webhook status) */
   integration?: import("@/api-client").OrganizationsIntegration;
+  canvasId?: string;
+  organizationId?: string;
+  runDisabled?: boolean;
+  runDisabledTooltip?: string;
 }
 
 export interface CustomFieldRenderer {
   /**
    * Render custom UI for the given node configuration
    * @param node The node from the backend
-   * @param context Optional context (e.g., onRun, integration for app nodes)
+   * @param context Optional context (e.g., integration, execution state for app nodes)
    * @returns React node to render
    */
   render(node: NodeInfo, context?: CustomFieldRendererContext): ReactNode;

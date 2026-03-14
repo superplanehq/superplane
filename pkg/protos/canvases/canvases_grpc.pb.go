@@ -38,7 +38,6 @@ const (
 	Canvases_UpdateNodePause_FullMethodName             = "/Superplane.Canvases.Canvases/UpdateNodePause"
 	Canvases_ListNodeExecutions_FullMethodName          = "/Superplane.Canvases.Canvases/ListNodeExecutions"
 	Canvases_ListNodeEvents_FullMethodName              = "/Superplane.Canvases.Canvases/ListNodeEvents"
-	Canvases_EmitNodeEvent_FullMethodName               = "/Superplane.Canvases.Canvases/EmitNodeEvent"
 	Canvases_InvokeNodeExecutionAction_FullMethodName   = "/Superplane.Canvases.Canvases/InvokeNodeExecutionAction"
 	Canvases_InvokeNodeTriggerAction_FullMethodName     = "/Superplane.Canvases.Canvases/InvokeNodeTriggerAction"
 	Canvases_ListChildExecutions_FullMethodName         = "/Superplane.Canvases.Canvases/ListChildExecutions"
@@ -74,7 +73,6 @@ type CanvasesClient interface {
 	UpdateNodePause(ctx context.Context, in *UpdateNodePauseRequest, opts ...grpc.CallOption) (*UpdateNodePauseResponse, error)
 	ListNodeExecutions(ctx context.Context, in *ListNodeExecutionsRequest, opts ...grpc.CallOption) (*ListNodeExecutionsResponse, error)
 	ListNodeEvents(ctx context.Context, in *ListNodeEventsRequest, opts ...grpc.CallOption) (*ListNodeEventsResponse, error)
-	EmitNodeEvent(ctx context.Context, in *EmitNodeEventRequest, opts ...grpc.CallOption) (*EmitNodeEventResponse, error)
 	InvokeNodeExecutionAction(ctx context.Context, in *InvokeNodeExecutionActionRequest, opts ...grpc.CallOption) (*InvokeNodeExecutionActionResponse, error)
 	InvokeNodeTriggerAction(ctx context.Context, in *InvokeNodeTriggerActionRequest, opts ...grpc.CallOption) (*InvokeNodeTriggerActionResponse, error)
 	ListChildExecutions(ctx context.Context, in *ListChildExecutionsRequest, opts ...grpc.CallOption) (*ListChildExecutionsResponse, error)
@@ -285,16 +283,6 @@ func (c *canvasesClient) ListNodeEvents(ctx context.Context, in *ListNodeEventsR
 	return out, nil
 }
 
-func (c *canvasesClient) EmitNodeEvent(ctx context.Context, in *EmitNodeEventRequest, opts ...grpc.CallOption) (*EmitNodeEventResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(EmitNodeEventResponse)
-	err := c.cc.Invoke(ctx, Canvases_EmitNodeEvent_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *canvasesClient) InvokeNodeExecutionAction(ctx context.Context, in *InvokeNodeExecutionActionRequest, opts ...grpc.CallOption) (*InvokeNodeExecutionActionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(InvokeNodeExecutionActionResponse)
@@ -418,7 +406,6 @@ type CanvasesServer interface {
 	UpdateNodePause(context.Context, *UpdateNodePauseRequest) (*UpdateNodePauseResponse, error)
 	ListNodeExecutions(context.Context, *ListNodeExecutionsRequest) (*ListNodeExecutionsResponse, error)
 	ListNodeEvents(context.Context, *ListNodeEventsRequest) (*ListNodeEventsResponse, error)
-	EmitNodeEvent(context.Context, *EmitNodeEventRequest) (*EmitNodeEventResponse, error)
 	InvokeNodeExecutionAction(context.Context, *InvokeNodeExecutionActionRequest) (*InvokeNodeExecutionActionResponse, error)
 	InvokeNodeTriggerAction(context.Context, *InvokeNodeTriggerActionRequest) (*InvokeNodeTriggerActionResponse, error)
 	ListChildExecutions(context.Context, *ListChildExecutionsRequest) (*ListChildExecutionsResponse, error)
@@ -494,9 +481,6 @@ func (UnimplementedCanvasesServer) ListNodeExecutions(context.Context, *ListNode
 }
 func (UnimplementedCanvasesServer) ListNodeEvents(context.Context, *ListNodeEventsRequest) (*ListNodeEventsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListNodeEvents not implemented")
-}
-func (UnimplementedCanvasesServer) EmitNodeEvent(context.Context, *EmitNodeEventRequest) (*EmitNodeEventResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method EmitNodeEvent not implemented")
 }
 func (UnimplementedCanvasesServer) InvokeNodeExecutionAction(context.Context, *InvokeNodeExecutionActionRequest) (*InvokeNodeExecutionActionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InvokeNodeExecutionAction not implemented")
@@ -890,24 +874,6 @@ func _Canvases_ListNodeEvents_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Canvases_EmitNodeEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(EmitNodeEventRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(CanvasesServer).EmitNodeEvent(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Canvases_EmitNodeEvent_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CanvasesServer).EmitNodeEvent(ctx, req.(*EmitNodeEventRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Canvases_InvokeNodeExecutionAction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(InvokeNodeExecutionActionRequest)
 	if err := dec(in); err != nil {
@@ -1170,10 +1136,6 @@ var Canvases_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListNodeEvents",
 			Handler:    _Canvases_ListNodeEvents_Handler,
-		},
-		{
-			MethodName: "EmitNodeEvent",
-			Handler:    _Canvases_EmitNodeEvent_Handler,
 		},
 		{
 			MethodName: "InvokeNodeExecutionAction",

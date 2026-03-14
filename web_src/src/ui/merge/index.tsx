@@ -30,9 +30,6 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
   error,
   warning,
   paused,
-  onRun,
-  runDisabled,
-  runDisabledTooltip,
   onEdit,
   onDuplicate,
   onDeactivate,
@@ -61,9 +58,6 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
       error={error}
       warning={warning}
       paused={paused}
-      onRun={onRun}
-      runDisabled={runDisabled}
-      runDisabledTooltip={runDisabledTooltip}
       onEdit={onEdit}
       onDuplicate={onDuplicate}
       onDeactivate={onDeactivate}
