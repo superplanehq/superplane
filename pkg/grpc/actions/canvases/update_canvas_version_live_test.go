@@ -86,7 +86,7 @@ func TestUpdateLiveCanvasWithoutVersioningRemapsSoftDeletedNodeIDConflicts(t *te
 	require.NotNil(t, resp.Version)
 	require.NotNil(t, resp.Version.Spec)
 	require.Len(t, resp.Version.Spec.Nodes, 1)
-	require.NotEqual(t, "node-1", resp.Version.Spec.Nodes[0].Id)
+	require.Equal(t, readdedNodeID(canvas.ID, "node-1"), resp.Version.Spec.Nodes[0].Id)
 }
 
 func TestUpdateLiveCanvasWithoutVersioningRejectsMissingAppInstallationID(t *testing.T) {

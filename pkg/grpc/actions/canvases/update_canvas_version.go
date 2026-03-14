@@ -189,7 +189,7 @@ func updateLiveCanvasWithoutVersioning(
 			return findNodesErr
 		}
 
-		nodes, edges, _ = remapNodeIDsForConflicts(nodes, edges, existingNodesUnscoped)
+		nodes, edges, _ = remapNodeIDsForConflicts(canvasID, nodes, edges, existingNodesUnscoped)
 
 		existingNodes, findNodesErr := models.FindCanvasNodesInTransaction(tx, canvasID)
 		if findNodesErr != nil {

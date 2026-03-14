@@ -136,7 +136,7 @@ func PublishCanvasChangeRequest(
 			return findNodesErr
 		}
 
-		mergedNodes, mergedEdges, _ = remapNodeIDsForConflicts(mergedNodes, mergedEdges, existingNodesUnscoped)
+		mergedNodes, mergedEdges, _ = remapNodeIDsForConflicts(canvasUUID, mergedNodes, mergedEdges, existingNodesUnscoped)
 
 		parentNodesByNodeID := make(map[string]*models.Node)
 		for i := range mergedNodes {

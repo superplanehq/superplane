@@ -2,6 +2,8 @@ package canvases
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
@@ -19,9 +21,32 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	nodeIDMaxLen          = 128
+	readdedNodeIDSuffix   = "-readded-"
+	readdedNodeIDHashSize = 16
+)
+
+func readdedNodeID(workflowID uuid.UUID, originalNodeID string) string {
+	sum := sha256.Sum256([]byte(workflowID.String() + "\x00" + originalNodeID))
+	hash := hex.EncodeToString(sum[:])[:readdedNodeIDHashSize]
+
+	available := nodeIDMaxLen - len(readdedNodeIDSuffix) - len(hash)
+	base := originalNodeID
+	if available < 1 {
+		return "readded-" + hash
+	}
+	if len(base) > available {
+		base = base[:available]
+	}
+
+	return base + readdedNodeIDSuffix + hash
+}
+
 // remapNodeIDsForConflicts avoids collisions with soft-deleted workflow_nodes
 // while preserving old node records for historical data.
 func remapNodeIDsForConflicts(
+	workflowID uuid.UUID,
 	nodes []models.Node,
 	edges []models.Edge,
 	existingNodes []models.CanvasNode,
@@ -43,7 +68,7 @@ func remapNodeIDsForConflicts(
 			continue
 		}
 
-		newID := models.GenerateUniqueNodeID(nodes[i], reservedIDs)
+		newID := readdedNodeID(workflowID, nodes[i].ID)
 		remappedIDs[nodes[i].ID] = newID
 		nodes[i].ID = newID
 		reservedIDs[newID] = true
