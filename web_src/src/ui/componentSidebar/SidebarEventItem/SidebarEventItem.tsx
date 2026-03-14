@@ -548,7 +548,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
             <div className="w-full px-2 py-2">
               <div className="flex items-center justify-between mb-2 relative">
                 <div className="flex items-center gap-1 absolute right-2 top-4">
-                  <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
+                  <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy"} hideOnClick={false}>
                     <button
                       onClick={() => copyPayloadToClipboard(tabData.payload)}
                       className="p-1 text-gray-500 hover:text-gray-800"
@@ -736,7 +736,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold text-gray-800">Payload</h3>
               <div className="flex items-center gap-2">
-                <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
+                <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy"} hideOnClick={false}>
                   <button
                     onClick={() => copyPayloadToClipboard(modalPayload)}
                     className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
