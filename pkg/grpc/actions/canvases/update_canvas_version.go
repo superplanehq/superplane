@@ -284,8 +284,8 @@ func updateLiveCanvasWithoutVersioning(
 		if status.Code(err) != codes.Unknown {
 			return nil, err
 		}
-		log.WithError(err).Error("failed to update live canvas without versioning")
-		return nil, status.Error(codes.Internal, "failed to update live canvas without versioning")
+		log.WithError(err).Error("failed to update live canvas")
+		return nil, status.Error(codes.Internal, "failed to update live canvas")
 	}
 
 	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String()).Publish(true); err != nil {
