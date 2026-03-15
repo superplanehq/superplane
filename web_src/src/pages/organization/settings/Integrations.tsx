@@ -209,6 +209,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
           onChange={(e) => setFilterQuery(e.target.value)}
           placeholder="Filter integrations..."
           className="pl-9 pr-9"
+          data-testid="integrations-filter-input"
         />
         {filterQuery.length > 0 ? (
           <button
@@ -234,7 +235,11 @@ export function Integrations({ organizationId }: IntegrationsProps) {
             const connectedCount = item.instances.length;
 
             return (
-              <div key={item.providerName} className="bg-white border border-gray-300 dark:border-gray-700 rounded-md">
+              <div
+                key={item.providerName}
+                className="bg-white border border-gray-300 dark:border-gray-700 rounded-md"
+                data-testid={`integrations-provider-card-${item.providerName}`}
+              >
                 <div className="p-4 flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5 flex h-8 w-8 items-center justify-center">
@@ -264,6 +269,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     <Button
                       variant="default"
                       size="sm"
+                      data-testid={`integrations-provider-connect-button-${item.providerName}`}
                       onClick={() => {
                         if (!item.integrationDef) return;
                         handleConnectClick(item.integrationDef);
@@ -364,7 +370,10 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                         iconSlug={selectedIntegration.icon}
                         className="w-6 h-6 text-gray-500 dark:text-gray-400"
                       />
-                      <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
+                      <h3
+                        className="text-base font-semibold text-gray-800 dark:text-gray-100"
+                        data-testid="integrations-connect-modal-title"
+                      >
                         Connect {selectedIntegration.label || selectedIntegration.name}
                       </h3>
                     </div>
@@ -390,6 +399,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                         value={integrationName}
                         onChange={(e) => setIntegrationName(e.target.value)}
                         placeholder="e.g., my-app-integration"
+                        data-testid="integrations-connect-name-input"
                         required
                         disabled={!canCreateIntegrations}
                       />
@@ -423,6 +433,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     <Button
                       color="blue"
                       onClick={handleConnect}
+                      data-testid="integrations-connect-submit-button"
                       disabled={
                         createIntegrationMutation.isPending || !integrationName?.trim() || !canCreateIntegrations
                       }

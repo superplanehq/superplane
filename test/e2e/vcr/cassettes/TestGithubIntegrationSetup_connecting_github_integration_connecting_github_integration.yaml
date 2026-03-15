@@ -1,0 +1,62 @@
+---
+version: 1
+interactions:
+  - request:
+      body: ""
+      form: {}
+      headers:
+        Accept:
+          - application/vnd.github+json
+      url: https://api.github.com/app-manifests/fake-manifest-code/conversions
+      method: POST
+    response:
+      body: >-
+        {"id":123456,"slug":"superplane-e2e-app","client_id":"Iv1.e2eclientid","client_secret":"e2e-client-secret","webhook_secret":"e2e-webhook-secret","pem":"-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDbJWAngVeowxvB\n9o1UU6mMq1OcUEsWUbj8uv6LM2Rg2XprDI4Lytv7sZSbzA/E9cw5aQKIRUzrQ+ct\noHHr8I1MfCN4m/RwR9GRZvdObTsfIRLLS8pvNDn5Jdr3b0IX4BBJSJmZPhc7weVA\nTiSX46Pcfpmknvnj0XjKBBqw65T5DajOYTHdMkX9/w859AaMnZ/J7dt67OLDTKil\nWwzQE0A5SEoPZqQEa69l2IJ6gLgrZRDFu6ttT75xLV2TvdnHaTZ4lSPuoG7g/V4a\nfdHlhS3flKjCwzn3OmGWeXuXPtzwvQFhXHmnBOLHo6pDXDz3Wvv5wZWTVjsJMUEs\nm0lh1haRAgMBAAECgf8GOo0YrU249COPGQp4ykZHa80ZoOs+EhtOPA/eZP/4wLxs\niyFWBU+7WwoKEr9f/tJmwdwQkPUo1abvAAIh+WAltM1axUnmlj7veqLJeY30ogYf\n/cC/2u6v86o7f901QwrHrCOJEnP7p0B0bmXYf48Kbpw5c0tPZ6Fo9Bn2iE/YttFm\nFhWcyLlsZ+ItW3wzjbP0bo2iwOrc4kFnaaJViwq3CrGibROD3no0NXN8L4sJKF4M\nFXgFtNjhoxn7/rkvBwWuCwrKMYrPhbJafxGvau2f47HF2O2Jv7qXmztIQec9mCBa\nmS8hJH7M2iGjfzvdad7FtDy6ZY7cg/K6HqzpdbECgYEA+zN39dr+a94yJw9a8rIH\nGtEcnbmqbxhsAXvNtQDXRSPfRALKgcYnL/67XSAfYSJ30g9ya/ld6uqoo4UHm5WJ\nzv4dofC0XeV8u/g3Txp+E2/Liaj2ji2IGm36YoqzzBYG46S/QBnGPOBkSuCYWhgN\ncQ6veWmM8LTDB3xoXVIyDekCgYEA31UjOpKiN722EibAu66jJNommVngwQwkPpmv\nL6XQxvL9IEDd3QVmjm0QSKhuPEMipiTKTcW8Fsz5D5eVeS4kFLpeGxSll4xyBlTi\n7VvtWq+at0AkC/DXpD2Ry/RlDxJZlK6wQb0Bx9vzizojkaBALc/sR0mlTFwHrMKj\nmts0EmkCgYEAgTxwii9Z17sgCFJxEw2edCCDXW4pDjD9WCIOqgG9vtd+xSm+b9e3\nT4z5bibZngqypILH9l77/6Esk7wcNuJPXQwFyMvir7AiZT6Fjg/uLyfECpXAC1PH\ngvlz6QC9EdF/R9z5fAwGnkk/r/oux6M6PyE0C/3OwgPtlstdki14jQkCgYEAnTV8\nL/4KbLyBjvNylmsPcqCRrT9EZAAc/2gFlr/dYD6qCms/AheMItQJM2xE9Oy5VkTt\nl6OKjG5LIDuvP3dIdMLf/aYiDrURiv10JGuigES+3yIqfbFSys2AdRabkOl036G8\ndvoKZ9qf7LDHWvp4UwdbJq9jyYW67VSyAA8v74kCgYEApM0l1ddqd4OjMBvNbm6n\nDEvmS9/rvznD37tlwEjm9q8fc/QOwViDakkcUSimH69LT4JbBqDfFif1Au6e7Vw7\ny1uwNUr2ulOp3/NrSW5YVBH2X7NIudqc6m8K3H5PdIlop9nHXVVS59T6naIqQ2mW\ng4/7XyJSP0vDqeYN0Aa+T2o=\n-----END PRIVATE KEY-----\n"}
+      headers:
+        Content-Type:
+          - application/json
+      status: 201 Created
+      code: 201
+      duration: 10ms
+  - request:
+      body: ""
+      form: {}
+      headers: {}
+      url: https://api.github.com/app/installations/999999/access_tokens
+      method: POST
+    response:
+      body: '{"token":"ghs_test_token","expires_at":"2099-01-01T00:00:00Z","permissions":{"contents":"write","metadata":"read"},"repositories_selection":"all"}'
+      headers:
+        Content-Type:
+          - application/json
+      status: 201 Created
+      code: 201
+      duration: 10ms
+  - request:
+      body: ""
+      form: {}
+      headers: {}
+      url: https://api.github.com/app
+      method: GET
+    response:
+      body: '{"id":123456,"slug":"superplane-e2e-app","owner":{"login":"superplane-e2e-owner"}}'
+      headers:
+        Content-Type:
+          - application/json
+      status: 200 OK
+      code: 200
+      duration: 10ms
+  - request:
+      body: ""
+      form: {}
+      headers: {}
+      url: https://api.github.com/installation/repositories
+      method: GET
+    response:
+      body: '{"total_count":1,"repositories":[{"id":987654321,"name":"demo-repo","html_url":"https://github.com/superplane-e2e-owner/demo-repo"}]}'
+      headers:
+        Content-Type:
+          - application/json
+      status: 200 OK
+      code: 200
+      duration: 10ms

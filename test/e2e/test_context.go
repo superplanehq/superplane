@@ -47,13 +47,21 @@ func (s *TestContext) Start() {
 	os.Setenv("START_NODE_REQUEST_WORKER", "yes")
 	os.Setenv("START_WEBHOOK_PROVISIONER", "yes")
 	os.Setenv("START_WEBHOOK_CLEANUP_WORKER", "yes")
+	os.Setenv("E2E_USE_DEFAULT_HTTP_TRANSPORT", "true")
 	os.Setenv("NO_ENCRYPTION", "yes")
 	os.Setenv("ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
 	os.Setenv("JWT_SECRET", "test-jwt-secret")
 	os.Setenv("OIDC_KEYS_PATH", "../../test/fixtures/oidc-keys")
 	os.Setenv("PUBLIC_API_PORT", "8001")
-	os.Setenv("BASE_URL", "http://127.0.0.1:8001")
-	os.Setenv("WEBHOOKS_BASE_URL", "https://superplane.sxmoon.com")
+	// Keep local E2E deterministic by default.
+	// Only respect external public URLs when explicitly requested.
+	respectExternalURLs := os.Getenv("E2E_RESPECT_EXTERNAL_URLS") == "true"
+	if !respectExternalURLs || os.Getenv("BASE_URL") == "" {
+		os.Setenv("BASE_URL", "http://127.0.0.1:8001")
+	}
+	if !respectExternalURLs || os.Getenv("WEBHOOKS_BASE_URL") == "" {
+		os.Setenv("WEBHOOKS_BASE_URL", "https://superplane.sxmoon.com")
+	}
 	os.Setenv("APP_ENV", "development")
 	os.Setenv("OWNER_SETUP_ENABLED", "yes")
 	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")

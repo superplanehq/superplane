@@ -32,18 +32,16 @@ func customMatcher(r *http.Request, i cassette.Request) bool {
 }
 
 func Run(t *testing.T, testName string, testFunc func(t *testing.T)) {
-	t.Run(testName, func(t *testing.T) {
-		withVCR(t, testName, recorder.ModeReplaying, testFunc)
-	})
-}
-
-func Record(t *testing.T, testName string, testFunc func(t *testing.T)) {
-	if os.Getenv("CI") == "true" {
-		t.Fatalf("Recording tests are not allowed to run in CI environment")
+	mode := recorder.ModeReplaying
+	if os.Getenv("RECORD_VCR") == "true" {
+		if os.Getenv("CI") == "true" {
+			t.Fatalf("recording tests are not allowed to run in CI environment")
+		}
+		mode = recorder.ModeRecording
 	}
 
 	t.Run(testName, func(t *testing.T) {
-		withVCR(t, testName, recorder.ModeRecording, testFunc)
+		withVCR(t, testName, mode, testFunc)
 	})
 }
 
