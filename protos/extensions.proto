@@ -1,0 +1,219 @@
+syntax = "proto3";
+
+package Superplane.Extensions;
+
+import "components.proto";
+import "configuration.proto";
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/extensions";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Extensions API";
+    version: "1.0";
+    description: "API for Superplane Extensions";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Extensions {
+  rpc ListExtensions(ListExtensionsRequest) returns (ListExtensionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/extensions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List extensions";
+      description: "Returns a list of all extensions";
+      tags: "Extension";
+    };
+  }
+
+  rpc CreateExtension(CreateExtensionRequest) returns (CreateExtensionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/extensions"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a new extension";
+      description: "Creates a new extension";
+      tags: "Extension";
+    };
+  }
+
+  rpc CreateVersion(CreateVersionRequest) returns (CreateVersionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/extensions/{extension_id}/versions"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Creates a new version of an extension";
+      description: "Creates a new version of an extension";
+      tags: "Extension";
+    };
+  }
+
+  rpc UpdateVersion(UpdateVersionRequest) returns (UpdateVersionResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/extensions/{extension_id}/versions/{version_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Updates the version of an extension";
+      description: "Updates the version of an extension";
+      tags: "Extension";
+    };
+  }
+
+  rpc PublishVersion(PublishVersionRequest) returns (PublishVersionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/extensions/{extension_id}/versions/{version_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Publishes a draft version of an extension";
+      description: "Publishes a draft version of an extension";
+      tags: "Extension";
+    };
+  }
+
+  rpc ListVersions(ListVersionsRequest) returns (ListVersionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/extensions/{extension_id}/versions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List versions of an extension";
+      description: "Returns a list of all versions for an extension";
+      tags: "Extension";
+    };
+  }
+}
+
+message ListExtensionsRequest {
+  string organization_id = 1;
+}
+
+message ListExtensionsResponse {
+  repeated Extension extensions = 1;
+}
+
+message CreateExtensionRequest {
+  string name = 1;
+}
+
+message CreateExtensionResponse {
+  Extension extension = 1;
+}
+
+message CreateVersionRequest {
+  string extension_id = 1;
+  Version.Spec spec = 2;
+}
+
+message CreateVersionResponse {
+  Version version = 1;
+}
+
+message UpdateVersionRequest {
+  string extension_id = 1;
+  string version_id = 2;
+  Version.Spec spec = 3;
+}
+
+message UpdateVersionResponse {
+  Version version = 1;
+}
+
+message PublishVersionRequest {
+  string extension_id = 1;
+  string version_id = 2;
+  string version = 3;
+}
+
+message PublishVersionResponse {
+  Version version = 1;
+}
+
+message ListVersionsRequest {
+  string extension_id = 1;
+}
+
+message ListVersionsResponse {
+  repeated Version versions = 1;
+}
+
+message Extension {
+  message Metadata {
+    string name = 1;
+    string description = 2;
+    google.protobuf.Timestamp created_at = 3;
+  }
+
+  Metadata metadata = 1;
+}
+
+message Version {
+  message Metadata {
+    string id = 1;
+    google.protobuf.Timestamp created_at = 2;
+    google.protobuf.Timestamp updated_at = 3;
+  }
+
+  message Manifest {
+    message Integration {
+      string name = 1;
+      string label = 2;
+      string description = 3;
+      string instructions = 4;
+      repeated Configuration.Field configuration = 5;
+      repeated string resource_types = 6;
+      repeated Components.ComponentAction actions = 7;
+    }
+
+    message Component {
+      string name = 1;
+      string label = 2;
+      string description = 3;
+      repeated Configuration.Field configuration = 4;
+      repeated Components.OutputChannel output_channels = 5;
+      repeated Components.ComponentAction actions = 6;
+    }
+
+    message Trigger {
+      string name = 1;
+      string label = 2;
+      string description = 3;
+      repeated Configuration.Field configuration = 4;
+      repeated Components.ComponentAction actions = 5;
+    }
+
+    repeated Integration integrations = 1;
+    repeated Component components = 2;
+    repeated Trigger triggers = 3; 
+  }
+
+  message Spec {
+    bytes bundle = 1;
+    string digest = 2;
+    Manifest manifest = 3;
+    // TODO: operations
+  }
+
+  enum State {
+    STATE_DRAFT = 0;
+    STATE_PUBLISHED = 1;
+  }
+
+  message Status {
+    State state = 1;
+  }
+}

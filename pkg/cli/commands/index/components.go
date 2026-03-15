@@ -75,7 +75,7 @@ func (c *componentsCommand) getComponentByName(ctx core.CommandContext, name str
 	})
 }
 
-func renderComponentText(stdout io.Writer, component openapi_client.ComponentsComponent) error {
+func renderComponentText(stdout io.Writer, component openapi_client.SuperplaneComponentsComponent) error {
 	_, err := fmt.Fprintf(stdout, "Name: %s\n", component.GetName())
 	if err != nil {
 		return err
@@ -211,7 +211,7 @@ func renderExamplePayloadText(stdout io.Writer, examplePayload map[string]interf
 	return nil
 }
 
-func (c *componentsCommand) listComponents(ctx core.CommandContext, from string) ([]openapi_client.ComponentsComponent, error) {
+func (c *componentsCommand) listComponents(ctx core.CommandContext, from string) ([]openapi_client.SuperplaneComponentsComponent, error) {
 	//
 	// if --from is used, we grab the components from the integration
 	//
@@ -234,25 +234,25 @@ func (c *componentsCommand) listComponents(ctx core.CommandContext, from string)
 	return response.GetComponents(), nil
 }
 
-func (c *componentsCommand) findComponentByName(ctx core.CommandContext, name string) (openapi_client.ComponentsComponent, error) {
+func (c *componentsCommand) findComponentByName(ctx core.CommandContext, name string) (openapi_client.SuperplaneComponentsComponent, error) {
 	integrationName, componentName, scoped := core.ParseIntegrationScopedName(name)
 	if scoped {
 		integration, err := core.FindIntegrationDefinition(ctx, integrationName)
 		if err != nil {
-			return openapi_client.ComponentsComponent{}, err
+			return openapi_client.SuperplaneComponentsComponent{}, err
 		}
 		return findIntegrationComponent(integration, componentName)
 	}
 
 	response, _, err := ctx.API.ComponentAPI.ComponentsDescribeComponent(ctx.Context, name).Execute()
 	if err != nil {
-		return openapi_client.ComponentsComponent{}, err
+		return openapi_client.SuperplaneComponentsComponent{}, err
 	}
 
 	return response.GetComponent(), nil
 }
 
-func findIntegrationComponent(integration openapi_client.IntegrationsIntegrationDefinition, name string) (openapi_client.ComponentsComponent, error) {
+func findIntegrationComponent(integration openapi_client.IntegrationsIntegrationDefinition, name string) (openapi_client.SuperplaneComponentsComponent, error) {
 	for _, component := range integration.GetComponents() {
 		componentName := component.GetName()
 		if componentName == name || componentName == fmt.Sprintf("%s.%s", integration.GetName(), name) {
@@ -260,5 +260,5 @@ func findIntegrationComponent(integration openapi_client.IntegrationsIntegration
 		}
 	}
 
-	return openapi_client.ComponentsComponent{}, fmt.Errorf("component %q not found in integration %q", name, integration.GetName())
+	return openapi_client.SuperplaneComponentsComponent{}, fmt.Errorf("component %q not found in integration %q", name, integration.GetName())
 }

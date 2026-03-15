@@ -20,7 +20,7 @@ var _ MappedNullable = &ComponentsDescribeComponentResponse{}
 
 // ComponentsDescribeComponentResponse struct for ComponentsDescribeComponentResponse
 type ComponentsDescribeComponentResponse struct {
-	Component *ComponentsComponent `json:"component,omitempty"`
+	Component *SuperplaneComponentsComponent `json:"component,omitempty"`
 }
 
 // NewComponentsDescribeComponentResponse instantiates a new ComponentsDescribeComponentResponse object
@@ -41,9 +41,9 @@ func NewComponentsDescribeComponentResponseWithDefaults() *ComponentsDescribeCom
 }
 
 // GetComponent returns the Component field value if set, zero value otherwise.
-func (o *ComponentsDescribeComponentResponse) GetComponent() ComponentsComponent {
+func (o *ComponentsDescribeComponentResponse) GetComponent() SuperplaneComponentsComponent {
 	if o == nil || IsNil(o.Component) {
-		var ret ComponentsComponent
+		var ret SuperplaneComponentsComponent
 		return ret
 	}
 	return *o.Component
@@ -51,7 +51,7 @@ func (o *ComponentsDescribeComponentResponse) GetComponent() ComponentsComponent
 
 // GetComponentOk returns a tuple with the Component field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsDescribeComponentResponse) GetComponentOk() (*ComponentsComponent, bool) {
+func (o *ComponentsDescribeComponentResponse) GetComponentOk() (*SuperplaneComponentsComponent, bool) {
 	if o == nil || IsNil(o.Component) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *ComponentsDescribeComponentResponse) HasComponent() bool {
 	return false
 }
 
-// SetComponent gets a reference to the given ComponentsComponent and assigns it to the Component field.
-func (o *ComponentsDescribeComponentResponse) SetComponent(v ComponentsComponent) {
+// SetComponent gets a reference to the given SuperplaneComponentsComponent and assigns it to the Component field.
+func (o *ComponentsDescribeComponentResponse) SetComponent(v SuperplaneComponentsComponent) {
 	o.Component = &v
 }
 

@@ -120,6 +120,24 @@ import type {
   ComponentsListComponentsData,
   ComponentsListComponentsErrors,
   ComponentsListComponentsResponses,
+  ExtensionsCreateExtensionData,
+  ExtensionsCreateExtensionErrors,
+  ExtensionsCreateExtensionResponses,
+  ExtensionsCreateVersionData,
+  ExtensionsCreateVersionErrors,
+  ExtensionsCreateVersionResponses,
+  ExtensionsListExtensionsData,
+  ExtensionsListExtensionsErrors,
+  ExtensionsListExtensionsResponses,
+  ExtensionsListVersionsData,
+  ExtensionsListVersionsErrors,
+  ExtensionsListVersionsResponses,
+  ExtensionsPublishVersionData,
+  ExtensionsPublishVersionErrors,
+  ExtensionsPublishVersionResponses,
+  ExtensionsUpdateVersionData,
+  ExtensionsUpdateVersionErrors,
+  ExtensionsUpdateVersionResponses,
   GroupsAddUserToGroupData,
   GroupsAddUserToGroupErrors,
   GroupsAddUserToGroupResponses,
@@ -935,6 +953,100 @@ export const componentsListComponentActions = <ThrowOnError extends boolean = tr
     ComponentsListComponentActionsErrors,
     ThrowOnError
   >({ url: "/api/v1/components/{name}/actions", ...options });
+
+/**
+ * List extensions
+ *
+ * Returns a list of all extensions
+ */
+export const extensionsListExtensions = <ThrowOnError extends boolean = true>(
+  options?: Options<ExtensionsListExtensionsData, ThrowOnError>,
+) =>
+  (options?.client ?? client).get<ExtensionsListExtensionsResponses, ExtensionsListExtensionsErrors, ThrowOnError>({
+    url: "/api/v1/extensions",
+    ...options,
+  });
+
+/**
+ * Create a new extension
+ *
+ * Creates a new extension
+ */
+export const extensionsCreateExtension = <ThrowOnError extends boolean = true>(
+  options: Options<ExtensionsCreateExtensionData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<ExtensionsCreateExtensionResponses, ExtensionsCreateExtensionErrors, ThrowOnError>({
+    url: "/api/v1/extensions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List versions of an extension
+ *
+ * Returns a list of all versions for an extension
+ */
+export const extensionsListVersions = <ThrowOnError extends boolean = true>(
+  options: Options<ExtensionsListVersionsData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<ExtensionsListVersionsResponses, ExtensionsListVersionsErrors, ThrowOnError>({
+    url: "/api/v1/extensions/{extensionId}/versions",
+    ...options,
+  });
+
+/**
+ * Creates a new version of an extension
+ *
+ * Creates a new version of an extension
+ */
+export const extensionsCreateVersion = <ThrowOnError extends boolean = true>(
+  options: Options<ExtensionsCreateVersionData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<ExtensionsCreateVersionResponses, ExtensionsCreateVersionErrors, ThrowOnError>({
+    url: "/api/v1/extensions/{extensionId}/versions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Publishes a draft version of an extension
+ *
+ * Publishes a draft version of an extension
+ */
+export const extensionsPublishVersion = <ThrowOnError extends boolean = true>(
+  options: Options<ExtensionsPublishVersionData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<ExtensionsPublishVersionResponses, ExtensionsPublishVersionErrors, ThrowOnError>({
+    url: "/api/v1/extensions/{extensionId}/versions/{versionId}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Updates the version of an extension
+ *
+ * Updates the version of an extension
+ */
+export const extensionsUpdateVersion = <ThrowOnError extends boolean = true>(
+  options: Options<ExtensionsUpdateVersionData, ThrowOnError>,
+) =>
+  (options.client ?? client).put<ExtensionsUpdateVersionResponses, ExtensionsUpdateVersionErrors, ThrowOnError>({
+    url: "/api/v1/extensions/{extensionId}/versions/{versionId}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
 
 /**
  * List groups

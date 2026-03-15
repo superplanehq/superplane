@@ -20,7 +20,7 @@ var _ MappedNullable = &ComponentsListComponentsResponse{}
 
 // ComponentsListComponentsResponse struct for ComponentsListComponentsResponse
 type ComponentsListComponentsResponse struct {
-	Components []ComponentsComponent `json:"components,omitempty"`
+	Components []SuperplaneComponentsComponent `json:"components,omitempty"`
 }
 
 // NewComponentsListComponentsResponse instantiates a new ComponentsListComponentsResponse object
@@ -41,9 +41,9 @@ func NewComponentsListComponentsResponseWithDefaults() *ComponentsListComponents
 }
 
 // GetComponents returns the Components field value if set, zero value otherwise.
-func (o *ComponentsListComponentsResponse) GetComponents() []ComponentsComponent {
+func (o *ComponentsListComponentsResponse) GetComponents() []SuperplaneComponentsComponent {
 	if o == nil || IsNil(o.Components) {
-		var ret []ComponentsComponent
+		var ret []SuperplaneComponentsComponent
 		return ret
 	}
 	return o.Components
@@ -51,7 +51,7 @@ func (o *ComponentsListComponentsResponse) GetComponents() []ComponentsComponent
 
 // GetComponentsOk returns a tuple with the Components field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsListComponentsResponse) GetComponentsOk() ([]ComponentsComponent, bool) {
+func (o *ComponentsListComponentsResponse) GetComponentsOk() ([]SuperplaneComponentsComponent, bool) {
 	if o == nil || IsNil(o.Components) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *ComponentsListComponentsResponse) HasComponents() bool {
 	return false
 }
 
-// SetComponents gets a reference to the given []ComponentsComponent and assigns it to the Components field.
-func (o *ComponentsListComponentsResponse) SetComponents(v []ComponentsComponent) {
+// SetComponents gets a reference to the given []SuperplaneComponentsComponent and assigns it to the Components field.
+func (o *ComponentsListComponentsResponse) SetComponents(v []SuperplaneComponentsComponent) {
 	o.Components = v
 }
 

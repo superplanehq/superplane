@@ -20,14 +20,14 @@ var _ MappedNullable = &IntegrationsIntegrationDefinition{}
 
 // IntegrationsIntegrationDefinition struct for IntegrationsIntegrationDefinition
 type IntegrationsIntegrationDefinition struct {
-	Name          *string               `json:"name,omitempty"`
-	Label         *string               `json:"label,omitempty"`
-	Icon          *string               `json:"icon,omitempty"`
-	Description   *string               `json:"description,omitempty"`
-	Configuration []ConfigurationField  `json:"configuration,omitempty"`
-	Components    []ComponentsComponent `json:"components,omitempty"`
-	Triggers      []TriggersTrigger     `json:"triggers,omitempty"`
-	Instructions  *string               `json:"instructions,omitempty"`
+	Name          *string                         `json:"name,omitempty"`
+	Label         *string                         `json:"label,omitempty"`
+	Icon          *string                         `json:"icon,omitempty"`
+	Description   *string                         `json:"description,omitempty"`
+	Configuration []ConfigurationField            `json:"configuration,omitempty"`
+	Components    []SuperplaneComponentsComponent `json:"components,omitempty"`
+	Triggers      []SuperplaneTriggersTrigger     `json:"triggers,omitempty"`
+	Instructions  *string                         `json:"instructions,omitempty"`
 }
 
 // NewIntegrationsIntegrationDefinition instantiates a new IntegrationsIntegrationDefinition object
@@ -208,9 +208,9 @@ func (o *IntegrationsIntegrationDefinition) SetConfiguration(v []ConfigurationFi
 }
 
 // GetComponents returns the Components field value if set, zero value otherwise.
-func (o *IntegrationsIntegrationDefinition) GetComponents() []ComponentsComponent {
+func (o *IntegrationsIntegrationDefinition) GetComponents() []SuperplaneComponentsComponent {
 	if o == nil || IsNil(o.Components) {
-		var ret []ComponentsComponent
+		var ret []SuperplaneComponentsComponent
 		return ret
 	}
 	return o.Components
@@ -218,7 +218,7 @@ func (o *IntegrationsIntegrationDefinition) GetComponents() []ComponentsComponen
 
 // GetComponentsOk returns a tuple with the Components field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *IntegrationsIntegrationDefinition) GetComponentsOk() ([]ComponentsComponent, bool) {
+func (o *IntegrationsIntegrationDefinition) GetComponentsOk() ([]SuperplaneComponentsComponent, bool) {
 	if o == nil || IsNil(o.Components) {
 		return nil, false
 	}
@@ -234,15 +234,15 @@ func (o *IntegrationsIntegrationDefinition) HasComponents() bool {
 	return false
 }
 
-// SetComponents gets a reference to the given []ComponentsComponent and assigns it to the Components field.
-func (o *IntegrationsIntegrationDefinition) SetComponents(v []ComponentsComponent) {
+// SetComponents gets a reference to the given []SuperplaneComponentsComponent and assigns it to the Components field.
+func (o *IntegrationsIntegrationDefinition) SetComponents(v []SuperplaneComponentsComponent) {
 	o.Components = v
 }
 
 // GetTriggers returns the Triggers field value if set, zero value otherwise.
-func (o *IntegrationsIntegrationDefinition) GetTriggers() []TriggersTrigger {
+func (o *IntegrationsIntegrationDefinition) GetTriggers() []SuperplaneTriggersTrigger {
 	if o == nil || IsNil(o.Triggers) {
-		var ret []TriggersTrigger
+		var ret []SuperplaneTriggersTrigger
 		return ret
 	}
 	return o.Triggers
@@ -250,7 +250,7 @@ func (o *IntegrationsIntegrationDefinition) GetTriggers() []TriggersTrigger {
 
 // GetTriggersOk returns a tuple with the Triggers field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *IntegrationsIntegrationDefinition) GetTriggersOk() ([]TriggersTrigger, bool) {
+func (o *IntegrationsIntegrationDefinition) GetTriggersOk() ([]SuperplaneTriggersTrigger, bool) {
 	if o == nil || IsNil(o.Triggers) {
 		return nil, false
 	}
@@ -266,8 +266,8 @@ func (o *IntegrationsIntegrationDefinition) HasTriggers() bool {
 	return false
 }
 
-// SetTriggers gets a reference to the given []TriggersTrigger and assigns it to the Triggers field.
-func (o *IntegrationsIntegrationDefinition) SetTriggers(v []TriggersTrigger) {
+// SetTriggers gets a reference to the given []SuperplaneTriggersTrigger and assigns it to the Triggers field.
+func (o *IntegrationsIntegrationDefinition) SetTriggers(v []SuperplaneTriggersTrigger) {
 	o.Triggers = v
 }
 

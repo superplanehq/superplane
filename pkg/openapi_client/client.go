@@ -65,6 +65,8 @@ type APIClient struct {
 
 	ComponentAPI *ComponentAPIService
 
+	ExtensionAPI *ExtensionAPIService
+
 	GroupsAPI *GroupsAPIService
 
 	IntegrationAPI *IntegrationAPIService
@@ -110,6 +112,7 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.CanvasNodeExecutionAPI = (*CanvasNodeExecutionAPIService)(&c.common)
 	c.CanvasVersionAPI = (*CanvasVersionAPIService)(&c.common)
 	c.ComponentAPI = (*ComponentAPIService)(&c.common)
+	c.ExtensionAPI = (*ExtensionAPIService)(&c.common)
 	c.GroupsAPI = (*GroupsAPIService)(&c.common)
 	c.IntegrationAPI = (*IntegrationAPIService)(&c.common)
 	c.MeAPI = (*MeAPIService)(&c.common)

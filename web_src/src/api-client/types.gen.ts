@@ -503,19 +503,6 @@ export type CanvasesUpdateNodePauseResponse = {
   node?: ComponentsNode;
 };
 
-export type ComponentsComponent = {
-  name?: string;
-  label?: string;
-  description?: string;
-  configuration?: Array<ConfigurationField>;
-  outputChannels?: Array<SuperplaneComponentsOutputChannel>;
-  icon?: string;
-  color?: string;
-  exampleOutput?: {
-    [key: string]: unknown;
-  };
-};
-
 export type ComponentsComponentAction = {
   name?: string;
   description?: string;
@@ -523,7 +510,7 @@ export type ComponentsComponentAction = {
 };
 
 export type ComponentsDescribeComponentResponse = {
-  component?: ComponentsComponent;
+  component?: SuperplaneComponentsComponent;
 };
 
 export type ComponentsEdge = {
@@ -542,7 +529,7 @@ export type ComponentsListComponentActionsResponse = {
 };
 
 export type ComponentsListComponentsResponse = {
-  components?: Array<ComponentsComponent>;
+  components?: Array<SuperplaneComponentsComponent>;
 };
 
 export type ComponentsNode = {
@@ -704,6 +691,66 @@ export type ConfigurationVisibilityCondition = {
   values?: Array<string>;
 };
 
+export type ExtensionsCreateExtensionRequest = {
+  name?: string;
+};
+
+export type ExtensionsCreateExtensionResponse = {
+  extension?: ExtensionsExtension;
+};
+
+export type ExtensionsCreateVersionBody = {
+  spec?: ExtensionsVersionSpec;
+};
+
+export type ExtensionsCreateVersionResponse = {
+  version?: ExtensionsVersion;
+};
+
+export type ExtensionsExtension = {
+  metadata?: ExtensionsExtensionMetadata;
+};
+
+export type ExtensionsExtensionMetadata = {
+  name?: string;
+  description?: string;
+  createdAt?: string;
+};
+
+export type ExtensionsListExtensionsResponse = {
+  extensions?: Array<ExtensionsExtension>;
+};
+
+export type ExtensionsListVersionsResponse = {
+  versions?: Array<ExtensionsVersion>;
+};
+
+export type ExtensionsPublishVersionBody = {
+  version?: string;
+};
+
+export type ExtensionsPublishVersionResponse = {
+  version?: ExtensionsVersion;
+};
+
+export type ExtensionsUpdateVersionBody = {
+  spec?: ExtensionsVersionSpec;
+};
+
+export type ExtensionsUpdateVersionResponse = {
+  version?: ExtensionsVersion;
+};
+
+export type ExtensionsVersion = {
+  [key: string]: unknown;
+};
+
+export type ExtensionsVersionSpec = {
+  bundle?: string;
+  digest?: string;
+  manifest?: VersionManifest;
+};
+
 export type GroupsAddUserToGroupBody = {
   domainType?: AuthorizationDomainType;
   domainId?: string;
@@ -800,8 +847,8 @@ export type IntegrationsIntegrationDefinition = {
   icon?: string;
   description?: string;
   configuration?: Array<ConfigurationField>;
-  components?: Array<ComponentsComponent>;
-  triggers?: Array<TriggersTrigger>;
+  components?: Array<SuperplaneComponentsComponent>;
+  triggers?: Array<SuperplaneTriggersTrigger>;
   instructions?: string;
 };
 
@@ -860,7 +907,7 @@ export type OrganizationsCreateIntegrationBody = {
 };
 
 export type OrganizationsCreateIntegrationResponse = {
-  integration?: OrganizationsIntegration;
+  integration?: SuperplaneOrganizationsIntegration;
 };
 
 export type OrganizationsCreateInvitationBody = {
@@ -884,7 +931,7 @@ export type OrganizationsDeleteOrganizationResponse = {
 };
 
 export type OrganizationsDescribeIntegrationResponse = {
-  integration?: OrganizationsIntegration;
+  integration?: SuperplaneOrganizationsIntegration;
 };
 
 export type OrganizationsDescribeOrganizationResponse = {
@@ -897,12 +944,6 @@ export type OrganizationsGetAgentSettingsResponse = {
 
 export type OrganizationsGetInviteLinkResponse = {
   inviteLink?: OrganizationsInviteLink;
-};
-
-export type OrganizationsIntegration = {
-  metadata?: OrganizationsIntegrationMetadata;
-  spec?: OrganizationsIntegrationSpec;
-  status?: OrganizationsIntegrationStatus;
 };
 
 export type OrganizationsIntegrationMetadata = {
@@ -1010,7 +1051,7 @@ export type OrganizationsUpdateIntegrationBody = {
 };
 
 export type OrganizationsUpdateIntegrationResponse = {
-  integration?: OrganizationsIntegration;
+  integration?: SuperplaneOrganizationsIntegration;
 };
 
 export type OrganizationsUpdateInviteLinkBody = {
@@ -1244,6 +1285,19 @@ export type SuperplaneCanvasesUserRef = {
   name?: string;
 };
 
+export type SuperplaneComponentsComponent = {
+  name?: string;
+  label?: string;
+  description?: string;
+  configuration?: Array<ConfigurationField>;
+  outputChannels?: Array<SuperplaneComponentsOutputChannel>;
+  icon?: string;
+  color?: string;
+  exampleOutput?: {
+    [key: string]: unknown;
+  };
+};
+
 export type SuperplaneComponentsOutputChannel = {
   name?: string;
   label?: string;
@@ -1262,25 +1316,17 @@ export type SuperplaneMeUser = {
   hasToken?: boolean;
 };
 
+export type SuperplaneOrganizationsIntegration = {
+  metadata?: OrganizationsIntegrationMetadata;
+  spec?: OrganizationsIntegrationSpec;
+  status?: OrganizationsIntegrationStatus;
+};
+
 export type SuperplaneOrganizationsListIntegrationsResponse = {
-  integrations?: Array<OrganizationsIntegration>;
+  integrations?: Array<SuperplaneOrganizationsIntegration>;
 };
 
-export type SuperplaneUsersUser = {
-  metadata?: UsersUserMetadata;
-  spec?: UsersUserSpec;
-  status?: UsersUserStatus;
-};
-
-export type TriggersDescribeTriggerResponse = {
-  trigger?: TriggersTrigger;
-};
-
-export type TriggersListTriggersResponse = {
-  triggers?: Array<TriggersTrigger>;
-};
-
-export type TriggersTrigger = {
+export type SuperplaneTriggersTrigger = {
   name?: string;
   label?: string;
   description?: string;
@@ -1290,6 +1336,20 @@ export type TriggersTrigger = {
   exampleData?: {
     [key: string]: unknown;
   };
+};
+
+export type SuperplaneUsersUser = {
+  metadata?: UsersUserMetadata;
+  spec?: UsersUserSpec;
+  status?: UsersUserStatus;
+};
+
+export type TriggersDescribeTriggerResponse = {
+  trigger?: SuperplaneTriggersTrigger;
+};
+
+export type TriggersListTriggersResponse = {
+  triggers?: Array<SuperplaneTriggersTrigger>;
 };
 
 export type UsersAccountProvider = {
@@ -1343,6 +1403,39 @@ export type UsersUserSpec = {
 
 export type UsersUserStatus = {
   roleAssignments?: Array<UsersUserRoleAssignment>;
+};
+
+export type VersionManifest = {
+  integrations?: Array<VersionManifestIntegration>;
+  components?: Array<VersionManifestComponent>;
+  triggers?: Array<VersionManifestTrigger>;
+};
+
+export type VersionManifestComponent = {
+  name?: string;
+  label?: string;
+  description?: string;
+  configuration?: Array<ConfigurationField>;
+  outputChannels?: Array<SuperplaneComponentsOutputChannel>;
+  actions?: Array<ComponentsComponentAction>;
+};
+
+export type VersionManifestIntegration = {
+  name?: string;
+  label?: string;
+  description?: string;
+  instructions?: string;
+  configuration?: Array<ConfigurationField>;
+  resourceTypes?: Array<string>;
+  actions?: Array<ComponentsComponentAction>;
+};
+
+export type VersionManifestTrigger = {
+  name?: string;
+  label?: string;
+  description?: string;
+  configuration?: Array<ConfigurationField>;
+  actions?: Array<ComponentsComponentAction>;
 };
 
 export type WidgetsDescribeWidgetResponse = {
@@ -2517,6 +2610,171 @@ export type ComponentsListComponentActionsResponses = {
 
 export type ComponentsListComponentActionsResponse2 =
   ComponentsListComponentActionsResponses[keyof ComponentsListComponentActionsResponses];
+
+export type ExtensionsListExtensionsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    organizationId?: string;
+  };
+  url: "/api/v1/extensions";
+};
+
+export type ExtensionsListExtensionsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ExtensionsListExtensionsError = ExtensionsListExtensionsErrors[keyof ExtensionsListExtensionsErrors];
+
+export type ExtensionsListExtensionsResponses = {
+  /**
+   * A successful response.
+   */
+  200: ExtensionsListExtensionsResponse;
+};
+
+export type ExtensionsListExtensionsResponse2 =
+  ExtensionsListExtensionsResponses[keyof ExtensionsListExtensionsResponses];
+
+export type ExtensionsCreateExtensionData = {
+  body: ExtensionsCreateExtensionRequest;
+  path?: never;
+  query?: never;
+  url: "/api/v1/extensions";
+};
+
+export type ExtensionsCreateExtensionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ExtensionsCreateExtensionError = ExtensionsCreateExtensionErrors[keyof ExtensionsCreateExtensionErrors];
+
+export type ExtensionsCreateExtensionResponses = {
+  /**
+   * A successful response.
+   */
+  200: ExtensionsCreateExtensionResponse;
+};
+
+export type ExtensionsCreateExtensionResponse2 =
+  ExtensionsCreateExtensionResponses[keyof ExtensionsCreateExtensionResponses];
+
+export type ExtensionsListVersionsData = {
+  body?: never;
+  path: {
+    extensionId: string;
+  };
+  query?: never;
+  url: "/api/v1/extensions/{extensionId}/versions";
+};
+
+export type ExtensionsListVersionsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ExtensionsListVersionsError = ExtensionsListVersionsErrors[keyof ExtensionsListVersionsErrors];
+
+export type ExtensionsListVersionsResponses = {
+  /**
+   * A successful response.
+   */
+  200: ExtensionsListVersionsResponse;
+};
+
+export type ExtensionsListVersionsResponse2 = ExtensionsListVersionsResponses[keyof ExtensionsListVersionsResponses];
+
+export type ExtensionsCreateVersionData = {
+  body: ExtensionsCreateVersionBody;
+  path: {
+    extensionId: string;
+  };
+  query?: never;
+  url: "/api/v1/extensions/{extensionId}/versions";
+};
+
+export type ExtensionsCreateVersionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ExtensionsCreateVersionError = ExtensionsCreateVersionErrors[keyof ExtensionsCreateVersionErrors];
+
+export type ExtensionsCreateVersionResponses = {
+  /**
+   * A successful response.
+   */
+  200: ExtensionsCreateVersionResponse;
+};
+
+export type ExtensionsCreateVersionResponse2 = ExtensionsCreateVersionResponses[keyof ExtensionsCreateVersionResponses];
+
+export type ExtensionsPublishVersionData = {
+  body: ExtensionsPublishVersionBody;
+  path: {
+    extensionId: string;
+    versionId: string;
+  };
+  query?: never;
+  url: "/api/v1/extensions/{extensionId}/versions/{versionId}";
+};
+
+export type ExtensionsPublishVersionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ExtensionsPublishVersionError = ExtensionsPublishVersionErrors[keyof ExtensionsPublishVersionErrors];
+
+export type ExtensionsPublishVersionResponses = {
+  /**
+   * A successful response.
+   */
+  200: ExtensionsPublishVersionResponse;
+};
+
+export type ExtensionsPublishVersionResponse2 =
+  ExtensionsPublishVersionResponses[keyof ExtensionsPublishVersionResponses];
+
+export type ExtensionsUpdateVersionData = {
+  body: ExtensionsUpdateVersionBody;
+  path: {
+    extensionId: string;
+    versionId: string;
+  };
+  query?: never;
+  url: "/api/v1/extensions/{extensionId}/versions/{versionId}";
+};
+
+export type ExtensionsUpdateVersionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ExtensionsUpdateVersionError = ExtensionsUpdateVersionErrors[keyof ExtensionsUpdateVersionErrors];
+
+export type ExtensionsUpdateVersionResponses = {
+  /**
+   * A successful response.
+   */
+  200: ExtensionsUpdateVersionResponse;
+};
+
+export type ExtensionsUpdateVersionResponse2 = ExtensionsUpdateVersionResponses[keyof ExtensionsUpdateVersionResponses];
 
 export type GroupsListGroupsData = {
   body?: never;

@@ -15,35 +15,35 @@ import (
 	"encoding/json"
 )
 
-// checks if the OrganizationsIntegration type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &OrganizationsIntegration{}
+// checks if the SuperplaneOrganizationsIntegration type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &SuperplaneOrganizationsIntegration{}
 
-// OrganizationsIntegration struct for OrganizationsIntegration
-type OrganizationsIntegration struct {
+// SuperplaneOrganizationsIntegration struct for SuperplaneOrganizationsIntegration
+type SuperplaneOrganizationsIntegration struct {
 	Metadata *OrganizationsIntegrationMetadata `json:"metadata,omitempty"`
 	Spec     *OrganizationsIntegrationSpec     `json:"spec,omitempty"`
 	Status   *OrganizationsIntegrationStatus   `json:"status,omitempty"`
 }
 
-// NewOrganizationsIntegration instantiates a new OrganizationsIntegration object
+// NewSuperplaneOrganizationsIntegration instantiates a new SuperplaneOrganizationsIntegration object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewOrganizationsIntegration() *OrganizationsIntegration {
-	this := OrganizationsIntegration{}
+func NewSuperplaneOrganizationsIntegration() *SuperplaneOrganizationsIntegration {
+	this := SuperplaneOrganizationsIntegration{}
 	return &this
 }
 
-// NewOrganizationsIntegrationWithDefaults instantiates a new OrganizationsIntegration object
+// NewSuperplaneOrganizationsIntegrationWithDefaults instantiates a new SuperplaneOrganizationsIntegration object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewOrganizationsIntegrationWithDefaults() *OrganizationsIntegration {
-	this := OrganizationsIntegration{}
+func NewSuperplaneOrganizationsIntegrationWithDefaults() *SuperplaneOrganizationsIntegration {
+	this := SuperplaneOrganizationsIntegration{}
 	return &this
 }
 
 // GetMetadata returns the Metadata field value if set, zero value otherwise.
-func (o *OrganizationsIntegration) GetMetadata() OrganizationsIntegrationMetadata {
+func (o *SuperplaneOrganizationsIntegration) GetMetadata() OrganizationsIntegrationMetadata {
 	if o == nil || IsNil(o.Metadata) {
 		var ret OrganizationsIntegrationMetadata
 		return ret
@@ -53,7 +53,7 @@ func (o *OrganizationsIntegration) GetMetadata() OrganizationsIntegrationMetadat
 
 // GetMetadataOk returns a tuple with the Metadata field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *OrganizationsIntegration) GetMetadataOk() (*OrganizationsIntegrationMetadata, bool) {
+func (o *SuperplaneOrganizationsIntegration) GetMetadataOk() (*OrganizationsIntegrationMetadata, bool) {
 	if o == nil || IsNil(o.Metadata) {
 		return nil, false
 	}
@@ -61,7 +61,7 @@ func (o *OrganizationsIntegration) GetMetadataOk() (*OrganizationsIntegrationMet
 }
 
 // HasMetadata returns a boolean if a field has been set.
-func (o *OrganizationsIntegration) HasMetadata() bool {
+func (o *SuperplaneOrganizationsIntegration) HasMetadata() bool {
 	if o != nil && !IsNil(o.Metadata) {
 		return true
 	}
@@ -70,12 +70,12 @@ func (o *OrganizationsIntegration) HasMetadata() bool {
 }
 
 // SetMetadata gets a reference to the given OrganizationsIntegrationMetadata and assigns it to the Metadata field.
-func (o *OrganizationsIntegration) SetMetadata(v OrganizationsIntegrationMetadata) {
+func (o *SuperplaneOrganizationsIntegration) SetMetadata(v OrganizationsIntegrationMetadata) {
 	o.Metadata = &v
 }
 
 // GetSpec returns the Spec field value if set, zero value otherwise.
-func (o *OrganizationsIntegration) GetSpec() OrganizationsIntegrationSpec {
+func (o *SuperplaneOrganizationsIntegration) GetSpec() OrganizationsIntegrationSpec {
 	if o == nil || IsNil(o.Spec) {
 		var ret OrganizationsIntegrationSpec
 		return ret
@@ -85,7 +85,7 @@ func (o *OrganizationsIntegration) GetSpec() OrganizationsIntegrationSpec {
 
 // GetSpecOk returns a tuple with the Spec field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *OrganizationsIntegration) GetSpecOk() (*OrganizationsIntegrationSpec, bool) {
+func (o *SuperplaneOrganizationsIntegration) GetSpecOk() (*OrganizationsIntegrationSpec, bool) {
 	if o == nil || IsNil(o.Spec) {
 		return nil, false
 	}
@@ -93,7 +93,7 @@ func (o *OrganizationsIntegration) GetSpecOk() (*OrganizationsIntegrationSpec, b
 }
 
 // HasSpec returns a boolean if a field has been set.
-func (o *OrganizationsIntegration) HasSpec() bool {
+func (o *SuperplaneOrganizationsIntegration) HasSpec() bool {
 	if o != nil && !IsNil(o.Spec) {
 		return true
 	}
@@ -102,12 +102,12 @@ func (o *OrganizationsIntegration) HasSpec() bool {
 }
 
 // SetSpec gets a reference to the given OrganizationsIntegrationSpec and assigns it to the Spec field.
-func (o *OrganizationsIntegration) SetSpec(v OrganizationsIntegrationSpec) {
+func (o *SuperplaneOrganizationsIntegration) SetSpec(v OrganizationsIntegrationSpec) {
 	o.Spec = &v
 }
 
 // GetStatus returns the Status field value if set, zero value otherwise.
-func (o *OrganizationsIntegration) GetStatus() OrganizationsIntegrationStatus {
+func (o *SuperplaneOrganizationsIntegration) GetStatus() OrganizationsIntegrationStatus {
 	if o == nil || IsNil(o.Status) {
 		var ret OrganizationsIntegrationStatus
 		return ret
@@ -117,7 +117,7 @@ func (o *OrganizationsIntegration) GetStatus() OrganizationsIntegrationStatus {
 
 // GetStatusOk returns a tuple with the Status field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *OrganizationsIntegration) GetStatusOk() (*OrganizationsIntegrationStatus, bool) {
+func (o *SuperplaneOrganizationsIntegration) GetStatusOk() (*OrganizationsIntegrationStatus, bool) {
 	if o == nil || IsNil(o.Status) {
 		return nil, false
 	}
@@ -125,7 +125,7 @@ func (o *OrganizationsIntegration) GetStatusOk() (*OrganizationsIntegrationStatu
 }
 
 // HasStatus returns a boolean if a field has been set.
-func (o *OrganizationsIntegration) HasStatus() bool {
+func (o *SuperplaneOrganizationsIntegration) HasStatus() bool {
 	if o != nil && !IsNil(o.Status) {
 		return true
 	}
@@ -134,11 +134,11 @@ func (o *OrganizationsIntegration) HasStatus() bool {
 }
 
 // SetStatus gets a reference to the given OrganizationsIntegrationStatus and assigns it to the Status field.
-func (o *OrganizationsIntegration) SetStatus(v OrganizationsIntegrationStatus) {
+func (o *SuperplaneOrganizationsIntegration) SetStatus(v OrganizationsIntegrationStatus) {
 	o.Status = &v
 }
 
-func (o OrganizationsIntegration) MarshalJSON() ([]byte, error) {
+func (o SuperplaneOrganizationsIntegration) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -146,7 +146,7 @@ func (o OrganizationsIntegration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o OrganizationsIntegration) ToMap() (map[string]interface{}, error) {
+func (o SuperplaneOrganizationsIntegration) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Metadata) {
 		toSerialize["metadata"] = o.Metadata
@@ -160,38 +160,38 @@ func (o OrganizationsIntegration) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableOrganizationsIntegration struct {
-	value *OrganizationsIntegration
+type NullableSuperplaneOrganizationsIntegration struct {
+	value *SuperplaneOrganizationsIntegration
 	isSet bool
 }
 
-func (v NullableOrganizationsIntegration) Get() *OrganizationsIntegration {
+func (v NullableSuperplaneOrganizationsIntegration) Get() *SuperplaneOrganizationsIntegration {
 	return v.value
 }
 
-func (v *NullableOrganizationsIntegration) Set(val *OrganizationsIntegration) {
+func (v *NullableSuperplaneOrganizationsIntegration) Set(val *SuperplaneOrganizationsIntegration) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableOrganizationsIntegration) IsSet() bool {
+func (v NullableSuperplaneOrganizationsIntegration) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableOrganizationsIntegration) Unset() {
+func (v *NullableSuperplaneOrganizationsIntegration) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableOrganizationsIntegration(val *OrganizationsIntegration) *NullableOrganizationsIntegration {
-	return &NullableOrganizationsIntegration{value: val, isSet: true}
+func NewNullableSuperplaneOrganizationsIntegration(val *SuperplaneOrganizationsIntegration) *NullableSuperplaneOrganizationsIntegration {
+	return &NullableSuperplaneOrganizationsIntegration{value: val, isSet: true}
 }
 
-func (v NullableOrganizationsIntegration) MarshalJSON() ([]byte, error) {
+func (v NullableSuperplaneOrganizationsIntegration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableOrganizationsIntegration) UnmarshalJSON(src []byte) error {
+func (v *NullableSuperplaneOrganizationsIntegration) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

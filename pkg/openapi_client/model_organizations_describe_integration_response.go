@@ -20,7 +20,7 @@ var _ MappedNullable = &OrganizationsDescribeIntegrationResponse{}
 
 // OrganizationsDescribeIntegrationResponse struct for OrganizationsDescribeIntegrationResponse
 type OrganizationsDescribeIntegrationResponse struct {
-	Integration *OrganizationsIntegration `json:"integration,omitempty"`
+	Integration *SuperplaneOrganizationsIntegration `json:"integration,omitempty"`
 }
 
 // NewOrganizationsDescribeIntegrationResponse instantiates a new OrganizationsDescribeIntegrationResponse object
@@ -41,9 +41,9 @@ func NewOrganizationsDescribeIntegrationResponseWithDefaults() *OrganizationsDes
 }
 
 // GetIntegration returns the Integration field value if set, zero value otherwise.
-func (o *OrganizationsDescribeIntegrationResponse) GetIntegration() OrganizationsIntegration {
+func (o *OrganizationsDescribeIntegrationResponse) GetIntegration() SuperplaneOrganizationsIntegration {
 	if o == nil || IsNil(o.Integration) {
-		var ret OrganizationsIntegration
+		var ret SuperplaneOrganizationsIntegration
 		return ret
 	}
 	return *o.Integration
@@ -51,7 +51,7 @@ func (o *OrganizationsDescribeIntegrationResponse) GetIntegration() Organization
 
 // GetIntegrationOk returns a tuple with the Integration field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *OrganizationsDescribeIntegrationResponse) GetIntegrationOk() (*OrganizationsIntegration, bool) {
+func (o *OrganizationsDescribeIntegrationResponse) GetIntegrationOk() (*SuperplaneOrganizationsIntegration, bool) {
 	if o == nil || IsNil(o.Integration) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *OrganizationsDescribeIntegrationResponse) HasIntegration() bool {
 	return false
 }
 
-// SetIntegration gets a reference to the given OrganizationsIntegration and assigns it to the Integration field.
-func (o *OrganizationsDescribeIntegrationResponse) SetIntegration(v OrganizationsIntegration) {
+// SetIntegration gets a reference to the given SuperplaneOrganizationsIntegration and assigns it to the Integration field.
+func (o *OrganizationsDescribeIntegrationResponse) SetIntegration(v SuperplaneOrganizationsIntegration) {
 	o.Integration = &v
 }
 
