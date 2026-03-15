@@ -134,7 +134,6 @@ For each `ComponentDefinition`:
 - `integration` is copied as-is when present
 - `label` is copied as-is
 - `description` is copied as-is
-- `documentation` is copied as-is when present
 - `icon` is copied as-is
 - `color` is copied as-is
 - `configuration` is copied as-is and serialized
@@ -192,12 +191,10 @@ For each `TriggerDefinition`:
 - `integration` is copied as-is when present
 - `label` is copied as-is
 - `description` is copied as-is
-- `documentation` is copied as-is when present
 - `icon` is copied as-is
 - `color` is copied as-is
 - `configuration` is copied as-is and serialized
 - `actions` defaults to `[]` when omitted
-- `exampleData` is copied as-is when present
 
 ## Static Data Rules
 

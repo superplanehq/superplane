@@ -16,6 +16,7 @@ import (
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
+	pbExtensions "github.com/superplanehq/superplane/pkg/protos/extensions"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	mepb "github.com/superplanehq/superplane/pkg/protos/me"
@@ -127,6 +128,9 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 
 	serviceAccountsService := NewServiceAccountsService(authService)
 	pbServiceAccounts.RegisterServiceAccountsServer(grpcServer, serviceAccountsService)
+
+	extensionService := NewExtensionService(registry)
+	pbExtensions.RegisterExtensionsServer(grpcServer, extensionService)
 
 	reflection.Register(grpcServer)
 

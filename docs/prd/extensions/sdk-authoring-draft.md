@@ -175,7 +175,6 @@ interface TriggerDefinition {
   color: string;
   integration?: string;
   configuration: readonly ConfigurationField[];
-  exampleData?: RuntimeValue;
   actions?: readonly ActionDefinition[];
   setup?(context: HandlerContext): Promise<void> | void;
   handleAction?(context: ActionHandlerContext): Promise<RuntimeValue> | RuntimeValue;

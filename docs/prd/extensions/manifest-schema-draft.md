@@ -129,8 +129,6 @@ components:
     integration: cloudflare
     label: Create DNS Record
     description: Create a DNS record in a Cloudflare zone
-    documentation: |
-      The Create DNS Record component creates...
     icon: cloud
     color: orange
     outputChannels:
@@ -146,7 +144,6 @@ Fields:
 - `integration`: optional integration name reference; this may refer to an integration defined by the same extension or by another installed extension
 - `label`: UI display label
 - `description`: short description
-- `documentation`: markdown documentation
 - `icon`: UI icon identifier
 - `color`: UI color token
 - `outputChannels`: declared output channels
@@ -175,14 +172,8 @@ triggers:
     integration: github
     label: Issue Opened
     description: Emits when a GitHub issue is opened
-    documentation: |
-      ...
     icon: github
     color: black
-    exampleData:
-      action: opened
-      issue:
-        number: 123
     configuration: []
     actions: []
 ```
@@ -193,10 +184,8 @@ Fields:
 - `integration`: optional integration name reference; this may refer to an integration defined by the same extension or by another installed extension
 - `label`: UI display label
 - `description`: short description
-- `documentation`: markdown documentation
 - `icon`: UI icon identifier
 - `color`: UI color token
-- `exampleData`: example emitted data
 - `configuration`: configuration fields shown to users
 - `actions`: static action definitions
 
@@ -470,8 +459,6 @@ components:
     integration: cloudflare
     label: Create DNS Record
     description: Create a DNS record in a Cloudflare zone
-    documentation: |
-      The Create DNS Record component creates a DNS record in a Cloudflare zone.
     icon: cloud
     color: orange
     outputChannels:

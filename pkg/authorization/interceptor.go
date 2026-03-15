@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
+	pbExtensions "github.com/superplanehq/superplane/pkg/protos/extensions"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbOrganization "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
@@ -147,6 +148,14 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbServiceAccounts.ServiceAccounts_UpdateServiceAccount_FullMethodName:          {Resource: "service_accounts", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbServiceAccounts.ServiceAccounts_DeleteServiceAccount_FullMethodName:          {Resource: "service_accounts", Action: "delete", DomainType: models.DomainTypeOrganization},
 		pbServiceAccounts.ServiceAccounts_RegenerateServiceAccountToken_FullMethodName: {Resource: "service_accounts", Action: "update", DomainType: models.DomainTypeOrganization},
+
+		// Extensions rules
+		pbExtensions.Extensions_ListExtensions_FullMethodName:  {Resource: "extensions", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbExtensions.Extensions_CreateExtension_FullMethodName: {Resource: "extensions", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbExtensions.Extensions_CreateVersion_FullMethodName:   {Resource: "extensions", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbExtensions.Extensions_UpdateVersion_FullMethodName:   {Resource: "extensions", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbExtensions.Extensions_PublishVersion_FullMethodName:  {Resource: "extensions", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbExtensions.Extensions_ListVersions_FullMethodName:    {Resource: "extensions", Action: "read", DomainType: models.DomainTypeOrganization},
 	}
 
 	return &AuthorizationInterceptor{

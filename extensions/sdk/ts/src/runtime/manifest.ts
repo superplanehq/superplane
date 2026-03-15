@@ -1,4 +1,10 @@
-import { DEFAULT_OUTPUT_CHANNEL, type ComponentDefinition, type ExtensionDefinition, type IntegrationDefinition, type TriggerDefinition } from "../block-definitions.js";
+import {
+  DEFAULT_OUTPUT_CHANNEL,
+  type ComponentDefinition,
+  type ExtensionDefinition,
+  type IntegrationDefinition,
+  type TriggerDefinition,
+} from "../block-definitions.js";
 import type {
   ActionDefinition,
   ComponentBlock,
@@ -28,7 +34,9 @@ export function deriveManifest(definition: ExtensionDefinition): ManifestV1 {
   };
 }
 
-export function validateExtensionDefinition(definition: ExtensionDefinition): void {
+export function validateExtensionDefinition(
+  definition: ExtensionDefinition,
+): void {
   assertNonEmpty(definition.metadata.id, "extension metadata.id");
   assertNonEmpty(definition.metadata.name, "extension metadata.name");
   assertNonEmpty(definition.metadata.version, "extension metadata.version");
@@ -38,20 +46,43 @@ export function validateExtensionDefinition(definition: ExtensionDefinition): vo
   for (const integration of definition.integrations ?? []) {
     assertUniqueName(seenNames, integration.name);
     assertNonEmpty(integration.label, `integration ${integration.name} label`);
-    assertNonEmpty(integration.description, `integration ${integration.name} description`);
-    assertArray(integration.configuration, `integration ${integration.name} configuration`);
-    assertActionDefinitions(integration.actions ?? [], `integration ${integration.name} actions`);
+    assertNonEmpty(
+      integration.description,
+      `integration ${integration.name} description`,
+    );
+    assertArray(
+      integration.configuration,
+      `integration ${integration.name} configuration`,
+    );
+    assertActionDefinitions(
+      integration.actions ?? [],
+      `integration ${integration.name} actions`,
+    );
   }
 
   for (const component of definition.components ?? []) {
     assertUniqueName(seenNames, component.name);
     assertNonEmpty(component.label, `component ${component.name} label`);
-    assertNonEmpty(component.description, `component ${component.name} description`);
-    assertArray(component.configuration, `component ${component.name} configuration`);
-    assertActionDefinitions(component.actions ?? [], `component ${component.name} actions`);
+    assertNonEmpty(
+      component.description,
+      `component ${component.name} description`,
+    );
+    assertArray(
+      component.configuration,
+      `component ${component.name} configuration`,
+    );
+    assertActionDefinitions(
+      component.actions ?? [],
+      `component ${component.name} actions`,
+    );
 
-    if (usesIntegrationResource(component.configuration) && !component.integration) {
-      throw new Error(`component ${component.name} uses integration-resource fields and must declare integration`);
+    if (
+      usesIntegrationResource(component.configuration) &&
+      !component.integration
+    ) {
+      throw new Error(
+        `component ${component.name} uses integration-resource fields and must declare integration`,
+      );
     }
   }
 
@@ -60,15 +91,25 @@ export function validateExtensionDefinition(definition: ExtensionDefinition): vo
     assertNonEmpty(trigger.label, `trigger ${trigger.name} label`);
     assertNonEmpty(trigger.description, `trigger ${trigger.name} description`);
     assertArray(trigger.configuration, `trigger ${trigger.name} configuration`);
-    assertActionDefinitions(trigger.actions ?? [], `trigger ${trigger.name} actions`);
+    assertActionDefinitions(
+      trigger.actions ?? [],
+      `trigger ${trigger.name} actions`,
+    );
 
-    if (usesIntegrationResource(trigger.configuration) && !trigger.integration) {
-      throw new Error(`trigger ${trigger.name} uses integration-resource fields and must declare integration`);
+    if (
+      usesIntegrationResource(trigger.configuration) &&
+      !trigger.integration
+    ) {
+      throw new Error(
+        `trigger ${trigger.name} uses integration-resource fields and must declare integration`,
+      );
     }
   }
 }
 
-function serializeIntegration(integration: IntegrationDefinition): IntegrationBlock {
+function serializeIntegration(
+  integration: IntegrationDefinition,
+): IntegrationBlock {
   return {
     name: integration.name,
     label: integration.label,
@@ -87,7 +128,6 @@ function serializeComponent(component: ComponentDefinition): ComponentBlock {
     integration: component.integration,
     label: component.label,
     description: component.description,
-    documentation: component.documentation,
     icon: component.icon,
     color: component.color,
     outputChannels: [...(component.outputChannels ?? [DEFAULT_OUTPUT_CHANNEL])],
@@ -102,20 +142,22 @@ function serializeTrigger(trigger: TriggerDefinition): TriggerBlock {
     integration: trigger.integration,
     label: trigger.label,
     description: trigger.description,
-    documentation: trigger.documentation,
     icon: trigger.icon,
     color: trigger.color,
-    exampleData: trigger.exampleData,
     configuration: cloneFields(trigger.configuration),
     actions: cloneActions(trigger.actions ?? []),
   };
 }
 
-function cloneFields(fields: readonly ConfigurationField[]): ConfigurationField[] {
+function cloneFields(
+  fields: readonly ConfigurationField[],
+): ConfigurationField[] {
   return fields.map((field) => structuredClone(field));
 }
 
-function cloneActions(actions: readonly ActionDefinition[]): ActionDefinition[] {
+function cloneActions(
+  actions: readonly ActionDefinition[],
+): ActionDefinition[] {
   return actions.map((action) => ({
     ...structuredClone(action),
     parameters: cloneFields(action.parameters),
@@ -142,7 +184,10 @@ function assertArray(value: readonly unknown[], label: string): void {
   }
 }
 
-function assertActionDefinitions(actions: readonly ActionDefinition[], label: string): void {
+function assertActionDefinitions(
+  actions: readonly ActionDefinition[],
+  label: string,
+): void {
   if (!Array.isArray(actions)) {
     throw new Error(`${label} must be an array`);
   }
@@ -154,7 +199,9 @@ function assertActionDefinitions(actions: readonly ActionDefinition[], label: st
   }
 }
 
-function usesIntegrationResource(fields: readonly ConfigurationField[]): boolean {
+function usesIntegrationResource(
+  fields: readonly ConfigurationField[],
+): boolean {
   return fields.some((field) => field.type === "integration-resource");
 }
 

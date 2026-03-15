@@ -43,7 +43,6 @@ export interface ComponentBlock {
   integration?: string;
   label: string;
   description: string;
-  documentation?: string;
   icon: string;
   color: string;
   outputChannels: OutputChannel[];
@@ -56,10 +55,8 @@ export interface TriggerBlock {
   integration?: string;
   label: string;
   description: string;
-  documentation?: string;
   icon: string;
   color: string;
-  exampleData?: ManifestJSONValue;
   configuration: ConfigurationField[];
   actions: ActionDefinition[];
 }
@@ -131,7 +128,10 @@ export type ConfigurationFieldType =
   | "git-ref"
   | "secret-key";
 
-export interface BaseConfigurationField<TType extends ConfigurationFieldType, TDefault = ManifestJSONValue> {
+export interface BaseConfigurationField<
+  TType extends ConfigurationFieldType,
+  TDefault = ManifestJSONValue,
+> {
   name: string;
   label: string;
   placeholder?: string;
@@ -160,7 +160,8 @@ export interface TextField extends BaseConfigurationField<"text", string> {
   };
 }
 
-export interface ExpressionField extends BaseConfigurationField<"expression", string> {
+export interface ExpressionField
+  extends BaseConfigurationField<"expression", string> {
   typeOptions?: {
     expression?: ExpressionTypeOptions;
   };
@@ -174,7 +175,8 @@ export interface NumberField extends BaseConfigurationField<"number", number> {
   };
 }
 
-export interface BooleanField extends BaseConfigurationField<"boolean", boolean> {}
+export interface BooleanField
+  extends BaseConfigurationField<"boolean", boolean> {}
 
 export interface SelectField extends BaseConfigurationField<"select", string> {
   typeOptions: {
@@ -182,19 +184,22 @@ export interface SelectField extends BaseConfigurationField<"select", string> {
   };
 }
 
-export interface MultiSelectField extends BaseConfigurationField<"multi-select", string[]> {
+export interface MultiSelectField
+  extends BaseConfigurationField<"multi-select", string[]> {
   typeOptions: {
     multiSelect: MultiSelectTypeOptions;
   };
 }
 
-export interface ListField extends BaseConfigurationField<"list", ManifestJSONValue[]> {
+export interface ListField
+  extends BaseConfigurationField<"list", ManifestJSONValue[]> {
   typeOptions: {
     list: ListTypeOptions;
   };
 }
 
-export interface ObjectField extends BaseConfigurationField<"object", ManifestJSONValue> {
+export interface ObjectField
+  extends BaseConfigurationField<"object", ManifestJSONValue> {
   typeOptions: {
     object: ObjectTypeOptions;
   };
@@ -212,23 +217,31 @@ export interface DateField extends BaseConfigurationField<"date", string> {
   };
 }
 
-export interface DateTimeField extends BaseConfigurationField<"datetime", string> {
+export interface DateTimeField
+  extends BaseConfigurationField<"datetime", string> {
   typeOptions?: {
     dateTime?: DateTimeTypeOptions;
   };
 }
 
-export interface TimezoneField extends BaseConfigurationField<"timezone", string> {
+export interface TimezoneField
+  extends BaseConfigurationField<"timezone", string> {
   typeOptions?: {
     timezone?: TimezoneTypeOptions;
   };
 }
 
-export interface DaysOfWeekField extends BaseConfigurationField<"days-of-week", string[]> {}
+export interface DaysOfWeekField
+  extends BaseConfigurationField<"days-of-week", string[]> {}
 
-export interface TimeRangeField extends BaseConfigurationField<"time-range", { start: string; end: string }> {}
+export interface TimeRangeField
+  extends BaseConfigurationField<
+    "time-range",
+    { start: string; end: string }
+  > {}
 
-export interface DayInYearField extends BaseConfigurationField<"day-in-year", string> {
+export interface DayInYearField
+  extends BaseConfigurationField<"day-in-year", string> {
   typeOptions?: {
     dayInYear?: DayInYearTypeOptions;
   };
@@ -246,21 +259,25 @@ export interface RoleField extends BaseConfigurationField<"role", string> {}
 
 export interface GroupField extends BaseConfigurationField<"group", string> {}
 
-export interface IntegrationResourceField extends BaseConfigurationField<"integration-resource", string | string[]> {
+export interface IntegrationResourceField
+  extends BaseConfigurationField<"integration-resource", string | string[]> {
   typeOptions: {
     resource: ResourceTypeOptions;
   };
 }
 
-export interface AnyPredicateListField extends BaseConfigurationField<"any-predicate-list", Predicate[]> {
+export interface AnyPredicateListField
+  extends BaseConfigurationField<"any-predicate-list", Predicate[]> {
   typeOptions: {
     anyPredicateList: AnyPredicateListTypeOptions;
   };
 }
 
-export interface GitRefField extends BaseConfigurationField<"git-ref", string> {}
+export interface GitRefField
+  extends BaseConfigurationField<"git-ref", string> {}
 
-export interface SecretKeyField extends BaseConfigurationField<"secret-key", string> {}
+export interface SecretKeyField
+  extends BaseConfigurationField<"secret-key", string> {}
 
 export interface TypeOptions {
   number?: NumberTypeOptions;

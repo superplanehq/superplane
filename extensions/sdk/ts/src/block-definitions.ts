@@ -44,31 +44,54 @@ export interface ListResourcesInput {
   parameters?: Record<string, string>;
 }
 
-export type VoidHandler<TConfiguration = RuntimeValue, TInput = RuntimeValue> = (
-  context: HandlerContext<TConfiguration, TInput>,
-) => Promise<void> | void;
+export type VoidHandler<
+  TConfiguration = RuntimeValue,
+  TInput = RuntimeValue,
+> = (context: HandlerContext<TConfiguration, TInput>) => Promise<void> | void;
 
-export type ValueHandler<TOutput = RuntimeValue, TConfiguration = RuntimeValue, TInput = RuntimeValue> = (
+export type ValueHandler<
+  TOutput = RuntimeValue,
+  TConfiguration = RuntimeValue,
+  TInput = RuntimeValue,
+> = (
   context: HandlerContext<TConfiguration, TInput>,
 ) => Promise<TOutput> | TOutput;
 
-export type ActionHandler<TConfiguration = RuntimeValue, TParameters = Record<string, RuntimeValue>, TOutput = RuntimeValue> = (
+export type ActionHandler<
+  TConfiguration = RuntimeValue,
+  TParameters = Record<string, RuntimeValue>,
+  TOutput = RuntimeValue,
+> = (
   context: ActionHandlerContext<TConfiguration, TParameters>,
 ) => Promise<TOutput> | TOutput;
 
-export type WebhookHandler<TConfiguration = RuntimeValue, TOutput = WebhookResponse | void> = (
+export type WebhookHandler<
+  TConfiguration = RuntimeValue,
+  TOutput = WebhookResponse | void,
+> = (
   context: WebhookHandlerContext<TConfiguration>,
 ) => Promise<TOutput> | TOutput;
 
-export type IntegrationMessageHandler<TConfiguration = RuntimeValue, TOutput = RuntimeValue> = (
+export type IntegrationMessageHandler<
+  TConfiguration = RuntimeValue,
+  TOutput = RuntimeValue,
+> = (
   context: IntegrationMessageHandlerContext<TConfiguration>,
 ) => Promise<TOutput> | TOutput;
 
 export interface IntegrationWebhookHandler<TConfiguration = RuntimeValue> {
-  setup?(context: IntegrationWebhookHandlerContext): Promise<RuntimeValue> | RuntimeValue;
+  setup?(
+    context: IntegrationWebhookHandlerContext,
+  ): Promise<RuntimeValue> | RuntimeValue;
   cleanup?(context: IntegrationWebhookHandlerContext): Promise<void> | void;
-  compareConfig?(context: CompareWebhookConfigContext): Promise<boolean> | boolean;
-  merge?(context: MergeWebhookConfigContext): Promise<{ merged: RuntimeValue; changed: boolean }> | { merged: RuntimeValue; changed: boolean };
+  compareConfig?(
+    context: CompareWebhookConfigContext,
+  ): Promise<boolean> | boolean;
+  merge?(
+    context: MergeWebhookConfigContext,
+  ):
+    | Promise<{ merged: RuntimeValue; changed: boolean }>
+    | { merged: RuntimeValue; changed: boolean };
 }
 
 export interface BaseBlockDefinition {
@@ -78,22 +101,28 @@ export interface BaseBlockDefinition {
   icon: string;
 }
 
-export interface IntegrationDefinition<TConfiguration = RuntimeValue> extends BaseBlockDefinition {
+export interface IntegrationDefinition<TConfiguration = RuntimeValue>
+  extends BaseBlockDefinition {
   instructions?: string;
   configuration: readonly ConfigurationField[];
   actions?: readonly ActionDefinition[];
   resourceTypes?: readonly string[];
   sync?(context: HandlerContext<TConfiguration>): Promise<void> | void;
   cleanup?(context: HandlerContext<TConfiguration>): Promise<void> | void;
-  handleAction?(context: ActionHandlerContext<TConfiguration, Record<string, RuntimeValue>>): Promise<void> | void;
+  handleAction?(
+    context: ActionHandlerContext<TConfiguration, Record<string, RuntimeValue>>,
+  ): Promise<void> | void;
   listResources?(
     context: HandlerContext<TConfiguration, ListResourcesInput>,
   ): Promise<IntegrationResource[]> | IntegrationResource[];
-  handleRequest?(context: WebhookHandlerContext<TConfiguration>): Promise<WebhookResponse | void> | WebhookResponse | void;
+  handleRequest?(
+    context: WebhookHandlerContext<TConfiguration>,
+  ): Promise<WebhookResponse | void> | WebhookResponse | void;
   webhook?(): IntegrationWebhookHandler<TConfiguration>;
 }
 
-export interface ComponentDefinition<TConfiguration = RuntimeValue> extends BaseBlockDefinition {
+export interface ComponentDefinition<TConfiguration = RuntimeValue>
+  extends BaseBlockDefinition {
   integration?: string;
   documentation?: string;
   color: string;
@@ -103,29 +132,43 @@ export interface ComponentDefinition<TConfiguration = RuntimeValue> extends Base
   setup?(context: HandlerContext<TConfiguration>): Promise<void> | void;
   processQueueItem?(
     context: HandlerContext<TConfiguration>,
-  ): Promise<QueueProcessingResult | string | void> | QueueProcessingResult | string | void;
+  ):
+    | Promise<QueueProcessingResult | string | void>
+    | QueueProcessingResult
+    | string
+    | void;
   execute(context: HandlerContext<TConfiguration>): Promise<void> | void;
-  handleAction?(context: ActionHandlerContext<TConfiguration, Record<string, RuntimeValue>>): Promise<void> | void;
-  handleWebhook?(context: WebhookHandlerContext<TConfiguration>): Promise<WebhookResponse | void> | WebhookResponse | void;
+  handleAction?(
+    context: ActionHandlerContext<TConfiguration, Record<string, RuntimeValue>>,
+  ): Promise<void> | void;
+  handleWebhook?(
+    context: WebhookHandlerContext<TConfiguration>,
+  ): Promise<WebhookResponse | void> | WebhookResponse | void;
   cancel?(context: HandlerContext<TConfiguration>): Promise<void> | void;
   cleanup?(context: HandlerContext<TConfiguration>): Promise<void> | void;
-  onIntegrationMessage?(context: IntegrationMessageHandlerContext<TConfiguration>): Promise<void> | void;
+  onIntegrationMessage?(
+    context: IntegrationMessageHandlerContext<TConfiguration>,
+  ): Promise<void> | void;
 }
 
-export interface TriggerDefinition<TConfiguration = RuntimeValue> extends BaseBlockDefinition {
+export interface TriggerDefinition<TConfiguration = RuntimeValue>
+  extends BaseBlockDefinition {
   integration?: string;
   documentation?: string;
   color: string;
-  exampleData?: RuntimeValue;
   configuration: readonly ConfigurationField[];
   actions?: readonly ActionDefinition[];
   setup?(context: HandlerContext<TConfiguration>): Promise<void> | void;
   handleAction?(
     context: ActionHandlerContext<TConfiguration, Record<string, RuntimeValue>>,
   ): Promise<RuntimeValue> | RuntimeValue;
-  handleWebhook?(context: WebhookHandlerContext<TConfiguration>): Promise<WebhookResponse | void> | WebhookResponse | void;
+  handleWebhook?(
+    context: WebhookHandlerContext<TConfiguration>,
+  ): Promise<WebhookResponse | void> | WebhookResponse | void;
   cleanup?(context: HandlerContext<TConfiguration>): Promise<void> | void;
-  onIntegrationMessage?(context: IntegrationMessageHandlerContext<TConfiguration>): Promise<void> | void;
+  onIntegrationMessage?(
+    context: IntegrationMessageHandlerContext<TConfiguration>,
+  ): Promise<void> | void;
 }
 
 export interface ExtensionDefinition {
@@ -136,6 +179,8 @@ export interface ExtensionDefinition {
   triggers?: readonly TriggerDefinition<any>[];
 }
 
-export function defineExtension<TDefinition extends ExtensionDefinition>(definition: TDefinition): TDefinition {
+export function defineExtension<TDefinition extends ExtensionDefinition>(
+  definition: TDefinition,
+): TDefinition {
   return definition;
 }

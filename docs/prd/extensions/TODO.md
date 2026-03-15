@@ -1,78 +1,32 @@
 # Next Steps
 
-This file captures the next implementation steps after the current manifest, SDK, packager, and GitHub example work.
+1. Implement the server-side use of uploaded extension bundles.
+   Current API calls store extension version metadata, but the runtime-side bundle storage, validation, and execution path still needs to be finished in the main product.
 
-## Current State
+2. Finalize how the server consumes `manifest.json`.
+   The CLI already produces `dist/manifest.json`, but the public API now only accepts the tar-gzipped bundle and its digest.
 
-- Extension authoring uses `default defineExtension(...)`.
-- The packager derives the serialized manifest and discovered operations.
-- The engine and worker now exchange a stable invocation envelope.
-- The Go entrypoints are now split into:
-  - `cmd/cli` for user-machine workflows such as `package`, `register`, and `call`
-  - `cmd/server` for SaaS/self-hosted runtime responsibilities
-- The code layout is now split into:
-  - `pkg/cli`
-  - `pkg/server`
-  - `pkg/protocol`
-- `register` is now a CLI-side flow:
-  - the CLI packages and inspects the extension locally
-  - the CLI uploads the bundle, manifest, operations, and digest to the server
-  - the server stores the registered extension without executing it for inspection
-- `cmd/server` now uses `EXTENSIONS_DIR` as the extension storage root.
-- The server now launches extension workers by running the packaged bundle directly with Node.
-- `cli register --entry ...` packages into a temporary directory before upload, so the CLI does not need to keep registration artifacts around.
-- Local server development now has:
-  - a server `Dockerfile`
-  - a `docker-compose.yml`
-  - `make up` to build and start the server
-- The reference example is a GitHub extension with:
-  - `github` integration
-  - `github.createIssue`
-  - `github.closeIssue`
-  - `github.onPush`
+3. Replace manifest parsing DTOs with engine-native types.
+   The current server-side bundle processing uses temporary manifest-specific structs for integrations, components, triggers, actions, output channels, and configuration fields.
+   We should keep the explicit manifest parsing layer, but convert the stored representation to engine-native types such as `configuration.Field`, `core.Action`, and `core.OutputChannel`.
 
-## Next Work
+4. Endpoints exposing available components, triggers and integrations should include the ones coming from extensions.
 
-1. Implement server-side install from a registered extension.
-   Registration and installation become separate concepts:
-   - `register`: CLI uploads the extension package and metadata
-   - `install`: server-side action that makes a registered extension available for a tenant/runtime
+5. Implement the runtime execution plane.
+   The SDK worker protocol exists, but production runtime orchestration, artifact download, worker lifecycle, and sandbox strategy are still open work.
 
-2. Implement real runtime-context population from the server.
-   The current runtime harness is enough for packaging and dispatch validation, but the server still needs to populate the context contract intentionally:
-   - `integration.getConfig`
-   - `metadata`
-   - `executionState`
-   - `requests`
-   - `events`
-   - `webhook`
+6. Decide whether the watch mode should stay intentionally shallow or become recursive.
+   The current CLI watches the entrypoint directory plus `integrations/`, `components/`, and `triggers/`.
 
-3. Add server-level dispatch tests.
-   Add tests that prove the server invokes the correct handler and captures the expected runtime side effects for at least:
-   - `integrations.github.sync`
-   - `integrations.github.listResources`
-   - `components.github.createIssue.execute`
-   - `components.github.closeIssue.execute`
-   - `integrations.github.webhook.setup`
-   - `integrations.github.webhook.cleanup`
-
-4. Improve the CLI/API shape.
-   Move away from user-facing `--operation` strings like `components.github.createIssue.execute` and expose a cleaner invocation model based on:
-   - block type
-   - block name
-   - operation
-
-5. Start the sandbox-provider abstraction.
+7. Start the sandbox-provider abstraction.
    Once the invocation contract is stable, define the provider boundary for:
    - artifact-backed extension startup
    - outbound control-channel lifecycle
    - Cloud Run as the first backend
    - future custom Kubernetes backends
 
-## Out of Scope For The Immediate Next Slice
-
-- Fine-grained permission declarations in the manifest
-- Marketplace/install approval UX
-- Multi-provider production support
-- Full provider-specific integration brokering
-- A permanent local bundle/install-state workflow in the CLI
+8. Public registry of extensions
+  What we have right now is the equivalent of a private extension.
+  However, it would be really good to have a public registry of extensions.
+  Once we have that, we could even start focusing on implementing new integrations
+  through extensions available in that registry instead of as part of SuperPlane itself.
