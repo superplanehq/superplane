@@ -1,25 +1,25 @@
-import { ArrowLeft, CircleX, ExternalLink, Loader2, Plug, Trash2 } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { useState, useEffect, useMemo } from "react";
+import type { ConfigurationField } from "@/api-client";
+import { PermissionTooltip } from "@/components/PermissionGate";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import {
   useAvailableIntegrations,
   useDeleteIntegration,
   useIntegration,
   useUpdateIntegration,
 } from "@/hooks/useIntegrations";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
-import type { ConfigurationField } from "@/api-client";
-import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { getApiErrorMessage } from "@/utils/errors";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
-import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
-import { PermissionTooltip } from "@/components/PermissionGate";
-import { usePermissions } from "@/contexts/PermissionsContext";
-import { Alert, AlertDescription } from "@/ui/alert";
+import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { ArrowLeft, CircleX, ExternalLink, Loader2, Plug, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { renderIntegrationMetadata } from "./integrationMetadataRenderers";
 
 interface IntegrationDetailsProps {
@@ -155,7 +155,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     }
   };
 
-  const handleBrowserAction = async () => {
+  const handleBrowserAction = () => {
     if (!integration?.status?.browserAction) return;
 
     const { url, method, formFields } = integration.status.browserAction;
@@ -185,13 +185,6 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
       if (url) {
         window.open(url, "_blank");
       }
-    }
-
-    // Trigger a resync with installed=true so the backend transitions to ready
-    try {
-      await updateMutation.mutateAsync({ configuration: { ...configValues, installed: "true" } });
-    } catch {
-      // Resync is best-effort
     }
   };
 
