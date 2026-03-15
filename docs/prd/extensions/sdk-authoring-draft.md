@@ -43,7 +43,7 @@ Do not switch these imports to `.ts` unless the runtime/tooling changes to a Typ
 ## Top-Level Extension Definition
 
 ```ts
-import { defineExtension } from "@superplanehq/extension-sdk";
+import { defineExtension } from "@superplanehq/sdk";
 import { github } from "./integrations/github.js";
 import { createIssue } from "./components/create-issue.js";
 import { closeIssue } from "./components/close-issue.js";
@@ -94,7 +94,7 @@ interface IntegrationWebhookHandler {
 Example:
 
 ```ts
-import type { IntegrationDefinition } from "@superplanehq/extension-sdk";
+import type { IntegrationDefinition } from "@superplanehq/sdk";
 
 export const github = {
   name: "github",
@@ -146,7 +146,7 @@ interface ComponentDefinition {
 Example:
 
 ```ts
-import type { ComponentDefinition } from "@superplanehq/extension-sdk";
+import type { ComponentDefinition } from "@superplanehq/sdk";
 
 export const createDnsRecord = {
   name: "github.createIssue",

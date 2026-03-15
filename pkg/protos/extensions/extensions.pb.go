@@ -9,8 +9,8 @@ package extensions
 import (
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
-	components "github.com/superplanehq/superplane/pkg/protos/components"
-	configuration "github.com/superplanehq/superplane/pkg/protos/configuration"
+	_ "github.com/superplanehq/superplane/pkg/protos/components"
+	_ "github.com/superplanehq/superplane/pkg/protos/configuration"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -26,49 +26,49 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Version_State int32
+type ExtensionVersion_State int32
 
 const (
-	Version_STATE_DRAFT     Version_State = 0
-	Version_STATE_PUBLISHED Version_State = 1
+	ExtensionVersion_STATE_DRAFT     ExtensionVersion_State = 0
+	ExtensionVersion_STATE_PUBLISHED ExtensionVersion_State = 1
 )
 
-// Enum value maps for Version_State.
+// Enum value maps for ExtensionVersion_State.
 var (
-	Version_State_name = map[int32]string{
+	ExtensionVersion_State_name = map[int32]string{
 		0: "STATE_DRAFT",
 		1: "STATE_PUBLISHED",
 	}
-	Version_State_value = map[string]int32{
+	ExtensionVersion_State_value = map[string]int32{
 		"STATE_DRAFT":     0,
 		"STATE_PUBLISHED": 1,
 	}
 )
 
-func (x Version_State) Enum() *Version_State {
-	p := new(Version_State)
+func (x ExtensionVersion_State) Enum() *ExtensionVersion_State {
+	p := new(ExtensionVersion_State)
 	*p = x
 	return p
 }
 
-func (x Version_State) String() string {
+func (x ExtensionVersion_State) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (Version_State) Descriptor() protoreflect.EnumDescriptor {
+func (ExtensionVersion_State) Descriptor() protoreflect.EnumDescriptor {
 	return file_extensions_proto_enumTypes[0].Descriptor()
 }
 
-func (Version_State) Type() protoreflect.EnumType {
+func (ExtensionVersion_State) Type() protoreflect.EnumType {
 	return &file_extensions_proto_enumTypes[0]
 }
 
-func (x Version_State) Number() protoreflect.EnumNumber {
+func (x ExtensionVersion_State) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use Version_State.Descriptor instead.
-func (Version_State) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use ExtensionVersion_State.Descriptor instead.
+func (ExtensionVersion_State) EnumDescriptor() ([]byte, []int) {
 	return file_extensions_proto_rawDescGZIP(), []int{13, 0}
 }
 
@@ -163,6 +163,7 @@ func (x *ListExtensionsResponse) GetExtensions() []*Extension {
 type CreateExtensionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -200,6 +201,13 @@ func (*CreateExtensionRequest) Descriptor() ([]byte, []int) {
 func (x *CreateExtensionRequest) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateExtensionRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
 	}
 	return ""
 }
@@ -251,7 +259,8 @@ func (x *CreateExtensionResponse) GetExtension() *Extension {
 type CreateVersionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ExtensionId   string                 `protobuf:"bytes,1,opt,name=extension_id,json=extensionId,proto3" json:"extension_id,omitempty"`
-	Spec          *Version_Spec          `protobuf:"bytes,2,opt,name=spec,proto3" json:"spec,omitempty"`
+	Bundle        []byte                 `protobuf:"bytes,2,opt,name=bundle,proto3" json:"bundle,omitempty"`
+	Digest        string                 `protobuf:"bytes,3,opt,name=digest,proto3" json:"digest,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -293,16 +302,23 @@ func (x *CreateVersionRequest) GetExtensionId() string {
 	return ""
 }
 
-func (x *CreateVersionRequest) GetSpec() *Version_Spec {
+func (x *CreateVersionRequest) GetBundle() []byte {
 	if x != nil {
-		return x.Spec
+		return x.Bundle
 	}
 	return nil
 }
 
+func (x *CreateVersionRequest) GetDigest() string {
+	if x != nil {
+		return x.Digest
+	}
+	return ""
+}
+
 type CreateVersionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Version       *Version               `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
+	Version       *ExtensionVersion      `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -337,7 +353,7 @@ func (*CreateVersionResponse) Descriptor() ([]byte, []int) {
 	return file_extensions_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *CreateVersionResponse) GetVersion() *Version {
+func (x *CreateVersionResponse) GetVersion() *ExtensionVersion {
 	if x != nil {
 		return x.Version
 	}
@@ -348,7 +364,8 @@ type UpdateVersionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ExtensionId   string                 `protobuf:"bytes,1,opt,name=extension_id,json=extensionId,proto3" json:"extension_id,omitempty"`
 	VersionId     string                 `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
-	Spec          *Version_Spec          `protobuf:"bytes,3,opt,name=spec,proto3" json:"spec,omitempty"`
+	Bundle        []byte                 `protobuf:"bytes,3,opt,name=bundle,proto3" json:"bundle,omitempty"`
+	Digest        string                 `protobuf:"bytes,4,opt,name=digest,proto3" json:"digest,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -397,16 +414,23 @@ func (x *UpdateVersionRequest) GetVersionId() string {
 	return ""
 }
 
-func (x *UpdateVersionRequest) GetSpec() *Version_Spec {
+func (x *UpdateVersionRequest) GetBundle() []byte {
 	if x != nil {
-		return x.Spec
+		return x.Bundle
 	}
 	return nil
 }
 
+func (x *UpdateVersionRequest) GetDigest() string {
+	if x != nil {
+		return x.Digest
+	}
+	return ""
+}
+
 type UpdateVersionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Version       *Version               `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
+	Version       *ExtensionVersion      `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -441,7 +465,7 @@ func (*UpdateVersionResponse) Descriptor() ([]byte, []int) {
 	return file_extensions_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *UpdateVersionResponse) GetVersion() *Version {
+func (x *UpdateVersionResponse) GetVersion() *ExtensionVersion {
 	if x != nil {
 		return x.Version
 	}
@@ -510,7 +534,7 @@ func (x *PublishVersionRequest) GetVersion() string {
 
 type PublishVersionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Version       *Version               `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
+	Version       *ExtensionVersion      `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -545,7 +569,7 @@ func (*PublishVersionResponse) Descriptor() ([]byte, []int) {
 	return file_extensions_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *PublishVersionResponse) GetVersion() *Version {
+func (x *PublishVersionResponse) GetVersion() *ExtensionVersion {
 	if x != nil {
 		return x.Version
 	}
@@ -598,7 +622,7 @@ func (x *ListVersionsRequest) GetExtensionId() string {
 
 type ListVersionsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Versions      []*Version             `protobuf:"bytes,1,rep,name=versions,proto3" json:"versions,omitempty"`
+	Versions      []*ExtensionVersion    `protobuf:"bytes,1,rep,name=versions,proto3" json:"versions,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -633,7 +657,7 @@ func (*ListVersionsResponse) Descriptor() ([]byte, []int) {
 	return file_extensions_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *ListVersionsResponse) GetVersions() []*Version {
+func (x *ListVersionsResponse) GetVersions() []*ExtensionVersion {
 	if x != nil {
 		return x.Versions
 	}
@@ -684,26 +708,28 @@ func (x *Extension) GetMetadata() *Extension_Metadata {
 	return nil
 }
 
-type Version struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+type ExtensionVersion struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Metadata      *ExtensionVersion_Metadata `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Status        *ExtensionVersion_Status   `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Version) Reset() {
-	*x = Version{}
+func (x *ExtensionVersion) Reset() {
+	*x = ExtensionVersion{}
 	mi := &file_extensions_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Version) String() string {
+func (x *ExtensionVersion) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Version) ProtoMessage() {}
+func (*ExtensionVersion) ProtoMessage() {}
 
-func (x *Version) ProtoReflect() protoreflect.Message {
+func (x *ExtensionVersion) ProtoReflect() protoreflect.Message {
 	mi := &file_extensions_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -715,16 +741,31 @@ func (x *Version) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Version.ProtoReflect.Descriptor instead.
-func (*Version) Descriptor() ([]byte, []int) {
+// Deprecated: Use ExtensionVersion.ProtoReflect.Descriptor instead.
+func (*ExtensionVersion) Descriptor() ([]byte, []int) {
 	return file_extensions_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ExtensionVersion) GetMetadata() *ExtensionVersion_Metadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ExtensionVersion) GetStatus() *ExtensionVersion_Status {
+	if x != nil {
+		return x.Status
+	}
+	return nil
 }
 
 type Extension_Metadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -759,6 +800,13 @@ func (*Extension_Metadata) Descriptor() ([]byte, []int) {
 	return file_extensions_proto_rawDescGZIP(), []int{12, 0}
 }
 
+func (x *Extension_Metadata) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 func (x *Extension_Metadata) GetName() string {
 	if x != nil {
 		return x.Name
@@ -780,29 +828,30 @@ func (x *Extension_Metadata) GetCreatedAt() *timestamp.Timestamp {
 	return nil
 }
 
-type Version_Metadata struct {
+type ExtensionVersion_Metadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,2,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamp.Timestamp   `protobuf:"bytes,3,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
+	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Version_Metadata) Reset() {
-	*x = Version_Metadata{}
+func (x *ExtensionVersion_Metadata) Reset() {
+	*x = ExtensionVersion_Metadata{}
 	mi := &file_extensions_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Version_Metadata) String() string {
+func (x *ExtensionVersion_Metadata) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Version_Metadata) ProtoMessage() {}
+func (*ExtensionVersion_Metadata) ProtoMessage() {}
 
-func (x *Version_Metadata) ProtoReflect() protoreflect.Message {
+func (x *ExtensionVersion_Metadata) ProtoReflect() protoreflect.Message {
 	mi := &file_extensions_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -814,55 +863,60 @@ func (x *Version_Metadata) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Version_Metadata.ProtoReflect.Descriptor instead.
-func (*Version_Metadata) Descriptor() ([]byte, []int) {
+// Deprecated: Use ExtensionVersion_Metadata.ProtoReflect.Descriptor instead.
+func (*ExtensionVersion_Metadata) Descriptor() ([]byte, []int) {
 	return file_extensions_proto_rawDescGZIP(), []int{13, 0}
 }
 
-func (x *Version_Metadata) GetId() string {
+func (x *ExtensionVersion_Metadata) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *Version_Metadata) GetCreatedAt() *timestamp.Timestamp {
+func (x *ExtensionVersion_Metadata) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *ExtensionVersion_Metadata) GetCreatedAt() *timestamp.Timestamp {
 	if x != nil {
 		return x.CreatedAt
 	}
 	return nil
 }
 
-func (x *Version_Metadata) GetUpdatedAt() *timestamp.Timestamp {
+func (x *ExtensionVersion_Metadata) GetUpdatedAt() *timestamp.Timestamp {
 	if x != nil {
 		return x.UpdatedAt
 	}
 	return nil
 }
 
-type Version_Manifest struct {
-	state         protoimpl.MessageState          `protogen:"open.v1"`
-	Integrations  []*Version_Manifest_Integration `protobuf:"bytes,1,rep,name=integrations,proto3" json:"integrations,omitempty"`
-	Components    []*Version_Manifest_Component   `protobuf:"bytes,2,rep,name=components,proto3" json:"components,omitempty"`
-	Triggers      []*Version_Manifest_Trigger     `protobuf:"bytes,3,rep,name=triggers,proto3" json:"triggers,omitempty"`
+type ExtensionVersion_Status struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	State         ExtensionVersion_State `protobuf:"varint,1,opt,name=state,proto3,enum=Superplane.Extensions.ExtensionVersion_State" json:"state,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Version_Manifest) Reset() {
-	*x = Version_Manifest{}
+func (x *ExtensionVersion_Status) Reset() {
+	*x = ExtensionVersion_Status{}
 	mi := &file_extensions_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Version_Manifest) String() string {
+func (x *ExtensionVersion_Status) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Version_Manifest) ProtoMessage() {}
+func (*ExtensionVersion_Status) ProtoMessage() {}
 
-func (x *Version_Manifest) ProtoReflect() protoreflect.Message {
+func (x *ExtensionVersion_Status) ProtoReflect() protoreflect.Message {
 	mi := &file_extensions_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -874,386 +928,16 @@ func (x *Version_Manifest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Version_Manifest.ProtoReflect.Descriptor instead.
-func (*Version_Manifest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ExtensionVersion_Status.ProtoReflect.Descriptor instead.
+func (*ExtensionVersion_Status) Descriptor() ([]byte, []int) {
 	return file_extensions_proto_rawDescGZIP(), []int{13, 1}
 }
 
-func (x *Version_Manifest) GetIntegrations() []*Version_Manifest_Integration {
-	if x != nil {
-		return x.Integrations
-	}
-	return nil
-}
-
-func (x *Version_Manifest) GetComponents() []*Version_Manifest_Component {
-	if x != nil {
-		return x.Components
-	}
-	return nil
-}
-
-func (x *Version_Manifest) GetTriggers() []*Version_Manifest_Trigger {
-	if x != nil {
-		return x.Triggers
-	}
-	return nil
-}
-
-type Version_Spec struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Bundle        []byte                 `protobuf:"bytes,1,opt,name=bundle,proto3" json:"bundle,omitempty"`
-	Digest        string                 `protobuf:"bytes,2,opt,name=digest,proto3" json:"digest,omitempty"`
-	Manifest      *Version_Manifest      `protobuf:"bytes,3,opt,name=manifest,proto3" json:"manifest,omitempty"` // TODO: operations
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Version_Spec) Reset() {
-	*x = Version_Spec{}
-	mi := &file_extensions_proto_msgTypes[17]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Version_Spec) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Version_Spec) ProtoMessage() {}
-
-func (x *Version_Spec) ProtoReflect() protoreflect.Message {
-	mi := &file_extensions_proto_msgTypes[17]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Version_Spec.ProtoReflect.Descriptor instead.
-func (*Version_Spec) Descriptor() ([]byte, []int) {
-	return file_extensions_proto_rawDescGZIP(), []int{13, 2}
-}
-
-func (x *Version_Spec) GetBundle() []byte {
-	if x != nil {
-		return x.Bundle
-	}
-	return nil
-}
-
-func (x *Version_Spec) GetDigest() string {
-	if x != nil {
-		return x.Digest
-	}
-	return ""
-}
-
-func (x *Version_Spec) GetManifest() *Version_Manifest {
-	if x != nil {
-		return x.Manifest
-	}
-	return nil
-}
-
-type Version_Status struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	State         Version_State          `protobuf:"varint,1,opt,name=state,proto3,enum=Superplane.Extensions.Version_State" json:"state,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Version_Status) Reset() {
-	*x = Version_Status{}
-	mi := &file_extensions_proto_msgTypes[18]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Version_Status) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Version_Status) ProtoMessage() {}
-
-func (x *Version_Status) ProtoReflect() protoreflect.Message {
-	mi := &file_extensions_proto_msgTypes[18]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Version_Status.ProtoReflect.Descriptor instead.
-func (*Version_Status) Descriptor() ([]byte, []int) {
-	return file_extensions_proto_rawDescGZIP(), []int{13, 3}
-}
-
-func (x *Version_Status) GetState() Version_State {
+func (x *ExtensionVersion_Status) GetState() ExtensionVersion_State {
 	if x != nil {
 		return x.State
 	}
-	return Version_STATE_DRAFT
-}
-
-type Version_Manifest_Integration struct {
-	state         protoimpl.MessageState        `protogen:"open.v1"`
-	Name          string                        `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Label         string                        `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
-	Description   string                        `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Instructions  string                        `protobuf:"bytes,4,opt,name=instructions,proto3" json:"instructions,omitempty"`
-	Configuration []*configuration.Field        `protobuf:"bytes,5,rep,name=configuration,proto3" json:"configuration,omitempty"`
-	ResourceTypes []string                      `protobuf:"bytes,6,rep,name=resource_types,json=resourceTypes,proto3" json:"resource_types,omitempty"`
-	Actions       []*components.ComponentAction `protobuf:"bytes,7,rep,name=actions,proto3" json:"actions,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Version_Manifest_Integration) Reset() {
-	*x = Version_Manifest_Integration{}
-	mi := &file_extensions_proto_msgTypes[19]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Version_Manifest_Integration) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Version_Manifest_Integration) ProtoMessage() {}
-
-func (x *Version_Manifest_Integration) ProtoReflect() protoreflect.Message {
-	mi := &file_extensions_proto_msgTypes[19]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Version_Manifest_Integration.ProtoReflect.Descriptor instead.
-func (*Version_Manifest_Integration) Descriptor() ([]byte, []int) {
-	return file_extensions_proto_rawDescGZIP(), []int{13, 1, 0}
-}
-
-func (x *Version_Manifest_Integration) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *Version_Manifest_Integration) GetLabel() string {
-	if x != nil {
-		return x.Label
-	}
-	return ""
-}
-
-func (x *Version_Manifest_Integration) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
-}
-
-func (x *Version_Manifest_Integration) GetInstructions() string {
-	if x != nil {
-		return x.Instructions
-	}
-	return ""
-}
-
-func (x *Version_Manifest_Integration) GetConfiguration() []*configuration.Field {
-	if x != nil {
-		return x.Configuration
-	}
-	return nil
-}
-
-func (x *Version_Manifest_Integration) GetResourceTypes() []string {
-	if x != nil {
-		return x.ResourceTypes
-	}
-	return nil
-}
-
-func (x *Version_Manifest_Integration) GetActions() []*components.ComponentAction {
-	if x != nil {
-		return x.Actions
-	}
-	return nil
-}
-
-type Version_Manifest_Component struct {
-	state          protoimpl.MessageState        `protogen:"open.v1"`
-	Name           string                        `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Label          string                        `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
-	Description    string                        `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Configuration  []*configuration.Field        `protobuf:"bytes,4,rep,name=configuration,proto3" json:"configuration,omitempty"`
-	OutputChannels []*components.OutputChannel   `protobuf:"bytes,5,rep,name=output_channels,json=outputChannels,proto3" json:"output_channels,omitempty"`
-	Actions        []*components.ComponentAction `protobuf:"bytes,6,rep,name=actions,proto3" json:"actions,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *Version_Manifest_Component) Reset() {
-	*x = Version_Manifest_Component{}
-	mi := &file_extensions_proto_msgTypes[20]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Version_Manifest_Component) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Version_Manifest_Component) ProtoMessage() {}
-
-func (x *Version_Manifest_Component) ProtoReflect() protoreflect.Message {
-	mi := &file_extensions_proto_msgTypes[20]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Version_Manifest_Component.ProtoReflect.Descriptor instead.
-func (*Version_Manifest_Component) Descriptor() ([]byte, []int) {
-	return file_extensions_proto_rawDescGZIP(), []int{13, 1, 1}
-}
-
-func (x *Version_Manifest_Component) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *Version_Manifest_Component) GetLabel() string {
-	if x != nil {
-		return x.Label
-	}
-	return ""
-}
-
-func (x *Version_Manifest_Component) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
-}
-
-func (x *Version_Manifest_Component) GetConfiguration() []*configuration.Field {
-	if x != nil {
-		return x.Configuration
-	}
-	return nil
-}
-
-func (x *Version_Manifest_Component) GetOutputChannels() []*components.OutputChannel {
-	if x != nil {
-		return x.OutputChannels
-	}
-	return nil
-}
-
-func (x *Version_Manifest_Component) GetActions() []*components.ComponentAction {
-	if x != nil {
-		return x.Actions
-	}
-	return nil
-}
-
-type Version_Manifest_Trigger struct {
-	state         protoimpl.MessageState        `protogen:"open.v1"`
-	Name          string                        `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Label         string                        `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
-	Description   string                        `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Configuration []*configuration.Field        `protobuf:"bytes,4,rep,name=configuration,proto3" json:"configuration,omitempty"`
-	Actions       []*components.ComponentAction `protobuf:"bytes,5,rep,name=actions,proto3" json:"actions,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Version_Manifest_Trigger) Reset() {
-	*x = Version_Manifest_Trigger{}
-	mi := &file_extensions_proto_msgTypes[21]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Version_Manifest_Trigger) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Version_Manifest_Trigger) ProtoMessage() {}
-
-func (x *Version_Manifest_Trigger) ProtoReflect() protoreflect.Message {
-	mi := &file_extensions_proto_msgTypes[21]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Version_Manifest_Trigger.ProtoReflect.Descriptor instead.
-func (*Version_Manifest_Trigger) Descriptor() ([]byte, []int) {
-	return file_extensions_proto_rawDescGZIP(), []int{13, 1, 2}
-}
-
-func (x *Version_Manifest_Trigger) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *Version_Manifest_Trigger) GetLabel() string {
-	if x != nil {
-		return x.Label
-	}
-	return ""
-}
-
-func (x *Version_Manifest_Trigger) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
-}
-
-func (x *Version_Manifest_Trigger) GetConfiguration() []*configuration.Field {
-	if x != nil {
-		return x.Configuration
-	}
-	return nil
-}
-
-func (x *Version_Manifest_Trigger) GetActions() []*components.ComponentAction {
-	if x != nil {
-		return x.Actions
-	}
-	return nil
+	return ExtensionVersion_STATE_DRAFT
 }
 
 var File_extensions_proto protoreflect.FileDescriptor
@@ -1266,81 +950,57 @@ const file_extensions_proto_rawDesc = "" +
 	"\x16ListExtensionsResponse\x12@\n" +
 	"\n" +
 	"extensions\x18\x01 \x03(\v2 .Superplane.Extensions.ExtensionR\n" +
-	"extensions\",\n" +
+	"extensions\"N\n" +
 	"\x16CreateExtensionRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"Y\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\"Y\n" +
 	"\x17CreateExtensionResponse\x12>\n" +
-	"\textension\x18\x01 \x01(\v2 .Superplane.Extensions.ExtensionR\textension\"r\n" +
+	"\textension\x18\x01 \x01(\v2 .Superplane.Extensions.ExtensionR\textension\"i\n" +
 	"\x14CreateVersionRequest\x12!\n" +
-	"\fextension_id\x18\x01 \x01(\tR\vextensionId\x127\n" +
-	"\x04spec\x18\x02 \x01(\v2#.Superplane.Extensions.Version.SpecR\x04spec\"Q\n" +
-	"\x15CreateVersionResponse\x128\n" +
-	"\aversion\x18\x01 \x01(\v2\x1e.Superplane.Extensions.VersionR\aversion\"\x91\x01\n" +
+	"\fextension_id\x18\x01 \x01(\tR\vextensionId\x12\x16\n" +
+	"\x06bundle\x18\x02 \x01(\fR\x06bundle\x12\x16\n" +
+	"\x06digest\x18\x03 \x01(\tR\x06digest\"Z\n" +
+	"\x15CreateVersionResponse\x12A\n" +
+	"\aversion\x18\x01 \x01(\v2'.Superplane.Extensions.ExtensionVersionR\aversion\"\x88\x01\n" +
 	"\x14UpdateVersionRequest\x12!\n" +
 	"\fextension_id\x18\x01 \x01(\tR\vextensionId\x12\x1d\n" +
 	"\n" +
-	"version_id\x18\x02 \x01(\tR\tversionId\x127\n" +
-	"\x04spec\x18\x03 \x01(\v2#.Superplane.Extensions.Version.SpecR\x04spec\"Q\n" +
-	"\x15UpdateVersionResponse\x128\n" +
-	"\aversion\x18\x01 \x01(\v2\x1e.Superplane.Extensions.VersionR\aversion\"s\n" +
+	"version_id\x18\x02 \x01(\tR\tversionId\x12\x16\n" +
+	"\x06bundle\x18\x03 \x01(\fR\x06bundle\x12\x16\n" +
+	"\x06digest\x18\x04 \x01(\tR\x06digest\"Z\n" +
+	"\x15UpdateVersionResponse\x12A\n" +
+	"\aversion\x18\x01 \x01(\v2'.Superplane.Extensions.ExtensionVersionR\aversion\"s\n" +
 	"\x15PublishVersionRequest\x12!\n" +
 	"\fextension_id\x18\x01 \x01(\tR\vextensionId\x12\x1d\n" +
 	"\n" +
 	"version_id\x18\x02 \x01(\tR\tversionId\x12\x18\n" +
-	"\aversion\x18\x03 \x01(\tR\aversion\"R\n" +
-	"\x16PublishVersionResponse\x128\n" +
-	"\aversion\x18\x01 \x01(\v2\x1e.Superplane.Extensions.VersionR\aversion\"8\n" +
+	"\aversion\x18\x03 \x01(\tR\aversion\"[\n" +
+	"\x16PublishVersionResponse\x12A\n" +
+	"\aversion\x18\x01 \x01(\v2'.Superplane.Extensions.ExtensionVersionR\aversion\"8\n" +
 	"\x13ListVersionsRequest\x12!\n" +
-	"\fextension_id\x18\x01 \x01(\tR\vextensionId\"R\n" +
-	"\x14ListVersionsResponse\x12:\n" +
-	"\bversions\x18\x01 \x03(\v2\x1e.Superplane.Extensions.VersionR\bversions\"\xcf\x01\n" +
+	"\fextension_id\x18\x01 \x01(\tR\vextensionId\"[\n" +
+	"\x14ListVersionsResponse\x12C\n" +
+	"\bversions\x18\x01 \x03(\v2'.Superplane.Extensions.ExtensionVersionR\bversions\"\xe0\x01\n" +
 	"\tExtension\x12E\n" +
-	"\bmetadata\x18\x01 \x01(\v2).Superplane.Extensions.Extension.MetadataR\bmetadata\x1a{\n" +
-	"\bMetadata\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x02 \x01(\tR\vdescription\x129\n" +
-	"\n" +
-	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xd7\v\n" +
-	"\aVersion\x1a\x90\x01\n" +
+	"\bmetadata\x18\x01 \x01(\v2).Superplane.Extensions.Extension.MetadataR\bmetadata\x1a\x8b\x01\n" +
 	"\bMetadata\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x129\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x129\n" +
 	"\n" +
-	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xd3\x03\n" +
+	"\x10ExtensionVersion\x12L\n" +
+	"\bmetadata\x18\x01 \x01(\v20.Superplane.Extensions.ExtensionVersion.MetadataR\bmetadata\x12F\n" +
+	"\x06status\x18\x02 \x01(\v2..Superplane.Extensions.ExtensionVersion.StatusR\x06status\x1a\xaa\x01\n" +
+	"\bMetadata\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x129\n" +
 	"\n" +
-	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a\xc6\b\n" +
-	"\bManifest\x12W\n" +
-	"\fintegrations\x18\x01 \x03(\v23.Superplane.Extensions.Version.Manifest.IntegrationR\fintegrations\x12Q\n" +
+	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"components\x18\x02 \x03(\v21.Superplane.Extensions.Version.Manifest.ComponentR\n" +
-	"components\x12K\n" +
-	"\btriggers\x18\x03 \x03(\v2/.Superplane.Extensions.Version.Manifest.TriggerR\btriggers\x1a\xad\x02\n" +
-	"\vIntegration\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\"\n" +
-	"\finstructions\x18\x04 \x01(\tR\finstructions\x12E\n" +
-	"\rconfiguration\x18\x05 \x03(\v2\x1f.Superplane.Configuration.FieldR\rconfiguration\x12%\n" +
-	"\x0eresource_types\x18\x06 \x03(\tR\rresourceTypes\x12@\n" +
-	"\aactions\x18\a \x03(\v2&.Superplane.Components.ComponentActionR\aactions\x1a\xaf\x02\n" +
-	"\tComponent\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\x12E\n" +
-	"\rconfiguration\x18\x04 \x03(\v2\x1f.Superplane.Configuration.FieldR\rconfiguration\x12M\n" +
-	"\x0foutput_channels\x18\x05 \x03(\v2$.Superplane.Components.OutputChannelR\x0eoutputChannels\x12@\n" +
-	"\aactions\x18\x06 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\x1a\xde\x01\n" +
-	"\aTrigger\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\x12E\n" +
-	"\rconfiguration\x18\x04 \x03(\v2\x1f.Superplane.Configuration.FieldR\rconfiguration\x12@\n" +
-	"\aactions\x18\x05 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\x1a{\n" +
-	"\x04Spec\x12\x16\n" +
-	"\x06bundle\x18\x01 \x01(\fR\x06bundle\x12\x16\n" +
-	"\x06digest\x18\x02 \x01(\tR\x06digest\x12C\n" +
-	"\bmanifest\x18\x03 \x01(\v2'.Superplane.Extensions.Version.ManifestR\bmanifest\x1aD\n" +
-	"\x06Status\x12:\n" +
-	"\x05state\x18\x01 \x01(\x0e2$.Superplane.Extensions.Version.StateR\x05state\"-\n" +
+	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1aM\n" +
+	"\x06Status\x12C\n" +
+	"\x05state\x18\x01 \x01(\x0e2-.Superplane.Extensions.ExtensionVersion.StateR\x05state\"-\n" +
 	"\x05State\x12\x0f\n" +
 	"\vSTATE_DRAFT\x10\x00\x12\x13\n" +
 	"\x0fSTATE_PUBLISHED\x10\x012\xcb\v\n" +
@@ -1374,78 +1034,59 @@ func file_extensions_proto_rawDescGZIP() []byte {
 }
 
 var file_extensions_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_extensions_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_extensions_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_extensions_proto_goTypes = []any{
-	(Version_State)(0),                   // 0: Superplane.Extensions.Version.State
-	(*ListExtensionsRequest)(nil),        // 1: Superplane.Extensions.ListExtensionsRequest
-	(*ListExtensionsResponse)(nil),       // 2: Superplane.Extensions.ListExtensionsResponse
-	(*CreateExtensionRequest)(nil),       // 3: Superplane.Extensions.CreateExtensionRequest
-	(*CreateExtensionResponse)(nil),      // 4: Superplane.Extensions.CreateExtensionResponse
-	(*CreateVersionRequest)(nil),         // 5: Superplane.Extensions.CreateVersionRequest
-	(*CreateVersionResponse)(nil),        // 6: Superplane.Extensions.CreateVersionResponse
-	(*UpdateVersionRequest)(nil),         // 7: Superplane.Extensions.UpdateVersionRequest
-	(*UpdateVersionResponse)(nil),        // 8: Superplane.Extensions.UpdateVersionResponse
-	(*PublishVersionRequest)(nil),        // 9: Superplane.Extensions.PublishVersionRequest
-	(*PublishVersionResponse)(nil),       // 10: Superplane.Extensions.PublishVersionResponse
-	(*ListVersionsRequest)(nil),          // 11: Superplane.Extensions.ListVersionsRequest
-	(*ListVersionsResponse)(nil),         // 12: Superplane.Extensions.ListVersionsResponse
-	(*Extension)(nil),                    // 13: Superplane.Extensions.Extension
-	(*Version)(nil),                      // 14: Superplane.Extensions.Version
-	(*Extension_Metadata)(nil),           // 15: Superplane.Extensions.Extension.Metadata
-	(*Version_Metadata)(nil),             // 16: Superplane.Extensions.Version.Metadata
-	(*Version_Manifest)(nil),             // 17: Superplane.Extensions.Version.Manifest
-	(*Version_Spec)(nil),                 // 18: Superplane.Extensions.Version.Spec
-	(*Version_Status)(nil),               // 19: Superplane.Extensions.Version.Status
-	(*Version_Manifest_Integration)(nil), // 20: Superplane.Extensions.Version.Manifest.Integration
-	(*Version_Manifest_Component)(nil),   // 21: Superplane.Extensions.Version.Manifest.Component
-	(*Version_Manifest_Trigger)(nil),     // 22: Superplane.Extensions.Version.Manifest.Trigger
-	(*timestamp.Timestamp)(nil),          // 23: google.protobuf.Timestamp
-	(*configuration.Field)(nil),          // 24: Superplane.Configuration.Field
-	(*components.ComponentAction)(nil),   // 25: Superplane.Components.ComponentAction
-	(*components.OutputChannel)(nil),     // 26: Superplane.Components.OutputChannel
+	(ExtensionVersion_State)(0),       // 0: Superplane.Extensions.ExtensionVersion.State
+	(*ListExtensionsRequest)(nil),     // 1: Superplane.Extensions.ListExtensionsRequest
+	(*ListExtensionsResponse)(nil),    // 2: Superplane.Extensions.ListExtensionsResponse
+	(*CreateExtensionRequest)(nil),    // 3: Superplane.Extensions.CreateExtensionRequest
+	(*CreateExtensionResponse)(nil),   // 4: Superplane.Extensions.CreateExtensionResponse
+	(*CreateVersionRequest)(nil),      // 5: Superplane.Extensions.CreateVersionRequest
+	(*CreateVersionResponse)(nil),     // 6: Superplane.Extensions.CreateVersionResponse
+	(*UpdateVersionRequest)(nil),      // 7: Superplane.Extensions.UpdateVersionRequest
+	(*UpdateVersionResponse)(nil),     // 8: Superplane.Extensions.UpdateVersionResponse
+	(*PublishVersionRequest)(nil),     // 9: Superplane.Extensions.PublishVersionRequest
+	(*PublishVersionResponse)(nil),    // 10: Superplane.Extensions.PublishVersionResponse
+	(*ListVersionsRequest)(nil),       // 11: Superplane.Extensions.ListVersionsRequest
+	(*ListVersionsResponse)(nil),      // 12: Superplane.Extensions.ListVersionsResponse
+	(*Extension)(nil),                 // 13: Superplane.Extensions.Extension
+	(*ExtensionVersion)(nil),          // 14: Superplane.Extensions.ExtensionVersion
+	(*Extension_Metadata)(nil),        // 15: Superplane.Extensions.Extension.Metadata
+	(*ExtensionVersion_Metadata)(nil), // 16: Superplane.Extensions.ExtensionVersion.Metadata
+	(*ExtensionVersion_Status)(nil),   // 17: Superplane.Extensions.ExtensionVersion.Status
+	(*timestamp.Timestamp)(nil),       // 18: google.protobuf.Timestamp
 }
 var file_extensions_proto_depIdxs = []int32{
 	13, // 0: Superplane.Extensions.ListExtensionsResponse.extensions:type_name -> Superplane.Extensions.Extension
 	13, // 1: Superplane.Extensions.CreateExtensionResponse.extension:type_name -> Superplane.Extensions.Extension
-	18, // 2: Superplane.Extensions.CreateVersionRequest.spec:type_name -> Superplane.Extensions.Version.Spec
-	14, // 3: Superplane.Extensions.CreateVersionResponse.version:type_name -> Superplane.Extensions.Version
-	18, // 4: Superplane.Extensions.UpdateVersionRequest.spec:type_name -> Superplane.Extensions.Version.Spec
-	14, // 5: Superplane.Extensions.UpdateVersionResponse.version:type_name -> Superplane.Extensions.Version
-	14, // 6: Superplane.Extensions.PublishVersionResponse.version:type_name -> Superplane.Extensions.Version
-	14, // 7: Superplane.Extensions.ListVersionsResponse.versions:type_name -> Superplane.Extensions.Version
-	15, // 8: Superplane.Extensions.Extension.metadata:type_name -> Superplane.Extensions.Extension.Metadata
-	23, // 9: Superplane.Extensions.Extension.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	23, // 10: Superplane.Extensions.Version.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	23, // 11: Superplane.Extensions.Version.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	20, // 12: Superplane.Extensions.Version.Manifest.integrations:type_name -> Superplane.Extensions.Version.Manifest.Integration
-	21, // 13: Superplane.Extensions.Version.Manifest.components:type_name -> Superplane.Extensions.Version.Manifest.Component
-	22, // 14: Superplane.Extensions.Version.Manifest.triggers:type_name -> Superplane.Extensions.Version.Manifest.Trigger
-	17, // 15: Superplane.Extensions.Version.Spec.manifest:type_name -> Superplane.Extensions.Version.Manifest
-	0,  // 16: Superplane.Extensions.Version.Status.state:type_name -> Superplane.Extensions.Version.State
-	24, // 17: Superplane.Extensions.Version.Manifest.Integration.configuration:type_name -> Superplane.Configuration.Field
-	25, // 18: Superplane.Extensions.Version.Manifest.Integration.actions:type_name -> Superplane.Components.ComponentAction
-	24, // 19: Superplane.Extensions.Version.Manifest.Component.configuration:type_name -> Superplane.Configuration.Field
-	26, // 20: Superplane.Extensions.Version.Manifest.Component.output_channels:type_name -> Superplane.Components.OutputChannel
-	25, // 21: Superplane.Extensions.Version.Manifest.Component.actions:type_name -> Superplane.Components.ComponentAction
-	24, // 22: Superplane.Extensions.Version.Manifest.Trigger.configuration:type_name -> Superplane.Configuration.Field
-	25, // 23: Superplane.Extensions.Version.Manifest.Trigger.actions:type_name -> Superplane.Components.ComponentAction
-	1,  // 24: Superplane.Extensions.Extensions.ListExtensions:input_type -> Superplane.Extensions.ListExtensionsRequest
-	3,  // 25: Superplane.Extensions.Extensions.CreateExtension:input_type -> Superplane.Extensions.CreateExtensionRequest
-	5,  // 26: Superplane.Extensions.Extensions.CreateVersion:input_type -> Superplane.Extensions.CreateVersionRequest
-	7,  // 27: Superplane.Extensions.Extensions.UpdateVersion:input_type -> Superplane.Extensions.UpdateVersionRequest
-	9,  // 28: Superplane.Extensions.Extensions.PublishVersion:input_type -> Superplane.Extensions.PublishVersionRequest
-	11, // 29: Superplane.Extensions.Extensions.ListVersions:input_type -> Superplane.Extensions.ListVersionsRequest
-	2,  // 30: Superplane.Extensions.Extensions.ListExtensions:output_type -> Superplane.Extensions.ListExtensionsResponse
-	4,  // 31: Superplane.Extensions.Extensions.CreateExtension:output_type -> Superplane.Extensions.CreateExtensionResponse
-	6,  // 32: Superplane.Extensions.Extensions.CreateVersion:output_type -> Superplane.Extensions.CreateVersionResponse
-	8,  // 33: Superplane.Extensions.Extensions.UpdateVersion:output_type -> Superplane.Extensions.UpdateVersionResponse
-	10, // 34: Superplane.Extensions.Extensions.PublishVersion:output_type -> Superplane.Extensions.PublishVersionResponse
-	12, // 35: Superplane.Extensions.Extensions.ListVersions:output_type -> Superplane.Extensions.ListVersionsResponse
-	30, // [30:36] is the sub-list for method output_type
-	24, // [24:30] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	14, // 2: Superplane.Extensions.CreateVersionResponse.version:type_name -> Superplane.Extensions.ExtensionVersion
+	14, // 3: Superplane.Extensions.UpdateVersionResponse.version:type_name -> Superplane.Extensions.ExtensionVersion
+	14, // 4: Superplane.Extensions.PublishVersionResponse.version:type_name -> Superplane.Extensions.ExtensionVersion
+	14, // 5: Superplane.Extensions.ListVersionsResponse.versions:type_name -> Superplane.Extensions.ExtensionVersion
+	15, // 6: Superplane.Extensions.Extension.metadata:type_name -> Superplane.Extensions.Extension.Metadata
+	16, // 7: Superplane.Extensions.ExtensionVersion.metadata:type_name -> Superplane.Extensions.ExtensionVersion.Metadata
+	17, // 8: Superplane.Extensions.ExtensionVersion.status:type_name -> Superplane.Extensions.ExtensionVersion.Status
+	18, // 9: Superplane.Extensions.Extension.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	18, // 10: Superplane.Extensions.ExtensionVersion.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	18, // 11: Superplane.Extensions.ExtensionVersion.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	0,  // 12: Superplane.Extensions.ExtensionVersion.Status.state:type_name -> Superplane.Extensions.ExtensionVersion.State
+	1,  // 13: Superplane.Extensions.Extensions.ListExtensions:input_type -> Superplane.Extensions.ListExtensionsRequest
+	3,  // 14: Superplane.Extensions.Extensions.CreateExtension:input_type -> Superplane.Extensions.CreateExtensionRequest
+	5,  // 15: Superplane.Extensions.Extensions.CreateVersion:input_type -> Superplane.Extensions.CreateVersionRequest
+	7,  // 16: Superplane.Extensions.Extensions.UpdateVersion:input_type -> Superplane.Extensions.UpdateVersionRequest
+	9,  // 17: Superplane.Extensions.Extensions.PublishVersion:input_type -> Superplane.Extensions.PublishVersionRequest
+	11, // 18: Superplane.Extensions.Extensions.ListVersions:input_type -> Superplane.Extensions.ListVersionsRequest
+	2,  // 19: Superplane.Extensions.Extensions.ListExtensions:output_type -> Superplane.Extensions.ListExtensionsResponse
+	4,  // 20: Superplane.Extensions.Extensions.CreateExtension:output_type -> Superplane.Extensions.CreateExtensionResponse
+	6,  // 21: Superplane.Extensions.Extensions.CreateVersion:output_type -> Superplane.Extensions.CreateVersionResponse
+	8,  // 22: Superplane.Extensions.Extensions.UpdateVersion:output_type -> Superplane.Extensions.UpdateVersionResponse
+	10, // 23: Superplane.Extensions.Extensions.PublishVersion:output_type -> Superplane.Extensions.PublishVersionResponse
+	12, // 24: Superplane.Extensions.Extensions.ListVersions:output_type -> Superplane.Extensions.ListVersionsResponse
+	19, // [19:25] is the sub-list for method output_type
+	13, // [13:19] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_extensions_proto_init() }
@@ -1459,7 +1100,7 @@ func file_extensions_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_extensions_proto_rawDesc), len(file_extensions_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   22,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

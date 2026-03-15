@@ -20,7 +20,7 @@ var _ MappedNullable = &ExtensionsListVersionsResponse{}
 
 // ExtensionsListVersionsResponse struct for ExtensionsListVersionsResponse
 type ExtensionsListVersionsResponse struct {
-	Versions []map[string]interface{} `json:"versions,omitempty"`
+	Versions []ExtensionsExtensionVersion `json:"versions,omitempty"`
 }
 
 // NewExtensionsListVersionsResponse instantiates a new ExtensionsListVersionsResponse object
@@ -41,9 +41,9 @@ func NewExtensionsListVersionsResponseWithDefaults() *ExtensionsListVersionsResp
 }
 
 // GetVersions returns the Versions field value if set, zero value otherwise.
-func (o *ExtensionsListVersionsResponse) GetVersions() []map[string]interface{} {
+func (o *ExtensionsListVersionsResponse) GetVersions() []ExtensionsExtensionVersion {
 	if o == nil || IsNil(o.Versions) {
-		var ret []map[string]interface{}
+		var ret []ExtensionsExtensionVersion
 		return ret
 	}
 	return o.Versions
@@ -51,7 +51,7 @@ func (o *ExtensionsListVersionsResponse) GetVersions() []map[string]interface{} 
 
 // GetVersionsOk returns a tuple with the Versions field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ExtensionsListVersionsResponse) GetVersionsOk() ([]map[string]interface{}, bool) {
+func (o *ExtensionsListVersionsResponse) GetVersionsOk() ([]ExtensionsExtensionVersion, bool) {
 	if o == nil || IsNil(o.Versions) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *ExtensionsListVersionsResponse) HasVersions() bool {
 	return false
 }
 
-// SetVersions gets a reference to the given []map[string]interface{} and assigns it to the Versions field.
-func (o *ExtensionsListVersionsResponse) SetVersions(v []map[string]interface{}) {
+// SetVersions gets a reference to the given []ExtensionsExtensionVersion and assigns it to the Versions field.
+func (o *ExtensionsListVersionsResponse) SetVersions(v []ExtensionsExtensionVersion) {
 	o.Versions = v
 }
 

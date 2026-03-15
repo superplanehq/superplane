@@ -20,7 +20,8 @@ var _ MappedNullable = &ExtensionsUpdateVersionBody{}
 
 // ExtensionsUpdateVersionBody struct for ExtensionsUpdateVersionBody
 type ExtensionsUpdateVersionBody struct {
-	Spec *ExtensionsVersionSpec `json:"spec,omitempty"`
+	Bundle *string `json:"bundle,omitempty" validate:"regexp=^(?:[A-Za-z0-9+\\/]{4})*(?:[A-Za-z0-9+\\/]{2}==|[A-Za-z0-9+\\/]{3}=)?$"`
+	Digest *string `json:"digest,omitempty"`
 }
 
 // NewExtensionsUpdateVersionBody instantiates a new ExtensionsUpdateVersionBody object
@@ -40,36 +41,68 @@ func NewExtensionsUpdateVersionBodyWithDefaults() *ExtensionsUpdateVersionBody {
 	return &this
 }
 
-// GetSpec returns the Spec field value if set, zero value otherwise.
-func (o *ExtensionsUpdateVersionBody) GetSpec() ExtensionsVersionSpec {
-	if o == nil || IsNil(o.Spec) {
-		var ret ExtensionsVersionSpec
+// GetBundle returns the Bundle field value if set, zero value otherwise.
+func (o *ExtensionsUpdateVersionBody) GetBundle() string {
+	if o == nil || IsNil(o.Bundle) {
+		var ret string
 		return ret
 	}
-	return *o.Spec
+	return *o.Bundle
 }
 
-// GetSpecOk returns a tuple with the Spec field value if set, nil otherwise
+// GetBundleOk returns a tuple with the Bundle field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ExtensionsUpdateVersionBody) GetSpecOk() (*ExtensionsVersionSpec, bool) {
-	if o == nil || IsNil(o.Spec) {
+func (o *ExtensionsUpdateVersionBody) GetBundleOk() (*string, bool) {
+	if o == nil || IsNil(o.Bundle) {
 		return nil, false
 	}
-	return o.Spec, true
+	return o.Bundle, true
 }
 
-// HasSpec returns a boolean if a field has been set.
-func (o *ExtensionsUpdateVersionBody) HasSpec() bool {
-	if o != nil && !IsNil(o.Spec) {
+// HasBundle returns a boolean if a field has been set.
+func (o *ExtensionsUpdateVersionBody) HasBundle() bool {
+	if o != nil && !IsNil(o.Bundle) {
 		return true
 	}
 
 	return false
 }
 
-// SetSpec gets a reference to the given ExtensionsVersionSpec and assigns it to the Spec field.
-func (o *ExtensionsUpdateVersionBody) SetSpec(v ExtensionsVersionSpec) {
-	o.Spec = &v
+// SetBundle gets a reference to the given string and assigns it to the Bundle field.
+func (o *ExtensionsUpdateVersionBody) SetBundle(v string) {
+	o.Bundle = &v
+}
+
+// GetDigest returns the Digest field value if set, zero value otherwise.
+func (o *ExtensionsUpdateVersionBody) GetDigest() string {
+	if o == nil || IsNil(o.Digest) {
+		var ret string
+		return ret
+	}
+	return *o.Digest
+}
+
+// GetDigestOk returns a tuple with the Digest field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ExtensionsUpdateVersionBody) GetDigestOk() (*string, bool) {
+	if o == nil || IsNil(o.Digest) {
+		return nil, false
+	}
+	return o.Digest, true
+}
+
+// HasDigest returns a boolean if a field has been set.
+func (o *ExtensionsUpdateVersionBody) HasDigest() bool {
+	if o != nil && !IsNil(o.Digest) {
+		return true
+	}
+
+	return false
+}
+
+// SetDigest gets a reference to the given string and assigns it to the Digest field.
+func (o *ExtensionsUpdateVersionBody) SetDigest(v string) {
+	o.Digest = &v
 }
 
 func (o ExtensionsUpdateVersionBody) MarshalJSON() ([]byte, error) {
@@ -82,8 +115,11 @@ func (o ExtensionsUpdateVersionBody) MarshalJSON() ([]byte, error) {
 
 func (o ExtensionsUpdateVersionBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.Spec) {
-		toSerialize["spec"] = o.Spec
+	if !IsNil(o.Bundle) {
+		toSerialize["bundle"] = o.Bundle
+	}
+	if !IsNil(o.Digest) {
+		toSerialize["digest"] = o.Digest
 	}
 	return toSerialize, nil
 }

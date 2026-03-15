@@ -108,7 +108,7 @@ func renderIntegrationText(stdout io.Writer, integration openapi_client.Integrat
 	return renderIntegrationTriggersText(stdout, integration.GetTriggers())
 }
 
-func renderIntegrationComponentsText(stdout io.Writer, components []openapi_client.SuperplaneComponentsComponent) error {
+func renderIntegrationComponentsText(stdout io.Writer, components []openapi_client.ComponentsComponent) error {
 	_, err := fmt.Fprintln(stdout, "Components:")
 	if err != nil {
 		return err
@@ -127,7 +127,7 @@ func renderIntegrationComponentsText(stdout io.Writer, components []openapi_clie
 	return writer.Flush()
 }
 
-func renderIntegrationTriggersText(stdout io.Writer, triggers []openapi_client.SuperplaneTriggersTrigger) error {
+func renderIntegrationTriggersText(stdout io.Writer, triggers []openapi_client.TriggersTrigger) error {
 	_, err := fmt.Fprintln(stdout, "Triggers:")
 	if err != nil {
 		return err

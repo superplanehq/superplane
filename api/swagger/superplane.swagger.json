@@ -5320,6 +5320,43 @@
         }
       }
     },
+    "ComponentsComponent": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationField"
+          }
+        },
+        "outputChannels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneComponentsOutputChannel"
+          }
+        },
+        "icon": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string"
+        },
+        "exampleOutput": {
+          "type": "object"
+        }
+      }
+    },
     "ComponentsComponentAction": {
       "type": "object",
       "properties": {
@@ -5342,7 +5379,7 @@
       "type": "object",
       "properties": {
         "component": {
-          "$ref": "#/definitions/SuperplaneComponentsComponent"
+          "$ref": "#/definitions/ComponentsComponent"
         }
       }
     },
@@ -5390,7 +5427,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/SuperplaneComponentsComponent"
+            "$ref": "#/definitions/ComponentsComponent"
           }
         }
       }
@@ -5826,6 +5863,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "description": {
+          "type": "string"
         }
       }
     },
@@ -5840,8 +5880,12 @@
     "ExtensionsCreateVersionBody": {
       "type": "object",
       "properties": {
-        "spec": {
-          "$ref": "#/definitions/ExtensionsVersionSpec"
+        "bundle": {
+          "type": "string",
+          "format": "byte"
+        },
+        "digest": {
+          "type": "string"
         }
       }
     },
@@ -5849,7 +5893,7 @@
       "type": "object",
       "properties": {
         "version": {
-          "$ref": "#/definitions/ExtensionsVersion"
+          "$ref": "#/definitions/ExtensionsExtensionVersion"
         }
       }
     },
@@ -5864,6 +5908,9 @@
     "ExtensionsExtensionMetadata": {
       "type": "object",
       "properties": {
+        "id": {
+          "type": "string"
+        },
         "name": {
           "type": "string"
         },
@@ -5873,6 +5920,52 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "ExtensionsExtensionVersion": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/ExtensionsExtensionVersionMetadata"
+        },
+        "status": {
+          "$ref": "#/definitions/ExtensionsExtensionVersionStatus"
+        }
+      }
+    },
+    "ExtensionsExtensionVersionMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "ExtensionsExtensionVersionState": {
+      "type": "string",
+      "enum": [
+        "STATE_DRAFT",
+        "STATE_PUBLISHED"
+      ],
+      "default": "STATE_DRAFT"
+    },
+    "ExtensionsExtensionVersionStatus": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/definitions/ExtensionsExtensionVersionState"
         }
       }
     },
@@ -5895,7 +5988,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ExtensionsVersion"
+            "$ref": "#/definitions/ExtensionsExtensionVersion"
           }
         }
       }
@@ -5912,30 +6005,11 @@
       "type": "object",
       "properties": {
         "version": {
-          "$ref": "#/definitions/ExtensionsVersion"
+          "$ref": "#/definitions/ExtensionsExtensionVersion"
         }
       }
     },
     "ExtensionsUpdateVersionBody": {
-      "type": "object",
-      "properties": {
-        "spec": {
-          "$ref": "#/definitions/ExtensionsVersionSpec"
-        }
-      }
-    },
-    "ExtensionsUpdateVersionResponse": {
-      "type": "object",
-      "properties": {
-        "version": {
-          "$ref": "#/definitions/ExtensionsVersion"
-        }
-      }
-    },
-    "ExtensionsVersion": {
-      "type": "object"
-    },
-    "ExtensionsVersionSpec": {
       "type": "object",
       "properties": {
         "bundle": {
@@ -5944,10 +6018,14 @@
         },
         "digest": {
           "type": "string"
-        },
-        "manifest": {
-          "$ref": "#/definitions/VersionManifest",
-          "title": "TODO: operations"
+        }
+      }
+    },
+    "ExtensionsUpdateVersionResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "$ref": "#/definitions/ExtensionsExtensionVersion"
         }
       }
     },
@@ -6175,14 +6253,14 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/SuperplaneComponentsComponent"
+            "$ref": "#/definitions/ComponentsComponent"
           }
         },
         "triggers": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/SuperplaneTriggersTrigger"
+            "$ref": "#/definitions/TriggersTrigger"
           }
         },
         "instructions": {
@@ -6313,7 +6391,7 @@
       "type": "object",
       "properties": {
         "integration": {
-          "$ref": "#/definitions/SuperplaneOrganizationsIntegration"
+          "$ref": "#/definitions/OrganizationsIntegration"
         }
       }
     },
@@ -6351,7 +6429,7 @@
       "type": "object",
       "properties": {
         "integration": {
-          "$ref": "#/definitions/SuperplaneOrganizationsIntegration"
+          "$ref": "#/definitions/OrganizationsIntegration"
         }
       }
     },
@@ -6376,6 +6454,20 @@
       "properties": {
         "inviteLink": {
           "$ref": "#/definitions/OrganizationsInviteLink"
+        }
+      }
+    },
+    "OrganizationsIntegration": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/OrganizationsIntegrationMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/OrganizationsIntegrationSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/OrganizationsIntegrationStatus"
         }
       }
     },
@@ -6614,7 +6706,7 @@
       "type": "object",
       "properties": {
         "integration": {
-          "$ref": "#/definitions/SuperplaneOrganizationsIntegration"
+          "$ref": "#/definitions/OrganizationsIntegration"
         }
       }
     },
@@ -7118,43 +7210,6 @@
         }
       }
     },
-    "SuperplaneComponentsComponent": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "label": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "configuration": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ConfigurationField"
-          }
-        },
-        "outputChannels": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneComponentsOutputChannel"
-          }
-        },
-        "icon": {
-          "type": "string"
-        },
-        "color": {
-          "type": "string"
-        },
-        "exampleOutput": {
-          "type": "object"
-        }
-      }
-    },
     "SuperplaneComponentsOutputChannel": {
       "type": "object",
       "properties": {
@@ -7202,20 +7257,6 @@
         }
       }
     },
-    "SuperplaneOrganizationsIntegration": {
-      "type": "object",
-      "properties": {
-        "metadata": {
-          "$ref": "#/definitions/OrganizationsIntegrationMetadata"
-        },
-        "spec": {
-          "$ref": "#/definitions/OrganizationsIntegrationSpec"
-        },
-        "status": {
-          "$ref": "#/definitions/OrganizationsIntegrationStatus"
-        }
-      }
-    },
     "SuperplaneOrganizationsListIntegrationsResponse": {
       "type": "object",
       "properties": {
@@ -7223,12 +7264,46 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/SuperplaneOrganizationsIntegration"
+            "$ref": "#/definitions/OrganizationsIntegration"
           }
         }
       }
     },
-    "SuperplaneTriggersTrigger": {
+    "SuperplaneUsersUser": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/UsersUserMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/UsersUserSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/UsersUserStatus"
+        }
+      }
+    },
+    "TriggersDescribeTriggerResponse": {
+      "type": "object",
+      "properties": {
+        "trigger": {
+          "$ref": "#/definitions/TriggersTrigger"
+        }
+      }
+    },
+    "TriggersListTriggersResponse": {
+      "type": "object",
+      "properties": {
+        "triggers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/TriggersTrigger"
+          }
+        }
+      }
+    },
+    "TriggersTrigger": {
       "type": "object",
       "properties": {
         "name": {
@@ -7255,40 +7330,6 @@
         },
         "exampleData": {
           "type": "object"
-        }
-      }
-    },
-    "SuperplaneUsersUser": {
-      "type": "object",
-      "properties": {
-        "metadata": {
-          "$ref": "#/definitions/UsersUserMetadata"
-        },
-        "spec": {
-          "$ref": "#/definitions/UsersUserSpec"
-        },
-        "status": {
-          "$ref": "#/definitions/UsersUserStatus"
-        }
-      }
-    },
-    "TriggersDescribeTriggerResponse": {
-      "type": "object",
-      "properties": {
-        "trigger": {
-          "$ref": "#/definitions/SuperplaneTriggersTrigger"
-        }
-      }
-    },
-    "TriggersListTriggersResponse": {
-      "type": "object",
-      "properties": {
-        "triggers": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneTriggersTrigger"
-          }
         }
       }
     },
@@ -7440,132 +7481,6 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/UsersUserRoleAssignment"
-          }
-        }
-      }
-    },
-    "VersionManifest": {
-      "type": "object",
-      "properties": {
-        "integrations": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/VersionManifestIntegration"
-          }
-        },
-        "components": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/VersionManifestComponent"
-          }
-        },
-        "triggers": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/VersionManifestTrigger"
-          }
-        }
-      }
-    },
-    "VersionManifestComponent": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "label": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "configuration": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ConfigurationField"
-          }
-        },
-        "outputChannels": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneComponentsOutputChannel"
-          }
-        },
-        "actions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsComponentAction"
-          }
-        }
-      }
-    },
-    "VersionManifestIntegration": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "label": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "instructions": {
-          "type": "string"
-        },
-        "configuration": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ConfigurationField"
-          }
-        },
-        "resourceTypes": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "actions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsComponentAction"
-          }
-        }
-      }
-    },
-    "VersionManifestTrigger": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "label": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "configuration": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ConfigurationField"
-          }
-        },
-        "actions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsComponentAction"
           }
         }
       }

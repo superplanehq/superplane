@@ -20,7 +20,7 @@ var _ MappedNullable = &OrganizationsCreateIntegrationResponse{}
 
 // OrganizationsCreateIntegrationResponse struct for OrganizationsCreateIntegrationResponse
 type OrganizationsCreateIntegrationResponse struct {
-	Integration *SuperplaneOrganizationsIntegration `json:"integration,omitempty"`
+	Integration *OrganizationsIntegration `json:"integration,omitempty"`
 }
 
 // NewOrganizationsCreateIntegrationResponse instantiates a new OrganizationsCreateIntegrationResponse object
@@ -41,9 +41,9 @@ func NewOrganizationsCreateIntegrationResponseWithDefaults() *OrganizationsCreat
 }
 
 // GetIntegration returns the Integration field value if set, zero value otherwise.
-func (o *OrganizationsCreateIntegrationResponse) GetIntegration() SuperplaneOrganizationsIntegration {
+func (o *OrganizationsCreateIntegrationResponse) GetIntegration() OrganizationsIntegration {
 	if o == nil || IsNil(o.Integration) {
-		var ret SuperplaneOrganizationsIntegration
+		var ret OrganizationsIntegration
 		return ret
 	}
 	return *o.Integration
@@ -51,7 +51,7 @@ func (o *OrganizationsCreateIntegrationResponse) GetIntegration() SuperplaneOrga
 
 // GetIntegrationOk returns a tuple with the Integration field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *OrganizationsCreateIntegrationResponse) GetIntegrationOk() (*SuperplaneOrganizationsIntegration, bool) {
+func (o *OrganizationsCreateIntegrationResponse) GetIntegrationOk() (*OrganizationsIntegration, bool) {
 	if o == nil || IsNil(o.Integration) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *OrganizationsCreateIntegrationResponse) HasIntegration() bool {
 	return false
 }
 
-// SetIntegration gets a reference to the given SuperplaneOrganizationsIntegration and assigns it to the Integration field.
-func (o *OrganizationsCreateIntegrationResponse) SetIntegration(v SuperplaneOrganizationsIntegration) {
+// SetIntegration gets a reference to the given OrganizationsIntegration and assigns it to the Integration field.
+func (o *OrganizationsCreateIntegrationResponse) SetIntegration(v OrganizationsIntegration) {
 	o.Integration = &v
 }
 

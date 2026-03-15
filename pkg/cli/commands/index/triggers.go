@@ -74,7 +74,7 @@ func (c *triggersCommand) getTriggerByName(ctx core.CommandContext, name string)
 	})
 }
 
-func renderTriggerText(stdout io.Writer, trigger openapi_client.SuperplaneTriggersTrigger) error {
+func renderTriggerText(stdout io.Writer, trigger openapi_client.TriggersTrigger) error {
 	_, err := fmt.Fprintf(stdout, "Name: %s\n", trigger.GetName())
 	if err != nil {
 		return err
@@ -108,7 +108,7 @@ func renderTriggerText(stdout io.Writer, trigger openapi_client.SuperplaneTrigge
 	return renderExamplePayloadText(stdout, trigger.GetExampleData())
 }
 
-func (c *triggersCommand) listTriggers(ctx core.CommandContext, from string) ([]openapi_client.SuperplaneTriggersTrigger, error) {
+func (c *triggersCommand) listTriggers(ctx core.CommandContext, from string) ([]openapi_client.TriggersTrigger, error) {
 	//
 	// if --from is used, we grab the triggers from the integration
 	//
@@ -132,19 +132,19 @@ func (c *triggersCommand) listTriggers(ctx core.CommandContext, from string) ([]
 	return response.GetTriggers(), nil
 }
 
-func (c *triggersCommand) findTriggerByName(ctx core.CommandContext, name string) (openapi_client.SuperplaneTriggersTrigger, error) {
+func (c *triggersCommand) findTriggerByName(ctx core.CommandContext, name string) (openapi_client.TriggersTrigger, error) {
 	integrationName, triggerName, scoped := core.ParseIntegrationScopedName(name)
 	if scoped {
 		integration, err := core.FindIntegrationDefinition(ctx, integrationName)
 		if err != nil {
-			return openapi_client.SuperplaneTriggersTrigger{}, err
+			return openapi_client.TriggersTrigger{}, err
 		}
 		return findIntegrationTrigger(integration, triggerName)
 	}
 
 	response, _, err := ctx.API.TriggerAPI.TriggersDescribeTrigger(ctx.Context, name).Execute()
 	if err != nil {
-		return openapi_client.SuperplaneTriggersTrigger{}, err
+		return openapi_client.TriggersTrigger{}, err
 	}
 	return response.GetTrigger(), nil
 }
@@ -152,7 +152,7 @@ func (c *triggersCommand) findTriggerByName(ctx core.CommandContext, name string
 func findIntegrationTrigger(
 	integration openapi_client.IntegrationsIntegrationDefinition,
 	name string,
-) (openapi_client.SuperplaneTriggersTrigger, error) {
+) (openapi_client.TriggersTrigger, error) {
 	for _, trigger := range integration.GetTriggers() {
 		triggerName := trigger.GetName()
 		if triggerName == name || triggerName == fmt.Sprintf("%s.%s", integration.GetName(), name) {
@@ -160,5 +160,5 @@ func findIntegrationTrigger(
 		}
 	}
 
-	return openapi_client.SuperplaneTriggersTrigger{}, fmt.Errorf("trigger %q not found in integration %q", name, integration.GetName())
+	return openapi_client.TriggersTrigger{}, fmt.Errorf("trigger %q not found in integration %q", name, integration.GetName())
 }

@@ -20,7 +20,7 @@ var _ MappedNullable = &SuperplaneOrganizationsListIntegrationsResponse{}
 
 // SuperplaneOrganizationsListIntegrationsResponse struct for SuperplaneOrganizationsListIntegrationsResponse
 type SuperplaneOrganizationsListIntegrationsResponse struct {
-	Integrations []SuperplaneOrganizationsIntegration `json:"integrations,omitempty"`
+	Integrations []OrganizationsIntegration `json:"integrations,omitempty"`
 }
 
 // NewSuperplaneOrganizationsListIntegrationsResponse instantiates a new SuperplaneOrganizationsListIntegrationsResponse object
@@ -41,9 +41,9 @@ func NewSuperplaneOrganizationsListIntegrationsResponseWithDefaults() *Superplan
 }
 
 // GetIntegrations returns the Integrations field value if set, zero value otherwise.
-func (o *SuperplaneOrganizationsListIntegrationsResponse) GetIntegrations() []SuperplaneOrganizationsIntegration {
+func (o *SuperplaneOrganizationsListIntegrationsResponse) GetIntegrations() []OrganizationsIntegration {
 	if o == nil || IsNil(o.Integrations) {
-		var ret []SuperplaneOrganizationsIntegration
+		var ret []OrganizationsIntegration
 		return ret
 	}
 	return o.Integrations
@@ -51,7 +51,7 @@ func (o *SuperplaneOrganizationsListIntegrationsResponse) GetIntegrations() []Su
 
 // GetIntegrationsOk returns a tuple with the Integrations field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneOrganizationsListIntegrationsResponse) GetIntegrationsOk() ([]SuperplaneOrganizationsIntegration, bool) {
+func (o *SuperplaneOrganizationsListIntegrationsResponse) GetIntegrationsOk() ([]OrganizationsIntegration, bool) {
 	if o == nil || IsNil(o.Integrations) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *SuperplaneOrganizationsListIntegrationsResponse) HasIntegrations() bool
 	return false
 }
 
-// SetIntegrations gets a reference to the given []SuperplaneOrganizationsIntegration and assigns it to the Integrations field.
-func (o *SuperplaneOrganizationsListIntegrationsResponse) SetIntegrations(v []SuperplaneOrganizationsIntegration) {
+// SetIntegrations gets a reference to the given []OrganizationsIntegration and assigns it to the Integrations field.
+func (o *SuperplaneOrganizationsListIntegrationsResponse) SetIntegrations(v []OrganizationsIntegration) {
 	o.Integrations = v
 }
 

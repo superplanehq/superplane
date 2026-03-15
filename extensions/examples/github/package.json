@@ -1,0 +1,9 @@
+{
+  "name": "@examples/github",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@superplanehq/sdk": "0.1.0"
+  }
+}

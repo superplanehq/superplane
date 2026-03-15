@@ -15,11 +15,11 @@ import (
 	"encoding/json"
 )
 
-// checks if the SuperplaneTriggersTrigger type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &SuperplaneTriggersTrigger{}
+// checks if the TriggersTrigger type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &TriggersTrigger{}
 
-// SuperplaneTriggersTrigger struct for SuperplaneTriggersTrigger
-type SuperplaneTriggersTrigger struct {
+// TriggersTrigger struct for TriggersTrigger
+type TriggersTrigger struct {
 	Name          *string                `json:"name,omitempty"`
 	Label         *string                `json:"label,omitempty"`
 	Description   *string                `json:"description,omitempty"`
@@ -29,25 +29,25 @@ type SuperplaneTriggersTrigger struct {
 	ExampleData   map[string]interface{} `json:"exampleData,omitempty"`
 }
 
-// NewSuperplaneTriggersTrigger instantiates a new SuperplaneTriggersTrigger object
+// NewTriggersTrigger instantiates a new TriggersTrigger object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewSuperplaneTriggersTrigger() *SuperplaneTriggersTrigger {
-	this := SuperplaneTriggersTrigger{}
+func NewTriggersTrigger() *TriggersTrigger {
+	this := TriggersTrigger{}
 	return &this
 }
 
-// NewSuperplaneTriggersTriggerWithDefaults instantiates a new SuperplaneTriggersTrigger object
+// NewTriggersTriggerWithDefaults instantiates a new TriggersTrigger object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewSuperplaneTriggersTriggerWithDefaults() *SuperplaneTriggersTrigger {
-	this := SuperplaneTriggersTrigger{}
+func NewTriggersTriggerWithDefaults() *TriggersTrigger {
+	this := TriggersTrigger{}
 	return &this
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *SuperplaneTriggersTrigger) GetName() string {
+func (o *TriggersTrigger) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -57,7 +57,7 @@ func (o *SuperplaneTriggersTrigger) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneTriggersTrigger) GetNameOk() (*string, bool) {
+func (o *TriggersTrigger) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -65,7 +65,7 @@ func (o *SuperplaneTriggersTrigger) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *SuperplaneTriggersTrigger) HasName() bool {
+func (o *TriggersTrigger) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -74,12 +74,12 @@ func (o *SuperplaneTriggersTrigger) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *SuperplaneTriggersTrigger) SetName(v string) {
+func (o *TriggersTrigger) SetName(v string) {
 	o.Name = &v
 }
 
 // GetLabel returns the Label field value if set, zero value otherwise.
-func (o *SuperplaneTriggersTrigger) GetLabel() string {
+func (o *TriggersTrigger) GetLabel() string {
 	if o == nil || IsNil(o.Label) {
 		var ret string
 		return ret
@@ -89,7 +89,7 @@ func (o *SuperplaneTriggersTrigger) GetLabel() string {
 
 // GetLabelOk returns a tuple with the Label field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneTriggersTrigger) GetLabelOk() (*string, bool) {
+func (o *TriggersTrigger) GetLabelOk() (*string, bool) {
 	if o == nil || IsNil(o.Label) {
 		return nil, false
 	}
@@ -97,7 +97,7 @@ func (o *SuperplaneTriggersTrigger) GetLabelOk() (*string, bool) {
 }
 
 // HasLabel returns a boolean if a field has been set.
-func (o *SuperplaneTriggersTrigger) HasLabel() bool {
+func (o *TriggersTrigger) HasLabel() bool {
 	if o != nil && !IsNil(o.Label) {
 		return true
 	}
@@ -106,12 +106,12 @@ func (o *SuperplaneTriggersTrigger) HasLabel() bool {
 }
 
 // SetLabel gets a reference to the given string and assigns it to the Label field.
-func (o *SuperplaneTriggersTrigger) SetLabel(v string) {
+func (o *TriggersTrigger) SetLabel(v string) {
 	o.Label = &v
 }
 
 // GetDescription returns the Description field value if set, zero value otherwise.
-func (o *SuperplaneTriggersTrigger) GetDescription() string {
+func (o *TriggersTrigger) GetDescription() string {
 	if o == nil || IsNil(o.Description) {
 		var ret string
 		return ret
@@ -121,7 +121,7 @@ func (o *SuperplaneTriggersTrigger) GetDescription() string {
 
 // GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneTriggersTrigger) GetDescriptionOk() (*string, bool) {
+func (o *TriggersTrigger) GetDescriptionOk() (*string, bool) {
 	if o == nil || IsNil(o.Description) {
 		return nil, false
 	}
@@ -129,7 +129,7 @@ func (o *SuperplaneTriggersTrigger) GetDescriptionOk() (*string, bool) {
 }
 
 // HasDescription returns a boolean if a field has been set.
-func (o *SuperplaneTriggersTrigger) HasDescription() bool {
+func (o *TriggersTrigger) HasDescription() bool {
 	if o != nil && !IsNil(o.Description) {
 		return true
 	}
@@ -138,12 +138,12 @@ func (o *SuperplaneTriggersTrigger) HasDescription() bool {
 }
 
 // SetDescription gets a reference to the given string and assigns it to the Description field.
-func (o *SuperplaneTriggersTrigger) SetDescription(v string) {
+func (o *TriggersTrigger) SetDescription(v string) {
 	o.Description = &v
 }
 
 // GetIcon returns the Icon field value if set, zero value otherwise.
-func (o *SuperplaneTriggersTrigger) GetIcon() string {
+func (o *TriggersTrigger) GetIcon() string {
 	if o == nil || IsNil(o.Icon) {
 		var ret string
 		return ret
@@ -153,7 +153,7 @@ func (o *SuperplaneTriggersTrigger) GetIcon() string {
 
 // GetIconOk returns a tuple with the Icon field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneTriggersTrigger) GetIconOk() (*string, bool) {
+func (o *TriggersTrigger) GetIconOk() (*string, bool) {
 	if o == nil || IsNil(o.Icon) {
 		return nil, false
 	}
@@ -161,7 +161,7 @@ func (o *SuperplaneTriggersTrigger) GetIconOk() (*string, bool) {
 }
 
 // HasIcon returns a boolean if a field has been set.
-func (o *SuperplaneTriggersTrigger) HasIcon() bool {
+func (o *TriggersTrigger) HasIcon() bool {
 	if o != nil && !IsNil(o.Icon) {
 		return true
 	}
@@ -170,12 +170,12 @@ func (o *SuperplaneTriggersTrigger) HasIcon() bool {
 }
 
 // SetIcon gets a reference to the given string and assigns it to the Icon field.
-func (o *SuperplaneTriggersTrigger) SetIcon(v string) {
+func (o *TriggersTrigger) SetIcon(v string) {
 	o.Icon = &v
 }
 
 // GetColor returns the Color field value if set, zero value otherwise.
-func (o *SuperplaneTriggersTrigger) GetColor() string {
+func (o *TriggersTrigger) GetColor() string {
 	if o == nil || IsNil(o.Color) {
 		var ret string
 		return ret
@@ -185,7 +185,7 @@ func (o *SuperplaneTriggersTrigger) GetColor() string {
 
 // GetColorOk returns a tuple with the Color field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneTriggersTrigger) GetColorOk() (*string, bool) {
+func (o *TriggersTrigger) GetColorOk() (*string, bool) {
 	if o == nil || IsNil(o.Color) {
 		return nil, false
 	}
@@ -193,7 +193,7 @@ func (o *SuperplaneTriggersTrigger) GetColorOk() (*string, bool) {
 }
 
 // HasColor returns a boolean if a field has been set.
-func (o *SuperplaneTriggersTrigger) HasColor() bool {
+func (o *TriggersTrigger) HasColor() bool {
 	if o != nil && !IsNil(o.Color) {
 		return true
 	}
@@ -202,12 +202,12 @@ func (o *SuperplaneTriggersTrigger) HasColor() bool {
 }
 
 // SetColor gets a reference to the given string and assigns it to the Color field.
-func (o *SuperplaneTriggersTrigger) SetColor(v string) {
+func (o *TriggersTrigger) SetColor(v string) {
 	o.Color = &v
 }
 
 // GetConfiguration returns the Configuration field value if set, zero value otherwise.
-func (o *SuperplaneTriggersTrigger) GetConfiguration() []ConfigurationField {
+func (o *TriggersTrigger) GetConfiguration() []ConfigurationField {
 	if o == nil || IsNil(o.Configuration) {
 		var ret []ConfigurationField
 		return ret
@@ -217,7 +217,7 @@ func (o *SuperplaneTriggersTrigger) GetConfiguration() []ConfigurationField {
 
 // GetConfigurationOk returns a tuple with the Configuration field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneTriggersTrigger) GetConfigurationOk() ([]ConfigurationField, bool) {
+func (o *TriggersTrigger) GetConfigurationOk() ([]ConfigurationField, bool) {
 	if o == nil || IsNil(o.Configuration) {
 		return nil, false
 	}
@@ -225,7 +225,7 @@ func (o *SuperplaneTriggersTrigger) GetConfigurationOk() ([]ConfigurationField, 
 }
 
 // HasConfiguration returns a boolean if a field has been set.
-func (o *SuperplaneTriggersTrigger) HasConfiguration() bool {
+func (o *TriggersTrigger) HasConfiguration() bool {
 	if o != nil && !IsNil(o.Configuration) {
 		return true
 	}
@@ -234,12 +234,12 @@ func (o *SuperplaneTriggersTrigger) HasConfiguration() bool {
 }
 
 // SetConfiguration gets a reference to the given []ConfigurationField and assigns it to the Configuration field.
-func (o *SuperplaneTriggersTrigger) SetConfiguration(v []ConfigurationField) {
+func (o *TriggersTrigger) SetConfiguration(v []ConfigurationField) {
 	o.Configuration = v
 }
 
 // GetExampleData returns the ExampleData field value if set, zero value otherwise.
-func (o *SuperplaneTriggersTrigger) GetExampleData() map[string]interface{} {
+func (o *TriggersTrigger) GetExampleData() map[string]interface{} {
 	if o == nil || IsNil(o.ExampleData) {
 		var ret map[string]interface{}
 		return ret
@@ -249,7 +249,7 @@ func (o *SuperplaneTriggersTrigger) GetExampleData() map[string]interface{} {
 
 // GetExampleDataOk returns a tuple with the ExampleData field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneTriggersTrigger) GetExampleDataOk() (map[string]interface{}, bool) {
+func (o *TriggersTrigger) GetExampleDataOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.ExampleData) {
 		return map[string]interface{}{}, false
 	}
@@ -257,7 +257,7 @@ func (o *SuperplaneTriggersTrigger) GetExampleDataOk() (map[string]interface{}, 
 }
 
 // HasExampleData returns a boolean if a field has been set.
-func (o *SuperplaneTriggersTrigger) HasExampleData() bool {
+func (o *TriggersTrigger) HasExampleData() bool {
 	if o != nil && !IsNil(o.ExampleData) {
 		return true
 	}
@@ -266,11 +266,11 @@ func (o *SuperplaneTriggersTrigger) HasExampleData() bool {
 }
 
 // SetExampleData gets a reference to the given map[string]interface{} and assigns it to the ExampleData field.
-func (o *SuperplaneTriggersTrigger) SetExampleData(v map[string]interface{}) {
+func (o *TriggersTrigger) SetExampleData(v map[string]interface{}) {
 	o.ExampleData = v
 }
 
-func (o SuperplaneTriggersTrigger) MarshalJSON() ([]byte, error) {
+func (o TriggersTrigger) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -278,7 +278,7 @@ func (o SuperplaneTriggersTrigger) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o SuperplaneTriggersTrigger) ToMap() (map[string]interface{}, error) {
+func (o TriggersTrigger) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
@@ -304,38 +304,38 @@ func (o SuperplaneTriggersTrigger) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableSuperplaneTriggersTrigger struct {
-	value *SuperplaneTriggersTrigger
+type NullableTriggersTrigger struct {
+	value *TriggersTrigger
 	isSet bool
 }
 
-func (v NullableSuperplaneTriggersTrigger) Get() *SuperplaneTriggersTrigger {
+func (v NullableTriggersTrigger) Get() *TriggersTrigger {
 	return v.value
 }
 
-func (v *NullableSuperplaneTriggersTrigger) Set(val *SuperplaneTriggersTrigger) {
+func (v *NullableTriggersTrigger) Set(val *TriggersTrigger) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableSuperplaneTriggersTrigger) IsSet() bool {
+func (v NullableTriggersTrigger) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableSuperplaneTriggersTrigger) Unset() {
+func (v *NullableTriggersTrigger) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableSuperplaneTriggersTrigger(val *SuperplaneTriggersTrigger) *NullableSuperplaneTriggersTrigger {
-	return &NullableSuperplaneTriggersTrigger{value: val, isSet: true}
+func NewNullableTriggersTrigger(val *TriggersTrigger) *NullableTriggersTrigger {
+	return &NullableTriggersTrigger{value: val, isSet: true}
 }
 
-func (v NullableSuperplaneTriggersTrigger) MarshalJSON() ([]byte, error) {
+func (v NullableTriggersTrigger) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableSuperplaneTriggersTrigger) UnmarshalJSON(src []byte) error {
+func (v *NullableTriggersTrigger) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

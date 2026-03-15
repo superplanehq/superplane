@@ -20,7 +20,7 @@ var _ MappedNullable = &TriggersDescribeTriggerResponse{}
 
 // TriggersDescribeTriggerResponse struct for TriggersDescribeTriggerResponse
 type TriggersDescribeTriggerResponse struct {
-	Trigger *SuperplaneTriggersTrigger `json:"trigger,omitempty"`
+	Trigger *TriggersTrigger `json:"trigger,omitempty"`
 }
 
 // NewTriggersDescribeTriggerResponse instantiates a new TriggersDescribeTriggerResponse object
@@ -41,9 +41,9 @@ func NewTriggersDescribeTriggerResponseWithDefaults() *TriggersDescribeTriggerRe
 }
 
 // GetTrigger returns the Trigger field value if set, zero value otherwise.
-func (o *TriggersDescribeTriggerResponse) GetTrigger() SuperplaneTriggersTrigger {
+func (o *TriggersDescribeTriggerResponse) GetTrigger() TriggersTrigger {
 	if o == nil || IsNil(o.Trigger) {
-		var ret SuperplaneTriggersTrigger
+		var ret TriggersTrigger
 		return ret
 	}
 	return *o.Trigger
@@ -51,7 +51,7 @@ func (o *TriggersDescribeTriggerResponse) GetTrigger() SuperplaneTriggersTrigger
 
 // GetTriggerOk returns a tuple with the Trigger field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *TriggersDescribeTriggerResponse) GetTriggerOk() (*SuperplaneTriggersTrigger, bool) {
+func (o *TriggersDescribeTriggerResponse) GetTriggerOk() (*TriggersTrigger, bool) {
 	if o == nil || IsNil(o.Trigger) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *TriggersDescribeTriggerResponse) HasTrigger() bool {
 	return false
 }
 
-// SetTrigger gets a reference to the given SuperplaneTriggersTrigger and assigns it to the Trigger field.
-func (o *TriggersDescribeTriggerResponse) SetTrigger(v SuperplaneTriggersTrigger) {
+// SetTrigger gets a reference to the given TriggersTrigger and assigns it to the Trigger field.
+func (o *TriggersDescribeTriggerResponse) SetTrigger(v TriggersTrigger) {
 	o.Trigger = &v
 }
 

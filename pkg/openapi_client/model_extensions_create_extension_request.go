@@ -20,7 +20,8 @@ var _ MappedNullable = &ExtensionsCreateExtensionRequest{}
 
 // ExtensionsCreateExtensionRequest struct for ExtensionsCreateExtensionRequest
 type ExtensionsCreateExtensionRequest struct {
-	Name *string `json:"name,omitempty"`
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
 
 // NewExtensionsCreateExtensionRequest instantiates a new ExtensionsCreateExtensionRequest object
@@ -72,6 +73,38 @@ func (o *ExtensionsCreateExtensionRequest) SetName(v string) {
 	o.Name = &v
 }
 
+// GetDescription returns the Description field value if set, zero value otherwise.
+func (o *ExtensionsCreateExtensionRequest) GetDescription() string {
+	if o == nil || IsNil(o.Description) {
+		var ret string
+		return ret
+	}
+	return *o.Description
+}
+
+// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ExtensionsCreateExtensionRequest) GetDescriptionOk() (*string, bool) {
+	if o == nil || IsNil(o.Description) {
+		return nil, false
+	}
+	return o.Description, true
+}
+
+// HasDescription returns a boolean if a field has been set.
+func (o *ExtensionsCreateExtensionRequest) HasDescription() bool {
+	if o != nil && !IsNil(o.Description) {
+		return true
+	}
+
+	return false
+}
+
+// SetDescription gets a reference to the given string and assigns it to the Description field.
+func (o *ExtensionsCreateExtensionRequest) SetDescription(v string) {
+	o.Description = &v
+}
+
 func (o ExtensionsCreateExtensionRequest) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -84,6 +117,9 @@ func (o ExtensionsCreateExtensionRequest) ToMap() (map[string]interface{}, error
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
+	}
+	if !IsNil(o.Description) {
+		toSerialize["description"] = o.Description
 	}
 	return toSerialize, nil
 }

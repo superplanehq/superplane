@@ -15,11 +15,11 @@ import (
 	"encoding/json"
 )
 
-// checks if the SuperplaneComponentsComponent type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &SuperplaneComponentsComponent{}
+// checks if the ComponentsComponent type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &ComponentsComponent{}
 
-// SuperplaneComponentsComponent struct for SuperplaneComponentsComponent
-type SuperplaneComponentsComponent struct {
+// ComponentsComponent struct for ComponentsComponent
+type ComponentsComponent struct {
 	Name           *string                             `json:"name,omitempty"`
 	Label          *string                             `json:"label,omitempty"`
 	Description    *string                             `json:"description,omitempty"`
@@ -30,25 +30,25 @@ type SuperplaneComponentsComponent struct {
 	ExampleOutput  map[string]interface{}              `json:"exampleOutput,omitempty"`
 }
 
-// NewSuperplaneComponentsComponent instantiates a new SuperplaneComponentsComponent object
+// NewComponentsComponent instantiates a new ComponentsComponent object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewSuperplaneComponentsComponent() *SuperplaneComponentsComponent {
-	this := SuperplaneComponentsComponent{}
+func NewComponentsComponent() *ComponentsComponent {
+	this := ComponentsComponent{}
 	return &this
 }
 
-// NewSuperplaneComponentsComponentWithDefaults instantiates a new SuperplaneComponentsComponent object
+// NewComponentsComponentWithDefaults instantiates a new ComponentsComponent object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewSuperplaneComponentsComponentWithDefaults() *SuperplaneComponentsComponent {
-	this := SuperplaneComponentsComponent{}
+func NewComponentsComponentWithDefaults() *ComponentsComponent {
+	this := ComponentsComponent{}
 	return &this
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *SuperplaneComponentsComponent) GetName() string {
+func (o *ComponentsComponent) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -58,7 +58,7 @@ func (o *SuperplaneComponentsComponent) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneComponentsComponent) GetNameOk() (*string, bool) {
+func (o *ComponentsComponent) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -66,7 +66,7 @@ func (o *SuperplaneComponentsComponent) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *SuperplaneComponentsComponent) HasName() bool {
+func (o *ComponentsComponent) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -75,12 +75,12 @@ func (o *SuperplaneComponentsComponent) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *SuperplaneComponentsComponent) SetName(v string) {
+func (o *ComponentsComponent) SetName(v string) {
 	o.Name = &v
 }
 
 // GetLabel returns the Label field value if set, zero value otherwise.
-func (o *SuperplaneComponentsComponent) GetLabel() string {
+func (o *ComponentsComponent) GetLabel() string {
 	if o == nil || IsNil(o.Label) {
 		var ret string
 		return ret
@@ -90,7 +90,7 @@ func (o *SuperplaneComponentsComponent) GetLabel() string {
 
 // GetLabelOk returns a tuple with the Label field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneComponentsComponent) GetLabelOk() (*string, bool) {
+func (o *ComponentsComponent) GetLabelOk() (*string, bool) {
 	if o == nil || IsNil(o.Label) {
 		return nil, false
 	}
@@ -98,7 +98,7 @@ func (o *SuperplaneComponentsComponent) GetLabelOk() (*string, bool) {
 }
 
 // HasLabel returns a boolean if a field has been set.
-func (o *SuperplaneComponentsComponent) HasLabel() bool {
+func (o *ComponentsComponent) HasLabel() bool {
 	if o != nil && !IsNil(o.Label) {
 		return true
 	}
@@ -107,12 +107,12 @@ func (o *SuperplaneComponentsComponent) HasLabel() bool {
 }
 
 // SetLabel gets a reference to the given string and assigns it to the Label field.
-func (o *SuperplaneComponentsComponent) SetLabel(v string) {
+func (o *ComponentsComponent) SetLabel(v string) {
 	o.Label = &v
 }
 
 // GetDescription returns the Description field value if set, zero value otherwise.
-func (o *SuperplaneComponentsComponent) GetDescription() string {
+func (o *ComponentsComponent) GetDescription() string {
 	if o == nil || IsNil(o.Description) {
 		var ret string
 		return ret
@@ -122,7 +122,7 @@ func (o *SuperplaneComponentsComponent) GetDescription() string {
 
 // GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneComponentsComponent) GetDescriptionOk() (*string, bool) {
+func (o *ComponentsComponent) GetDescriptionOk() (*string, bool) {
 	if o == nil || IsNil(o.Description) {
 		return nil, false
 	}
@@ -130,7 +130,7 @@ func (o *SuperplaneComponentsComponent) GetDescriptionOk() (*string, bool) {
 }
 
 // HasDescription returns a boolean if a field has been set.
-func (o *SuperplaneComponentsComponent) HasDescription() bool {
+func (o *ComponentsComponent) HasDescription() bool {
 	if o != nil && !IsNil(o.Description) {
 		return true
 	}
@@ -139,12 +139,12 @@ func (o *SuperplaneComponentsComponent) HasDescription() bool {
 }
 
 // SetDescription gets a reference to the given string and assigns it to the Description field.
-func (o *SuperplaneComponentsComponent) SetDescription(v string) {
+func (o *ComponentsComponent) SetDescription(v string) {
 	o.Description = &v
 }
 
 // GetConfiguration returns the Configuration field value if set, zero value otherwise.
-func (o *SuperplaneComponentsComponent) GetConfiguration() []ConfigurationField {
+func (o *ComponentsComponent) GetConfiguration() []ConfigurationField {
 	if o == nil || IsNil(o.Configuration) {
 		var ret []ConfigurationField
 		return ret
@@ -154,7 +154,7 @@ func (o *SuperplaneComponentsComponent) GetConfiguration() []ConfigurationField 
 
 // GetConfigurationOk returns a tuple with the Configuration field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneComponentsComponent) GetConfigurationOk() ([]ConfigurationField, bool) {
+func (o *ComponentsComponent) GetConfigurationOk() ([]ConfigurationField, bool) {
 	if o == nil || IsNil(o.Configuration) {
 		return nil, false
 	}
@@ -162,7 +162,7 @@ func (o *SuperplaneComponentsComponent) GetConfigurationOk() ([]ConfigurationFie
 }
 
 // HasConfiguration returns a boolean if a field has been set.
-func (o *SuperplaneComponentsComponent) HasConfiguration() bool {
+func (o *ComponentsComponent) HasConfiguration() bool {
 	if o != nil && !IsNil(o.Configuration) {
 		return true
 	}
@@ -171,12 +171,12 @@ func (o *SuperplaneComponentsComponent) HasConfiguration() bool {
 }
 
 // SetConfiguration gets a reference to the given []ConfigurationField and assigns it to the Configuration field.
-func (o *SuperplaneComponentsComponent) SetConfiguration(v []ConfigurationField) {
+func (o *ComponentsComponent) SetConfiguration(v []ConfigurationField) {
 	o.Configuration = v
 }
 
 // GetOutputChannels returns the OutputChannels field value if set, zero value otherwise.
-func (o *SuperplaneComponentsComponent) GetOutputChannels() []SuperplaneComponentsOutputChannel {
+func (o *ComponentsComponent) GetOutputChannels() []SuperplaneComponentsOutputChannel {
 	if o == nil || IsNil(o.OutputChannels) {
 		var ret []SuperplaneComponentsOutputChannel
 		return ret
@@ -186,7 +186,7 @@ func (o *SuperplaneComponentsComponent) GetOutputChannels() []SuperplaneComponen
 
 // GetOutputChannelsOk returns a tuple with the OutputChannels field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneComponentsComponent) GetOutputChannelsOk() ([]SuperplaneComponentsOutputChannel, bool) {
+func (o *ComponentsComponent) GetOutputChannelsOk() ([]SuperplaneComponentsOutputChannel, bool) {
 	if o == nil || IsNil(o.OutputChannels) {
 		return nil, false
 	}
@@ -194,7 +194,7 @@ func (o *SuperplaneComponentsComponent) GetOutputChannelsOk() ([]SuperplaneCompo
 }
 
 // HasOutputChannels returns a boolean if a field has been set.
-func (o *SuperplaneComponentsComponent) HasOutputChannels() bool {
+func (o *ComponentsComponent) HasOutputChannels() bool {
 	if o != nil && !IsNil(o.OutputChannels) {
 		return true
 	}
@@ -203,12 +203,12 @@ func (o *SuperplaneComponentsComponent) HasOutputChannels() bool {
 }
 
 // SetOutputChannels gets a reference to the given []SuperplaneComponentsOutputChannel and assigns it to the OutputChannels field.
-func (o *SuperplaneComponentsComponent) SetOutputChannels(v []SuperplaneComponentsOutputChannel) {
+func (o *ComponentsComponent) SetOutputChannels(v []SuperplaneComponentsOutputChannel) {
 	o.OutputChannels = v
 }
 
 // GetIcon returns the Icon field value if set, zero value otherwise.
-func (o *SuperplaneComponentsComponent) GetIcon() string {
+func (o *ComponentsComponent) GetIcon() string {
 	if o == nil || IsNil(o.Icon) {
 		var ret string
 		return ret
@@ -218,7 +218,7 @@ func (o *SuperplaneComponentsComponent) GetIcon() string {
 
 // GetIconOk returns a tuple with the Icon field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneComponentsComponent) GetIconOk() (*string, bool) {
+func (o *ComponentsComponent) GetIconOk() (*string, bool) {
 	if o == nil || IsNil(o.Icon) {
 		return nil, false
 	}
@@ -226,7 +226,7 @@ func (o *SuperplaneComponentsComponent) GetIconOk() (*string, bool) {
 }
 
 // HasIcon returns a boolean if a field has been set.
-func (o *SuperplaneComponentsComponent) HasIcon() bool {
+func (o *ComponentsComponent) HasIcon() bool {
 	if o != nil && !IsNil(o.Icon) {
 		return true
 	}
@@ -235,12 +235,12 @@ func (o *SuperplaneComponentsComponent) HasIcon() bool {
 }
 
 // SetIcon gets a reference to the given string and assigns it to the Icon field.
-func (o *SuperplaneComponentsComponent) SetIcon(v string) {
+func (o *ComponentsComponent) SetIcon(v string) {
 	o.Icon = &v
 }
 
 // GetColor returns the Color field value if set, zero value otherwise.
-func (o *SuperplaneComponentsComponent) GetColor() string {
+func (o *ComponentsComponent) GetColor() string {
 	if o == nil || IsNil(o.Color) {
 		var ret string
 		return ret
@@ -250,7 +250,7 @@ func (o *SuperplaneComponentsComponent) GetColor() string {
 
 // GetColorOk returns a tuple with the Color field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneComponentsComponent) GetColorOk() (*string, bool) {
+func (o *ComponentsComponent) GetColorOk() (*string, bool) {
 	if o == nil || IsNil(o.Color) {
 		return nil, false
 	}
@@ -258,7 +258,7 @@ func (o *SuperplaneComponentsComponent) GetColorOk() (*string, bool) {
 }
 
 // HasColor returns a boolean if a field has been set.
-func (o *SuperplaneComponentsComponent) HasColor() bool {
+func (o *ComponentsComponent) HasColor() bool {
 	if o != nil && !IsNil(o.Color) {
 		return true
 	}
@@ -267,12 +267,12 @@ func (o *SuperplaneComponentsComponent) HasColor() bool {
 }
 
 // SetColor gets a reference to the given string and assigns it to the Color field.
-func (o *SuperplaneComponentsComponent) SetColor(v string) {
+func (o *ComponentsComponent) SetColor(v string) {
 	o.Color = &v
 }
 
 // GetExampleOutput returns the ExampleOutput field value if set, zero value otherwise.
-func (o *SuperplaneComponentsComponent) GetExampleOutput() map[string]interface{} {
+func (o *ComponentsComponent) GetExampleOutput() map[string]interface{} {
 	if o == nil || IsNil(o.ExampleOutput) {
 		var ret map[string]interface{}
 		return ret
@@ -282,7 +282,7 @@ func (o *SuperplaneComponentsComponent) GetExampleOutput() map[string]interface{
 
 // GetExampleOutputOk returns a tuple with the ExampleOutput field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneComponentsComponent) GetExampleOutputOk() (map[string]interface{}, bool) {
+func (o *ComponentsComponent) GetExampleOutputOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.ExampleOutput) {
 		return map[string]interface{}{}, false
 	}
@@ -290,7 +290,7 @@ func (o *SuperplaneComponentsComponent) GetExampleOutputOk() (map[string]interfa
 }
 
 // HasExampleOutput returns a boolean if a field has been set.
-func (o *SuperplaneComponentsComponent) HasExampleOutput() bool {
+func (o *ComponentsComponent) HasExampleOutput() bool {
 	if o != nil && !IsNil(o.ExampleOutput) {
 		return true
 	}
@@ -299,11 +299,11 @@ func (o *SuperplaneComponentsComponent) HasExampleOutput() bool {
 }
 
 // SetExampleOutput gets a reference to the given map[string]interface{} and assigns it to the ExampleOutput field.
-func (o *SuperplaneComponentsComponent) SetExampleOutput(v map[string]interface{}) {
+func (o *ComponentsComponent) SetExampleOutput(v map[string]interface{}) {
 	o.ExampleOutput = v
 }
 
-func (o SuperplaneComponentsComponent) MarshalJSON() ([]byte, error) {
+func (o ComponentsComponent) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -311,7 +311,7 @@ func (o SuperplaneComponentsComponent) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o SuperplaneComponentsComponent) ToMap() (map[string]interface{}, error) {
+func (o ComponentsComponent) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
@@ -340,38 +340,38 @@ func (o SuperplaneComponentsComponent) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableSuperplaneComponentsComponent struct {
-	value *SuperplaneComponentsComponent
+type NullableComponentsComponent struct {
+	value *ComponentsComponent
 	isSet bool
 }
 
-func (v NullableSuperplaneComponentsComponent) Get() *SuperplaneComponentsComponent {
+func (v NullableComponentsComponent) Get() *ComponentsComponent {
 	return v.value
 }
 
-func (v *NullableSuperplaneComponentsComponent) Set(val *SuperplaneComponentsComponent) {
+func (v *NullableComponentsComponent) Set(val *ComponentsComponent) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableSuperplaneComponentsComponent) IsSet() bool {
+func (v NullableComponentsComponent) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableSuperplaneComponentsComponent) Unset() {
+func (v *NullableComponentsComponent) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableSuperplaneComponentsComponent(val *SuperplaneComponentsComponent) *NullableSuperplaneComponentsComponent {
-	return &NullableSuperplaneComponentsComponent{value: val, isSet: true}
+func NewNullableComponentsComponent(val *ComponentsComponent) *NullableComponentsComponent {
+	return &NullableComponentsComponent{value: val, isSet: true}
 }
 
-func (v NullableSuperplaneComponentsComponent) MarshalJSON() ([]byte, error) {
+func (v NullableComponentsComponent) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableSuperplaneComponentsComponent) UnmarshalJSON(src []byte) error {
+func (v *NullableComponentsComponent) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

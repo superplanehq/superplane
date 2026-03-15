@@ -21,6 +21,7 @@ var _ MappedNullable = &ExtensionsExtensionMetadata{}
 
 // ExtensionsExtensionMetadata struct for ExtensionsExtensionMetadata
 type ExtensionsExtensionMetadata struct {
+	Id          *string    `json:"id,omitempty"`
 	Name        *string    `json:"name,omitempty"`
 	Description *string    `json:"description,omitempty"`
 	CreatedAt   *time.Time `json:"createdAt,omitempty"`
@@ -41,6 +42,38 @@ func NewExtensionsExtensionMetadata() *ExtensionsExtensionMetadata {
 func NewExtensionsExtensionMetadataWithDefaults() *ExtensionsExtensionMetadata {
 	this := ExtensionsExtensionMetadata{}
 	return &this
+}
+
+// GetId returns the Id field value if set, zero value otherwise.
+func (o *ExtensionsExtensionMetadata) GetId() string {
+	if o == nil || IsNil(o.Id) {
+		var ret string
+		return ret
+	}
+	return *o.Id
+}
+
+// GetIdOk returns a tuple with the Id field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ExtensionsExtensionMetadata) GetIdOk() (*string, bool) {
+	if o == nil || IsNil(o.Id) {
+		return nil, false
+	}
+	return o.Id, true
+}
+
+// HasId returns a boolean if a field has been set.
+func (o *ExtensionsExtensionMetadata) HasId() bool {
+	if o != nil && !IsNil(o.Id) {
+		return true
+	}
+
+	return false
+}
+
+// SetId gets a reference to the given string and assigns it to the Id field.
+func (o *ExtensionsExtensionMetadata) SetId(v string) {
+	o.Id = &v
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
@@ -149,6 +182,9 @@ func (o ExtensionsExtensionMetadata) MarshalJSON() ([]byte, error) {
 
 func (o ExtensionsExtensionMetadata) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
+	if !IsNil(o.Id) {
+		toSerialize["id"] = o.Id
+	}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
 	}

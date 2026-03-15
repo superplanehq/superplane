@@ -503,6 +503,19 @@ export type CanvasesUpdateNodePauseResponse = {
   node?: ComponentsNode;
 };
 
+export type ComponentsComponent = {
+  name?: string;
+  label?: string;
+  description?: string;
+  configuration?: Array<ConfigurationField>;
+  outputChannels?: Array<SuperplaneComponentsOutputChannel>;
+  icon?: string;
+  color?: string;
+  exampleOutput?: {
+    [key: string]: unknown;
+  };
+};
+
 export type ComponentsComponentAction = {
   name?: string;
   description?: string;
@@ -510,7 +523,7 @@ export type ComponentsComponentAction = {
 };
 
 export type ComponentsDescribeComponentResponse = {
-  component?: SuperplaneComponentsComponent;
+  component?: ComponentsComponent;
 };
 
 export type ComponentsEdge = {
@@ -529,7 +542,7 @@ export type ComponentsListComponentActionsResponse = {
 };
 
 export type ComponentsListComponentsResponse = {
-  components?: Array<SuperplaneComponentsComponent>;
+  components?: Array<ComponentsComponent>;
 };
 
 export type ComponentsNode = {
@@ -693,6 +706,7 @@ export type ConfigurationVisibilityCondition = {
 
 export type ExtensionsCreateExtensionRequest = {
   name?: string;
+  description?: string;
 };
 
 export type ExtensionsCreateExtensionResponse = {
@@ -700,11 +714,12 @@ export type ExtensionsCreateExtensionResponse = {
 };
 
 export type ExtensionsCreateVersionBody = {
-  spec?: ExtensionsVersionSpec;
+  bundle?: string;
+  digest?: string;
 };
 
 export type ExtensionsCreateVersionResponse = {
-  version?: ExtensionsVersion;
+  version?: ExtensionsExtensionVersion;
 };
 
 export type ExtensionsExtension = {
@@ -712,9 +727,28 @@ export type ExtensionsExtension = {
 };
 
 export type ExtensionsExtensionMetadata = {
+  id?: string;
   name?: string;
   description?: string;
   createdAt?: string;
+};
+
+export type ExtensionsExtensionVersion = {
+  metadata?: ExtensionsExtensionVersionMetadata;
+  status?: ExtensionsExtensionVersionStatus;
+};
+
+export type ExtensionsExtensionVersionMetadata = {
+  id?: string;
+  version?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ExtensionsExtensionVersionState = "STATE_DRAFT" | "STATE_PUBLISHED";
+
+export type ExtensionsExtensionVersionStatus = {
+  state?: ExtensionsExtensionVersionState;
 };
 
 export type ExtensionsListExtensionsResponse = {
@@ -722,7 +756,7 @@ export type ExtensionsListExtensionsResponse = {
 };
 
 export type ExtensionsListVersionsResponse = {
-  versions?: Array<ExtensionsVersion>;
+  versions?: Array<ExtensionsExtensionVersion>;
 };
 
 export type ExtensionsPublishVersionBody = {
@@ -730,25 +764,16 @@ export type ExtensionsPublishVersionBody = {
 };
 
 export type ExtensionsPublishVersionResponse = {
-  version?: ExtensionsVersion;
+  version?: ExtensionsExtensionVersion;
 };
 
 export type ExtensionsUpdateVersionBody = {
-  spec?: ExtensionsVersionSpec;
+  bundle?: string;
+  digest?: string;
 };
 
 export type ExtensionsUpdateVersionResponse = {
-  version?: ExtensionsVersion;
-};
-
-export type ExtensionsVersion = {
-  [key: string]: unknown;
-};
-
-export type ExtensionsVersionSpec = {
-  bundle?: string;
-  digest?: string;
-  manifest?: VersionManifest;
+  version?: ExtensionsExtensionVersion;
 };
 
 export type GroupsAddUserToGroupBody = {
@@ -847,8 +872,8 @@ export type IntegrationsIntegrationDefinition = {
   icon?: string;
   description?: string;
   configuration?: Array<ConfigurationField>;
-  components?: Array<SuperplaneComponentsComponent>;
-  triggers?: Array<SuperplaneTriggersTrigger>;
+  components?: Array<ComponentsComponent>;
+  triggers?: Array<TriggersTrigger>;
   instructions?: string;
 };
 
@@ -907,7 +932,7 @@ export type OrganizationsCreateIntegrationBody = {
 };
 
 export type OrganizationsCreateIntegrationResponse = {
-  integration?: SuperplaneOrganizationsIntegration;
+  integration?: OrganizationsIntegration;
 };
 
 export type OrganizationsCreateInvitationBody = {
@@ -931,7 +956,7 @@ export type OrganizationsDeleteOrganizationResponse = {
 };
 
 export type OrganizationsDescribeIntegrationResponse = {
-  integration?: SuperplaneOrganizationsIntegration;
+  integration?: OrganizationsIntegration;
 };
 
 export type OrganizationsDescribeOrganizationResponse = {
@@ -944,6 +969,12 @@ export type OrganizationsGetAgentSettingsResponse = {
 
 export type OrganizationsGetInviteLinkResponse = {
   inviteLink?: OrganizationsInviteLink;
+};
+
+export type OrganizationsIntegration = {
+  metadata?: OrganizationsIntegrationMetadata;
+  spec?: OrganizationsIntegrationSpec;
+  status?: OrganizationsIntegrationStatus;
 };
 
 export type OrganizationsIntegrationMetadata = {
@@ -1051,7 +1082,7 @@ export type OrganizationsUpdateIntegrationBody = {
 };
 
 export type OrganizationsUpdateIntegrationResponse = {
-  integration?: SuperplaneOrganizationsIntegration;
+  integration?: OrganizationsIntegration;
 };
 
 export type OrganizationsUpdateInviteLinkBody = {
@@ -1285,19 +1316,6 @@ export type SuperplaneCanvasesUserRef = {
   name?: string;
 };
 
-export type SuperplaneComponentsComponent = {
-  name?: string;
-  label?: string;
-  description?: string;
-  configuration?: Array<ConfigurationField>;
-  outputChannels?: Array<SuperplaneComponentsOutputChannel>;
-  icon?: string;
-  color?: string;
-  exampleOutput?: {
-    [key: string]: unknown;
-  };
-};
-
 export type SuperplaneComponentsOutputChannel = {
   name?: string;
   label?: string;
@@ -1316,26 +1334,8 @@ export type SuperplaneMeUser = {
   hasToken?: boolean;
 };
 
-export type SuperplaneOrganizationsIntegration = {
-  metadata?: OrganizationsIntegrationMetadata;
-  spec?: OrganizationsIntegrationSpec;
-  status?: OrganizationsIntegrationStatus;
-};
-
 export type SuperplaneOrganizationsListIntegrationsResponse = {
-  integrations?: Array<SuperplaneOrganizationsIntegration>;
-};
-
-export type SuperplaneTriggersTrigger = {
-  name?: string;
-  label?: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  configuration?: Array<ConfigurationField>;
-  exampleData?: {
-    [key: string]: unknown;
-  };
+  integrations?: Array<OrganizationsIntegration>;
 };
 
 export type SuperplaneUsersUser = {
@@ -1345,11 +1345,23 @@ export type SuperplaneUsersUser = {
 };
 
 export type TriggersDescribeTriggerResponse = {
-  trigger?: SuperplaneTriggersTrigger;
+  trigger?: TriggersTrigger;
 };
 
 export type TriggersListTriggersResponse = {
-  triggers?: Array<SuperplaneTriggersTrigger>;
+  triggers?: Array<TriggersTrigger>;
+};
+
+export type TriggersTrigger = {
+  name?: string;
+  label?: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  configuration?: Array<ConfigurationField>;
+  exampleData?: {
+    [key: string]: unknown;
+  };
 };
 
 export type UsersAccountProvider = {
@@ -1403,39 +1415,6 @@ export type UsersUserSpec = {
 
 export type UsersUserStatus = {
   roleAssignments?: Array<UsersUserRoleAssignment>;
-};
-
-export type VersionManifest = {
-  integrations?: Array<VersionManifestIntegration>;
-  components?: Array<VersionManifestComponent>;
-  triggers?: Array<VersionManifestTrigger>;
-};
-
-export type VersionManifestComponent = {
-  name?: string;
-  label?: string;
-  description?: string;
-  configuration?: Array<ConfigurationField>;
-  outputChannels?: Array<SuperplaneComponentsOutputChannel>;
-  actions?: Array<ComponentsComponentAction>;
-};
-
-export type VersionManifestIntegration = {
-  name?: string;
-  label?: string;
-  description?: string;
-  instructions?: string;
-  configuration?: Array<ConfigurationField>;
-  resourceTypes?: Array<string>;
-  actions?: Array<ComponentsComponentAction>;
-};
-
-export type VersionManifestTrigger = {
-  name?: string;
-  label?: string;
-  description?: string;
-  configuration?: Array<ConfigurationField>;
-  actions?: Array<ComponentsComponentAction>;
 };
 
 export type WidgetsDescribeWidgetResponse = {
