@@ -9,6 +9,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Assign Reserved IP" href="#assign-reserved-ip" description="Assign or unassign a DigitalOcean Reserved IP to a Droplet" />
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record for a DigitalOcean domain" />
   <LinkCard title="Create Droplet" href="#create-droplet" description="Create a new DigitalOcean Droplet" />
   <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a DigitalOcean Load Balancer with forwarding rules and targets" />
@@ -36,6 +37,59 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 5. Copy the token and paste it below
 
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.
+
+<a id="assign-reserved-ip"></a>
+
+## Assign Reserved IP
+
+The Assign Reserved IP component assigns or unassigns a DigitalOcean Reserved IP to a droplet.
+
+### Use Cases
+
+- **Blue/green deployments**: Reassign a reserved IP to the new deployment with zero downtime
+- **Failover**: Quickly reassign a reserved IP from a failed droplet to a healthy replacement
+- **Maintenance**: Temporarily unassign a reserved IP while a droplet is being serviced
+
+### Configuration
+
+- **Reserved IP**: The reserved IP address to manage (required)
+- **Action**: The operation to perform: assign or unassign (required)
+- **Droplet ID**: The target droplet for the assignment (required when action is assign)
+
+### Output
+
+Returns the action result including:
+- **id**: Action ID
+- **status**: Final action status (completed)
+- **type**: Type of action performed (assign or unassign)
+- **started_at**: When the action started
+- **completed_at**: When the action completed
+- **resource_id**: Reserved IP resource identifier
+
+### Important Notes
+
+- The component polls until the action completes
+- For **assign**, the reserved IP will be unassigned from any current droplet first
+- For **unassign**, the **Droplet ID** field is ignored
+
+### Example Output
+
+```json
+{
+  "data": {
+    "completed_at": "2026-03-13T10:10:05Z",
+    "id": 2048576123,
+    "region_slug": "nyc3",
+    "resource_id": 2335912909,
+    "resource_type": "floating_ip",
+    "started_at": "2026-03-13T10:10:00Z",
+    "status": "completed",
+    "type": "assign_ip"
+  },
+  "timestamp": "2026-03-13T10:10:08.000000000Z",
+  "type": "digitalocean.reservedip.assign"
+}
+```
 
 <a id="create-dns-record"></a>
 
