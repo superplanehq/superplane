@@ -50,7 +50,7 @@ func Test__AssignReservedIP__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "invalid action")
 	})
 
-	t.Run("assign without dropletID returns error", func(t *testing.T) {
+	t.Run("assign without droplet returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"reservedIP": "104.131.186.241",
@@ -59,7 +59,7 @@ func Test__AssignReservedIP__Setup(t *testing.T) {
 			Metadata: &contexts.MetadataContext{},
 		})
 
-		require.ErrorContains(t, err, "dropletID is required when action is assign")
+		require.ErrorContains(t, err, "droplet is required when action is assign")
 	})
 
 	t.Run("valid assign configuration -> no error", func(t *testing.T) {
@@ -67,7 +67,7 @@ func Test__AssignReservedIP__Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"reservedIP": "104.131.186.241",
 				"action":     "assign",
-				"dropletID":  "98765432",
+				"droplet":    "98765432",
 			},
 			Metadata: &contexts.MetadataContext{},
 		})
@@ -123,7 +123,7 @@ func Test__AssignReservedIP__Execute(t *testing.T) {
 			Configuration: map[string]any{
 				"reservedIP": "104.131.186.241",
 				"action":     "assign",
-				"dropletID":  "98765432",
+				"droplet":    "98765432",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -207,7 +207,7 @@ func Test__AssignReservedIP__Execute(t *testing.T) {
 			Configuration: map[string]any{
 				"reservedIP": "104.131.186.241",
 				"action":     "assign",
-				"dropletID":  "not-a-number",
+				"droplet":    "not-a-number",
 			},
 			HTTP:           &contexts.HTTPContext{},
 			Integration:    integrationCtx,
@@ -240,7 +240,7 @@ func Test__AssignReservedIP__Execute(t *testing.T) {
 			Configuration: map[string]any{
 				"reservedIP": "104.131.186.241",
 				"action":     "assign",
-				"dropletID":  "98765432",
+				"droplet":    "98765432",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,

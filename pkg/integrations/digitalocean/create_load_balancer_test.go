@@ -181,7 +181,7 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 		assert.Equal(t, "4de7ac8b-495b-4884-9a69-1050c6793cd6", metadata["lbID"])
 
 		assert.Equal(t, "poll", requestCtx.Action)
-		assert.Equal(t, 10*time.Second, requestCtx.Duration)
+		assert.Equal(t, 15*time.Second, requestCtx.Duration)
 		assert.False(t, executionState.Passed)
 	})
 
