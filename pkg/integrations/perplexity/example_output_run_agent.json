@@ -12,7 +12,10 @@
         "usage": {
             "input_tokens": 3681,
             "output_tokens": 780,
-            "total_tokens": 4461
+            "total_tokens": 4461,
+            "cost": {
+                "total_cost": 0.05
+            }
         }
     },
     "timestamp": "2026-01-19T12:00:00Z"
