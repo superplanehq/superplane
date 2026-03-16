@@ -164,7 +164,6 @@ func Test__CreateDNSRecord__Execute(t *testing.T) {
 	})
 
 	t.Run("MX record with priority -> creates successfully", func(t *testing.T) {
-		priority := 10
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -201,7 +200,7 @@ func Test__CreateDNSRecord__Execute(t *testing.T) {
 				"type":     "MX",
 				"name":     "@",
 				"data":     "mail.example.com",
-				"priority": &priority,
+				"priority": "10",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,

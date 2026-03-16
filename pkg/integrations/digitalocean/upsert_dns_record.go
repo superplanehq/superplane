@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -18,10 +19,10 @@ type UpsertDNSRecordSpec struct {
 	Type     string `json:"type"`
 	Name     string `json:"name"`
 	Data     string `json:"data"`
-	TTL      int    `json:"ttl"`
-	Priority *int   `json:"priority"`
-	Port     *int   `json:"port"`
-	Weight   *int   `json:"weight"`
+	TTL      string `json:"ttl"`
+	Priority string `json:"priority"`
+	Port     string `json:"port"`
+	Weight   string `json:"weight"`
 }
 
 func (u *UpsertDNSRecord) Name() string {
@@ -129,56 +130,39 @@ func (u *UpsertDNSRecord) Configuration() []configuration.Field {
 		{
 			Name:        "ttl",
 			Label:       "TTL (seconds)",
-			Type:        configuration.FieldTypeNumber,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Togglable:   true,
 			Default:     "1800",
 			Description: "Time-to-live in seconds",
-			TypeOptions: &configuration.TypeOptions{
-				Number: &configuration.NumberTypeOptions{
-					Min: func() *int { min := 30; return &min }(),
-				},
-			},
+			Placeholder: "1800",
 		},
 		{
 			Name:        "priority",
 			Label:       "Priority",
-			Type:        configuration.FieldTypeNumber,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Togglable:   true,
 			Description: "Record priority (required for MX and SRV records)",
-			TypeOptions: &configuration.TypeOptions{
-				Number: &configuration.NumberTypeOptions{
-					Min: func() *int { min := 0; return &min }(),
-				},
-			},
+			Placeholder: "10",
 		},
 		{
 			Name:        "port",
 			Label:       "Port",
-			Type:        configuration.FieldTypeNumber,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Togglable:   true,
 			Description: "Port number (required for SRV records)",
-			TypeOptions: &configuration.TypeOptions{
-				Number: &configuration.NumberTypeOptions{
-					Min: func() *int { min := 1; return &min }(),
-					Max: func() *int { max := 65535; return &max }(),
-				},
-			},
+			Placeholder: "443",
 		},
 		{
 			Name:        "weight",
 			Label:       "Weight",
-			Type:        configuration.FieldTypeNumber,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Togglable:   true,
 			Description: "Weight (required for SRV records)",
-			TypeOptions: &configuration.TypeOptions{
-				Number: &configuration.NumberTypeOptions{
-					Min: func() *int { min := 0; return &min }(),
-				},
-			},
+			Placeholder: "10",
 		},
 	}
 }
@@ -223,9 +207,40 @@ func (u *UpsertDNSRecord) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	ttl := spec.TTL
-	if ttl == 0 {
-		ttl = 1800
+	ttl := 1800
+	if spec.TTL != "" {
+		parsed, err := strconv.Atoi(spec.TTL)
+		if err != nil {
+			return fmt.Errorf("invalid ttl value %q: %v", spec.TTL, err)
+		}
+		ttl = parsed
+	}
+
+	var priority *int
+	if spec.Priority != "" {
+		p, err := strconv.Atoi(spec.Priority)
+		if err != nil {
+			return fmt.Errorf("invalid priority value %q: %v", spec.Priority, err)
+		}
+		priority = &p
+	}
+
+	var port *int
+	if spec.Port != "" {
+		p, err := strconv.Atoi(spec.Port)
+		if err != nil {
+			return fmt.Errorf("invalid port value %q: %v", spec.Port, err)
+		}
+		port = &p
+	}
+
+	var weight *int
+	if spec.Weight != "" {
+		w, err := strconv.Atoi(spec.Weight)
+		if err != nil {
+			return fmt.Errorf("invalid weight value %q: %v", spec.Weight, err)
+		}
+		weight = &w
 	}
 
 	req := DNSRecordRequest{
@@ -233,9 +248,9 @@ func (u *UpsertDNSRecord) Execute(ctx core.ExecutionContext) error {
 		Name:     spec.Name,
 		Data:     spec.Data,
 		TTL:      ttl,
-		Priority: spec.Priority,
-		Port:     spec.Port,
-		Weight:   spec.Weight,
+		Priority: priority,
+		Port:     port,
+		Weight:   weight,
 	}
 
 	// Look for an existing record with the same name and type
