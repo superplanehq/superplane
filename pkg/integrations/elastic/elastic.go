@@ -126,6 +126,8 @@ func (e *Elastic) Configuration() []configuration.Field {
 func (e *Elastic) Components() []core.Component {
 	return []core.Component{
 		&IndexDocument{},
+		&GetDocument{},
+		&UpdateDocument{},
 	}
 }
 
