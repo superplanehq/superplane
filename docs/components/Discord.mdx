@@ -2,13 +2,14 @@
 title: "Discord"
 ---
 
-Send messages to Discord channels
+Send messages to Discord channels and fetch mentions
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Get Last Mention" href="#get-last-mention" description="Get the most recent message that mentions the Discord bot in a channel" />
   <LinkCard title="Send Text Message" href="#send-text-message" description="Send a text message to a Discord channel" />
 </CardGrid>
 
@@ -20,13 +21,78 @@ To set up Discord integration:
 2. Click **New Application** and give it a name
 3. Go to **OAuth2** → **URL Generator**:
    - Under **Scopes**, select **bot**
-   - Under **Bot Permissions**, select **View Channels** and **Send Messages**
+   - Under **Bot Permissions**, select **View Channels**, **Send Messages**, and **Read Message History**
    - Copy the generated URL and open it in a new tab to invite the bot to your server
 4. Go to the **Bot** section:
    - Click **Add Bot** (if not already added)
    - Uncheck the **Public Bot** option
    - Under **Token**, click **Reset Token** then **Copy** to get your bot token
 5. Paste the **Bot Token** in the **Bot Token** field below
+
+<a id="get-last-mention"></a>
+
+## Get Last Mention
+
+The Get Last Mention component fetches recent messages from a Discord channel and returns the latest one that mentions your bot.
+
+### Use Cases
+
+- **Command polling**: Retrieve the most recent mention command in a channel
+- **Manual workflows**: Pull latest bot mention on demand in a workflow step
+- **Mention auditing**: Inspect the latest mention payload before replying
+
+### Configuration
+
+- **Channel**: Discord channel to search for mentions
+- **Since**: Optional date string lower-bound for mentions (only mentions at or after this time are considered). Supports expressions.
+  Accepted formats include ISO 8601 (recommended) and Go's default timestamp format (e.g. 2026-03-16 04:17:08.750328135 +0000 UTC).
+
+### Output
+
+The payload includes:
+- **channel_id**: Channel queried
+- **mention**: Full message payload for the latest bot mention (when found)
+
+Output channels:
+- **found**: Emitted when a matching mention is found
+- **notFound**: Emitted when no matching mention is found
+
+### Notes
+
+- Requires the bot permission **Read Message History** in the selected channel
+- Only non-bot-authored messages are considered
+- Datetimes without timezone in **Since** are interpreted as UTC
+
+### Example Output
+
+```json
+{
+  "data": {
+    "channel_id": "1381731186335651880",
+    "mention": {
+      "author": {
+        "bot": false,
+        "id": "98432147091234567",
+        "username": "pedro"
+      },
+      "channel_id": "1381731186335651880",
+      "content": "\u003c@1372980427293554709\u003e can you run /deploy?",
+      "guild_id": "1381731029892325376",
+      "id": "1381731283190517770",
+      "mentions": [
+        {
+          "bot": true,
+          "id": "1372980427293554709",
+          "username": "superplane-bot"
+        }
+      ],
+      "timestamp": "2026-03-10T15:04:05.000Z"
+    }
+  },
+  "timestamp": "2026-03-10T15:04:05.000Z",
+  "type": "discord.getLastMention.result"
+}
+```
 
 <a id="send-text-message"></a>
 
