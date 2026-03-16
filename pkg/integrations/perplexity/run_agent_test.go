@@ -52,10 +52,11 @@ func TestRunAgent_WithPreset(t *testing.T) {
 	c := &runAgent{}
 	err := c.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"preset":    "pro-search",
-			"input":     "What is Go?",
-			"webSearch": true,
-			"fetchUrl":  true,
+			"modelSource": "preset",
+			"preset":      "pro-search",
+			"input":       "What is Go?",
+			"webSearch":   true,
+			"fetchUrl":    true,
 		},
 		ExecutionState: execState,
 		HTTP:           httpCtx,
@@ -92,10 +93,11 @@ func TestRunAgent_WithModel(t *testing.T) {
 	c := &runAgent{}
 	err := c.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"model":     "anthropic/claude-haiku-4-5",
-			"input":     "Explain recursion",
-			"webSearch": true,
-			"fetchUrl":  false,
+			"modelSource": "model",
+			"model":       "anthropic/claude-haiku-4-5",
+			"input":       "Explain recursion",
+			"webSearch":   true,
+			"fetchUrl":    false,
 		},
 		ExecutionState: execState,
 		HTTP:           httpCtx,
@@ -165,10 +167,11 @@ func TestRunAgent_ToolFlags(t *testing.T) {
 			c := &runAgent{}
 			err := c.Execute(core.ExecutionContext{
 				Configuration: map[string]any{
-					"preset":    "fast-search",
-					"input":     "test",
-					"webSearch": tt.webSearch,
-					"fetchUrl":  tt.fetchURL,
+					"modelSource": "preset",
+					"preset":      "fast-search",
+					"input":       "test",
+					"webSearch":   tt.webSearch,
+					"fetchUrl":    tt.fetchURL,
 				},
 				ExecutionState: execState,
 				HTTP:           httpCtx,
@@ -227,10 +230,11 @@ func TestRunAgent_OutputParsing(t *testing.T) {
 	c := &runAgent{}
 	err := c.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"preset":    "pro-search",
-			"input":     "Latest AI news",
-			"webSearch": true,
-			"fetchUrl":  true,
+			"modelSource": "preset",
+			"preset":      "pro-search",
+			"input":       "Latest AI news",
+			"webSearch":   true,
+			"fetchUrl":    true,
 		},
 		ExecutionState: execState,
 		HTTP:           httpCtx,
@@ -255,23 +259,36 @@ func TestRunAgent_OutputParsing(t *testing.T) {
 	assert.Equal(t, 4461, data.Usage.TotalTokens)
 }
 
-func TestRunAgent_MissingPresetAndModel(t *testing.T) {
+func TestRunAgent_MissingPreset(t *testing.T) {
 	c := &runAgent{}
 	err := c.Execute(core.ExecutionContext{
-		Configuration:  map[string]any{"input": "test query"},
+		Configuration:  map[string]any{"modelSource": "preset", "preset": "", "input": "test query"},
 		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		HTTP:           &contexts.HTTPContext{},
 		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "key"}},
 	})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "model is required when no preset is specified")
+	assert.Contains(t, err.Error(), "preset is required")
+}
+
+func TestRunAgent_MissingModel(t *testing.T) {
+	c := &runAgent{}
+	err := c.Execute(core.ExecutionContext{
+		Configuration:  map[string]any{"modelSource": "model", "model": "", "input": "test query"},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		HTTP:           &contexts.HTTPContext{},
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "key"}},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "model is required")
 }
 
 func TestRunAgent_MissingInput(t *testing.T) {
 	c := &runAgent{}
 	err := c.Execute(core.ExecutionContext{
-		Configuration:  map[string]any{"preset": "pro-search", "input": ""},
+		Configuration:  map[string]any{"modelSource": "preset", "preset": "pro-search", "input": ""},
 		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		HTTP:           &contexts.HTTPContext{},
 		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "key"}},
@@ -294,8 +311,9 @@ func TestRunAgent_APIError(t *testing.T) {
 	c := &runAgent{}
 	err := c.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"preset": "pro-search",
-			"input":  "test query",
+			"modelSource": "preset",
+			"preset":      "pro-search",
+			"input":       "test query",
 		},
 		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		HTTP:           httpCtx,

@@ -14,6 +14,7 @@ import perplexityIcon from "@/assets/icons/integrations/perplexity.svg";
 import { formatTimeAgo } from "@/utils/date";
 
 interface RunAgentConfiguration {
+  modelSource?: string;
   preset?: string;
   model?: string;
 }

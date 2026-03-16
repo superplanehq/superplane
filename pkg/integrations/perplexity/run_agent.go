@@ -16,6 +16,7 @@ const AgentPayloadType = "perplexity.agent.response"
 type runAgent struct{}
 
 type runAgentSpec struct {
+	ModelSource  string `mapstructure:"modelSource"`
 	Preset       string `mapstructure:"preset"`
 	Model        string `mapstructure:"model"`
 	Input        string `mapstructure:"input"`
@@ -93,16 +94,39 @@ func (c *runAgent) OutputChannels(configuration any) []core.OutputChannel {
 func (c *runAgent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:               "modelSource",
+			Label:              "Model Source",
+			Type:               configuration.FieldTypeSelect,
+			Required:           true,
+			Default:            "preset",
+			DisallowExpression: true,
+			Description:        "Choose between a preset or a specific model",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Preset", Value: "preset"},
+						{Label: "Custom Model", Value: "model"},
+					},
+				},
+			},
+		},
+		{
 			Name:        "preset",
 			Label:       "Preset",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Default:     "pro-search",
-			Description: "Agent preset (recommended). When set, model is ignored.",
+			Description: "Agent preset to use",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "agent-preset",
 				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "modelSource", Values: []string{"preset"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "modelSource", Values: []string{"preset"}},
 			},
 		},
 		{
@@ -110,17 +134,19 @@ func (c *runAgent) Configuration() []configuration.Field {
 			Label:       "Model",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Model to use when no preset is specified",
+			Default:     "sonar-pro",
+			Placeholder: "Select a model",
+			Description: "Model to use",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "agent-model",
 				},
 			},
 			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "preset", Values: []string{""}},
+				{Field: "modelSource", Values: []string{"model"}},
 			},
 			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "preset", Values: []string{""}},
+				{Field: "modelSource", Values: []string{"model"}},
 			},
 		},
 		{
@@ -164,8 +190,12 @@ func (c *runAgent) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
-	if spec.Preset == "" && spec.Model == "" {
-		return fmt.Errorf("model is required when no preset is specified")
+	if spec.ModelSource == "preset" && spec.Preset == "" {
+		return fmt.Errorf("preset is required")
+	}
+
+	if spec.ModelSource == "model" && spec.Model == "" {
+		return fmt.Errorf("model is required")
 	}
 
 	if spec.Input == "" {
@@ -181,8 +211,12 @@ func (c *runAgent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
-	if spec.Preset == "" && spec.Model == "" {
-		return fmt.Errorf("model is required when no preset is specified")
+	if spec.ModelSource == "preset" && spec.Preset == "" {
+		return fmt.Errorf("preset is required")
+	}
+
+	if spec.ModelSource == "model" && spec.Model == "" {
+		return fmt.Errorf("model is required")
 	}
 
 	if spec.Input == "" {
