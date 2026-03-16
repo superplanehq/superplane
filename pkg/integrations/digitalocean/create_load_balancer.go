@@ -31,7 +31,7 @@ type CreateLoadBalancerSpec struct {
 	Name            string               `json:"name" mapstructure:"name"`
 	Region          string               `json:"region" mapstructure:"region"`
 	ForwardingRules []ForwardingRuleSpec `json:"forwardingRules" mapstructure:"forwardingRules"`
-	DropletIDs      []string             `json:"dropletIds" mapstructure:"dropletIds"`
+	Droplets        []string             `json:"droplets" mapstructure:"droplets"`
 	Tag             string               `json:"tag" mapstructure:"tag"`
 }
 
@@ -61,8 +61,8 @@ func (c *CreateLoadBalancer) Documentation() string {
 - **Name**: The name of the load balancer (required, only letters, numbers, and hyphens)
 - **Region**: Region where the load balancer will be created (required)
 - **Forwarding Rules**: One or more forwarding rules specifying entry/target protocol, port, and optional TLS passthrough (required)
-- **Droplet IDs**: IDs of droplets to add as targets — must be in the same region as the load balancer (optional, mutually exclusive with Tag)
-- **Tag**: Tag used to dynamically target droplets (optional, mutually exclusive with Droplet IDs)
+- **Droplets**: The droplets to add as targets — must be in the same region as the load balancer (optional, mutually exclusive with Tag)
+- **Tag**: Tag used to dynamically target droplets (optional, mutually exclusive with Droplets)
 
 ## Output
 
@@ -195,8 +195,8 @@ func (c *CreateLoadBalancer) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "dropletIds",
-			Label:       "Droplet IDs",
+			Name:        "droplets",
+			Label:       "Droplets",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Togglable:   true,
@@ -293,9 +293,9 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 		Tag:             spec.Tag,
 	}
 
-	if len(spec.DropletIDs) > 0 {
-		dropletIDs := make([]int, 0, len(spec.DropletIDs))
-		for _, idStr := range spec.DropletIDs {
+	if len(spec.Droplets) > 0 {
+		dropletIDs := make([]int, 0, len(spec.Droplets))
+		for _, idStr := range spec.Droplets {
 			var id int
 			if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil {
 				return fmt.Errorf("invalid droplet ID %q: must be a number", idStr)
