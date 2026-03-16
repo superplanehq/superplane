@@ -16,6 +16,7 @@ import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.sv
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
+import elasticIcon from "@/assets/icons/integrations/elastic.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import digitaloceanIcon from "@/assets/icons/integrations/digitalocean.svg";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
@@ -96,6 +97,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   statuspage: statuspageIcon,
   launchdarkly: launchdarklyIcon,
   teams: teamsIcon,
+  elastic: elasticIcon,
 };
 
 /** Block name first part (e.g. "github") or compound (e.g. aws.lambda) → logo src for header. */
@@ -156,6 +158,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
     artifactregistry: gcpArtifactRegistryIcon,
     pubsub: gcpPubSubIcon,
   },
+  elastic: elasticIcon,
 };
 
 /**
