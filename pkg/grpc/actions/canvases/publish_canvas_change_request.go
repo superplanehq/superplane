@@ -136,7 +136,7 @@ func PublishCanvasChangeRequest(
 			return findNodesErr
 		}
 
-		mergedNodes, mergedEdges, _ = remapNodeIDsForConflicts(mergedNodes, mergedEdges, existingNodesUnscoped)
+		mergedNodes, mergedEdges, _ = remapNodeIDsForConflicts(canvasUUID, mergedNodes, mergedEdges, existingNodesUnscoped)
 
 		parentNodesByNodeID := make(map[string]*models.Node)
 		for i := range mergedNodes {
@@ -160,9 +160,22 @@ func PublishCanvasChangeRequest(
 				continue
 			}
 
-			workflowNode, upsertErr := upsertNode(tx, existingNodes, node, canvasUUID)
+			workflowNode, nodeLevelErrorMessage, upsertErr := upsertNode(tx, existingNodes, node, canvasUUID)
 			if upsertErr != nil {
 				return upsertErr
+			}
+
+			if nodeLevelErrorMessage != nil {
+				errorNodeID := node.ID
+				if workflowNode.ParentNodeID != nil {
+					errorNodeID = *workflowNode.ParentNodeID
+				}
+				parentNode, ok := parentNodesByNodeID[errorNodeID]
+				if !ok {
+					log.Errorf("Parent node %s not found for node-level error", errorNodeID)
+				} else {
+					parentNode.ErrorMessage = nodeLevelErrorMessage
+				}
 			}
 
 			if workflowNode.State == models.CanvasNodeStateReady {

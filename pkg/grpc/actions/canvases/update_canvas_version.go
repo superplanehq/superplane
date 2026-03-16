@@ -139,7 +139,8 @@ func UpdateCanvasVersion(
 		if status.Code(err) != codes.Unknown {
 			return nil, err
 		}
-		return nil, status.Errorf(codes.Internal, "failed to update canvas version: %v", err)
+		log.WithError(err).Error("failed to update canvas version")
+		return nil, status.Error(codes.Internal, "failed to update canvas version")
 	}
 
 	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {
@@ -183,6 +184,13 @@ func updateLiveCanvasWithoutVersioning(
 		}
 
 		now := time.Now()
+		existingNodesUnscoped, findNodesErr := models.FindCanvasNodesUnscopedInTransaction(tx, canvasID)
+		if findNodesErr != nil {
+			return findNodesErr
+		}
+
+		nodes, edges, _ = remapNodeIDsForConflicts(canvasID, nodes, edges, existingNodesUnscoped)
+
 		existingNodes, findNodesErr := models.FindCanvasNodesInTransaction(tx, canvasID)
 		if findNodesErr != nil {
 			return findNodesErr
@@ -203,9 +211,20 @@ func updateLiveCanvasWithoutVersioning(
 				continue
 			}
 
-			workflowNode, upsertErr := upsertNode(tx, existingNodes, node, canvasID)
+			workflowNode, nodeLevelErrorMessage, upsertErr := upsertNode(tx, existingNodes, node, canvasID)
 			if upsertErr != nil {
 				return upsertErr
+			}
+
+			if nodeLevelErrorMessage != nil {
+				errorNodeID := node.ID
+				if workflowNode.ParentNodeID != nil {
+					errorNodeID = *workflowNode.ParentNodeID
+				}
+				parentNode, ok := parentNodesByNodeID[errorNodeID]
+				if ok {
+					parentNode.ErrorMessage = nodeLevelErrorMessage
+				}
 			}
 
 			if workflowNode.State == models.CanvasNodeStateReady {
@@ -265,7 +284,8 @@ func updateLiveCanvasWithoutVersioning(
 		if status.Code(err) != codes.Unknown {
 			return nil, err
 		}
-		return nil, status.Errorf(codes.Internal, "failed to update live canvas without versioning: %v", err)
+		log.WithError(err).Error("failed to update live canvas")
+		return nil, status.Error(codes.Internal, "failed to update live canvas")
 	}
 
 	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String()).Publish(true); err != nil {
