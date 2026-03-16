@@ -111,9 +111,6 @@ export const BlueprintExecutionPage: Story = {
           title={dynamicTitle}
           breadcrumbs={dynamicBreadcrumbs}
           getSidebarData={getSidebarData}
-          onRun={(nodeId) => {
-            console.log("Run action for node:", nodeId);
-          }}
           onDuplicate={(nodeId) => {
             console.log("Duplicate action for node:", nodeId);
           }}

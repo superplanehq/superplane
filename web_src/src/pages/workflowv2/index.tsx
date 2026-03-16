@@ -21,7 +21,6 @@ import {
   CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
-  canvasesEmitNodeEvent,
   canvasesUpdateNodePause,
   OrganizationsIntegration,
 } from "@/api-client";
@@ -1305,6 +1304,27 @@ export function WorkflowPageV2() {
     () => buildBuildingBlockCategories(triggers, components, blueprints, availableIntegrations),
     [triggers, components, blueprints, availableIntegrations],
   );
+  const hasRunBlockingChanges = hasUnsavedChanges && hasNonPositionalUnsavedChanges;
+  const runDisabled =
+    hasRunBlockingChanges ||
+    isTemplate ||
+    !canUpdateCanvas ||
+    canvasDeletedRemotely ||
+    isViewingDraftVersion ||
+    !isViewingCurrentLiveVersion;
+  const runDisabledTooltip = canvasDeletedRemotely
+    ? "This canvas was deleted in another session."
+    : isViewingDraftVersion
+      ? "Draft versions do not execute. Publish to run this canvas."
+      : !isViewingCurrentLiveVersion
+        ? "Only the current live version can execute."
+        : !canUpdateCanvas
+          ? "You don't have permission to run this canvas."
+          : isTemplate
+            ? "Templates are read-only"
+            : hasRunBlockingChanges
+              ? "Save canvas changes before running"
+              : undefined;
 
   const { nodes, edges } = useMemo(() => {
     // Don't prepare data until everything is loaded
@@ -1323,6 +1343,8 @@ export function WorkflowPageV2() {
       canvasId!,
       queryClient,
       organizationId!,
+      runDisabled,
+      runDisabledTooltip,
       account ? { id: account.id, email: account.email } : undefined,
     );
   }, [
@@ -1336,6 +1358,8 @@ export function WorkflowPageV2() {
     groupUsersUpdatedAt,
     canvasId,
     queryClient,
+    runDisabled,
+    runDisabledTooltip,
     canvasLoading,
     triggersLoading,
     blueprintsLoading,
@@ -3319,32 +3343,6 @@ export function WorkflowPageV2() {
     [canvas, organizationId, canvasId, navigate],
   );
 
-  const handleRun = useCallback(
-    async (nodeId: string, channel: string, data: any) => {
-      if (!canvasId) return;
-
-      try {
-        await canvasesEmitNodeEvent(
-          withOrganizationHeader({
-            path: {
-              canvasId: canvasId,
-              nodeId: nodeId,
-            },
-            body: {
-              channel,
-              data,
-            },
-          }),
-        );
-        // Note: Success toast is shown by EmitEventModal
-      } catch (error) {
-        showErrorToast("Failed to emit event");
-        throw error; // Re-throw to let EmitEventModal handle it
-      }
-    },
-    [canvasId],
-  );
-
   const handleTogglePause = useCallback(
     async (nodeId: string) => {
       if (!canvasId || !organizationId || !canvas) return;
@@ -3397,17 +3395,6 @@ export function WorkflowPageV2() {
       }
     },
     [canvasId, organizationId, canvas, queryClient],
-  );
-
-  const handleReEmit = useCallback(
-    async (nodeId: string, eventOrExecutionId: string) => {
-      const nodeEvents = visibleNodeEventsMap[nodeId];
-      if (!nodeEvents) return;
-      const eventToReemit = nodeEvents.find((event) => event.id === eventOrExecutionId);
-      if (!eventToReemit) return;
-      handleRun(nodeId, eventToReemit.channel || "", eventToReemit.data);
-    },
-    [handleRun, visibleNodeEventsMap],
   );
 
   const handleNodeDuplicate = useCallback(
@@ -4281,7 +4268,7 @@ export function WorkflowPageV2() {
   );
 
   const getCustomField = useCallback(
-    (nodeId: string, onRun?: (initialData?: string) => void, integration?: OrganizationsIntegration) => {
+    (nodeId: string, integration?: OrganizationsIntegration) => {
       const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return null;
 
@@ -4298,10 +4285,17 @@ export function WorkflowPageV2() {
       if (!renderer) return null;
 
       const context: {
-        onRun?: (initialData?: string) => void;
         integration?: OrganizationsIntegration;
-      } = onRun ? { onRun } : {};
+        canvasId?: string;
+        organizationId?: string;
+        runDisabled?: boolean;
+        runDisabledTooltip?: string;
+      } = {};
       if (integration) context.integration = integration;
+      if (canvasId) context.canvasId = canvasId;
+      if (organizationId) context.organizationId = organizationId;
+      context.runDisabled = runDisabled;
+      context.runDisabledTooltip = runDisabledTooltip;
 
       // Return a function that takes the current configuration
       return (configuration?: Record<string, unknown>) => {
@@ -4316,7 +4310,7 @@ export function WorkflowPageV2() {
         );
       };
     },
-    [canvas],
+    [canvas, canvasId, organizationId, runDisabled, runDisabledTooltip],
   );
 
   const canvasSettingsInitialValues = useMemo(
@@ -4495,7 +4489,6 @@ export function WorkflowPageV2() {
     }
   };
 
-  const hasRunBlockingChanges = hasUnsavedChanges && hasNonPositionalUnsavedChanges;
   const remoteUpdateBanner = remoteCanvasUpdatePending ? (
     <div className="bg-amber-100 px-4 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div>
@@ -4623,27 +4616,6 @@ export function WorkflowPageV2() {
       : !hasEditableVersion
         ? "Edit mode is not enabled."
         : undefined;
-  const runDisabled =
-    hasRunBlockingChanges ||
-    isTemplate ||
-    !canUpdateCanvas ||
-    canvasDeletedRemotely ||
-    isViewingDraftVersion ||
-    !isViewingCurrentLiveVersion;
-  const runDisabledTooltip = canvasDeletedRemotely
-    ? "This canvas was deleted in another session."
-    : isViewingDraftVersion
-      ? "Draft versions do not execute. Publish to run this canvas."
-      : !isViewingCurrentLiveVersion
-        ? "Only the current live version can execute."
-        : !canUpdateCanvas
-          ? "You don't have permission to emit events on this canvas."
-          : isTemplate
-            ? "Templates are read-only"
-            : hasRunBlockingChanges
-              ? "Save canvas changes before running"
-              : undefined;
-
   const dataViewContent =
     topViewMode === "yaml" && yamlPayload ? (
       <CanvasYamlView
@@ -4775,7 +4747,6 @@ export function WorkflowPageV2() {
           onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
           onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
           onToggleCollapse={!isReadOnly ? () => markUnsavedChange("structural") : undefined}
-          onRun={isViewingLiveVersion ? handleRun : undefined}
           onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
           onConfigure={!isReadOnly ? handleConfigure : undefined}
@@ -4825,8 +4796,6 @@ export function WorkflowPageV2() {
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
           onExportYamlCopy={isDev ? handleExportYamlCopy : undefined}
           onExportYamlDownload={isDev ? handleExportYamlDownload : undefined}
-          runDisabled={runDisabled}
-          runDisabledTooltip={runDisabledTooltip}
           onCancelQueueItem={onCancelQueueItem}
           onPushThrough={isViewingLiveVersion ? onPushThrough : undefined}
           supportsPushThrough={isViewingLiveVersion ? supportsPushThrough : undefined}
@@ -4839,7 +4808,6 @@ export function WorkflowPageV2() {
           getAllQueueEvents={getAllQueueEvents}
           getHasMoreQueue={getHasMoreQueue}
           getLoadingMoreQueue={getLoadingMoreQueue}
-          onReEmit={canUpdateCanvas && isViewingLiveVersion ? handleReEmit : undefined}
           loadExecutionChain={loadExecutionChain}
           getExecutionState={getExecutionState}
           workflowNodes={canvas?.spec?.nodes}
@@ -5038,6 +5006,8 @@ function prepareData(
   workflowId: string,
   queryClient: QueryClient,
   organizationId: string,
+  runDisabled?: boolean,
+  runDisabledTooltip?: string,
   currentUser?: { id?: string; email?: string },
 ): {
   nodes: CanvasNode[];
@@ -5060,6 +5030,8 @@ function prepareData(
           workflowId,
           queryClient,
           organizationId,
+          runDisabled,
+          runDisabledTooltip,
           currentUser,
           workflowEdges,
         );
@@ -5076,6 +5048,10 @@ function prepareTriggerNode(
   node: ComponentsNode,
   triggers: TriggersTrigger[],
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
+  workflowId: string,
+  organizationId: string,
+  runDisabled?: boolean,
+  runDisabledTooltip?: string,
 ): CanvasNode {
   const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
   const renderer = getTriggerRenderer(node.trigger?.name || "");
@@ -5084,6 +5060,10 @@ function prepareTriggerNode(
     node: buildNodeInfo(node),
     definition: buildComponentDefinition(triggerMetadata),
     lastEvent: buildEventInfo(lastEvent),
+    canvasId: workflowId,
+    organizationId,
+    runDisabled,
+    runDisabledTooltip,
   });
 
   // Use node name if available, otherwise fall back to trigger label (from metadata)
@@ -5221,12 +5201,22 @@ function prepareNode(
   workflowId: string,
   queryClient: any,
   organizationId: string,
+  runDisabled?: boolean,
+  runDisabledTooltip?: string,
   currentUser?: { id?: string; email?: string },
   edges?: ComponentsEdge[],
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
-      return prepareTriggerNode(node, triggers, nodeEventsMap);
+      return prepareTriggerNode(
+        node,
+        triggers,
+        nodeEventsMap,
+        workflowId,
+        organizationId,
+        runDisabled,
+        runDisabledTooltip,
+      );
     case "TYPE_BLUEPRINT":
       const componentMetadata = components.find((c) => c.name === node.component?.name);
       const compositeNode = prepareCompositeNode(nodes, node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);

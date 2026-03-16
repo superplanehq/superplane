@@ -386,9 +386,6 @@ export const Ephemeral: Story = {
           {...args}
           nodes={nodes}
           getSidebarData={getSidebarData}
-          onRun={(nodeId) => {
-            console.log("Run action for node:", nodeId);
-          }}
           onDuplicate={(nodeId) => {
             console.log("Duplicate action for node:", nodeId);
           }}

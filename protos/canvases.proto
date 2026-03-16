@@ -248,18 +248,6 @@ service Canvases {
     };
   }
 
-  rpc EmitNodeEvent(EmitNodeEventRequest) returns (EmitNodeEventResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/events"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Emit output event for canvas node";
-      description: "Emit output event for canvas node";
-      tags: "CanvasNode";
-    };
-  }
-
   rpc InvokeNodeExecutionAction(InvokeNodeExecutionActionRequest) returns (InvokeNodeExecutionActionResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id}/executions/{execution_id}/actions/{action_name}"
@@ -673,17 +661,6 @@ message ListNodeEventsResponse {
   uint32 total_count = 2;
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
-}
-
-message EmitNodeEventRequest {
-  string canvas_id = 1;
-  string node_id = 2;
-  string channel = 3;
-  google.protobuf.Struct data = 4;
-}
-
-message EmitNodeEventResponse {
-  string event_id = 1;
 }
 
 message ListNodeQueueItemsRequest {

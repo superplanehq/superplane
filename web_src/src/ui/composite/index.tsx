@@ -94,9 +94,6 @@ export const Composite: React.FC<CompositeProps> = ({
   error,
   warning,
   paused,
-  onRun,
-  runDisabled,
-  runDisabledTooltip,
   onEdit,
   onConfigure,
   onDuplicate,
@@ -215,9 +212,6 @@ export const Composite: React.FC<CompositeProps> = ({
       collapsedBackground={collapsedBackground}
       selected={selected}
       onToggleCollapse={onToggleCollapse}
-      onRun={onRun}
-      runDisabled={runDisabled}
-      runDisabledTooltip={runDisabledTooltip}
       onEdit={onEdit}
       onConfigure={onConfigure}
       onDuplicate={onDuplicate}

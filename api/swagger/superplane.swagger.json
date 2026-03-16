@@ -941,50 +941,6 @@
         "tags": [
           "CanvasNode"
         ]
-      },
-      "post": {
-        "summary": "Emit output event for canvas node",
-        "description": "Emit output event for canvas node",
-        "operationId": "Canvases_EmitNodeEvent",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/CanvasesEmitNodeEventResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "nodeId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/CanvasesEmitNodeEventBody"
-            }
-          }
-        ],
-        "tags": [
-          "CanvasNode"
-        ]
       }
     },
     "/api/v1/canvases/{canvasId}/nodes/{nodeId}/executions": {
@@ -4731,25 +4687,6 @@
       "properties": {
         "version": {
           "$ref": "#/definitions/CanvasesCanvasVersion"
-        }
-      }
-    },
-    "CanvasesEmitNodeEventBody": {
-      "type": "object",
-      "properties": {
-        "channel": {
-          "type": "string"
-        },
-        "data": {
-          "type": "object"
-        }
-      }
-    },
-    "CanvasesEmitNodeEventResponse": {
-      "type": "object",
-      "properties": {
-        "eventId": {
-          "type": "string"
         }
       }
     },

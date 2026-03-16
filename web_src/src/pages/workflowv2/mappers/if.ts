@@ -115,8 +115,6 @@ export const ifMapper: ComponentBaseMapper = {
       eventSections: lastExecution ? getEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       specs: specs,
-      runDisabled: false,
-      runDisabledTooltip: undefined,
       eventStateMap: getStateMap(componentName),
     };
   },

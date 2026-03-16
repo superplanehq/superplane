@@ -375,9 +375,6 @@ function BlockContent({
   selected = false,
   onAnnotationUpdate,
   onAnnotationBlur,
-  onRun,
-  runDisabled,
-  runDisabledTooltip,
   onTogglePause,
   onEdit,
   onConfigure,
@@ -414,9 +411,6 @@ function BlockContent({
   };
 
   const actionProps = {
-    onRun,
-    runDisabled,
-    runDisabledTooltip,
     onTogglePause: data.type === "trigger" ? undefined : onTogglePause,
     onEdit,
     onDuplicate,

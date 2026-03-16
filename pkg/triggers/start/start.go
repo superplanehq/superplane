@@ -1,8 +1,11 @@
 package manual
 
 import (
+	"fmt"
 	"net/http"
+	"slices"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -13,6 +16,15 @@ func init() {
 }
 
 type Start struct{}
+
+type StartConfiguration struct {
+	Templates []StartTemplate `mapstructure:"templates"`
+}
+
+type StartTemplate struct {
+	Name    string         `mapstructure:"name"`
+	Payload map[string]any `mapstructure:"payload"`
+}
 
 func (s *Start) Name() string {
 	return "start"
@@ -106,11 +118,52 @@ func (s *Start) Setup(ctx core.TriggerContext) error {
 }
 
 func (s *Start) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name:           "run",
+			Description:    "Start a new execution chain manually",
+			UserAccessible: true,
+			Parameters: []configuration.Field{
+				{
+					Name:  "templateName",
+					Label: "Template Name",
+					Type:  configuration.FieldTypeString,
+				},
+			},
+		},
+	}
 }
 
 func (s *Start) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	return nil, nil
+	switch ctx.Name {
+	case "run":
+		templateName, _ := ctx.Parameters["templateName"].(string)
+		if templateName == "" {
+			return nil, fmt.Errorf("template name is required")
+		}
+
+		var config StartConfiguration
+		if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+			return nil, fmt.Errorf("failed to decode configuration: %w", err)
+		}
+
+		templateIndex := slices.IndexFunc(config.Templates, func(template StartTemplate) bool {
+			return template.Name == templateName
+		})
+
+		if templateIndex == -1 {
+			return nil, fmt.Errorf("template %q not found", templateName)
+		}
+
+		if config.Templates[templateIndex].Payload == nil {
+			return nil, fmt.Errorf("template %q has no payload", templateName)
+		}
+
+		return nil, ctx.Events.Emit("manual.run", config.Templates[templateIndex].Payload)
+
+	default:
+		return nil, fmt.Errorf("action %s not supported", ctx.Name)
+	}
 }
 
 func (s *Start) Cleanup(ctx core.TriggerContext) error {

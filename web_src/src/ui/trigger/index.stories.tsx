@@ -7,7 +7,6 @@ const createTriggerProps = (
   baseProps: Omit<TriggerProps, keyof import("../types/componentActions").ComponentActionsProps>,
 ): TriggerProps => ({
   ...baseProps,
-  onRun: () => console.log("Run clicked!"),
   onDuplicate: () => console.log("Duplicate clicked!"),
   onEdit: () => console.log("Edit clicked!"),
   onDeactivate: () => console.log("Deactivate clicked!"),
