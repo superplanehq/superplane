@@ -24,3 +24,16 @@ export interface ManageDropletPowerConfiguration {
 export interface DeleteSnapshotConfiguration {
   snapshot: string;
 }
+
+export interface DNSRecordConfiguration {
+  domain?: string;
+  type?: string;
+  name?: string;
+  data?: string;
+  recordId?: string;
+}
+
+export interface DNSRecordNodeMetadata {
+  recordId?: number;
+  recordName?: string;
+}

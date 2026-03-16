@@ -1,0 +1,14 @@
+{
+  "data": {
+    "data": "167.71.224.221.felixgateru2.com",
+    "id": 1812548333,
+    "name": "_sip._tcp",
+    "port": 8000,
+    "priority": 1,
+    "ttl": 1800,
+    "type": "SRV",
+    "weight": 1
+  },
+  "timestamp": "2026-03-16T09:50:03.222782653Z",
+  "type": "digitalocean.dns.record.created"
+}

@@ -9,12 +9,15 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record for a DigitalOcean domain" />
   <LinkCard title="Create Droplet" href="#create-droplet" description="Create a new DigitalOcean Droplet" />
   <LinkCard title="Create Snapshot" href="#create-snapshot" description="Create a snapshot of a DigitalOcean Droplet" />
+  <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a DigitalOcean domain" />
   <LinkCard title="Delete Droplet" href="#delete-droplet" description="Delete a DigitalOcean Droplet by ID" />
   <LinkCard title="Delete Snapshot" href="#delete-snapshot" description="Delete a DigitalOcean snapshot" />
   <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
   <LinkCard title="Manage Droplet Power" href="#manage-droplet-power" description="Perform power operations on a DigitalOcean Droplet" />
+  <LinkCard title="Upsert DNS Record" href="#upsert-dns-record" description="Idempotently create or update a DNS record for a DigitalOcean domain" />
 </CardGrid>
 
 ## Instructions
@@ -31,6 +34,61 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 5. Copy the token and paste it below
 
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.
+
+<a id="create-dns-record"></a>
+
+## Create DNS Record
+
+The Create DNS Record component creates a new DNS record for a domain managed by DigitalOcean.
+
+### Use Cases
+
+- **Service discovery**: Add A or CNAME records when provisioning new services
+- **Email routing**: Create MX records for custom mail delivery
+- **Verification**: Add TXT records for domain ownership verification
+- **Subdomain management**: Dynamically create subdomains as part of provisioning workflows
+
+### Configuration
+
+- **Domain**: The DigitalOcean-managed domain to add the record to (required)
+- **Type**: The DNS record type (required): A, AAAA, CNAME, MX, NS, TXT, SRV, CAA
+- **Name**: The subdomain name for the record (required, use @ for root)
+- **Data**: The record value, e.g. an IP address or hostname (required, supports expressions)
+- **TTL**: Time-to-live in seconds (optional, defaults to 1800)
+- **Priority**: Record priority for MX/SRV records (optional)
+- **Port**: Port number for SRV records (optional)
+- **Weight**: Weight for SRV records (optional)
+
+### Output
+
+Returns the created DNS record including:
+- **id**: Record ID
+- **type**: Record type
+- **name**: Subdomain name
+- **data**: Record value
+- **ttl**: Time-to-live
+- **priority**: Priority (for MX/SRV)
+- **port**: Port (for SRV)
+- **weight**: Weight (for SRV)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "data": "167.71.224.221.felixgateru2.com",
+    "id": 1812548333,
+    "name": "_sip._tcp",
+    "port": 8000,
+    "priority": 1,
+    "ttl": 1800,
+    "type": "SRV",
+    "weight": 1
+  },
+  "timestamp": "2026-03-16T09:50:03.222782653Z",
+  "type": "digitalocean.dns.record.created"
+}
+```
 
 <a id="create-droplet"></a>
 
@@ -145,6 +203,49 @@ Returns the snapshot details including:
   },
   "timestamp": "2026-03-13T13:36:14.803060936Z",
   "type": "digitalocean.snapshot.created"
+}
+```
+
+<a id="delete-dns-record"></a>
+
+## Delete DNS Record
+
+The Delete DNS Record component permanently removes a DNS record from a DigitalOcean-managed domain.
+
+### Use Cases
+
+- **Cleanup**: Remove DNS records for decommissioned services
+- **Rotation**: Delete old records as part of a DNS rotation workflow
+- **Automated teardown**: Remove service discovery records when tearing down infrastructure
+
+### Configuration
+
+- **Domain**: The DigitalOcean-managed domain containing the record (required)
+- **Record ID**: The ID of the DNS record to delete (required, supports expressions)
+
+### Output
+
+Returns information about the deleted record:
+- **recordId**: The ID of the record that was deleted
+- **domain**: The domain the record belonged to
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone
+- Deleting a record that does not exist is treated as a success (idempotent)
+- Record IDs can be obtained from the output of createDNSRecord or upsertDNSRecord
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "domain": "example.com",
+    "recordId": 12345678
+  },
+  "timestamp": "2026-03-13T10:05:00.000000000Z",
+  "type": "digitalocean.dns.record.deleted"
 }
 ```
 
@@ -353,6 +454,62 @@ Returns the action result including:
   },
   "timestamp": "2026-03-12T22:27:20.613332846Z",
   "type": "digitalocean.droplet.power.power_off"
+}
+```
+
+<a id="upsert-dns-record"></a>
+
+## Upsert DNS Record
+
+The Upsert DNS Record component idempotently creates or updates a DNS record for a DigitalOcean-managed domain.
+
+It first looks up existing records with the same name and type. If a match is found it updates the record in-place; otherwise it creates a new one.
+
+### Use Cases
+
+- **Idempotent provisioning**: Safely run DNS setup steps multiple times without creating duplicates
+- **IP updates**: Keep A/AAAA records in sync with changing IP addresses
+- **Dynamic configuration**: Update TXT records (e.g. SPF, DKIM) as part of automated workflows
+
+### Configuration
+
+- **Domain**: The DigitalOcean-managed domain to manage the record in (required)
+- **Type**: The DNS record type (required): A, AAAA, CNAME, MX, NS, TXT, SRV, CAA
+- **Name**: The subdomain name for the record (required, use @ for root)
+- **Data**: The record value, e.g. an IP address or hostname (required, supports expressions)
+- **TTL**: Time-to-live in seconds (optional, defaults to 1800)
+- **Priority**: Record priority for MX/SRV records (optional)
+- **Port**: Port number for SRV records (optional)
+- **Weight**: Weight for SRV records (optional)
+
+### Output
+
+Returns the created or updated DNS record including:
+- **id**: Record ID
+- **type**: Record type
+- **name**: Subdomain name
+- **data**: Record value
+- **ttl**: Time-to-live
+- **priority**: Priority (for MX/SRV)
+- **port**: Port (for SRV)
+- **weight**: Weight (for SRV)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "data": "192.0.2.2",
+    "id": 12345678,
+    "name": "www",
+    "port": null,
+    "priority": null,
+    "ttl": 1800,
+    "type": "A",
+    "weight": null
+  },
+  "timestamp": "2026-03-13T10:10:00.000000000Z",
+  "type": "digitalocean.dns.record.upserted"
 }
 ```
 

@@ -76,6 +76,9 @@ func (d *DigitalOcean) Components() []core.Component {
 		&ManageDropletPower{},
 		&CreateSnapshot{},
 		&DeleteSnapshot{},
+		&CreateDNSRecord{},
+		&DeleteDNSRecord{},
+		&UpsertDNSRecord{},
 	}
 }
 

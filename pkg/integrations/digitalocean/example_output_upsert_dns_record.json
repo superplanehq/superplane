@@ -1,0 +1,14 @@
+{
+  "data": {
+    "data": "192.0.2.2",
+    "id": 12345678,
+    "name": "www",
+    "port": null,
+    "priority": null,
+    "ttl": 1800,
+    "type": "A",
+    "weight": null
+  },
+  "timestamp": "2026-03-13T10:10:00.000000000Z",
+  "type": "digitalocean.dns.record.upserted"
+}
