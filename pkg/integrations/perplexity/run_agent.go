@@ -119,6 +119,9 @@ func (c *runAgent) Configuration() []configuration.Field {
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "preset", Values: []string{""}},
 			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "preset", Values: []string{""}},
+			},
 		},
 		{
 			Name:        "input",
@@ -161,6 +164,10 @@ func (c *runAgent) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
+	if spec.Preset == "" && spec.Model == "" {
+		return fmt.Errorf("model is required when no preset is specified")
+	}
+
 	if spec.Input == "" {
 		return fmt.Errorf("input is required")
 	}
@@ -172,6 +179,10 @@ func (c *runAgent) Execute(ctx core.ExecutionContext) error {
 	spec := runAgentSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
+	}
+
+	if spec.Preset == "" && spec.Model == "" {
+		return fmt.Errorf("model is required when no preset is specified")
 	}
 
 	if spec.Input == "" {

@@ -255,10 +255,23 @@ func TestRunAgent_OutputParsing(t *testing.T) {
 	assert.Equal(t, 4461, data.Usage.TotalTokens)
 }
 
+func TestRunAgent_MissingPresetAndModel(t *testing.T) {
+	c := &runAgent{}
+	err := c.Execute(core.ExecutionContext{
+		Configuration:  map[string]any{"input": "test query"},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		HTTP:           &contexts.HTTPContext{},
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "key"}},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "model is required when no preset is specified")
+}
+
 func TestRunAgent_MissingInput(t *testing.T) {
 	c := &runAgent{}
 	err := c.Execute(core.ExecutionContext{
-		Configuration:  map[string]any{"input": ""},
+		Configuration:  map[string]any{"preset": "pro-search", "input": ""},
 		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		HTTP:           &contexts.HTTPContext{},
 		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "key"}},
