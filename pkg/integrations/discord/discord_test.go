@@ -131,7 +131,6 @@ func Test__Discord__ListResources(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		// Should only include text channel (type 0)
 		require.Len(t, resources, 1)
 		assert.Equal(t, "channel1", resources[0].ID)
 		assert.Equal(t, "#general (Test Server)", resources[0].Name)
@@ -153,4 +152,17 @@ func Test__Discord__ListResources(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, resources)
 	})
+}
+
+func Test__Discord__ComponentsAndTriggers(t *testing.T) {
+	d := &Discord{}
+
+	componentNames := []string{}
+	for _, component := range d.Components() {
+		componentNames = append(componentNames, component.Name())
+	}
+
+	assert.Contains(t, componentNames, "discord.sendTextMessage")
+	assert.Contains(t, componentNames, "discord.getLastMention")
+	assert.Empty(t, d.Triggers())
 }
