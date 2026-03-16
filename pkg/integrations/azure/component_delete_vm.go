@@ -16,8 +16,9 @@ type DeleteVMComponent struct {
 }
 
 type DeleteVMConfiguration struct {
-	ResourceGroup string `json:"resourceGroup" mapstructure:"resourceGroup"`
-	Name          string `json:"name" mapstructure:"name"`
+	ResourceGroup             string `json:"resourceGroup" mapstructure:"resourceGroup"`
+	Name                      string `json:"name" mapstructure:"name"`
+	DeleteAssociatedResources bool   `json:"deleteAssociatedResources" mapstructure:"deleteAssociatedResources"`
 }
 
 func (c *DeleteVMComponent) Name() string {
@@ -54,6 +55,7 @@ The Delete Virtual Machine component deletes an existing Azure VM.
 
 - **Resource Group**: The Azure resource group containing the VM
 - **VM Name**: The name of the virtual machine to delete
+- **Delete Associated Resources**: When enabled, also deletes the VM's OS disk, data disks, network interfaces, and public IPs
 
 ## Output
 
@@ -66,7 +68,8 @@ Returns the deleted VM information including:
 
 - The VM deletion is a Long-Running Operation (LRO) that typically takes 1-3 minutes
 - The component waits for the VM to be fully deleted before completing
-- Deleting a VM does not delete associated resources (NICs, disks, public IPs)
+- When "Delete Associated Resources" is enabled, Azure cascade-deletes OS disk, data disks, NICs, and public IPs along with the VM
+- Shared resources like virtual networks, subnets, and network security groups are never deleted
 - This operation is irreversible
 `
 }
@@ -114,6 +117,13 @@ func (c *DeleteVMComponent) Configuration() []configuration.Field {
 			Description: "The name of the virtual machine to delete",
 			Placeholder: "my-vm",
 		},
+		{
+			Name:        "deleteAssociatedResources",
+			Label:       "Delete Associated Resources",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Description: "Also delete OS disk, data disks, network interfaces, and public IPs associated with this VM",
+		},
 	}
 }
 
@@ -149,8 +159,9 @@ func (c *DeleteVMComponent) Execute(ctx core.ExecutionContext) error {
 	}
 
 	req := DeleteVMRequest{
-		ResourceGroup: config.ResourceGroup,
-		VMName:        config.Name,
+		ResourceGroup:             config.ResourceGroup,
+		VMName:                    config.Name,
+		DeleteAssociatedResources: config.DeleteAssociatedResources,
 	}
 
 	ctx.Logger.Infof("Deleting Azure VM: %s in resource group %s", config.Name, config.ResourceGroup)

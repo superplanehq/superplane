@@ -424,10 +424,36 @@ export function IntegrationCreateDialog({
                 </Button>
               ) : (
                 <>
-                  <Button color="blue" onClick={handleClose}>
-                    Save
+                  <Button
+                    color="blue"
+                    disabled={updateIntegrationMutation.isPending}
+                    onClick={async () => {
+                      if (createdIntegrationId) {
+                        try {
+                          await updateIntegrationMutation.mutateAsync({
+                            configuration: { ...configuration },
+                          });
+                          await queryClient.invalidateQueries({
+                            queryKey: integrationKeys.connected(organizationId),
+                          });
+                        } catch {
+                          // Resync is best-effort
+                        }
+                        onCreated?.(createdIntegrationId);
+                      }
+                      handleClose();
+                    }}
+                  >
+                    {updateIntegrationMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save"
+                    )}
                   </Button>
-                  <Button variant="outline" onClick={handleClose}>
+                  <Button variant="outline" onClick={handleClose} disabled={updateIntegrationMutation.isPending}>
                     Cancel
                   </Button>
                 </>

@@ -112,6 +112,10 @@ func (a *AzureIntegration) Components() []core.Component {
 	return []core.Component{
 		&CreateVMComponent{integration: a},
 		&DeleteVMComponent{integration: a},
+		&StartVMComponent{integration: a},
+		&StopVMComponent{integration: a},
+		&DeallocateVMComponent{integration: a},
+		&RestartVMComponent{integration: a},
 	}
 }
 
@@ -120,6 +124,10 @@ func (a *AzureIntegration) Triggers() []core.Trigger {
 		&OnVMDeleted{integration: a},
 		&OnImagePushed{integration: a},
 		&OnImageDeleted{integration: a},
+		&OnVMStarted{integration: a},
+		&OnVMStopped{integration: a},
+		&OnVMDeallocated{integration: a},
+		&OnVMRestarted{integration: a},
 	}
 }
 
