@@ -1,0 +1,26 @@
+{
+  "type": "discord.getLastMention.result",
+  "data": {
+    "channel_id": "1381731186335651880",
+    "mention": {
+      "id": "1381731283190517770",
+      "channel_id": "1381731186335651880",
+      "guild_id": "1381731029892325376",
+      "content": "<@1372980427293554709> can you run /deploy?",
+      "timestamp": "2026-03-10T15:04:05.000Z",
+      "author": {
+        "id": "98432147091234567",
+        "username": "pedro",
+        "bot": false
+      },
+      "mentions": [
+        {
+          "id": "1372980427293554709",
+          "username": "superplane-bot",
+          "bot": true
+        }
+      ]
+    }
+  },
+  "timestamp": "2026-03-10T15:04:05.000Z"
+}
