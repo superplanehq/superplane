@@ -15,7 +15,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Get Document" href="#get-document" description="Retrieve a document from Elasticsearch by index and document ID" />
   <LinkCard title="Index Document" href="#index-document" description="Write a JSON document to an Elasticsearch index" />
+  <LinkCard title="Update Document" href="#update-document" description="Partially update an existing document in an Elasticsearch index" />
 </CardGrid>
 
 ## Instructions
@@ -134,6 +136,78 @@ The component emits an event containing:
   },
   "timestamp": "2026-03-12T09:00:00Z",
   "type": "elastic.document.indexed"
+}
+```
+
+<a id="get-document"></a>
+
+## Get Document
+
+The Get Document component retrieves a JSON document from an Elasticsearch index by its ID.
+
+### Configuration
+
+- **Index**: The Elasticsearch index to read from
+- **Document ID**: The ID of the document to retrieve
+
+### Outputs
+
+The component emits an event containing:
+- `id`: The document ID
+- `index`: The index the document was read from
+- `version`: The document version number
+- `source`: The document fields
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "aB3kLmN4oPqR",
+    "index": "workflow-audit",
+    "source": {
+      "env": "production",
+      "message": "deployment started"
+    },
+    "version": 3
+  },
+  "timestamp": "2026-03-12T09:00:00Z",
+  "type": "elastic.document.retrieved"
+}
+```
+
+<a id="update-document"></a>
+
+## Update Document
+
+The Update Document component applies a partial update to an existing document in an Elasticsearch index.
+
+### Configuration
+
+- **Index**: The Elasticsearch index containing the document
+- **Document ID**: The ID of the document to update
+- **Fields**: The fields to merge into the existing document (partial update)
+
+### Outputs
+
+The component emits an event containing:
+- `id`: The document ID
+- `index`: The index the document belongs to
+- `result`: Operation result (`updated`)
+- `version`: The new document version number
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "aB3kLmN4oPqR",
+    "index": "workflow-audit",
+    "result": "updated",
+    "version": 4
+  },
+  "timestamp": "2026-03-12T09:00:00Z",
+  "type": "elastic.document.updated"
 }
 ```
 

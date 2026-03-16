@@ -17,6 +17,26 @@ func (c *IndexDocument) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputIndexDocumentOnce, exampleOutputIndexDocumentBytes, &exampleOutputIndexDocument)
 }
 
+//go:embed example_output_get_document.json
+var exampleOutputGetDocumentBytes []byte
+
+var exampleOutputGetDocumentOnce sync.Once
+var exampleOutputGetDocument map[string]any
+
+func (c *GetDocument) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetDocumentOnce, exampleOutputGetDocumentBytes, &exampleOutputGetDocument)
+}
+
+//go:embed example_output_update_document.json
+var exampleOutputUpdateDocumentBytes []byte
+
+var exampleOutputUpdateDocumentOnce sync.Once
+var exampleOutputUpdateDocument map[string]any
+
+func (c *UpdateDocument) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateDocumentOnce, exampleOutputUpdateDocumentBytes, &exampleOutputUpdateDocument)
+}
+
 //go:embed example_data_on_alert.json
 var exampleDataOnAlertBytes []byte
 

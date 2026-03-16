@@ -367,3 +367,52 @@ func (c *Client) IndexDocument(index, documentID string, doc map[string]any) (*I
 
 	return &resp, nil
 }
+
+// GetDocumentResponse is returned by GET /{index}/_doc/{id}.
+type GetDocumentResponse struct {
+	ID      string         `json:"_id"`
+	Index   string         `json:"_index"`
+	Version int            `json:"_version"`
+	Found   bool           `json:"found"`
+	Source  map[string]any `json:"_source"`
+}
+
+// GetDocument retrieves a document by index and document ID.
+func (c *Client) GetDocument(index, documentID string) (*GetDocumentResponse, error) {
+	fullURL := fmt.Sprintf("%s/%s/_doc/%s", c.baseURL, url.PathEscape(index), url.PathEscape(documentID))
+	responseBody, err := c.execRequest(http.MethodGet, fullURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp GetDocumentResponse
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing get document response: %v", err)
+	}
+
+	return &resp, nil
+}
+
+// UpdateDocument applies a partial update to an existing document.
+// Uses POST /{index}/_update/{id} with body {"doc": fields}.
+// Reuses IndexDocumentResponse since the response shape is identical.
+func (c *Client) UpdateDocument(index, documentID string, fields map[string]any) (*IndexDocumentResponse, error) {
+	payload := map[string]any{"doc": fields}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling update payload: %v", err)
+	}
+
+	fullURL := fmt.Sprintf("%s/%s/_update/%s", c.baseURL, url.PathEscape(index), url.PathEscape(documentID))
+	responseBody, err := c.execRequest(http.MethodPost, fullURL, bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var resp IndexDocumentResponse
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing update document response: %v", err)
+	}
+
+	return &resp, nil
+}
