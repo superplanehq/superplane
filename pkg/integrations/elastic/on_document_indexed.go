@@ -49,7 +49,7 @@ SuperPlane polls the configured index every minute, querying for documents with 
 
 ## Event Data
 
-The trigger emits the full document source as the event data, along with the document ID, index, and version.`
+The trigger emits the document ID, index name, and full source as the event data.`
 }
 
 func (t *OnDocumentIndexed) Configuration() []configuration.Field {
