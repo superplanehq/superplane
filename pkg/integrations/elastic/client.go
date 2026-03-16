@@ -3,6 +3,7 @@ package elastic
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -102,6 +103,17 @@ func (c *Client) execRequest(method, fullURL string, body io.Reader) ([]byte, er
 	return responseBody, nil
 }
 
+// KibanaAPIError is returned by execKibanaRequest for non-2xx responses so
+// callers can check the status code (e.g. treat 404 as a no-op on delete).
+type KibanaAPIError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *KibanaAPIError) Error() string {
+	return fmt.Sprintf("Kibana request failed (%d): %s", e.StatusCode, e.Body)
+}
+
 // execKibanaRequest is like execRequest but targets the Kibana URL and adds
 // the kbn-xsrf header required by all Kibana write endpoints.
 func (c *Client) execKibanaRequest(method, path string, body io.Reader) ([]byte, error) {
@@ -130,7 +142,7 @@ func (c *Client) execKibanaRequest(method, path string, body io.Reader) ([]byte,
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("Kibana request failed (%d): %s", res.StatusCode, redactedResponseHint(responseBody))
+		return nil, &KibanaAPIError{StatusCode: res.StatusCode, Body: redactedResponseHint(responseBody)}
 	}
 
 	return responseBody, nil
@@ -261,12 +273,17 @@ func (c *Client) CreateKibanaConnector(name, webhookURL, secret string) (*Kibana
 }
 
 // DeleteKibanaConnector removes a Kibana connector by ID.
+// A 404 response is treated as success: the connector is already gone.
 func (c *Client) DeleteKibanaConnector(connectorID string) error {
 	_, err := c.execKibanaRequest(
 		http.MethodDelete,
 		fmt.Sprintf("/api/actions/connector/%s", url.PathEscape(connectorID)),
 		nil,
 	)
+	var kibanaErr *KibanaAPIError
+	if errors.As(err, &kibanaErr) && kibanaErr.StatusCode == http.StatusNotFound {
+		return nil
+	}
 	return err
 }
 
