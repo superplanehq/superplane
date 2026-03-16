@@ -46,3 +46,13 @@ var exampleDataOnAlert map[string]any
 func (t *OnAlertFires) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlertOnce, exampleDataOnAlertBytes, &exampleDataOnAlert)
 }
+
+//go:embed example_data_on_document_indexed.json
+var exampleDataOnDocumentIndexedBytes []byte
+
+var exampleDataOnDocumentIndexedOnce sync.Once
+var exampleDataOnDocumentIndexed map[string]any
+
+func (t *OnDocumentIndexed) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnDocumentIndexedOnce, exampleDataOnDocumentIndexedBytes, &exampleDataOnDocumentIndexed)
+}

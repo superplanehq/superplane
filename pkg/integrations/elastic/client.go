@@ -416,3 +416,64 @@ func (c *Client) UpdateDocument(index, documentID string, fields map[string]any)
 
 	return &resp, nil
 }
+
+// SearchHit represents a single document result from an Elasticsearch search.
+type SearchHit struct {
+	ID     string         `json:"_id"`
+	Index  string         `json:"_index"`
+	Source map[string]any `json:"_source"`
+}
+
+// TimestampValue extracts the value of the given timestamp field from the source
+// as a string. Returns "" if the field is absent or not a string.
+func (h *SearchHit) TimestampValue(field string) string {
+	if h.Source == nil {
+		return ""
+	}
+	if v, ok := h.Source[field]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+// SearchDocumentsAfter queries an index for documents where the given
+// timestamp field is strictly greater than afterTimestamp, sorted ascending.
+func (c *Client) SearchDocumentsAfter(index, timestampField, afterTimestamp string, size int) ([]SearchHit, error) {
+	query := map[string]any{
+		"query": map[string]any{
+			"range": map[string]any{
+				timestampField: map[string]any{
+					"gt": afterTimestamp,
+				},
+			},
+		},
+		"sort": []any{
+			map[string]any{timestampField: map[string]any{"order": "asc"}},
+		},
+		"size": size,
+	}
+
+	data, err := json.Marshal(query)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling search query: %v", err)
+	}
+
+	fullURL := fmt.Sprintf("%s/%s/_search", c.baseURL, url.PathEscape(index))
+	responseBody, err := c.execRequest(http.MethodPost, fullURL, bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Hits struct {
+			Hits []SearchHit `json:"hits"`
+		} `json:"hits"`
+	}
+	if err := json.Unmarshal(responseBody, &result); err != nil {
+		return nil, fmt.Errorf("error parsing search response: %v", err)
+	}
+
+	return result.Hits.Hits, nil
+}
