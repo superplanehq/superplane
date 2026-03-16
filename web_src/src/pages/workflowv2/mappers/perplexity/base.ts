@@ -18,6 +18,18 @@ interface RunAgentConfiguration {
   model?: string;
 }
 
+interface AgentPayload {
+  model?: string;
+  status?: string;
+  text?: string;
+  citations?: { type: string; url: string }[];
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+  };
+}
+
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as RunAgentConfiguration | undefined;
@@ -53,14 +65,30 @@ export const baseMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const payload = outputs?.default?.[0];
+    const data = outputs?.default?.[0]?.data as AgentPayload | undefined;
 
-    if (payload?.type) {
-      details["Event Type"] = payload.type;
+    if (context.execution.createdAt) {
+      details["Started At"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
-    if (payload?.timestamp) {
-      details["Emitted At"] = new Date(payload.timestamp).toLocaleString();
+    if (data?.model) {
+      details["Model"] = data.model;
+    }
+
+    if (data?.citations && data.citations.length > 0) {
+      details["Citations"] = `${data.citations.length} source${data.citations.length === 1 ? "" : "s"}`;
+    }
+
+    if (data?.usage) {
+      const { input_tokens, output_tokens, total_tokens } = data.usage;
+      if (total_tokens) {
+        details["Tokens"] =
+          `${total_tokens.toLocaleString()} (${input_tokens.toLocaleString()} in / ${output_tokens.toLocaleString()} out)`;
+      }
+    }
+
+    if (context.execution.resultMessage) {
+      details["Error"] = context.execution.resultMessage;
     }
 
     return details;
