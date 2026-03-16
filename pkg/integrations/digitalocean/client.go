@@ -510,6 +510,200 @@ func (c *Client) UpdateDNSRecord(domain string, recordID int, req DNSRecordReque
 	return &response.DomainRecord, nil
 }
 
+// LoadBalancer represents a DigitalOcean load balancer
+type LoadBalancer struct {
+	ID              string           `json:"id"`
+	Name            string           `json:"name"`
+	IP              string           `json:"ip"`
+	Status          string           `json:"status"`
+	Algorithm       string           `json:"algorithm"`
+	Region          DropletRegion    `json:"region"`
+	ForwardingRules []ForwardingRule `json:"forwarding_rules"`
+	DropletIDs      []int            `json:"droplet_ids"`
+	Tag             string           `json:"tag"`
+	CreatedAt       string           `json:"created_at"`
+}
+
+// ForwardingRule defines a load balancer forwarding rule
+type ForwardingRule struct {
+	EntryProtocol  string `json:"entry_protocol"`
+	EntryPort      int    `json:"entry_port"`
+	TargetProtocol string `json:"target_protocol"`
+	TargetPort     int    `json:"target_port"`
+	TLSPassthrough bool   `json:"tls_passthrough,omitempty"`
+}
+
+// CreateLoadBalancerRequest is the payload for creating a load balancer
+type CreateLoadBalancerRequest struct {
+	Name            string           `json:"name"`
+	Region          string           `json:"region"`
+	ForwardingRules []ForwardingRule `json:"forwarding_rules"`
+	DropletIDs      []int            `json:"droplet_ids,omitempty"`
+	Tag             string           `json:"tag,omitempty"`
+}
+
+// CreateLoadBalancer creates a new load balancer
+func (c *Client) CreateLoadBalancer(req CreateLoadBalancerRequest) (*LoadBalancer, error) {
+	url := fmt.Sprintf("%s/load_balancers", c.BaseURL)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		LoadBalancer LoadBalancer `json:"load_balancer"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.LoadBalancer, nil
+}
+
+// GetLoadBalancer retrieves a load balancer by its ID
+func (c *Client) GetLoadBalancer(lbID string) (*LoadBalancer, error) {
+	url := fmt.Sprintf("%s/load_balancers/%s", c.BaseURL, lbID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		LoadBalancer LoadBalancer `json:"load_balancer"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.LoadBalancer, nil
+}
+
+// DeleteLoadBalancer deletes a load balancer by its ID
+func (c *Client) DeleteLoadBalancer(lbID string) error {
+	url := fmt.Sprintf("%s/load_balancers/%s", c.BaseURL, lbID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
+// ListLoadBalancers retrieves all load balancers in the account
+func (c *Client) ListLoadBalancers() ([]LoadBalancer, error) {
+	url := fmt.Sprintf("%s/load_balancers?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		LoadBalancers []LoadBalancer `json:"load_balancers"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.LoadBalancers, nil
+}
+
+// ReservedIP represents a DigitalOcean reserved IP
+type ReservedIP struct {
+	IP         string `json:"ip"`
+	RegionSlug string `json:"region_slug"`
+	Locked     bool   `json:"locked"`
+}
+
+// ListReservedIPs retrieves all reserved IPs in the account
+func (c *Client) ListReservedIPs() ([]ReservedIP, error) {
+	url := fmt.Sprintf("%s/reserved_ips?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		ReservedIPs []ReservedIP `json:"reserved_ips"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.ReservedIPs, nil
+}
+
+// PostReservedIPAction initiates an assign or unassign action for a reserved IP
+func (c *Client) PostReservedIPAction(reservedIP, actionType string, dropletID *int) (*DOAction, error) {
+	url := fmt.Sprintf("%s/reserved_ips/%s/actions", c.BaseURL, reservedIP)
+
+	payload := map[string]any{"type": actionType}
+	if dropletID != nil {
+		payload["droplet_id"] = *dropletID
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Action DOAction `json:"action"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Action, nil
+}
+
+// LBNodeMetadata stores metadata about a load balancer for display in the UI
+type LBNodeMetadata struct {
+	LBID   string `json:"lbId" mapstructure:"lbId"`
+	LBName string `json:"lbName" mapstructure:"lbName"`
+}
+
+// resolveLBMetadata fetches the load balancer name from the API and stores it in metadata
+func resolveLBMetadata(ctx core.SetupContext, lbID string) error {
+	if strings.Contains(lbID, "{{") {
+		return ctx.Metadata.Set(LBNodeMetadata{
+			LBName: lbID,
+		})
+	}
+
+	var existing LBNodeMetadata
+	err := mapstructure.Decode(ctx.Metadata.Get(), &existing)
+	if err == nil && existing.LBID == lbID && existing.LBName != "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client for metadata resolution: %w", err)
+	}
+
+	lb, err := client.GetLoadBalancer(lbID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch load balancer %s for metadata: %w", lbID, err)
+	}
+
+	return ctx.Metadata.Set(LBNodeMetadata{
+		LBID:   lbID,
+		LBName: lb.Name,
+	})
+}
+
 // DropletNodeMetadata stores metadata about a droplet for display in the UI
 type DropletNodeMetadata struct {
 	DropletID   int    `json:"dropletId" mapstructure:"dropletId"`

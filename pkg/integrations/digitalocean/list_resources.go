@@ -22,6 +22,10 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listDomains(ctx)
 	case "dns_record":
 		return listDNSRecords(ctx)
+	case "load_balancer":
+		return listLoadBalancers(ctx)
+	case "reserved_ip":
+		return listReservedIPs(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -197,5 +201,51 @@ func listDNSRecords(ctx core.ListResourcesContext) ([]core.IntegrationResource, 
 			ID:   fmt.Sprintf("%d", record.ID),
 		})
 	}
+	return resources, nil
+}
+
+func listLoadBalancers(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	loadBalancers, err := client.ListLoadBalancers()
+	if err != nil {
+		return nil, fmt.Errorf("error listing load balancers: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(loadBalancers))
+	for _, lb := range loadBalancers {
+		resources = append(resources, core.IntegrationResource{
+			Type: "load_balancer",
+			Name: lb.Name,
+			ID:   lb.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listReservedIPs(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	reservedIPs, err := client.ListReservedIPs()
+	if err != nil {
+		return nil, fmt.Errorf("error listing reserved IPs: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(reservedIPs))
+	for _, ip := range reservedIPs {
+		resources = append(resources, core.IntegrationResource{
+			Type: "reserved_ip",
+			Name: ip.IP,
+			ID:   ip.IP,
+		})
+	}
+
 	return resources, nil
 }
