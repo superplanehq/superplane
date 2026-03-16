@@ -83,14 +83,14 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "elastic.alert", eventsCtx.Payloads[0].Type)
 	})
 
-	// --- ruleIds ---
+	// --- rules ---
 
-	t.Run("ruleIds matches -> emits event", func(t *testing.T) {
+	t.Run("rules matches by rule ID -> emits event", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"ruleIds": []string{"rule-123", "rule-456"}},
+			Configuration: map[string]any{"rules": []string{"rule-123", "rule-456"}},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
@@ -99,12 +99,26 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		require.Len(t, eventsCtx.Payloads, 1)
 	})
 
-	t.Run("ruleIds does not match -> silent pass", func(t *testing.T) {
+	t.Run("rules matches by rule name -> emits event", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"ruleIds": []string{"rule-999"}},
+			Configuration: map[string]any{"rules": []string{"High error rate"}},
+			Events:        eventsCtx,
+			Webhook:       webhook,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Len(t, eventsCtx.Payloads, 1)
+	})
+
+	t.Run("rules does not match -> silent pass", func(t *testing.T) {
+		eventsCtx := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          validBody,
+			Headers:       headersWithSecret(),
+			Configuration: map[string]any{"rules": []string{"rule-999"}},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
@@ -113,14 +127,14 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		assert.Empty(t, eventsCtx.Payloads)
 	})
 
-	// --- spaceIds ---
+	// --- spaces ---
 
-	t.Run("spaceIds matches -> emits event", func(t *testing.T) {
+	t.Run("spaces matches -> emits event", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"spaceIds": []string{"default"}},
+			Configuration: map[string]any{"spaces": []string{"default"}},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
@@ -129,12 +143,12 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		require.Len(t, eventsCtx.Payloads, 1)
 	})
 
-	t.Run("spaceIds does not match -> silent pass", func(t *testing.T) {
+	t.Run("spaces does not match -> silent pass", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"spaceIds": []string{"production"}},
+			Configuration: map[string]any{"spaces": []string{"production"}},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
@@ -239,8 +253,8 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 			Body:    validBody,
 			Headers: headersWithSecret(),
 			Configuration: map[string]any{
-				"ruleIds":    []string{"rule-123"},
-				"spaceIds":   []string{"default"},
+				"rules":      []string{"rule-123"},
+				"spaces":     []string{"default"},
 				"tags":       []string{"team:infra"},
 				"severities": []string{"critical"},
 				"statuses":   []string{"active"},
@@ -259,7 +273,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 			Body:    validBody,
 			Headers: headersWithSecret(),
 			Configuration: map[string]any{
-				"ruleIds":  []string{"rule-123"},
+				"rules":    []string{"rule-123"},
 				"statuses": []string{"recovered"}, // active != recovered
 			},
 			Events:  eventsCtx,

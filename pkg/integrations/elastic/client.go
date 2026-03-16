@@ -226,8 +226,8 @@ func (c *Client) CreateKibanaConnector(name, webhookURL, secret string) (*Kibana
 			"url":    webhookURL,
 			"method": "post",
 			"headers": map[string]string{
-				"Content-Type":       "application/json",
-				SigningHeaderName:    secret,
+				"Content-Type":    "application/json",
+				SigningHeaderName: secret,
 			},
 			"hasAuth": false,
 		},

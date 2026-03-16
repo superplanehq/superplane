@@ -19,11 +19,13 @@ type IndexDocumentConfiguration struct {
 	DocumentID string         `json:"documentId" mapstructure:"documentId"`
 }
 
-func (c *IndexDocument) Name() string        { return "elastic.indexDocument" }
-func (c *IndexDocument) Label() string       { return "Index Document" }
-func (c *IndexDocument) Description() string { return "Write a JSON document to an Elasticsearch index" }
-func (c *IndexDocument) Icon() string        { return "elastic" }
-func (c *IndexDocument) Color() string       { return "gray" }
+func (c *IndexDocument) Name() string  { return "elastic.indexDocument" }
+func (c *IndexDocument) Label() string { return "Index Document" }
+func (c *IndexDocument) Description() string {
+	return "Write a JSON document to an Elasticsearch index"
+}
+func (c *IndexDocument) Icon() string  { return "elastic" }
+func (c *IndexDocument) Color() string { return "gray" }
 
 func (c *IndexDocument) Documentation() string {
 	return `The Index Document component writes a JSON document to an Elasticsearch index.

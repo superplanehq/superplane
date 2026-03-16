@@ -16,18 +16,35 @@ const SigningHeaderName = "X-Superplane-Secret"
 // connectors when the OnAlertFires trigger is set up or removed.
 type ElasticWebhookHandler struct{}
 
+type webhookConfig struct {
+	KibanaURL string `json:"kibanaUrl" mapstructure:"kibanaUrl"`
+}
+
 type webhookMetadata struct {
 	ConnectorID string `json:"connectorId" mapstructure:"connectorId"`
 }
 
 func (h *ElasticWebhookHandler) CompareConfig(a, b any) (bool, error) {
-	// All Elastic triggers share one connector per integration; filtering is
-	// handled per-trigger in HandleWebhook, not at the connector level.
-	return true, nil
+	var ca, cb webhookConfig
+	mapstructure.Decode(a, &ca)
+	mapstructure.Decode(b, &cb)
+	// Triggers sharing one connector only if they point at the same Kibana.
+	// A URL change returns false, triggering connector replacement.
+	return ca.KibanaURL == cb.KibanaURL, nil
 }
 
 func (h *ElasticWebhookHandler) Merge(current, requested any) (any, bool, error) {
-	return current, false, nil
+	var cur, req webhookConfig
+	mapstructure.Decode(current, &cur)
+	mapstructure.Decode(requested, &req)
+
+	if cur.KibanaURL == req.KibanaURL {
+		return current, false, nil
+	}
+
+	// KibanaURL changed: update the stored config and re-queue for provisioning
+	// so Setup() recreates the connector on the new Kibana instance.
+	return req, true, nil
 }
 
 func (h *ElasticWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {

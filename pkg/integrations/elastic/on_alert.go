@@ -15,18 +15,20 @@ import (
 type OnAlertFires struct{}
 
 type OnAlertFiresConfiguration struct {
-	RuleIDs    []string `json:"ruleIds" mapstructure:"ruleIds"`
-	SpaceIDs   []string `json:"spaceIds" mapstructure:"spaceIds"`
+	Rules      []string `json:"rules" mapstructure:"rules"`
+	Spaces     []string `json:"spaces" mapstructure:"spaces"`
 	Tags       []string `json:"tags" mapstructure:"tags"`
 	Severities []string `json:"severities" mapstructure:"severities"`
 	Statuses   []string `json:"statuses" mapstructure:"statuses"`
 }
 
-func (t *OnAlertFires) Name() string        { return "elastic.onAlertFires" }
-func (t *OnAlertFires) Label() string       { return "When Alert Fires" }
-func (t *OnAlertFires) Description() string { return "Trigger a workflow when a Kibana alert rule fires" }
-func (t *OnAlertFires) Icon() string        { return "bell" }
-func (t *OnAlertFires) Color() string       { return "gray" }
+func (t *OnAlertFires) Name() string  { return "elastic.onAlertFires" }
+func (t *OnAlertFires) Label() string { return "When Alert Fires" }
+func (t *OnAlertFires) Description() string {
+	return "Trigger a workflow when a Kibana alert rule fires"
+}
+func (t *OnAlertFires) Icon() string  { return "bell" }
+func (t *OnAlertFires) Color() string { return "gray" }
 
 func (t *OnAlertFires) Documentation() string {
 	return `The When Alert Fires trigger starts a workflow execution when a Kibana alert rule fires via a webhook connector.
@@ -73,27 +75,28 @@ Each received alert emits:
 func (t *OnAlertFires) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "ruleIds",
+			Name:        "rules",
 			Label:       "Rules",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Description: "Only fire for alerts from these Kibana alert rules. Leave empty to accept alerts from all rules.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type:     ResourceTypeKibanaRule,
-					Multi: true,
+					Type:           ResourceTypeKibanaRule,
+					UseNameAsValue: true,
+					Multi:          true,
 				},
 			},
 		},
 		{
-			Name:        "spaceIds",
+			Name:        "spaces",
 			Label:       "Spaces",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Description: "Only fire for alerts originating from these Kibana spaces. Leave empty to accept all spaces.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type:     ResourceTypeKibanaSpace,
+					Type:  ResourceTypeKibanaSpace,
 					Multi: true,
 				},
 			},
@@ -106,13 +109,13 @@ func (t *OnAlertFires) Configuration() []configuration.Field {
 			Description: "Only fire for alerts that include at least one of these tags.",
 		},
 		{
-			Name:     "severities",
-			Label:    "Severities",
-			Type:     configuration.FieldTypeMultiSelect,
-			Required: false,
+			Name:        "severities",
+			Label:       "Severities",
+			Type:        configuration.FieldTypeMultiSelect,
+			Required:    false,
 			Description: "Only fire for alerts with one of these severity values. Leave empty to accept all severities.",
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
+				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
 						{Label: "Critical", Value: "critical"},
 						{Label: "High", Value: "high"},
@@ -124,13 +127,13 @@ func (t *OnAlertFires) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "statuses",
-			Label:    "Statuses",
-			Type:     configuration.FieldTypeMultiSelect,
-			Required: false,
+			Name:        "statuses",
+			Label:       "Statuses",
+			Type:        configuration.FieldTypeMultiSelect,
+			Required:    false,
 			Description: "Only fire for alerts with one of these status values. Leave empty to accept all statuses.",
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
+				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
 						{Label: "Active", Value: "active"},
 						{Label: "Recovered", Value: "recovered"},
@@ -142,7 +145,12 @@ func (t *OnAlertFires) Configuration() []configuration.Field {
 }
 
 func (t *OnAlertFires) Setup(ctx core.TriggerContext) error {
-	return ctx.Integration.RequestWebhook(nil)
+	kibanaURL, err := ctx.Integration.GetConfig("kibanaUrl")
+	if err != nil {
+		return fmt.Errorf("failed to get Kibana URL: %w", err)
+	}
+
+	return ctx.Integration.RequestWebhook(map[string]any{"kibanaUrl": string(kibanaURL)})
 }
 
 func (t *OnAlertFires) Actions() []core.Action {
@@ -200,14 +208,14 @@ func (t *OnAlertFires) Cleanup(_ core.TriggerContext) error {
 // matchesFilters returns true if the alert payload satisfies all configured filters.
 // An empty/nil filter is treated as a pass-through (no restriction).
 func matchesFilters(payload map[string]any, config OnAlertFiresConfiguration) bool {
-	if len(config.RuleIDs) > 0 {
-		if !containsIgnoreCase(config.RuleIDs, extractString(payload, "ruleId")) {
+	if len(config.Rules) > 0 {
+		if !matchesAnyString(config.Rules, extractString(payload, "ruleName"), extractString(payload, "ruleId")) {
 			return false
 		}
 	}
 
-	if len(config.SpaceIDs) > 0 {
-		if !containsIgnoreCase(config.SpaceIDs, extractString(payload, "spaceId")) {
+	if len(config.Spaces) > 0 {
+		if !containsIgnoreCase(config.Spaces, extractString(payload, "spaceId")) {
 			return false
 		}
 	}
@@ -271,6 +279,20 @@ func containsIgnoreCase(list []string, value string) bool {
 			return true
 		}
 	}
+	return false
+}
+
+// matchesAnyString reports whether any candidate appears in list (case-insensitive).
+func matchesAnyString(list []string, candidates ...string) bool {
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		if containsIgnoreCase(list, candidate) {
+			return true
+		}
+	}
+
 	return false
 }
 

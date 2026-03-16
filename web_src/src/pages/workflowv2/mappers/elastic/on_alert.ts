@@ -22,9 +22,9 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
 
     const details: Record<string, string> = {};
 
-    if (payload?.ruleId) details["Rule ID"] = String(payload.ruleId);
-    if (payload?.ruleName) details["Rule Name"] = String(payload.ruleName);
-    if (payload?.alertName) details["Alert Name"] = String(payload.alertName);
+    const rule = payload?.ruleName || payload?.alertName || payload?.ruleId;
+    if (rule) details["Rule"] = String(rule);
+    if (payload?.alertName && payload.alertName !== rule) details["Alert Name"] = String(payload.alertName);
     if (payload?.spaceId) details["Space"] = String(payload.spaceId);
     if (payload?.status) details["Status"] = String(payload.status);
     if (payload?.severity) details["Severity"] = String(payload.severity);
@@ -78,14 +78,14 @@ function buildMetadataItems(config: Record<string, any> | undefined): MetadataIt
   const items: MetadataItem[] = [];
   if (!config) return items;
 
-  const ruleIds: string[] = Array.isArray(config.ruleIds) ? config.ruleIds : [];
-  const spaceIds: string[] = Array.isArray(config.spaceIds) ? config.spaceIds : [];
+  const rules: string[] = Array.isArray(config.rules) ? config.rules : [];
+  const spaces: string[] = Array.isArray(config.spaces) ? config.spaces : [];
   const tags: string[] = Array.isArray(config.tags) ? config.tags : [];
   const severities: string[] = Array.isArray(config.severities) ? config.severities : [];
   const statuses: string[] = Array.isArray(config.statuses) ? config.statuses : [];
 
-  if (ruleIds.length > 0) items.push({ icon: "hash", label: ruleIds.join(", ") });
-  if (spaceIds.length > 0) items.push({ icon: "layers", label: spaceIds.join(", ") });
+  if (rules.length > 0) items.push({ icon: "bell", label: rules.join(", ") });
+  if (spaces.length > 0) items.push({ icon: "layers", label: spaces.join(", ") });
   if (tags.length > 0) items.push({ icon: "tag", label: tags.join(", ") });
   if (severities.length > 0) items.push({ icon: "alert-triangle", label: severities.join(", ") });
   if (statuses.length > 0) items.push({ icon: "activity", label: statuses.join(", ") });
@@ -95,11 +95,5 @@ function buildMetadataItems(config: Record<string, any> | undefined): MetadataIt
 
 function alertTitle(payload: Record<string, any> | undefined): string {
   if (!payload) return "Elastic alert received";
-  return (
-    payload.ruleName ||
-    payload.alertName ||
-    payload.name ||
-    payload.title ||
-    "Elastic alert received"
-  );
+  return payload.ruleName || payload.alertName || payload.name || payload.title || "Elastic alert received";
 }
