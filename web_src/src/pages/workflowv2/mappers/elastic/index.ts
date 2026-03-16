@@ -12,5 +12,5 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
-  indexDocument: buildActionStateRegistry("Document indexed"),
+  indexDocument: buildActionStateRegistry("indexed"),
 };

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -16,11 +15,11 @@ import (
 type OnAlertFires struct{}
 
 type OnAlertFiresConfiguration struct {
-	Rules      []string `json:"rules" mapstructure:"rules"`
-	Spaces     []string `json:"spaces" mapstructure:"spaces"`
-	Tags       []string `json:"tags" mapstructure:"tags"`
-	Severities []string `json:"severities" mapstructure:"severities"`
-	Statuses   []string `json:"statuses" mapstructure:"statuses"`
+	Rules      []string                  `json:"rules" mapstructure:"rules"`
+	Spaces     []string                  `json:"spaces" mapstructure:"spaces"`
+	Tags       []configuration.Predicate `json:"tags" mapstructure:"tags"`
+	Severities []configuration.Predicate `json:"severities" mapstructure:"severities"`
+	Statuses   []configuration.Predicate `json:"statuses" mapstructure:"statuses"`
 }
 
 func (t *OnAlertFires) Name() string  { return "elastic.onAlertFires" }
@@ -68,9 +67,7 @@ SuperPlane generates a random signing secret and configures the Kibana connector
 
 ## Event Data
 
-Each received alert emits:
-- ` + "`payload`" + `: The full parsed JSON body sent by Kibana
-- ` + "`receivedAt`" + `: ISO 8601 timestamp when SuperPlane received the request`
+Each received alert emits the parsed JSON body sent by Kibana directly as the event data. Use the workflow event timestamp to know when SuperPlane received it.`
 }
 
 func (t *OnAlertFires) Configuration() []configuration.Field {
@@ -105,40 +102,36 @@ func (t *OnAlertFires) Configuration() []configuration.Field {
 		{
 			Name:        "tags",
 			Label:       "Tags",
-			Type:        configuration.FieldTypeList,
+			Type:        configuration.FieldTypeAnyPredicateList,
 			Required:    false,
-			Description: "Only fire for alerts that include at least one of these tags.",
+			Description: "Only fire for alerts that include at least one tag matching any of these predicates.",
+			TypeOptions: &configuration.TypeOptions{
+				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
+					Operators: configuration.AllPredicateOperators,
+				},
+			},
 		},
 		{
 			Name:        "severities",
 			Label:       "Severities",
-			Type:        configuration.FieldTypeMultiSelect,
+			Type:        configuration.FieldTypeAnyPredicateList,
 			Required:    false,
-			Description: "Only fire for alerts with one of these severity values. Leave empty to accept all severities.",
+			Description: "Only fire for alerts whose severity matches any of these predicates. Leave empty to accept all severities.",
 			TypeOptions: &configuration.TypeOptions{
-				MultiSelect: &configuration.MultiSelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Critical", Value: "critical"},
-						{Label: "High", Value: "high"},
-						{Label: "Medium", Value: "medium"},
-						{Label: "Low", Value: "low"},
-						{Label: "Warning", Value: "warning"},
-					},
+				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
+					Operators: configuration.AllPredicateOperators,
 				},
 			},
 		},
 		{
 			Name:        "statuses",
 			Label:       "Statuses",
-			Type:        configuration.FieldTypeMultiSelect,
+			Type:        configuration.FieldTypeAnyPredicateList,
 			Required:    false,
-			Description: "Only fire for alerts with one of these status values. Leave empty to accept all statuses.",
+			Description: "Only fire for alerts whose status matches any of these predicates. Leave empty to accept all statuses.",
 			TypeOptions: &configuration.TypeOptions{
-				MultiSelect: &configuration.MultiSelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Active", Value: "active"},
-						{Label: "Recovered", Value: "recovered"},
-					},
+				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
+					Operators: configuration.AllPredicateOperators,
 				},
 			},
 		},
@@ -190,12 +183,7 @@ func (t *OnAlertFires) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 		return http.StatusOK, nil, nil
 	}
 
-	event := map[string]any{
-		"payload":    payload,
-		"receivedAt": time.Now().UTC().Format(time.RFC3339),
-	}
-
-	if err := ctx.Events.Emit("elastic.alert", event); err != nil {
+	if err := ctx.Events.Emit("elastic.alert", payload); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
@@ -222,19 +210,26 @@ func matchesFilters(payload map[string]any, config OnAlertFiresConfiguration) bo
 	}
 
 	if len(config.Tags) > 0 {
-		if !matchesAnyTag(config.Tags, extractStringSlice(payload, "tags")) {
+		matched := false
+		for _, tag := range extractStringSlice(payload, "tags") {
+			if configuration.MatchesAnyPredicate(config.Tags, tag) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
 			return false
 		}
 	}
 
 	if len(config.Severities) > 0 {
-		if !containsIgnoreCase(config.Severities, extractString(payload, "severity")) {
+		if !configuration.MatchesAnyPredicate(config.Severities, extractString(payload, "severity")) {
 			return false
 		}
 	}
 
 	if len(config.Statuses) > 0 {
-		if !containsIgnoreCase(config.Statuses, extractString(payload, "status")) {
+		if !configuration.MatchesAnyPredicate(config.Statuses, extractString(payload, "status")) {
 			return false
 		}
 	}
@@ -294,15 +289,5 @@ func matchesAnyString(list []string, candidates ...string) bool {
 		}
 	}
 
-	return false
-}
-
-// matchesAnyTag reports whether any configured tag appears in the payload's tag list.
-func matchesAnyTag(configured, payloadTags []string) bool {
-	for _, tag := range configured {
-		if containsIgnoreCase(payloadTags, tag) {
-			return true
-		}
-	}
 	return false
 }

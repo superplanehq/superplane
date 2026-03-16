@@ -14,6 +14,11 @@ import { MetadataItem } from "@/ui/metadataList";
 import elasticIcon from "@/assets/icons/integrations/elastic.svg";
 import { formatTimeAgo } from "@/utils/date";
 
+interface IndexDocumentConfiguration {
+  index?: string;
+  documentId?: string;
+}
+
 export const indexDocumentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
@@ -52,7 +57,7 @@ export const indexDocumentMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as IndexDocumentConfiguration | undefined;
 
   if (configuration?.index) {
     metadata.push({ icon: "database", label: configuration.index });

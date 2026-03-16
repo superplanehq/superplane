@@ -69,32 +69,27 @@ SuperPlane generates a random signing secret and configures the Kibana connector
 
 ### Event Data
 
-Each received alert emits:
-- `payload`: The full parsed JSON body sent by Kibana
-- `receivedAt`: ISO 8601 timestamp when SuperPlane received the request
+Each received alert emits the parsed JSON body sent by Kibana directly as the event data. Use the workflow event timestamp to know when SuperPlane received it.
 
 ### Example Data
 
 ```json
 {
   "data": {
-    "payload": {
-      "ruleId": "abc-123",
-      "ruleName": "High error rate detected",
-      "context": {
-        "message": "Error rate exceeded threshold: 15%",
-        "threshold": 10,
-        "value": 15
-      },
-      "severity": "critical",
-      "spaceId": "default",
-      "status": "active",
-      "tags": [
-        "infrastructure",
-        "prod"
-      ]
+    "context": {
+      "message": "Error rate exceeded threshold: 15%",
+      "threshold": 10,
+      "value": 15
     },
-    "receivedAt": "2026-03-12T09:00:00Z"
+    "ruleId": "abc-123",
+    "ruleName": "High error rate detected",
+    "severity": "critical",
+    "spaceId": "default",
+    "status": "active",
+    "tags": [
+      "infrastructure",
+      "prod"
+    ]
   },
   "timestamp": "2026-03-12T09:00:00Z",
   "type": "elastic.alert"
@@ -141,3 +136,4 @@ The component emits an event containing:
   "type": "elastic.document.indexed"
 }
 ```
+

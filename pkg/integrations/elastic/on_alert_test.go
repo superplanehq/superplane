@@ -6,9 +6,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
+
+func eq(value string) configuration.Predicate {
+	return configuration.Predicate{Type: configuration.PredicateTypeEquals, Value: value}
+}
 
 func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 	trigger := &OnAlertFires{}
@@ -81,6 +86,10 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 		require.Len(t, eventsCtx.Payloads, 1)
 		assert.Equal(t, "elastic.alert", eventsCtx.Payloads[0].Type)
+		eventData := eventsCtx.Payloads[0].Data.(map[string]any)
+		assert.Equal(t, "rule-123", eventData["ruleId"])
+		assert.Equal(t, "High error rate", eventData["ruleName"])
+		assert.NotContains(t, eventData, "payload")
 	})
 
 	// --- rules ---
@@ -164,7 +173,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"tags": []string{"env:prod"}},
+			Configuration: map[string]any{"tags": []configuration.Predicate{eq("env:prod")}},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
@@ -178,7 +187,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"tags": []string{"env:staging"}},
+			Configuration: map[string]any{"tags": []configuration.Predicate{eq("env:staging")}},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
@@ -194,7 +203,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"severities": []string{"critical", "high"}},
+			Configuration: map[string]any{"severities": []configuration.Predicate{eq("critical"), eq("high")}},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
@@ -208,7 +217,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"severities": []string{"low"}},
+			Configuration: map[string]any{"severities": []configuration.Predicate{eq("low")}},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
@@ -222,7 +231,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"statuses": []string{"active"}},
+			Configuration: map[string]any{"statuses": []configuration.Predicate{eq("active")}},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
@@ -236,7 +245,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"statuses": []string{"recovered"}},
+			Configuration: map[string]any{"statuses": []configuration.Predicate{eq("recovered")}},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
@@ -255,9 +264,9 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"rules":      []string{"rule-123"},
 				"spaces":     []string{"default"},
-				"tags":       []string{"team:infra"},
-				"severities": []string{"critical"},
-				"statuses":   []string{"active"},
+				"tags":       []configuration.Predicate{eq("team:infra")},
+				"severities": []configuration.Predicate{eq("critical")},
+				"statuses":   []configuration.Predicate{eq("active")},
 			},
 			Events:  eventsCtx,
 			Webhook: webhook,
@@ -274,7 +283,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 			Headers: headersWithSecret(),
 			Configuration: map[string]any{
 				"rules":    []string{"rule-123"},
-				"statuses": []string{"recovered"}, // active != recovered
+				"statuses": []configuration.Predicate{eq("recovered")}, // active != recovered
 			},
 			Events:  eventsCtx,
 			Webhook: webhook,

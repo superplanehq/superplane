@@ -72,11 +72,12 @@ func (e *Elastic) Configuration() []configuration.Field {
 			Description: "Full URL of your Kibana instance (e.g. https://my-cluster.kb.us-east-1.aws.found.io:9243).",
 		},
 		{
-			Name:     "authType",
-			Label:    "Auth Method",
-			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			Default:  "apiKey",
+			Name:        "authType",
+			Label:       "Auth Method",
+			Type:        configuration.FieldTypeSelect,
+			Required:    true,
+			Default:     "apiKey",
+			Description: "Choose whether SuperPlane should authenticate to Elasticsearch and Kibana with an API key or a username/password.",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -99,20 +100,22 @@ func (e *Elastic) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "username",
-			Label:    "Username",
-			Type:     configuration.FieldTypeString,
-			Required: false,
+			Name:        "username",
+			Label:       "Username",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Username for basic authentication. Use an account with permission to index documents and manage Kibana connectors.",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "authType", Values: []string{"basic"}},
 			},
 		},
 		{
-			Name:      "password",
-			Label:     "Password",
-			Type:      configuration.FieldTypeString,
-			Required:  false,
-			Sensitive: true,
+			Name:        "password",
+			Label:       "Password",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Sensitive:   true,
+			Description: "Password for basic authentication.",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "authType", Values: []string{"basic"}},
 			},

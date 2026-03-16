@@ -7,8 +7,7 @@ import elasticIcon from "@/assets/icons/integrations/elastic.svg";
 
 export const onAlertFiresTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event?.data as Record<string, any> | undefined;
-    const payload = eventData?.payload as Record<string, any> | undefined;
+    const payload = context.event?.data as Record<string, any> | undefined;
 
     const title = alertTitle(payload);
     const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
@@ -17,8 +16,7 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as Record<string, any> | undefined;
-    const payload = eventData?.payload as Record<string, any> | undefined;
+    const payload = context.event?.data as Record<string, any> | undefined;
 
     const details: Record<string, string> = {};
 
@@ -34,8 +32,6 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
       details["Tags"] = tags.join(", ");
     }
 
-    if (eventData?.receivedAt) details["Received At"] = String(eventData.receivedAt);
-
     return details;
   },
 
@@ -45,8 +41,7 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
     const metadataItems: MetadataItem[] = buildMetadataItems(config);
 
     if (lastEvent) {
-      const eventData = lastEvent.data as Record<string, any> | undefined;
-      const payload = eventData?.payload as Record<string, any> | undefined;
+      const payload = lastEvent.data as Record<string, any> | undefined;
       const title = alertTitle(payload);
       const subtitle = formatTimeAgo(new Date(lastEvent.createdAt));
 
@@ -74,26 +69,36 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
   },
 };
 
+interface Predicate {
+  type: string;
+  value: string;
+}
+
+function predicateLabel(predicates: Predicate[]): string {
+  return predicates.map((p) => (p.type === "equals" ? p.value : `${p.type}: ${p.value}`)).join(", ");
+}
+
 function buildMetadataItems(config: Record<string, any> | undefined): MetadataItem[] {
   const items: MetadataItem[] = [];
   if (!config) return items;
 
   const rules: string[] = Array.isArray(config.rules) ? config.rules : [];
   const spaces: string[] = Array.isArray(config.spaces) ? config.spaces : [];
-  const tags: string[] = Array.isArray(config.tags) ? config.tags : [];
-  const severities: string[] = Array.isArray(config.severities) ? config.severities : [];
-  const statuses: string[] = Array.isArray(config.statuses) ? config.statuses : [];
+  const tags: Predicate[] = Array.isArray(config.tags) ? config.tags : [];
+  const severities: Predicate[] = Array.isArray(config.severities) ? config.severities : [];
+  const statuses: Predicate[] = Array.isArray(config.statuses) ? config.statuses : [];
 
   if (rules.length > 0) items.push({ icon: "bell", label: rules.join(", ") });
   if (spaces.length > 0) items.push({ icon: "layers", label: spaces.join(", ") });
-  if (tags.length > 0) items.push({ icon: "tag", label: tags.join(", ") });
-  if (severities.length > 0) items.push({ icon: "alert-triangle", label: severities.join(", ") });
-  if (statuses.length > 0) items.push({ icon: "activity", label: statuses.join(", ") });
+  if (tags.length > 0) items.push({ icon: "tag", label: predicateLabel(tags) });
+  if (severities.length > 0) items.push({ icon: "alert-triangle", label: predicateLabel(severities) });
+  if (statuses.length > 0) items.push({ icon: "activity", label: predicateLabel(statuses) });
 
   return items;
 }
 
 function alertTitle(payload: Record<string, any> | undefined): string {
   if (!payload) return "Elastic alert received";
-  return payload.ruleName || payload.alertName || payload.name || payload.title || "Elastic alert received";
+  const baseTitle = payload.ruleName || payload.alertName || payload.name || payload.title || "Elastic alert received";
+  return payload.spaceId ? `${baseTitle} · ${payload.spaceId}` : baseTitle;
 }

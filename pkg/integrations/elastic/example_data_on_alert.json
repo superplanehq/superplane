@@ -1,20 +1,17 @@
 {
   "type": "elastic.alert",
   "data": {
-    "payload": {
-      "ruleId": "abc-123",
-      "ruleName": "High error rate detected",
-      "spaceId": "default",
-      "tags": ["infrastructure", "prod"],
-      "status": "active",
-      "severity": "critical",
-      "context": {
-        "message": "Error rate exceeded threshold: 15%",
-        "threshold": 10,
-        "value": 15
-      }
-    },
-    "receivedAt": "2026-03-12T09:00:00Z"
+    "ruleId": "abc-123",
+    "ruleName": "High error rate detected",
+    "spaceId": "default",
+    "tags": ["infrastructure", "prod"],
+    "status": "active",
+    "severity": "critical",
+    "context": {
+      "message": "Error rate exceeded threshold: 15%",
+      "threshold": 10,
+      "value": 15
+    }
   },
   "timestamp": "2026-03-12T09:00:00Z"
 }
