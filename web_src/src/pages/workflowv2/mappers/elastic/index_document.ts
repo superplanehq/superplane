@@ -67,8 +67,10 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+  const triggerComponent = rootTriggerNode?.componentName ?? componentName;
+  const rootTriggerRenderer = getTriggerRenderer(triggerComponent);
+  const titleAndSubtitle = rootTriggerRenderer?.getTitleAndSubtitle({ event: execution.rootEvent });
+  const title = titleAndSubtitle?.title ?? "";
 
   return [
     {

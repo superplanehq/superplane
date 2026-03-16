@@ -26,8 +26,12 @@ type webhookMetadata struct {
 
 func (h *ElasticWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	var ca, cb webhookConfig
-	mapstructure.Decode(a, &ca)
-	mapstructure.Decode(b, &cb)
+	if err := mapstructure.Decode(a, &ca); err != nil {
+		return false, fmt.Errorf("decode webhook config a: %w", err)
+	}
+	if err := mapstructure.Decode(b, &cb); err != nil {
+		return false, fmt.Errorf("decode webhook config b: %w", err)
+	}
 	// Triggers sharing one connector only if they point at the same Kibana.
 	// A URL change returns false, triggering connector replacement.
 	return ca.KibanaURL == cb.KibanaURL, nil
@@ -35,8 +39,12 @@ func (h *ElasticWebhookHandler) CompareConfig(a, b any) (bool, error) {
 
 func (h *ElasticWebhookHandler) Merge(current, requested any) (any, bool, error) {
 	var cur, req webhookConfig
-	mapstructure.Decode(current, &cur)
-	mapstructure.Decode(requested, &req)
+	if err := mapstructure.Decode(current, &cur); err != nil {
+		return nil, false, fmt.Errorf("decode current webhook config: %w", err)
+	}
+	if err := mapstructure.Decode(requested, &req); err != nil {
+		return nil, false, fmt.Errorf("decode requested webhook config: %w", err)
+	}
 
 	if cur.KibanaURL == req.KibanaURL {
 		return current, false, nil

@@ -1,6 +1,7 @@
 package elastic
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -171,7 +172,7 @@ func (t *OnAlertFires) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 	if headerVal == "" {
 		return http.StatusForbidden, nil, fmt.Errorf("missing required header %q", SigningHeaderName)
 	}
-	if headerVal != string(secret) {
+	if len(headerVal) != len(secret) || subtle.ConstantTimeCompare([]byte(headerVal), secret) != 1 {
 		return http.StatusForbidden, nil, fmt.Errorf("invalid value for header %q", SigningHeaderName)
 	}
 

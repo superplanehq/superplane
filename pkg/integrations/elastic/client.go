@@ -96,7 +96,7 @@ func (c *Client) execRequest(method, fullURL string, body io.Reader) ([]byte, er
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("request failed (%d): %s", res.StatusCode, string(responseBody))
+		return nil, fmt.Errorf("request failed (%d): %s", res.StatusCode, redactedResponseHint(responseBody))
 	}
 
 	return responseBody, nil
@@ -130,7 +130,7 @@ func (c *Client) execKibanaRequest(method, path string, body io.Reader) ([]byte,
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("Kibana request failed (%d): %s", res.StatusCode, string(responseBody))
+		return nil, fmt.Errorf("Kibana request failed (%d): %s", res.StatusCode, redactedResponseHint(responseBody))
 	}
 
 	return responseBody, nil
@@ -166,9 +166,10 @@ type kibanaRulesResponse struct {
 // ListKibanaRules returns all alerting rules from Kibana, paginating as needed.
 func (c *Client) ListKibanaRules() ([]KibanaRule, error) {
 	const perPage = 100
+	const maxPages = 100
 	var all []KibanaRule
 
-	for page := 1; ; page++ {
+	for page := 1; page <= maxPages; page++ {
 		path := fmt.Sprintf("/api/alerting/rules/_find?per_page=%d&page=%d", perPage, page)
 		body, err := c.execKibanaRequest(http.MethodGet, path, nil)
 		if err != nil {
@@ -180,13 +181,20 @@ func (c *Client) ListKibanaRules() ([]KibanaRule, error) {
 			return nil, fmt.Errorf("error parsing Kibana rules response: %v", err)
 		}
 
+		if len(resp.Data) == 0 {
+			if resp.Total == 0 || len(all) >= resp.Total {
+				return all, nil
+			}
+			return nil, fmt.Errorf("received empty Kibana rules page %d before reaching reported total %d", page, resp.Total)
+		}
+
 		all = append(all, resp.Data...)
 		if len(all) >= resp.Total {
-			break
+			return all, nil
 		}
 	}
 
-	return all, nil
+	return nil, fmt.Errorf("exceeded maximum Kibana rule pages (%d)", maxPages)
 }
 
 // KibanaSpace is the relevant subset of a Kibana space.
@@ -260,6 +268,15 @@ func (c *Client) DeleteKibanaConnector(connectorID string) error {
 		nil,
 	)
 	return err
+}
+
+// redactedResponseHint returns a safe hint for inclusion in returned errors
+// without exposing raw upstream response bodies.
+func redactedResponseHint(b []byte) string {
+	if len(b) == 0 {
+		return "response body omitted"
+	}
+	return fmt.Sprintf("response body omitted (%d bytes)", len(b))
 }
 
 // IndexInfo holds the minimal fields returned by GET /_cat/indices.

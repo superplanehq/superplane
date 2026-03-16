@@ -79,8 +79,8 @@ Each received alert emits:
 {
   "data": {
     "payload": {
-      "alertId": "abc-123",
-      "alertName": "High error rate detected",
+      "ruleId": "abc-123",
+      "ruleName": "High error rate detected",
       "context": {
         "message": "Error rate exceeded threshold: 15%",
         "threshold": 10,
@@ -141,4 +141,3 @@ The component emits an event containing:
   "type": "elastic.document.indexed"
 }
 ```
-

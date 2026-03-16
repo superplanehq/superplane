@@ -2,8 +2,8 @@
   "type": "elastic.alert",
   "data": {
     "payload": {
-      "alertId": "abc-123",
-      "alertName": "High error rate detected",
+      "ruleId": "abc-123",
+      "ruleName": "High error rate detected",
       "spaceId": "default",
       "tags": ["infrastructure", "prod"],
       "status": "active",
