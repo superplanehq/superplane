@@ -4,11 +4,12 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/extensions"
 	pb "github.com/superplanehq/superplane/pkg/protos/extensions"
 )
 
-func CreateExtension(ctx context.Context, storage *ExtensionStorage, organizationID string, name string, description string) (*pb.CreateExtensionResponse, error) {
-	extension := Extension{
+func CreateExtension(ctx context.Context, storage *extensions.Storage, organizationID string, name string, description string) (*pb.CreateExtensionResponse, error) {
+	extension := extensions.Extension{
 		ID:          uuid.New().String(),
 		Name:        name,
 		Description: description,

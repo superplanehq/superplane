@@ -12,7 +12,9 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/extensions"
 	"github.com/superplanehq/superplane/pkg/registry"
+	artifactstorage "github.com/superplanehq/superplane/pkg/storage"
 
 	// Import server to auto-register all integrations, components, and triggers via init()
 	_ "github.com/superplanehq/superplane/pkg/server"
@@ -25,7 +27,7 @@ var camelBoundary = regexp.MustCompile(`([a-z0-9])([A-Z])`)
 func main() {
 	createOutputDirectory()
 
-	reg, err := registry.NewRegistry(crypto.NewNoOpEncryptor(), registry.HTTPOptions{})
+	reg, err := registry.NewRegistry(crypto.NewNoOpEncryptor(), extensions.NewStorage(artifactstorage.NewInMemoryStorage()), registry.HTTPOptions{})
 	if err != nil {
 		exitWithError(err)
 	}

@@ -4,14 +4,16 @@ import (
 	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/extensions"
 	"github.com/superplanehq/superplane/pkg/registry"
+	artifactstorage "github.com/superplanehq/superplane/pkg/storage"
 
 	// Import server to auto-register all integrations, components, and triggers via init().
 	_ "github.com/superplanehq/superplane/pkg/server"
 )
 
 func main() {
-	reg, _ := registry.NewRegistry(crypto.NewNoOpEncryptor(), registry.HTTPOptions{})
+	reg, _ := registry.NewRegistry(crypto.NewNoOpEncryptor(), extensions.NewStorage(artifactstorage.NewInMemoryStorage()), registry.HTTPOptions{})
 	integrations := reg.ListIntegrations()
 	coreComponents := reg.ListComponents()
 	coreTriggers := reg.ListTriggers()

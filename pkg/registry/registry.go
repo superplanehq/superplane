@@ -8,6 +8,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/extensions"
 )
 
 var (
@@ -59,6 +60,7 @@ type IntegrationRegistration struct {
 type Registry struct {
 	httpCtx         *HTTPContext
 	Encryptor       crypto.Encryptor
+	Storage         *extensions.Storage
 	Integrations    map[string]core.Integration
 	WebhookHandlers map[string]core.WebhookHandler
 	Components      map[string]core.Component
@@ -66,7 +68,7 @@ type Registry struct {
 	Widgets         map[string]core.Widget
 }
 
-func NewRegistry(encryptor crypto.Encryptor, httpOptions HTTPOptions) (*Registry, error) {
+func NewRegistry(encryptor crypto.Encryptor, storage *extensions.Storage, httpOptions HTTPOptions) (*Registry, error) {
 	httpCtx, err := NewHTTPContext(httpOptions)
 	if err != nil {
 		return nil, err
@@ -74,6 +76,7 @@ func NewRegistry(encryptor crypto.Encryptor, httpOptions HTTPOptions) (*Registry
 
 	r := &Registry{
 		Encryptor:       encryptor,
+		Storage:         storage,
 		httpCtx:         httpCtx,
 		Components:      map[string]core.Component{},
 		Triggers:        map[string]core.Trigger{},
@@ -167,6 +170,28 @@ func (r *Registry) ListComponents() []core.Component {
 	return components
 }
 
+func (r *Registry) ListComponentsForOrganization(organizationID string) []core.Component {
+	components := r.ListComponents()
+
+	fromExtensions := r.Storage.ListComponents(organizationID)
+	for _, c := range fromExtensions {
+		components = append(components, &ExtensionComponent{manifest: c})
+	}
+
+	return components
+}
+
+func (r *Registry) ListTriggersForOrganization(organizationID string) []core.Trigger {
+	triggers := r.ListTriggers()
+
+	fromExtensions := r.Storage.ListTriggers(organizationID)
+	for _, t := range fromExtensions {
+		triggers = append(triggers, &ExtensionTrigger{manifest: t})
+	}
+
+	return triggers
+}
+
 func (r *Registry) GetComponent(name string) (core.Component, error) {
 	parts := strings.SplitN(name, ".", 2)
 	if len(parts) > 2 {
@@ -235,6 +260,17 @@ func (r *Registry) ListIntegrations() []core.Integration {
 	sort.Slice(integrations, func(i, j int) bool {
 		return integrations[i].Name() < integrations[j].Name()
 	})
+
+	return integrations
+}
+
+func (r *Registry) ListIntegrationsForOrganization(organizationID string) []core.Integration {
+	integrations := r.ListIntegrations()
+
+	fromExtensions := r.Storage.ListIntegrations(organizationID)
+	for _, i := range fromExtensions {
+		integrations = append(integrations, &ExtensionIntegration{manifest: i})
+	}
 
 	return integrations
 }

@@ -3,10 +3,11 @@ package extensions
 import (
 	"context"
 
+	extensions "github.com/superplanehq/superplane/pkg/extensions"
 	pb "github.com/superplanehq/superplane/pkg/protos/extensions"
 )
 
-func ListExtensions(ctx context.Context, storage *ExtensionStorage, organizationID string) (*pb.ListExtensionsResponse, error) {
+func ListExtensions(ctx context.Context, storage *extensions.Storage, organizationID string) (*pb.ListExtensionsResponse, error) {
 	extensions, err := storage.ListExtensions(organizationID)
 	if err != nil {
 		return nil, err
@@ -20,7 +21,7 @@ func ListExtensions(ctx context.Context, storage *ExtensionStorage, organization
 	return &pb.ListExtensionsResponse{Extensions: protoExtensions}, nil
 }
 
-func SerializeExtension(extension *Extension) *pb.Extension {
+func SerializeExtension(extension *extensions.Extension) *pb.Extension {
 	return &pb.Extension{
 		Metadata: &pb.Extension_Metadata{
 			Id:          extension.ID,

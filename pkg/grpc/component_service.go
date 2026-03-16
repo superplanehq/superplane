@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/components"
 	pb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -17,7 +18,8 @@ func NewComponentService(registry *registry.Registry) *ComponentService {
 }
 
 func (s *ComponentService) ListComponents(ctx context.Context, req *pb.ListComponentsRequest) (*pb.ListComponentsResponse, error) {
-	return components.ListComponents(ctx, s.registry)
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return components.ListComponents(ctx, s.registry, organizationID)
 }
 
 func (s *ComponentService) DescribeComponent(ctx context.Context, req *pb.DescribeComponentRequest) (*pb.DescribeComponentResponse, error) {

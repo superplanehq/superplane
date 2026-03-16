@@ -7,12 +7,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
+	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbExtensions "github.com/superplanehq/superplane/pkg/protos/extensions"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
+	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbOrganization "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecrets "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbServiceAccounts "github.com/superplanehq/superplane/pkg/protos/service_accounts"
+	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -148,6 +151,11 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbServiceAccounts.ServiceAccounts_UpdateServiceAccount_FullMethodName:          {Resource: "service_accounts", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbServiceAccounts.ServiceAccounts_DeleteServiceAccount_FullMethodName:          {Resource: "service_accounts", Action: "delete", DomainType: models.DomainTypeOrganization},
 		pbServiceAccounts.ServiceAccounts_RegenerateServiceAccountToken_FullMethodName: {Resource: "service_accounts", Action: "update", DomainType: models.DomainTypeOrganization},
+
+		// Discovery endpoints
+		pbComponents.Components_ListComponents_FullMethodName:       {Resource: "components", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbTriggers.Triggers_ListTriggers_FullMethodName:             {Resource: "triggers", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbIntegrations.Integrations_ListIntegrations_FullMethodName: {Resource: "integrations", Action: "read", DomainType: models.DomainTypeOrganization},
 
 		// Extensions rules
 		pbExtensions.Extensions_ListExtensions_FullMethodName:  {Resource: "extensions", Action: "read", DomainType: models.DomainTypeOrganization},

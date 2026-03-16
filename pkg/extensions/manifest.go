@@ -13,12 +13,12 @@ import (
 )
 
 type Manifest struct {
-	Integrations []ManifestIntegration `json:"integrations"`
-	Components   []ManifestComponent   `json:"components"`
-	Triggers     []ManifestTrigger     `json:"triggers"`
+	Integrations []IntegrationManifest `json:"integrations"`
+	Components   []ComponentManifest   `json:"components"`
+	Triggers     []TriggerManifest     `json:"triggers"`
 }
 
-type ManifestIntegration struct {
+type IntegrationManifest struct {
 	Name          string   `json:"name"`
 	Label         string   `json:"label"`
 	Icon          string   `json:"icon"`
@@ -30,10 +30,10 @@ type ManifestIntegration struct {
 	Configuration []map[string]any `json:"configuration"`
 
 	// TODO: should use []core.Action
-	Actions []ManifestAction `json:"actions"`
+	Actions []Action `json:"actions"`
 }
 
-type ManifestComponent struct {
+type ComponentManifest struct {
 	Name           string               `json:"name"`
 	Integration    string               `json:"integration,omitempty"`
 	Label          string               `json:"label"`
@@ -46,10 +46,10 @@ type ManifestComponent struct {
 	Configuration []map[string]any `json:"configuration"`
 
 	// TODO: should use []core.Action
-	Actions []ManifestAction `json:"actions"`
+	Actions []Action `json:"actions"`
 }
 
-type ManifestTrigger struct {
+type TriggerManifest struct {
 	Name        string `json:"name"`
 	Integration string `json:"integration,omitempty"`
 	Label       string `json:"label"`
@@ -61,22 +61,38 @@ type ManifestTrigger struct {
 	Configuration []map[string]any `json:"configuration"`
 
 	// TODO: should use []core.Action
-	Actions []ManifestAction `json:"actions"`
+	Actions []Action `json:"actions"`
 }
 
-type ManifestAction struct {
+type Action struct {
 	Name        string           `json:"name"`
 	Description string           `json:"description"`
 	Parameters  []map[string]any `json:"parameters"`
 }
 
-func extractManifestFromBundle(bundle []byte) (*Manifest, error) {
+type BundleFiles struct {
+	Manifest     *Manifest
+	ManifestJSON []byte
+	BundleJS     []byte
+}
+
+func ExtractManifestFromBundle(bundle []byte) (*Manifest, error) {
+	files, err := ExtractBundleFiles(bundle)
+	if err != nil {
+		return nil, err
+	}
+
+	return files.Manifest, nil
+}
+
+func ExtractBundleFiles(bundle []byte) (*BundleFiles, error) {
 	gzipReader, err := gzip.NewReader(bytes.NewReader(bundle))
 	if err != nil {
 		return nil, fmt.Errorf("open bundle gzip: %w", err)
 	}
 	defer gzipReader.Close()
 
+	files := &BundleFiles{}
 	tarReader := tar.NewReader(gzipReader)
 	for {
 		header, err := tarReader.Next()
@@ -89,22 +105,32 @@ func extractManifestFromBundle(bundle []byte) (*Manifest, error) {
 		if header.FileInfo().IsDir() {
 			continue
 		}
-		if path.Base(header.Name) != "manifest.json" {
-			continue
-		}
 
-		manifestJSON, err := io.ReadAll(tarReader)
+		fileData, err := io.ReadAll(tarReader)
 		if err != nil {
-			return nil, fmt.Errorf("read manifest.json: %w", err)
+			return nil, fmt.Errorf("read bundle file %s: %w", path.Base(header.Name), err)
 		}
 
-		var manifest Manifest
-		if err := json.Unmarshal(manifestJSON, &manifest); err != nil {
-			return nil, fmt.Errorf("parse manifest.json: %w", err)
+		switch path.Base(header.Name) {
+		case "manifest.json":
+			files.ManifestJSON = fileData
+		case "bundle.js":
+			files.BundleJS = fileData
 		}
-
-		return &manifest, nil
 	}
 
-	return nil, fmt.Errorf("manifest.json not found in bundle")
+	if len(files.ManifestJSON) == 0 {
+		return nil, fmt.Errorf("manifest.json not found in bundle")
+	}
+	if len(files.BundleJS) == 0 {
+		return nil, fmt.Errorf("bundle.js not found in bundle")
+	}
+
+	var manifest Manifest
+	if err := json.Unmarshal(files.ManifestJSON, &manifest); err != nil {
+		return nil, fmt.Errorf("parse manifest.json: %w", err)
+	}
+
+	files.Manifest = &manifest
+	return files, nil
 }

@@ -8,8 +8,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-func ListTriggers(ctx context.Context, registry *registry.Registry) (*pb.ListTriggersResponse, error) {
+func ListTriggers(ctx context.Context, registry *registry.Registry, organizationID string) (*pb.ListTriggersResponse, error) {
 	return &pb.ListTriggersResponse{
-		Triggers: actions.SerializeTriggers(registry.ListTriggers()),
+		Triggers: actions.SerializeTriggers(registry.ListTriggersForOrganization(organizationID)),
 	}, nil
 }

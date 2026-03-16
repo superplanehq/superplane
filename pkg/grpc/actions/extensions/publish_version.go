@@ -3,16 +3,17 @@ package extensions
 import (
 	"context"
 
+	extensions "github.com/superplanehq/superplane/pkg/extensions"
 	pb "github.com/superplanehq/superplane/pkg/protos/extensions"
 )
 
-func PublishVersion(ctx context.Context, storage *ExtensionStorage, organizationID string, extensionID string, versionID string, version string) (*pb.PublishVersionResponse, error) {
+func PublishVersion(ctx context.Context, storage *extensions.Storage, organizationID string, extensionID string, versionID string, version string) (*pb.PublishVersionResponse, error) {
 	currentVersion, err := storage.FindVersionById(organizationID, extensionID, versionID)
 	if err != nil {
 		return nil, err
 	}
 
-	newVersion := Version{
+	newVersion := extensions.Version{
 		Version:      version,
 		State:        "published",
 		ExtensionID:  currentVersion.ExtensionID,
@@ -23,7 +24,7 @@ func PublishVersion(ctx context.Context, storage *ExtensionStorage, organization
 		Triggers:     currentVersion.Triggers,
 	}
 
-	err = storage.UpdateVersion(organizationID, extensionID, versionID, newVersion)
+	err = storage.UpdateVersion(organizationID, extensionID, versionID, newVersion, nil)
 	if err != nil {
 		return nil, err
 	}

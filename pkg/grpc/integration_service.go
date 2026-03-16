@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/integrations"
 	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -22,5 +23,6 @@ func NewIntegrationService(encryptor crypto.Encryptor, registry *registry.Regist
 }
 
 func (s *IntegrationService) ListIntegrations(ctx context.Context, req *pb.ListIntegrationsRequest) (*pb.ListIntegrationsResponse, error) {
-	return integrations.ListIntegrations(ctx, s.registry)
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return integrations.ListIntegrations(ctx, s.registry, organizationID)
 }

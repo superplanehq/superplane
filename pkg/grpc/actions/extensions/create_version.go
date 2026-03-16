@@ -4,26 +4,27 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	extensions "github.com/superplanehq/superplane/pkg/extensions"
 	pb "github.com/superplanehq/superplane/pkg/protos/extensions"
 )
 
-func CreateVersion(ctx context.Context, storage *ExtensionStorage, organizationID string, extensionID string, bundle []byte, digest string) (*pb.CreateVersionResponse, error) {
-	manifest, err := extractManifestFromBundle(bundle)
+func CreateVersion(ctx context.Context, storage *extensions.Storage, organizationID string, extensionID string, bundle []byte, digest string) (*pb.CreateVersionResponse, error) {
+	files, err := extensions.ExtractBundleFiles(bundle)
 	if err != nil {
 		return nil, err
 	}
 
-	version := Version{
+	version := extensions.Version{
 		ID:           uuid.New().String(),
 		ExtensionID:  extensionID,
 		Digest:       digest,
 		State:        "draft",
-		Integrations: manifest.Integrations,
-		Components:   manifest.Components,
-		Triggers:     manifest.Triggers,
+		Integrations: files.Manifest.Integrations,
+		Components:   files.Manifest.Components,
+		Triggers:     files.Manifest.Triggers,
 	}
 
-	err = storage.CreateVersion(organizationID, extensionID, version)
+	err = storage.CreateVersion(organizationID, extensionID, version, files)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +32,7 @@ func CreateVersion(ctx context.Context, storage *ExtensionStorage, organizationI
 	return &pb.CreateVersionResponse{Version: SerializeVersion(&version)}, nil
 }
 
-func SerializeVersion(version *Version) *pb.ExtensionVersion {
+func SerializeVersion(version *extensions.Version) *pb.ExtensionVersion {
 	return &pb.ExtensionVersion{
 		Metadata: &pb.ExtensionVersion_Metadata{
 			Id:      version.ID,

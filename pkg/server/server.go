@@ -12,12 +12,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/extensions"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/public"
 	registry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/services"
+	artifactstorage "github.com/superplanehq/superplane/pkg/storage"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/templates"
 	"github.com/superplanehq/superplane/pkg/workers"
@@ -202,9 +204,9 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	go notificationEmailConsumer.Start()
 }
 
-func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcProvider oidc.Provider) {
+func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, storage *extensions.Storage, registry *registry.Registry, oidcProvider oidc.Provider) {
 	log.Println("Starting Internal API")
-	grpc.RunServer(baseURL, webhooksBaseURL, basePath, encryptor, authService, registry, oidcProvider, lookupInternalAPIPort())
+	grpc.RunServer(baseURL, webhooksBaseURL, basePath, encryptor, authService, registry, storage, oidcProvider, lookupInternalAPIPort())
 }
 
 func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcProvider oidc.Provider, authService authorization.Authorization) {
@@ -373,7 +375,8 @@ func Start() {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
 	}
 
-	registry, err := registry.NewRegistry(encryptorInstance, registry.HTTPOptions{
+	storage := newExtensionStorage()
+	registry, err := registry.NewRegistry(encryptorInstance, storage, registry.HTTPOptions{
 		BlockedHosts:     getBlockedHTTPHosts(),
 		PrivateIPRanges:  getPrivateIPRanges(),
 		MaxResponseBytes: DefaultMaxHTTPResponseBytes,
@@ -390,7 +393,7 @@ func Start() {
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, authService, registry, oidcProvider)
+		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, authService, storage, registry, oidcProvider)
 	}
 
 	startWorkers(encryptorInstance, registry, oidcProvider, baseURL, authService)
@@ -410,6 +413,16 @@ func getWebhookBaseURL(baseURL string) string {
 		webhookBaseURL = baseURL
 	}
 	return webhookBaseURL
+}
+
+func newExtensionStorage() *extensions.Storage {
+	extensionsDir := os.Getenv("EXTENSIONS_DIR")
+	if extensionsDir == "" {
+		return extensions.NewStorage(artifactstorage.NewInMemoryStorage())
+	}
+
+	log.Printf("Using folder-backed extension storage at %s", extensionsDir)
+	return extensions.NewStorage(artifactstorage.NewLocalFolderStorage(extensionsDir))
 }
 
 /*

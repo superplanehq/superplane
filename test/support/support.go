@@ -13,9 +13,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/extensions"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/secrets"
+	artifactstorage "github.com/superplanehq/superplane/pkg/storage"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -71,7 +73,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
 
 	encryptor := crypto.NewNoOpEncryptor()
-	registry, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
+	registry, err := registry.NewRegistry(encryptor, extensions.NewStorage(artifactstorage.NewInMemoryStorage()), registry.HTTPOptions{})
 	require.NoError(t, err)
 
 	//

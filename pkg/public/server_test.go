@@ -16,9 +16,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/extensions"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	artifactstorage "github.com/superplanehq/superplane/pkg/storage"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
 )
@@ -27,7 +29,7 @@ func Test__HealthCheckEndpoint(t *testing.T) {
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
 
-	registry, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
+	registry, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, extensions.NewStorage(artifactstorage.NewInMemoryStorage()), registry.HTTPOptions{})
 	require.NoError(t, err)
 	signer := jwt.NewSigner("test")
 	oidcProvider := support.NewOIDCProvider()
@@ -49,7 +51,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 	require.NoError(t, err)
 
 	signer := jwt.NewSigner("test")
-	registry, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
+	registry, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, extensions.NewStorage(artifactstorage.NewInMemoryStorage()), registry.HTTPOptions{})
 	require.NoError(t, err)
 	oidcProvider := support.NewOIDCProvider()
 	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, false)
@@ -120,7 +122,7 @@ func Test__GRPCGatewayRegistration(t *testing.T) {
 	require.NoError(t, err)
 
 	signer := jwt.NewSigner("test")
-	registry, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
+	registry, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, extensions.NewStorage(artifactstorage.NewInMemoryStorage()), registry.HTTPOptions{})
 	require.NoError(t, err)
 	oidcProvider := support.NewOIDCProvider()
 	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, false)
@@ -254,7 +256,7 @@ func Test__CreateOrganization(t *testing.T) {
 		}
 
 		encryptor := &crypto.NoOpEncryptor{}
-		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
+		r, err := registry.NewRegistry(encryptor, extensions.NewStorage(artifactstorage.NewInMemoryStorage()), registry.HTTPOptions{})
 		require.NoError(t, err)
 		oidcProvider := support.NewOIDCProvider()
 		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", mockedAuthService, false)
@@ -305,7 +307,7 @@ func Test__CreateOrganization(t *testing.T) {
 		require.NoError(t, err)
 
 		encryptor := &crypto.NoOpEncryptor{}
-		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
+		r, err := registry.NewRegistry(encryptor, extensions.NewStorage(artifactstorage.NewInMemoryStorage()), registry.HTTPOptions{})
 		require.NoError(t, err)
 		oidcProvider := support.NewOIDCProvider()
 		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", authService, false)
@@ -360,7 +362,7 @@ func Test__CreateOrganization(t *testing.T) {
 		require.NoError(t, err)
 
 		encryptor := &crypto.NoOpEncryptor{}
-		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
+		r, err := registry.NewRegistry(encryptor, extensions.NewStorage(artifactstorage.NewInMemoryStorage()), registry.HTTPOptions{})
 		require.NoError(t, err)
 		oidcProvider := support.NewOIDCProvider()
 		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", authService, false)

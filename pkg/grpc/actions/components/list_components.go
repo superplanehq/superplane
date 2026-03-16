@@ -8,8 +8,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-func ListComponents(ctx context.Context, registry *registry.Registry) (*pb.ListComponentsResponse, error) {
+func ListComponents(ctx context.Context, registry *registry.Registry, organizationID string) (*pb.ListComponentsResponse, error) {
 	return &pb.ListComponentsResponse{
-		Components: actions.SerializeComponents(registry.ListComponents()),
+		Components: actions.SerializeComponents(registry.ListComponentsForOrganization(organizationID)),
 	}, nil
 }

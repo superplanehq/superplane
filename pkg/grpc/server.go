@@ -12,6 +12,7 @@ import (
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	extensions "github.com/superplanehq/superplane/pkg/extensions"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -55,7 +56,15 @@ func sentryRecoveryHandler(p any) error {
 	return status.Errorf(codes.Internal, "internal server error")
 }
 
-func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcProvider oidc.Provider, port int) {
+func RunServer(
+	baseURL, webhooksBaseURL, basePath string,
+	encryptor crypto.Encryptor,
+	authService authorization.Authorization,
+	registry *registry.Registry,
+	storage *extensions.Storage,
+	oidcProvider oidc.Provider,
+	port int,
+) {
 	endpoint := fmt.Sprintf("0.0.0.0:%d", port)
 	lis, err := net.Listen("tcp", endpoint)
 
@@ -129,7 +138,7 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 	serviceAccountsService := NewServiceAccountsService(authService)
 	pbServiceAccounts.RegisterServiceAccountsServer(grpcServer, serviceAccountsService)
 
-	extensionService := NewExtensionService(registry)
+	extensionService := NewExtensionService(registry, storage)
 	pbExtensions.RegisterExtensionsServer(grpcServer, extensionService)
 
 	reflection.Register(grpcServer)

@@ -10,8 +10,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-func ListIntegrations(ctx context.Context, registry *registry.Registry) (*pb.ListIntegrationsResponse, error) {
-	integrations := registry.ListIntegrations()
+func ListIntegrations(ctx context.Context, registry *registry.Registry, organizationID string) (*pb.ListIntegrationsResponse, error) {
+	integrations := registry.ListIntegrationsForOrganization(organizationID)
 
 	return &pb.ListIntegrationsResponse{
 		Integrations: serializeIntegrations(integrations),

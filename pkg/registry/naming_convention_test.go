@@ -8,7 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/extensions"
 	"github.com/superplanehq/superplane/pkg/registry"
+	artifactstorage "github.com/superplanehq/superplane/pkg/storage"
 
 	// Import server package which imports all components, triggers, and applications
 	_ "github.com/superplanehq/superplane/pkg/server"
@@ -37,7 +39,7 @@ func isValidName(name string) bool {
 }
 
 func TestComponentsAndTriggersUseCamelCaseNames(t *testing.T) {
-	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
+	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, extensions.NewStorage(artifactstorage.NewInMemoryStorage()), registry.HTTPOptions{})
 	require.NoError(t, err)
 
 	for _, c := range reg.ListComponents() {
