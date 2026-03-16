@@ -9,6 +9,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Triggers
 
 <CardGrid>
+  <LinkCard title="On Image Deleted" href="#on-image-deleted" description="Listen to Azure Container Registry image deletion events" />
+  <LinkCard title="On Image Pushed" href="#on-image-pushed" description="Listen to Azure Container Registry image push events" />
   <LinkCard title="On VM Deleted" href="#on-vm-deleted" description="Listen to Azure VM deletion events" />
 </CardGrid>
 
@@ -41,6 +43,157 @@ Enter the following information below and create the integration:
 After creation, you will be guided through configuring the Federated Identity Credential and granting the required permissions.
 
 SuperPlane will use Workload Identity Federation to authenticate without storing any credentials.
+
+<a id="on-image-deleted"></a>
+
+## On Image Deleted
+
+The On Image Deleted trigger starts a workflow execution when a container image is deleted from an Azure Container Registry.
+
+### Use Cases
+
+- **Cleanup workflows**: Remove associated resources when an image is deleted
+- **Audit trails**: Record image deletions for compliance purposes
+- **Notification workflows**: Alert teams when images are removed from the registry
+
+### How It Works
+
+This trigger listens to Azure Event Grid events from an ACR registry. When an image or manifest is deleted,
+the `Microsoft.ContainerRegistry.ImageDeleted` event is delivered and the trigger fires with the full event payload.
+
+Note: Image deletions reference manifests by digest. Tags may be empty if the manifest itself was deleted.
+
+### Configuration
+
+- **Resource Group** (required): The resource group containing the ACR registry.
+- **Registry** (required): The ACR registry to watch.
+- **Repository Filter** (optional): A regex pattern to filter by repository name.
+
+### Event Data
+
+Each delete event includes:
+
+- **target.repository**: The repository name
+- **target.digest**: The manifest digest that was deleted
+- **target.tag**: The tag (may be empty for manifest deletes)
+- **actor.name**: The user or service principal that deleted the image
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "delete",
+    "actor": {
+      "name": "myuser"
+    },
+    "id": "afc359b4-001e-001b-66ab-eeb76e069631",
+    "request": {
+      "addr": "203.0.113.0:49926",
+      "host": "myregistry.azurecr.io",
+      "id": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
+      "method": "DELETE",
+      "useragent": "docker/20.10.7"
+    },
+    "source": {
+      "addr": "myregistry.azurecr.io",
+      "instanceID": "a29a591f-f89c-4f8d-b061-3c5d73d4756c"
+    },
+    "target": {
+      "digest": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "repository": "myrepository",
+      "tag": "",
+      "url": "https://myregistry.azurecr.io/v2/myrepository/manifests/sha256:abcdef1234567890"
+    },
+    "timestamp": "2026-03-16T11:00:00Z"
+  },
+  "dataVersion": "1.0",
+  "eventTime": "2026-03-16T11:00:00Z",
+  "eventType": "Microsoft.ContainerRegistry.ImageDeleted",
+  "id": "afc359b4-001e-001b-66ab-eeb76e069631",
+  "metadataVersion": "1",
+  "subject": "myregistry.azurecr.io/myrepository@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.ContainerRegistry/registries/myregistry"
+}
+```
+
+<a id="on-image-pushed"></a>
+
+## On Image Pushed
+
+The On Image Pushed trigger starts a workflow execution when a container image is pushed to an Azure Container Registry.
+
+### Use Cases
+
+- **CI/CD pipelines**: Trigger deployments when a new image version is pushed
+- **Image scanning**: Kick off security scans when new images arrive
+- **Notification workflows**: Notify teams when images are updated
+- **Tag tracking**: React to specific image tags being published
+
+### How It Works
+
+This trigger listens to Azure Event Grid events from an ACR registry. When an image push succeeds,
+the `Microsoft.ContainerRegistry.ImagePushed` event is delivered and the trigger fires with the full event payload.
+
+### Configuration
+
+- **Resource Group** (required): The resource group containing the ACR registry.
+- **Registry** (required): The ACR registry to watch.
+- **Repository Filter** (optional): A regex pattern to filter by repository name.
+- **Tag Filter** (optional): A regex pattern to filter by image tag.
+
+### Event Data
+
+Each push event includes:
+
+- **target.repository**: The repository name
+- **target.tag**: The image tag
+- **target.digest**: The image manifest digest
+- **actor.name**: The user or service principal that pushed the image
+- **request.host**: The registry hostname
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "push",
+    "actor": {
+      "name": "myuser"
+    },
+    "id": "831e1650-001e-001b-66ab-eeb76e069631",
+    "request": {
+      "addr": "203.0.113.0:49926",
+      "host": "myregistry.azurecr.io",
+      "id": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
+      "method": "PUT",
+      "useragent": "docker/20.10.7"
+    },
+    "source": {
+      "addr": "myregistry.azurecr.io",
+      "instanceID": "a29a591f-f89c-4f8d-b061-3c5d73d4756c"
+    },
+    "target": {
+      "digest": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+      "length": 1234567,
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "repository": "myrepository",
+      "size": 1234567,
+      "tag": "v1.2.3",
+      "url": "https://myregistry.azurecr.io/v2/myrepository/manifests/sha256:abcdef1234567890"
+    },
+    "timestamp": "2026-03-16T10:00:00Z"
+  },
+  "dataVersion": "1.0",
+  "eventTime": "2026-03-16T10:00:00Z",
+  "eventType": "Microsoft.ContainerRegistry.ImagePushed",
+  "id": "831e1650-001e-001b-66ab-eeb76e069631",
+  "metadataVersion": "1",
+  "subject": "myregistry.azurecr.io/myrepository:v1.2.3",
+  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.ContainerRegistry/registries/myregistry"
+}
+```
 
 <a id="on-vm-deleted"></a>
 
