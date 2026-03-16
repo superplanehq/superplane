@@ -853,7 +853,6 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        contexts.NewEventContext(tx, &node, onNewEvents),
 		Integration:   integrationCtx,
-		Response:      &core.WebhookResponseBody{},
 	})
 }
 
@@ -889,7 +888,6 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        contexts.NewEventContext(tx, &node, onNewEvents),
 		Integration:   integrationCtx,
-		Response:      &core.WebhookResponseBody{},
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
 			if err != nil {

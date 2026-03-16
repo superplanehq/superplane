@@ -205,10 +205,11 @@ func (t *OnVMDeleted) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 		ctx.Logger.Infof("Event[%d]: id=%s type=%s subject=%s", i, event.ID, event.EventType, event.Subject)
 
 		if event.EventType == EventTypeSubscriptionValidation {
-			if err := t.handleSubscriptionValidation(ctx, event); err != nil {
+			resp, err := t.handleSubscriptionValidation(ctx, event)
+			if err != nil {
 				return http.StatusInternalServerError, nil, err
 			}
-			return http.StatusOK, nil, nil
+			return http.StatusOK, resp, nil
 		}
 
 		if event.EventType == EventTypeResourceDeleteSuccess {
@@ -224,32 +225,27 @@ func (t *OnVMDeleted) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 
 // handleSubscriptionValidation validates Event Grid subscription using the
 // synchronous handshake: return the validationCode in the HTTP response body.
-func (t *OnVMDeleted) handleSubscriptionValidation(ctx core.WebhookRequestContext, event EventGridEvent) error {
+func (t *OnVMDeleted) handleSubscriptionValidation(ctx core.WebhookRequestContext, event EventGridEvent) (*core.WebhookResponseBody, error) {
 	var validationData SubscriptionValidationEventData
 	if err := mapstructure.Decode(event.Data, &validationData); err != nil {
-		return fmt.Errorf("failed to parse validation data: %w", err)
+		return nil, fmt.Errorf("failed to parse validation data: %w", err)
 	}
 
 	if validationData.ValidationCode == "" {
-		return fmt.Errorf("validation code is empty")
+		return nil, fmt.Errorf("validation code is empty")
 	}
 
 	ctx.Logger.Infof("Event Grid subscription validation received, responding with validation code")
 
-	if ctx.Response != nil {
-		body, err := json.Marshal(map[string]string{
-			"validationResponse": validationData.ValidationCode,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to marshal validation response: %w", err)
-		}
-
-		ctx.Response.Body = body
-		ctx.Response.ContentType = "application/json"
+	body, err := json.Marshal(map[string]string{
+		"validationResponse": validationData.ValidationCode,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal validation response: %w", err)
 	}
 
 	ctx.Logger.Info("Event Grid subscription validation response set successfully")
-	return nil
+	return &core.WebhookResponseBody{Body: body, ContentType: "application/json"}, nil
 }
 
 // handleVMDeletedEvent processes VM delete events.

@@ -173,9 +173,12 @@ func TestOnVMDeleted_HandleWebhook_SubscriptionValidation(t *testing.T) {
 		Logger:        logger,
 	}
 
-	code, _, err := trigger.HandleWebhook(ctx)
+	code, resp, err := trigger.HandleWebhook(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code)
+	require.NotNil(t, resp)
+	assert.Equal(t, "application/json", resp.ContentType)
+	assert.Contains(t, string(resp.Body), validationCode)
 
 	// Subscription validation should not emit any events to the workflow
 	assert.Equal(t, 0, eventsCtx.Count())
