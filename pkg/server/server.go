@@ -50,6 +50,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/digitalocean"
 	_ "github.com/superplanehq/superplane/pkg/integrations/discord"
 	_ "github.com/superplanehq/superplane/pkg/integrations/dockerhub"
+	_ "github.com/superplanehq/superplane/pkg/integrations/elastic"
 	_ "github.com/superplanehq/superplane/pkg/integrations/firehydrant"
 	_ "github.com/superplanehq/superplane/pkg/integrations/gcp"
 	_ "github.com/superplanehq/superplane/pkg/integrations/github"

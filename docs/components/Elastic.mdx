@@ -1,0 +1,139 @@
+---
+title: "Elastic"
+---
+
+Index documents into Elasticsearch and receive Kibana alert webhooks
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="When Alert Fires" href="#when-alert-fires" description="Trigger a workflow when a Kibana alert rule fires" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Index Document" href="#index-document" description="Write a JSON document to an Elasticsearch index" />
+</CardGrid>
+
+## Instructions
+
+To connect Elastic to SuperPlane:
+
+1. **Elasticsearch URL**: Full URL of your Elasticsearch cluster (e.g. `https://my-cluster.es.us-east-1.aws.found.io:9243`).
+2. **Kibana URL**: Full URL of your Kibana instance (e.g. `https://my-cluster.kb.us-east-1.aws.found.io:9243`). Required for automatic Kibana webhook connector setup.
+3. **Auth Method**:
+   - **API Key** (recommended for Elastic Cloud): Go to Kibana → Stack Management → API Keys and create a new key. Paste the base64-encoded `id:api_key` value.
+   - **Username / Password**: Provide the credentials for a user with the required privileges.
+4. **Kibana alerts (trigger)**: SuperPlane automatically creates a signed Kibana Webhook connector. You still need to attach that connector to your alert rules in Kibana.
+
+<a id="when-alert-fires"></a>
+
+## When Alert Fires
+
+The When Alert Fires trigger starts a workflow execution when a Kibana alert rule fires via a webhook connector.
+
+### Setup
+
+1. Save this trigger — SuperPlane automatically creates a signed Kibana Webhook connector.
+2. In Kibana, attach the connector to one or more alert rules and configure the action body as shown below.
+
+#### Recommended Kibana action body
+
+For filters to work reliably, configure the rule action body in Kibana to include these fields:
+
+```json
+{
+  "ruleId":   "{{rule.id}}",
+  "ruleName": "{{rule.name}}",
+  "spaceId":  "{{rule.spaceId}}",
+  "tags":     {{rule.tags}},
+  "severity": "{{context.severity}}",
+  "status":   "{{rule.status}}"
+}
+```
+
+Kibana substitutes `{{rule.id}}` and `{{rule.name}}` at delivery time. Fields omitted from the body will not be filterable in SuperPlane.
+
+### Filtering
+
+All filter fields are optional. Leave them empty to fire for every incoming alert. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
+
+**Rule ID** is the most reliable filter because rule names are user-editable. Use it as the primary key when you need precise per-rule routing.
+
+### Webhook Verification
+
+SuperPlane generates a random signing secret and configures the Kibana connector to include it on every request. Requests without the correct secret are rejected automatically.
+
+### Event Data
+
+Each received alert emits the parsed JSON body sent by Kibana directly as the event data. Use the workflow event timestamp to know when SuperPlane received it.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "context": {
+      "message": "Error rate exceeded threshold: 15%",
+      "threshold": 10,
+      "value": 15
+    },
+    "ruleId": "abc-123",
+    "ruleName": "High error rate detected",
+    "severity": "critical",
+    "spaceId": "default",
+    "status": "active",
+    "tags": [
+      "infrastructure",
+      "prod"
+    ]
+  },
+  "timestamp": "2026-03-12T09:00:00Z",
+  "type": "elastic.alert"
+}
+```
+
+<a id="index-document"></a>
+
+## Index Document
+
+The Index Document component writes a JSON document to an Elasticsearch index.
+
+### Use Cases
+
+- **Audit logging**: Record workflow actions in Elasticsearch for centralized search and dashboards
+- **Incident records**: Index structured incident data for analysis and alerting
+- **Workflow output**: Store results from any workflow step for downstream querying
+
+### Configuration
+
+- **Index**: The Elasticsearch index name to write to (e.g. `workflow-audit`)
+- **Document**: The JSON object to index
+- **Document ID** *(optional)*: A stable ID for idempotent writes. If omitted, Elasticsearch generates one automatically. Providing an ID means re-runs update the existing document rather than creating a duplicate.
+
+### Outputs
+
+The component emits an event containing:
+- `id`: The document ID assigned by Elasticsearch
+- `index`: The index the document was written to
+- `result`: Operation result (`created` or `updated`)
+- `version`: The document version number
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "aB3kLmN4oPqR",
+    "index": "workflow-audit",
+    "result": "created",
+    "version": 1
+  },
+  "timestamp": "2026-03-12T09:00:00Z",
+  "type": "elastic.document.indexed"
+}
+```
+
