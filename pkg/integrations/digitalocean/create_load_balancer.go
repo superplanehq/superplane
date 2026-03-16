@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,21 +13,23 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const lbPollInterval = 10 * time.Second
+const lbPollInterval = 15 * time.Second
 
 type CreateLoadBalancer struct{}
+
+var lbNameRegexp = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
 
 type ForwardingRuleSpec struct {
 	EntryProtocol  string `json:"entryProtocol" mapstructure:"entryProtocol"`
 	EntryPort      int    `json:"entryPort" mapstructure:"entryPort"`
 	TargetProtocol string `json:"targetProtocol" mapstructure:"targetProtocol"`
 	TargetPort     int    `json:"targetPort" mapstructure:"targetPort"`
+	TLSPassthrough bool   `json:"tlsPassthrough" mapstructure:"tlsPassthrough"`
 }
 
 type CreateLoadBalancerSpec struct {
 	Name            string               `json:"name" mapstructure:"name"`
 	Region          string               `json:"region" mapstructure:"region"`
-	Algorithm       string               `json:"algorithm" mapstructure:"algorithm"`
 	ForwardingRules []ForwardingRuleSpec `json:"forwardingRules" mapstructure:"forwardingRules"`
 	DropletIDs      []string             `json:"dropletIds" mapstructure:"dropletIds"`
 	Tag             string               `json:"tag" mapstructure:"tag"`
@@ -55,11 +58,10 @@ func (c *CreateLoadBalancer) Documentation() string {
 
 ## Configuration
 
-- **Name**: The name of the load balancer (required)
+- **Name**: The name of the load balancer (required, only letters, numbers, and hyphens)
 - **Region**: Region where the load balancer will be created (required)
-- **Algorithm**: Load balancing algorithm: round_robin (default) or least_connections (optional)
-- **Forwarding Rules**: One or more forwarding rules specifying entry/target protocol and port (required)
-- **Droplet IDs**: IDs of droplets to add as targets (optional, mutually exclusive with Tag)
+- **Forwarding Rules**: One or more forwarding rules specifying entry/target protocol, port, and optional TLS passthrough (required)
+- **Droplet IDs**: IDs of droplets to add as targets — must be in the same region as the load balancer (optional, mutually exclusive with Tag)
 - **Tag**: Tag used to dynamically target droplets (optional, mutually exclusive with Droplet IDs)
 
 ## Output
@@ -69,7 +71,6 @@ Returns the created load balancer object including:
 - **name**: Load balancer name
 - **ip**: Assigned public IP address
 - **status**: Current status (active)
-- **algorithm**: Balancing algorithm
 - **region**: Region information
 - **forwarding_rules**: Configured forwarding rules
 - **droplet_ids**: Targeted droplet IDs
@@ -77,7 +78,9 @@ Returns the created load balancer object including:
 ## Important Notes
 
 - The component polls until the load balancer status becomes **active**
-- Specify either **Droplet IDs** or **Tag** to define targets, not both`
+- Specify either **Droplet IDs** or **Tag** to define targets, not both
+- The load balancer name must contain only letters, numbers, and hyphens
+- All specified droplets must be in the same region as the load balancer`
 }
 
 func (c *CreateLoadBalancer) Icon() string {
@@ -118,23 +121,6 @@ func (c *CreateLoadBalancer) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "region",
-				},
-			},
-		},
-		{
-			Name:        "algorithm",
-			Label:       "Algorithm",
-			Type:        configuration.FieldTypeSelect,
-			Required:    false,
-			Togglable:   true,
-			Description: "The load balancing algorithm",
-			Default:     "round_robin",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Round Robin", Value: "round_robin"},
-						{Label: "Least Connections", Value: "least_connections"},
-					},
 				},
 			},
 		},
@@ -196,6 +182,13 @@ func (c *CreateLoadBalancer) Configuration() []configuration.Field {
 									},
 								},
 							},
+							{
+								Name:        "tlsPassthrough",
+								Label:       "TLS Passthrough",
+								Type:        configuration.FieldTypeBool,
+								Required:    false,
+								Description: "Pass TLS traffic through to the target without terminating the connection",
+							},
 						},
 					},
 				},
@@ -207,7 +200,7 @@ func (c *CreateLoadBalancer) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Togglable:   true,
-			Description: "Droplets to add as load balancer targets (mutually exclusive with Tag)",
+			Description: "Droplets to add as load balancer targets. Must be in the same region as the load balancer (mutually exclusive with Tag)",
 			Placeholder: "Select droplets",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -239,6 +232,10 @@ func (c *CreateLoadBalancer) Setup(ctx core.SetupContext) error {
 
 	if spec.Name == "" {
 		return errors.New("name is required")
+	}
+
+	if !lbNameRegexp.MatchString(spec.Name) {
+		return errors.New("name must contain only letters, numbers, and hyphens")
 	}
 
 	if spec.Region == "" {
@@ -285,13 +282,13 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 			EntryPort:      r.EntryPort,
 			TargetProtocol: r.TargetProtocol,
 			TargetPort:     r.TargetPort,
+			TLSPassthrough: r.TLSPassthrough,
 		})
 	}
 
 	req := CreateLoadBalancerRequest{
 		Name:            spec.Name,
 		Region:          spec.Region,
-		Algorithm:       spec.Algorithm,
 		ForwardingRules: rules,
 		Tag:             spec.Tag,
 	}
@@ -371,11 +368,8 @@ func (c *CreateLoadBalancer) HandleAction(ctx core.ActionContext) error {
 			"digitalocean.loadbalancer.created",
 			[]any{lb},
 		)
-	case "new", "errored":
-		if lb.Status == "errored" {
-			return fmt.Errorf("load balancer reached error status")
-		}
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, lbPollInterval)
+	case "errored":
+		return fmt.Errorf("load balancer reached error status")
 	default:
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, lbPollInterval)
 	}

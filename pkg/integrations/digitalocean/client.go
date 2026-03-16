@@ -530,13 +530,13 @@ type ForwardingRule struct {
 	EntryPort      int    `json:"entry_port"`
 	TargetProtocol string `json:"target_protocol"`
 	TargetPort     int    `json:"target_port"`
+	TLSPassthrough bool   `json:"tls_passthrough,omitempty"`
 }
 
 // CreateLoadBalancerRequest is the payload for creating a load balancer
 type CreateLoadBalancerRequest struct {
 	Name            string           `json:"name"`
 	Region          string           `json:"region"`
-	Algorithm       string           `json:"algorithm,omitempty"`
 	ForwardingRules []ForwardingRule `json:"forwarding_rules"`
 	DropletIDs      []int            `json:"droplet_ids,omitempty"`
 	Tag             string           `json:"tag,omitempty"`

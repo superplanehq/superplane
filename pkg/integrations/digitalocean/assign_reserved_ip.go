@@ -20,7 +20,7 @@ type AssignReservedIP struct{}
 type AssignReservedIPSpec struct {
 	ReservedIP string `json:"reservedIP" mapstructure:"reservedIP"`
 	Action     string `json:"action" mapstructure:"action"`
-	DropletID  string `json:"dropletID" mapstructure:"dropletID"`
+	Droplet    string `json:"droplet" mapstructure:"droplet"`
 }
 
 func (a *AssignReservedIP) Name() string {
@@ -111,7 +111,7 @@ func (a *AssignReservedIP) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "dropletID",
+			Name:        "droplet",
 			Label:       "Droplet",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
@@ -151,8 +151,8 @@ func (a *AssignReservedIP) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("invalid action %q: must be assign or unassign", spec.Action)
 	}
 
-	if spec.Action == "assign" && spec.DropletID == "" {
-		return errors.New("dropletID is required when action is assign")
+	if spec.Action == "assign" && spec.Droplet == "" {
+		return errors.New("droplet is required when action is assign")
 	}
 
 	return nil
@@ -171,9 +171,9 @@ func (a *AssignReservedIP) Execute(ctx core.ExecutionContext) error {
 
 	var dropletIDPtr *int
 	if spec.Action == "assign" {
-		id, err := strconv.Atoi(spec.DropletID)
+		id, err := strconv.Atoi(spec.Droplet)
 		if err != nil {
-			return fmt.Errorf("invalid droplet ID %q: must be a number", spec.DropletID)
+			return fmt.Errorf("invalid droplet ID %q: must be a number", spec.Droplet)
 		}
 		dropletIDPtr = &id
 	}
