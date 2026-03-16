@@ -367,3 +367,113 @@ func (c *Client) IndexDocument(index, documentID string, doc map[string]any) (*I
 
 	return &resp, nil
 }
+
+// GetDocumentResponse is returned by GET /{index}/_doc/{id}.
+type GetDocumentResponse struct {
+	ID      string         `json:"_id"`
+	Index   string         `json:"_index"`
+	Version int            `json:"_version"`
+	Found   bool           `json:"found"`
+	Source  map[string]any `json:"_source"`
+}
+
+// GetDocument retrieves a document by index and document ID.
+func (c *Client) GetDocument(index, documentID string) (*GetDocumentResponse, error) {
+	fullURL := fmt.Sprintf("%s/%s/_doc/%s", c.baseURL, url.PathEscape(index), url.PathEscape(documentID))
+	responseBody, err := c.execRequest(http.MethodGet, fullURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp GetDocumentResponse
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing get document response: %v", err)
+	}
+
+	return &resp, nil
+}
+
+// UpdateDocument applies a partial update to an existing document.
+// Uses POST /{index}/_update/{id} with body {"doc": fields}.
+// Reuses IndexDocumentResponse since the response shape is identical.
+func (c *Client) UpdateDocument(index, documentID string, fields map[string]any) (*IndexDocumentResponse, error) {
+	payload := map[string]any{"doc": fields}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling update payload: %v", err)
+	}
+
+	fullURL := fmt.Sprintf("%s/%s/_update/%s", c.baseURL, url.PathEscape(index), url.PathEscape(documentID))
+	responseBody, err := c.execRequest(http.MethodPost, fullURL, bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var resp IndexDocumentResponse
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing update document response: %v", err)
+	}
+
+	return &resp, nil
+}
+
+// SearchHit represents a single document result from an Elasticsearch search.
+type SearchHit struct {
+	ID     string         `json:"_id"`
+	Index  string         `json:"_index"`
+	Source map[string]any `json:"_source"`
+}
+
+// TimestampValue extracts the value of the given timestamp field from the source
+// as a string. Returns "" if the field is absent or not a string.
+func (h *SearchHit) TimestampValue(field string) string {
+	if h.Source == nil {
+		return ""
+	}
+	if v, ok := h.Source[field]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+// SearchDocumentsAfter queries an index for documents where the given
+// timestamp field is strictly greater than afterTimestamp, sorted ascending.
+func (c *Client) SearchDocumentsAfter(index, timestampField, afterTimestamp string, size int) ([]SearchHit, error) {
+	query := map[string]any{
+		"query": map[string]any{
+			"range": map[string]any{
+				timestampField: map[string]any{
+					"gt": afterTimestamp,
+				},
+			},
+		},
+		"sort": []any{
+			map[string]any{timestampField: map[string]any{"order": "asc"}},
+		},
+		"size": size,
+	}
+
+	data, err := json.Marshal(query)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling search query: %v", err)
+	}
+
+	fullURL := fmt.Sprintf("%s/%s/_search", c.baseURL, url.PathEscape(index))
+	responseBody, err := c.execRequest(http.MethodPost, fullURL, bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Hits struct {
+			Hits []SearchHit `json:"hits"`
+		} `json:"hits"`
+	}
+	if err := json.Unmarshal(responseBody, &result); err != nil {
+		return nil, fmt.Errorf("error parsing search response: %v", err)
+	}
+
+	return result.Hits.Hits, nil
+}
