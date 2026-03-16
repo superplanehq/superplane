@@ -3,6 +3,7 @@ import { indexDocumentMapper } from "./index_document";
 import { getDocumentMapper } from "./get_document";
 import { updateDocumentMapper } from "./update_document";
 import { onAlertFiresTriggerRenderer } from "./on_alert";
+import { onDocumentIndexedTriggerRenderer } from "./on_document_indexed";
 import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -13,6 +14,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   onAlertFires: onAlertFiresTriggerRenderer,
+  onDocumentIndexed: onDocumentIndexedTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
