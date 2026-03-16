@@ -1,0 +1,15 @@
+{
+  "data": {
+    "createdAt": "2026-03-12T09:00:00.000Z",
+    "description": "Elevated error rate detected in production.",
+    "id": "3c0a2b10-4e5f-11ee-be56-0242ac120002",
+    "severity": "high",
+    "status": "in-progress",
+    "tags": ["production", "incident"],
+    "title": "Production incident",
+    "updatedAt": "2026-03-12T10:00:00.000Z",
+    "version": "WzE3LDFd"
+  },
+  "timestamp": "2026-03-12T10:00:00Z",
+  "type": "elastic.case.status.changed"
+}

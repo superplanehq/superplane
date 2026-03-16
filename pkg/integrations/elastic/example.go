@@ -56,3 +56,13 @@ var exampleDataOnAlert map[string]any
 func (t *OnAlertFires) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlertOnce, exampleDataOnAlertBytes, &exampleDataOnAlert)
 }
+
+//go:embed example_data_on_case_status_change.json
+var exampleDataOnCaseStatusChangeBytes []byte
+
+var exampleDataOnCaseStatusChangeOnce sync.Once
+var exampleDataOnCaseStatusChange map[string]any
+
+func (t *OnCaseStatusChange) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnCaseStatusChangeOnce, exampleDataOnCaseStatusChangeBytes, &exampleDataOnCaseStatusChange)
+}

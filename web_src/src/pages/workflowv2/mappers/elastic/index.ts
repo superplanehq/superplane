@@ -4,6 +4,7 @@ import { createCaseMapper } from "./create_case";
 import { getCaseMapper } from "./get_case";
 import { updateCaseMapper } from "./update_case";
 import { onAlertFiresTriggerRenderer } from "./on_alert";
+import { onCaseStatusChangeTriggerRenderer } from "./on_case_status_change";
 import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -15,6 +16,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   onAlertFires: onAlertFiresTriggerRenderer,
+  onCaseStatusChange: onCaseStatusChangeTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {

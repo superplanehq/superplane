@@ -135,6 +135,7 @@ func (e *Elastic) Components() []core.Component {
 func (e *Elastic) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnAlertFires{},
+		&OnCaseStatusChange{},
 	}
 }
 
