@@ -232,9 +232,9 @@ func (c *runAgent) Execute(ctx core.ExecutionContext) error {
 		Input: spec.Input,
 	}
 
-	if spec.Preset != "" {
+	if spec.ModelSource == "preset" {
 		req.Preset = spec.Preset
-	} else if spec.Model != "" {
+	} else {
 		req.Model = spec.Model
 	}
 
