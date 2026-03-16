@@ -17,6 +17,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Virtual Machine" href="#create-virtual-machine" description="Creates a new Azure Virtual Machine with the specified configuration" />
   <LinkCard title="Delete Virtual Machine" href="#delete-virtual-machine" description="Deletes an existing Azure Virtual Machine" />
+  <LinkCard title="Stop Virtual Machine" href="#stop-virtual-machine" description="Powers off an Azure Virtual Machine without deallocating" />
+  <LinkCard title="Deallocate Virtual Machine" href="#deallocate-virtual-machine" description="Deallocates an Azure Virtual Machine, releasing compute resources" />
+  <LinkCard title="Restart Virtual Machine" href="#restart-virtual-machine" description="Restarts an Azure Virtual Machine" />
 </CardGrid>
 
 ## Instructions
@@ -208,6 +211,7 @@ The Delete Virtual Machine component deletes an existing Azure VM.
 
 - **Resource Group**: The Azure resource group containing the VM
 - **VM Name**: The name of the virtual machine to delete
+- **Delete Associated Resources**: When enabled, also deletes the VM's OS disk, data disks, network interfaces, and public IPs. Shared resources like virtual networks, subnets, and network security groups are never deleted.
 
 ### Output
 
@@ -220,8 +224,158 @@ Returns the deleted VM information including:
 
 - The VM deletion is a Long-Running Operation (LRO) that typically takes 1-3 minutes
 - The component waits for the VM to be fully deleted before completing
-- Deleting a VM does not delete associated resources (NICs, disks, public IPs)
+- When "Delete Associated Resources" is enabled, Azure cascade-deletes the OS disk, data disks, NICs, and public IPs along with the VM
+- When "Delete Associated Resources" is disabled, only the VM itself is deleted — associated resources remain
 - This operation is irreversible
+
+### Example Output
+
+```json
+{
+  "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+  "name": "my-vm",
+  "resourceGroup": "my-rg"
+}
+```
+
+<a id="stop-virtual-machine"></a>
+
+## Stop Virtual Machine
+
+The Stop Virtual Machine component powers off an existing Azure VM without deallocating it.
+
+### Use Cases
+
+- **Temporary shutdown**: Stop a VM temporarily while keeping its compute allocation
+- **Maintenance windows**: Power off VMs during maintenance periods
+- **Pre-deallocate workflows**: Stop VMs before performing other operations
+
+### How It Works
+
+1. Validates the VM parameters
+2. Initiates VM power-off via the Azure Compute API
+3. Waits for the VM to be fully powered off (using Azure's Long-Running Operation pattern)
+4. Returns the VM details including ID and name
+
+### Configuration
+
+- **Resource Group**: The Azure resource group containing the VM
+- **VM Name**: The name of the virtual machine to stop
+
+### Output
+
+Returns the stopped VM information including:
+- **id**: The Azure resource ID of the VM
+- **name**: The name of the VM
+- **resourceGroup**: The resource group containing the VM
+
+### Notes
+
+- The VM is powered off but compute resources remain allocated — **you still incur compute charges**
+- To fully release compute resources and stop charges, use the "Deallocate Virtual Machine" action
+- The operation is a Long-Running Operation (LRO) that typically takes 1-2 minutes
+- The component waits for the VM to be fully powered off before completing
+
+### Example Output
+
+```json
+{
+  "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+  "name": "my-vm",
+  "resourceGroup": "my-rg"
+}
+```
+
+<a id="deallocate-virtual-machine"></a>
+
+## Deallocate Virtual Machine
+
+The Deallocate Virtual Machine component deallocates an existing Azure VM, stopping it and
+releasing its compute resources.
+
+### Use Cases
+
+- **Cost optimization**: Deallocate VMs to stop compute charges during off-hours
+- **Scheduled shutdown**: Deallocate VMs on a schedule to reduce costs
+- **Pre-resize operations**: Deallocate a VM before changing its size
+- **Environment teardown**: Deallocate VMs without deleting them
+
+### How It Works
+
+1. Validates the VM parameters
+2. Initiates VM deallocation via the Azure Compute API
+3. Waits for the VM to be fully deallocated (using Azure's Long-Running Operation pattern)
+4. Returns the VM details including ID and name
+
+### Configuration
+
+- **Resource Group**: The Azure resource group containing the VM
+- **VM Name**: The name of the virtual machine to deallocate
+
+### Output
+
+Returns the deallocated VM information including:
+- **id**: The Azure resource ID of the VM
+- **name**: The name of the VM
+- **resourceGroup**: The resource group containing the VM
+
+### Notes
+
+- Deallocation stops the VM and releases compute resources — **compute charges stop**
+- Only storage charges remain for the VM's disks
+- Dynamic public IP addresses are released on deallocation
+- The operation is a Long-Running Operation (LRO) that typically takes 1-3 minutes
+- The component waits for the VM to be fully deallocated before completing
+- To power off without releasing compute resources, use the "Stop Virtual Machine" action
+
+### Example Output
+
+```json
+{
+  "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+  "name": "my-vm",
+  "resourceGroup": "my-rg"
+}
+```
+
+<a id="restart-virtual-machine"></a>
+
+## Restart Virtual Machine
+
+The Restart Virtual Machine component restarts an existing Azure VM in place.
+
+### Use Cases
+
+- **Apply updates**: Restart VMs after applying OS or software updates
+- **Troubleshooting**: Restart VMs to recover from transient issues
+- **Configuration changes**: Restart VMs after configuration changes that require a reboot
+- **Automated maintenance**: Restart VMs as part of maintenance workflows
+
+### How It Works
+
+1. Validates the VM parameters
+2. Initiates VM restart via the Azure Compute API
+3. Waits for the VM to be fully restarted (using Azure's Long-Running Operation pattern)
+4. Returns the VM details including ID and name
+
+### Configuration
+
+- **Resource Group**: The Azure resource group containing the VM
+- **VM Name**: The name of the virtual machine to restart
+
+### Output
+
+Returns the restarted VM information including:
+- **id**: The Azure resource ID of the VM
+- **name**: The name of the VM
+- **resourceGroup**: The resource group containing the VM
+
+### Notes
+
+- The VM is rebooted in place — it keeps its compute allocation and IP addresses
+- The operation is a Long-Running Operation (LRO) that typically takes 1-3 minutes
+- The component waits for the VM to be fully restarted before completing
+- This performs a graceful restart of the VM
 
 ### Example Output
 
