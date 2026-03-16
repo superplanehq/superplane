@@ -8,7 +8,6 @@ import (
 )
 
 type Trigger interface {
-
 	/*
 	 * The unique identifier for the trigger.
 	 * This is how nodes reference it, and is used for registration.
@@ -70,7 +69,7 @@ type Trigger interface {
 	Actions() []Action
 
 	/*
-	 * Execution a custom action - defined in Actions() for a trigger.
+	 * Execute a custom action - defined in Actions() for a trigger.
 	 */
 	HandleAction(ctx TriggerActionContext) (map[string]any, error)
 
