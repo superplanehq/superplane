@@ -407,6 +407,7 @@ message UpdateCanvasResponse {
 
 message CreateCanvasRequest {
   Canvas canvas = 1;
+  CanvasAutoLayout auto_layout = 2;
 }
 
 message CreateCanvasResponse {

@@ -178,7 +178,7 @@ func (c *changeRequestCreateCommand) Execute(ctx core.CommandContext) error {
 			return err
 		}
 		if !versioningContext.versioningEnabled {
-			return fmt.Errorf("effective canvas versioning is disabled for this canvas")
+			return fmt.Errorf("effective canvas versioning is disabled for this canvas; use `superplane canvases update` without --draft to update the live canvas directly")
 		}
 
 		versionID, err = findCurrentUserDraftVersionID(ctx, canvasID)

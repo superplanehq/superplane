@@ -2994,6 +2994,7 @@ export function WorkflowPageV2() {
 
       const existingNodeNames = (canvas.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
       const newNodes: ComponentsNode[] = [];
+      const nodeIdMap: Record<string, string> = {};
 
       for (const nodeId of nodeIds) {
         const nodeToDuplicate = canvas.spec?.nodes?.find((node) => node.id === nodeId);
@@ -3017,6 +3018,8 @@ export function WorkflowPageV2() {
         const uniqueNodeName = generateUniqueNodeName(baseName, allNames);
         const newNodeId = generateNodeId(baseName, uniqueNodeName);
 
+        nodeIdMap[nodeId] = newNodeId;
+
         newNodes.push({
           ...nodeToDuplicate,
           id: newNodeId,
@@ -3031,11 +3034,27 @@ export function WorkflowPageV2() {
 
       if (newNodes.length === 0) return;
 
+      const duplicatedNodeIds = new Set(nodeIds);
+      const newEdges = (canvas.spec?.edges || [])
+        .filter(
+          (edge) =>
+            edge.sourceId != null &&
+            edge.targetId != null &&
+            duplicatedNodeIds.has(edge.sourceId) &&
+            duplicatedNodeIds.has(edge.targetId),
+        )
+        .map((edge) => ({
+          ...edge,
+          sourceId: nodeIdMap[edge.sourceId!],
+          targetId: nodeIdMap[edge.targetId!],
+        }));
+
       const updatedWorkflow = {
         ...canvas,
         spec: {
           ...canvas.spec,
           nodes: [...(canvas.spec?.nodes || []), ...newNodes],
+          edges: [...(canvas.spec?.edges || []), ...newEdges],
         },
       };
 

@@ -2,6 +2,9 @@ package canvases
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -18,18 +21,47 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	nodeIDMaxLen          = 128
+	readdedNodeIDSuffix   = "-readded-"
+	readdedNodeIDHashSize = 16
+)
+
+func readdedNodeID(workflowID uuid.UUID, originalNodeID string) string {
+	return readdedNodeIDWithAttempt(workflowID, originalNodeID, 0)
+}
+
+func readdedNodeIDWithAttempt(workflowID uuid.UUID, originalNodeID string, attempt int) string {
+	sum := sha256.Sum256([]byte(workflowID.String() + "\x00" + originalNodeID + "\x00" + fmt.Sprintf("%d", attempt)))
+	hash := hex.EncodeToString(sum[:])[:readdedNodeIDHashSize]
+
+	available := nodeIDMaxLen - len(readdedNodeIDSuffix) - len(hash)
+	base := originalNodeID
+	if available < 1 {
+		return "readded-" + hash
+	}
+	if len(base) > available {
+		base = base[:available]
+	}
+
+	return base + readdedNodeIDSuffix + hash
+}
+
 // remapNodeIDsForConflicts avoids collisions with soft-deleted workflow_nodes
 // while preserving old node records for historical data.
 func remapNodeIDsForConflicts(
+	workflowID uuid.UUID,
 	nodes []models.Node,
 	edges []models.Edge,
 	existingNodes []models.CanvasNode,
 ) ([]models.Node, []models.Edge, map[string]string) {
 	reservedIDs := make(map[string]bool, len(existingNodes))
 	deletedIDs := make(map[string]bool, len(existingNodes))
+	existingByID := make(map[string]models.CanvasNode, len(existingNodes))
 
 	for _, existing := range existingNodes {
 		reservedIDs[existing.NodeID] = true
+		existingByID[existing.NodeID] = existing
 		if existing.DeletedAt.Valid {
 			deletedIDs[existing.NodeID] = true
 		}
@@ -42,7 +74,28 @@ func remapNodeIDsForConflicts(
 			continue
 		}
 
-		newID := models.GenerateUniqueNodeID(nodes[i], reservedIDs)
+		originalID := nodes[i].ID
+		attempt := 0
+		var newID string
+		for {
+			candidate := readdedNodeIDWithAttempt(workflowID, originalID, attempt)
+
+			if existing, ok := existingByID[candidate]; ok && !existing.DeletedAt.Valid {
+				newID = candidate
+				break
+			}
+			if !reservedIDs[candidate] {
+				newID = candidate
+				break
+			}
+
+			attempt++
+			if attempt > 100 {
+				newID = readdedNodeIDWithAttempt(workflowID, originalID, attempt)
+				break
+			}
+		}
+
 		remappedIDs[nodes[i].ID] = newID
 		nodes[i].ID = newID
 		reservedIDs[newID] = true
@@ -65,27 +118,48 @@ func remapNodeIDsForConflicts(
 }
 
 func findNode(nodes []models.CanvasNode, nodeID string) *models.CanvasNode {
-	for _, node := range nodes {
-		if node.NodeID == nodeID {
-			return &node
+	for i := range nodes {
+		if nodes[i].NodeID == nodeID {
+			return &nodes[i]
 		}
 	}
 	return nil
 }
 
-func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node, workflowID uuid.UUID) (*models.CanvasNode, error) {
+func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node, workflowID uuid.UUID) (*models.CanvasNode, *string, error) {
 	now := time.Now()
 
 	var appInstallationID *uuid.UUID
-	if node.IntegrationID != nil && *node.IntegrationID != "" {
-		parsedID, err := uuid.Parse(*node.IntegrationID)
+	var nodeLevelErrorMessage *string
+	if node.IntegrationID != nil && strings.TrimSpace(*node.IntegrationID) != "" {
+		parsedID, err := uuid.Parse(strings.TrimSpace(*node.IntegrationID))
 		if err != nil {
-			return nil, fmt.Errorf("invalid integration ID: %v", err)
+			msg := "invalid integration id"
+			nodeLevelErrorMessage = &msg
+			appInstallationID = nil
+		} else {
+			appInstallationID = &parsedID
 		}
-		appInstallationID = &parsedID
 	}
 
 	existingNode := findNode(existingNodes, node.ID)
+	if appInstallationID != nil {
+		integration, err := models.FindMaybeDeletedIntegrationInTransaction(tx, *appInstallationID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				msg := "integration not found"
+				nodeLevelErrorMessage = &msg
+				appInstallationID = nil
+			} else {
+				return nil, nil, err
+			}
+		} else if integration.DeletedAt.Valid {
+			msg := "integration is deleted"
+			nodeLevelErrorMessage = &msg
+			appInstallationID = nil
+		}
+	}
+
 	if existingNode != nil {
 		existingNode.Name = node.Name
 		existingNode.Type = node.Type
@@ -95,9 +169,16 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 		existingNode.IsCollapsed = node.IsCollapsed
 		existingNode.AppInstallationID = appInstallationID
 
-		if node.ErrorMessage != nil && *node.ErrorMessage != "" {
+		var specErrorMessage *string
+		if node.ErrorMessage != nil && strings.TrimSpace(*node.ErrorMessage) != "" {
+			specErrorMessage = node.ErrorMessage
+		} else if nodeLevelErrorMessage != nil {
+			specErrorMessage = nodeLevelErrorMessage
+		}
+
+		if specErrorMessage != nil {
 			existingNode.State = models.CanvasNodeStateError
-			existingNode.StateReason = node.ErrorMessage
+			existingNode.StateReason = specErrorMessage
 		} else if existingNode.State == models.CanvasNodeStateError {
 			existingNode.State = models.CanvasNodeStateReady
 			existingNode.StateReason = nil
@@ -111,11 +192,11 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 		}
 
 		existingNode.UpdatedAt = &now
-		if err := tx.Save(&existingNode).Error; err != nil {
-			return nil, err
+		if err := tx.Save(existingNode).Error; err != nil {
+			return nil, nil, err
 		}
 
-		return existingNode, nil
+		return existingNode, nodeLevelErrorMessage, nil
 	}
 
 	var parentNodeID *string
@@ -126,9 +207,12 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 
 	initialState := models.CanvasNodeStateReady
 	var stateReason *string
-	if node.ErrorMessage != nil && *node.ErrorMessage != "" {
+	if node.ErrorMessage != nil && strings.TrimSpace(*node.ErrorMessage) != "" {
 		initialState = models.CanvasNodeStateError
 		stateReason = node.ErrorMessage
+	} else if nodeLevelErrorMessage != nil {
+		initialState = models.CanvasNodeStateError
+		stateReason = nodeLevelErrorMessage
 	}
 
 	canvasNode := models.CanvasNode{
@@ -150,10 +234,10 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 	}
 
 	if err := tx.Create(&canvasNode).Error; err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &canvasNode, nil
+	return &canvasNode, nodeLevelErrorMessage, nil
 }
 
 func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string) error {

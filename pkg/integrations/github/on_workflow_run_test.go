@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -22,6 +23,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", eventType)
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -34,6 +36,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Events:  &contexts.EventContext{},
 			Webhook: &contexts.NodeWebhookContext{},
 		})
@@ -52,6 +55,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    []byte(`{"action":"completed","workflow_run":{"conclusion":"success","path":".github/workflows/ci.yml"}}`),
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 			},
@@ -79,6 +83,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository":  "test",
 				"conclusions": []string{"success"},
@@ -108,6 +113,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository":  "test",
 				"conclusions": []string{"success"},
@@ -137,6 +143,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository":    "test",
 				"workflowFiles": []string{".github/workflows/ci.yml"},
@@ -166,6 +173,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository":    "test",
 				"workflowFiles": []string{".github/workflows/ci.yml"},
@@ -195,6 +203,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 			},
@@ -223,6 +232,7 @@ func Test__OnWorkflowRun__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 			},

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -22,6 +23,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "create")
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -34,6 +36,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Events:  &contexts.EventContext{},
 			Webhook: &contexts.NodeWebhookContext{},
 		})
@@ -52,6 +55,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    []byte(`{"ref":"v1.0.0","ref_type":"tag"}`),
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: OnTagCreatedConfiguration{
 				Repository: "test",
 				Tags: []configuration.Predicate{
@@ -82,6 +86,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: OnTagCreatedConfiguration{
 				Repository: "test",
 				Tags: []configuration.Predicate{
@@ -113,6 +118,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: OnTagCreatedConfiguration{
 				Repository: "test",
 				Tags: []configuration.Predicate{
@@ -144,6 +150,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: OnTagCreatedConfiguration{
 				Repository: "test",
 				Tags: []configuration.Predicate{
@@ -175,6 +182,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: OnTagCreatedConfiguration{
 				Repository: "test",
 				Tags: []configuration.Predicate{
@@ -206,6 +214,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: OnTagCreatedConfiguration{
 				Repository: "test",
 				Tags: []configuration.Predicate{
@@ -237,6 +246,7 @@ func Test__OnTagCreated__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: OnTagCreatedConfiguration{
 				Repository: "test",
 				Tags: []configuration.Predicate{

@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/go-github/v74/github"
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 )
@@ -92,6 +93,15 @@ func sanitizeAssignees(assignees []string) []string {
 	}
 
 	return result
+}
+
+func withWebhookLogger(ctx core.WebhookRequestContext, triggerName string) core.WebhookRequestContext {
+	ctx.Logger = ctx.Logger.WithFields(log.Fields{
+		"gh-id":   ctx.Headers.Get("X-GitHub-Delivery"),
+		"trigger": triggerName,
+	})
+
+	return ctx
 }
 
 func verifySignature(ctx core.WebhookRequestContext) (int, error) {

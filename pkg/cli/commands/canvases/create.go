@@ -2,7 +2,7 @@ package canvases
 
 import (
 	"fmt"
-	"os"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -10,7 +10,10 @@ import (
 )
 
 type createCommand struct {
-	file *string
+	file            *string
+	autoLayout      *string
+	autoLayoutScope *string
+	autoLayoutNodes *[]string
 }
 
 func (c *createCommand) Execute(ctx core.CommandContext) error {
@@ -18,12 +21,24 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 	if c.file != nil {
 		filePath = *c.file
 	}
+	autoLayoutValue := ""
+	if c.autoLayout != nil {
+		autoLayoutValue = strings.TrimSpace(*c.autoLayout)
+	}
+	autoLayoutScopeValue := ""
+	if c.autoLayoutScope != nil {
+		autoLayoutScopeValue = strings.TrimSpace(*c.autoLayoutScope)
+	}
+	autoLayoutNodeIDs := []string{}
+	if c.autoLayoutNodes != nil {
+		autoLayoutNodeIDs = append(autoLayoutNodeIDs, *c.autoLayoutNodes...)
+	}
 
 	if filePath != "" {
 		if len(ctx.Args) > 0 {
 			return fmt.Errorf("cannot use <canvas-name> together with --file")
 		}
-		return c.createFromFile(ctx, filePath)
+		return c.createFromFile(ctx, filePath, autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
 	}
 
 	if len(ctx.Args) != 1 {
@@ -38,40 +53,57 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 		Spec:       models.EmptyCanvasSpec(),
 	}
 
-	canvas := models.CanvasFromCanvas(resource)
-	request := openapi_client.CanvasesCreateCanvasRequest{}
-	request.SetCanvas(canvas)
+	request := models.CreateCanvasRequestFromCanvas(resource)
+	if autoLayoutFlagsWereSet(ctx) {
+		autoLayout, parseErr := parseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
+		if parseErr != nil {
+			return parseErr
+		}
+		if autoLayout != nil {
+			request.SetAutoLayout(*autoLayout)
+		}
+	} else {
+		request.SetAutoLayout(buildDefaultAutoLayout())
+	}
 
 	_, _, err := ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
 	return err
 }
 
-func (c *createCommand) createFromFile(ctx core.CommandContext, path string) error {
-	// #nosec
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("failed to read resource file: %w", err)
-	}
-
-	_, kind, err := core.ParseYamlResourceHeaders(data)
+func (c *createCommand) createFromFile(
+	ctx core.CommandContext,
+	path string,
+	autoLayoutValue string,
+	autoLayoutScopeValue string,
+	autoLayoutNodeIDs []string,
+) error {
+	canvas, fileAutoLayout, err := loadCanvasForCreateFromFile(path)
 	if err != nil {
 		return err
 	}
 
-	switch kind {
-	case models.CanvasKind:
-		resource, err := models.ParseCanvas(data)
-		if err != nil {
-			return err
+	request := openapi_client.CanvasesCreateCanvasRequest{}
+	request.SetCanvas(canvas)
+
+	if autoLayoutFlagsWereSet(ctx) {
+		autoLayout, parseErr := parseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
+		if parseErr != nil {
+			return parseErr
 		}
-
-		canvas := models.CanvasFromCanvas(*resource)
-		request := openapi_client.CanvasesCreateCanvasRequest{}
-		request.SetCanvas(canvas)
-
-		_, _, err = ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
-		return err
-	default:
-		return fmt.Errorf("unsupported resource kind %q", kind)
+		if autoLayout != nil {
+			if fileAutoLayout != nil {
+				return fmt.Errorf("cannot use auto-layout flags with --file when file already defines autoLayout")
+			}
+			request.SetAutoLayout(*autoLayout)
+		}
+	} else {
+		if fileAutoLayout != nil {
+			request.SetAutoLayout(*fileAutoLayout)
+		} else {
+			request.SetAutoLayout(buildDefaultAutoLayout())
+		}
 	}
+
+	_, _, err = ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
+	return err
 }

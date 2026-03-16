@@ -1,0 +1,35 @@
+{
+  "data": {
+    "disk": 25,
+    "id": 557784760,
+    "image": {
+      "id": 220345895,
+      "name": "superplane-1773328904",
+      "slug": ""
+    },
+    "memory": 1024,
+    "name": "superplane-1773328904-s-1vcpu-1gb-nyc3-01",
+    "networks": {
+      "v4": [
+        {
+          "ip_address": "192.0.2.1",
+          "type": "public"
+        },
+        {
+          "ip_address": "10.108.0.3",
+          "type": "private"
+        }
+      ]
+    },
+    "region": {
+      "name": "New York 3",
+      "slug": "nyc3"
+    },
+    "size_slug": "s-1vcpu-1gb",
+    "status": "active",
+    "tags": [],
+    "vcpus": 1
+  },
+  "timestamp": "2026-03-12T21:13:32.946693411Z",
+  "type": "digitalocean.droplet.fetched"
+}
