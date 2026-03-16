@@ -7,6 +7,7 @@ import {
   ViewportPortal,
   useOnSelectionChange,
   useReactFlow,
+  useStore,
   useViewport,
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
@@ -1796,21 +1797,29 @@ function CanvasContent({
 
   const multiSelectedNodeIds = useMemo(() => new Set(multiSelectedNodes.map((n) => n.id)), [multiSelectedNodes]);
 
-  const selectionToolbarFlowPos = useMemo(() => {
-    if (multiSelectedNodeIds.size < 2) return null;
+  const selectionToolbarFlowPos = useStore(
+    useCallback(
+      (store) => {
+        if (multiSelectedNodeIds.size < 2) return null;
 
-    let minY = Infinity;
-    let maxX = -Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
 
-    for (const node of state.nodes) {
-      if (!multiSelectedNodeIds.has(node.id)) continue;
-      const w = node.measured?.width ?? node.width ?? 240;
-      if (node.position.y < minY) minY = node.position.y;
-      if (node.position.x + w > maxX) maxX = node.position.x + w;
-    }
+        for (const id of multiSelectedNodeIds) {
+          const node = store.nodeLookup.get(id);
+          if (!node) continue;
+          const w = node.measured?.width ?? node.width ?? 240;
+          if (node.position.y < minY) minY = node.position.y;
+          if (node.position.x + w > maxX) maxX = node.position.x + w;
+        }
 
-    return { x: maxX, y: minY };
-  }, [multiSelectedNodeIds, state.nodes]);
+        if (minY === Infinity || maxX === -Infinity) return null;
+        return { x: maxX, y: minY };
+      },
+      [multiSelectedNodeIds],
+    ),
+    (a, b) => a?.x === b?.x && a?.y === b?.y,
+  );
 
   useEffect(() => {
     const activeNoteId = getActiveNoteId();
