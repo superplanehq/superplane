@@ -55,7 +55,7 @@ type armNetworkProfile struct {
 }
 
 type armNetworkInterfaceRef struct {
-	ID         string                      `json:"id"`
+	ID         string                       `json:"id"`
 	Properties *armNetworkInterfaceRefProps `json:"properties,omitempty"`
 }
 
@@ -74,7 +74,7 @@ type armOsDisk struct {
 }
 
 type armDataDisk struct {
-	Lun          int               `json:"lun"`
+	Lun          int                `json:"lun"`
 	ManagedDisk  *armManagedDiskRef `json:"managedDisk"`
 	DeleteOption string             `json:"deleteOption"`
 }
@@ -94,7 +94,7 @@ type armNICProperties struct {
 }
 
 type armIPConfiguration struct {
-	Name       string                `json:"name"`
+	Name       string                 `json:"name"`
 	Properties *armIPConfigProperties `json:"properties"`
 }
 
@@ -105,8 +105,8 @@ type armIPConfigProperties struct {
 }
 
 type armPublicIPRef struct {
-	ID         string                `json:"id"`
-	Properties *armPublicIPRefProps  `json:"properties,omitempty"`
+	ID         string               `json:"id"`
+	Properties *armPublicIPRefProps `json:"properties,omitempty"`
 }
 
 type armPublicIPRefProps struct {
@@ -747,7 +747,7 @@ func markNICPublicIPsForDeletion(ctx context.Context, client *armClient, nicID s
 	ipConfigs := make([]map[string]any, len(nic.Properties.IPConfigurations))
 	for i, ipConfig := range nic.Properties.IPConfigurations {
 		ipConfigPatch := map[string]any{
-			"name": ipConfig.Name,
+			"name":       ipConfig.Name,
 			"properties": map[string]any{},
 		}
 
