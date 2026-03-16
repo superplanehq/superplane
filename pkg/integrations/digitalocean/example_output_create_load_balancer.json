@@ -1,0 +1,26 @@
+{
+  "data": {
+    "algorithm": "round_robin",
+    "created_at": "2026-03-13T10:00:00Z",
+    "droplet_ids": [98765432, 98765433],
+    "forwarding_rules": [
+      {
+        "entry_port": 80,
+        "entry_protocol": "http",
+        "target_port": 80,
+        "target_protocol": "http"
+      }
+    ],
+    "id": "4de7ac8b-495b-4884-9a69-1050c6793cd6",
+    "ip": "104.131.186.241",
+    "name": "my-load-balancer",
+    "region": {
+      "name": "New York 3",
+      "slug": "nyc3"
+    },
+    "status": "active",
+    "tag": ""
+  },
+  "timestamp": "2026-03-13T10:01:15.000000000Z",
+  "type": "digitalocean.loadbalancer.created"
+}

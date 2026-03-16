@@ -1,0 +1,14 @@
+{
+  "data": {
+    "completed_at": "2026-03-13T10:10:05Z",
+    "id": 2048576123,
+    "region_slug": "nyc3",
+    "resource_id": 2335912909,
+    "resource_type": "floating_ip",
+    "started_at": "2026-03-13T10:10:00Z",
+    "status": "completed",
+    "type": "assign_ip"
+  },
+  "timestamp": "2026-03-13T10:10:08.000000000Z",
+  "type": "digitalocean.reservedip.assign"
+}

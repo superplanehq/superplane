@@ -96,3 +96,33 @@ var exampleOutputUpsertDNSRecord map[string]any
 func (u *UpsertDNSRecord) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpsertDNSRecordOnce, exampleOutputUpsertDNSRecordBytes, &exampleOutputUpsertDNSRecord)
 }
+
+//go:embed example_output_create_load_balancer.json
+var exampleOutputCreateLoadBalancerBytes []byte
+
+var exampleOutputCreateLoadBalancerOnce sync.Once
+var exampleOutputCreateLoadBalancer map[string]any
+
+func (c *CreateLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateLoadBalancerOnce, exampleOutputCreateLoadBalancerBytes, &exampleOutputCreateLoadBalancer)
+}
+
+//go:embed example_output_delete_load_balancer.json
+var exampleOutputDeleteLoadBalancerBytes []byte
+
+var exampleOutputDeleteLoadBalancerOnce sync.Once
+var exampleOutputDeleteLoadBalancer map[string]any
+
+func (d *DeleteLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteLoadBalancerOnce, exampleOutputDeleteLoadBalancerBytes, &exampleOutputDeleteLoadBalancer)
+}
+
+//go:embed example_output_assign_reserved_ip.json
+var exampleOutputAssignReservedIPBytes []byte
+
+var exampleOutputAssignReservedIPOnce sync.Once
+var exampleOutputAssignReservedIP map[string]any
+
+func (a *AssignReservedIP) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAssignReservedIPOnce, exampleOutputAssignReservedIPBytes, &exampleOutputAssignReservedIP)
+}
