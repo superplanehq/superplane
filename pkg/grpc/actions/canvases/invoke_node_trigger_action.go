@@ -53,7 +53,7 @@ func InvokeNodeTriggerAction(
 		return nil, status.Error(codes.InvalidArgument, "node is not a trigger node")
 	}
 
-	trigger, err := registry.GetTrigger(node.Ref.Data().Trigger.Name)
+	trigger, err := registry.GetTrigger(canvas.OrganizationID.String(), node.Ref.Data().Trigger.Name)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "trigger not found: %v", err)
 	}

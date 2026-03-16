@@ -143,12 +143,17 @@ func (w *NodeRequestWorker) invokeNodeAction(tx *gorm.DB, request *models.Canvas
 }
 
 func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
+	canvas, err := models.FindUnscopedCanvas(node.WorkflowID)
+	if err != nil {
+		return err
+	}
+
 	nodeRef := node.Ref.Data()
 	if nodeRef.Trigger == nil {
 		return fmt.Errorf("node %s is not a trigger", node.NodeID)
 	}
 
-	trigger, err := w.registry.GetTrigger(nodeRef.Trigger.Name)
+	trigger, err := w.registry.GetTrigger(canvas.OrganizationID.String(), nodeRef.Trigger.Name)
 	if err != nil {
 		return fmt.Errorf("trigger not found: %w", err)
 	}
@@ -212,7 +217,12 @@ func (w *NodeRequestWorker) invokeNodeComponentAction(tx *gorm.DB, request *mode
 		return fmt.Errorf("node %s is not a component", node.NodeID)
 	}
 
-	component, err := w.registry.GetComponent(nodeRef.Component.Name)
+	canvas, err := models.FindUnscopedCanvas(node.WorkflowID)
+	if err != nil {
+		return err
+	}
+
+	component, err := w.registry.GetComponent(canvas.OrganizationID.String(), nodeRef.Component.Name)
 	if err != nil {
 		return fmt.Errorf("component not found: %w", err)
 	}
@@ -292,7 +302,12 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(
 		return fmt.Errorf("node not found: %w", err)
 	}
 
-	component, err := w.registry.GetComponent(node.Ref.Data().Component.Name)
+	canvas, err := models.FindUnscopedCanvas(node.WorkflowID)
+	if err != nil {
+		return err
+	}
+
+	component, err := w.registry.GetComponent(canvas.OrganizationID.String(), node.Ref.Data().Component.Name)
 	if err != nil {
 		return fmt.Errorf("component not found: %w", err)
 	}
@@ -378,7 +393,12 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(
 		return fmt.Errorf("node not found: %w", err)
 	}
 
-	component, err := w.registry.GetComponent(childNode.Ref.Component.Name)
+	canvas, err := models.FindUnscopedCanvas(execution.WorkflowID)
+	if err != nil {
+		return err
+	}
+
+	component, err := w.registry.GetComponent(canvas.OrganizationID.String(), childNode.Ref.Component.Name)
 	if err != nil {
 		return fmt.Errorf("component not found: %w", err)
 	}

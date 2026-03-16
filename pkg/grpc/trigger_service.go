@@ -23,5 +23,6 @@ func (s *TriggerService) ListTriggers(ctx context.Context, req *pb.ListTriggersR
 }
 
 func (s *TriggerService) DescribeTrigger(ctx context.Context, req *pb.DescribeTriggerRequest) (*pb.DescribeTriggerResponse, error) {
-	return triggers.DescribeTrigger(ctx, s.registry, req.Name)
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return triggers.DescribeTrigger(ctx, s.registry, organizationID, req.Name)
 }

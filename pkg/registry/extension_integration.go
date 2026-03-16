@@ -1,6 +1,8 @@
 package registry
 
 import (
+	"fmt"
+
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/extensions"
@@ -10,8 +12,8 @@ type ExtensionIntegration struct {
 	manifest extensions.IntegrationManifest
 }
 
-func NewExtensionIntegration(manifest extensions.IntegrationManifest) ExtensionIntegration {
-	return ExtensionIntegration{manifest: manifest}
+func NewExtensionIntegration(manifest extensions.IntegrationManifest) *ExtensionIntegration {
+	return &ExtensionIntegration{manifest: manifest}
 }
 
 func (s *ExtensionIntegration) Name() string {
@@ -35,13 +37,11 @@ func (s *ExtensionIntegration) Instructions() string {
 }
 
 func (s *ExtensionIntegration) Configuration() []configuration.Field {
-	// return s.manifest.Configuration
-	return nil
+	return s.manifest.Configuration
 }
 
 func (s *ExtensionIntegration) Actions() []core.Action {
-	// return s.manifest.Actions
-	return nil
+	return s.manifest.Actions
 }
 
 func (s *ExtensionIntegration) Components() []core.Component {
@@ -53,19 +53,19 @@ func (s *ExtensionIntegration) Triggers() []core.Trigger {
 }
 
 func (s *ExtensionIntegration) Sync(ctx core.SyncContext) (err error) {
-	return nil
+	return fmt.Errorf("not implemented")
 }
 
 func (s *ExtensionIntegration) Cleanup(ctx core.IntegrationCleanupContext) (err error) {
-	return nil
+	return fmt.Errorf("not implemented")
 }
 
 func (s *ExtensionIntegration) HandleAction(ctx core.IntegrationActionContext) (err error) {
-	return nil
+	return fmt.Errorf("not implemented")
 }
 
 func (s *ExtensionIntegration) ListResources(resourceType string, ctx core.ListResourcesContext) (resources []core.IntegrationResource, err error) {
-	return nil, nil
+	return nil, fmt.Errorf("not implemented")
 }
 
 func (s *ExtensionIntegration) HandleRequest(ctx core.HTTPRequestContext) {

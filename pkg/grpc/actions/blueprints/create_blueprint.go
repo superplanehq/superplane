@@ -29,12 +29,12 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 		return nil, err
 	}
 
-	outputChannels, err := ParseOutputChannels(registry, blueprint.Nodes, blueprint.OutputChannels)
+	outputChannels, err := ParseOutputChannels(registry, organizationID, blueprint.Nodes, blueprint.OutputChannels)
 	if err != nil {
 		return nil, err
 	}
 
-	nodes = validateAndMarkNodeErrors(nodes, registry)
+	nodes = validateAndMarkNodeErrors(nodes, organizationID, registry)
 
 	configuration, err := ProtoToConfiguration(blueprint.Configuration)
 	if err != nil {
@@ -75,7 +75,7 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 	}, nil
 }
 
-func ParseOutputChannels(registry *registry.Registry, nodes []*componentpb.Node, outputChannels []*pb.OutputChannel) ([]models.BlueprintOutputChannel, error) {
+func ParseOutputChannels(registry *registry.Registry, organizationID string, nodes []*componentpb.Node, outputChannels []*pb.OutputChannel) ([]models.BlueprintOutputChannel, error) {
 	channels := []models.BlueprintOutputChannel{}
 	for _, outputChannel := range outputChannels {
 		if outputChannel.Name == "" {
@@ -90,7 +90,7 @@ func ParseOutputChannels(registry *registry.Registry, nodes []*componentpb.Node,
 			return nil, fmt.Errorf("output channel node output channel is required")
 		}
 
-		err := validateOutputChannelReference(registry, nodes, outputChannel)
+		err := validateOutputChannelReference(registry, organizationID, nodes, outputChannel)
 		if err != nil {
 			return nil, err
 		}
@@ -105,7 +105,7 @@ func ParseOutputChannels(registry *registry.Registry, nodes []*componentpb.Node,
 	return channels, nil
 }
 
-func validateOutputChannelReference(registry *registry.Registry, nodes []*componentpb.Node, outputChannel *pb.OutputChannel) error {
+func validateOutputChannelReference(registry *registry.Registry, organizationID string, nodes []*componentpb.Node, outputChannel *pb.OutputChannel) error {
 	//
 	// Check if the node referenced exists
 	//
@@ -117,7 +117,7 @@ func validateOutputChannelReference(registry *registry.Registry, nodes []*compon
 	//
 	// Check if the node has the output channel referenced
 	//
-	component, err := registry.GetComponent(node.Component.Name)
+	component, err := registry.GetComponent(organizationID, node.Component.Name)
 	if err != nil {
 		return err
 	}

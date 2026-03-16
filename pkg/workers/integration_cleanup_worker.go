@@ -90,7 +90,7 @@ func (w *IntegrationCleanupWorker) processIntegration(tx *gorm.DB, integration *
 	}
 
 	w.log("Cleaning up app installation %s", integration.ID)
-	impl, err := w.registry.GetIntegration(integration.AppName)
+	impl, err := w.registry.GetIntegration(integration.OrganizationID.String(), integration.AppName)
 	if err != nil {
 		return err
 	}

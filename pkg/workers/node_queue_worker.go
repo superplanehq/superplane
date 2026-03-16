@@ -224,7 +224,12 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 	logger = logging.WithQueueItem(logger, *queueItem)
 	logger.Info("Processing queue item")
 
-	configFields, err := w.configurationFieldsForNode(tx, node)
+	canvas, err := models.FindUnscopedCanvas(node.WorkflowID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	configFields, err := w.configurationFieldsForNode(tx, canvas.OrganizationID.String(), node)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -265,7 +270,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		 * For component nodes, delegate to the component's ProcessQueueItem implementation to handle
 		 * the processing.
 		 */
-		executionID, err = w.processComponentNode(ctx, node)
+		executionID, err = w.processComponentNode(ctx, canvas.OrganizationID.String(), node)
 	case models.NodeTypeBlueprint:
 		/*
 		 * For blueprint nodes, use the default processing logic.
@@ -279,7 +284,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 	return []*uuid.UUID{executionID}, queueItem, err
 }
 
-func (w *NodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *models.CanvasNode) ([]configuration.Field, error) {
+func (w *NodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, organizationID string, node *models.CanvasNode) ([]configuration.Field, error) {
 	ref := node.Ref.Data()
 	switch node.Type {
 	case models.NodeTypeComponent:
@@ -287,7 +292,7 @@ func (w *NodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *models.C
 			return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
 		}
 
-		comp, err := w.registry.GetComponent(ref.Component.Name)
+		comp, err := w.registry.GetComponent(organizationID, ref.Component.Name)
 		if err != nil {
 			return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
 		}
@@ -309,14 +314,14 @@ func (w *NodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *models.C
 	}
 }
 
-func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, node *models.CanvasNode) (*uuid.UUID, error) {
+func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, organizationID string, node *models.CanvasNode) (*uuid.UUID, error) {
 	ref := node.Ref.Data()
 
 	if ref.Component == nil || ref.Component.Name == "" {
 		return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
 	}
 
-	comp, err := w.registry.GetComponent(ref.Component.Name)
+	comp, err := w.registry.GetComponent(organizationID, ref.Component.Name)
 	if err != nil {
 		return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
 	}

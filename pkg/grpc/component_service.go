@@ -23,9 +23,11 @@ func (s *ComponentService) ListComponents(ctx context.Context, req *pb.ListCompo
 }
 
 func (s *ComponentService) DescribeComponent(ctx context.Context, req *pb.DescribeComponentRequest) (*pb.DescribeComponentResponse, error) {
-	return components.DescribeComponent(ctx, s.registry, req.Name)
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return components.DescribeComponent(ctx, s.registry, organizationID, req.Name)
 }
 
 func (s *ComponentService) ListComponentActions(ctx context.Context, req *pb.ListComponentActionsRequest) (*pb.ListComponentActionsResponse, error) {
-	return components.ListComponentActions(ctx, s.registry, req.Name)
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return components.ListComponentActions(ctx, s.registry, organizationID, req.Name)
 }

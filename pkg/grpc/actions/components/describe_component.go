@@ -10,8 +10,8 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func DescribeComponent(ctx context.Context, registry *registry.Registry, name string) (*pb.DescribeComponentResponse, error) {
-	component, err := registry.GetComponent(name)
+func DescribeComponent(ctx context.Context, registry *registry.Registry, organizationID string, name string) (*pb.DescribeComponentResponse, error) {
+	component, err := registry.GetComponent(organizationID, name)
 	if err != nil {
 		return nil, err
 	}

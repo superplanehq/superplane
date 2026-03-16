@@ -114,7 +114,7 @@ func SendAiMessage(
 		return nil, status.Error(codes.Internal, "failed to decrypt organization ai key")
 	}
 
-	plan, err := generateCanvasAIPlan(ctx, registry, string(apiKeyBytes), req)
+	plan, err := generateCanvasAIPlan(ctx, registry, organizationID, string(apiKeyBytes), req)
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, "failed to generate ai response")
 	}
@@ -137,6 +137,7 @@ func SendAiMessage(
 func generateCanvasAIPlan(
 	ctx context.Context,
 	registry *registry.Registry,
+	organizationID string,
 	apiKey string,
 	req *pb.SendAiMessageRequest,
 ) (*openAICanvasPlan, error) {
@@ -182,6 +183,7 @@ func generateCanvasAIPlan(
 
 		additionalContext, contextErr := buildRequestedCanvasContextData(
 			registry,
+			organizationID,
 			req.GetCanvasId(),
 			req.GetCanvasContext(),
 			contextRequests,
@@ -619,6 +621,7 @@ func messageMentionsAnyBlockAlias(normalizedMessage string, aliases []string) bo
 
 func buildRequestedCanvasContextData(
 	registry *registry.Registry,
+	organizationID string,
 	canvasID string,
 	canvasContext *pb.CanvasAiContext,
 	requests []openAICanvasContextReq,
@@ -745,7 +748,7 @@ func buildRequestedCanvasContextData(
 					} else if node.Type == models.NodeTypeTrigger {
 						schemaType = "trigger"
 					}
-					schemaData, schemaErr := loadBlockSchemaFromRegistry(registry, blockName, schemaType)
+					schemaData, schemaErr := loadBlockSchemaFromRegistry(registry, organizationID, blockName, schemaType)
 					if schemaErr != nil {
 						errorMessages = append(errorMessages, fmt.Sprintf("block_schema(%s): %s", blockName, schemaErr.Error()))
 					} else if schemaData != nil {
@@ -753,7 +756,7 @@ func buildRequestedCanvasContextData(
 					}
 				}
 				if _, exists := blockExampleOutputs[blockName]; !exists {
-					exampleOutput, exampleErr := loadBlockExampleOutputFromRegistry(registry, blockName, "")
+					exampleOutput, exampleErr := loadBlockExampleOutputFromRegistry(registry, organizationID, blockName, "")
 					if exampleErr != nil {
 						errorMessages = append(errorMessages, fmt.Sprintf("block_example_output(%s): %s", blockName, exampleErr.Error()))
 					} else if exampleOutput != nil {
@@ -770,7 +773,7 @@ func buildRequestedCanvasContextData(
 				continue
 			}
 
-			schemaData, schemaErr := loadBlockSchemaFromRegistry(registry, blockName, strings.TrimSpace(req.BlockType))
+			schemaData, schemaErr := loadBlockSchemaFromRegistry(registry, organizationID, blockName, strings.TrimSpace(req.BlockType))
 			if schemaErr != nil {
 				errorMessages = append(errorMessages, fmt.Sprintf("block_schema(%s): %s", blockName, schemaErr.Error()))
 				continue
@@ -787,7 +790,7 @@ func buildRequestedCanvasContextData(
 				continue
 			}
 
-			exampleOutput, exampleErr := loadBlockExampleOutputFromRegistry(registry, blockName, strings.TrimSpace(req.BlockType))
+			exampleOutput, exampleErr := loadBlockExampleOutputFromRegistry(registry, organizationID, blockName, strings.TrimSpace(req.BlockType))
 			if exampleErr != nil {
 				errorMessages = append(errorMessages, fmt.Sprintf("block_example_output(%s): %s", blockName, exampleErr.Error()))
 				continue
@@ -835,6 +838,7 @@ func buildRequestedCanvasContextData(
 
 func loadBlockSchemaFromRegistry(
 	registry *registry.Registry,
+	organizationID string,
 	blockName string,
 	blockType string,
 ) (map[string]any, error) {
@@ -846,7 +850,7 @@ func loadBlockSchemaFromRegistry(
 	kind := strings.TrimSpace(strings.ToLower(blockType))
 	switch kind {
 	case "component":
-		component, err := registry.GetComponent(name)
+		component, err := registry.GetComponent(organizationID, name)
 		if err != nil {
 			return nil, err
 		}
@@ -857,7 +861,7 @@ func loadBlockSchemaFromRegistry(
 			"outputChannels": component.OutputChannels(nil),
 		}, nil
 	case "trigger":
-		trigger, err := registry.GetTrigger(name)
+		trigger, err := registry.GetTrigger(organizationID, name)
 		if err != nil {
 			return nil, err
 		}
@@ -867,7 +871,7 @@ func loadBlockSchemaFromRegistry(
 			"configuration": trigger.Configuration(),
 		}, nil
 	default:
-		component, componentErr := registry.GetComponent(name)
+		component, componentErr := registry.GetComponent(organizationID, name)
 		if componentErr == nil {
 			return map[string]any{
 				"type":           "component",
@@ -877,7 +881,7 @@ func loadBlockSchemaFromRegistry(
 			}, nil
 		}
 
-		trigger, triggerErr := registry.GetTrigger(name)
+		trigger, triggerErr := registry.GetTrigger(organizationID, name)
 		if triggerErr == nil {
 			return map[string]any{
 				"type":          "trigger",
@@ -892,6 +896,7 @@ func loadBlockSchemaFromRegistry(
 
 func loadBlockExampleOutputFromRegistry(
 	registry *registry.Registry,
+	organizationID string,
 	blockName string,
 	blockType string,
 ) (map[string]any, error) {
@@ -903,7 +908,7 @@ func loadBlockExampleOutputFromRegistry(
 	kind := strings.TrimSpace(strings.ToLower(blockType))
 	switch kind {
 	case "component":
-		component, err := registry.GetComponent(name)
+		component, err := registry.GetComponent(organizationID, name)
 		if err != nil {
 			return nil, err
 		}
@@ -913,7 +918,7 @@ func loadBlockExampleOutputFromRegistry(
 			"exampleOutput": component.ExampleOutput(),
 		}, nil
 	case "trigger":
-		trigger, err := registry.GetTrigger(name)
+		trigger, err := registry.GetTrigger(organizationID, name)
 		if err != nil {
 			return nil, err
 		}
@@ -923,7 +928,7 @@ func loadBlockExampleOutputFromRegistry(
 			"exampleOutput": trigger.ExampleData(),
 		}, nil
 	default:
-		component, componentErr := registry.GetComponent(name)
+		component, componentErr := registry.GetComponent(organizationID, name)
 		if componentErr == nil {
 			return map[string]any{
 				"type":          "component",
@@ -932,7 +937,7 @@ func loadBlockExampleOutputFromRegistry(
 			}, nil
 		}
 
-		trigger, triggerErr := registry.GetTrigger(name)
+		trigger, triggerErr := registry.GetTrigger(organizationID, name)
 		if triggerErr == nil {
 			return map[string]any{
 				"type":          "trigger",

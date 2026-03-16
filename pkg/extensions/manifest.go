@@ -9,6 +9,7 @@ import (
 	"io"
 	"path"
 
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -19,55 +20,37 @@ type Manifest struct {
 }
 
 type IntegrationManifest struct {
-	Name          string   `json:"name"`
-	Label         string   `json:"label"`
-	Icon          string   `json:"icon"`
-	Description   string   `json:"description"`
-	Instructions  string   `json:"instructions,omitempty"`
-	ResourceTypes []string `json:"resourceTypes"`
-
-	// TODO: should use []configuration.Field
-	Configuration []map[string]any `json:"configuration"`
-
-	// TODO: should use []core.Action
-	Actions []Action `json:"actions"`
+	Name          string                `json:"name"`
+	Label         string                `json:"label"`
+	Icon          string                `json:"icon"`
+	Description   string                `json:"description"`
+	Instructions  string                `json:"instructions,omitempty"`
+	ResourceTypes []string              `json:"resourceTypes"`
+	Configuration []configuration.Field `json:"configuration"`
+	Actions       []core.Action         `json:"actions"`
 }
 
 type ComponentManifest struct {
-	Name           string               `json:"name"`
-	Integration    string               `json:"integration,omitempty"`
-	Label          string               `json:"label"`
-	Description    string               `json:"description"`
-	Icon           string               `json:"icon"`
-	Color          string               `json:"color"`
-	OutputChannels []core.OutputChannel `json:"outputChannels"`
-
-	// TODO: should use []configuration.Field
-	Configuration []map[string]any `json:"configuration"`
-
-	// TODO: should use []core.Action
-	Actions []Action `json:"actions"`
+	Name           string                `json:"name"`
+	Integration    string                `json:"integration,omitempty"`
+	Label          string                `json:"label"`
+	Description    string                `json:"description"`
+	Icon           string                `json:"icon"`
+	Color          string                `json:"color"`
+	OutputChannels []core.OutputChannel  `json:"outputChannels"`
+	Configuration  []configuration.Field `json:"configuration"`
+	Actions        []core.Action         `json:"actions"`
 }
 
 type TriggerManifest struct {
-	Name        string `json:"name"`
-	Integration string `json:"integration,omitempty"`
-	Label       string `json:"label"`
-	Description string `json:"description"`
-	Icon        string `json:"icon"`
-	Color       string `json:"color"`
-
-	// TODO: should use []configuration.Field
-	Configuration []map[string]any `json:"configuration"`
-
-	// TODO: should use []core.Action
-	Actions []Action `json:"actions"`
-}
-
-type Action struct {
-	Name        string           `json:"name"`
-	Description string           `json:"description"`
-	Parameters  []map[string]any `json:"parameters"`
+	Name          string                `json:"name"`
+	Integration   string                `json:"integration,omitempty"`
+	Label         string                `json:"label"`
+	Description   string                `json:"description"`
+	Icon          string                `json:"icon"`
+	Color         string                `json:"color"`
+	Configuration []configuration.Field `json:"configuration"`
+	Actions       []core.Action         `json:"actions"`
 }
 
 type BundleFiles struct {

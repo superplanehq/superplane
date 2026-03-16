@@ -139,7 +139,23 @@ func (r *Registry) ListTriggers() []core.Trigger {
 	return triggers
 }
 
-func (r *Registry) GetTrigger(name string) (core.Trigger, error) {
+func (r *Registry) GetTrigger(organizationID string, name string) (core.Trigger, error) {
+	trigger, err := r.getTriggerFromCore(organizationID, name)
+	if err == nil {
+		return trigger, nil
+	}
+
+	triggers := r.Storage.ListTriggers(organizationID)
+	for _, trigger := range triggers {
+		if trigger.Name == name {
+			return NewExtensionTrigger(trigger), nil
+		}
+	}
+
+	return nil, fmt.Errorf("trigger %s not found", name)
+}
+
+func (r *Registry) getTriggerFromCore(organizationID string, name string) (core.Trigger, error) {
 	parts := strings.SplitN(name, ".", 2)
 	if len(parts) > 2 {
 		return nil, fmt.Errorf("invalid trigger name: %s", name)
@@ -150,11 +166,10 @@ func (r *Registry) GetTrigger(name string) (core.Trigger, error) {
 		if !ok {
 			return nil, fmt.Errorf("trigger %s not registered", name)
 		}
-
 		return trigger, nil
 	}
 
-	return r.GetIntegrationTrigger(parts[0], name)
+	return r.GetIntegrationTrigger(organizationID, parts[0], name)
 }
 
 func (r *Registry) ListComponents() []core.Component {
@@ -192,7 +207,23 @@ func (r *Registry) ListTriggersForOrganization(organizationID string) []core.Tri
 	return triggers
 }
 
-func (r *Registry) GetComponent(name string) (core.Component, error) {
+func (r *Registry) GetComponent(organizationID string, name string) (core.Component, error) {
+	component, err := r.getComponentFromCore(organizationID, name)
+	if err == nil {
+		return component, nil
+	}
+
+	components := r.Storage.ListComponents(organizationID)
+	for _, component := range components {
+		if component.Name == name {
+			return NewExtensionComponent(component), nil
+		}
+	}
+
+	return nil, fmt.Errorf("component %s not found", name)
+}
+
+func (r *Registry) getComponentFromCore(organizationID string, name string) (core.Component, error) {
 	parts := strings.SplitN(name, ".", 2)
 	if len(parts) > 2 {
 		return nil, fmt.Errorf("invalid component name: %s", name)
@@ -207,7 +238,7 @@ func (r *Registry) GetComponent(name string) (core.Component, error) {
 		return component, nil
 	}
 
-	return r.GetIntegrationComponent(parts[0], name)
+	return r.GetIntegrationComponent(organizationID, parts[0], name)
 }
 
 func (r *Registry) GetWidget(name string) (core.Widget, error) {
@@ -233,18 +264,26 @@ func (r *Registry) ListWidgets() []core.Widget {
 	return widgets
 }
 
-func (r *Registry) GetIntegration(name string) (core.Integration, error) {
+func (r *Registry) GetIntegration(organizationID string, name string) (core.Integration, error) {
 	integration, ok := r.Integrations[name]
-	if !ok {
-		return nil, fmt.Errorf("integration %s not registered", name)
+	if ok {
+		return integration, nil
 	}
 
-	return integration, nil
+	integrations := r.Storage.ListIntegrations(organizationID)
+	for _, integration := range integrations {
+		if integration.Name == name {
+			return NewExtensionIntegration(integration), nil
+		}
+	}
+
+	return nil, fmt.Errorf("integration %s not found", name)
 }
 
+// TODO: we need to consider webhook handlers from extensions too
 func (r *Registry) GetWebhookHandler(name string) (core.WebhookHandler, error) {
 	webhookHandler, ok := r.WebhookHandlers[name]
-	if !ok {
+	if ok {
 		return nil, fmt.Errorf("webhook handler %s not registered", name)
 	}
 
@@ -275,8 +314,8 @@ func (r *Registry) ListIntegrationsForOrganization(organizationID string) []core
 	return integrations
 }
 
-func (r *Registry) GetIntegrationTrigger(appName, triggerName string) (core.Trigger, error) {
-	integration, err := r.GetIntegration(appName)
+func (r *Registry) GetIntegrationTrigger(organizationID string, appName, triggerName string) (core.Trigger, error) {
+	integration, err := r.GetIntegration(organizationID, appName)
 	if err != nil {
 		return nil, err
 	}
@@ -290,8 +329,8 @@ func (r *Registry) GetIntegrationTrigger(appName, triggerName string) (core.Trig
 	return nil, fmt.Errorf("trigger %s not found for integration %s", triggerName, appName)
 }
 
-func (r *Registry) GetIntegrationComponent(appName, componentName string) (core.Component, error) {
-	integration, err := r.GetIntegration(appName)
+func (r *Registry) GetIntegrationComponent(organizationID string, appName, componentName string) (core.Component, error) {
+	integration, err := r.GetIntegration(organizationID, appName)
 	if err != nil {
 		return nil, err
 	}

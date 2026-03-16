@@ -10,9 +10,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-func ValidateNodeConfigurations(nodes []models.Node, registry *registry.Registry) error {
+func ValidateNodeConfigurations(nodes []models.Node, organizationID string, registry *registry.Registry) error {
 	for _, node := range nodes {
-		if err := ValidateNodeConfiguration(node, registry); err != nil {
+		if err := ValidateNodeConfiguration(node, organizationID, registry); err != nil {
 			return err
 		}
 	}
@@ -20,7 +20,7 @@ func ValidateNodeConfigurations(nodes []models.Node, registry *registry.Registry
 	return nil
 }
 
-func validateAndMarkNodeErrors(nodes []models.Node, registry *registry.Registry) []models.Node {
+func validateAndMarkNodeErrors(nodes []models.Node, organizationID string, registry *registry.Registry) []models.Node {
 	result := make([]models.Node, len(nodes))
 
 	for i, node := range nodes {
@@ -30,7 +30,7 @@ func validateAndMarkNodeErrors(nodes []models.Node, registry *registry.Registry)
 			continue
 		}
 
-		if err := ValidateNodeConfiguration(node, registry); err != nil {
+		if err := ValidateNodeConfiguration(node, organizationID, registry); err != nil {
 			errorMsg := err.Error()
 			result[i].ErrorMessage = &errorMsg
 		} else {
@@ -41,14 +41,14 @@ func validateAndMarkNodeErrors(nodes []models.Node, registry *registry.Registry)
 	return result
 }
 
-func ValidateNodeConfiguration(node models.Node, registry *registry.Registry) error {
+func ValidateNodeConfiguration(node models.Node, organizationID string, registry *registry.Registry) error {
 	switch node.Type {
 	case models.NodeTypeComponent:
 		if node.Ref.Component == nil {
 			return fmt.Errorf("node %s: component is required", node.ID)
 		}
 
-		component, err := registry.GetComponent(node.Ref.Component.Name)
+		component, err := registry.GetComponent(organizationID, node.Ref.Component.Name)
 		if err != nil {
 			return fmt.Errorf("node %s: unknown component %s", node.ID, node.Ref.Component.Name)
 		}

@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -13,8 +14,8 @@ type ExtensionComponent struct {
 	manifest extensions.ComponentManifest
 }
 
-func NewExtensionComponent(manifest extensions.ComponentManifest) ExtensionComponent {
-	return ExtensionComponent{manifest: manifest}
+func NewExtensionComponent(manifest extensions.ComponentManifest) *ExtensionComponent {
+	return &ExtensionComponent{manifest: manifest}
 }
 
 func (s *ExtensionComponent) Name() string {
@@ -46,13 +47,11 @@ func (s *ExtensionComponent) ExampleOutput() map[string]any {
 }
 
 func (s *ExtensionComponent) Configuration() []configuration.Field {
-	// return s.manifest.Configuration
-	return nil
+	return s.manifest.Configuration
 }
 
 func (s *ExtensionComponent) Actions() []core.Action {
-	// return s.manifest.Actions
-	return nil
+	return s.manifest.Actions
 }
 
 func (s *ExtensionComponent) OutputChannels(config any) []core.OutputChannel {
@@ -64,11 +63,11 @@ func (s *ExtensionComponent) OutputChannels(config any) []core.OutputChannel {
 //
 
 func (s *ExtensionComponent) Setup(ctx core.SetupContext) error {
-	return nil
+	return fmt.Errorf("not implemented")
 }
 
 func (s *ExtensionComponent) Execute(ctx core.ExecutionContext) error {
-	return nil
+	return fmt.Errorf("not implemented")
 }
 
 func (s *ExtensionComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -76,21 +75,21 @@ func (s *ExtensionComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uu
 }
 
 func (s *ExtensionComponent) HandleAction(ctx core.ActionContext) error {
-	return nil
+	return fmt.Errorf("not implemented")
 }
 
 func (s *ExtensionComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return http.StatusOK, nil, nil
+	return http.StatusInternalServerError, nil, fmt.Errorf("not implemented")
 }
 
 func (s *ExtensionComponent) Cancel(ctx core.ExecutionContext) error {
-	return nil
+	return fmt.Errorf("not implemented")
 }
 
 func (s *ExtensionComponent) Cleanup(ctx core.SetupContext) error {
-	return nil
+	return fmt.Errorf("not implemented")
 }
 
 func (s *ExtensionComponent) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {
-	return nil
+	return fmt.Errorf("not implemented")
 }

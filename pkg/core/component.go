@@ -124,9 +124,9 @@ type Component interface {
 }
 
 type OutputChannel struct {
-	Name        string
-	Label       string
-	Description string
+	Name        string `json:"name"`
+	Label       string `json:"label"`
+	Description string `json:"description,omitempty"`
 }
 
 /*
@@ -238,10 +238,10 @@ type RequestContext interface {
  * Custom action definition for a component.
  */
 type Action struct {
-	Name           string
-	Description    string
-	UserAccessible bool
-	Parameters     []configuration.Field
+	Name           string                `json:"name"`
+	Description    string                `json:"description"`
+	UserAccessible bool                  `json:"userAccessible"`
+	Parameters     []configuration.Field `json:"parameters"`
 }
 
 /*

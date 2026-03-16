@@ -156,12 +156,12 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 	return &canvasNode, nil
 }
 
-func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string) error {
+func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, organizationID string, node *models.CanvasNode, webhookBaseURL string) error {
 	switch node.Type {
 	case models.NodeTypeTrigger:
-		return setupTrigger(ctx, tx, encryptor, registry, node, webhookBaseURL)
+		return setupTrigger(ctx, tx, encryptor, registry, organizationID, node, webhookBaseURL)
 	case models.NodeTypeComponent:
-		return setupComponent(ctx, tx, encryptor, registry, node, webhookBaseURL)
+		return setupComponent(ctx, tx, encryptor, registry, organizationID, node, webhookBaseURL)
 	case models.NodeTypeWidget:
 		return nil
 	}
@@ -169,9 +169,9 @@ func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, reg
 	return nil
 }
 
-func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string) error {
+func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, organizationID string, node *models.CanvasNode, webhookBaseURL string) error {
 	ref := node.Ref.Data()
-	trigger, err := registry.GetTrigger(ref.Trigger.Name)
+	trigger, err := registry.GetTrigger(organizationID, ref.Trigger.Name)
 	if err != nil {
 		return err
 	}
@@ -211,9 +211,9 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 	return tx.Save(node).Error
 }
 
-func setupComponent(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string) error {
+func setupComponent(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, organizationID string, node *models.CanvasNode, webhookBaseURL string) error {
 	ref := node.Ref.Data()
-	component, err := registry.GetComponent(ref.Component.Name)
+	component, err := registry.GetComponent(organizationID, ref.Component.Name)
 	if err != nil {
 		return err
 	}

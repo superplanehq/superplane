@@ -60,7 +60,7 @@ func InvokeNodeExecutionAction(
 		return nil, fmt.Errorf("node is not a component node")
 	}
 
-	component, err := registry.GetComponent(node.Ref.Data().Component.Name)
+	component, err := registry.GetComponent(orgID.String(), node.Ref.Data().Component.Name)
 	if err != nil {
 		return nil, fmt.Errorf("component not found: %w", err)
 	}

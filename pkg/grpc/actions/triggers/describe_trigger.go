@@ -10,8 +10,8 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func DescribeTrigger(ctx context.Context, registry *registry.Registry, name string) (*pb.DescribeTriggerResponse, error) {
-	trigger, err := registry.GetTrigger(name)
+func DescribeTrigger(ctx context.Context, registry *registry.Registry, organizationID string, name string) (*pb.DescribeTriggerResponse, error) {
+	trigger, err := registry.GetTrigger(organizationID, name)
 	if err != nil {
 		return nil, err
 	}

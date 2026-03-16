@@ -209,7 +209,7 @@ func updateLiveCanvasWithoutVersioning(
 			}
 
 			if workflowNode.State == models.CanvasNodeStateReady {
-				setupErr := setupNode(ctx, tx, encryptor, registry, workflowNode, webhookBaseURL)
+				setupErr := setupNode(ctx, tx, encryptor, registry, organizationID, workflowNode, webhookBaseURL)
 				if setupErr != nil {
 					workflowNode.State = models.CanvasNodeStateError
 					errorMsg := setupErr.Error()

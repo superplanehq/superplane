@@ -10,8 +10,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-func ListComponentActions(ctx context.Context, registry *registry.Registry, name string) (*pb.ListComponentActionsResponse, error) {
-	component, err := registry.GetComponent(name)
+func ListComponentActions(ctx context.Context, registry *registry.Registry, organizationID string, name string) (*pb.ListComponentActionsResponse, error) {
+	component, err := registry.GetComponent(organizationID, name)
 	if err != nil {
 		return nil, fmt.Errorf("component not found: %w", err)
 	}
