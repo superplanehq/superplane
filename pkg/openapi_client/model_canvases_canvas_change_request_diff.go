@@ -20,7 +20,7 @@ var _ MappedNullable = &CanvasesCanvasChangeRequestDiff{}
 
 // CanvasesCanvasChangeRequestDiff struct for CanvasesCanvasChangeRequestDiff
 type CanvasesCanvasChangeRequestDiff struct {
-	ChangedNodeIds     []string `json:"changedNodeIds,omitempty"`
+	ChangedNodeIds []string `json:"changedNodeIds,omitempty"`
 	ConflictingNodeIds []string `json:"conflictingNodeIds,omitempty"`
 }
 
@@ -106,7 +106,7 @@ func (o *CanvasesCanvasChangeRequestDiff) SetConflictingNodeIds(v []string) {
 }
 
 func (o CanvasesCanvasChangeRequestDiff) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,3 +159,5 @@ func (v *NullableCanvasesCanvasChangeRequestDiff) UnmarshalJSON(src []byte) erro
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

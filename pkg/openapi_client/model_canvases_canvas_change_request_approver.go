@@ -20,9 +20,9 @@ var _ MappedNullable = &CanvasesCanvasChangeRequestApprover{}
 
 // CanvasesCanvasChangeRequestApprover struct for CanvasesCanvasChangeRequestApprover
 type CanvasesCanvasChangeRequestApprover struct {
-	Type     *CanvasesCanvasChangeRequestApproverType `json:"type,omitempty"`
-	UserId   *string                                  `json:"userId,omitempty"`
-	RoleName *string                                  `json:"roleName,omitempty"`
+	Type *CanvasesCanvasChangeRequestApproverType `json:"type,omitempty"`
+	UserId *string `json:"userId,omitempty"`
+	RoleName *string `json:"roleName,omitempty"`
 }
 
 // NewCanvasesCanvasChangeRequestApprover instantiates a new CanvasesCanvasChangeRequestApprover object
@@ -143,7 +143,7 @@ func (o *CanvasesCanvasChangeRequestApprover) SetRoleName(v string) {
 }
 
 func (o CanvasesCanvasChangeRequestApprover) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -199,3 +199,5 @@ func (v *NullableCanvasesCanvasChangeRequestApprover) UnmarshalJSON(src []byte) 
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

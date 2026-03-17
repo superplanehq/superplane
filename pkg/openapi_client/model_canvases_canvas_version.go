@@ -21,7 +21,7 @@ var _ MappedNullable = &CanvasesCanvasVersion{}
 // CanvasesCanvasVersion struct for CanvasesCanvasVersion
 type CanvasesCanvasVersion struct {
 	Metadata *CanvasesCanvasVersionMetadata `json:"metadata,omitempty"`
-	Spec     *CanvasesCanvasSpec            `json:"spec,omitempty"`
+	Spec *CanvasesCanvasSpec `json:"spec,omitempty"`
 }
 
 // NewCanvasesCanvasVersion instantiates a new CanvasesCanvasVersion object
@@ -106,7 +106,7 @@ func (o *CanvasesCanvasVersion) SetSpec(v CanvasesCanvasSpec) {
 }
 
 func (o CanvasesCanvasVersion) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,3 +159,5 @@ func (v *NullableCanvasesCanvasVersion) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

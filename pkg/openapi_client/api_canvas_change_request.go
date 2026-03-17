@@ -21,15 +21,16 @@ import (
 	"time"
 )
 
+
 // CanvasChangeRequestAPIService CanvasChangeRequestAPI service
 type CanvasChangeRequestAPIService service
 
 type ApiCanvasesActOnCanvasChangeRequestRequest struct {
-	ctx             context.Context
-	ApiService      *CanvasChangeRequestAPIService
-	canvasId        string
+	ctx context.Context
+	ApiService *CanvasChangeRequestAPIService
+	canvasId string
 	changeRequestId string
-	body            *CanvasesActOnCanvasChangeRequestBody
+	body *CanvasesActOnCanvasChangeRequestBody
 }
 
 func (r ApiCanvasesActOnCanvasChangeRequestRequest) Body(body CanvasesActOnCanvasChangeRequestBody) ApiCanvasesActOnCanvasChangeRequestRequest {
@@ -46,29 +47,28 @@ CanvasesActOnCanvasChangeRequest Act on canvas change request
 
 Applies an action (approve, unapprove, reject, reopen, publish) to a change request
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param canvasId
-	@param changeRequestId
-	@return ApiCanvasesActOnCanvasChangeRequestRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param canvasId
+ @param changeRequestId
+ @return ApiCanvasesActOnCanvasChangeRequestRequest
 */
 func (a *CanvasChangeRequestAPIService) CanvasesActOnCanvasChangeRequest(ctx context.Context, canvasId string, changeRequestId string) ApiCanvasesActOnCanvasChangeRequestRequest {
 	return ApiCanvasesActOnCanvasChangeRequestRequest{
-		ApiService:      a,
-		ctx:             ctx,
-		canvasId:        canvasId,
+		ApiService: a,
+		ctx: ctx,
+		canvasId: canvasId,
 		changeRequestId: changeRequestId,
 	}
 }
 
 // Execute executes the request
-//
-//	@return CanvasesActOnCanvasChangeRequestResponse
+//  @return CanvasesActOnCanvasChangeRequestResponse
 func (a *CanvasChangeRequestAPIService) CanvasesActOnCanvasChangeRequestExecute(r ApiCanvasesActOnCanvasChangeRequestRequest) (*CanvasesActOnCanvasChangeRequestResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPatch
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *CanvasesActOnCanvasChangeRequestResponse
+		localVarHTTPMethod   = http.MethodPatch
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *CanvasesActOnCanvasChangeRequestResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasChangeRequestAPIService.CanvasesActOnCanvasChangeRequest")
@@ -128,14 +128,14 @@ func (a *CanvasChangeRequestAPIService) CanvasesActOnCanvasChangeRequestExecute(
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -152,10 +152,10 @@ func (a *CanvasChangeRequestAPIService) CanvasesActOnCanvasChangeRequestExecute(
 }
 
 type ApiCanvasesCreateCanvasChangeRequestRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *CanvasChangeRequestAPIService
-	canvasId   string
-	body       *CanvasesCreateCanvasChangeRequestBody
+	canvasId string
+	body *CanvasesCreateCanvasChangeRequestBody
 }
 
 func (r ApiCanvasesCreateCanvasChangeRequestRequest) Body(body CanvasesCreateCanvasChangeRequestBody) ApiCanvasesCreateCanvasChangeRequestRequest {
@@ -172,27 +172,26 @@ CanvasesCreateCanvasChangeRequest Create canvas change request
 
 Creates a change request for a draft canvas version
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param canvasId
-	@return ApiCanvasesCreateCanvasChangeRequestRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param canvasId
+ @return ApiCanvasesCreateCanvasChangeRequestRequest
 */
 func (a *CanvasChangeRequestAPIService) CanvasesCreateCanvasChangeRequest(ctx context.Context, canvasId string) ApiCanvasesCreateCanvasChangeRequestRequest {
 	return ApiCanvasesCreateCanvasChangeRequestRequest{
 		ApiService: a,
-		ctx:        ctx,
-		canvasId:   canvasId,
+		ctx: ctx,
+		canvasId: canvasId,
 	}
 }
 
 // Execute executes the request
-//
-//	@return CanvasesCreateCanvasChangeRequestResponse
+//  @return CanvasesCreateCanvasChangeRequestResponse
 func (a *CanvasChangeRequestAPIService) CanvasesCreateCanvasChangeRequestExecute(r ApiCanvasesCreateCanvasChangeRequestRequest) (*CanvasesCreateCanvasChangeRequestResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPost
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *CanvasesCreateCanvasChangeRequestResponse
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *CanvasesCreateCanvasChangeRequestResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasChangeRequestAPIService.CanvasesCreateCanvasChangeRequest")
@@ -251,14 +250,14 @@ func (a *CanvasChangeRequestAPIService) CanvasesCreateCanvasChangeRequestExecute
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -275,9 +274,9 @@ func (a *CanvasChangeRequestAPIService) CanvasesCreateCanvasChangeRequestExecute
 }
 
 type ApiCanvasesDescribeCanvasChangeRequestRequest struct {
-	ctx             context.Context
-	ApiService      *CanvasChangeRequestAPIService
-	canvasId        string
+	ctx context.Context
+	ApiService *CanvasChangeRequestAPIService
+	canvasId string
 	changeRequestId string
 }
 
@@ -290,29 +289,28 @@ CanvasesDescribeCanvasChangeRequest Describe canvas change request
 
 Returns one canvas change request by ID
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param canvasId
-	@param changeRequestId
-	@return ApiCanvasesDescribeCanvasChangeRequestRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param canvasId
+ @param changeRequestId
+ @return ApiCanvasesDescribeCanvasChangeRequestRequest
 */
 func (a *CanvasChangeRequestAPIService) CanvasesDescribeCanvasChangeRequest(ctx context.Context, canvasId string, changeRequestId string) ApiCanvasesDescribeCanvasChangeRequestRequest {
 	return ApiCanvasesDescribeCanvasChangeRequestRequest{
-		ApiService:      a,
-		ctx:             ctx,
-		canvasId:        canvasId,
+		ApiService: a,
+		ctx: ctx,
+		canvasId: canvasId,
 		changeRequestId: changeRequestId,
 	}
 }
 
 // Execute executes the request
-//
-//	@return CanvasesDescribeCanvasChangeRequestResponse
+//  @return CanvasesDescribeCanvasChangeRequestResponse
 func (a *CanvasChangeRequestAPIService) CanvasesDescribeCanvasChangeRequestExecute(r ApiCanvasesDescribeCanvasChangeRequestRequest) (*CanvasesDescribeCanvasChangeRequestResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *CanvasesDescribeCanvasChangeRequestResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *CanvasesDescribeCanvasChangeRequestResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasChangeRequestAPIService.CanvasesDescribeCanvasChangeRequest")
@@ -367,14 +365,14 @@ func (a *CanvasChangeRequestAPIService) CanvasesDescribeCanvasChangeRequestExecu
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -391,14 +389,14 @@ func (a *CanvasChangeRequestAPIService) CanvasesDescribeCanvasChangeRequestExecu
 }
 
 type ApiCanvasesListCanvasChangeRequestsRequest struct {
-	ctx          context.Context
-	ApiService   *CanvasChangeRequestAPIService
-	canvasId     string
-	limit        *int64
-	before       *time.Time
+	ctx context.Context
+	ApiService *CanvasChangeRequestAPIService
+	canvasId string
+	limit *int64
+	before *time.Time
 	statusFilter *string
-	onlyMine     *bool
-	query        *string
+	onlyMine *bool
+	query *string
 }
 
 func (r ApiCanvasesListCanvasChangeRequestsRequest) Limit(limit int64) ApiCanvasesListCanvasChangeRequestsRequest {
@@ -435,27 +433,26 @@ CanvasesListCanvasChangeRequests List canvas change requests
 
 Lists change requests for a canvas
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param canvasId
-	@return ApiCanvasesListCanvasChangeRequestsRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param canvasId
+ @return ApiCanvasesListCanvasChangeRequestsRequest
 */
 func (a *CanvasChangeRequestAPIService) CanvasesListCanvasChangeRequests(ctx context.Context, canvasId string) ApiCanvasesListCanvasChangeRequestsRequest {
 	return ApiCanvasesListCanvasChangeRequestsRequest{
 		ApiService: a,
-		ctx:        ctx,
-		canvasId:   canvasId,
+		ctx: ctx,
+		canvasId: canvasId,
 	}
 }
 
 // Execute executes the request
-//
-//	@return CanvasesListCanvasChangeRequestsResponse
+//  @return CanvasesListCanvasChangeRequestsResponse
 func (a *CanvasChangeRequestAPIService) CanvasesListCanvasChangeRequestsExecute(r ApiCanvasesListCanvasChangeRequestsRequest) (*CanvasesListCanvasChangeRequestsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *CanvasesListCanvasChangeRequestsResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *CanvasesListCanvasChangeRequestsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasChangeRequestAPIService.CanvasesListCanvasChangeRequests")
@@ -524,14 +521,14 @@ func (a *CanvasChangeRequestAPIService) CanvasesListCanvasChangeRequestsExecute(
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -548,11 +545,11 @@ func (a *CanvasChangeRequestAPIService) CanvasesListCanvasChangeRequestsExecute(
 }
 
 type ApiCanvasesResolveCanvasChangeRequestRequest struct {
-	ctx             context.Context
-	ApiService      *CanvasChangeRequestAPIService
-	canvasId        string
+	ctx context.Context
+	ApiService *CanvasChangeRequestAPIService
+	canvasId string
 	changeRequestId string
-	body            *CanvasesResolveCanvasChangeRequestBody
+	body *CanvasesResolveCanvasChangeRequestBody
 }
 
 func (r ApiCanvasesResolveCanvasChangeRequestRequest) Body(body CanvasesResolveCanvasChangeRequestBody) ApiCanvasesResolveCanvasChangeRequestRequest {
@@ -569,29 +566,28 @@ CanvasesResolveCanvasChangeRequest Resolve canvas change request conflicts
 
 Updates a change request version with a conflict-resolved result
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param canvasId
-	@param changeRequestId
-	@return ApiCanvasesResolveCanvasChangeRequestRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param canvasId
+ @param changeRequestId
+ @return ApiCanvasesResolveCanvasChangeRequestRequest
 */
 func (a *CanvasChangeRequestAPIService) CanvasesResolveCanvasChangeRequest(ctx context.Context, canvasId string, changeRequestId string) ApiCanvasesResolveCanvasChangeRequestRequest {
 	return ApiCanvasesResolveCanvasChangeRequestRequest{
-		ApiService:      a,
-		ctx:             ctx,
-		canvasId:        canvasId,
+		ApiService: a,
+		ctx: ctx,
+		canvasId: canvasId,
 		changeRequestId: changeRequestId,
 	}
 }
 
 // Execute executes the request
-//
-//	@return CanvasesResolveCanvasChangeRequestResponse
+//  @return CanvasesResolveCanvasChangeRequestResponse
 func (a *CanvasChangeRequestAPIService) CanvasesResolveCanvasChangeRequestExecute(r ApiCanvasesResolveCanvasChangeRequestRequest) (*CanvasesResolveCanvasChangeRequestResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPatch
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *CanvasesResolveCanvasChangeRequestResponse
+		localVarHTTPMethod   = http.MethodPatch
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *CanvasesResolveCanvasChangeRequestResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasChangeRequestAPIService.CanvasesResolveCanvasChangeRequest")
@@ -651,14 +647,14 @@ func (a *CanvasChangeRequestAPIService) CanvasesResolveCanvasChangeRequestExecut
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

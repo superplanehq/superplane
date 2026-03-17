@@ -21,15 +21,15 @@ var _ MappedNullable = &CanvasesCanvasMetadata{}
 
 // CanvasesCanvasMetadata struct for CanvasesCanvasMetadata
 type CanvasesCanvasMetadata struct {
-	Id                          *string                                    `json:"id,omitempty"`
-	OrganizationId              *string                                    `json:"organizationId,omitempty"`
-	Name                        *string                                    `json:"name,omitempty"`
-	Description                 *string                                    `json:"description,omitempty"`
-	CreatedAt                   *time.Time                                 `json:"createdAt,omitempty"`
-	UpdatedAt                   *time.Time                                 `json:"updatedAt,omitempty"`
-	CreatedBy                   *SuperplaneCanvasesUserRef                 `json:"createdBy,omitempty"`
-	IsTemplate                  *bool                                      `json:"isTemplate,omitempty"`
-	CanvasVersioningEnabled     *bool                                      `json:"canvasVersioningEnabled,omitempty"`
+	Id *string `json:"id,omitempty"`
+	OrganizationId *string `json:"organizationId,omitempty"`
+	Name *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	CreatedBy *SuperplaneCanvasesUserRef `json:"createdBy,omitempty"`
+	IsTemplate *bool `json:"isTemplate,omitempty"`
+	CanvasVersioningEnabled *bool `json:"canvasVersioningEnabled,omitempty"`
 	ChangeRequestApprovalConfig *CanvasesCanvasChangeRequestApprovalConfig `json:"changeRequestApprovalConfig,omitempty"`
 }
 
@@ -371,7 +371,7 @@ func (o *CanvasesCanvasMetadata) SetChangeRequestApprovalConfig(v CanvasesCanvas
 }
 
 func (o CanvasesCanvasMetadata) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -448,3 +448,5 @@ func (v *NullableCanvasesCanvasMetadata) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

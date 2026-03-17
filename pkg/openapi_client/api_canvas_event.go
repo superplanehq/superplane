@@ -21,15 +21,16 @@ import (
 	"time"
 )
 
+
 // CanvasEventAPIService CanvasEventAPI service
 type CanvasEventAPIService service
 
 type ApiCanvasesListCanvasEventsRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *CanvasEventAPIService
-	canvasId   string
-	limit      *int64
-	before     *time.Time
+	canvasId string
+	limit *int64
+	before *time.Time
 }
 
 func (r ApiCanvasesListCanvasEventsRequest) Limit(limit int64) ApiCanvasesListCanvasEventsRequest {
@@ -51,27 +52,26 @@ CanvasesListCanvasEvents List canvas events
 
 Returns a list of root events that triggered executions in a canvas
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param canvasId
-	@return ApiCanvasesListCanvasEventsRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param canvasId
+ @return ApiCanvasesListCanvasEventsRequest
 */
 func (a *CanvasEventAPIService) CanvasesListCanvasEvents(ctx context.Context, canvasId string) ApiCanvasesListCanvasEventsRequest {
 	return ApiCanvasesListCanvasEventsRequest{
 		ApiService: a,
-		ctx:        ctx,
-		canvasId:   canvasId,
+		ctx: ctx,
+		canvasId: canvasId,
 	}
 }
 
 // Execute executes the request
-//
-//	@return CanvasesListCanvasEventsResponse
+//  @return CanvasesListCanvasEventsResponse
 func (a *CanvasEventAPIService) CanvasesListCanvasEventsExecute(r ApiCanvasesListCanvasEventsRequest) (*CanvasesListCanvasEventsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *CanvasesListCanvasEventsResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *CanvasesListCanvasEventsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasEventAPIService.CanvasesListCanvasEvents")
@@ -131,14 +131,14 @@ func (a *CanvasEventAPIService) CanvasesListCanvasEventsExecute(r ApiCanvasesLis
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -155,10 +155,10 @@ func (a *CanvasEventAPIService) CanvasesListCanvasEventsExecute(r ApiCanvasesLis
 }
 
 type ApiCanvasesListEventExecutionsRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *CanvasEventAPIService
-	canvasId   string
-	eventId    string
+	canvasId string
+	eventId string
 }
 
 func (r ApiCanvasesListEventExecutionsRequest) Execute() (*CanvasesListEventExecutionsResponse, *http.Response, error) {
@@ -170,29 +170,28 @@ CanvasesListEventExecutions List event executions
 
 Returns a list of all node executions triggered by a root event
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param canvasId
-	@param eventId
-	@return ApiCanvasesListEventExecutionsRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param canvasId
+ @param eventId
+ @return ApiCanvasesListEventExecutionsRequest
 */
 func (a *CanvasEventAPIService) CanvasesListEventExecutions(ctx context.Context, canvasId string, eventId string) ApiCanvasesListEventExecutionsRequest {
 	return ApiCanvasesListEventExecutionsRequest{
 		ApiService: a,
-		ctx:        ctx,
-		canvasId:   canvasId,
-		eventId:    eventId,
+		ctx: ctx,
+		canvasId: canvasId,
+		eventId: eventId,
 	}
 }
 
 // Execute executes the request
-//
-//	@return CanvasesListEventExecutionsResponse
+//  @return CanvasesListEventExecutionsResponse
 func (a *CanvasEventAPIService) CanvasesListEventExecutionsExecute(r ApiCanvasesListEventExecutionsRequest) (*CanvasesListEventExecutionsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *CanvasesListEventExecutionsResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *CanvasesListEventExecutionsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasEventAPIService.CanvasesListEventExecutions")
@@ -247,14 +246,14 @@ func (a *CanvasEventAPIService) CanvasesListEventExecutionsExecute(r ApiCanvases
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

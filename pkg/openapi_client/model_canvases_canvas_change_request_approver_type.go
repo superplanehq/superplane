@@ -22,9 +22,9 @@ type CanvasesCanvasChangeRequestApproverType string
 // List of CanvasesCanvasChangeRequestApproverType
 const (
 	CANVASESCANVASCHANGEREQUESTAPPROVERTYPE_TYPE_UNSPECIFIED CanvasesCanvasChangeRequestApproverType = "TYPE_UNSPECIFIED"
-	CANVASESCANVASCHANGEREQUESTAPPROVERTYPE_TYPE_ANYONE      CanvasesCanvasChangeRequestApproverType = "TYPE_ANYONE"
-	CANVASESCANVASCHANGEREQUESTAPPROVERTYPE_TYPE_USER        CanvasesCanvasChangeRequestApproverType = "TYPE_USER"
-	CANVASESCANVASCHANGEREQUESTAPPROVERTYPE_TYPE_ROLE        CanvasesCanvasChangeRequestApproverType = "TYPE_ROLE"
+	CANVASESCANVASCHANGEREQUESTAPPROVERTYPE_TYPE_ANYONE CanvasesCanvasChangeRequestApproverType = "TYPE_ANYONE"
+	CANVASESCANVASCHANGEREQUESTAPPROVERTYPE_TYPE_USER CanvasesCanvasChangeRequestApproverType = "TYPE_USER"
+	CANVASESCANVASCHANGEREQUESTAPPROVERTYPE_TYPE_ROLE CanvasesCanvasChangeRequestApproverType = "TYPE_ROLE"
 )
 
 // All allowed values of CanvasesCanvasChangeRequestApproverType enum
@@ -113,3 +113,4 @@ func (v *NullableCanvasesCanvasChangeRequestApproverType) UnmarshalJSON(src []by
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+

@@ -10,7 +10,6 @@ package integrations
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net/http"
 
@@ -25,48 +24,46 @@ import (
 )
 
 // Suppress "imported and not used" errors
-var (
-	_ codes.Code
-	_ io.Reader
-	_ status.Status
-	_ = errors.New
-	_ = runtime.String
-	_ = utilities.NewDoubleArray
-	_ = metadata.Join
-)
+var _ codes.Code
+var _ io.Reader
+var _ status.Status
+var _ = runtime.String
+var _ = utilities.NewDoubleArray
+var _ = metadata.Join
 
 func request_Integrations_ListIntegrations_0(ctx context.Context, marshaler runtime.Marshaler, client IntegrationsClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq ListIntegrationsRequest
-		metadata runtime.ServerMetadata
-	)
-	io.Copy(io.Discard, req.Body)
+	var protoReq ListIntegrationsRequest
+	var metadata runtime.ServerMetadata
+
 	msg, err := client.ListIntegrations(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
+
 }
 
 func local_request_Integrations_ListIntegrations_0(ctx context.Context, marshaler runtime.Marshaler, server IntegrationsServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq ListIntegrationsRequest
-		metadata runtime.ServerMetadata
-	)
+	var protoReq ListIntegrationsRequest
+	var metadata runtime.ServerMetadata
+
 	msg, err := server.ListIntegrations(ctx, &protoReq)
 	return msg, metadata, err
+
 }
 
 // RegisterIntegrationsHandlerServer registers the http handlers for service Integrations to "mux".
 // UnaryRPC     :call IntegrationsServer directly.
 // StreamingRPC :currently unsupported pending https://github.com/grpc/grpc-go/issues/906.
 // Note that using this registration option will cause many gRPC library features to stop working. Consider using RegisterIntegrationsHandlerFromEndpoint instead.
-// GRPC interceptors will not work for this type of registration. To use interceptors, you must use the "runtime.WithMiddlewares" option in the "runtime.NewServeMux" call.
 func RegisterIntegrationsHandlerServer(ctx context.Context, mux *runtime.ServeMux, server IntegrationsServer) error {
-	mux.Handle(http.MethodGet, pattern_Integrations_ListIntegrations_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("GET", pattern_Integrations_ListIntegrations_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Integrations.Integrations/ListIntegrations", runtime.WithHTTPPathPattern("/api/v1/integrations"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Integrations.Integrations/ListIntegrations", runtime.WithHTTPPathPattern("/api/v1/integrations"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -78,7 +75,9 @@ func RegisterIntegrationsHandlerServer(ctx context.Context, mux *runtime.ServeMu
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Integrations_ListIntegrations_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
 
 	return nil
@@ -105,6 +104,7 @@ func RegisterIntegrationsHandlerFromEndpoint(ctx context.Context, mux *runtime.S
 			}
 		}()
 	}()
+
 	return RegisterIntegrationsHandler(ctx, mux, conn)
 }
 
@@ -118,13 +118,16 @@ func RegisterIntegrationsHandler(ctx context.Context, mux *runtime.ServeMux, con
 // to "mux". The handlers forward requests to the grpc endpoint over the given implementation of "IntegrationsClient".
 // Note: the gRPC framework executes interceptors within the gRPC handler. If the passed in "IntegrationsClient"
 // doesn't go through the normal gRPC flow (creating a gRPC client etc.) then it will be up to the passed in
-// "IntegrationsClient" to call the correct interceptors. This client ignores the HTTP middlewares.
+// "IntegrationsClient" to call the correct interceptors.
 func RegisterIntegrationsHandlerClient(ctx context.Context, mux *runtime.ServeMux, client IntegrationsClient) error {
-	mux.Handle(http.MethodGet, pattern_Integrations_ListIntegrations_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("GET", pattern_Integrations_ListIntegrations_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Integrations.Integrations/ListIntegrations", runtime.WithHTTPPathPattern("/api/v1/integrations"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/Superplane.Integrations.Integrations/ListIntegrations", runtime.WithHTTPPathPattern("/api/v1/integrations"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -135,8 +138,11 @@ func RegisterIntegrationsHandlerClient(ctx context.Context, mux *runtime.ServeMu
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Integrations_ListIntegrations_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
+
 	return nil
 }
 

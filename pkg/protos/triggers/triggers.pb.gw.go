@@ -10,7 +10,6 @@ package triggers
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net/http"
 
@@ -25,85 +24,98 @@ import (
 )
 
 // Suppress "imported and not used" errors
-var (
-	_ codes.Code
-	_ io.Reader
-	_ status.Status
-	_ = errors.New
-	_ = runtime.String
-	_ = utilities.NewDoubleArray
-	_ = metadata.Join
-)
+var _ codes.Code
+var _ io.Reader
+var _ status.Status
+var _ = runtime.String
+var _ = utilities.NewDoubleArray
+var _ = metadata.Join
 
 func request_Triggers_ListTriggers_0(ctx context.Context, marshaler runtime.Marshaler, client TriggersClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq ListTriggersRequest
-		metadata runtime.ServerMetadata
-	)
-	io.Copy(io.Discard, req.Body)
+	var protoReq ListTriggersRequest
+	var metadata runtime.ServerMetadata
+
 	msg, err := client.ListTriggers(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
+
 }
 
 func local_request_Triggers_ListTriggers_0(ctx context.Context, marshaler runtime.Marshaler, server TriggersServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq ListTriggersRequest
-		metadata runtime.ServerMetadata
-	)
+	var protoReq ListTriggersRequest
+	var metadata runtime.ServerMetadata
+
 	msg, err := server.ListTriggers(ctx, &protoReq)
 	return msg, metadata, err
+
 }
 
 func request_Triggers_DescribeTrigger_0(ctx context.Context, marshaler runtime.Marshaler, client TriggersClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var protoReq DescribeTriggerRequest
+	var metadata runtime.ServerMetadata
+
 	var (
-		protoReq DescribeTriggerRequest
-		metadata runtime.ServerMetadata
-		err      error
+		val string
+		ok  bool
+		err error
+		_   = err
 	)
-	io.Copy(io.Discard, req.Body)
-	val, ok := pathParams["name"]
+
+	val, ok = pathParams["name"]
 	if !ok {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "name")
 	}
+
 	protoReq.Name, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "name", err)
 	}
+
 	msg, err := client.DescribeTrigger(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
+
 }
 
 func local_request_Triggers_DescribeTrigger_0(ctx context.Context, marshaler runtime.Marshaler, server TriggersServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var protoReq DescribeTriggerRequest
+	var metadata runtime.ServerMetadata
+
 	var (
-		protoReq DescribeTriggerRequest
-		metadata runtime.ServerMetadata
-		err      error
+		val string
+		ok  bool
+		err error
+		_   = err
 	)
-	val, ok := pathParams["name"]
+
+	val, ok = pathParams["name"]
 	if !ok {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "name")
 	}
+
 	protoReq.Name, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "name", err)
 	}
+
 	msg, err := server.DescribeTrigger(ctx, &protoReq)
 	return msg, metadata, err
+
 }
 
 // RegisterTriggersHandlerServer registers the http handlers for service Triggers to "mux".
 // UnaryRPC     :call TriggersServer directly.
 // StreamingRPC :currently unsupported pending https://github.com/grpc/grpc-go/issues/906.
 // Note that using this registration option will cause many gRPC library features to stop working. Consider using RegisterTriggersHandlerFromEndpoint instead.
-// GRPC interceptors will not work for this type of registration. To use interceptors, you must use the "runtime.WithMiddlewares" option in the "runtime.NewServeMux" call.
 func RegisterTriggersHandlerServer(ctx context.Context, mux *runtime.ServeMux, server TriggersServer) error {
-	mux.Handle(http.MethodGet, pattern_Triggers_ListTriggers_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("GET", pattern_Triggers_ListTriggers_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Triggers.Triggers/ListTriggers", runtime.WithHTTPPathPattern("/api/v1/triggers"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Triggers.Triggers/ListTriggers", runtime.WithHTTPPathPattern("/api/v1/triggers"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -115,15 +127,20 @@ func RegisterTriggersHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Triggers_ListTriggers_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodGet, pattern_Triggers_DescribeTrigger_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("GET", pattern_Triggers_DescribeTrigger_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Triggers.Triggers/DescribeTrigger", runtime.WithHTTPPathPattern("/api/v1/triggers/{name}"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Triggers.Triggers/DescribeTrigger", runtime.WithHTTPPathPattern("/api/v1/triggers/{name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -135,7 +152,9 @@ func RegisterTriggersHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Triggers_DescribeTrigger_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
 
 	return nil
@@ -162,6 +181,7 @@ func RegisterTriggersHandlerFromEndpoint(ctx context.Context, mux *runtime.Serve
 			}
 		}()
 	}()
+
 	return RegisterTriggersHandler(ctx, mux, conn)
 }
 
@@ -175,13 +195,16 @@ func RegisterTriggersHandler(ctx context.Context, mux *runtime.ServeMux, conn *g
 // to "mux". The handlers forward requests to the grpc endpoint over the given implementation of "TriggersClient".
 // Note: the gRPC framework executes interceptors within the gRPC handler. If the passed in "TriggersClient"
 // doesn't go through the normal gRPC flow (creating a gRPC client etc.) then it will be up to the passed in
-// "TriggersClient" to call the correct interceptors. This client ignores the HTTP middlewares.
+// "TriggersClient" to call the correct interceptors.
 func RegisterTriggersHandlerClient(ctx context.Context, mux *runtime.ServeMux, client TriggersClient) error {
-	mux.Handle(http.MethodGet, pattern_Triggers_ListTriggers_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("GET", pattern_Triggers_ListTriggers_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Triggers.Triggers/ListTriggers", runtime.WithHTTPPathPattern("/api/v1/triggers"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/Superplane.Triggers.Triggers/ListTriggers", runtime.WithHTTPPathPattern("/api/v1/triggers"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -192,13 +215,18 @@ func RegisterTriggersHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Triggers_ListTriggers_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodGet, pattern_Triggers_DescribeTrigger_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("GET", pattern_Triggers_DescribeTrigger_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Triggers.Triggers/DescribeTrigger", runtime.WithHTTPPathPattern("/api/v1/triggers/{name}"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/Superplane.Triggers.Triggers/DescribeTrigger", runtime.WithHTTPPathPattern("/api/v1/triggers/{name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -209,17 +237,22 @@ func RegisterTriggersHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Triggers_DescribeTrigger_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
+
 	return nil
 }
 
 var (
-	pattern_Triggers_ListTriggers_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "triggers"}, ""))
+	pattern_Triggers_ListTriggers_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "triggers"}, ""))
+
 	pattern_Triggers_DescribeTrigger_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "triggers", "name"}, ""))
 )
 
 var (
-	forward_Triggers_ListTriggers_0    = runtime.ForwardResponseMessage
+	forward_Triggers_ListTriggers_0 = runtime.ForwardResponseMessage
+
 	forward_Triggers_DescribeTrigger_0 = runtime.ForwardResponseMessage
 )

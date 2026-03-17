@@ -10,7 +10,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
-type getCommand struct{}
+type getCommand struct {
+	draft *bool
+}
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
 	canvasID, err := findCanvasID(ctx, ctx.API, ctx.Args[0])
@@ -18,7 +20,12 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	response, _, err := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, canvasID).Execute()
+	req := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, canvasID)
+	if c.draft != nil && *c.draft {
+		req = req.Draft(true)
+	}
+
+	response, _, err := req.Execute()
 	if err != nil {
 		return err
 	}

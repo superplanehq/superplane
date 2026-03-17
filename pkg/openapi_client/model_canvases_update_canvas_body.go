@@ -20,9 +20,9 @@ var _ MappedNullable = &CanvasesUpdateCanvasBody{}
 
 // CanvasesUpdateCanvasBody struct for CanvasesUpdateCanvasBody
 type CanvasesUpdateCanvasBody struct {
-	Name                        *string                                    `json:"name,omitempty"`
-	Description                 *string                                    `json:"description,omitempty"`
-	CanvasVersioningEnabled     *bool                                      `json:"canvasVersioningEnabled,omitempty"`
+	Name *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
+	CanvasVersioningEnabled *bool `json:"canvasVersioningEnabled,omitempty"`
 	ChangeRequestApprovalConfig *CanvasesCanvasChangeRequestApprovalConfig `json:"changeRequestApprovalConfig,omitempty"`
 }
 
@@ -172,7 +172,7 @@ func (o *CanvasesUpdateCanvasBody) SetChangeRequestApprovalConfig(v CanvasesCanv
 }
 
 func (o CanvasesUpdateCanvasBody) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -231,3 +231,5 @@ func (v *NullableCanvasesUpdateCanvasBody) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

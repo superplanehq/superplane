@@ -22,9 +22,9 @@ type CanvasesCanvasChangeRequestApprovalState string
 // List of CanvasesCanvasChangeRequestApprovalState
 const (
 	CANVASESCANVASCHANGEREQUESTAPPROVALSTATE_STATE_UNSPECIFIED CanvasesCanvasChangeRequestApprovalState = "STATE_UNSPECIFIED"
-	CANVASESCANVASCHANGEREQUESTAPPROVALSTATE_STATE_APPROVED    CanvasesCanvasChangeRequestApprovalState = "STATE_APPROVED"
-	CANVASESCANVASCHANGEREQUESTAPPROVALSTATE_STATE_REJECTED    CanvasesCanvasChangeRequestApprovalState = "STATE_REJECTED"
-	CANVASESCANVASCHANGEREQUESTAPPROVALSTATE_STATE_UNAPPROVED  CanvasesCanvasChangeRequestApprovalState = "STATE_UNAPPROVED"
+	CANVASESCANVASCHANGEREQUESTAPPROVALSTATE_STATE_APPROVED CanvasesCanvasChangeRequestApprovalState = "STATE_APPROVED"
+	CANVASESCANVASCHANGEREQUESTAPPROVALSTATE_STATE_REJECTED CanvasesCanvasChangeRequestApprovalState = "STATE_REJECTED"
+	CANVASESCANVASCHANGEREQUESTAPPROVALSTATE_STATE_UNAPPROVED CanvasesCanvasChangeRequestApprovalState = "STATE_UNAPPROVED"
 )
 
 // All allowed values of CanvasesCanvasChangeRequestApprovalState enum
@@ -113,3 +113,4 @@ func (v *NullableCanvasesCanvasChangeRequestApprovalState) UnmarshalJSON(src []b
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+

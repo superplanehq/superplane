@@ -22,6 +22,7 @@ import (
 type contextKey string
 
 const OrganizationContextKey contextKey = "organization"
+const UserContextKey contextKey = "user"
 const DomainTypeContextKey contextKey = "domainType"
 const DomainIdContextKey contextKey = "domainId"
 
@@ -198,6 +199,7 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 		}
 
 		newContext := context.WithValue(ctx, OrganizationContextKey, organizationID)
+		newContext = context.WithValue(newContext, UserContextKey, userID)
 		newContext = context.WithValue(newContext, DomainTypeContextKey, models.DomainTypeOrganization)
 		newContext = context.WithValue(newContext, DomainIdContextKey, organizationID)
 		return handler(newContext, req)

@@ -387,6 +387,7 @@ message ListCanvasesResponse {
 
 message DescribeCanvasRequest {
   string id = 1;
+  bool draft = 2;
 }
 
 message DescribeCanvasResponse {

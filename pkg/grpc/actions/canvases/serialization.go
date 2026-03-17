@@ -138,6 +138,128 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 	}, nil
 }
 
+func SerializeCanvasFromVersion(canvas *models.Canvas, version *models.CanvasVersion, includeStatus bool) (*pb.Canvas, error) {
+	if canvas == nil || version == nil {
+		return nil, status.Error(codes.InvalidArgument, "canvas is required")
+	}
+	if canvas.ID != version.WorkflowID {
+		return nil, status.Error(codes.InvalidArgument, "canvas version does not belong to canvas")
+	}
+
+	canvasVersioningEnabled, err := isCanvasVersioningEnabledForCanvas(canvas)
+	if err != nil {
+		return nil, err
+	}
+
+	serializedNodes, err := serializeCanvasNodes(canvas.ID, version.Nodes)
+	if err != nil {
+		return nil, err
+	}
+
+	var createdBy *pb.UserRef
+	if canvas.CreatedBy != nil {
+		idStr := canvas.CreatedBy.String()
+		name := ""
+		if user, err := models.FindMaybeDeletedUserByID(canvas.OrganizationID.String(), idStr); err == nil && user != nil {
+			name = user.Name
+		}
+		createdBy = &pb.UserRef{Id: idStr, Name: name}
+	}
+
+	if !includeStatus {
+		return &pb.Canvas{
+			Metadata: &pb.Canvas_Metadata{
+				Id:                      canvas.ID.String(),
+				OrganizationId:          canvas.OrganizationID.String(),
+				Name:                    canvas.Name,
+				Description:             canvas.Description,
+				CreatedAt:               timestamppb.New(*canvas.CreatedAt),
+				UpdatedAt:               timestamppb.New(*canvas.UpdatedAt),
+				CreatedBy:               createdBy,
+				IsTemplate:              canvas.IsTemplate,
+				CanvasVersioningEnabled: canvasVersioningEnabled,
+				ChangeRequestApprovalConfig: serializeCanvasChangeRequestApprovalConfig(
+					canvas.EffectiveChangeRequestApprovers(),
+				),
+			},
+			Spec: &pb.Canvas_Spec{
+				Nodes: serializedNodes,
+				Edges: actions.EdgesToProto(version.Edges),
+			},
+			Status: nil,
+		}, nil
+	}
+
+	// Fetch last executions per node
+	lastExecutions, err := models.FindLastExecutionPerNode(canvas.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	executionIDs := make([]string, len(lastExecutions))
+	for i, execution := range lastExecutions {
+		executionIDs[i] = execution.ID.String()
+	}
+
+	childExecutions, err := models.FindChildExecutionsForMultiple(executionIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	serializedExecutions, err := SerializeNodeExecutions(lastExecutions, childExecutions)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch next queue items per node
+	nextQueueItems, err := models.FindNextQueueItemPerNode(canvas.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	serializedQueueItems, err := SerializeNodeQueueItems(nextQueueItems)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch last events per node
+	lastEvents, err := models.FindLastEventPerNode(canvas.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	serializedEvents, err := SerializeCanvasEvents(lastEvents)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{
+			Id:                      canvas.ID.String(),
+			OrganizationId:          canvas.OrganizationID.String(),
+			Name:                    canvas.Name,
+			Description:             canvas.Description,
+			CreatedAt:               timestamppb.New(*canvas.CreatedAt),
+			UpdatedAt:               timestamppb.New(*canvas.UpdatedAt),
+			CreatedBy:               createdBy,
+			IsTemplate:              canvas.IsTemplate,
+			CanvasVersioningEnabled: canvasVersioningEnabled,
+			ChangeRequestApprovalConfig: serializeCanvasChangeRequestApprovalConfig(
+				canvas.EffectiveChangeRequestApprovers(),
+			),
+		},
+		Spec: &pb.Canvas_Spec{
+			Nodes: serializedNodes,
+			Edges: actions.EdgesToProto(version.Edges),
+		},
+		Status: &pb.Canvas_Status{
+			LastExecutions: serializedExecutions,
+			NextQueueItems: serializedQueueItems,
+			LastEvents:     serializedEvents,
+		},
+	}, nil
+}
+
 func serializeCanvasChangeRequestApprovalConfig(
 	approvers []models.CanvasChangeRequestApprover,
 ) *pb.CanvasChangeRequestApprovalConfig {

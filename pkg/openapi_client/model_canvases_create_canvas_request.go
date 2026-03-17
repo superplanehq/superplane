@@ -20,7 +20,7 @@ var _ MappedNullable = &CanvasesCreateCanvasRequest{}
 
 // CanvasesCreateCanvasRequest struct for CanvasesCreateCanvasRequest
 type CanvasesCreateCanvasRequest struct {
-	Canvas     *CanvasesCanvas           `json:"canvas,omitempty"`
+	Canvas *CanvasesCanvas `json:"canvas,omitempty"`
 	AutoLayout *CanvasesCanvasAutoLayout `json:"autoLayout,omitempty"`
 }
 
@@ -106,7 +106,7 @@ func (o *CanvasesCreateCanvasRequest) SetAutoLayout(v CanvasesCanvasAutoLayout) 
 }
 
 func (o CanvasesCreateCanvasRequest) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,3 +159,5 @@ func (v *NullableCanvasesCreateCanvasRequest) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+
