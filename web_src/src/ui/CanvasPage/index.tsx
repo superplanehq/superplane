@@ -868,9 +868,9 @@ function CanvasPage(props: CanvasPageProps) {
   const canvasStateMode = props.canvasStateMode || "default";
   const canvasStateBorderClass =
     canvasStateMode === "editing"
-      ? "ring-inset ring-[3px] ring-amber-500"
+      ? "border-3 border-amber-500"
       : canvasStateMode === "previewing-previous-version"
-        ? "ring-inset ring-[3px] ring-sky-500"
+        ? "border-3 border-sky-500"
         : "";
   const canvasStateBadgeClass =
     canvasStateMode === "editing"
