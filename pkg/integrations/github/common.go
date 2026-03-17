@@ -54,17 +54,40 @@ func ensureRepoInMetadata(ctx core.MetadataContext, app core.IntegrationContext,
 		return r.Name == repository
 	})
 
-	if repoIndex == -1 {
-		return fmt.Errorf("repository %s is not accessible to app installation", repository)
-	}
-
 	if nodeMetadata.Repository != nil && nodeMetadata.Repository.Name == repository {
 		return nil
 	}
 
-	return ctx.Set(NodeMetadata{
-		Repository: &appMetadata.Repositories[repoIndex],
-	})
+	// Prefer cached metadata when present (fast path).
+	if repoIndex != -1 {
+		return ctx.Set(NodeMetadata{
+			Repository: &appMetadata.Repositories[repoIndex],
+		})
+	}
+
+	// Cached metadata can be incomplete (pagination, stale cache). If we have enough information,
+	// validate live against GitHub to avoid false rejections.
+	if appMetadata.InstallationID == "" || appMetadata.GitHubApp.ID == 0 || appMetadata.Owner == "" {
+		return fmt.Errorf("repository %s is not accessible to app installation", repository)
+	}
+
+	client, err := NewClient(app, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	if err != nil {
+		return fmt.Errorf("failed to initialize GitHub client: %w", err)
+	}
+
+	repo, _, err := client.Repositories.Get(context.Background(), appMetadata.Owner, repository)
+	if err != nil {
+		return fmt.Errorf("repository %s is not accessible to app installation", repository)
+	}
+
+	live := Repository{
+		ID:   repo.GetID(),
+		Name: repo.GetName(),
+		URL:  repo.GetHTMLURL(),
+	}
+
+	return ctx.Set(NodeMetadata{Repository: &live})
 }
 
 func getRepositoryFromConfiguration(c any) string {
