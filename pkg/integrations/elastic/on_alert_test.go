@@ -203,7 +203,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"severities": []configuration.Predicate{eq("critical"), eq("high")}},
+			Configuration: map[string]any{"severities": []string{"critical", "high"}},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
@@ -217,7 +217,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"severities": []configuration.Predicate{eq("low")}},
+			Configuration: map[string]any{"severities": []string{"low"}},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
@@ -231,7 +231,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"statuses": []configuration.Predicate{eq("active")}},
+			Configuration: map[string]any{"statuses": []string{"active"}},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
@@ -245,7 +245,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"statuses": []configuration.Predicate{eq("recovered")}},
+			Configuration: map[string]any{"statuses": []string{"recovered"}},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
@@ -265,8 +265,8 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 				"rules":      []string{"rule-123"},
 				"spaces":     []string{"default"},
 				"tags":       []configuration.Predicate{eq("team:infra")},
-				"severities": []configuration.Predicate{eq("critical")},
-				"statuses":   []configuration.Predicate{eq("active")},
+				"severities": []string{"critical"},
+				"statuses":   []string{"active"},
 			},
 			Events:  eventsCtx,
 			Webhook: webhook,
@@ -283,7 +283,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 			Headers: headersWithSecret(),
 			Configuration: map[string]any{
 				"rules":    []string{"rule-123"},
-				"statuses": []configuration.Predicate{eq("recovered")}, // active != recovered
+				"statuses": []string{"recovered"}, // active != recovered
 			},
 			Events:  eventsCtx,
 			Webhook: webhook,
@@ -292,4 +292,26 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 		assert.Empty(t, eventsCtx.Payloads)
 	})
+}
+
+func Test__Elastic__ListResources__AlertSeverityAndStatus(t *testing.T) {
+	integration := &Elastic{}
+
+	severities, err := integration.ListResources(ResourceTypeKibanaAlertSeverity, core.ListResourcesContext{})
+	require.NoError(t, err)
+	assert.Equal(t, []core.IntegrationResource{
+		{Type: ResourceTypeKibanaAlertSeverity, ID: "low", Name: "Low"},
+		{Type: ResourceTypeKibanaAlertSeverity, ID: "medium", Name: "Medium"},
+		{Type: ResourceTypeKibanaAlertSeverity, ID: "high", Name: "High"},
+		{Type: ResourceTypeKibanaAlertSeverity, ID: "critical", Name: "Critical"},
+	}, severities)
+
+	statuses, err := integration.ListResources(ResourceTypeKibanaAlertStatus, core.ListResourcesContext{})
+	require.NoError(t, err)
+	assert.Equal(t, []core.IntegrationResource{
+		{Type: ResourceTypeKibanaAlertStatus, ID: "active", Name: "Active"},
+		{Type: ResourceTypeKibanaAlertStatus, ID: "flapping", Name: "Flapping"},
+		{Type: ResourceTypeKibanaAlertStatus, ID: "recovered", Name: "Recovered"},
+		{Type: ResourceTypeKibanaAlertStatus, ID: "untracked", Name: "Untracked"},
+	}, statuses)
 }

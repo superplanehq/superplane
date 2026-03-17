@@ -22,12 +22,25 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 To connect Elastic to SuperPlane:
 
-1. **Elasticsearch URL**: Full URL of your Elasticsearch cluster (e.g. `https://my-cluster.es.us-east-1.aws.found.io:9243`).
-2. **Kibana URL**: Full URL of your Kibana instance (e.g. `https://my-cluster.kb.us-east-1.aws.found.io:9243`). Required for automatic Kibana webhook connector setup.
-3. **Auth Method**:
-   - **API Key** (recommended for Elastic Cloud): Go to Kibana → Stack Management → API Keys and create a new key. Paste the base64-encoded `id:api_key` value.
-   - **Username / Password**: Provide the credentials for a user with the required privileges.
-4. **Kibana alerts (trigger)**: SuperPlane automatically creates a signed Kibana Webhook connector. You still need to attach that connector to your alert rules in Kibana.
+1. **Elasticsearch URL**:
+   - Paste your Elasticsearch endpoint.
+   - Example: `https://my-cluster.es.us-east-1.aws.found.io:9243`.
+2. **Kibana URL**:
+   - Open Kibana in your browser and copy the URL from the address bar.
+   - Keep only the base URL: protocol, host, and port.
+   - Remove anything after that, such as `/app/...`, anything starting with `?`, or anything starting with `#`.
+   - Example browser URL: `https://my-cluster.kb.us-east-1.aws.found.io:9243/app/home`.
+   - Paste into SuperPlane: `https://my-cluster.kb.us-east-1.aws.found.io:9243`.
+3. **Where to find these URLs**:
+   - **Elastic Cloud**: Go to **Elastic Cloud → Deployments**, open your deployment, and copy the **Elasticsearch endpoint** and **Kibana endpoint** from the Overview page.
+   - **Self-managed Elastic**: Use the Elasticsearch server URL for **Elasticsearch URL**, and the normal browser URL you use to open Kibana for **Kibana URL**.
+4. **API Key**:
+   - In Kibana, go to **Stack Management → API Keys**.
+   - Create an API key that can index documents in Elasticsearch and manage Kibana connectors.
+   - Paste that API key into SuperPlane.
+5. **Alert rules**:
+   - SuperPlane automatically creates the Kibana webhook connector.
+   - In Kibana, add that connector to the alert rules you want to send to SuperPlane.
 
 <a id="when-alert-fires"></a>
 

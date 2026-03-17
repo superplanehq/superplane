@@ -18,21 +18,31 @@ type Elastic struct{}
 type Configuration struct {
 	URL       string `json:"url"`
 	KibanaURL string `json:"kibanaUrl"`
-	AuthType  string `json:"authType"`
 	APIKey    string `json:"apiKey"`
-	Username  string `json:"username"`
-	Password  string `json:"password"`
 }
 
 const installationInstructions = `
 To connect Elastic to SuperPlane:
 
-1. **Elasticsearch URL**: Full URL of your Elasticsearch cluster (e.g. ` + "`https://my-cluster.es.us-east-1.aws.found.io:9243`" + `).
-2. **Kibana URL**: Full URL of your Kibana instance (e.g. ` + "`https://my-cluster.kb.us-east-1.aws.found.io:9243`" + `). Required for automatic Kibana webhook connector setup.
-3. **Auth Method**:
-   - **API Key** (recommended for Elastic Cloud): Go to Kibana → Stack Management → API Keys and create a new key. Paste the base64-encoded ` + "`id:api_key`" + ` value.
-   - **Username / Password**: Provide the credentials for a user with the required privileges.
-4. **Kibana alerts (trigger)**: SuperPlane automatically creates a signed Kibana Webhook connector. You still need to attach that connector to your alert rules in Kibana.
+1. **Elasticsearch URL**:
+   - Paste your Elasticsearch endpoint.
+   - Example: ` + "`https://my-cluster.es.us-east-1.aws.found.io:9243`" + `.
+2. **Kibana URL**:
+   - Open Kibana in your browser and copy the URL from the address bar.
+   - Keep only the base URL: protocol, host, and port.
+   - Remove anything after that, such as ` + "`/app/...`" + `, anything starting with ` + "`?`" + `, or anything starting with ` + "`#`" + `.
+   - Example browser URL: ` + "`https://my-cluster.kb.us-east-1.aws.found.io:9243/app/home`" + `.
+   - Paste into SuperPlane: ` + "`https://my-cluster.kb.us-east-1.aws.found.io:9243`" + `.
+3. **Where to find these URLs**:
+   - **Elastic Cloud**: Go to **Elastic Cloud → Deployments**, open your deployment, and copy the **Elasticsearch endpoint** and **Kibana endpoint** from the Overview page.
+   - **Self-managed Elastic**: Use the Elasticsearch server URL for **Elasticsearch URL**, and the normal browser URL you use to open Kibana for **Kibana URL**.
+4. **API Key**:
+   - In Kibana, go to **Stack Management → API Keys**.
+   - Create an API key that can index documents in Elasticsearch and manage Kibana connectors.
+   - Paste that API key into SuperPlane.
+5. **Alert rules**:
+   - SuperPlane automatically creates the Kibana webhook connector.
+   - In Kibana, add that connector to the alert rules you want to send to SuperPlane.
 `
 
 func (e *Elastic) Name() string {
@@ -62,63 +72,21 @@ func (e *Elastic) Configuration() []configuration.Field {
 			Label:       "Elasticsearch URL",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Full URL of your Elasticsearch cluster (e.g. https://my-cluster.es.us-east-1.aws.found.io:9243).",
+			Description: "Base URL used to send API requests to Elasticsearch, such as https://my-cluster.es.us-east-1.aws.found.io:9243.",
 		},
 		{
 			Name:        "kibanaUrl",
 			Label:       "Kibana URL",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Full URL of your Kibana instance (e.g. https://my-cluster.kb.us-east-1.aws.found.io:9243).",
-		},
-		{
-			Name:        "authType",
-			Label:       "Auth Method",
-			Type:        configuration.FieldTypeSelect,
-			Required:    true,
-			Default:     "apiKey",
-			Description: "Choose whether SuperPlane should authenticate to Elasticsearch and Kibana with an API key or a username/password.",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "API Key", Value: "apiKey"},
-						{Label: "Username / Password", Value: "basic"},
-					},
-				},
-			},
+			Description: "Base URL of your Kibana instance. Copy the browser address up to the host and port only, without /app/... or query parameters.",
 		},
 		{
 			Name:      "apiKey",
 			Label:     "API Key",
 			Type:      configuration.FieldTypeString,
-			Required:  false,
+			Required:  true,
 			Sensitive: true,
-			Description: "Base64-encoded Elasticsearch API key (id:api_key format). " +
-				"Create one in Kibana → Stack Management → API Keys.",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "authType", Values: []string{"apiKey"}},
-			},
-		},
-		{
-			Name:        "username",
-			Label:       "Username",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Username for basic authentication. Use an account with permission to index documents and manage Kibana connectors.",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "authType", Values: []string{"basic"}},
-			},
-		},
-		{
-			Name:        "password",
-			Label:       "Password",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Sensitive:   true,
-			Description: "Password for basic authentication.",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "authType", Values: []string{"basic"}},
-			},
 		},
 	}
 }
@@ -153,24 +121,8 @@ func (e *Elastic) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("kibanaUrl is required")
 	}
 
-	if config.AuthType == "" {
-		return fmt.Errorf("authType is required")
-	}
-
-	switch config.AuthType {
-	case "apiKey":
-		if config.APIKey == "" {
-			return fmt.Errorf("apiKey is required when authType is apiKey")
-		}
-	case "basic":
-		if config.Username == "" {
-			return fmt.Errorf("username is required when authType is basic")
-		}
-		if config.Password == "" {
-			return fmt.Errorf("password is required when authType is basic")
-		}
-	default:
-		return fmt.Errorf("unknown authType %q: must be apiKey or basic", config.AuthType)
+	if config.APIKey == "" {
+		return fmt.Errorf("apiKey is required")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -193,19 +145,20 @@ func (e *Elastic) Sync(ctx core.SyncContext) error {
 func (e *Elastic) HandleRequest(_ core.HTTPRequestContext) {}
 
 const (
-	ResourceTypeIndex       = "elastic.index"
-	ResourceTypeKibanaRule  = "elastic.kibana.rule"
-	ResourceTypeKibanaSpace = "elastic.kibana.space"
+	ResourceTypeIndex               = "elastic.index"
+	ResourceTypeKibanaRule          = "elastic.kibana.rule"
+	ResourceTypeKibanaSpace         = "elastic.kibana.space"
+	ResourceTypeKibanaAlertSeverity = "elastic.kibana.alert.severity"
+	ResourceTypeKibanaAlertStatus   = "elastic.kibana.alert.status"
 )
 
 func (e *Elastic) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return nil, fmt.Errorf("error creating client: %v", err)
-	}
-
 	switch resourceType {
 	case ResourceTypeIndex:
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %v", err)
+		}
 		indices, err := client.ListIndices()
 		if err != nil {
 			return nil, fmt.Errorf("error listing indices: %v", err)
@@ -217,6 +170,10 @@ func (e *Elastic) ListResources(resourceType string, ctx core.ListResourcesConte
 		return resources, nil
 
 	case ResourceTypeKibanaRule:
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %v", err)
+		}
 		rules, err := client.ListKibanaRules()
 		if err != nil {
 			return nil, fmt.Errorf("error listing Kibana rules: %v", err)
@@ -228,6 +185,10 @@ func (e *Elastic) ListResources(resourceType string, ctx core.ListResourcesConte
 		return resources, nil
 
 	case ResourceTypeKibanaSpace:
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %v", err)
+		}
 		spaces, err := client.ListKibanaSpaces()
 		if err != nil {
 			return nil, fmt.Errorf("error listing Kibana spaces: %v", err)
@@ -237,6 +198,22 @@ func (e *Elastic) ListResources(resourceType string, ctx core.ListResourcesConte
 			resources = append(resources, core.IntegrationResource{ID: s.ID, Name: s.Name})
 		}
 		return resources, nil
+
+	case ResourceTypeKibanaAlertSeverity:
+		return []core.IntegrationResource{
+			{Type: ResourceTypeKibanaAlertSeverity, ID: "low", Name: "Low"},
+			{Type: ResourceTypeKibanaAlertSeverity, ID: "medium", Name: "Medium"},
+			{Type: ResourceTypeKibanaAlertSeverity, ID: "high", Name: "High"},
+			{Type: ResourceTypeKibanaAlertSeverity, ID: "critical", Name: "Critical"},
+		}, nil
+
+	case ResourceTypeKibanaAlertStatus:
+		return []core.IntegrationResource{
+			{Type: ResourceTypeKibanaAlertStatus, ID: "active", Name: "Active"},
+			{Type: ResourceTypeKibanaAlertStatus, ID: "flapping", Name: "Flapping"},
+			{Type: ResourceTypeKibanaAlertStatus, ID: "recovered", Name: "Recovered"},
+			{Type: ResourceTypeKibanaAlertStatus, ID: "untracked", Name: "Untracked"},
+		}, nil
 	}
 
 	return nil, fmt.Errorf("unsupported resourceType %q", resourceType)
