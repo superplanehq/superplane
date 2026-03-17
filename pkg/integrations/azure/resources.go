@@ -13,11 +13,12 @@ import (
 )
 
 const (
-	ResourceTypeResourceGroupDropdown  = "azure.resourceGroup"
-	ResourceTypeResourceGroupLocation  = "azure.resourceGroupLocation"
-	ResourceTypeVMSizeDropdown         = "azure.vmSize"
-	ResourceTypeVirtualNetworkDropdown = "azure.virtualNetwork"
-	ResourceTypeSubnetDropdown         = "azure.subnet"
+	ResourceTypeResourceGroupDropdown     = "azure.resourceGroup"
+	ResourceTypeResourceGroupLocation     = "azure.resourceGroupLocation"
+	ResourceTypeVMSizeDropdown            = "azure.vmSize"
+	ResourceTypeVirtualNetworkDropdown    = "azure.virtualNetwork"
+	ResourceTypeSubnetDropdown            = "azure.subnet"
+	ResourceTypeContainerRegistryDropdown = "azure.containerRegistry"
 )
 
 type armResourceGroup struct {
@@ -297,6 +298,68 @@ func (a *AzureIntegration) ListSubnets(ctx core.ListResourcesContext, resourceGr
 
 // azureResourceName extracts the final resource name segment from an Azure resource ID.
 // It handles plain names, full ARM IDs, and URL-encoded ARM IDs (e.g. from query parameters).
+type armContainerRegistryProperties struct {
+	LoginServer string `json:"loginServer"`
+}
+
+type armContainerRegistry struct {
+	Name       string                          `json:"name"`
+	ID         string                          `json:"id"`
+	Location   string                          `json:"location"`
+	Properties *armContainerRegistryProperties `json:"properties"`
+}
+
+func (a *AzureIntegration) ListContainerRegistries(ctx core.ListResourcesContext, resourceGroup string) ([]core.IntegrationResource, error) {
+	ctx.Logger.Infof("listing Azure container registries for resource group: %s", resourceGroup)
+
+	provider, err := a.ensureProvider(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	var listURL string
+	if resourceGroup != "" {
+		listURL = fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.ContainerRegistry/registries?api-version=2023-07-01",
+			armBaseURL, provider.GetSubscriptionID(), resourceGroup)
+	} else {
+		listURL = fmt.Sprintf("%s/subscriptions/%s/providers/Microsoft.ContainerRegistry/registries?api-version=2023-07-01",
+			armBaseURL, provider.GetSubscriptionID())
+	}
+
+	items, err := provider.getClient().listAll(context.Background(), listURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list container registries: %w", err)
+	}
+
+	resources := []core.IntegrationResource{}
+	for _, raw := range items {
+		var registry armContainerRegistry
+		if err := json.Unmarshal(raw, &registry); err != nil {
+			continue
+		}
+		if registry.Name == "" {
+			continue
+		}
+
+		id := registry.Name
+		if registry.ID != "" {
+			id = registry.ID
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeContainerRegistryDropdown,
+			Name: registry.Name,
+			ID:   id,
+		})
+	}
+
+	sort.Slice(resources, func(i, j int) bool {
+		return resources[i].Name < resources[j].Name
+	})
+
+	return resources, nil
+}
+
 func azureResourceName(value string) string {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
