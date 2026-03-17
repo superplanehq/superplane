@@ -76,7 +76,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -98,7 +98,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -132,7 +132,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -162,7 +162,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -192,7 +192,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -232,7 +232,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -262,7 +262,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -296,7 +296,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -336,7 +336,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -398,7 +398,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -438,7 +438,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -476,7 +476,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -522,7 +522,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -568,7 +568,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -614,7 +614,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -652,7 +652,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -692,7 +692,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -744,7 +744,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -790,7 +790,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -836,7 +836,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -868,7 +868,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -906,7 +906,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -956,7 +956,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1002,7 +1002,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1086,7 +1086,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1132,7 +1132,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1184,7 +1184,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1228,7 +1228,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1280,7 +1280,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1324,7 +1324,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1362,7 +1362,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1402,7 +1402,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1438,7 +1438,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1484,7 +1484,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1514,7 +1514,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1544,7 +1544,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1584,7 +1584,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1608,7 +1608,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1640,7 +1640,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1672,7 +1672,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1713,7 +1713,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1747,7 +1747,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1794,7 +1794,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1841,7 +1841,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1881,7 +1881,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1928,7 +1928,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1968,7 +1968,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2008,7 +2008,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2032,7 +2032,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2096,7 +2096,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2120,7 +2120,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2144,7 +2144,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2174,7 +2174,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2204,7 +2204,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2244,7 +2244,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2274,7 +2274,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2314,7 +2314,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2344,7 +2344,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2384,7 +2384,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2414,7 +2414,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2454,7 +2454,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2490,7 +2490,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2526,7 +2526,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2572,7 +2572,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2616,7 +2616,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2646,7 +2646,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2686,7 +2686,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2724,7 +2724,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2754,7 +2754,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2794,7 +2794,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2826,7 +2826,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2864,7 +2864,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2905,7 +2905,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2939,7 +2939,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2986,7 +2986,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3033,7 +3033,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3073,7 +3073,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3113,7 +3113,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3154,7 +3154,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3188,7 +3188,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3235,7 +3235,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3282,7 +3282,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3322,7 +3322,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3375,7 +3375,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3421,7 +3421,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3461,7 +3461,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3483,7 +3483,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3517,7 +3517,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3547,7 +3547,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3577,7 +3577,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3617,7 +3617,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3657,7 +3657,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3681,7 +3681,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3713,7 +3713,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3762,7 +3762,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3811,7 +3811,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3860,7 +3860,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -3884,7 +3884,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googleRpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -7134,7 +7134,7 @@
         }
       }
     },
-    "googleRpcStatus": {
+    "googlerpcStatus": {
       "type": "object",
       "properties": {
         "code": {

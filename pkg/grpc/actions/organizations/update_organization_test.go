@@ -37,9 +37,9 @@ func Test__UpdateOrganization(t *testing.T) {
 
 		updatedOrg := &protos.Organization{
 			Metadata: &protos.Organization_Metadata{
-				Name:                    "updated-org",
-				Description:             "Updated description",
-				VersioningEnabled:       &versioningEnabled,
+				Name:              "updated-org",
+				Description:       "Updated description",
+				VersioningEnabled: &versioningEnabled,
 			},
 		}
 

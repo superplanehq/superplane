@@ -397,7 +397,9 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
               name: updatedMetadata?.name ?? variables.name ?? current.metadata?.name,
               description: updatedMetadata?.description ?? variables.description ?? current.metadata?.description,
               versioningEnabled:
-                updatedMetadata?.versioningEnabled ?? variables.versioningEnabled ?? current.metadata?.versioningEnabled,
+                updatedMetadata?.versioningEnabled ??
+                variables.versioningEnabled ??
+                current.metadata?.versioningEnabled,
               changeRequestApprovalConfig:
                 updatedMetadata?.changeRequestApprovalConfig ??
                 variables.changeRequestApprovalConfig ??

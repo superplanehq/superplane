@@ -55,12 +55,12 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 	response := &pb.UpdateOrganizationResponse{
 		Organization: &pb.Organization{
 			Metadata: &pb.Organization_Metadata{
-				Id:                      organization.ID.String(),
-				Name:                    organization.Name,
-				Description:             organization.Description,
-				CreatedAt:               timestamppb.New(*organization.CreatedAt),
-				UpdatedAt:               timestamppb.New(*organization.UpdatedAt),
-				VersioningEnabled:       &organization.CanvasVersioningEnabled,
+				Id:                organization.ID.String(),
+				Name:              organization.Name,
+				Description:       organization.Description,
+				CreatedAt:         timestamppb.New(*organization.CreatedAt),
+				UpdatedAt:         timestamppb.New(*organization.UpdatedAt),
+				VersioningEnabled: &organization.CanvasVersioningEnabled,
 			},
 		},
 	}

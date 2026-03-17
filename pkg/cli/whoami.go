@@ -56,11 +56,11 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.Render(map[string]any{
-		"id":                      response.GetId(),
-		"email":                   response.GetEmail(),
-		"organizationId":          response.GetOrganizationId(),
-		"organizationName":        organizationLabel,
-		"versioningEnabled":       versioningEnabled,
+		"id":                response.GetId(),
+		"email":             response.GetEmail(),
+		"organizationId":    response.GetOrganizationId(),
+		"organizationName":  organizationLabel,
+		"versioningEnabled": versioningEnabled,
 	})
 }
 
