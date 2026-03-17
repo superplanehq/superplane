@@ -40,6 +40,7 @@ export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ childr
     queryFn: async () => {
       const response = await usersListUserPermissions(
         withOrganizationHeader({
+          organizationId,
           path: { userId: userId! },
           query: { domainType: "DOMAIN_TYPE_ORGANIZATION", domainId: organizationId },
         }),
@@ -74,7 +75,7 @@ export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ childr
     [permissionSet],
   );
 
-  const isLoading = meLoading || permissionsQuery.isLoading;
+  const isLoading = !organizationId || meLoading || (!!organizationId && !userId) || permissionsQuery.isLoading;
 
   return (
     <PermissionsContext.Provider value={{ permissions, isLoading, canAct }}>{children}</PermissionsContext.Provider>
