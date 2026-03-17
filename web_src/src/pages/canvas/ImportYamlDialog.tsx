@@ -154,9 +154,7 @@ export function ImportYamlDialog({ open, onOpenChange, organizationId, onSuccess
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Import Canvas from YAML</DialogTitle>
-          <DialogDescription>
-            Upload a YAML file or paste a Canvas definition to create a new Canvas.
-          </DialogDescription>
+          <DialogDescription>Upload a YAML file or paste a Canvas definition to create a new Canvas.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
