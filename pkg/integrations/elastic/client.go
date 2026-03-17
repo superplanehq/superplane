@@ -16,10 +16,7 @@ import (
 type Client struct {
 	baseURL   string
 	kibanaURL string
-	authType  string
 	apiKey    string
-	username  string
-	password  string
 	http      core.HTTPContext
 }
 
@@ -29,51 +26,26 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 		return nil, fmt.Errorf("error getting url: %v", err)
 	}
 
-	authType, err := ctx.GetConfig("authType")
+	apiKey, err := ctx.GetConfig("apiKey")
 	if err != nil {
-		return nil, fmt.Errorf("error getting authType: %v", err)
+		return nil, fmt.Errorf("error getting apiKey: %v", err)
 	}
 
 	c := &Client{
-		baseURL:  strings.TrimRight(string(serverURL), "/"),
-		authType: string(authType),
-		http:     httpCtx,
+		baseURL: strings.TrimRight(string(serverURL), "/"),
+		apiKey:  string(apiKey),
+		http:    httpCtx,
 	}
 
 	if kibanaURL, err := ctx.GetConfig("kibanaUrl"); err == nil {
 		c.kibanaURL = strings.TrimRight(string(kibanaURL), "/")
 	}
 
-	switch c.authType {
-	case "apiKey":
-		apiKey, err := ctx.GetConfig("apiKey")
-		if err != nil {
-			return nil, fmt.Errorf("error getting apiKey: %v", err)
-		}
-		c.apiKey = string(apiKey)
-	case "basic":
-		username, err := ctx.GetConfig("username")
-		if err != nil {
-			return nil, fmt.Errorf("error getting username: %v", err)
-		}
-		password, err := ctx.GetConfig("password")
-		if err != nil {
-			return nil, fmt.Errorf("error getting password: %v", err)
-		}
-		c.username = string(username)
-		c.password = string(password)
-	}
-
 	return c, nil
 }
 
 func (c *Client) setAuthHeaders(req *http.Request) {
-	switch c.authType {
-	case "apiKey":
-		req.Header.Set("Authorization", "ApiKey "+c.apiKey)
-	case "basic":
-		req.SetBasicAuth(c.username, c.password)
-	}
+	req.Header.Set("Authorization", "ApiKey "+c.apiKey)
 }
 
 func (c *Client) execRequest(method, fullURL string, body io.Reader) ([]byte, error) {
