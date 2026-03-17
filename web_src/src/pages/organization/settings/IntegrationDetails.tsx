@@ -17,6 +17,7 @@ import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { getApiErrorMessage } from "@/utils/errors";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { ArrowLeft, CircleX, ExternalLink, Loader2, Plug, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -30,13 +31,14 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   const navigate = useNavigate();
   const { integrationId } = useParams<{ integrationId: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
+
+  const { data: integration, isLoading, error } = useIntegration(organizationId, integrationId || "");
+  usePageTitle(["Integrations", integration?.metadata?.name]);
   const [configValues, setConfigValues] = useState<Record<string, unknown>>({});
   const [integrationName, setIntegrationName] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const canUpdateIntegrations = canAct("integrations", "update");
   const canDeleteIntegrations = canAct("integrations", "delete");
-
-  const { data: integration, isLoading, error } = useIntegration(organizationId, integrationId || "");
 
   const { data: availableIntegrations = [] } = useAvailableIntegrations();
   const integrationDef = integration

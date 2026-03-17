@@ -1,4 +1,5 @@
 import { Icon } from "@/components/Icon";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,10 +26,12 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
+
+  const { data: serviceAccount, isLoading } = useServiceAccount(organizationId, id || "");
+  usePageTitle(["Service Accounts", serviceAccount?.name]);
   const canUpdate = canAct("service_accounts", "update");
   const canDelete = canAct("service_accounts", "delete");
 
-  const { data: serviceAccount, isLoading } = useServiceAccount(organizationId, id || "");
   const updateMutation = useUpdateServiceAccount(organizationId);
   const deleteMutation = useDeleteServiceAccount(organizationId);
   const regenerateTokenMutation = useRegenerateServiceAccountToken(organizationId);

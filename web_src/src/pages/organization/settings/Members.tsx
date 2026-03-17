@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Badge } from "../../../components/Badge/badge";
@@ -40,6 +41,7 @@ interface MembersProps {
 }
 
 export function Members({ organizationId }: MembersProps) {
+  usePageTitle(["Members"]);
   const { data: me } = useMe();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [sortConfig, setSortConfig] = useState<{

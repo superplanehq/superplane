@@ -1,4 +1,5 @@
 import { Icon } from "@/components/Icon";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Link } from "@/components/Link/link";
 import { Textarea } from "@/components/Textarea/textarea";
@@ -24,6 +25,7 @@ interface KeyValuePair {
 }
 
 export function Secrets({ organizationId }: SecretsProps) {
+  usePageTitle(["Secrets"]);
   const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
