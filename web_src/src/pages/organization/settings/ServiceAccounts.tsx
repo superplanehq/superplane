@@ -1,4 +1,5 @@
 import { Icon } from "@/components/Icon";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Link } from "@/components/Link/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/Table/table";
@@ -20,6 +21,7 @@ interface ServiceAccountsProps {
 }
 
 export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
+  usePageTitle(["Service Accounts"]);
   const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);

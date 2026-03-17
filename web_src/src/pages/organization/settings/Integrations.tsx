@@ -1,6 +1,7 @@
 import { Loader2, Plug, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import {
   useAvailableIntegrations,
   useConnectedIntegrations,
@@ -25,6 +26,7 @@ interface IntegrationsProps {
 }
 
 export function Integrations({ organizationId }: IntegrationsProps) {
+  usePageTitle(["Integrations"]);
   const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationDefinition | null>(null);

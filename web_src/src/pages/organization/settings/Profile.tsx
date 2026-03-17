@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { meRegenerateToken } from "../../../api-client/sdk.gen";
 import type { SuperplaneMeUser } from "../../../api-client/types.gen";
 import { Avatar } from "../../../components/Avatar/avatar";
@@ -12,6 +13,7 @@ import { useOrganizationId, withOrganizationHeader } from "../../../utils/withOr
 import { meKeys, useMe } from "@/hooks/useMe";
 
 export function Profile() {
+  usePageTitle(["Profile"]);
   const queryClient = useQueryClient();
   const organizationId = useOrganizationId();
   const { data: user, isLoading: loading, error: meError } = useMe();
