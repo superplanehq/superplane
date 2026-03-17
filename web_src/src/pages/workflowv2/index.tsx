@@ -4126,7 +4126,10 @@ export function WorkflowPageV2() {
         }) || [];
 
       const exportWorkflow = {
+        apiVersion: "v1",
+        kind: "Canvas",
         metadata: {
+          id: canvas.metadata?.id || "",
           name: canvas.metadata?.name || "Canvas",
           description: canvas.metadata?.description || "",
           isTemplate: canvas.metadata?.isTemplate ?? false,
