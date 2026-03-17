@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Field, Fieldset, Label } from "@/components/Fieldset/fieldset";
 import { Input } from "@/components/Input/input";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/ui/switch";
@@ -457,13 +458,15 @@ export function CanvasSettingsView({
       ) : null}
 
       <div className="flex items-center gap-4">
-        <Button
+        <LoadingButton
           type="button"
           onClick={handleSave}
-          disabled={isSaving || !canUpdateCanvas || !hasChanges || hasApproverValidationErrors}
+          disabled={!canUpdateCanvas || !hasChanges || hasApproverValidationErrors}
+          loading={isSaving}
+          loadingText="Saving..."
         >
-          {isSaving ? "Saving..." : "Save Changes"}
-        </Button>
+          Save Changes
+        </LoadingButton>
         {saveMessage ? (
           <span className={`text-sm ${saveMessage.includes("successfully") ? "text-green-600" : "text-red-600"}`}>
             {saveMessage}

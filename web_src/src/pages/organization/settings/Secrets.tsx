@@ -5,12 +5,13 @@ import { Link } from "@/components/Link/link";
 import { Textarea } from "@/components/Textarea/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/Table/table";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { Key, Loader2, Plus, Trash2 } from "lucide-react";
+import { Key, Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCreateSecret, useSecrets, type CreateSecretParams } from "@/hooks/useSecrets";
@@ -306,22 +307,17 @@ export function Secrets({ organizationId }: SecretsProps) {
               </div>
 
               <div className="flex justify-start gap-3 mt-6">
-                <Button
+                <LoadingButton
                   type="submit"
                   color="blue"
-                  disabled={createSecretMutation.isPending || !secretName?.trim() || !canCreateSecrets}
+                  disabled={!secretName?.trim() || !canCreateSecrets}
+                  loading={createSecretMutation.isPending}
+                  loadingText="Creating..."
                   className="flex items-center gap-2"
                   data-testid="secrets-create-submit"
                 >
-                  {createSecretMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    "Create Secret"
-                  )}
-                </Button>
+                  Create Secret
+                </LoadingButton>
                 <Button
                   type="button"
                   variant="outline"

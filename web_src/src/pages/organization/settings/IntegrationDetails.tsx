@@ -1,6 +1,7 @@
 import type { ConfigurationField } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePermissions } from "@/contexts/PermissionsContext";
@@ -346,20 +347,15 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
                     ))}
 
                   <div className="flex items-center gap-3 pt-4">
-                    <Button
+                    <LoadingButton
                       type="submit"
                       color="blue"
-                      disabled={updateMutation.isPending || !integrationName.trim() || !canUpdateIntegrations}
+                      disabled={!integrationName.trim() || !canUpdateIntegrations}
+                      loading={updateMutation.isPending}
+                      loadingText="Saving..."
                     >
-                      {updateMutation.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        "Save"
-                      )}
-                    </Button>
+                      Save
+                    </LoadingButton>
                     {updateMutation.isError && (
                       <span className="text-sm text-red-600 dark:text-red-400">
                         Failed to update integration: {getApiErrorMessage(updateMutation.error)}
@@ -466,21 +462,16 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
                 This cannot be undone. All data will be permanently deleted.
               </p>
               <div className="flex justify-start gap-3">
-                <Button
+                <LoadingButton
                   color="blue"
                   onClick={handleDelete}
-                  disabled={deleteMutation.isPending || !canDeleteIntegrations}
+                  disabled={!canDeleteIntegrations}
+                  loading={deleteMutation.isPending}
+                  loadingText="Deleting..."
                   className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
                 >
-                  {deleteMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Deleting...
-                    </>
-                  ) : (
-                    "Delete"
-                  )}
-                </Button>
+                  Delete
+                </LoadingButton>
                 <Button
                   variant="outline"
                   onClick={() => setShowDeleteConfirm(false)}

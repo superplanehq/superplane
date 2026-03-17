@@ -21,6 +21,7 @@ import { isCustomComponentsEnabled } from "../../lib/env";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
 
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
 import { useCreateCustomComponentModalState } from "./useCreateCustomComponentModalState";
 import type { ComponentsEdge, ComponentsNode } from "@/api-client";
@@ -824,18 +825,20 @@ function CanvasActionsMenu({
           This cannot be undone. Are you sure you want to continue?
         </DialogDescription>
         <DialogActions>
-          <Button
+          <LoadingButton
             variant="destructive"
             onClick={(event) => {
               event.stopPropagation();
               handleDelete();
             }}
-            disabled={deleteCanvasMutation.isPending || !canDeleteCanvases}
+            disabled={!canDeleteCanvases}
+            loading={deleteCanvasMutation.isPending}
+            loadingText="Deleting..."
             className="flex items-center gap-2"
           >
             <Trash2 size={16} />
-            {deleteCanvasMutation.isPending ? "Deleting..." : "Delete"}
-          </Button>
+            Delete
+          </LoadingButton>
           <Button
             variant="outline"
             onClick={(event) => {
@@ -973,15 +976,17 @@ function BlueprintActionsMenu({
           This cannot be undone. Are you sure you want to continue?
         </DialogDescription>
         <DialogActions>
-          <Button
+          <LoadingButton
             variant="destructive"
             onClick={handleDelete}
-            disabled={deleteBlueprintMutation.isPending || !canDeleteBlueprints}
+            disabled={!canDeleteBlueprints}
+            loading={deleteBlueprintMutation.isPending}
+            loadingText="Deleting..."
             className="flex items-center gap-2"
           >
             <Trash2 size={16} />
-            {deleteBlueprintMutation.isPending ? "Deleting..." : "Delete"}
-          </Button>
+            Delete
+          </LoadingButton>
           <Button variant="outline" onClick={closeDialog}>
             Cancel
           </Button>

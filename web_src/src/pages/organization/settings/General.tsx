@@ -15,6 +15,7 @@ import {
   useDeleteOrganizationAgentOpenAIKey,
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import {
   Dialog,
   DialogContent,
@@ -210,14 +211,16 @@ export function General({ organization }: GeneralProps) {
               allowed={canUpdateOrg || permissionsLoading}
               message="You don't have permission to update this organization."
             >
-              <Button
+              <LoadingButton
                 type="button"
                 onClick={handleSave}
-                disabled={updateOrganizationMutation.isPending || !canUpdateOrg}
+                disabled={!canUpdateOrg}
+                loading={updateOrganizationMutation.isPending}
+                loadingText="Saving..."
                 className="max-w-48"
               >
-                {updateOrganizationMutation.isPending ? "Saving..." : "Save Changes"}
-              </Button>
+                Save Changes
+              </LoadingButton>
             </PermissionTooltip>
             {saveMessage && (
               <span className={`text-sm ${saveMessage.includes("successfully") ? "text-green-600" : "text-red-600"}`}>
@@ -270,15 +273,17 @@ export function General({ organization }: GeneralProps) {
                 </Button>
               )}
               {!isAgentModeZeroState && (
-                <Button
+                <LoadingButton
                   type="button"
                   variant="outline"
                   onClick={handleDisableAgentMode}
-                  disabled={!canUpdateOrg || agentSettingsBusy || !openAIKeyConfigured}
+                  disabled={!canUpdateOrg || !openAIKeyConfigured}
+                  loading={agentSettingsBusy}
+                  loadingText="Disabling..."
                   data-testid="agent-mode-disable-button"
                 >
                   Disable
-                </Button>
+                </LoadingButton>
               )}
             </div>
           </div>
@@ -327,13 +332,15 @@ export function General({ organization }: GeneralProps) {
                   >
                     Cancel
                   </Button>
-                  <Button
+                  <LoadingButton
                     type="submit"
-                    disabled={!canUpdateOrg || agentSettingsBusy || !agentApiKey.trim()}
+                    disabled={!canUpdateOrg || !agentApiKey.trim()}
+                    loading={agentSettingsBusy}
+                    loadingText="Saving..."
                     data-testid="agent-openai-key-save"
                   >
-                    {setAgentOpenAIKeyMutation.isPending ? "Saving..." : "Save"}
-                  </Button>
+                    Save
+                  </LoadingButton>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -429,21 +436,20 @@ export function General({ organization }: GeneralProps) {
                 allowed={canDeleteOrg || permissionsLoading}
                 message="You don't have permission to delete this organization."
               >
-                <Button
+                <LoadingButton
                   type="button"
                   variant="outline"
                   onClick={handleDelete}
                   disabled={
-                    deleteOrganizationMutation.isPending ||
-                    deleteConfirmation !== (organization.metadata?.name || "") ||
-                    !organizationId ||
-                    !canDeleteOrg
+                    deleteConfirmation !== (organization.metadata?.name || "") || !organizationId || !canDeleteOrg
                   }
+                  loading={deleteOrganizationMutation.isPending}
+                  loadingText="Deleting..."
                   className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 gap-1"
                 >
                   <Trash2 className="h-4 w-4" />
-                  {deleteOrganizationMutation.isPending ? "Deleting..." : "Delete Organization"}
-                </Button>
+                  Delete Organization
+                </LoadingButton>
               </PermissionTooltip>
               {deleteError && <span className="text-sm text-red-600">{deleteError}</span>}
             </div>

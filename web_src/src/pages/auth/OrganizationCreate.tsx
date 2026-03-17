@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Text } from "../../components/Text/text";
-import { Button } from "../../ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 
 const OrganizationCreate: React.FC = () => {
   const [name, setName] = useState("");
@@ -90,9 +90,15 @@ const OrganizationCreate: React.FC = () => {
             </div>
 
             <div className="flex space-x-4">
-              <Button type="submit" className="flex-1" disabled={loading || !name.trim()}>
-                {loading ? "Creating..." : "Create Organization"}
-              </Button>
+              <LoadingButton
+                type="submit"
+                className="flex-1"
+                disabled={!name.trim()}
+                loading={loading}
+                loadingText="Creating..."
+              >
+                Create Organization
+              </LoadingButton>
             </div>
           </form>
         </div>
