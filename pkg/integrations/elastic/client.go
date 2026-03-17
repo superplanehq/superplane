@@ -142,7 +142,11 @@ func (c *Client) execKibanaRequest(method, path string, body io.Reader) ([]byte,
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, &KibanaAPIError{StatusCode: res.StatusCode, Body: redactedResponseHint(responseBody)}
+		body := redactedResponseHint(responseBody)
+		if res.StatusCode >= 400 && res.StatusCode < 500 {
+			body = string(responseBody)
+		}
+		return nil, &KibanaAPIError{StatusCode: res.StatusCode, Body: body}
 	}
 
 	return responseBody, nil
@@ -424,13 +428,13 @@ type SearchHit struct {
 	Source map[string]any `json:"_source"`
 }
 
-// TimestampValue extracts the value of the given timestamp field from the source
-// as a string. Returns "" if the field is absent or not a string.
-func (h *SearchHit) TimestampValue(field string) string {
+// TimestampValue extracts the @timestamp value from the source as a string.
+// Returns "" if the field is absent or not a string.
+func (h *SearchHit) TimestampValue() string {
 	if h.Source == nil {
 		return ""
 	}
-	if v, ok := h.Source[field]; ok {
+	if v, ok := h.Source[onDocumentIndexedTimeField]; ok {
 		if s, ok := v.(string); ok {
 			return s
 		}
@@ -438,19 +442,19 @@ func (h *SearchHit) TimestampValue(field string) string {
 	return ""
 }
 
-// SearchDocumentsAfter queries an index for documents where the given
-// timestamp field is strictly greater than afterTimestamp, sorted ascending.
-func (c *Client) SearchDocumentsAfter(index, timestampField, afterTimestamp string, size int) ([]SearchHit, error) {
+// SearchDocumentsAfter queries an index for documents where @timestamp is
+// strictly greater than afterTimestamp, sorted ascending.
+func (c *Client) SearchDocumentsAfter(index, afterTimestamp string, size int) ([]SearchHit, error) {
 	query := map[string]any{
 		"query": map[string]any{
 			"range": map[string]any{
-				timestampField: map[string]any{
+				onDocumentIndexedTimeField: map[string]any{
 					"gt": afterTimestamp,
 				},
 			},
 		},
 		"sort": []any{
-			map[string]any{timestampField: map[string]any{"order": "asc"}},
+			map[string]any{onDocumentIndexedTimeField: map[string]any{"order": "asc"}},
 		},
 		"size": size,
 	}
@@ -476,4 +480,113 @@ func (c *Client) SearchDocumentsAfter(index, timestampField, afterTimestamp stri
 	}
 
 	return result.Hits.Hits, nil
+}
+
+// KibanaConnector is the relevant subset of a Kibana actions connector.
+type KibanaConnector struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ListKibanaConnectors returns all connectors from Kibana.
+func (c *Client) ListKibanaConnectors() ([]KibanaConnector, error) {
+	body, err := c.execKibanaRequest(http.MethodGet, "/api/actions/connectors", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var connectors []KibanaConnector
+	if err := json.Unmarshal(body, &connectors); err != nil {
+		return nil, fmt.Errorf("error parsing connectors response: %v", err)
+	}
+
+	return connectors, nil
+}
+
+// KibanaRuleResponse is the relevant subset of the Kibana alerting rule API response.
+type KibanaRuleResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// CreateKibanaQueryRule creates a Kibana Elasticsearch query rule that fires
+// connectorID whenever new documents appear in index within a 1-minute window.
+func (c *Client) CreateKibanaQueryRule(index, connectorID, routeKey string) (*KibanaRuleResponse, error) {
+	actionBody, err := json.Marshal(map[string]any{
+		"eventType": "document_indexed",
+		"index":     index,
+		"routeKey":  routeKey,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling action body: %v", err)
+	}
+
+	esQuery, err := json.Marshal(map[string]any{"query": map[string]any{"match_all": map[string]any{}}})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling esQuery: %v", err)
+	}
+
+	payload := map[string]any{
+		"name":         "SuperPlane \u2022 " + index,
+		"rule_type_id": ".es-query",
+		"consumer":     "alerts",
+		"schedule":     map[string]any{"interval": "1m"},
+		"params": map[string]any{
+			"index":                      []string{index},
+			"timeField":                  onDocumentIndexedTimeField,
+			"esQuery":                    string(esQuery),
+			"size":                       100,
+			"threshold":                  []int{0},
+			"thresholdComparator":        ">",
+			"timeWindowSize":             1,
+			"timeWindowUnit":             "m",
+			"excludeHitsFromPreviousRun": true,
+		},
+		"actions": []any{
+			map[string]any{
+				"id":    connectorID,
+				"group": "query matched",
+				"params": map[string]any{
+					"body": string(actionBody),
+				},
+				"frequency": map[string]any{
+					"notify_when": "onActiveAlert",
+					"throttle":    nil,
+					"summary":     false,
+				},
+			},
+		},
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling rule payload: %v", err)
+	}
+
+	responseBody, err := c.execKibanaRequest(http.MethodPost, "/api/alerting/rule", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var resp KibanaRuleResponse
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing rule response: %v", err)
+	}
+
+	return &resp, nil
+}
+
+// DeleteKibanaRule removes a Kibana alerting rule by ID.
+// A 404 response is treated as success: the rule is already gone.
+func (c *Client) DeleteKibanaRule(ruleID string) error {
+	_, err := c.execKibanaRequest(
+		http.MethodDelete,
+		fmt.Sprintf("/api/alerting/rule/%s", url.PathEscape(ruleID)),
+		nil,
+	)
+	var kibanaErr *KibanaAPIError
+	if errors.As(err, &kibanaErr) && kibanaErr.StatusCode == http.StatusNotFound {
+		return nil
+	}
+	return err
 }

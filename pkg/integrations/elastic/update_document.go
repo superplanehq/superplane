@@ -34,7 +34,7 @@ func (c *UpdateDocument) Documentation() string {
 
 - **Index**: The Elasticsearch index containing the document
 - **Document ID**: The ID of the document to update
-- **Fields**: The fields to merge into the existing document (partial update)
+- **Fields**: The fields to merge into the existing document (partial update). The editor starts with an ` + "`@timestamp`" + ` template for convenience.
 
 ## Outputs
 
@@ -71,12 +71,14 @@ func (c *UpdateDocument) Configuration() []configuration.Field {
 			Description: "The ID of the document to update.",
 		},
 		{
-			Name:        "fields",
-			Label:       "Fields",
-			Type:        configuration.FieldTypeObject,
-			Required:    true,
-			Default:     map[string]any{},
-			Description: "The fields to merge into the existing document (partial update).",
+			Name:     "fields",
+			Label:    "Fields",
+			Type:     configuration.FieldTypeObject,
+			Required: true,
+			Default: map[string]any{
+				onDocumentIndexedTimeField: defaultDocumentTimestampTemplate,
+			},
+			Description: "The fields to merge into the existing document (partial update). Defaults to include an @timestamp field template.",
 		},
 	}
 }

@@ -1,6 +1,7 @@
 package elastic
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -13,52 +14,280 @@ import (
 )
 
 func Test__OnDocumentIndexed__Setup(t *testing.T) {
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
+		"url":       "https://elastic.example.com",
+		"kibanaUrl": "https://kibana.example.com",
+		"authType":  "apiKey",
+		"apiKey":    "test-api-key",
+	}}
+
 	t.Run("missing index -> error", func(t *testing.T) {
-		ctx := core.TriggerContext{
+		err := (&OnDocumentIndexed{}).Setup(core.TriggerContext{
 			Configuration: map[string]any{},
-		}
-		err := (&OnDocumentIndexed{}).Setup(ctx)
+			Integration:   integrationCtx,
+		})
 		require.ErrorContains(t, err, "index is required")
 	})
 
-	t.Run("valid config -> initializes metadata and schedules poll", func(t *testing.T) {
+	t.Run("valid config -> schedules checkConnectorAvailability", func(t *testing.T) {
 		meta := &contexts.MetadataContext{}
 		requests := &contexts.RequestContext{}
-		ctx := core.TriggerContext{
+		err := (&OnDocumentIndexed{}).Setup(core.TriggerContext{
 			Configuration: map[string]any{"index": "my-index"},
+			Integration:   integrationCtx,
 			Metadata:      meta,
 			Requests:      requests,
-		}
-		err := (&OnDocumentIndexed{}).Setup(ctx)
+		})
 		require.NoError(t, err)
-		assert.NotNil(t, meta.Metadata)
-		assert.Equal(t, onDocumentIndexedPollAction, requests.Action)
-	})
-
-	t.Run("re-save preserves existing checkpoint", func(t *testing.T) {
-		meta := &contexts.MetadataContext{Metadata: OnDocumentIndexedMetadata{LastTimestamp: "2024-01-01T00:00:00Z"}}
-		requests := &contexts.RequestContext{}
-		ctx := core.TriggerContext{
-			Configuration: map[string]any{"index": "my-index"},
-			Metadata:      meta,
-			Requests:      requests,
-		}
-		err := (&OnDocumentIndexed{}).Setup(ctx)
-		require.NoError(t, err)
+		assert.Equal(t, checkConnectorAction, requests.Action)
 		saved, ok := meta.Metadata.(OnDocumentIndexedMetadata)
 		require.True(t, ok)
-		assert.Equal(t, "2024-01-01T00:00:00Z", saved.LastTimestamp)
+		assert.NotEmpty(t, saved.RouteKey)
+		assert.NotEmpty(t, saved.LastTimestamp)
+	})
+
+	t.Run("rule already provisioned -> no-op", func(t *testing.T) {
+		meta := &contexts.MetadataContext{Metadata: OnDocumentIndexedMetadata{
+			LastTimestamp: "2024-06-01T12:00:00Z",
+			RouteKey:      "route-123",
+			RuleID:        "existing-rule-id",
+		}}
+		requests := &contexts.RequestContext{}
+		err := (&OnDocumentIndexed{}).Setup(core.TriggerContext{
+			Configuration: map[string]any{"index": "my-index"},
+			Integration:   integrationCtx,
+			Metadata:      meta,
+			Requests:      requests,
+		})
+		require.NoError(t, err)
+		assert.Empty(t, requests.Action)
 	})
 }
 
-func Test__OnDocumentIndexed__Poll(t *testing.T) {
+func Test__OnDocumentIndexed__CheckConnectorAndCreateRule(t *testing.T) {
 	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
-		"url":      "https://elastic.example.com",
-		"authType": "apiKey",
-		"apiKey":   "test-api-key",
+		"url":       "https://elastic.example.com",
+		"kibanaUrl": "https://kibana.example.com",
+		"authType":  "apiKey",
+		"apiKey":    "test-api-key",
 	}}
 
-	t.Run("emits event for each new document", func(t *testing.T) {
+	connectorsResponse := `[{"id":"conn-123","name":"SuperPlane Alert"}]`
+	ruleResponse := `{"id":"rule-456","name":"SuperPlane • my-index"}`
+
+	t.Run("connector found -> creates rule and saves rule ID", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(connectorsResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ruleResponse))},
+			},
+		}
+		meta := &contexts.MetadataContext{}
+		requests := &contexts.RequestContext{}
+
+		_, err := (&OnDocumentIndexed{}).HandleAction(core.TriggerActionContext{
+			Name:          checkConnectorAction,
+			Configuration: map[string]any{"index": "my-index"},
+			HTTP:          httpCtx,
+			Integration:   integrationCtx,
+			Metadata:      meta,
+			Requests:      requests,
+		})
+
+		require.NoError(t, err)
+		saved, ok := meta.Metadata.(OnDocumentIndexedMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "rule-456", saved.RuleID)
+		assert.NotEmpty(t, saved.RouteKey)
+		assert.Empty(t, requests.Action)
+
+		require.Len(t, httpCtx.Requests, 2)
+		body, err := io.ReadAll(httpCtx.Requests[1].Body)
+		require.NoError(t, err)
+
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(body, &payload))
+		actions := payload["actions"].([]any)
+		action := actions[0].(map[string]any)
+		params := action["params"].(map[string]any)
+		assert.Equal(t, onDocumentIndexedTimeField, payload["params"].(map[string]any)["timeField"])
+
+		var actionBody map[string]any
+		require.NoError(t, json.Unmarshal([]byte(params["body"].(string)), &actionBody))
+		assert.Equal(t, "document_indexed", actionBody["eventType"])
+		assert.Equal(t, saved.RouteKey, actionBody["routeKey"])
+		assert.Equal(t, "my-index", actionBody["index"])
+	})
+
+	t.Run("connector not found yet -> reschedules", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[]`))},
+			},
+		}
+		meta := &contexts.MetadataContext{}
+		requests := &contexts.RequestContext{}
+
+		_, err := (&OnDocumentIndexed{}).HandleAction(core.TriggerActionContext{
+			Name:          checkConnectorAction,
+			Configuration: map[string]any{"index": "my-index"},
+			HTTP:          httpCtx,
+			Integration:   integrationCtx,
+			Metadata:      meta,
+			Requests:      requests,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, checkConnectorAction, requests.Action)
+	})
+
+	t.Run("Kibana error listing connectors -> reschedules", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"error":"internal"}`))},
+			},
+		}
+		meta := &contexts.MetadataContext{}
+		requests := &contexts.RequestContext{}
+
+		_, err := (&OnDocumentIndexed{}).HandleAction(core.TriggerActionContext{
+			Name:          checkConnectorAction,
+			Configuration: map[string]any{"index": "my-index"},
+			HTTP:          httpCtx,
+			Integration:   integrationCtx,
+			Metadata:      meta,
+			Requests:      requests,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, checkConnectorAction, requests.Action)
+	})
+
+	t.Run("rule already provisioned -> no-op", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{}
+		meta := &contexts.MetadataContext{Metadata: OnDocumentIndexedMetadata{RuleID: "existing-rule-id"}}
+		requests := &contexts.RequestContext{}
+
+		_, err := (&OnDocumentIndexed{}).HandleAction(core.TriggerActionContext{
+			Name:          checkConnectorAction,
+			Configuration: map[string]any{"index": "my-index"},
+			HTTP:          httpCtx,
+			Integration:   integrationCtx,
+			Metadata:      meta,
+			Requests:      requests,
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, requests.Action)
+		assert.Empty(t, httpCtx.Requests)
+	})
+
+	t.Run("uses correct Kibana URL and auth", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(connectorsResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ruleResponse))},
+			},
+		}
+		meta := &contexts.MetadataContext{}
+		requests := &contexts.RequestContext{}
+
+		_, err := (&OnDocumentIndexed{}).HandleAction(core.TriggerActionContext{
+			Name:          checkConnectorAction,
+			Configuration: map[string]any{"index": "my-index"},
+			HTTP:          httpCtx,
+			Integration:   integrationCtx,
+			Metadata:      meta,
+			Requests:      requests,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 2)
+		assert.Contains(t, httpCtx.Requests[0].URL.String(), "kibana.example.com")
+		assert.Equal(t, "ApiKey test-api-key", httpCtx.Requests[0].Header.Get("Authorization"))
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[1].Method)
+		assert.Contains(t, httpCtx.Requests[1].URL.String(), "/api/alerting/rule")
+	})
+}
+
+func Test__OnDocumentIndexed__HandleWebhook(t *testing.T) {
+	trigger := &OnDocumentIndexed{}
+	secret := "auto-generated-secret"
+	webhook := &contexts.NodeWebhookContext{Secret: secret}
+
+	validBody := []byte(`{"eventType":"document_indexed","routeKey":"route-123","index":"my-index"}`)
+
+	headersWithSecret := func() http.Header {
+		h := http.Header{}
+		h.Set(SigningHeaderName, secret)
+		return h
+	}
+
+	t.Run("secret missing -> 403", func(t *testing.T) {
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body: validBody, Headers: http.Header{},
+			Configuration: map[string]any{}, Events: &contexts.EventContext{}, Webhook: webhook,
+		})
+		assert.Equal(t, http.StatusForbidden, code)
+		assert.ErrorContains(t, err, "missing required header")
+	})
+
+	t.Run("wrong secret -> 403", func(t *testing.T) {
+		h := http.Header{}
+		h.Set(SigningHeaderName, "wrong")
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body: validBody, Headers: h,
+			Configuration: map[string]any{}, Events: &contexts.EventContext{}, Webhook: webhook,
+		})
+		assert.Equal(t, http.StatusForbidden, code)
+		assert.ErrorContains(t, err, "invalid value for header")
+	})
+
+	t.Run("invalid JSON -> 400", func(t *testing.T) {
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body: []byte("not json"), Headers: headersWithSecret(),
+			Configuration: map[string]any{}, Events: &contexts.EventContext{}, Webhook: webhook,
+		})
+		assert.Equal(t, http.StatusBadRequest, code)
+		assert.ErrorContains(t, err, "invalid JSON payload")
+	})
+
+	t.Run("wrong eventType -> silent pass", func(t *testing.T) {
+		eventsCtx := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          []byte(`{"eventType":"alert_fired","routeKey":"route-123","index":"my-index"}`),
+			Headers:       headersWithSecret(),
+			Configuration: map[string]any{"index": "my-index"},
+			Metadata:      &contexts.MetadataContext{Metadata: OnDocumentIndexedMetadata{RouteKey: "route-123", LastTimestamp: "2024-06-01T12:00:00Z"}},
+			Events:        eventsCtx,
+			Webhook:       webhook,
+			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"url": "https://elastic.example.com", "authType": "apiKey", "apiKey": "test-api-key"}},
+			HTTP:          &contexts.HTTPContext{},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Empty(t, eventsCtx.Payloads)
+	})
+
+	t.Run("routeKey mismatch -> silent pass", func(t *testing.T) {
+		eventsCtx := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          validBody,
+			Headers:       headersWithSecret(),
+			Configuration: map[string]any{"index": "my-index"},
+			Metadata:      &contexts.MetadataContext{Metadata: OnDocumentIndexedMetadata{RouteKey: "other-route", LastTimestamp: "2024-06-01T12:00:00Z"}},
+			Events:        eventsCtx,
+			Webhook:       webhook,
+			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"url": "https://elastic.example.com", "authType": "apiKey", "apiKey": "test-api-key"}},
+			HTTP:          &contexts.HTTPContext{},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Empty(t, eventsCtx.Payloads)
+	})
+
+	t.Run("valid request -> queries Elasticsearch and emits documents", func(t *testing.T) {
+		eventsCtx := &contexts.EventContext{}
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -82,87 +311,39 @@ func Test__OnDocumentIndexed__Poll(t *testing.T) {
 				},
 			},
 		}
-		events := &contexts.EventContext{}
-		meta := &contexts.MetadataContext{Metadata: OnDocumentIndexedMetadata{LastTimestamp: "2024-06-01T12:00:00Z"}}
-		requests := &contexts.RequestContext{}
-
-		_, err := (&OnDocumentIndexed{}).HandleAction(core.TriggerActionContext{
-			Name:          onDocumentIndexedPollAction,
+		meta := &contexts.MetadataContext{Metadata: OnDocumentIndexedMetadata{
+			LastTimestamp: "2024-06-01T12:00:00Z",
+			RouteKey:      "route-123",
+			RuleID:        "rule-456",
+		}}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          validBody,
+			Headers:       headersWithSecret(),
 			Configuration: map[string]any{"index": "my-index"},
-			HTTP:          httpCtx,
-			Integration:   integrationCtx,
-			Events:        events,
 			Metadata:      meta,
-			Requests:      requests,
+			Events:        eventsCtx,
+			Webhook:       webhook,
+			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"url": "https://elastic.example.com", "authType": "apiKey", "apiKey": "test-api-key"}},
+			HTTP:          httpCtx,
 		})
-
 		require.NoError(t, err)
-		assert.Equal(t, 2, events.Count())
-		assert.Equal(t, onDocumentIndexedPollAction, requests.Action)
+		assert.Equal(t, http.StatusOK, code)
+		require.Len(t, eventsCtx.Payloads, 2)
+		assert.Equal(t, "elastic.document.indexed", eventsCtx.Payloads[0].Type)
+		data := eventsCtx.Payloads[0].Data.(map[string]any)
+		assert.Equal(t, "doc-1", data["id"])
+		assert.Equal(t, "my-index", data["index"])
 
-		// Checkpoint advances to last document's timestamp
-		saved := meta.Metadata.(OnDocumentIndexedMetadata)
+		saved, ok := meta.Metadata.(OnDocumentIndexedMetadata)
+		require.True(t, ok)
 		assert.Equal(t, "2024-06-01T12:02:00Z", saved.LastTimestamp)
-	})
-
-	t.Run("search uses correct URL and auth", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"hits":{"hits":[]}}`)),
-				},
-			},
-		}
-		meta := &contexts.MetadataContext{Metadata: OnDocumentIndexedMetadata{LastTimestamp: "2024-01-01T00:00:00Z"}}
-		requests := &contexts.RequestContext{}
-
-		_, err := (&OnDocumentIndexed{}).HandleAction(core.TriggerActionContext{
-			Name:          onDocumentIndexedPollAction,
-			Configuration: map[string]any{"index": "my-index"},
-			HTTP:          httpCtx,
-			Integration:   integrationCtx,
-			Events:        &contexts.EventContext{},
-			Metadata:      meta,
-			Requests:      requests,
-		})
-
-		require.NoError(t, err)
 		require.Len(t, httpCtx.Requests, 1)
-		req := httpCtx.Requests[0]
-		assert.Equal(t, http.MethodPost, req.Method)
-		assert.Equal(t, "https://elastic.example.com/my-index/_search", req.URL.String())
-		assert.Equal(t, "ApiKey test-api-key", req.Header.Get("Authorization"))
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
+		assert.Equal(t, "https://elastic.example.com/my-index/_search", httpCtx.Requests[0].URL.String())
 	})
 
-	t.Run("no new documents -> checkpoint unchanged", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"hits":{"hits":[]}}`)),
-				},
-			},
-		}
-		meta := &contexts.MetadataContext{Metadata: OnDocumentIndexedMetadata{LastTimestamp: "2024-06-01T12:00:00Z"}}
-		requests := &contexts.RequestContext{}
-
-		_, err := (&OnDocumentIndexed{}).HandleAction(core.TriggerActionContext{
-			Name:          onDocumentIndexedPollAction,
-			Configuration: map[string]any{"index": "my-index"},
-			HTTP:          httpCtx,
-			Integration:   integrationCtx,
-			Events:        &contexts.EventContext{},
-			Metadata:      meta,
-			Requests:      requests,
-		})
-
-		require.NoError(t, err)
-		saved := meta.Metadata.(OnDocumentIndexedMetadata)
-		assert.Equal(t, "2024-06-01T12:00:00Z", saved.LastTimestamp)
-	})
-
-	t.Run("Elasticsearch error -> schedules next poll without error", func(t *testing.T) {
+	t.Run("search failure -> returns 200 without emitting", func(t *testing.T) {
+		eventsCtx := &contexts.EventContext{}
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -171,20 +352,26 @@ func Test__OnDocumentIndexed__Poll(t *testing.T) {
 				},
 			},
 		}
-		meta := &contexts.MetadataContext{Metadata: OnDocumentIndexedMetadata{LastTimestamp: "2024-01-01T00:00:00Z"}}
-		requests := &contexts.RequestContext{}
-
-		_, err := (&OnDocumentIndexed{}).HandleAction(core.TriggerActionContext{
-			Name:          onDocumentIndexedPollAction,
+		meta := &contexts.MetadataContext{Metadata: OnDocumentIndexedMetadata{
+			LastTimestamp: "2024-06-01T12:00:00Z",
+			RouteKey:      "route-123",
+			RuleID:        "rule-456",
+		}}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          validBody,
+			Headers:       headersWithSecret(),
 			Configuration: map[string]any{"index": "my-index"},
-			HTTP:          httpCtx,
-			Integration:   integrationCtx,
-			Events:        &contexts.EventContext{},
 			Metadata:      meta,
-			Requests:      requests,
+			Events:        eventsCtx,
+			Webhook:       webhook,
+			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"url": "https://elastic.example.com", "authType": "apiKey", "apiKey": "test-api-key"}},
+			HTTP:          httpCtx,
 		})
-
 		require.NoError(t, err)
-		assert.Equal(t, onDocumentIndexedPollAction, requests.Action)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Empty(t, eventsCtx.Payloads)
+		saved, ok := meta.Metadata.(OnDocumentIndexedMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "2024-06-01T12:00:00Z", saved.LastTimestamp)
 	})
 }
