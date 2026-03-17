@@ -148,6 +148,7 @@ export const useCanvas = (organizationId: string, canvasId: string) => {
       );
       return response.data?.canvas;
     },
+    staleTime: 0,
     enabled: !!organizationId && !!canvasId,
   });
 };
@@ -704,6 +705,7 @@ export const useCanvasEvents = (canvasId: string, enabled = true) => {
       );
       return response.data;
     },
+    staleTime: 0,
     refetchOnWindowFocus: false,
     enabled: !!canvasId && enabled,
   });

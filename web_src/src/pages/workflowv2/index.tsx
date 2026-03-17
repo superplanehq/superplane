@@ -231,7 +231,12 @@ export function WorkflowPageV2() {
   const canCreateIntegrations = canAct("integrations", "create");
   const canUpdateIntegrations = canAct("integrations", "update");
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
-  const { data: liveCanvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId!, canvasId!);
+  const {
+    data: liveCanvas,
+    isLoading: canvasLoading,
+    isFetching: canvasFetching,
+    error: canvasError,
+  } = useCanvas(organizationId!, canvasId!);
   const { data: organizationUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true, 10);
@@ -651,6 +656,7 @@ export function WorkflowPageV2() {
   const getNodeData = useNodeExecutionStore((state) => state.getNodeData);
   const loadNodeDataMethod = useNodeExecutionStore((state) => state.loadNodeData);
   const initializeFromWorkflow = useNodeExecutionStore((state) => state.initializeFromWorkflow);
+  const clearNodeExecutionStore = useNodeExecutionStore((state) => state.clear);
 
   // Redirect to home page if workflow is not found (404)
   // Use replace to avoid back button issues and prevent 404 flash
@@ -670,14 +676,16 @@ export function WorkflowPageV2() {
     }
   }, [canvasError, canvasLoading, navigate, organizationId, canvasDeletedRemotely]);
 
-  // Initialize store from workflow.status on workflow load (only once per workflow)
+  // Initialize store from workflow.status on workflow load (only once per workflow).
+  // Skip initialization while the canvas is being refetched to avoid populating
+  // the store with stale cached data when switching between canvases.
   const hasInitializedStoreRef = useRef<string | null>(null);
   useEffect(() => {
-    if (canvas?.metadata?.id && hasInitializedStoreRef.current !== canvas.metadata.id) {
+    if (canvas?.metadata?.id && !canvasFetching && hasInitializedStoreRef.current !== canvas.metadata.id) {
       initializeFromWorkflow(canvas);
       hasInitializedStoreRef.current = canvas.metadata.id;
     }
-  }, [canvas, initializeFromWorkflow]);
+  }, [canvas, canvasFetching, initializeFromWorkflow]);
 
   useEffect(() => {
     if (!canvas) {
@@ -698,7 +706,9 @@ export function WorkflowPageV2() {
     hasSyncedVersionFromURLRef.current = false;
     lastSavedWorkflowRef.current = null;
     lastLocalCanvasSaveAtRef.current = 0;
-  }, [canvasId]);
+    hasInitializedStoreRef.current = null;
+    clearNodeExecutionStore();
+  }, [canvasId, clearNodeExecutionStore]);
 
   useEffect(() => {
     if (isTemplate) {
