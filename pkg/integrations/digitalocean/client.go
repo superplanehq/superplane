@@ -155,6 +155,32 @@ func (c *Client) ListSizes() ([]Size, error) {
 	return response.Sizes, nil
 }
 
+// SSHKey represents a DigitalOcean SSH key
+type SSHKey struct {
+	ID          int    `json:"id"`
+	Fingerprint string `json:"fingerprint"`
+	Name        string `json:"name"`
+}
+
+// ListSSHKeys retrieves all SSH keys on the account
+func (c *Client) ListSSHKeys() ([]SSHKey, error) {
+	url := fmt.Sprintf("%s/account/keys?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		SSHKeys []SSHKey `json:"ssh_keys"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.SSHKeys, nil
+}
+
 // Image represents a DigitalOcean image
 type Image struct {
 	ID           int    `json:"id"`
