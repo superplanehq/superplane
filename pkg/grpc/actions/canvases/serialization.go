@@ -55,7 +55,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 				UpdatedAt:               timestamppb.New(*canvas.UpdatedAt),
 				CreatedBy:               createdBy,
 				IsTemplate:              canvas.IsTemplate,
-				CanvasVersioningEnabled: canvasVersioningEnabled,
+				VersioningEnabled:       canvasVersioningEnabled,
 				ChangeRequestApprovalConfig: serializeCanvasChangeRequestApprovalConfig(
 					canvas.EffectiveChangeRequestApprovers(),
 				),
@@ -121,7 +121,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 			UpdatedAt:               timestamppb.New(*canvas.UpdatedAt),
 			CreatedBy:               createdBy,
 			IsTemplate:              canvas.IsTemplate,
-			CanvasVersioningEnabled: canvasVersioningEnabled,
+			VersioningEnabled:       canvasVersioningEnabled,
 			ChangeRequestApprovalConfig: serializeCanvasChangeRequestApprovalConfig(
 				canvas.EffectiveChangeRequestApprovers(),
 			),

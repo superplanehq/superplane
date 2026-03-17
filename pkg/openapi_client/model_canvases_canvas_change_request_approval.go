@@ -21,11 +21,11 @@ var _ MappedNullable = &CanvasesCanvasChangeRequestApproval{}
 
 // CanvasesCanvasChangeRequestApproval struct for CanvasesCanvasChangeRequestApproval
 type CanvasesCanvasChangeRequestApproval struct {
-	Actor         *SuperplaneCanvasesUserRef                `json:"actor,omitempty"`
-	Approver      *CanvasesCanvasChangeRequestApprover      `json:"approver,omitempty"`
-	State         *CanvasesCanvasChangeRequestApprovalState `json:"state,omitempty"`
-	CreatedAt     *time.Time                                `json:"createdAt,omitempty"`
-	InvalidatedAt *time.Time                                `json:"invalidatedAt,omitempty"`
+	Actor *SuperplaneCanvasesUserRef `json:"actor,omitempty"`
+	Approver *CanvasesCanvasChangeRequestApprover `json:"approver,omitempty"`
+	State *CanvasesCanvasChangeRequestApprovalState `json:"state,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	InvalidatedAt *time.Time `json:"invalidatedAt,omitempty"`
 }
 
 // NewCanvasesCanvasChangeRequestApproval instantiates a new CanvasesCanvasChangeRequestApproval object
@@ -210,7 +210,7 @@ func (o *CanvasesCanvasChangeRequestApproval) SetInvalidatedAt(v time.Time) {
 }
 
 func (o CanvasesCanvasChangeRequestApproval) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -272,3 +272,5 @@ func (v *NullableCanvasesCanvasChangeRequestApproval) UnmarshalJSON(src []byte) 
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

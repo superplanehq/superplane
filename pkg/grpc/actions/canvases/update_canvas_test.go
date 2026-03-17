@@ -131,7 +131,7 @@ func Test__UpdateCanvas(t *testing.T) {
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
 		require.NotNil(t, response.Canvas.Metadata)
-		assert.True(t, response.Canvas.Metadata.CanvasVersioningEnabled)
+		assert.True(t, response.Canvas.Metadata.VersioningEnabled)
 
 		updatedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
 		require.NoError(t, findErr)
@@ -173,7 +173,7 @@ func Test__UpdateCanvas(t *testing.T) {
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
 		require.NotNil(t, response.Canvas.Metadata)
-		assert.True(t, response.Canvas.Metadata.CanvasVersioningEnabled)
+		assert.True(t, response.Canvas.Metadata.VersioningEnabled)
 
 		updatedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
 		require.NoError(t, findErr)
@@ -202,7 +202,7 @@ func Test__UpdateCanvas(t *testing.T) {
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
 		require.NotNil(t, response.Canvas.Metadata)
-		assert.True(t, response.Canvas.Metadata.CanvasVersioningEnabled)
+		assert.True(t, response.Canvas.Metadata.VersioningEnabled)
 
 		updatedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
 		require.NoError(t, findErr)

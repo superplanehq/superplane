@@ -21,18 +21,18 @@ var _ MappedNullable = &CanvasesCanvasChangeRequestMetadata{}
 
 // CanvasesCanvasChangeRequestMetadata struct for CanvasesCanvasChangeRequestMetadata
 type CanvasesCanvasChangeRequestMetadata struct {
-	Id               *string                            `json:"id,omitempty"`
-	CanvasId         *string                            `json:"canvasId,omitempty"`
-	VersionId        *string                            `json:"versionId,omitempty"`
-	Owner            *SuperplaneCanvasesUserRef         `json:"owner,omitempty"`
-	BasedOnVersionId *string                            `json:"basedOnVersionId,omitempty"`
-	Status           *CanvasesCanvasChangeRequestStatus `json:"status,omitempty"`
-	PublishedAt      *time.Time                         `json:"publishedAt,omitempty"`
-	CreatedAt        *time.Time                         `json:"createdAt,omitempty"`
-	UpdatedAt        *time.Time                         `json:"updatedAt,omitempty"`
-	Title            *string                            `json:"title,omitempty"`
-	Description      *string                            `json:"description,omitempty"`
-	IsConflicted     *bool                              `json:"isConflicted,omitempty"`
+	Id *string `json:"id,omitempty"`
+	CanvasId *string `json:"canvasId,omitempty"`
+	VersionId *string `json:"versionId,omitempty"`
+	Owner *SuperplaneCanvasesUserRef `json:"owner,omitempty"`
+	BasedOnVersionId *string `json:"basedOnVersionId,omitempty"`
+	Status *CanvasesCanvasChangeRequestStatus `json:"status,omitempty"`
+	PublishedAt *time.Time `json:"publishedAt,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	Title *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+	IsConflicted *bool `json:"isConflicted,omitempty"`
 }
 
 // NewCanvasesCanvasChangeRequestMetadata instantiates a new CanvasesCanvasChangeRequestMetadata object
@@ -441,7 +441,7 @@ func (o *CanvasesCanvasChangeRequestMetadata) SetIsConflicted(v bool) {
 }
 
 func (o CanvasesCanvasChangeRequestMetadata) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -524,3 +524,5 @@ func (v *NullableCanvasesCanvasChangeRequestMetadata) UnmarshalJSON(src []byte) 
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

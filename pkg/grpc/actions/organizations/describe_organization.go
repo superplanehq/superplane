@@ -32,7 +32,7 @@ func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrgani
 				Description:             organization.Description,
 				CreatedAt:               timestamppb.New(*organization.CreatedAt),
 				UpdatedAt:               timestamppb.New(*organization.UpdatedAt),
-				CanvasVersioningEnabled: &organization.CanvasVersioningEnabled,
+				VersioningEnabled:       &organization.CanvasVersioningEnabled,
 			},
 		},
 	}

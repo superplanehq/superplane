@@ -272,7 +272,7 @@ message Organization {
     string description = 3;
     google.protobuf.Timestamp created_at = 4;
     google.protobuf.Timestamp updated_at = 5;
-    optional bool canvas_versioning_enabled = 6;
+    optional bool versioning_enabled = 6;
   }
 
   Metadata metadata = 1;

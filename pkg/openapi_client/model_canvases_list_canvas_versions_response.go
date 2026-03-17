@@ -21,10 +21,10 @@ var _ MappedNullable = &CanvasesListCanvasVersionsResponse{}
 
 // CanvasesListCanvasVersionsResponse struct for CanvasesListCanvasVersionsResponse
 type CanvasesListCanvasVersionsResponse struct {
-	Versions      []CanvasesCanvasVersion `json:"versions,omitempty"`
-	TotalCount    *int64                  `json:"totalCount,omitempty"`
-	HasNextPage   *bool                   `json:"hasNextPage,omitempty"`
-	LastTimestamp *time.Time              `json:"lastTimestamp,omitempty"`
+	Versions []CanvasesCanvasVersion `json:"versions,omitempty"`
+	TotalCount *int64 `json:"totalCount,omitempty"`
+	HasNextPage *bool `json:"hasNextPage,omitempty"`
+	LastTimestamp *time.Time `json:"lastTimestamp,omitempty"`
 }
 
 // NewCanvasesListCanvasVersionsResponse instantiates a new CanvasesListCanvasVersionsResponse object
@@ -173,7 +173,7 @@ func (o *CanvasesListCanvasVersionsResponse) SetLastTimestamp(v time.Time) {
 }
 
 func (o CanvasesListCanvasVersionsResponse) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -232,3 +232,5 @@ func (v *NullableCanvasesListCanvasVersionsResponse) UnmarshalJSON(src []byte) e
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

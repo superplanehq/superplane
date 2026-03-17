@@ -36,8 +36,8 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 		organization.Description = pbOrganization.Metadata.Description
 	}
 
-	if pbOrganization.Metadata.CanvasVersioningEnabled != nil {
-		organization.CanvasVersioningEnabled = *pbOrganization.Metadata.CanvasVersioningEnabled
+	if pbOrganization.Metadata.VersioningEnabled != nil {
+		organization.CanvasVersioningEnabled = *pbOrganization.Metadata.VersioningEnabled
 	}
 
 	now := time.Now()
@@ -60,7 +60,7 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 				Description:             organization.Description,
 				CreatedAt:               timestamppb.New(*organization.CreatedAt),
 				UpdatedAt:               timestamppb.New(*organization.UpdatedAt),
-				CanvasVersioningEnabled: &organization.CanvasVersioningEnabled,
+				VersioningEnabled:       &organization.CanvasVersioningEnabled,
 			},
 		},
 	}

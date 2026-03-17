@@ -20,9 +20,9 @@ var _ MappedNullable = &ServiceAccountsCreateServiceAccountRequest{}
 
 // ServiceAccountsCreateServiceAccountRequest struct for ServiceAccountsCreateServiceAccountRequest
 type ServiceAccountsCreateServiceAccountRequest struct {
-	Name        *string `json:"name,omitempty"`
+	Name *string `json:"name,omitempty"`
 	Description *string `json:"description,omitempty"`
-	Role        *string `json:"role,omitempty"`
+	Role *string `json:"role,omitempty"`
 }
 
 // NewServiceAccountsCreateServiceAccountRequest instantiates a new ServiceAccountsCreateServiceAccountRequest object
@@ -139,7 +139,7 @@ func (o *ServiceAccountsCreateServiceAccountRequest) SetRole(v string) {
 }
 
 func (o ServiceAccountsCreateServiceAccountRequest) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,3 +195,5 @@ func (v *NullableServiceAccountsCreateServiceAccountRequest) UnmarshalJSON(src [
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

@@ -73,7 +73,7 @@ func (o *OrganizationsDeleteAgentOpenAIKeyResponse) SetAgentSettings(v Organizat
 }
 
 func (o OrganizationsDeleteAgentOpenAIKeyResponse) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -123,3 +123,5 @@ func (v *NullableOrganizationsDeleteAgentOpenAIKeyResponse) UnmarshalJSON(src []
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

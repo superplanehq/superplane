@@ -77,7 +77,7 @@ func (o *CanvasesActOnCanvasChangeRequestBody) SetAction(v ActOnCanvasChangeRequ
 }
 
 func (o CanvasesActOnCanvasChangeRequestBody) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -127,3 +127,5 @@ func (v *NullableCanvasesActOnCanvasChangeRequestBody) UnmarshalJSON(src []byte)
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

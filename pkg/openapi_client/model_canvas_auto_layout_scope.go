@@ -21,8 +21,8 @@ type CanvasAutoLayoutScope string
 
 // List of CanvasAutoLayoutScope
 const (
-	CANVASAUTOLAYOUTSCOPE_SCOPE_UNSPECIFIED         CanvasAutoLayoutScope = "SCOPE_UNSPECIFIED"
-	CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS         CanvasAutoLayoutScope = "SCOPE_FULL_CANVAS"
+	CANVASAUTOLAYOUTSCOPE_SCOPE_UNSPECIFIED CanvasAutoLayoutScope = "SCOPE_UNSPECIFIED"
+	CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS CanvasAutoLayoutScope = "SCOPE_FULL_CANVAS"
 	CANVASAUTOLAYOUTSCOPE_SCOPE_CONNECTED_COMPONENT CanvasAutoLayoutScope = "SCOPE_CONNECTED_COMPONENT"
 )
 
@@ -111,3 +111,4 @@ func (v *NullableCanvasAutoLayoutScope) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+

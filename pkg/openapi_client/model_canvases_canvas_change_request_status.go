@@ -22,9 +22,9 @@ type CanvasesCanvasChangeRequestStatus string
 // List of CanvasesCanvasChangeRequestStatus
 const (
 	CANVASESCANVASCHANGEREQUESTSTATUS_STATUS_UNSPECIFIED CanvasesCanvasChangeRequestStatus = "STATUS_UNSPECIFIED"
-	CANVASESCANVASCHANGEREQUESTSTATUS_STATUS_OPEN        CanvasesCanvasChangeRequestStatus = "STATUS_OPEN"
-	CANVASESCANVASCHANGEREQUESTSTATUS_STATUS_PUBLISHED   CanvasesCanvasChangeRequestStatus = "STATUS_PUBLISHED"
-	CANVASESCANVASCHANGEREQUESTSTATUS_STATUS_REJECTED    CanvasesCanvasChangeRequestStatus = "STATUS_REJECTED"
+	CANVASESCANVASCHANGEREQUESTSTATUS_STATUS_OPEN CanvasesCanvasChangeRequestStatus = "STATUS_OPEN"
+	CANVASESCANVASCHANGEREQUESTSTATUS_STATUS_PUBLISHED CanvasesCanvasChangeRequestStatus = "STATUS_PUBLISHED"
+	CANVASESCANVASCHANGEREQUESTSTATUS_STATUS_REJECTED CanvasesCanvasChangeRequestStatus = "STATUS_REJECTED"
 )
 
 // All allowed values of CanvasesCanvasChangeRequestStatus enum
@@ -113,3 +113,4 @@ func (v *NullableCanvasesCanvasChangeRequestStatus) UnmarshalJSON(src []byte) er
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+

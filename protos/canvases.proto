@@ -397,7 +397,7 @@ message UpdateCanvasRequest {
   string id = 1;
   optional string name = 2;
   optional string description = 3;
-  optional bool canvas_versioning_enabled = 4;
+  optional bool versioning_enabled = 4;
   optional CanvasChangeRequestApprovalConfig change_request_approval_config = 5;
 }
 
@@ -560,7 +560,7 @@ message Canvas {
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
     bool is_template = 8;
-    bool canvas_versioning_enabled = 9;
+    bool versioning_enabled = 9;
     CanvasChangeRequestApprovalConfig change_request_approval_config = 10;
   }
 

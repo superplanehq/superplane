@@ -61,7 +61,7 @@ func TestCreateCanvasInheritsOrganizationVersioningWhenEnabled(t *testing.T) {
 	require.NotNil(t, response.Canvas)
 	require.NotNil(t, response.Canvas.Metadata)
 	// New canvases inherit organization versioning.
-	require.True(t, response.Canvas.Metadata.CanvasVersioningEnabled)
+	require.True(t, response.Canvas.Metadata.VersioningEnabled)
 
 	require.NotEmpty(t, response.Canvas.Metadata.Id)
 	createdCanvasUUID, parseErr := uuid.Parse(response.Canvas.Metadata.Id)
