@@ -85,4 +85,3 @@ func Test__listInstallationRepositories__paginates_all_pages(t *testing.T) {
 	require.Equal(t, "repo2", repos[1].Name)
 	require.Equal(t, "https://github.com/test/repo2", repos[1].URL)
 }
-
