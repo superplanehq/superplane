@@ -20,9 +20,9 @@ var _ MappedNullable = &ConfigurationValidationRule{}
 
 // ConfigurationValidationRule struct for ConfigurationValidationRule
 type ConfigurationValidationRule struct {
-	Type *string `json:"type,omitempty"`
+	Type        *string `json:"type,omitempty"`
 	CompareWith *string `json:"compareWith,omitempty"`
-	Message *string `json:"message,omitempty"`
+	Message     *string `json:"message,omitempty"`
 }
 
 // NewConfigurationValidationRule instantiates a new ConfigurationValidationRule object
@@ -139,7 +139,7 @@ func (o *ConfigurationValidationRule) SetMessage(v string) {
 }
 
 func (o ConfigurationValidationRule) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,5 +195,3 @@ func (v *NullableConfigurationValidationRule) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

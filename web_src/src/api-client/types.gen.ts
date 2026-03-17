@@ -2385,9 +2385,7 @@ export type CanvasesDescribeCanvasData = {
   path: {
     id: string;
   };
-  query?: {
-    draft?: boolean;
-  };
+  query?: never;
   url: "/api/v1/canvases/{id}";
 };
 
@@ -3217,9 +3215,6 @@ export type OrganizationsListIntegrationResourcesData = {
     integrationId: string;
   };
   query?: {
-    /**
-     * This is a request variable of the map type. The query format is "map_name[key]=value", e.g. If the map name is Age, the key type is string, and the value type is integer, the query parameter is expressed as Age["bob"]=18
-     */
     parameters?: string;
   };
   url: "/api/v1/organizations/{id}/integrations/{integrationId}/resources";

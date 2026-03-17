@@ -25,9 +25,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Short: "Get a canvas",
 		Args:  cobra.ExactArgs(1),
 	}
-	var getDraft bool
-	getCmd.Flags().BoolVar(&getDraft, "draft", false, "get your draft version (only available when effective canvas versioning is enabled)")
-	core.Bind(getCmd, &getCommand{draft: &getDraft}, options)
+	core.Bind(getCmd, &getCommand{}, options)
 
 	activeCmd := &cobra.Command{
 		Use:   "active [canvas-id]",

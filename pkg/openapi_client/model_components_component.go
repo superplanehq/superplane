@@ -20,14 +20,14 @@ var _ MappedNullable = &ComponentsComponent{}
 
 // ComponentsComponent struct for ComponentsComponent
 type ComponentsComponent struct {
-	Name *string `json:"name,omitempty"`
-	Label *string `json:"label,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Configuration []ConfigurationField `json:"configuration,omitempty"`
+	Name           *string                             `json:"name,omitempty"`
+	Label          *string                             `json:"label,omitempty"`
+	Description    *string                             `json:"description,omitempty"`
+	Configuration  []ConfigurationField                `json:"configuration,omitempty"`
 	OutputChannels []SuperplaneComponentsOutputChannel `json:"outputChannels,omitempty"`
-	Icon *string `json:"icon,omitempty"`
-	Color *string `json:"color,omitempty"`
-	ExampleOutput map[string]interface{} `json:"exampleOutput,omitempty"`
+	Icon           *string                             `json:"icon,omitempty"`
+	Color          *string                             `json:"color,omitempty"`
+	ExampleOutput  map[string]interface{}              `json:"exampleOutput,omitempty"`
 }
 
 // NewComponentsComponent instantiates a new ComponentsComponent object
@@ -304,7 +304,7 @@ func (o *ComponentsComponent) SetExampleOutput(v map[string]interface{}) {
 }
 
 func (o ComponentsComponent) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -375,5 +375,3 @@ func (v *NullableComponentsComponent) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

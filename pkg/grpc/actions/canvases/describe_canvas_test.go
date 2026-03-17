@@ -20,14 +20,14 @@ func Test__DescribeCanvas(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		_, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), uuid.New().String(), false)
+		_, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), uuid.New().String())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
-		_, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), "invalid-id", false)
+		_, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), "invalid-id")
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -77,7 +77,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String(), false)
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
@@ -126,95 +126,6 @@ func Test__DescribeCanvas(t *testing.T) {
 		assert.NotNil(t, response.Canvas.Status.LastExecutions)
 		assert.NotNil(t, response.Canvas.Status.NextQueueItems)
 		assert.NotNil(t, response.Canvas.Status.LastEvents)
-	})
-
-	t.Run("draft requested when versioning disabled -> error", func(t *testing.T) {
-		require.NoError(t, database.Conn().
-			Model(&models.Organization{}).
-			Where("id = ?", r.Organization.ID).
-			Update("canvas_versioning_enabled", false).
-			Error)
-
-		canvas, _ := support.CreateCanvas(
-			t,
-			r.Organization.ID,
-			r.User,
-			[]models.CanvasNode{},
-			[]models.Edge{},
-		)
-		require.NoError(t, database.Conn().
-			Model(&models.Canvas{}).
-			Where("id = ?", canvas.ID).
-			Update("canvas_versioning_enabled", false).
-			Error)
-
-		_, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String(), true)
-		s, ok := status.FromError(err)
-		require.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, s.Code())
-	})
-
-	t.Run("draft requested when no draft exists -> error", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(
-			t,
-			r.Organization.ID,
-			r.User,
-			[]models.CanvasNode{},
-			[]models.Edge{},
-		)
-		require.NoError(t, database.Conn().
-			Model(&models.Canvas{}).
-			Where("id = ?", canvas.ID).
-			Update("canvas_versioning_enabled", true).
-			Error)
-
-		_, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String(), true)
-		s, ok := status.FromError(err)
-		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-	})
-
-	t.Run("draft requested -> returns draft version", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(
-			t,
-			r.Organization.ID,
-			r.User,
-			[]models.CanvasNode{
-				{
-					NodeID: "node-1",
-					Name:   "Live Node",
-					Type:   models.NodeTypeComponent,
-					Ref: datatypes.NewJSONType(models.NodeRef{
-						Component: &models.ComponentRef{Name: "noop"},
-					}),
-				},
-			},
-			[]models.Edge{},
-		)
-		require.NoError(t, database.Conn().
-			Model(&models.Canvas{}).
-			Where("id = ?", canvas.ID).
-			Update("canvas_versioning_enabled", true).
-			Error)
-
-		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
-		require.NoError(t, err)
-
-		draftNodes := append([]models.Node(nil), liveVersion.Nodes...)
-		require.NotEmpty(t, draftNodes)
-		draftNodes[0].Name = "Draft Node"
-
-		draftEdges := append([]models.Edge(nil), liveVersion.Edges...)
-		_, err = models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, draftNodes, draftEdges)
-		require.NoError(t, err)
-
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String(), true)
-		require.NoError(t, err)
-		require.NotNil(t, response.Canvas)
-		require.NotNil(t, response.Canvas.Spec)
-
-		require.Len(t, response.Canvas.Spec.Nodes, 1)
-		assert.Equal(t, "Draft Node", response.Canvas.Spec.Nodes[0].Name)
 	})
 
 	t.Run("status includes last execution per node", func(t *testing.T) {
@@ -269,7 +180,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String(), false)
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -347,7 +258,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String(), false)
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -416,7 +327,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String(), false)
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -466,7 +377,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String(), false)
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -549,7 +460,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String(), false)
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -642,7 +553,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String(), false)
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -725,7 +636,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String(), false)
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
