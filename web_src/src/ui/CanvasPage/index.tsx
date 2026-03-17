@@ -868,10 +868,10 @@ function CanvasPage(props: CanvasPageProps) {
   const canvasStateMode = props.canvasStateMode || "default";
   const canvasStateBorderClass =
     canvasStateMode === "editing"
-      ? "border-amber-500"
+      ? "ring-inset ring-[3px] ring-amber-500"
       : canvasStateMode === "previewing-previous-version"
-        ? "border-sky-500"
-        : "border-transparent";
+        ? "ring-inset ring-[3px] ring-sky-500"
+        : "";
   const canvasStateBadgeClass =
     canvasStateMode === "editing"
       ? "bg-amber-500"
@@ -959,7 +959,7 @@ function CanvasPage(props: CanvasPageProps) {
             onAddNote={handleAddNote}
           />
 
-          <div className={`flex-1 relative border-3 ${canvasStateBorderClass}`}>
+          <div className={`flex-1 relative ${canvasStateBorderClass}`}>
             {canvasStateLabel ? (
               <div
                 className={`uppercase absolute bottom-0 right-0 z-20 px-3 py-1 text-xs font-semibold text-white ${canvasStateBadgeClass}`}
