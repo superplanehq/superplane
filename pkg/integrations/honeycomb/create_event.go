@@ -133,8 +133,8 @@ func (c *CreateEvent) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *CreateEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (c *CreateEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (c *CreateEvent) Actions() []core.Action {

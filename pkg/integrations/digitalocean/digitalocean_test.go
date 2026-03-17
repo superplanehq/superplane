@@ -136,6 +136,42 @@ func Test__DigitalOcean__ListResources(t *testing.T) {
 		assert.Equal(t, "nyc3", resources[0].ID)
 	})
 
+	t.Run("list droplets", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"droplets": [
+							{"id": 12345, "name": "web-server-1", "status": "active"},
+							{"id": 67890, "name": "db-server-1", "status": "active"}
+						]
+					}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+			},
+		}
+
+		resources, err := d.ListResources("droplet", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 2)
+		assert.Equal(t, "droplet", resources[0].Type)
+		assert.Equal(t, "web-server-1", resources[0].Name)
+		assert.Equal(t, "12345", resources[0].ID)
+		assert.Equal(t, "droplet", resources[1].Type)
+		assert.Equal(t, "db-server-1", resources[1].Name)
+		assert.Equal(t, "67890", resources[1].ID)
+	})
+
 	t.Run("unknown resource type returns empty list", func(t *testing.T) {
 		resources, err := d.ListResources("unknown", core.ListResourcesContext{
 			HTTP: &contexts.HTTPContext{},

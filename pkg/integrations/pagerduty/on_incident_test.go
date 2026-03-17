@@ -28,7 +28,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 	}
 
 	t.Run("missing X-PagerDuty-Signature -> 403", func(t *testing.T) {
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: http.Header{},
 		})
 
@@ -40,7 +40,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-PagerDuty-Signature", "invalid")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
 			Events:  &contexts.EventContext{},
 			Webhook: &contexts.NodeWebhookContext{},
@@ -55,7 +55,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-PagerDuty-Signature", "v1=invalid")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,
@@ -74,7 +74,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-PagerDuty-Signature", "v1="+signatureFor(secret, body))
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,
@@ -94,7 +94,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers.Set("X-PagerDuty-Signature", "v1="+signatureFor(secret, body))
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,
@@ -115,7 +115,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers.Set("X-PagerDuty-Signature", "v1="+signatureFor(secret, body))
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{"events": []string{"incident.triggered"}, "urgencies": []string{"high"}},
@@ -136,7 +136,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers.Set("X-PagerDuty-Signature", "v1="+signatureFor(secret, body))
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: validConfig,

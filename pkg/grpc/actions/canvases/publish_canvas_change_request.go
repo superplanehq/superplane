@@ -83,6 +83,9 @@ func PublishCanvasChangeRequest(
 		if request.Status == models.CanvasChangeRequestStatusPublished {
 			return status.Error(codes.FailedPrecondition, "change request was already merged")
 		}
+		if request.Status == models.CanvasChangeRequestStatusRejected {
+			return status.Error(codes.FailedPrecondition, "change request is rejected")
+		}
 
 		version, err = models.FindCanvasVersionInTransaction(tx, canvasUUID, request.VersionID)
 		if err != nil {
@@ -92,15 +95,48 @@ func PublishCanvasChangeRequest(
 			return err
 		}
 
-		mergedNodes := append([]models.Node(nil), version.Nodes...)
-		mergedEdges := append([]models.Edge(nil), version.Edges...)
+		if err := refreshCanvasChangeRequestDiffInTransaction(tx, canvasForUpdate, version, request); err != nil {
+			return err
+		}
+		if len(request.ConflictingNodeIDs) > 0 {
+			return status.Error(codes.FailedPrecondition, "change request has conflicts")
+		}
+		if !isOpenCanvasChangeRequestStatus(request.Status) {
+			return status.Error(codes.FailedPrecondition, "change request cannot be published in its current status")
+		}
+		approvals, approvalsErr := models.ListCanvasChangeRequestApprovalsInTransaction(tx, canvasUUID, request.ID)
+		if approvalsErr != nil {
+			return approvalsErr
+		}
+		if publishCheckErr := ensureCanvasChangeRequestReadyToPublish(canvasForUpdate, approvals); publishCheckErr != nil {
+			return publishCheckErr
+		}
+
+		baseNodes, baseEdges, liveNodes, liveEdges, resolveErr := resolveCanvasChangeRequestBaseAndLiveInTransaction(
+			tx,
+			canvasForUpdate,
+			request,
+		)
+		if resolveErr != nil {
+			return resolveErr
+		}
+
+		mergedNodes, mergedEdges := mergeCanvasVersionIntoLive(
+			baseNodes,
+			baseEdges,
+			liveNodes,
+			liveEdges,
+			version.Nodes,
+			version.Edges,
+			request.ChangedNodeIDs,
+		)
 
 		existingNodesUnscoped, findNodesErr := models.FindCanvasNodesUnscopedInTransaction(tx, canvasUUID)
 		if findNodesErr != nil {
 			return findNodesErr
 		}
 
-		mergedNodes, mergedEdges, _ = remapNodeIDsForConflicts(mergedNodes, mergedEdges, existingNodesUnscoped)
+		mergedNodes, mergedEdges, _ = remapNodeIDsForConflicts(canvasUUID, mergedNodes, mergedEdges, existingNodesUnscoped)
 
 		parentNodesByNodeID := make(map[string]*models.Node)
 		for i := range mergedNodes {
@@ -124,9 +160,22 @@ func PublishCanvasChangeRequest(
 				continue
 			}
 
-			workflowNode, upsertErr := upsertNode(tx, existingNodes, node, canvasUUID)
+			workflowNode, nodeLevelErrorMessage, upsertErr := upsertNode(tx, existingNodes, node, canvasUUID)
 			if upsertErr != nil {
 				return upsertErr
+			}
+
+			if nodeLevelErrorMessage != nil {
+				errorNodeID := node.ID
+				if workflowNode.ParentNodeID != nil {
+					errorNodeID = *workflowNode.ParentNodeID
+				}
+				parentNode, ok := parentNodesByNodeID[errorNodeID]
+				if !ok {
+					log.Errorf("Parent node %s not found for node-level error", errorNodeID)
+				} else {
+					parentNode.ErrorMessage = nodeLevelErrorMessage
+				}
 			}
 
 			if workflowNode.State == models.CanvasNodeStateReady {
@@ -187,6 +236,10 @@ func PublishCanvasChangeRequest(
 		request.UpdatedAt = &now
 		if saveErr := tx.Save(request).Error; saveErr != nil {
 			return saveErr
+		}
+
+		if refreshErr := refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, request.ID); refreshErr != nil {
+			return refreshErr
 		}
 
 		if request.OwnerID != nil {

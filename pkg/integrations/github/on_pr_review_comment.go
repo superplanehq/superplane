@@ -82,44 +82,56 @@ func (p *OnPRReviewComment) HandleAction(ctx core.TriggerActionContext) (map[str
 	return nil, nil
 }
 
-func (p *OnPRReviewComment) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (p *OnPRReviewComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	ctx = withWebhookLogger(ctx, p.Name())
+	ctx.Logger.Infof("Received GitHub webhook")
+
 	config, err := decodePRCommentConfiguration(ctx.Configuration)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		ctx.Logger.Errorf("Failed to decode configuration: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	eventType, err := extractGitHubEventType(ctx.Headers)
 	if err != nil {
-		return http.StatusBadRequest, err
+		ctx.Logger.Errorf("Failed to extract GitHub event type: %v", err)
+		return http.StatusBadRequest, nil, fmt.Errorf("failed to extract GitHub event type: %w", err)
 	}
 
 	if eventType != "pull_request_review_comment" && eventType != "pull_request_review" {
-		return http.StatusOK, nil
+		ctx.Logger.Infof("Ignoring event - event type %q is not a pull_request_review_comment or pull_request_review event", eventType)
+		return http.StatusOK, nil, nil
 	}
 
 	data, code, err := verifyAndParseWebhookData(ctx)
 	if err != nil {
-		return code, err
+		ctx.Logger.Errorf("Failed to verify and parse webhook data: %v", err)
+		return code, nil, fmt.Errorf("failed to verify and parse webhook data: %w", err)
 	}
 
 	if !isExpectedPRCommentAction(eventType, data) {
-		return http.StatusOK, nil
+		action, _ := extractAction(data)
+		ctx.Logger.Infof("Ignoring event - action %q is not supported", action)
+		return http.StatusOK, nil, nil
 	}
 
 	matched, code, err := applyPRCommentContentFilter(config.ContentFilter, eventType, data)
 	if err != nil {
-		return code, err
+		ctx.Logger.Errorf("Failed to apply PR comment content filter: %v", err)
+		return code, nil, fmt.Errorf("failed to apply PR comment content filter: %w", err)
 	}
 
 	if !matched {
-		return http.StatusOK, nil
+		ctx.Logger.Info("Ignoring event - content filter did not match")
+		return http.StatusOK, nil, nil
 	}
 
 	if err := ctx.Events.Emit("github.prReviewComment", data); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		ctx.Logger.Errorf("Failed to emit event: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
-	return http.StatusOK, nil
+	return http.StatusOK, nil, nil
 }
 
 func (p *OnPRReviewComment) Cleanup(ctx core.TriggerContext) error {

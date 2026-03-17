@@ -167,8 +167,8 @@ func (c *SendTextMessage) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *SendTextMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+func (c *SendTextMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
 }
 
 func (c *SendTextMessage) Actions() []core.Action {

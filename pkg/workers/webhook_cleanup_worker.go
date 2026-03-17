@@ -67,7 +67,7 @@ func (w *WebhookCleanupWorker) Start(ctx context.Context) {
 
 func (w *WebhookCleanupWorker) LockAndProcessWebhook(webhook models.Webhook) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		r, err := models.LockWebhook(tx, webhook.ID)
+		r, err := models.LockDeletedWebhook(tx, webhook.ID)
 		if err != nil {
 			w.log("Webhook %s already being processed - skipping", webhook.ID)
 			return nil
@@ -99,7 +99,7 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, webhoo
 
 	err = handler.Cleanup(core.WebhookHandlerContext{
 		HTTP:        w.registry.HTTPContext(),
-		Integration: contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry),
+		Integration: contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry, nil),
 		Webhook:     contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
 		Logger:      logging.ForIntegration(*instance),
 	})

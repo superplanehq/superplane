@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -161,9 +162,11 @@ type Message struct {
 	Type      int     `json:"type"`
 	Content   string  `json:"content"`
 	ChannelID string  `json:"channel_id"`
+	GuildID   string  `json:"guild_id,omitempty"`
 	Author    User    `json:"author"`
 	Timestamp string  `json:"timestamp"`
 	Embeds    []Embed `json:"embeds,omitempty"`
+	Mentions  []User  `json:"mentions,omitempty"`
 }
 
 // CreateMessage sends a message to a channel
@@ -184,6 +187,32 @@ func (c *Client) CreateMessage(channelID string, req CreateMessageRequest) (*Mes
 	}
 
 	return &message, nil
+}
+
+// GetChannelMessages retrieves recent messages from a channel.
+func (c *Client) GetChannelMessages(channelID string, limit int) ([]Message, error) {
+	if limit <= 0 {
+		limit = 25
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	endpoint := fmt.Sprintf("/channels/%s/messages?%s", channelID, url.Values{
+		"limit": []string{fmt.Sprintf("%d", limit)},
+	}.Encode())
+
+	responseBody, err := c.doRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var messages []Message
+	if err := json.Unmarshal(responseBody, &messages); err != nil {
+		return nil, fmt.Errorf("failed to decode channel messages: %w", err)
+	}
+
+	return messages, nil
 }
 
 // doRequest executes an HTTP request to the Discord API

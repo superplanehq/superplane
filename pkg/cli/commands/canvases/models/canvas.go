@@ -1,10 +1,11 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 
-	"github.com/ghodss/yaml"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -12,16 +13,27 @@ const (
 )
 
 type Canvas struct {
-	APIVersion string                                 `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string                                 `json:"kind" yaml:"kind"`
-	Metadata   *openapi_client.CanvasesCanvasMetadata `json:"metadata" yaml:"metadata"`
-	Spec       *openapi_client.CanvasesCanvasSpec     `json:"spec,omitempty" yaml:"spec,omitempty"`
+	APIVersion string                                   `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string                                   `json:"kind" yaml:"kind"`
+	Metadata   *openapi_client.CanvasesCanvasMetadata   `json:"metadata" yaml:"metadata"`
+	Spec       *openapi_client.CanvasesCanvasSpec       `json:"spec,omitempty" yaml:"spec,omitempty"`
+	AutoLayout *openapi_client.CanvasesCanvasAutoLayout `json:"autoLayout,omitempty" yaml:"autoLayout,omitempty"`
 }
 
 func ParseCanvas(raw []byte) (*Canvas, error) {
-	var resource Canvas
-	if err := yaml.Unmarshal(raw, &resource); err != nil {
+	var yamlObject any
+	if err := yaml.Unmarshal(raw, &yamlObject); err != nil {
 		return nil, fmt.Errorf("failed to parse canvas resource: %w", err)
+	}
+
+	jsonData, err := json.Marshal(yamlObject)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert canvas resource to json: %w", err)
+	}
+
+	var resource Canvas
+	if err := json.Unmarshal(jsonData, &resource); err != nil {
+		return nil, fmt.Errorf("failed to parse canvas json payload: %w", err)
 	}
 
 	if resource.Kind != CanvasKind {
@@ -57,6 +69,15 @@ func CanvasResourceFromCanvas(canvas openapi_client.CanvasesCanvas) Canvas {
 		Metadata:   canvas.Metadata,
 		Spec:       canvas.Spec,
 	}
+}
+
+func CreateCanvasRequestFromCanvas(resource Canvas) openapi_client.CanvasesCreateCanvasRequest {
+	request := openapi_client.CanvasesCreateCanvasRequest{}
+	request.SetCanvas(CanvasFromCanvas(resource))
+	if resource.AutoLayout != nil {
+		request.SetAutoLayout(*resource.AutoLayout)
+	}
+	return request
 }
 
 func EmptyCanvasSpec() *openapi_client.CanvasesCanvasSpec {

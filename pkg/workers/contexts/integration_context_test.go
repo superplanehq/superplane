@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -34,7 +35,7 @@ func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry)
+	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
 
 	t.Run("rejects short interval", func(t *testing.T) {
 		err = ctx.ScheduleResync(500 * time.Millisecond)
@@ -135,7 +136,7 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 	node.WebhookID = &webhookID
 	require.NoError(t, database.Conn().Save(&node).Error)
 
-	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry)
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, nil)
 	require.NoError(t, ctx.RequestWebhook(newConfig))
 
 	require.NotNil(t, node.WebhookID)
@@ -149,6 +150,83 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 	require.NoError(t, err)
 	require.False(t, newWebhook.DeletedAt.Valid)
 	assert.Equal(t, newConfig, newWebhook.Configuration.Data())
+}
+
+func Test__IntegrationContext_RequestWebhook_ReuseWebhookOnResave(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	// CompareConfig always returns true — this is the Elastic/Prometheus/SendGrid model
+	// where all triggers for the integration share one webhook.
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = support.NewDummyWebhookHandler(support.DummyWebhookHandlerOptions{
+		CompareConfigFunc: func(a, b any) (bool, error) {
+			return true, nil
+		},
+	})
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	// Create a webhook that the node already points to (simulates first save).
+	webhookID := uuid.New()
+	_, encryptedKey, err := crypto.NewRandomKey(context.Background(), r.Encryptor, webhookID.String())
+	require.NoError(t, err)
+
+	now := time.Now()
+	webhook := models.Webhook{
+		ID:                webhookID,
+		State:             models.WebhookStateReady,
+		Secret:            encryptedKey,
+		Configuration:     datatypes.NewJSONType[any](nil),
+		Metadata:          datatypes.NewJSONType[any](map[string]any{}),
+		AppInstallationID: &integration.ID,
+		CreatedAt:         &now,
+	}
+	require.NoError(t, database.Conn().Create(&webhook).Error)
+
+	inputNode := models.CanvasNode{
+		NodeID:        "node-1",
+		Name:          "Node 1",
+		Type:          models.NodeTypeTrigger,
+		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{}),
+		Metadata:      datatypes.NewJSONType(map[string]any{}),
+		Position:      datatypes.NewJSONType(models.Position{}),
+	}
+
+	canvas, nodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{inputNode}, nil)
+	require.NotNil(t, canvas)
+	require.Len(t, nodes, 1)
+
+	node := nodes[0]
+	node.AppInstallationID = &integration.ID
+	node.WebhookID = &webhookID // node already has a webhook (simulates re-save)
+	require.NoError(t, database.Conn().Save(&node).Error)
+
+	// Simulate re-save: RequestWebhook is called again with nil config.
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, nil)
+	require.NoError(t, ctx.RequestWebhook(nil))
+
+	// The node must still point to the original webhook — not a new one.
+	require.NotNil(t, node.WebhookID)
+	assert.Equal(t, webhookID, *node.WebhookID)
+
+	// The original webhook must not have been soft-deleted.
+	var existingWebhook models.Webhook
+	require.NoError(t, database.Conn().Unscoped().First(&existingWebhook, webhookID).Error)
+	assert.False(t, existingWebhook.DeletedAt.Valid, "original webhook should not be soft-deleted on re-save")
+
+	// No additional webhook records should have been created for this integration.
+	var webhooks []models.Webhook
+	require.NoError(t, database.Conn().Where("app_installation_id = ?", integration.ID).Find(&webhooks).Error)
+	assert.Len(t, webhooks, 1, "re-save must not create a second webhook")
 }
 
 func Test__IntegrationContext_RequestWebhook_MergesExistingWebhookConfig(t *testing.T) {
@@ -239,7 +317,7 @@ func Test__IntegrationContext_RequestWebhook_MergesExistingWebhookConfig(t *test
 	node.AppInstallationID = &integration.ID
 	require.NoError(t, database.Conn().Save(&node).Error)
 
-	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry)
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, nil)
 	require.NoError(t, ctx.RequestWebhook(map[string]any{"eventTypes": []string{"build_ended"}}))
 
 	require.NotNil(t, node.WebhookID)
@@ -252,4 +330,73 @@ func Test__IntegrationContext_RequestWebhook_MergesExistingWebhookConfig(t *test
 	configurationJSON, marshalErr := json.Marshal(updatedWebhook.Configuration.Data())
 	require.NoError(t, marshalErr)
 	assert.JSONEq(t, `{"eventTypes":["build_ended","deploy_ended"]}`, string(configurationJSON))
+}
+
+func Test__IntegrationContext_ListSubscriptions_UsesOnEventsCallback(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerName := "dummy.subscription-trigger"
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		Triggers: []core.Trigger{
+			support.NewDummyIntegrationTrigger(support.DummyIntegrationTriggerOptions{
+				Name: triggerName,
+				OnIntegrationMessage: func(ctx core.IntegrationMessageContext) error {
+					return ctx.Events.Emit("test.payload", map[string]any{"message": ctx.Message})
+				},
+			}),
+		},
+	})
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	canvas, nodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID:        "trigger-1",
+				Name:          "trigger-1",
+				Type:          models.NodeTypeTrigger,
+				Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: triggerName}}),
+				Configuration: datatypes.NewJSONType(map[string]any{}),
+			},
+		},
+		nil,
+	)
+	require.NotNil(t, canvas)
+	require.Len(t, nodes, 1)
+
+	node := nodes[0]
+	node.AppInstallationID = &integration.ID
+	require.NoError(t, database.Conn().Save(&node).Error)
+
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, onNewEvents)
+	_, err = ctx.Subscribe(map[string]any{"enabled": true})
+	require.NoError(t, err)
+
+	subscriptions, err := ctx.ListSubscriptions()
+	require.NoError(t, err)
+	require.Len(t, subscriptions, 1)
+
+	err = subscriptions[0].SendMessage(map[string]any{"hello": "world"})
+	require.NoError(t, err)
+
+	assert.Len(t, newEvents, 1)
+	assert.Equal(t, canvas.ID, newEvents[0].WorkflowID)
+	assert.Equal(t, node.NodeID, newEvents[0].NodeID)
+	support.VerifyCanvasNodeEventsCount(t, canvas.ID, node.NodeID, 1)
 }

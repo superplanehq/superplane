@@ -38,7 +38,7 @@ func Test__OnEmailEvent__HandleWebhook_Filters(t *testing.T) {
 		},
 	})
 
-	status, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	status, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:   body,
 		Events: eventsCtx,
 		Headers: http.Header{
@@ -79,7 +79,7 @@ func Test__OnEmailEvent__HandleWebhook_Verification(t *testing.T) {
 	timestamp := "1700000000"
 	signature := signPayload(t, privateKey, timestamp, body)
 
-	status, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	status, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:   body,
 		Events: eventsCtx,
 		Headers: http.Header{
@@ -112,7 +112,7 @@ func Test__OnEmailEvent__HandleWebhook_InvalidSignature(t *testing.T) {
 	timestamp := "1700000000"
 	signature := signPayload(t, privateKey, timestamp, []byte(`[]`))
 
-	status, err := trigger.HandleWebhook(core.WebhookRequestContext{
+	status, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:   body,
 		Events: eventsCtx,
 		Headers: http.Header{

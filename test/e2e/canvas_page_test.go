@@ -111,6 +111,27 @@ func TestCanvasPage(t *testing.T) {
 		steps.assertNodesAreNotConnectedInDB("First", "Second")
 	})
 
+	t.Run("YAML preview tab shows canvas definition", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addNoop("YamlTestNode")
+		steps.switchToYamlTab()
+		steps.assertYamlContentVisible("YamlTestNode")
+		steps.assertYamlContentVisible("metadata:")
+	})
+
+	t.Run("YAML preview tab allows switching back to canvas", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addNoop("SwitchTest")
+		steps.switchToYamlTab()
+		steps.assertYamlContentVisible("SwitchTest")
+		steps.switchToCanvasTab()
+		steps.assertNodeIsAdded("SwitchTest")
+	})
+
 	t.Run("autocomplete suggests node data in filter expression", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
@@ -405,4 +426,18 @@ func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName 
 
 		time.Sleep(200 * time.Millisecond)
 	}
+}
+
+func (s *CanvasPageSteps) switchToYamlTab() {
+	s.session.Click(q.Locator(`button:has-text("YAML")`))
+	s.session.Sleep(1000)
+}
+
+func (s *CanvasPageSteps) switchToCanvasTab() {
+	s.session.Click(q.Locator(`button:has-text("Canvas")`))
+	s.session.Sleep(500)
+}
+
+func (s *CanvasPageSteps) assertYamlContentVisible(text string) {
+	s.session.AssertText(text)
 }

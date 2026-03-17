@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -20,8 +21,9 @@ func Test__OnPullRequest__HandleWebhook(t *testing.T) {
 	t.Run("no X-Hub-Signature-256 -> 403", func(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-GitHub-Event", eventType)
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -32,8 +34,9 @@ func Test__OnPullRequest__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-Hub-Signature-256", "sha256=asdasd")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Events:  &contexts.EventContext{},
 			Webhook: &contexts.NodeWebhookContext{},
 		})
@@ -49,9 +52,10 @@ func Test__OnPullRequest__HandleWebhook(t *testing.T) {
 		headers.Set("X-Hub-Signature-256", "sha256=asdasd")
 		headers.Set("X-GitHub-Event", eventType)
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    []byte(`{"action":"opened"}`),
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 				"actions":    []string{"opened"},
@@ -77,9 +81,10 @@ func Test__OnPullRequest__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", eventType)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 				"actions":    []string{"opened"},
@@ -106,9 +111,10 @@ func Test__OnPullRequest__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", eventType)
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{
 				"repository": "test",
 				"actions":    []string{"opened"},

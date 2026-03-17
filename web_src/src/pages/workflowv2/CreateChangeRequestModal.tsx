@@ -48,7 +48,7 @@ export function CreateChangeRequestModal({
   const handlePublish = () => {
     if (isDraftOutdated) {
       const confirmed = window.confirm(
-        "This draft is outdated because the live version was updated after this draft was created. Publish anyway?",
+        "This draft is outdated because the live version was updated after this draft was created. Create anyway?",
       );
       if (!confirmed) {
         return;
@@ -62,15 +62,15 @@ export function CreateChangeRequestModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="min-w-[70vw] max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Publish to Live</DialogTitle>
+          <DialogTitle>Create Change Request</DialogTitle>
           <DialogDescription>
-            Add a title and summary. Publishing will create a snapshot from your current draft and set it as live.
+            Add a title and summary. This will create a change request snapshot from your current draft.
           </DialogDescription>
         </DialogHeader>
 
         {!version ? (
           <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-            Enable edit mode and save your draft before publishing.
+            Enable edit mode and save your draft before creating a change request.
           </div>
         ) : (
           <div className="space-y-4">
@@ -184,7 +184,7 @@ export function CreateChangeRequestModal({
             </div>
           ) : null}
           <Button onClick={handlePublish} disabled={!version || pending || !title.trim()}>
-            {pending ? "Publishing..." : "Publish"}
+            {pending ? "Creating..." : "Create"}
           </Button>
         </DialogFooter>
       </DialogContent>

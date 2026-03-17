@@ -43,7 +43,7 @@ func Test__LaunchAgent__HandleWebhook__SignatureVerification(t *testing.T) {
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 		}
 
-		status, err := c.HandleWebhook(webhookCtx)
+		status, _, err := c.HandleWebhook(webhookCtx)
 		require.Error(t, err)
 		assert.Equal(t, http.StatusUnauthorized, status)
 		assert.Contains(t, err.Error(), "missing signature header")
@@ -63,7 +63,7 @@ func Test__LaunchAgent__HandleWebhook__SignatureVerification(t *testing.T) {
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},
 		}
 
-		status, err := c.HandleWebhook(webhookCtx)
+		status, _, err := c.HandleWebhook(webhookCtx)
 		require.Error(t, err)
 		assert.Equal(t, http.StatusUnauthorized, status)
 		assert.Contains(t, err.Error(), "invalid webhook signature")
@@ -99,7 +99,7 @@ func Test__LaunchAgent__HandleWebhook__SignatureVerification(t *testing.T) {
 			},
 		}
 
-		status, err := c.HandleWebhook(webhookCtx)
+		status, _, err := c.HandleWebhook(webhookCtx)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, status)
 	})
@@ -137,7 +137,7 @@ func Test__LaunchAgent__HandleWebhook__IdempotencyCheck(t *testing.T) {
 			},
 		}
 
-		status, err := c.HandleWebhook(webhookCtx)
+		status, _, err := c.HandleWebhook(webhookCtx)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, status)
 		// Emit should NOT have been called
@@ -166,7 +166,7 @@ func Test__LaunchAgent__HandleWebhook__ExecutionNotFound(t *testing.T) {
 			},
 		}
 
-		status, err := c.HandleWebhook(webhookCtx)
+		status, _, err := c.HandleWebhook(webhookCtx)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, status)
 	})

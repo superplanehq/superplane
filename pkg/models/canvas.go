@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -16,12 +17,41 @@ type Canvas struct {
 	LiveVersionID           *uuid.UUID
 	IsTemplate              bool
 	CanvasVersioningEnabled bool
+	ChangeRequestApprovers  datatypes.JSONSlice[CanvasChangeRequestApprover]
 	Name                    string
 	Description             string
 	CreatedBy               *uuid.UUID
 	CreatedAt               *time.Time
 	UpdatedAt               *time.Time
 	DeletedAt               gorm.DeletedAt `gorm:"index"`
+}
+
+func (c *Canvas) EffectiveChangeRequestApprovers() []CanvasChangeRequestApprover {
+	if c == nil || len(c.ChangeRequestApprovers) == 0 {
+		return DefaultCanvasChangeRequestApprovers()
+	}
+
+	approvers := make([]CanvasChangeRequestApprover, len(c.ChangeRequestApprovers))
+	copy(approvers, c.ChangeRequestApprovers)
+	return approvers
+}
+
+func (c *Canvas) BeforeCreate(_ *gorm.DB) error {
+	c.ensureDefaultChangeRequestApprovers()
+	return nil
+}
+
+func (c *Canvas) BeforeSave(_ *gorm.DB) error {
+	c.ensureDefaultChangeRequestApprovers()
+	return nil
+}
+
+func (c *Canvas) ensureDefaultChangeRequestApprovers() {
+	if len(c.ChangeRequestApprovers) > 0 {
+		return
+	}
+
+	c.ChangeRequestApprovers = datatypes.NewJSONSlice(DefaultCanvasChangeRequestApprovers())
 }
 
 func (c *Canvas) TableName() string {

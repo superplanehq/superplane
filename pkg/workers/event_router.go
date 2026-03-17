@@ -6,31 +6,44 @@ import (
 	"time"
 
 	"golang.org/x/sync/semaphore"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 
+	"github.com/google/uuid"
+	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
 type EventRouter struct {
-	semaphore *semaphore.Weighted
-	logger    *log.Entry
+	semaphore   *semaphore.Weighted
+	logger      *log.Entry
+	rabbitMQURL string
+	consumer    *tackle.Consumer
 }
 
-func NewEventRouter() *EventRouter {
+func NewEventRouter(rabbitMQURL string) *EventRouter {
 	return &EventRouter{
-		semaphore: semaphore.NewWeighted(25),
-		logger:    log.WithFields(log.Fields{"worker": "EventRouter"}),
+		semaphore:   semaphore.NewWeighted(25),
+		logger:      log.WithFields(log.Fields{"worker": "EventRouter"}),
+		rabbitMQURL: rabbitMQURL,
 	}
 }
 
+func (w *EventRouter) Name() string {
+	return "EventRouter"
+}
+
 func (w *EventRouter) Start(ctx context.Context) {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
+
+	go w.StartRabbitMQConsumer(ctx)
 
 	for {
 		select {
@@ -67,17 +80,74 @@ func (w *EventRouter) Start(ctx context.Context) {
 	}
 }
 
+func (w *EventRouter) StartRabbitMQConsumer(ctx context.Context) {
+	options := tackle.Options{
+		URL:            w.rabbitMQURL,
+		ConnectionName: w.Name(),
+		RemoteExchange: messages.WorkflowExchange,
+		Service:        messages.WorkflowExchange + "." + messages.WorkflowEventCreatedRoutingKey + "." + w.Name(),
+		RoutingKey:     messages.WorkflowEventCreatedRoutingKey,
+	}
+
+	consumer := tackle.NewConsumer()
+	consumer.SetLogger(logging.NewTackleLogger(w.logger))
+	w.consumer = consumer
+
+	for {
+		log.Infof("Connecting to RabbitMQ queue for %s events", messages.WorkflowEventCreatedRoutingKey)
+
+		err := w.consumer.Start(&options, w.Consume)
+		if err != nil {
+			w.logger.Errorf("Error consuming messages from %s: %v", messages.WorkflowEventCreatedRoutingKey, err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.WorkflowEventCreatedRoutingKey)
+		time.Sleep(5 * time.Second)
+	}
+}
+
+func (w *EventRouter) Consume(delivery tackle.Delivery) error {
+	data := &pb.CanvasNodeEventMessage{}
+	err := proto.Unmarshal(delivery.Body(), data)
+	if err != nil {
+		w.logger.Errorf("Error unmarshaling canvas event message: %v", err)
+		return err
+	}
+
+	eventID, err := uuid.Parse(data.Id)
+	if err != nil {
+		w.logger.Errorf("Error parsing event id: %v", err)
+		return err
+	}
+
+	event, err := models.FindCanvasEvent(eventID)
+	if err != nil {
+		w.logger.Errorf("Error finding canvas event: %v", err)
+		return err
+	}
+
+	if event.State == models.CanvasEventStateRouted {
+		w.logger.Infof("Event %s is already routed - skipping", event.ID)
+		return nil
+	}
+
+	logger := logging.ForEvent(w.logger, *event)
+	return w.LockAndProcessEvent(logger, *event)
+}
+
 func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.CanvasEvent) error {
 	var createdQueueItems []models.CanvasNodeQueueItem
 	var execution *models.CanvasNodeExecution
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		e, err := models.LockCanvasEvent(tx, event.ID)
+		event, err := models.LockCanvasEvent(tx, event.ID)
 		if err != nil {
 			logger.Info("Event already being processed - skipping")
 			return nil
 		}
 
-		createdQueueItems, execution, err = w.processEvent(tx, logger, e)
+		createdQueueItems, execution, err = w.processEvent(tx, logger, event)
 		if err != nil {
 			return err
 		}
@@ -88,8 +158,6 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	if err != nil {
 		return err
 	}
-
-	messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
 
 	if len(createdQueueItems) > 0 {
 		for _, queueItem := range createdQueueItems {

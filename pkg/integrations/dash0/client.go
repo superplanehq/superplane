@@ -7,7 +7,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -16,6 +18,8 @@ const (
 	// MaxResponseSize limits the size of Prometheus API responses to prevent excessive memory usage
 	// 1MB should be sufficient for most Prometheus queries while preventing abuse
 	MaxResponseSize = 1 * 1024 * 1024 // 1MB
+	// Dash0DatasetHeader is the HTTP header name used by Dash0 for dataset routing.
+	Dash0DatasetHeader = "Dash0-Dataset"
 )
 
 type Client struct {
@@ -99,8 +103,8 @@ type PrometheusResponseData struct {
 
 type PrometheusQueryResult struct {
 	Metric map[string]string `json:"metric"`
-	Value  []interface{}     `json:"value,omitempty"`  // For instant queries: [timestamp, value]
-	Values [][]interface{}   `json:"values,omitempty"` // For range queries: [[timestamp, value], ...]
+	Value  []any             `json:"value,omitempty"`  // For instant queries: [timestamp, value]
+	Values [][]any           `json:"values,omitempty"` // For range queries: [[timestamp, value], ...]
 }
 
 func (c *Client) ExecutePrometheusInstantQuery(promQLQuery, dataset string) (map[string]any, error) {
@@ -205,6 +209,112 @@ func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	}
 
 	return checkRules, nil
+}
+
+// CheckRuleRequest represents the request body for creating or updating a check rule.
+type CheckRuleRequest struct {
+	Dataset       string               `json:"dataset,omitempty"`
+	ID            string               `json:"id,omitempty"`
+	Name          string               `json:"name"`
+	Expression    string               `json:"expression"`
+	Thresholds    *CheckRuleThresholds `json:"thresholds,omitempty"`
+	Summary       string               `json:"summary,omitempty"`
+	Description   string               `json:"description,omitempty"`
+	Interval      string               `json:"interval,omitempty"`
+	For           string               `json:"for,omitempty"`
+	KeepFiringFor string               `json:"keepFiringFor,omitempty"`
+	Labels        map[string]string    `json:"labels,omitempty"`
+	Annotations   map[string]string    `json:"annotations,omitempty"`
+	Enabled       *bool                `json:"enabled,omitempty"`
+}
+
+// CheckRuleThresholds represents the degraded and critical thresholds for a check rule.
+type CheckRuleThresholds struct {
+	Degraded *float64 `json:"degraded,omitempty"`
+	Critical *float64 `json:"critical,omitempty"`
+}
+
+// CreateCheckRule creates a new check rule (Prometheus alert rule) in Dash0.
+func (c *Client) CreateCheckRule(request CheckRuleRequest, dataset string) (map[string]any, error) {
+	apiURL := fmt.Sprintf("%s/api/alerting/check-rules?dataset=%s", c.BaseURL, url.QueryEscape(dataset))
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, apiURL, bytes.NewReader(body), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
+}
+
+// GetCheckRule retrieves a specific check rule by its origin or ID.
+func (c *Client) GetCheckRule(originOrID string, dataset string) (map[string]any, error) {
+	apiURL := fmt.Sprintf("%s/api/alerting/check-rules/%s?dataset=%s", c.BaseURL, url.PathEscape(originOrID), url.QueryEscape(dataset))
+
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil, "")
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
+}
+
+// UpdateCheckRule updates an existing check rule by its origin or ID.
+func (c *Client) UpdateCheckRule(originOrID string, request CheckRuleRequest, dataset string) (map[string]any, error) {
+	apiURL := fmt.Sprintf("%s/api/alerting/check-rules/%s?dataset=%s", c.BaseURL, url.PathEscape(originOrID), url.QueryEscape(dataset))
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, apiURL, bytes.NewReader(body), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
+}
+
+// DeleteCheckRule deletes a specific check rule by its origin or ID.
+func (c *Client) DeleteCheckRule(originOrID string, dataset string) (map[string]any, error) {
+	apiURL := fmt.Sprintf("%s/api/alerting/check-rules/%s?dataset=%s", c.BaseURL, url.PathEscape(originOrID), url.QueryEscape(dataset))
+
+	responseBody, err := c.execRequest(http.MethodDelete, apiURL, nil, "")
+	if err != nil {
+		return nil, err
+	}
+
+	// DELETE might return empty body on success
+	if len(responseBody) == 0 {
+		return map[string]any{"deleted": true, "id": originOrID}, nil
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
 }
 
 // SyntheticCheckAssertion represents a single assertion in a synthetic check.
@@ -389,6 +499,165 @@ func (c *Client) GetSyntheticCheck(checkID string, dataset string) (*SyntheticCh
 	}
 
 	return &response, nil
+}
+
+// LogRecord represents a structured log record to be sent to Dash0 via OTLP HTTP ingestion.
+type LogRecord struct {
+	SeverityText string            `json:"severityText"`
+	Body         string            `json:"body"`
+	EventName    string            `json:"eventName"`
+	ServiceName  string            `json:"serviceName,omitempty"`
+	Attributes   map[string]string `json:"attributes,omitempty"`
+}
+
+// SendLogRecord sends a log record to Dash0 via OTLP HTTP ingestion (POST).
+// It builds the full OTLP ExportLogsServiceRequest payload from the given LogRecord.
+func (c *Client) SendLogRecord(dataset string, record LogRecord) (map[string]any, error) {
+	otlpBaseURL, err := deriveOTLPEndpoint(c.BaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("error deriving OTLP endpoint: %v", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/v1/logs", otlpBaseURL)
+
+	otlpPayload := buildOTLPLogPayload(record)
+	jsonBody, err := json.Marshal(otlpPayload)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling log body: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))
+	if dataset != "" && dataset != "default" {
+		req.Header.Set(Dash0DatasetHeader, dataset)
+	}
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %v", err)
+	}
+	defer res.Body.Close()
+
+	limitedReader := io.LimitReader(res.Body, MaxResponseSize)
+	responseBody, err := io.ReadAll(limitedReader)
+	if err != nil {
+		return nil, fmt.Errorf("error reading body: %v", err)
+	}
+
+	if len(responseBody) >= MaxResponseSize {
+		return nil, fmt.Errorf("response too large: exceeds maximum size of %d bytes", MaxResponseSize)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+	}
+
+	return map[string]any{"sent": true}, nil
+}
+
+// deriveOTLPEndpoint derives the OTLP HTTP ingress endpoint from the Dash0 API base URL.
+// The API base URL has the format: https://api.{region}.aws.dash0.com
+// The OTLP HTTP ingress endpoint has the format: https://ingress.{region}.aws.dash0.com:4318
+func deriveOTLPEndpoint(apiBaseURL string) (string, error) {
+	parsed, err := url.Parse(apiBaseURL)
+	if err != nil {
+		return "", fmt.Errorf("error parsing API base URL: %v", err)
+	}
+
+	host := parsed.Hostname()
+	if !strings.HasPrefix(host, "api.") {
+		return "", fmt.Errorf("cannot derive OTLP endpoint: API base URL host %q does not start with 'api.'", host)
+	}
+
+	ingressHost := "ingress." + strings.TrimPrefix(host, "api.")
+	return fmt.Sprintf("https://%s:4318", ingressHost), nil
+}
+
+// buildOTLPLogPayload constructs a full OTLP ExportLogsServiceRequest JSON structure from a LogRecord.
+func buildOTLPLogPayload(record LogRecord) map[string]any {
+	timestamp := strconv.FormatInt(time.Now().UnixNano(), 10)
+
+	attributes := []map[string]any{}
+	for key, value := range record.Attributes {
+		attributes = append(attributes, map[string]any{
+			"key": key,
+			"value": map[string]any{
+				"stringValue": value,
+			},
+		})
+	}
+
+	if record.EventName != "" {
+		attributes = append(attributes, map[string]any{
+			"key": "event.name",
+			"value": map[string]any{
+				"stringValue": record.EventName,
+			},
+		})
+	}
+
+	severityNumber := severityTextToNumber(record.SeverityText)
+
+	// Build resource attributes (service.name goes here per OTLP spec)
+	resourceAttributes := []map[string]any{}
+	if record.ServiceName != "" {
+		resourceAttributes = append(resourceAttributes, map[string]any{
+			"key": "service.name",
+			"value": map[string]any{
+				"stringValue": record.ServiceName,
+			},
+		})
+	}
+
+	return map[string]any{
+		"resourceLogs": []map[string]any{
+			{
+				"resource": map[string]any{
+					"attributes": resourceAttributes,
+				},
+				"scopeLogs": []map[string]any{
+					{
+						"logRecords": []map[string]any{
+							{
+								"timeUnixNano":   timestamp,
+								"severityNumber": severityNumber,
+								"severityText":   record.SeverityText,
+								"body": map[string]any{
+									"stringValue": record.Body,
+								},
+								"attributes": attributes,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// severityTextToNumber maps OTLP severity text to its corresponding severity number.
+func severityTextToNumber(severityText string) int {
+	switch strings.ToUpper(severityText) {
+	case "TRACE":
+		return 1
+	case "DEBUG":
+		return 5
+	case "INFO":
+		return 9
+	case "WARN":
+		return 13
+	case "ERROR":
+		return 17
+	case "FATAL":
+		return 21
+	default:
+		return 9 // INFO
+	}
 }
 
 // UpdateSyntheticCheck updates an existing synthetic check by ID (PUT).

@@ -7,6 +7,7 @@ import {
   ViewportPortal,
   useOnSelectionChange,
   useReactFlow,
+  useViewport,
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
   type NodeChange,
@@ -31,7 +32,7 @@ import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 
 import {
   ConfigurationField,
@@ -175,14 +176,14 @@ export interface CanvasPageProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  versioningDisabledTooltip?: string;
   showPendingDraftBadge?: boolean;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
-  topViewMode?: "canvas" | "memory" | "settings" | "versioning";
-  onTopViewModeChange?: (mode: "canvas" | "memory" | "settings" | "versioning") => void;
+  topViewMode?: "canvas" | "yaml" | "memory" | "settings" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings" | "versioning") => void;
+  canvasStateMode?: "default" | "editing" | "previewing-previous-version";
   showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;
@@ -864,6 +865,26 @@ function CanvasPage(props: CanvasPageProps) {
     );
   }, [state, templateNodeId]);
 
+  const canvasStateMode = props.canvasStateMode || "default";
+  const canvasStateBorderClass =
+    canvasStateMode === "editing"
+      ? "border-amber-500"
+      : canvasStateMode === "previewing-previous-version"
+        ? "border-sky-500"
+        : "border-transparent";
+  const canvasStateBadgeClass =
+    canvasStateMode === "editing"
+      ? "bg-amber-500"
+      : canvasStateMode === "previewing-previous-version"
+        ? "bg-sky-500"
+        : "";
+  const canvasStateLabel =
+    canvasStateMode === "editing"
+      ? "Edit Mode"
+      : canvasStateMode === "previewing-previous-version"
+        ? "Previewing Previous Version"
+        : "";
+
   return (
     <div ref={canvasWrapperRef} className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
@@ -901,7 +922,6 @@ function CanvasPage(props: CanvasPageProps) {
           onExitEditMode={props.onExitEditMode}
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
-          versioningDisabledTooltip={props.versioningDisabledTooltip}
           showPendingDraftBadge={props.showPendingDraftBadge}
           topViewMode={props.topViewMode}
           onTopViewModeChange={props.onTopViewModeChange}
@@ -939,7 +959,14 @@ function CanvasPage(props: CanvasPageProps) {
             onAddNote={handleAddNote}
           />
 
-          <div className="flex-1 relative">
+          <div className={`flex-1 relative border-3 ${canvasStateBorderClass}`}>
+            {canvasStateLabel ? (
+              <div
+                className={`uppercase absolute bottom-0 right-0 z-20 px-3 py-1 text-xs font-semibold text-white ${canvasStateBadgeClass}`}
+              >
+                {canvasStateLabel}
+              </div>
+            ) : null}
             <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
               <CanvasContent
                 state={state}
@@ -1002,7 +1029,6 @@ function CanvasPage(props: CanvasPageProps) {
                 onExitEditMode={props.onExitEditMode}
                 exitEditModeDisabled={props.exitEditModeDisabled}
                 exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
-                versioningDisabledTooltip={props.versioningDisabledTooltip}
                 showPendingDraftBadge={props.showPendingDraftBadge}
                 isVersionControlOpen={props.isVersionControlOpen}
                 onOpenVersionControl={props.onOpenVersionControl}
@@ -1266,7 +1292,7 @@ function Sidebar({
 
     return (
       <div
-        className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white"
+        className="border-l-1 border-border absolute right-0 top-0 h-full z-21 overflow-y-auto overflow-x-hidden bg-white"
         style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
       >
         <div className="flex items-center justify-center h-full">
@@ -1404,7 +1430,6 @@ function CanvasContentHeader({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  versioningDisabledTooltip,
   showPendingDraftBadge,
   topViewMode,
   onTopViewModeChange,
@@ -1446,10 +1471,9 @@ function CanvasContentHeader({
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  versioningDisabledTooltip?: string;
   showPendingDraftBadge?: boolean;
-  topViewMode?: "canvas" | "memory" | "settings" | "versioning";
-  onTopViewModeChange?: (mode: "canvas" | "memory" | "settings" | "versioning") => void;
+  topViewMode?: "canvas" | "yaml" | "memory" | "settings" | "versioning";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings" | "versioning") => void;
   showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;
@@ -1518,7 +1542,6 @@ function CanvasContentHeader({
       onExitEditMode={onExitEditMode}
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-      versioningDisabledTooltip={versioningDisabledTooltip}
       showPendingDraftBadge={showPendingDraftBadge}
       topViewMode={topViewMode}
       onTopViewModeChange={onTopViewModeChange}
@@ -1594,7 +1617,6 @@ function CanvasContent({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  versioningDisabledTooltip,
   showPendingDraftBadge,
   isVersionControlOpen,
   onOpenVersionControl,
@@ -1680,7 +1702,6 @@ function CanvasContent({
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  versioningDisabledTooltip?: string;
   showPendingDraftBadge?: boolean;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
@@ -1700,6 +1721,7 @@ function CanvasContent({
   title?: string;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
+  const { zoom } = useViewport();
   const isReadOnly = readOnly ?? false;
 
   // Determine selection key code to support both Control (Windows/Linux) and Meta (Mac)
@@ -1761,26 +1783,34 @@ function CanvasContent({
   const [isSelecting, setIsSelecting] = useState(false);
   const previouslySelectedRef = useRef<Set<string>>(new Set());
 
+  const stopCanvasPointerEvent = useCallback((event: SyntheticEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
+
   useOnSelectionChange({
     onChange: useCallback(({ nodes }: { nodes: ReactFlowNode[] }) => {
       setMultiSelectedNodes(nodes.length >= 2 ? nodes : []);
     }, []),
   });
 
+  const multiSelectedNodeIds = useMemo(() => new Set(multiSelectedNodes.map((n) => n.id)), [multiSelectedNodes]);
+
   const selectionToolbarFlowPos = useMemo(() => {
-    if (multiSelectedNodes.length < 2) return null;
+    if (multiSelectedNodeIds.size < 2) return null;
 
     let minY = Infinity;
     let maxX = -Infinity;
 
-    for (const node of multiSelectedNodes) {
+    for (const node of state.nodes) {
+      if (!multiSelectedNodeIds.has(node.id)) continue;
       const w = node.measured?.width ?? node.width ?? 240;
       if (node.position.y < minY) minY = node.position.y;
       if (node.position.x + w > maxX) maxX = node.position.x + w;
     }
 
     return { x: maxX, y: minY };
-  }, [multiSelectedNodes]);
+  }, [multiSelectedNodeIds, state.nodes]);
 
   useEffect(() => {
     const activeNoteId = getActiveNoteId();
@@ -2420,7 +2450,6 @@ function CanvasContent({
           onExitEditMode={onExitEditMode}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          versioningDisabledTooltip={versioningDisabledTooltip}
           showPendingDraftBadge={showPendingDraftBadge}
         />
       )}
@@ -2641,66 +2670,81 @@ function CanvasContent({
               (onNodesDelete || onNodeDelete || onAutoLayoutNodes || onDuplicateNodes) && (
                 <ViewportPortal>
                   <div
-                    className="nodrag nopan flex items-center gap-2"
                     style={{
                       position: "absolute",
                       left: selectionToolbarFlowPos.x,
                       top: selectionToolbarFlowPos.y,
                       transform: "translate(-100%, -100%) translateY(-24px)",
-                      pointerEvents: "all",
                     }}
                   >
-                    {onAutoLayoutNodes && (
-                      <button
-                        type="button"
-                        data-testid="multi-select-auto-layout"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          onAutoLayoutNodes(multiSelectedNodes.map((n) => n.id));
-                        }}
-                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                      >
-                        <LayoutGrid className="h-4 w-4" />
-                      </button>
-                    )}
-                    {onDuplicateNodes && (
-                      <button
-                        type="button"
-                        data-testid="multi-select-duplicate"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          onDuplicateNodes(multiSelectedNodes.map((n) => n.id));
-                        }}
-                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </button>
-                    )}
-                    {(onNodesDelete || onNodeDelete) && (
-                      <button
-                        type="button"
-                        data-testid="multi-select-delete"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          const nodeIds = multiSelectedNodes.map((n) => n.id);
-                          if (onNodesDelete) {
-                            onNodesDelete(nodeIds);
-                          } else {
-                            for (const id of nodeIds) {
-                              onNodeDelete?.(id);
+                    <div
+                      className="nodrag nopan flex items-center gap-2"
+                      onPointerDown={stopCanvasPointerEvent}
+                      onMouseDown={stopCanvasPointerEvent}
+                      style={{
+                        transform: `scale(${1 / zoom})`,
+                        transformOrigin: "bottom right",
+                        pointerEvents: "all",
+                      }}
+                    >
+                      {onAutoLayoutNodes && (
+                        <button
+                          type="button"
+                          data-testid="multi-select-auto-layout"
+                          onPointerDown={stopCanvasPointerEvent}
+                          onMouseDown={stopCanvasPointerEvent}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            onAutoLayoutNodes(multiSelectedNodes.map((n) => n.id));
+                          }}
+                          className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                        >
+                          <LayoutGrid className="h-4 w-4" />
+                        </button>
+                      )}
+                      {onDuplicateNodes && (
+                        <button
+                          type="button"
+                          data-testid="multi-select-duplicate"
+                          onPointerDown={stopCanvasPointerEvent}
+                          onMouseDown={stopCanvasPointerEvent}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            onDuplicateNodes(multiSelectedNodes.map((n) => n.id));
+                          }}
+                          className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      )}
+                      {(onNodesDelete || onNodeDelete) && (
+                        <button
+                          type="button"
+                          data-testid="multi-select-delete"
+                          onPointerDown={stopCanvasPointerEvent}
+                          onMouseDown={stopCanvasPointerEvent}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            const nodeIds = multiSelectedNodes.map((n) => n.id);
+                            if (onNodesDelete) {
+                              onNodesDelete(nodeIds);
+                            } else {
+                              for (const id of nodeIds) {
+                                onNodeDelete?.(id);
+                              }
                             }
-                          }
-                          stateRef.current.setNodes((nodes) => nodes.map((node) => ({ ...node, selected: false })));
-                          setMultiSelectedNodes([]);
-                        }}
-                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
+                            stateRef.current.setNodes((nodes) => nodes.map((node) => ({ ...node, selected: false })));
+                            setMultiSelectedNodes([]);
+                          }}
+                          className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </ViewportPortal>
               )}

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -21,8 +22,9 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-GitHub-Event", "create")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -33,8 +35,9 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-Hub-Signature-256", "sha256=asdasd")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Events:  &contexts.EventContext{},
 			Webhook: &contexts.NodeWebhookContext{},
 		})
@@ -50,9 +53,10 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers.Set("X-Hub-Signature-256", "sha256=asdasd")
 		headers.Set("X-GitHub-Event", "create")
 
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    []byte(`{"ref":"feature-branch","ref_type":"branch"}`),
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: OnBranchCreatedConfiguration{
 				Repository: "test",
 				Branches: []configuration.Predicate{
@@ -80,9 +84,10 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "create")
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: OnBranchCreatedConfiguration{
 				Repository: "test",
 				Branches: []configuration.Predicate{
@@ -111,9 +116,10 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "create")
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: OnBranchCreatedConfiguration{
 				Repository: "test",
 				Branches: []configuration.Predicate{
@@ -142,9 +148,10 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "create")
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: OnBranchCreatedConfiguration{
 				Repository: "test",
 				Branches: []configuration.Predicate{
@@ -173,9 +180,10 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "create")
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: OnBranchCreatedConfiguration{
 				Repository: "test",
 				Branches: []configuration.Predicate{
@@ -204,9 +212,10 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "create")
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: OnBranchCreatedConfiguration{
 				Repository: "test",
 				Branches: []configuration.Predicate{
@@ -235,9 +244,10 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "create")
 
 		eventContext := &contexts.EventContext{}
-		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
 			Configuration: OnBranchCreatedConfiguration{
 				Repository: "test",
 				Branches: []configuration.Predicate{

@@ -292,8 +292,8 @@ func (p *OnPipeline) OnIntegrationMessage(ctx core.IntegrationMessageContext) er
 	return ctx.Events.Emit("aws.codepipeline.pipeline", ctx.Message)
 }
 
-func (p *OnPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (p *OnPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (p *OnPipeline) Cleanup(ctx core.TriggerContext) error {

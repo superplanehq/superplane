@@ -130,7 +130,7 @@ func Test__Render_OnBuild__HandleWebhook(t *testing.T) {
 		},
 	}
 
-	status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+	status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
 		HTTP:          httpCtx,
@@ -177,7 +177,7 @@ func Test__Render_OnBuild__HandleWebhook__WithoutEventResolution(t *testing.T) {
 	headers := buildSignedHeaders(secret, body)
 	eventCtx := &contexts.EventContext{}
 
-	status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+	status, _, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
 		Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},

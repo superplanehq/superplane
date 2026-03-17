@@ -38,6 +38,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/upsertmemory"
 	_ "github.com/superplanehq/superplane/pkg/components/wait"
 	_ "github.com/superplanehq/superplane/pkg/integrations/aws"
+	_ "github.com/superplanehq/superplane/pkg/integrations/azure"
 	_ "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	_ "github.com/superplanehq/superplane/pkg/integrations/circleci"
 	_ "github.com/superplanehq/superplane/pkg/integrations/claude"
@@ -49,6 +50,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/digitalocean"
 	_ "github.com/superplanehq/superplane/pkg/integrations/discord"
 	_ "github.com/superplanehq/superplane/pkg/integrations/dockerhub"
+	_ "github.com/superplanehq/superplane/pkg/integrations/elastic"
 	_ "github.com/superplanehq/superplane/pkg/integrations/firehydrant"
 	_ "github.com/superplanehq/superplane/pkg/integrations/gcp"
 	_ "github.com/superplanehq/superplane/pkg/integrations/github"
@@ -65,6 +67,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/octopus"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
 	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
+	_ "github.com/superplanehq/superplane/pkg/integrations/perplexity"
 	_ "github.com/superplanehq/superplane/pkg/integrations/prometheus"
 	_ "github.com/superplanehq/superplane/pkg/integrations/render"
 	_ "github.com/superplanehq/superplane/pkg/integrations/rootly"
@@ -97,7 +100,7 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" || os.Getenv("START_EVENT_ROUTER") == "yes" {
 		log.Println("Starting Event Router")
 
-		w := workers.NewEventRouter()
+		w := workers.NewEventRouter(rabbitMQURL)
 		go w.Start(context.Background())
 	}
 
@@ -105,7 +108,7 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		log.Println("Starting Node Executor")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL)
+		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL, rabbitMQURL)
 		go w.Start(context.Background())
 	}
 
@@ -128,7 +131,7 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" || os.Getenv("START_NODE_QUEUE_WORKER") == "yes" {
 		log.Println("Starting Node Queue Worker")
 
-		w := workers.NewNodeQueueWorker(registry)
+		w := workers.NewNodeQueueWorker(registry, rabbitMQURL)
 		go w.Start(context.Background())
 	}
 
@@ -426,19 +429,19 @@ var DefaultMaxHTTPResponseBytes int64 = 8 * 1024 * 1024
  * - Localhost variations
  */
 var defaultBlockedHTTPHosts = []string{
-	// "metadata.google.internal",
-	// "metadata.goog",
-	// "metadata.azure.com",
-	// "169.254.169.254",
-	// "fd00:ec2::254",
-	// "kubernetes.default",
-	// "kubernetes.default.svc",
-	// "kubernetes.default.svc.cluster.local",
-	// "localhost",
-	// "127.0.0.1",
-	// "::1",
-	// "0.0.0.0",
-	// "::",
+	"metadata.google.internal",
+	"metadata.goog",
+	"metadata.azure.com",
+	"169.254.169.254",
+	"fd00:ec2::254",
+	"kubernetes.default",
+	"kubernetes.default.svc",
+	"kubernetes.default.svc.cluster.local",
+	"localhost",
+	"127.0.0.1",
+	"::1",
+	"0.0.0.0",
+	"::",
 }
 
 func getBlockedHTTPHosts() []string {
@@ -451,15 +454,15 @@ func getBlockedHTTPHosts() []string {
 }
 
 var defaultBlockedPrivateIPRanges = []string{
-	// "0.0.0.0/8",
-	// "10.0.0.0/8",
-	// "172.16.0.0/12",
-	// "192.168.0.0/16",
-	// "127.0.0.0/8",
-	// "169.254.0.0/16",
-	// "::1/128",
-	// "fc00::/7",
-	// "fe80::/10",
+	"0.0.0.0/8",
+	"10.0.0.0/8",
+	"172.16.0.0/12",
+	"192.168.0.0/16",
+	"127.0.0.0/8",
+	"169.254.0.0/16",
+	"::1/128",
+	"fc00::/7",
+	"fe80::/10",
 }
 
 func getPrivateIPRanges() []string {

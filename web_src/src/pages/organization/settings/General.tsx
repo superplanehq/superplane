@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { useParams } from "react-router-dom";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import type { OrganizationsOrganization } from "../../../api-client/types.gen";
 import { Field, Fieldset, Label } from "../../../components/Fieldset/fieldset";
 import { Heading } from "../../../components/Heading/heading";
@@ -34,6 +35,7 @@ interface GeneralProps {
 export function General({ organization }: GeneralProps) {
   const { organizationId } = useParams<{ organizationId: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
+  usePageTitle(["Settings"]);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [versioningMessage, setVersioningMessage] = useState<string | null>(null);
   const [name, setName] = useState(organization.metadata?.name || "");

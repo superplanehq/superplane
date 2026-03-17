@@ -7,6 +7,13 @@ export interface QueryPrometheusConfiguration {
   step?: string;
 }
 
+export interface SendLogEventConfiguration {
+  body: string;
+  severityText?: string;
+  dataset?: string;
+  attributes?: Record<string, string>;
+}
+
 export interface QueryPrometheusMetadata {
   // No metadata needed initially
 }
@@ -51,6 +58,11 @@ export interface GetHttpSyntheticCheckNodeMetadata {
   checkName?: string;
 }
 
+export interface CheckRuleNodeMetadata {
+  checkRule?: string;
+  checkRuleName?: string;
+}
+
 export interface UpdateHttpSyntheticCheckConfiguration {
   checkId: string;
   name: string;
@@ -90,4 +102,33 @@ export interface CreateHttpSyntheticCheckConfiguration {
   };
   assertions?: AssertionItem[];
   retries?: { attempts: number; delay: string };
+}
+
+export interface CheckRuleConfiguration {
+  name: string;
+  expression: string;
+  dataset: string;
+  thresholds?: { degraded?: number; critical?: number };
+  summary?: string;
+  description?: string;
+  interval?: string;
+  for?: string;
+  keepFiringFor?: string;
+  labels?: Array<{ key: string; value: string }>;
+  annotations?: Array<{ key: string; value: string }>;
+  enabled?: boolean;
+}
+
+export interface GetCheckRuleConfiguration {
+  checkRule: string;
+  dataset: string;
+}
+
+export interface UpdateCheckRuleConfiguration extends CheckRuleConfiguration {
+  checkRule: string;
+}
+
+export interface DeleteCheckRuleConfiguration {
+  checkRule: string;
+  dataset: string;
 }

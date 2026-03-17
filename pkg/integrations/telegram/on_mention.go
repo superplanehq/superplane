@@ -154,8 +154,8 @@ func (t *OnMention) HandleAction(ctx core.TriggerActionContext) (map[string]any,
 	return nil, nil
 }
 
-func (t *OnMention) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
+func (t *OnMention) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
 }
 
 func (t *OnMention) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {

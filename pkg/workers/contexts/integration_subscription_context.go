@@ -17,6 +17,7 @@ type IntegrationSubscriptionContext struct {
 	integration    *models.Integration
 	subscription   *models.NodeSubscription
 	integrationCtx *IntegrationContext
+	onNewEvents    func([]models.CanvasEvent)
 }
 
 func NewIntegrationSubscriptionContext(
@@ -26,6 +27,7 @@ func NewIntegrationSubscriptionContext(
 	node *models.CanvasNode,
 	integration *models.Integration,
 	integrationCtx *IntegrationContext,
+	onNewEvents func([]models.CanvasEvent),
 ) core.IntegrationSubscriptionContext {
 	return &IntegrationSubscriptionContext{
 		tx:             tx,
@@ -34,6 +36,7 @@ func NewIntegrationSubscriptionContext(
 		node:           node,
 		integration:    integration,
 		integrationCtx: integrationCtx,
+		onNewEvents:    onNewEvents,
 	}
 }
 
@@ -75,7 +78,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToComponent(message any) err
 		Configuration: c.node.Configuration.Data(),
 		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
 		Integration:   c.integrationCtx,
-		Events:        NewEventContext(c.tx, c.node),
+		Events:        NewEventContext(c.tx, c.node, c.onNewEvents),
 		Message:       message,
 		Logger:        logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
@@ -107,7 +110,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 		NodeMetadata:      NewNodeMetadataContext(c.tx, c.node),
 		Integration:       c.integrationCtx,
 		Message:           message,
-		Events:            NewEventContext(c.tx, c.node),
+		Events:            NewEventContext(c.tx, c.node, c.onNewEvents),
 		Logger:            logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
 		FindExecutionByKV: c.findExecutionByKV,
 	})
@@ -131,7 +134,7 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 		HTTP:           c.registry.HTTPContext(),
 		Metadata:       NewExecutionMetadataContext(c.tx, execution),
 		NodeMetadata:   NewNodeMetadataContext(c.tx, c.node),
-		ExecutionState: NewExecutionStateContext(c.tx, execution),
+		ExecutionState: NewExecutionStateContext(c.tx, execution, c.onNewEvents),
 		Requests:       NewExecutionRequestContext(c.tx, execution),
 		Integration:    c.integrationCtx,
 		Logger:         logging.WithExecution(logging.ForNode(*c.node), execution, nil),

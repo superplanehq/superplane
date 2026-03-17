@@ -40,6 +40,78 @@ div.monaco-editor {
   --vscode-focusBorder: transparent;
 }
 
+.canvas-conflict-current-line {
+  background: rgb(220 252 231 / 45%);
+}
+
+.canvas-conflict-incoming-line {
+  background: rgb(219 234 254 / 45%);
+}
+
+.canvas-conflict-marker-current {
+  background: rgb(22 163 74 / 18%);
+  font-weight: 600;
+}
+
+.canvas-conflict-marker-separator {
+  background: rgb(249 115 22 / 20%);
+  font-weight: 600;
+}
+
+.canvas-conflict-marker-incoming {
+  background: rgb(59 130 246 / 20%);
+  font-weight: 600;
+}
+
+.canvas-conflict-inline-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 2px 8px;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+  pointer-events: auto;
+  position: relative;
+  top: -6px;
+  z-index: 20;
+}
+
+.canvas-conflict-inline-actions__buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.canvas-conflict-inline-action-button {
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  font-size: 11px;
+  line-height: 18px;
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.canvas-conflict-inline-action-button:hover {
+  color: #1d4ed8;
+}
+
+.canvas-conflict-inline-action-button:focus-visible {
+  outline: 1px solid #93c5fd;
+  outline-offset: 2px;
+}
+
 /* Reusable 1px 45deg diagonal line pattern (gray-950/10), 8px between lines */
 .bg-stripe-diagonal {
   background-image: repeating-linear-gradient(
@@ -50,4 +122,3 @@ div.monaco-editor {
     transparent 9px
   );
 }
-

@@ -21,7 +21,7 @@ func Test__OnIssue__HandleWebhook__MissingEventHeader(t *testing.T) {
 		Configuration: map[string]any{"project": "123", "actions": []string{"open"}},
 	}
 
-	code, err := trigger.HandleWebhook(ctx)
+	code, _, err := trigger.HandleWebhook(ctx)
 	assert.Equal(t, http.StatusBadRequest, code)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "X-Gitlab-Event")
@@ -42,7 +42,7 @@ func Test__OnIssue__HandleWebhook__WrongEventType(t *testing.T) {
 		Logger:        log.NewEntry(log.New()),
 	}
 
-	code, err := trigger.HandleWebhook(ctx)
+	code, _, err := trigger.HandleWebhook(ctx)
 	assert.Equal(t, http.StatusOK, code)
 	assert.NoError(t, err)
 	assert.Zero(t, eventsCtx.Count())
@@ -65,7 +65,7 @@ func Test__OnIssue__HandleWebhook__InvalidToken(t *testing.T) {
 		Logger:        log.NewEntry(log.New()),
 	}
 
-	code, err := trigger.HandleWebhook(ctx)
+	code, _, err := trigger.HandleWebhook(ctx)
 	assert.Equal(t, http.StatusForbidden, code)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid webhook token")
@@ -98,7 +98,7 @@ func Test__OnIssue__HandleWebhook__StateNotOpened(t *testing.T) {
 		Logger:        log.NewEntry(log.New()),
 	}
 
-	code, err := trigger.HandleWebhook(ctx)
+	code, _, err := trigger.HandleWebhook(ctx)
 	assert.Equal(t, http.StatusOK, code)
 	assert.NoError(t, err)
 
@@ -134,7 +134,7 @@ func Test__OnIssue__HandleWebhook__Success(t *testing.T) {
 		Logger:        log.NewEntry(log.New()),
 	}
 
-	code, err := trigger.HandleWebhook(ctx)
+	code, _, err := trigger.HandleWebhook(ctx)
 	assert.Equal(t, http.StatusOK, code)
 	assert.NoError(t, err)
 
@@ -176,7 +176,7 @@ func Test__OnIssue__HandleWebhook__Filters(t *testing.T) {
 			Logger:        log.NewEntry(log.New()),
 		}
 
-		code, err := trigger.HandleWebhook(ctx)
+		code, _, err := trigger.HandleWebhook(ctx)
 		assert.Equal(t, http.StatusOK, code)
 		assert.NoError(t, err)
 
@@ -203,7 +203,7 @@ func Test__OnIssue__HandleWebhook__Filters(t *testing.T) {
 			Logger:        log.NewEntry(log.New()),
 		}
 
-		code, err := trigger.HandleWebhook(ctx)
+		code, _, err := trigger.HandleWebhook(ctx)
 		assert.Equal(t, http.StatusOK, code)
 		assert.NoError(t, err)
 
@@ -274,7 +274,7 @@ func Test__OnIssue__HandleWebhook__UpdateOnClosed(t *testing.T) {
 		Logger:        log.NewEntry(log.New()),
 	}
 
-	code, err := trigger.HandleWebhook(ctx)
+	code, _, err := trigger.HandleWebhook(ctx)
 	assert.Equal(t, http.StatusOK, code)
 	assert.NoError(t, err)
 

@@ -36,7 +36,7 @@ func (d *Discord) Icon() string {
 }
 
 func (d *Discord) Description() string {
-	return "Send messages to Discord channels"
+	return "Send messages to Discord channels and fetch mentions"
 }
 
 func (d *Discord) Instructions() string {
@@ -46,7 +46,7 @@ func (d *Discord) Instructions() string {
 2. Click **New Application** and give it a name
 3. Go to **OAuth2** → **URL Generator**:
    - Under **Scopes**, select **bot**
-   - Under **Bot Permissions**, select **View Channels** and **Send Messages**
+   - Under **Bot Permissions**, select **View Channels**, **Send Messages**, and **Read Message History**
    - Copy the generated URL and open it in a new tab to invite the bot to your server
 4. Go to the **Bot** section:
    - Click **Add Bot** (if not already added)
@@ -71,6 +71,7 @@ func (d *Discord) Configuration() []configuration.Field {
 func (d *Discord) Components() []core.Component {
 	return []core.Component{
 		&SendTextMessage{},
+		&GetLastMention{},
 	}
 }
 
@@ -79,7 +80,6 @@ func (d *Discord) Triggers() []core.Trigger {
 }
 
 func (d *Discord) Sync(ctx core.SyncContext) error {
-	// Get the decrypted bot token using GetConfig (sensitive fields are encrypted)
 	botTokenBytes, err := ctx.Integration.GetConfig("botToken")
 	if err != nil {
 		return fmt.Errorf("botToken is required")
@@ -90,7 +90,6 @@ func (d *Discord) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("botToken is required")
 	}
 
-	// Verify the bot token is valid by getting the current user
 	client, err := NewClient(ctx.Integration)
 	if err != nil {
 		return err
@@ -111,7 +110,7 @@ func (d *Discord) Sync(ctx core.SyncContext) error {
 }
 
 func (d *Discord) HandleRequest(ctx core.HTTPRequestContext) {
-	// no-op: Discord bot integration doesn't receive incoming HTTP requests
+	// no-op: Discord integration doesn't receive mention events through HTTP webhooks.
 }
 
 func (d *Discord) Cleanup(ctx core.IntegrationCleanupContext) error {
@@ -153,14 +152,14 @@ func (d *Discord) ListResources(resourceType string, ctx core.ListResourcesConte
 			if ctx.Logger != nil {
 				ctx.Logger.Warnf("Discord: failed to get channels for guild %s: %v", guild.ID, err)
 			}
-			continue // Skip guilds where we can't list channels
+			continue
 		}
 
 		if ctx.Logger != nil {
 			ctx.Logger.Infof("Discord: found %d channels in guild %s", len(channels), guild.Name)
 		}
+
 		for _, channel := range channels {
-			// Only include text channels (type 0)
 			if channel.Type == 0 {
 				resources = append(resources, core.IntegrationResource{
 					Type: "channel",
@@ -174,6 +173,7 @@ func (d *Discord) ListResources(resourceType string, ctx core.ListResourcesConte
 	if ctx.Logger != nil {
 		ctx.Logger.Infof("Discord: returning %d channel resources", len(resources))
 	}
+
 	return resources, nil
 }
 

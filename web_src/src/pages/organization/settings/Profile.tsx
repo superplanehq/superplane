@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { meRegenerateToken } from "../../../api-client/sdk.gen";
 import type { SuperplaneMeUser } from "../../../api-client/types.gen";
 import { Avatar } from "../../../components/Avatar/avatar";
@@ -8,11 +9,13 @@ import { Icon } from "../../../components/Icon";
 import { Input } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";
 import { Button } from "@/components/ui/button";
-import { withOrganizationHeader } from "../../../utils/withOrganizationHeader";
+import { useOrganizationId, withOrganizationHeader } from "../../../utils/withOrganizationHeader";
 import { meKeys, useMe } from "@/hooks/useMe";
 
 export function Profile() {
+  usePageTitle(["Profile"]);
   const queryClient = useQueryClient();
+  const organizationId = useOrganizationId();
   const { data: user, isLoading: loading, error: meError } = useMe();
   const [actionError, setActionError] = useState<string | null>(null);
   const [token, setToken] = useState<string>("");
@@ -26,16 +29,18 @@ export function Profile() {
     try {
       setActionError(null);
       setRegeneratingToken(true);
-      const response = await meRegenerateToken(withOrganizationHeader());
+      const response = await meRegenerateToken(withOrganizationHeader({ organizationId }));
       setToken(response.data.token || "");
       setTokenVisible(true);
       // Update user to reflect token existence
-      queryClient.setQueryData<SuperplaneMeUser | null>(meKeys.me, (currentUser) => {
-        if (!currentUser) {
-          return currentUser;
-        }
-        return { ...currentUser, hasToken: true };
-      });
+      if (organizationId) {
+        queryClient.setQueryData<SuperplaneMeUser | null>(meKeys.me(organizationId), (currentUser) => {
+          if (!currentUser) {
+            return currentUser;
+          }
+          return { ...currentUser, hasToken: true };
+        });
+      }
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to regenerate token");
     } finally {
