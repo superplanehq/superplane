@@ -27,7 +27,8 @@ var camelBoundary = regexp.MustCompile(`([a-z0-9])([A-Z])`)
 func main() {
 	createOutputDirectory()
 
-	reg, err := registry.NewRegistry(crypto.NewNoOpEncryptor(), extensions.NewStorage(artifactstorage.NewInMemoryStorage()), registry.HTTPOptions{})
+	extensionStorage, err := extensions.NewStorage(artifactstorage.NewInMemoryStorage(), nil)
+	reg, err := registry.NewRegistry(crypto.NewNoOpEncryptor(), extensionStorage, registry.HTTPOptions{})
 	if err != nil {
 		exitWithError(err)
 	}

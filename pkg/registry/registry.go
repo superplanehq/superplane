@@ -58,31 +58,31 @@ type IntegrationRegistration struct {
 }
 
 type Registry struct {
-	httpCtx         *HTTPContext
-	Encryptor       crypto.Encryptor
-	Storage         *extensions.Storage
-	Integrations    map[string]core.Integration
-	WebhookHandlers map[string]core.WebhookHandler
-	Components      map[string]core.Component
-	Triggers        map[string]core.Trigger
-	Widgets         map[string]core.Widget
+	httpCtx          *HTTPContext
+	Encryptor        crypto.Encryptor
+	ExtensionStorage *extensions.Storage
+	Integrations     map[string]core.Integration
+	WebhookHandlers  map[string]core.WebhookHandler
+	Components       map[string]core.Component
+	Triggers         map[string]core.Trigger
+	Widgets          map[string]core.Widget
 }
 
-func NewRegistry(encryptor crypto.Encryptor, storage *extensions.Storage, httpOptions HTTPOptions) (*Registry, error) {
+func NewRegistry(encryptor crypto.Encryptor, extensionStorage *extensions.Storage, httpOptions HTTPOptions) (*Registry, error) {
 	httpCtx, err := NewHTTPContext(httpOptions)
 	if err != nil {
 		return nil, err
 	}
 
 	r := &Registry{
-		Encryptor:       encryptor,
-		Storage:         storage,
-		httpCtx:         httpCtx,
-		Components:      map[string]core.Component{},
-		Triggers:        map[string]core.Trigger{},
-		Integrations:    map[string]core.Integration{},
-		WebhookHandlers: map[string]core.WebhookHandler{},
-		Widgets:         map[string]core.Widget{},
+		Encryptor:        encryptor,
+		ExtensionStorage: extensionStorage,
+		httpCtx:          httpCtx,
+		Components:       map[string]core.Component{},
+		Triggers:         map[string]core.Trigger{},
+		Integrations:     map[string]core.Integration{},
+		WebhookHandlers:  map[string]core.WebhookHandler{},
+		Widgets:          map[string]core.Widget{},
 	}
 
 	r.Init()
@@ -145,7 +145,11 @@ func (r *Registry) GetTrigger(organizationID string, name string) (core.Trigger,
 		return trigger, nil
 	}
 
-	triggers := r.Storage.ListTriggers(organizationID)
+	triggers, err := r.ExtensionStorage.ListTriggers(organizationID)
+	if err != nil {
+		return nil, fmt.Errorf("error listing triggers from extensions: %w", err)
+	}
+
 	for _, trigger := range triggers {
 		if trigger.Name == name {
 			return NewExtensionTrigger(trigger), nil
@@ -188,7 +192,11 @@ func (r *Registry) ListComponents() []core.Component {
 func (r *Registry) ListComponentsForOrganization(organizationID string) []core.Component {
 	components := r.ListComponents()
 
-	fromExtensions := r.Storage.ListComponents(organizationID)
+	fromExtensions, err := r.ExtensionStorage.ListComponents(organizationID)
+	if err != nil {
+		return components
+	}
+
 	for _, c := range fromExtensions {
 		components = append(components, &ExtensionComponent{manifest: c})
 	}
@@ -199,7 +207,11 @@ func (r *Registry) ListComponentsForOrganization(organizationID string) []core.C
 func (r *Registry) ListTriggersForOrganization(organizationID string) []core.Trigger {
 	triggers := r.ListTriggers()
 
-	fromExtensions := r.Storage.ListTriggers(organizationID)
+	fromExtensions, err := r.ExtensionStorage.ListTriggers(organizationID)
+	if err != nil {
+		return triggers
+	}
+
 	for _, t := range fromExtensions {
 		triggers = append(triggers, &ExtensionTrigger{manifest: t})
 	}
@@ -213,7 +225,11 @@ func (r *Registry) GetComponent(organizationID string, name string) (core.Compon
 		return component, nil
 	}
 
-	components := r.Storage.ListComponents(organizationID)
+	components, err := r.ExtensionStorage.ListComponents(organizationID)
+	if err != nil {
+		return nil, fmt.Errorf("error listing components from extensions: %w", err)
+	}
+
 	for _, component := range components {
 		if component.Name == name {
 			return NewExtensionComponent(component), nil
@@ -270,10 +286,24 @@ func (r *Registry) GetIntegration(organizationID string, name string) (core.Inte
 		return integration, nil
 	}
 
-	integrations := r.Storage.ListIntegrations(organizationID)
+	integrations, err := r.ExtensionStorage.ListIntegrations(organizationID)
+	if err != nil {
+		return nil, fmt.Errorf("error listing integrations from extensions: %w", err)
+	}
+
 	for _, integration := range integrations {
 		if integration.Name == name {
-			return NewExtensionIntegration(integration), nil
+			components, err := r.getIntegrationComponentsForExtension(organizationID, name)
+			if err != nil {
+				return nil, err
+			}
+
+			triggers, err := r.getIntegrationTriggersForExtension(organizationID, name)
+			if err != nil {
+				return nil, err
+			}
+
+			return NewExtensionIntegration(integration, components, triggers), nil
 		}
 	}
 
@@ -306,12 +336,62 @@ func (r *Registry) ListIntegrations() []core.Integration {
 func (r *Registry) ListIntegrationsForOrganization(organizationID string) []core.Integration {
 	integrations := r.ListIntegrations()
 
-	fromExtensions := r.Storage.ListIntegrations(organizationID)
-	for _, i := range fromExtensions {
-		integrations = append(integrations, &ExtensionIntegration{manifest: i})
+	manifests, err := r.ExtensionStorage.ListIntegrations(organizationID)
+	if err != nil {
+		return integrations
+	}
+
+	for _, manifest := range manifests {
+		components, err := r.getIntegrationComponentsForExtension(organizationID, manifest.Name)
+		if err != nil {
+			return integrations
+		}
+
+		triggers, err := r.getIntegrationTriggersForExtension(organizationID, manifest.Name)
+		if err != nil {
+			return integrations
+		}
+
+		integrations = append(integrations, &ExtensionIntegration{
+			manifest:   manifest,
+			components: components,
+			triggers:   triggers,
+		})
 	}
 
 	return integrations
+}
+
+func (r *Registry) getIntegrationComponentsForExtension(organizationID string, integrationName string) ([]core.Component, error) {
+	manifests, err := r.ExtensionStorage.ListComponents(organizationID)
+	if err != nil {
+		return nil, err
+	}
+
+	components := make([]core.Component, 0, len(manifests))
+	for _, manifest := range manifests {
+		if manifest.Integration == integrationName {
+			components = append(components, &ExtensionComponent{manifest: manifest})
+		}
+	}
+
+	return components, nil
+}
+
+func (r *Registry) getIntegrationTriggersForExtension(organizationID string, integrationName string) ([]core.Trigger, error) {
+	manifests, err := r.ExtensionStorage.ListTriggers(organizationID)
+	if err != nil {
+		return nil, err
+	}
+
+	triggers := make([]core.Trigger, 0, len(manifests))
+	for _, manifest := range manifests {
+		if manifest.Integration == integrationName {
+			triggers = append(triggers, &ExtensionTrigger{manifest: manifest})
+		}
+	}
+
+	return triggers, nil
 }
 
 func (r *Registry) GetIntegrationTrigger(organizationID string, appName, triggerName string) (core.Trigger, error) {

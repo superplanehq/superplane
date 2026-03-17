@@ -39,7 +39,10 @@ func isValidName(name string) bool {
 }
 
 func TestComponentsAndTriggersUseCamelCaseNames(t *testing.T) {
-	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, extensions.NewStorage(artifactstorage.NewInMemoryStorage()), registry.HTTPOptions{})
+	extensionStorage, err := extensions.NewStorage(artifactstorage.NewInMemoryStorage(), nil)
+	require.NoError(t, err)
+
+	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, extensionStorage, registry.HTTPOptions{})
 	require.NoError(t, err)
 
 	for _, c := range reg.ListComponents() {

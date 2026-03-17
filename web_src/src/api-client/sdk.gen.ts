@@ -993,7 +993,7 @@ export const extensionsListVersions = <ThrowOnError extends boolean = true>(
   options: Options<ExtensionsListVersionsData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<ExtensionsListVersionsResponses, ExtensionsListVersionsErrors, ThrowOnError>({
-    url: "/api/v1/extensions/{extensionId}/versions",
+    url: "/api/v1/extensions/{extension}/versions",
     ...options,
   });
 
@@ -1006,7 +1006,7 @@ export const extensionsCreateVersion = <ThrowOnError extends boolean = true>(
   options: Options<ExtensionsCreateVersionData, ThrowOnError>,
 ) =>
   (options.client ?? client).post<ExtensionsCreateVersionResponses, ExtensionsCreateVersionErrors, ThrowOnError>({
-    url: "/api/v1/extensions/{extensionId}/versions",
+    url: "/api/v1/extensions/{extension}/versions",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1023,7 +1023,7 @@ export const extensionsPublishVersion = <ThrowOnError extends boolean = true>(
   options: Options<ExtensionsPublishVersionData, ThrowOnError>,
 ) =>
   (options.client ?? client).post<ExtensionsPublishVersionResponses, ExtensionsPublishVersionErrors, ThrowOnError>({
-    url: "/api/v1/extensions/{extensionId}/versions/{versionId}",
+    url: "/api/v1/extensions/{extension}/versions/{version}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1040,7 +1040,7 @@ export const extensionsUpdateVersion = <ThrowOnError extends boolean = true>(
   options: Options<ExtensionsUpdateVersionData, ThrowOnError>,
 ) =>
   (options.client ?? client).put<ExtensionsUpdateVersionResponses, ExtensionsUpdateVersionErrors, ThrowOnError>({
-    url: "/api/v1/extensions/{extensionId}/versions/{versionId}",
+    url: "/api/v1/extensions/{extension}/versions/{version}",
     ...options,
     headers: {
       "Content-Type": "application/json",

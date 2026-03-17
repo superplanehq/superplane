@@ -9,11 +9,13 @@ import (
 )
 
 type ExtensionIntegration struct {
-	manifest extensions.IntegrationManifest
+	manifest   extensions.IntegrationManifest
+	components []core.Component
+	triggers   []core.Trigger
 }
 
-func NewExtensionIntegration(manifest extensions.IntegrationManifest) *ExtensionIntegration {
-	return &ExtensionIntegration{manifest: manifest}
+func NewExtensionIntegration(manifest extensions.IntegrationManifest, components []core.Component, triggers []core.Trigger) *ExtensionIntegration {
+	return &ExtensionIntegration{manifest: manifest, components: components, triggers: triggers}
 }
 
 func (s *ExtensionIntegration) Name() string {
@@ -45,11 +47,11 @@ func (s *ExtensionIntegration) Actions() []core.Action {
 }
 
 func (s *ExtensionIntegration) Components() []core.Component {
-	return nil
+	return s.components
 }
 
 func (s *ExtensionIntegration) Triggers() []core.Trigger {
-	return nil
+	return s.triggers
 }
 
 func (s *ExtensionIntegration) Sync(ctx core.SyncContext) (err error) {

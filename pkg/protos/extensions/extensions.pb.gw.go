@@ -101,13 +101,13 @@ func request_Extensions_CreateVersion_0(ctx context.Context, marshaler runtime.M
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	val, ok := pathParams["extension_id"]
+	val, ok := pathParams["extension"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension")
 	}
-	protoReq.ExtensionId, err = runtime.String(val)
+	protoReq.Extension, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension", err)
 	}
 	msg, err := client.CreateVersion(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -122,13 +122,13 @@ func local_request_Extensions_CreateVersion_0(ctx context.Context, marshaler run
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	val, ok := pathParams["extension_id"]
+	val, ok := pathParams["extension"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension")
 	}
-	protoReq.ExtensionId, err = runtime.String(val)
+	protoReq.Extension, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension", err)
 	}
 	msg, err := server.CreateVersion(ctx, &protoReq)
 	return msg, metadata, err
@@ -143,21 +143,21 @@ func request_Extensions_UpdateVersion_0(ctx context.Context, marshaler runtime.M
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	val, ok := pathParams["extension_id"]
+	val, ok := pathParams["extension"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension")
 	}
-	protoReq.ExtensionId, err = runtime.String(val)
+	protoReq.Extension, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension", err)
 	}
-	val, ok = pathParams["version_id"]
+	val, ok = pathParams["version"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "version_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "version")
 	}
-	protoReq.VersionId, err = runtime.String(val)
+	protoReq.Version, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "version_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "version", err)
 	}
 	msg, err := client.UpdateVersion(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -172,21 +172,21 @@ func local_request_Extensions_UpdateVersion_0(ctx context.Context, marshaler run
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	val, ok := pathParams["extension_id"]
+	val, ok := pathParams["extension"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension")
 	}
-	protoReq.ExtensionId, err = runtime.String(val)
+	protoReq.Extension, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension", err)
 	}
-	val, ok = pathParams["version_id"]
+	val, ok = pathParams["version"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "version_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "version")
 	}
-	protoReq.VersionId, err = runtime.String(val)
+	protoReq.Version, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "version_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "version", err)
 	}
 	msg, err := server.UpdateVersion(ctx, &protoReq)
 	return msg, metadata, err
@@ -201,21 +201,21 @@ func request_Extensions_PublishVersion_0(ctx context.Context, marshaler runtime.
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	val, ok := pathParams["extension_id"]
+	val, ok := pathParams["extension"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension")
 	}
-	protoReq.ExtensionId, err = runtime.String(val)
+	protoReq.Extension, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension", err)
 	}
-	val, ok = pathParams["version_id"]
+	val, ok = pathParams["version"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "version_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "version")
 	}
-	protoReq.VersionId, err = runtime.String(val)
+	protoReq.Version, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "version_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "version", err)
 	}
 	msg, err := client.PublishVersion(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -230,21 +230,21 @@ func local_request_Extensions_PublishVersion_0(ctx context.Context, marshaler ru
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	val, ok := pathParams["extension_id"]
+	val, ok := pathParams["extension"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension")
 	}
-	protoReq.ExtensionId, err = runtime.String(val)
+	protoReq.Extension, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension", err)
 	}
-	val, ok = pathParams["version_id"]
+	val, ok = pathParams["version"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "version_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "version")
 	}
-	protoReq.VersionId, err = runtime.String(val)
+	protoReq.Version, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "version_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "version", err)
 	}
 	msg, err := server.PublishVersion(ctx, &protoReq)
 	return msg, metadata, err
@@ -257,13 +257,13 @@ func request_Extensions_ListVersions_0(ctx context.Context, marshaler runtime.Ma
 		err      error
 	)
 	io.Copy(io.Discard, req.Body)
-	val, ok := pathParams["extension_id"]
+	val, ok := pathParams["extension"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension")
 	}
-	protoReq.ExtensionId, err = runtime.String(val)
+	protoReq.Extension, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension", err)
 	}
 	msg, err := client.ListVersions(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -275,13 +275,13 @@ func local_request_Extensions_ListVersions_0(ctx context.Context, marshaler runt
 		metadata runtime.ServerMetadata
 		err      error
 	)
-	val, ok := pathParams["extension_id"]
+	val, ok := pathParams["extension"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "extension")
 	}
-	protoReq.ExtensionId, err = runtime.String(val)
+	protoReq.Extension, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "extension", err)
 	}
 	msg, err := server.ListVersions(ctx, &protoReq)
 	return msg, metadata, err
@@ -339,7 +339,7 @@ func RegisterExtensionsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Extensions.Extensions/CreateVersion", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension_id}/versions"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Extensions.Extensions/CreateVersion", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension}/versions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -359,7 +359,7 @@ func RegisterExtensionsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Extensions.Extensions/UpdateVersion", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension_id}/versions/{version_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Extensions.Extensions/UpdateVersion", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension}/versions/{version}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -379,7 +379,7 @@ func RegisterExtensionsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Extensions.Extensions/PublishVersion", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension_id}/versions/{version_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Extensions.Extensions/PublishVersion", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension}/versions/{version}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -399,7 +399,7 @@ func RegisterExtensionsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Extensions.Extensions/ListVersions", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension_id}/versions"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Extensions.Extensions/ListVersions", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension}/versions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -491,7 +491,7 @@ func RegisterExtensionsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Extensions.Extensions/CreateVersion", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension_id}/versions"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Extensions.Extensions/CreateVersion", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension}/versions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -508,7 +508,7 @@ func RegisterExtensionsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Extensions.Extensions/UpdateVersion", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension_id}/versions/{version_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Extensions.Extensions/UpdateVersion", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension}/versions/{version}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -525,7 +525,7 @@ func RegisterExtensionsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Extensions.Extensions/PublishVersion", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension_id}/versions/{version_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Extensions.Extensions/PublishVersion", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension}/versions/{version}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -542,7 +542,7 @@ func RegisterExtensionsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Extensions.Extensions/ListVersions", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension_id}/versions"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Extensions.Extensions/ListVersions", runtime.WithHTTPPathPattern("/api/v1/extensions/{extension}/versions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -561,10 +561,10 @@ func RegisterExtensionsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 var (
 	pattern_Extensions_ListExtensions_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "extensions"}, ""))
 	pattern_Extensions_CreateExtension_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "extensions"}, ""))
-	pattern_Extensions_CreateVersion_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "extensions", "extension_id", "versions"}, ""))
-	pattern_Extensions_UpdateVersion_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "extensions", "extension_id", "versions", "version_id"}, ""))
-	pattern_Extensions_PublishVersion_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "extensions", "extension_id", "versions", "version_id"}, ""))
-	pattern_Extensions_ListVersions_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "extensions", "extension_id", "versions"}, ""))
+	pattern_Extensions_CreateVersion_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "extensions", "extension", "versions"}, ""))
+	pattern_Extensions_UpdateVersion_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "extensions", "extension", "versions", "version"}, ""))
+	pattern_Extensions_PublishVersion_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "extensions", "extension", "versions", "version"}, ""))
+	pattern_Extensions_ListVersions_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "extensions", "extension", "versions"}, ""))
 )
 
 var (

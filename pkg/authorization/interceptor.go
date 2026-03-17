@@ -153,9 +153,12 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbServiceAccounts.ServiceAccounts_RegenerateServiceAccountToken_FullMethodName: {Resource: "service_accounts", Action: "update", DomainType: models.DomainTypeOrganization},
 
 		// Discovery endpoints
-		pbComponents.Components_ListComponents_FullMethodName:       {Resource: "components", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbTriggers.Triggers_ListTriggers_FullMethodName:             {Resource: "triggers", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbIntegrations.Integrations_ListIntegrations_FullMethodName: {Resource: "integrations", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbComponents.Components_ListComponents_FullMethodName:       {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbComponents.Components_DescribeComponent_FullMethodName:    {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbComponents.Components_ListComponentActions_FullMethodName: {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbTriggers.Triggers_ListTriggers_FullMethodName:             {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbTriggers.Triggers_DescribeTrigger_FullMethodName:          {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbIntegrations.Integrations_ListIntegrations_FullMethodName: {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
 
 		// Extensions rules
 		pbExtensions.Extensions_ListExtensions_FullMethodName:  {Resource: "extensions", Action: "read", DomainType: models.DomainTypeOrganization},

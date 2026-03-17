@@ -72,8 +72,10 @@ func Setup(t *testing.T) *ResourceRegistry {
 func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
 
+	extensionStorage, err := extensions.NewStorage(artifactstorage.NewInMemoryStorage(), nil)
+	require.NoError(t, err)
 	encryptor := crypto.NewNoOpEncryptor()
-	registry, err := registry.NewRegistry(encryptor, extensions.NewStorage(artifactstorage.NewInMemoryStorage()), registry.HTTPOptions{})
+	registry, err := registry.NewRegistry(encryptor, extensionStorage, registry.HTTPOptions{})
 	require.NoError(t, err)
 
 	//

@@ -2,196 +2,115 @@ package extensions
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"path"
+	"time"
 
+	"github.com/dgraph-io/ristretto/v2"
 	storage "github.com/superplanehq/superplane/pkg/storage"
 )
 
 type Storage struct {
-	underlying storage.Storage
-	extensions map[string][]Extension
-	versions   map[string][]Version
+	underlying    storage.Storage
+	manifestCache *ristretto.Cache[string, *Manifest]
+	loadManifest  func(organizationID string) (*Manifest, error)
 }
 
-type Extension struct {
-	ID          string
-	Name        string
-	Description string
-}
+func NewStorage(underlying storage.Storage, loadManifest func(organizationID string) (*Manifest, error)) (*Storage, error) {
+	if loadManifest == nil {
+		return nil, fmt.Errorf("loadManifest is required")
+	}
 
-type Version struct {
-	ID           string
-	Version      string
-	ExtensionID  string
-	Digest       string
-	State        string
-	Integrations []IntegrationManifest
-	Components   []ComponentManifest
-	Triggers     []TriggerManifest
-}
+	//
+	// MaxCost=100 and cost for every manifest is 1,
+	// so we can keep at most 100 manifests in memory.
+	//
+	cache, err := ristretto.NewCache(&ristretto.Config[string, *Manifest]{
+		MaxCost:     100,
+		NumCounters: 1000,
+		BufferItems: 64,
+	})
 
-func NewStorage(underlying storage.Storage) *Storage {
+	if err != nil {
+		return nil, fmt.Errorf("error creating manifest cache: %w", err)
+	}
+
 	return &Storage{
-		underlying: underlying,
-		extensions: make(map[string][]Extension),
-		versions:   make(map[string][]Version),
+		underlying:    underlying,
+		manifestCache: cache,
+		loadManifest:  loadManifest,
+	}, nil
+}
+
+func (s *Storage) ListIntegrations(organizationID string) ([]IntegrationManifest, error) {
+	manifest, ok := s.manifestCache.Get(organizationID)
+	if ok {
+		return manifest.Integrations, nil
 	}
-}
 
-func (s *Storage) ListExtensions(organizationID string) ([]Extension, error) {
-	return s.extensions[organizationID], nil
-}
-
-func (s *Storage) ListVersions(organizationID string, extensionID string) ([]Version, error) {
-	_, err := s.FindExtensionById(organizationID, extensionID)
+	manifest, err := s.loadManifest(organizationID)
 	if err != nil {
-		return []Version{}, nil
+		return nil, err
 	}
 
-	return s.versions[extensionID], nil
+	s.manifestCache.SetWithTTL(organizationID, manifest, 1, time.Minute)
+	return manifest.Integrations, nil
 }
 
-func (s *Storage) CreateExtension(organizationID string, extension Extension) error {
-	if _, ok := s.extensions[organizationID]; !ok {
-		s.extensions[organizationID] = []Extension{}
+func (s *Storage) ListComponents(organizationID string) ([]ComponentManifest, error) {
+	manifest, ok := s.manifestCache.Get(organizationID)
+	if ok {
+		return manifest.Components, nil
 	}
 
-	if _, err := s.FindExtensionByName(organizationID, extension.Name); err == nil {
-		return fmt.Errorf("extension %s already exists", extension.Name)
-	}
-
-	s.extensions[organizationID] = append(s.extensions[organizationID], extension)
-	return nil
-}
-
-func (s *Storage) CreateVersion(organizationID string, extensionID string, version Version, files *BundleFiles) error {
-	extension, err := s.FindExtensionById(organizationID, extensionID)
+	manifest, err := s.loadManifest(organizationID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if files == nil {
-		return errors.New("bundle files are required")
-	}
-
-	if _, ok := s.versions[extensionID]; !ok {
-		s.versions[extensionID] = []Version{}
-	}
-
-	if err := s.writeVersionFiles(organizationID, extension.Name, version, files); err != nil {
-		return err
-	}
-
-	s.versions[extensionID] = append(s.versions[extensionID], version)
-	return nil
+	s.manifestCache.SetWithTTL(organizationID, manifest, 1, time.Minute)
+	return manifest.Components, nil
 }
 
-func (s *Storage) FindExtensionById(organizationID string, extensionID string) (*Extension, error) {
-	for _, extension := range s.extensions[organizationID] {
-		if extension.ID == extensionID {
-			return &extension, nil
-		}
+func (s *Storage) ListTriggers(organizationID string) ([]TriggerManifest, error) {
+	manifest, ok := s.manifestCache.Get(organizationID)
+	if ok {
+		return manifest.Triggers, nil
 	}
 
-	return nil, errors.New("extension not found")
-}
-
-func (s *Storage) FindExtensionByName(organizationID string, name string) (*Extension, error) {
-	for _, extension := range s.extensions[organizationID] {
-		if extension.Name == name {
-			return &extension, nil
-		}
-	}
-
-	return nil, errors.New("extension not found")
-}
-
-func (s *Storage) FindVersionById(organizationID string, extensionID string, versionID string) (*Version, error) {
-	for _, version := range s.versions[extensionID] {
-		if version.ID == versionID {
-			return &version, nil
-		}
-	}
-
-	return nil, errors.New("version not found")
-}
-
-func (s *Storage) UpdateVersion(organizationID string, extensionID string, versionID string, updatedVersion Version, files *BundleFiles) error {
-	extension, err := s.FindExtensionById(organizationID, extensionID)
+	manifest, err := s.loadManifest(organizationID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	currentVersion, err := s.FindVersionById(organizationID, extensionID, versionID)
-	if err != nil {
-		return err
-	}
-
-	if files != nil {
-		if err := s.writeVersionFiles(organizationID, extension.Name, updatedVersion, files); err != nil {
-			return err
-		}
-	}
-
-	if files == nil && versionDirectoryName(*currentVersion) != versionDirectoryName(updatedVersion) {
-		if err := s.copyVersionFiles(organizationID, extension.Name, *currentVersion, updatedVersion); err != nil {
-			return err
-		}
-	}
-
-	for i, version := range s.versions[extensionID] {
-		if version.ID == versionID {
-			s.versions[extensionID][i] = updatedVersion
-			break
-		}
-	}
-
-	return nil
+	s.manifestCache.SetWithTTL(organizationID, manifest, 1, time.Minute)
+	return manifest.Triggers, nil
 }
 
-func (s *Storage) ListComponents(organizationID string) []ComponentManifest {
-	components := []ComponentManifest{}
-	for _, extension := range s.extensions[organizationID] {
-		for _, version := range s.versions[extension.ID] {
-			components = append(components, version.Components...)
-		}
-	}
-
-	return components
+func (s *Storage) UploadVersion(organizationID string, extensionName string, versionName string, files *BundleFiles) error {
+	return s.writeVersionFiles(organizationID, extensionName, versionName, files)
 }
 
-func (s *Storage) ListTriggers(organizationID string) []TriggerManifest {
-	triggers := []TriggerManifest{}
-	for _, extension := range s.extensions[organizationID] {
-		for _, version := range s.versions[extension.ID] {
-			triggers = append(triggers, version.Triggers...)
-		}
-	}
-
-	return triggers
+func (s *Storage) ReadVersionManifestJSON(organizationID string, extensionName string, versionName string) ([]byte, error) {
+	return s.readVersionNamedFile(organizationID, extensionName, versionName, "manifest.json")
 }
 
-func (s *Storage) ListIntegrations(organizationID string) []IntegrationManifest {
-	integrations := []IntegrationManifest{}
-	for _, extension := range s.extensions[organizationID] {
-		for _, version := range s.versions[extension.ID] {
-			integrations = append(integrations, version.Integrations...)
-		}
-	}
-
-	return integrations
+func (s *Storage) ReadVersionBundleJS(organizationID string, extensionName string, versionName string) ([]byte, error) {
+	return s.readVersionNamedFile(organizationID, extensionName, versionName, "bundle.js")
 }
 
-func (s *Storage) writeVersionFiles(organizationID string, extensionName string, version Version, files *BundleFiles) error {
-	manifestPath := versionFilePath(organizationID, extensionName, version, "manifest.json")
+func (s *Storage) readVersionNamedFile(organizationID string, extensionName string, versionName string, filename string) ([]byte, error) {
+	return s.readVersionFile(organizationID, extensionName, versionName, filename)
+}
+
+func (s *Storage) writeVersionFiles(organizationID string, extensionName string, versionName string, files *BundleFiles) error {
+	manifestPath := versionFilePath(organizationID, extensionName, versionName, "manifest.json")
 	if err := s.underlying.Write(manifestPath, bytes.NewReader(files.ManifestJSON)); err != nil {
 		return fmt.Errorf("write manifest.json: %w", err)
 	}
 
-	bundlePath := versionFilePath(organizationID, extensionName, version, "bundle.js")
+	bundlePath := versionFilePath(organizationID, extensionName, versionName, "bundle.js")
 	if err := s.underlying.Write(bundlePath, bytes.NewReader(files.BundleJS)); err != nil {
 		return fmt.Errorf("write bundle.js: %w", err)
 	}
@@ -199,24 +118,8 @@ func (s *Storage) writeVersionFiles(organizationID string, extensionName string,
 	return nil
 }
 
-func (s *Storage) copyVersionFiles(organizationID string, extensionName string, currentVersion Version, updatedVersion Version) error {
-	for _, filename := range []string{"manifest.json", "bundle.js"} {
-		content, err := s.readVersionFile(organizationID, extensionName, currentVersion, filename)
-		if err != nil {
-			return err
-		}
-
-		targetPath := versionFilePath(organizationID, extensionName, updatedVersion, filename)
-		if err := s.underlying.Write(targetPath, bytes.NewReader(content)); err != nil {
-			return fmt.Errorf("copy %s: %w", filename, err)
-		}
-	}
-
-	return nil
-}
-
-func (s *Storage) readVersionFile(organizationID string, extensionName string, version Version, filename string) ([]byte, error) {
-	reader, err := s.underlying.Read(versionFilePath(organizationID, extensionName, version, filename))
+func (s *Storage) readVersionFile(organizationID string, extensionName string, versionName string, filename string) ([]byte, error) {
+	reader, err := s.underlying.Read(versionFilePath(organizationID, extensionName, versionName, filename))
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", filename, err)
 	}
@@ -229,14 +132,6 @@ func (s *Storage) readVersionFile(organizationID string, extensionName string, v
 	return content, nil
 }
 
-func versionFilePath(organizationID string, extensionName string, version Version, filename string) string {
-	return path.Join(organizationID, extensionName, versionDirectoryName(version), filename)
-}
-
-func versionDirectoryName(version Version) string {
-	if version.Version != "" {
-		return version.Version
-	}
-
-	return version.ID
+func versionFilePath(organizationID string, extensionName string, versionName string, filename string) string {
+	return path.Join(organizationID, extensionName, versionName, filename)
 }

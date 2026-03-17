@@ -3,36 +3,47 @@ package extensions
 import (
 	"context"
 
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
 	extensions "github.com/superplanehq/superplane/pkg/extensions"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/extensions"
+	"gorm.io/gorm"
 )
 
-func UpdateVersion(ctx context.Context, storage *extensions.Storage, organizationID string, extensionID string, versionID string, bundle []byte, digest string) (*pb.UpdateVersionResponse, error) {
-	currentVersion, err := storage.FindVersionById(organizationID, extensionID, versionID)
-	if err != nil {
-		return nil, err
-	}
-
+func UpdateVersion(ctx context.Context, storage *extensions.Storage, organizationID string, extensionID string, versionName string, bundle []byte, digest string) (*pb.UpdateVersionResponse, error) {
 	files, err := extensions.ExtractBundleFiles(bundle)
 	if err != nil {
 		return nil, err
 	}
 
-	newVersion := extensions.Version{
-		Digest:       digest,
-		State:        currentVersion.State,
-		Version:      currentVersion.Version,
-		ExtensionID:  currentVersion.ExtensionID,
-		ID:           currentVersion.ID,
-		Integrations: files.Manifest.Integrations,
-		Components:   files.Manifest.Components,
-		Triggers:     files.Manifest.Triggers,
-	}
-
-	err = storage.UpdateVersion(organizationID, extensionID, versionID, newVersion, files)
+	extension, err := models.FindExtension(uuid.MustParse(organizationID), extensionID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.UpdateVersionResponse{Version: SerializeVersion(&newVersion)}, nil
+	version, err := extension.FindVersion(versionName)
+	if err != nil {
+		return nil, err
+	}
+
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		err = version.UpdateInTransaction(tx, digest, files.Manifest)
+		if err != nil {
+			return err
+		}
+
+		err = storage.UploadVersion(organizationID, extension.Name, version.Name, files)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.UpdateVersionResponse{Version: SerializeVersion(version)}, nil
 }

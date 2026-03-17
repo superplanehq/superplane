@@ -29,6 +29,7 @@ import (
 type CreateVersionCommand struct {
 	ExtensionID string
 	EntryPoint  string
+	Version     string
 	Watch       bool
 }
 
@@ -54,8 +55,9 @@ func (c *CreateVersionCommand) Execute(ctx core.CommandContext) error {
 
 	response, _, err := ctx.API.ExtensionAPI.ExtensionsCreateVersion(ctx.Context, c.ExtensionID).
 		Body(openapi_client.ExtensionsCreateVersionBody{
-			Bundle: &bundle,
-			Digest: &digest,
+			Version: &c.Version,
+			Bundle:  &bundle,
+			Digest:  &digest,
 		}).
 		Execute()
 	if err != nil {
@@ -72,14 +74,9 @@ func (c *CreateVersionCommand) Execute(ctx core.CommandContext) error {
 		return nil
 	}
 
-	versionID, err := versionIDFromResponse(version)
-	if err != nil {
-		return err
-	}
+	_, _ = fmt.Fprintf(ctx.Cmd.ErrOrStderr(), "Created draft version %s. Watching for changes...\n", c.Version)
 
-	_, _ = fmt.Fprintf(ctx.Cmd.ErrOrStderr(), "Created draft version %s. Watching for changes...\n", versionID)
-
-	return watchAndUpdateVersion(ctx, c.ExtensionID, projectDir, entryPoint, versionID)
+	return watchAndUpdateVersion(ctx, c.ExtensionID, projectDir, entryPoint, c.Version)
 }
 
 func watchAndUpdateVersion(
@@ -87,7 +84,7 @@ func watchAndUpdateVersion(
 	extensionID string,
 	projectDir string,
 	entryPoint string,
-	versionID string,
+	versionName string,
 ) error {
 	signalCtx, stop := signal.NotifyContext(ctx.Context, os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -103,9 +100,10 @@ func watchAndUpdateVersion(
 		return err
 	}
 
+	watchedPaths := make(map[string]struct{}, len(watchPaths))
 	for _, path := range watchPaths {
-		if err := watcher.Add(path); err != nil {
-			return fmt.Errorf("watch %q: %w", path, err)
+		if err := addWatchPath(watcher, watchedPaths, path); err != nil {
+			return err
 		}
 	}
 
@@ -126,6 +124,10 @@ func watchAndUpdateVersion(
 				_, _ = fmt.Fprintf(ctx.Cmd.ErrOrStderr(), "watch error: %v\n", err)
 			}
 		case event := <-watcher.Events:
+			if err := addWatchPathsForNewDirectory(watcher, watchedPaths, event.Name); err != nil {
+				_, _ = fmt.Fprintf(ctx.Cmd.ErrOrStderr(), "watch error: %v\n", err)
+			}
+
 			if !shouldTriggerRebuild(event) {
 				continue
 			}
@@ -146,7 +148,7 @@ func watchAndUpdateVersion(
 				continue
 			}
 
-			_, _, err = ctx.API.ExtensionAPI.ExtensionsUpdateVersion(signalCtx, extensionID, versionID).
+			_, _, err = ctx.API.ExtensionAPI.ExtensionsUpdateVersion(signalCtx, extensionID, versionName).
 				Body(openapi_client.ExtensionsUpdateVersionBody{
 					Bundle: &bundle,
 					Digest: &digest,
@@ -157,7 +159,7 @@ func watchAndUpdateVersion(
 				continue
 			}
 
-			_, _ = fmt.Fprintf(ctx.Cmd.ErrOrStderr(), "Updated draft version %s.\n", versionID)
+			_, _ = fmt.Fprintf(ctx.Cmd.ErrOrStderr(), "Updated draft version %s.\n", versionName)
 		}
 	}
 }
@@ -277,12 +279,12 @@ func findSDKEntryPoint(startDir string) (string, error) {
 
 func bundleRuntimeEntry(projectDir, entryPoint, sdkEntryPoint, outfile string) error {
 	source := fmt.Sprintf(
-		"import { startPackagedExtension } from %s;\nimport extension from %s;\nPromise.resolve(startPackagedExtension(extension)).catch((error) => {\n  console.error(error);\n  process.exit(1);\n});\n",
+		"import { createPackagedExtensionRuntime } from %s;\nimport extension from %s;\nconst runtime = createPackagedExtensionRuntime(extension);\nexport const manifest = runtime.manifest;\nexport const operations = runtime.operations;\nexport async function invoke(payload) {\n  return await runtime.invoke(payload);\n}\n",
 		jsonStringLiteral("@superplanehq/sdk"),
 		jsonStringLiteral(entryPoint),
 	)
 
-	return runEsbuild(projectDir, sdkEntryPoint, outfile, source)
+	return runRuntimeEsbuild(projectDir, sdkEntryPoint, outfile, source)
 }
 
 func bundleManifestEntry(projectDir, entryPoint, sdkEntryPoint, outfile string) error {
@@ -292,10 +294,37 @@ func bundleManifestEntry(projectDir, entryPoint, sdkEntryPoint, outfile string) 
 		jsonStringLiteral(entryPoint),
 	)
 
-	return runEsbuild(projectDir, sdkEntryPoint, outfile, source)
+	return runManifestEsbuild(projectDir, sdkEntryPoint, outfile, source)
 }
 
-func runEsbuild(projectDir, sdkEntryPoint, outfile, source string) error {
+func runRuntimeEsbuild(projectDir, sdkEntryPoint, outfile, source string) error {
+	result := esbuild.Build(esbuild.BuildOptions{
+		AbsWorkingDir: projectDir,
+		Alias: map[string]string{
+			"@superplanehq/sdk": sdkEntryPoint,
+		},
+		Bundle:   true,
+		Format:   esbuild.FormatESModule,
+		LogLevel: esbuild.LogLevelSilent,
+		Outfile:  outfile,
+		Platform: esbuild.PlatformNeutral,
+		Stdin: &esbuild.StdinOptions{
+			Contents:   source,
+			Loader:     esbuild.LoaderTS,
+			ResolveDir: projectDir,
+			Sourcefile: "entry.ts",
+		},
+		Target: esbuild.ES2022,
+		Write:  true,
+	})
+	if len(result.Errors) > 0 {
+		return fmt.Errorf("bundle extension: %s", formatEsbuildMessages(result.Errors))
+	}
+
+	return nil
+}
+
+func runManifestEsbuild(projectDir, sdkEntryPoint, outfile, source string) error {
 	result := esbuild.Build(esbuild.BuildOptions{
 		AbsWorkingDir: projectDir,
 		Alias: map[string]string{
@@ -469,15 +498,6 @@ func jsonStringLiteral(value string) string {
 	return string(encoded)
 }
 
-func versionIDFromResponse(version openapi_client.ExtensionsExtensionVersion) (string, error) {
-	metadata, ok := version.GetMetadataOk()
-	if !ok || metadata == nil || metadata.Id == nil || strings.TrimSpace(*metadata.Id) == "" {
-		return "", fmt.Errorf("create-version response is missing version metadata.id")
-	}
-
-	return *metadata.Id, nil
-}
-
 func findWatchPaths(projectDir string, entryPoint string) ([]string, error) {
 	paths := []string{filepath.Dir(entryPoint)}
 	for _, candidate := range []string{"integrations", "components", "triggers"} {
@@ -491,16 +511,86 @@ func findWatchPaths(projectDir string, entryPoint string) ([]string, error) {
 	seen := make(map[string]struct{}, len(paths))
 	uniquePaths := make([]string, 0, len(paths))
 	for _, path := range paths {
-		cleanPath := filepath.Clean(path)
-		if _, ok := seen[cleanPath]; ok {
-			continue
+		walkPaths, err := collectWatchDirectories(path)
+		if err != nil {
+			return nil, err
 		}
 
-		seen[cleanPath] = struct{}{}
-		uniquePaths = append(uniquePaths, cleanPath)
+		for _, walkPath := range walkPaths {
+			cleanPath := filepath.Clean(walkPath)
+			if _, ok := seen[cleanPath]; ok {
+				continue
+			}
+
+			seen[cleanPath] = struct{}{}
+			uniquePaths = append(uniquePaths, cleanPath)
+		}
 	}
 
 	return uniquePaths, nil
+}
+
+func collectWatchDirectories(root string) ([]string, error) {
+	directories := make([]string, 0)
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+
+		if !entry.IsDir() {
+			return nil
+		}
+
+		directories = append(directories, path)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scan watch paths from %q: %w", root, err)
+	}
+
+	return directories, nil
+}
+
+func addWatchPath(watcher *fsnotify.Watcher, watchedPaths map[string]struct{}, path string) error {
+	cleanPath := filepath.Clean(path)
+	if _, ok := watchedPaths[cleanPath]; ok {
+		return nil
+	}
+
+	if err := watcher.Add(cleanPath); err != nil {
+		return fmt.Errorf("watch %q: %w", cleanPath, err)
+	}
+
+	watchedPaths[cleanPath] = struct{}{}
+	return nil
+}
+
+func addWatchPathsForNewDirectory(watcher *fsnotify.Watcher, watchedPaths map[string]struct{}, path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+
+		return fmt.Errorf("stat watch path %q: %w", path, err)
+	}
+
+	if !info.IsDir() {
+		return nil
+	}
+
+	paths, err := collectWatchDirectories(path)
+	if err != nil {
+		return err
+	}
+
+	for _, watchPath := range paths {
+		if err := addWatchPath(watcher, watchedPaths, watchPath); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func shouldTriggerRebuild(event fsnotify.Event) bool {

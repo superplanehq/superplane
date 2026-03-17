@@ -3,12 +3,15 @@ package extensions
 import (
 	"context"
 
+	"github.com/google/uuid"
 	extensions "github.com/superplanehq/superplane/pkg/extensions"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/extensions"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ListExtensions(ctx context.Context, storage *extensions.Storage, organizationID string) (*pb.ListExtensionsResponse, error) {
-	extensions, err := storage.ListExtensions(organizationID)
+func ListExtensions(ctx context.Context, storage *extensions.Storage, organizationID uuid.UUID) (*pb.ListExtensionsResponse, error) {
+	extensions, err := models.ListExtensions(organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -21,12 +24,13 @@ func ListExtensions(ctx context.Context, storage *extensions.Storage, organizati
 	return &pb.ListExtensionsResponse{Extensions: protoExtensions}, nil
 }
 
-func SerializeExtension(extension *extensions.Extension) *pb.Extension {
+func SerializeExtension(extension *models.Extension) *pb.Extension {
 	return &pb.Extension{
 		Metadata: &pb.Extension_Metadata{
-			Id:          extension.ID,
+			Id:          extension.ID.String(),
 			Name:        extension.Name,
 			Description: extension.Description,
+			CreatedAt:   timestamppb.New(*extension.CreatedAt),
 		},
 	}
 }

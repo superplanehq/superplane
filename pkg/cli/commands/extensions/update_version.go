@@ -10,7 +10,7 @@ import (
 
 type UpdateVersionCommand struct {
 	ExtensionID string
-	VersionID   string
+	Version     string
 	EntryPoint  string
 	Watch       bool
 }
@@ -35,7 +35,7 @@ func (c *UpdateVersionCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	response, _, err := ctx.API.ExtensionAPI.ExtensionsUpdateVersion(ctx.Context, c.ExtensionID, c.VersionID).
+	response, _, err := ctx.API.ExtensionAPI.ExtensionsUpdateVersion(ctx.Context, c.ExtensionID, c.Version).
 		Body(openapi_client.ExtensionsUpdateVersionBody{
 			Bundle: &bundle,
 			Digest: &digest,
@@ -47,8 +47,8 @@ func (c *UpdateVersionCommand) Execute(ctx core.CommandContext) error {
 
 	version := response.GetVersion()
 	if c.Watch {
-		_, _ = fmt.Fprintf(ctx.Cmd.ErrOrStderr(), "Updated draft version %s. Watching for changes...\n", c.VersionID)
-		return watchAndUpdateVersion(ctx, c.ExtensionID, projectDir, entryPoint, c.VersionID)
+		_, _ = fmt.Fprintf(ctx.Cmd.ErrOrStderr(), "Updated draft version %s. Watching for changes...\n", c.Version)
+		return watchAndUpdateVersion(ctx, c.ExtensionID, projectDir, entryPoint, c.Version)
 	}
 
 	if !ctx.Renderer.IsText() {

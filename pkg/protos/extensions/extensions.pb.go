@@ -9,8 +9,6 @@ package extensions
 import (
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
-	_ "github.com/superplanehq/superplane/pkg/protos/components"
-	_ "github.com/superplanehq/superplane/pkg/protos/configuration"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -258,9 +256,10 @@ func (x *CreateExtensionResponse) GetExtension() *Extension {
 
 type CreateVersionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ExtensionId   string                 `protobuf:"bytes,1,opt,name=extension_id,json=extensionId,proto3" json:"extension_id,omitempty"`
-	Bundle        []byte                 `protobuf:"bytes,2,opt,name=bundle,proto3" json:"bundle,omitempty"`
-	Digest        string                 `protobuf:"bytes,3,opt,name=digest,proto3" json:"digest,omitempty"`
+	Extension     string                 `protobuf:"bytes,1,opt,name=extension,proto3" json:"extension,omitempty"`
+	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
+	Bundle        []byte                 `protobuf:"bytes,3,opt,name=bundle,proto3" json:"bundle,omitempty"`
+	Digest        string                 `protobuf:"bytes,4,opt,name=digest,proto3" json:"digest,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -295,9 +294,16 @@ func (*CreateVersionRequest) Descriptor() ([]byte, []int) {
 	return file_extensions_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *CreateVersionRequest) GetExtensionId() string {
+func (x *CreateVersionRequest) GetExtension() string {
 	if x != nil {
-		return x.ExtensionId
+		return x.Extension
+	}
+	return ""
+}
+
+func (x *CreateVersionRequest) GetVersion() string {
+	if x != nil {
+		return x.Version
 	}
 	return ""
 }
@@ -362,8 +368,8 @@ func (x *CreateVersionResponse) GetVersion() *ExtensionVersion {
 
 type UpdateVersionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ExtensionId   string                 `protobuf:"bytes,1,opt,name=extension_id,json=extensionId,proto3" json:"extension_id,omitempty"`
-	VersionId     string                 `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	Extension     string                 `protobuf:"bytes,1,opt,name=extension,proto3" json:"extension,omitempty"`
+	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
 	Bundle        []byte                 `protobuf:"bytes,3,opt,name=bundle,proto3" json:"bundle,omitempty"`
 	Digest        string                 `protobuf:"bytes,4,opt,name=digest,proto3" json:"digest,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -400,16 +406,16 @@ func (*UpdateVersionRequest) Descriptor() ([]byte, []int) {
 	return file_extensions_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *UpdateVersionRequest) GetExtensionId() string {
+func (x *UpdateVersionRequest) GetExtension() string {
 	if x != nil {
-		return x.ExtensionId
+		return x.Extension
 	}
 	return ""
 }
 
-func (x *UpdateVersionRequest) GetVersionId() string {
+func (x *UpdateVersionRequest) GetVersion() string {
 	if x != nil {
-		return x.VersionId
+		return x.Version
 	}
 	return ""
 }
@@ -474,9 +480,8 @@ func (x *UpdateVersionResponse) GetVersion() *ExtensionVersion {
 
 type PublishVersionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ExtensionId   string                 `protobuf:"bytes,1,opt,name=extension_id,json=extensionId,proto3" json:"extension_id,omitempty"`
-	VersionId     string                 `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
-	Version       string                 `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
+	Extension     string                 `protobuf:"bytes,1,opt,name=extension,proto3" json:"extension,omitempty"`
+	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -511,16 +516,9 @@ func (*PublishVersionRequest) Descriptor() ([]byte, []int) {
 	return file_extensions_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *PublishVersionRequest) GetExtensionId() string {
+func (x *PublishVersionRequest) GetExtension() string {
 	if x != nil {
-		return x.ExtensionId
-	}
-	return ""
-}
-
-func (x *PublishVersionRequest) GetVersionId() string {
-	if x != nil {
-		return x.VersionId
+		return x.Extension
 	}
 	return ""
 }
@@ -578,7 +576,7 @@ func (x *PublishVersionResponse) GetVersion() *ExtensionVersion {
 
 type ListVersionsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ExtensionId   string                 `protobuf:"bytes,1,opt,name=extension_id,json=extensionId,proto3" json:"extension_id,omitempty"`
+	Extension     string                 `protobuf:"bytes,1,opt,name=extension,proto3" json:"extension,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -613,9 +611,9 @@ func (*ListVersionsRequest) Descriptor() ([]byte, []int) {
 	return file_extensions_proto_rawDescGZIP(), []int{10}
 }
 
-func (x *ListVersionsRequest) GetExtensionId() string {
+func (x *ListVersionsRequest) GetExtension() string {
 	if x != nil {
-		return x.ExtensionId
+		return x.Extension
 	}
 	return ""
 }
@@ -944,7 +942,7 @@ var File_extensions_proto protoreflect.FileDescriptor
 
 const file_extensions_proto_rawDesc = "" +
 	"\n" +
-	"\x10extensions.proto\x12\x15Superplane.Extensions\x1a\x10components.proto\x1a\x13configuration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"@\n" +
+	"\x10extensions.proto\x12\x15Superplane.Extensions\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"@\n" +
 	"\x15ListExtensionsRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\"Z\n" +
 	"\x16ListExtensionsResponse\x12@\n" +
@@ -955,30 +953,28 @@ const file_extensions_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\"Y\n" +
 	"\x17CreateExtensionResponse\x12>\n" +
-	"\textension\x18\x01 \x01(\v2 .Superplane.Extensions.ExtensionR\textension\"i\n" +
-	"\x14CreateVersionRequest\x12!\n" +
-	"\fextension_id\x18\x01 \x01(\tR\vextensionId\x12\x16\n" +
-	"\x06bundle\x18\x02 \x01(\fR\x06bundle\x12\x16\n" +
-	"\x06digest\x18\x03 \x01(\tR\x06digest\"Z\n" +
+	"\textension\x18\x01 \x01(\v2 .Superplane.Extensions.ExtensionR\textension\"~\n" +
+	"\x14CreateVersionRequest\x12\x1c\n" +
+	"\textension\x18\x01 \x01(\tR\textension\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x12\x16\n" +
+	"\x06bundle\x18\x03 \x01(\fR\x06bundle\x12\x16\n" +
+	"\x06digest\x18\x04 \x01(\tR\x06digest\"Z\n" +
 	"\x15CreateVersionResponse\x12A\n" +
-	"\aversion\x18\x01 \x01(\v2'.Superplane.Extensions.ExtensionVersionR\aversion\"\x88\x01\n" +
-	"\x14UpdateVersionRequest\x12!\n" +
-	"\fextension_id\x18\x01 \x01(\tR\vextensionId\x12\x1d\n" +
-	"\n" +
-	"version_id\x18\x02 \x01(\tR\tversionId\x12\x16\n" +
+	"\aversion\x18\x01 \x01(\v2'.Superplane.Extensions.ExtensionVersionR\aversion\"~\n" +
+	"\x14UpdateVersionRequest\x12\x1c\n" +
+	"\textension\x18\x01 \x01(\tR\textension\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x12\x16\n" +
 	"\x06bundle\x18\x03 \x01(\fR\x06bundle\x12\x16\n" +
 	"\x06digest\x18\x04 \x01(\tR\x06digest\"Z\n" +
 	"\x15UpdateVersionResponse\x12A\n" +
-	"\aversion\x18\x01 \x01(\v2'.Superplane.Extensions.ExtensionVersionR\aversion\"s\n" +
-	"\x15PublishVersionRequest\x12!\n" +
-	"\fextension_id\x18\x01 \x01(\tR\vextensionId\x12\x1d\n" +
-	"\n" +
-	"version_id\x18\x02 \x01(\tR\tversionId\x12\x18\n" +
-	"\aversion\x18\x03 \x01(\tR\aversion\"[\n" +
+	"\aversion\x18\x01 \x01(\v2'.Superplane.Extensions.ExtensionVersionR\aversion\"O\n" +
+	"\x15PublishVersionRequest\x12\x1c\n" +
+	"\textension\x18\x01 \x01(\tR\textension\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\"[\n" +
 	"\x16PublishVersionResponse\x12A\n" +
-	"\aversion\x18\x01 \x01(\v2'.Superplane.Extensions.ExtensionVersionR\aversion\"8\n" +
-	"\x13ListVersionsRequest\x12!\n" +
-	"\fextension_id\x18\x01 \x01(\tR\vextensionId\"[\n" +
+	"\aversion\x18\x01 \x01(\v2'.Superplane.Extensions.ExtensionVersionR\aversion\"3\n" +
+	"\x13ListVersionsRequest\x12\x1c\n" +
+	"\textension\x18\x01 \x01(\tR\textension\"[\n" +
 	"\x14ListVersionsResponse\x12C\n" +
 	"\bversions\x18\x01 \x03(\v2'.Superplane.Extensions.ExtensionVersionR\bversions\"\xe0\x01\n" +
 	"\tExtension\x12E\n" +
@@ -1003,21 +999,21 @@ const file_extensions_proto_rawDesc = "" +
 	"\x05state\x18\x01 \x01(\x0e2-.Superplane.Extensions.ExtensionVersion.StateR\x05state\"-\n" +
 	"\x05State\x12\x0f\n" +
 	"\vSTATE_DRAFT\x10\x00\x12\x13\n" +
-	"\x0fSTATE_PUBLISHED\x10\x012\xcb\v\n" +
+	"\x0fSTATE_PUBLISHED\x10\x012\xb9\v\n" +
 	"\n" +
 	"Extensions\x12\xca\x01\n" +
 	"\x0eListExtensions\x12,.Superplane.Extensions.ListExtensionsRequest\x1a-.Superplane.Extensions.ListExtensionsResponse\"[\x92A>\n" +
 	"\tExtension\x12\x0fList extensions\x1a Returns a list of all extensions\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1/extensions\x12\xce\x01\n" +
 	"\x0fCreateExtension\x12-.Superplane.Extensions.CreateExtensionRequest\x1a..Superplane.Extensions.CreateExtensionResponse\"\\\x92A<\n" +
-	"\tExtension\x12\x16Create a new extension\x1a\x17Creates a new extension\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/api/v1/extensions\x12\xfe\x01\n" +
-	"\rCreateVersion\x12+.Superplane.Extensions.CreateVersionRequest\x1a,.Superplane.Extensions.CreateVersionResponse\"\x91\x01\x92AY\n" +
-	"\tExtension\x12%Creates a new version of an extension\x1a%Creates a new version of an extension\x82\xd3\xe4\x93\x02/:\x01*\"*/api/v1/extensions/{extension_id}/versions\x12\x87\x02\n" +
-	"\rUpdateVersion\x12+.Superplane.Extensions.UpdateVersionRequest\x1a,.Superplane.Extensions.UpdateVersionResponse\"\x9a\x01\x92AU\n" +
-	"\tExtension\x12#Updates the version of an extension\x1a#Updates the version of an extension\x82\xd3\xe4\x93\x02<:\x01*\x1a7/api/v1/extensions/{extension_id}/versions/{version_id}\x12\x96\x02\n" +
-	"\x0ePublishVersion\x12,.Superplane.Extensions.PublishVersionRequest\x1a-.Superplane.Extensions.PublishVersionResponse\"\xa6\x01\x92Aa\n" +
-	"\tExtension\x12)Publishes a draft version of an extension\x1a)Publishes a draft version of an extension\x82\xd3\xe4\x93\x02<:\x01*\"7/api/v1/extensions/{extension_id}/versions/{version_id}\x12\xfa\x01\n" +
-	"\fListVersions\x12*.Superplane.Extensions.ListVersionsRequest\x1a+.Superplane.Extensions.ListVersionsResponse\"\x90\x01\x92A[\n" +
-	"\tExtension\x12\x1dList versions of an extension\x1a/Returns a list of all versions for an extension\x82\xd3\xe4\x93\x02,\x12*/api/v1/extensions/{extension_id}/versionsB\xce\x01\x92A\x90\x01\x12f\n" +
+	"\tExtension\x12\x16Create a new extension\x1a\x17Creates a new extension\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/api/v1/extensions\x12\xfb\x01\n" +
+	"\rCreateVersion\x12+.Superplane.Extensions.CreateVersionRequest\x1a,.Superplane.Extensions.CreateVersionResponse\"\x8e\x01\x92AY\n" +
+	"\tExtension\x12%Creates a new version of an extension\x1a%Creates a new version of an extension\x82\xd3\xe4\x93\x02,:\x01*\"'/api/v1/extensions/{extension}/versions\x12\x81\x02\n" +
+	"\rUpdateVersion\x12+.Superplane.Extensions.UpdateVersionRequest\x1a,.Superplane.Extensions.UpdateVersionResponse\"\x94\x01\x92AU\n" +
+	"\tExtension\x12#Updates the version of an extension\x1a#Updates the version of an extension\x82\xd3\xe4\x93\x026:\x01*\x1a1/api/v1/extensions/{extension}/versions/{version}\x12\x90\x02\n" +
+	"\x0ePublishVersion\x12,.Superplane.Extensions.PublishVersionRequest\x1a-.Superplane.Extensions.PublishVersionResponse\"\xa0\x01\x92Aa\n" +
+	"\tExtension\x12)Publishes a draft version of an extension\x1a)Publishes a draft version of an extension\x82\xd3\xe4\x93\x026:\x01*\"1/api/v1/extensions/{extension}/versions/{version}\x12\xf7\x01\n" +
+	"\fListVersions\x12*.Superplane.Extensions.ListVersionsRequest\x1a+.Superplane.Extensions.ListVersionsResponse\"\x8d\x01\x92A[\n" +
+	"\tExtension\x12\x1dList versions of an extension\x1a/Returns a list of all versions for an extension\x82\xd3\xe4\x93\x02)\x12'/api/v1/extensions/{extension}/versionsB\xce\x01\x92A\x90\x01\x12f\n" +
 	"\x19Superplane Extensions API\x12\x1dAPI for Superplane Extensions\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ8github.com/superplanehq/superplane/pkg/protos/extensionsb\x06proto3"
 

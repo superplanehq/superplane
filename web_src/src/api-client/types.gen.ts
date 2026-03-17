@@ -714,6 +714,7 @@ export type ExtensionsCreateExtensionResponse = {
 };
 
 export type ExtensionsCreateVersionBody = {
+  version?: string;
   bundle?: string;
   digest?: string;
 };
@@ -760,7 +761,7 @@ export type ExtensionsListVersionsResponse = {
 };
 
 export type ExtensionsPublishVersionBody = {
-  version?: string;
+  [key: string]: unknown;
 };
 
 export type ExtensionsPublishVersionResponse = {
@@ -2647,10 +2648,10 @@ export type ExtensionsCreateExtensionResponse2 =
 export type ExtensionsListVersionsData = {
   body?: never;
   path: {
-    extensionId: string;
+    extension: string;
   };
   query?: never;
-  url: "/api/v1/extensions/{extensionId}/versions";
+  url: "/api/v1/extensions/{extension}/versions";
 };
 
 export type ExtensionsListVersionsErrors = {
@@ -2674,10 +2675,10 @@ export type ExtensionsListVersionsResponse2 = ExtensionsListVersionsResponses[ke
 export type ExtensionsCreateVersionData = {
   body: ExtensionsCreateVersionBody;
   path: {
-    extensionId: string;
+    extension: string;
   };
   query?: never;
-  url: "/api/v1/extensions/{extensionId}/versions";
+  url: "/api/v1/extensions/{extension}/versions";
 };
 
 export type ExtensionsCreateVersionErrors = {
@@ -2701,11 +2702,11 @@ export type ExtensionsCreateVersionResponse2 = ExtensionsCreateVersionResponses[
 export type ExtensionsPublishVersionData = {
   body: ExtensionsPublishVersionBody;
   path: {
-    extensionId: string;
-    versionId: string;
+    extension: string;
+    version: string;
   };
   query?: never;
-  url: "/api/v1/extensions/{extensionId}/versions/{versionId}";
+  url: "/api/v1/extensions/{extension}/versions/{version}";
 };
 
 export type ExtensionsPublishVersionErrors = {
@@ -2730,11 +2731,11 @@ export type ExtensionsPublishVersionResponse2 =
 export type ExtensionsUpdateVersionData = {
   body: ExtensionsUpdateVersionBody;
   path: {
-    extensionId: string;
-    versionId: string;
+    extension: string;
+    version: string;
   };
   query?: never;
-  url: "/api/v1/extensions/{extensionId}/versions/{versionId}";
+  url: "/api/v1/extensions/{extension}/versions/{version}";
 };
 
 export type ExtensionsUpdateVersionErrors = {

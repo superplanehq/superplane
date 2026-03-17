@@ -152,7 +152,6 @@ docs/ExtensionsExtensionVersionState.md
 docs/ExtensionsExtensionVersionStatus.md
 docs/ExtensionsListExtensionsResponse.md
 docs/ExtensionsListVersionsResponse.md
-docs/ExtensionsPublishVersionBody.md
 docs/ExtensionsPublishVersionResponse.md
 docs/ExtensionsUpdateVersionBody.md
 docs/ExtensionsUpdateVersionResponse.md
@@ -399,7 +398,6 @@ model_extensions_extension_version_state.go
 model_extensions_extension_version_status.go
 model_extensions_list_extensions_response.go
 model_extensions_list_versions_response.go
-model_extensions_publish_version_body.go
 model_extensions_publish_version_response.go
 model_extensions_update_version_body.go
 model_extensions_update_version_response.go

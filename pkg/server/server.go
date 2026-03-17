@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/extensions"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/public"
 	registry "github.com/superplanehq/superplane/pkg/registry"
@@ -375,8 +376,12 @@ func Start() {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
 	}
 
-	storage := newExtensionStorage()
-	registry, err := registry.NewRegistry(encryptorInstance, storage, registry.HTTPOptions{
+	extensionStorage, err := newExtensionStorage()
+	if err != nil {
+		panic(fmt.Sprintf("failed to create extension storage: %v", err))
+	}
+
+	registry, err := registry.NewRegistry(encryptorInstance, extensionStorage, registry.HTTPOptions{
 		BlockedHosts:     getBlockedHTTPHosts(),
 		PrivateIPRanges:  getPrivateIPRanges(),
 		MaxResponseBytes: DefaultMaxHTTPResponseBytes,
@@ -393,7 +398,7 @@ func Start() {
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, authService, storage, registry, oidcProvider)
+		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, authService, extensionStorage, registry, oidcProvider)
 	}
 
 	startWorkers(encryptorInstance, registry, oidcProvider, baseURL, authService)
@@ -415,14 +420,18 @@ func getWebhookBaseURL(baseURL string) string {
 	return webhookBaseURL
 }
 
-func newExtensionStorage() *extensions.Storage {
+func newExtensionStorage() (*extensions.Storage, error) {
+	manifestLoader := func(organizationID string) (*extensions.Manifest, error) {
+		return models.LoadManifest(organizationID)
+	}
+
 	extensionsDir := os.Getenv("EXTENSIONS_DIR")
 	if extensionsDir == "" {
-		return extensions.NewStorage(artifactstorage.NewInMemoryStorage())
+		return extensions.NewStorage(artifactstorage.NewInMemoryStorage(), manifestLoader)
 	}
 
 	log.Printf("Using folder-backed extension storage at %s", extensionsDir)
-	return extensions.NewStorage(artifactstorage.NewLocalFolderStorage(extensionsDir))
+	return extensions.NewStorage(artifactstorage.NewLocalFolderStorage(extensionsDir), manifestLoader)
 }
 
 /*

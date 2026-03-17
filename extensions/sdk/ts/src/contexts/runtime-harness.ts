@@ -71,7 +71,7 @@ export function createRuntimeHarness(invocation: InvocationEnvelope): RuntimeHar
   let integrationReady = false;
   let integrationErrorMessage = "";
   let browserAction: BrowserAction | null = null;
-  let nodeWebhookSecret: Uint8Array = new Uint8Array();
+  let nodeWebhookSecret: Uint8Array = new Uint8Array(0);
   let provisionedWebhookSecret: Uint8Array = invocation.webhook.secret;
   let provisionedWebhookMetadata: RuntimeValue = invocation.webhook.metadata;
   let provisionedWebhookConfiguration: RuntimeValue = invocation.webhook.configuration;
@@ -348,7 +348,7 @@ export function normalizeForJSON(value: unknown): RuntimeValue {
   if (value instanceof Uint8Array) {
     return {
       type: "bytes",
-      base64: Buffer.from(value).toString("base64"),
+      base64: encodeBase64(value),
     };
   }
 
@@ -362,7 +362,7 @@ export function normalizeForJSON(value: unknown): RuntimeValue {
 
   if (typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>).map(([key, entryValue]) => [key, normalizeForJSON(entryValue)]);
-    return Object.fromEntries(entries);
+    return Object.fromEntries(entries) as Record<string, RuntimeValue>;
   }
 
   return String(value);
@@ -405,7 +405,7 @@ function normalizeBody(value: RuntimeValue | undefined): Uint8Array {
     return Uint8Array.from(value.map((item) => Number(item)));
   }
 
-  return new Uint8Array();
+  return new Uint8Array(0);
 }
 
 function normalizeRequestBody(body: string | Uint8Array | undefined): BodyInit | undefined {
@@ -417,7 +417,9 @@ function normalizeRequestBody(body: string | Uint8Array | undefined): BodyInit |
     return body;
   }
 
-  return Buffer.from(body);
+  const copy = new Uint8Array(body.length);
+  copy.set(body);
+  return new Blob([copy]);
 }
 
 function writeLog(level: string, message: string, fields?: Record<string, RuntimeValue>): void {
@@ -431,4 +433,13 @@ function readResponseHeaders(headers: Headers): Record<string, string> {
     values[key] = value;
   });
   return values;
+}
+
+function encodeBase64(value: Uint8Array): string {
+  let binary = "";
+  for (const byte of value) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary);
 }

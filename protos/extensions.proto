@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package Superplane.Extensions;
 
-import "components.proto";
-import "configuration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
@@ -52,7 +50,7 @@ service Extensions {
 
   rpc CreateVersion(CreateVersionRequest) returns (CreateVersionResponse) {
     option (google.api.http) = {
-      post: "/api/v1/extensions/{extension_id}/versions"
+      post: "/api/v1/extensions/{extension}/versions"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -64,7 +62,7 @@ service Extensions {
 
   rpc UpdateVersion(UpdateVersionRequest) returns (UpdateVersionResponse) {
     option (google.api.http) = {
-      put: "/api/v1/extensions/{extension_id}/versions/{version_id}"
+      put: "/api/v1/extensions/{extension}/versions/{version}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -76,7 +74,7 @@ service Extensions {
 
   rpc PublishVersion(PublishVersionRequest) returns (PublishVersionResponse) {
     option (google.api.http) = {
-      post: "/api/v1/extensions/{extension_id}/versions/{version_id}"
+      post: "/api/v1/extensions/{extension}/versions/{version}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -88,7 +86,7 @@ service Extensions {
 
   rpc ListVersions(ListVersionsRequest) returns (ListVersionsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/extensions/{extension_id}/versions"
+      get: "/api/v1/extensions/{extension}/versions"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List versions of an extension";
@@ -116,9 +114,10 @@ message CreateExtensionResponse {
 }
 
 message CreateVersionRequest {
-  string extension_id = 1;
-  bytes bundle = 2;
-  string digest = 3;
+  string extension = 1;
+  string version = 2;
+  bytes bundle = 3;
+  string digest = 4;
 }
 
 message CreateVersionResponse {
@@ -126,8 +125,8 @@ message CreateVersionResponse {
 }
 
 message UpdateVersionRequest {
-  string extension_id = 1;
-  string version_id = 2;
+  string extension = 1;
+  string version = 2;
   bytes bundle = 3;
   string digest = 4;
 }
@@ -137,9 +136,8 @@ message UpdateVersionResponse {
 }
 
 message PublishVersionRequest {
-  string extension_id = 1;
-  string version_id = 2;
-  string version = 3;
+  string extension = 1;
+  string version = 2;
 }
 
 message PublishVersionResponse {
@@ -147,7 +145,7 @@ message PublishVersionResponse {
 }
 
 message ListVersionsRequest {
-  string extension_id = 1;
+  string extension = 1;
 }
 
 message ListVersionsResponse {

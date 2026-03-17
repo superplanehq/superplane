@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
+-- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -247,6 +247,40 @@ CREATE TABLE public.email_settings (
     smtp_use_tls boolean DEFAULT false NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: extension_versions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.extension_versions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    extension_id uuid NOT NULL,
+    name character varying(128) NOT NULL,
+    digest character varying(128) NOT NULL,
+    state character varying(64) NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    published_at timestamp without time zone,
+    deleted_at timestamp without time zone,
+    manifest jsonb NOT NULL
+);
+
+
+--
+-- Name: extensions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.extensions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    name character varying(255) NOT NULL,
+    description text NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    deleted_at timestamp without time zone
 );
 
 
@@ -792,6 +826,38 @@ ALTER TABLE ONLY public.email_settings
 
 
 --
+-- Name: extension_versions extension_versions_extension_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.extension_versions
+    ADD CONSTRAINT extension_versions_extension_id_name_key UNIQUE (extension_id, name);
+
+
+--
+-- Name: extension_versions extension_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.extension_versions
+    ADD CONSTRAINT extension_versions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: extensions extensions_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.extensions
+    ADD CONSTRAINT extensions_organization_id_name_key UNIQUE (organization_id, name);
+
+
+--
+-- Name: extensions extensions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.extensions
+    ADD CONSTRAINT extensions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: group_metadata group_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1181,6 +1247,27 @@ CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
 
 
 --
+-- Name: idx_extension_versions_org_extension; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_extension_versions_org_extension ON public.extension_versions USING btree (organization_id, extension_id);
+
+
+--
+-- Name: idx_extensions_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_extensions_deleted_at ON public.extensions USING btree (deleted_at);
+
+
+--
+-- Name: idx_extensions_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_extensions_organization_id ON public.extensions USING btree (organization_id);
+
+
+--
 -- Name: idx_group_metadata_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1545,6 +1632,30 @@ ALTER TABLE ONLY public.app_installations
 
 ALTER TABLE ONLY public.canvas_memories
     ADD CONSTRAINT canvas_memories_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: extension_versions extension_versions_extension_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.extension_versions
+    ADD CONSTRAINT extension_versions_extension_id_fkey FOREIGN KEY (extension_id) REFERENCES public.extensions(id);
+
+
+--
+-- Name: extension_versions extension_versions_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.extension_versions
+    ADD CONSTRAINT extension_versions_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
+-- Name: extensions extensions_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.extensions
+    ADD CONSTRAINT extensions_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 
 --
@@ -1920,7 +2031,7 @@ ALTER TABLE ONLY public.workflows
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
+-- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1939,7 +2050,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260310154909	f
+20260317005239	f
 \.
 
 
@@ -1956,7 +2067,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
+-- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;

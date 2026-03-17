@@ -18,12 +18,40 @@ func NewSigner(secret string) *Signer {
 
 func (s *Signer) Generate(subject string, duration time.Duration) (string, error) {
 	now := time.Now()
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+	return s.signClaims(jwt.MapClaims{
 		"iat": now.Unix(),
 		"nbf": now.Unix(),
 		"exp": now.Add(duration).Unix(),
 		"sub": subject,
 	})
+}
+
+func (s *Signer) GenerateWithClaims(subject string, duration time.Duration, claims map[string]any) (string, error) {
+	now := time.Now()
+	tokenClaims := jwt.MapClaims{
+		"iat": now.Unix(),
+		"nbf": now.Unix(),
+		"exp": now.Add(duration).Unix(),
+		"sub": subject,
+	}
+
+	for key, value := range claims {
+		tokenClaims[key] = value
+	}
+
+	return s.signClaims(tokenClaims)
+}
+
+func (s *Signer) signClaims(claims jwt.MapClaims) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"iat": claims["iat"],
+		"nbf": claims["nbf"],
+		"exp": claims["exp"],
+		"sub": claims["sub"],
+	})
+	for key, value := range claims {
+		token.Claims.(jwt.MapClaims)[key] = value
+	}
 
 	tokenString, err := token.SignedString([]byte(s.Secret))
 	if err != nil {

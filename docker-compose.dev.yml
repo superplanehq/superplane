@@ -78,7 +78,7 @@ services:
       OTEL_SERVICE_NAME: "superplane-dev"
       OWNER_SETUP_ENABLED: "yes"
       VITE_ENABLE_CUSTOM_COMPONENTS: "true"
-      EXTENSIONS_DIR: "/app/extensions"
+      EXTENSIONS_DIR: "/tmp/extensions"
 
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}

@@ -7,12 +7,14 @@ require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.17.0
 	github.com/casbin/casbin/v2 v2.134.0
 	github.com/casbin/gorm-adapter/v3 v3.37.0
+	github.com/dgraph-io/ristretto/v2 v2.4.0
 	github.com/evanw/esbuild v0.27.4
-	github.com/fsnotify/fsnotify v1.5.1
 	github.com/expr-lang/expr v1.17.7
+	github.com/fsnotify/fsnotify v1.5.1
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang/protobuf v1.5.4
 	github.com/google/go-github/v74 v74.0.0
 	github.com/google/uuid v1.6.0
@@ -56,7 +58,6 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.11 // indirect
 	github.com/googleapis/gax-go/v2 v2.17.0 // indirect

@@ -143,10 +143,10 @@ func (a *ExtensionAPIService) ExtensionsCreateExtensionExecute(r ApiExtensionsCr
 }
 
 type ApiExtensionsCreateVersionRequest struct {
-	ctx         context.Context
-	ApiService  *ExtensionAPIService
-	extensionId string
-	body        *ExtensionsCreateVersionBody
+	ctx        context.Context
+	ApiService *ExtensionAPIService
+	extension  string
+	body       *ExtensionsCreateVersionBody
 }
 
 func (r ApiExtensionsCreateVersionRequest) Body(body ExtensionsCreateVersionBody) ApiExtensionsCreateVersionRequest {
@@ -164,14 +164,14 @@ ExtensionsCreateVersion Creates a new version of an extension
 Creates a new version of an extension
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param extensionId
+	@param extension
 	@return ApiExtensionsCreateVersionRequest
 */
-func (a *ExtensionAPIService) ExtensionsCreateVersion(ctx context.Context, extensionId string) ApiExtensionsCreateVersionRequest {
+func (a *ExtensionAPIService) ExtensionsCreateVersion(ctx context.Context, extension string) ApiExtensionsCreateVersionRequest {
 	return ApiExtensionsCreateVersionRequest{
-		ApiService:  a,
-		ctx:         ctx,
-		extensionId: extensionId,
+		ApiService: a,
+		ctx:        ctx,
+		extension:  extension,
 	}
 }
 
@@ -191,8 +191,8 @@ func (a *ExtensionAPIService) ExtensionsCreateVersionExecute(r ApiExtensionsCrea
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/extensions/{extensionId}/versions"
-	localVarPath = strings.Replace(localVarPath, "{"+"extensionId"+"}", url.PathEscape(parameterValueToString(r.extensionId, "extensionId")), -1)
+	localVarPath := localBasePath + "/api/v1/extensions/{extension}/versions"
+	localVarPath = strings.Replace(localVarPath, "{"+"extension"+"}", url.PathEscape(parameterValueToString(r.extension, "extension")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -383,9 +383,9 @@ func (a *ExtensionAPIService) ExtensionsListExtensionsExecute(r ApiExtensionsLis
 }
 
 type ApiExtensionsListVersionsRequest struct {
-	ctx         context.Context
-	ApiService  *ExtensionAPIService
-	extensionId string
+	ctx        context.Context
+	ApiService *ExtensionAPIService
+	extension  string
 }
 
 func (r ApiExtensionsListVersionsRequest) Execute() (*ExtensionsListVersionsResponse, *http.Response, error) {
@@ -398,14 +398,14 @@ ExtensionsListVersions List versions of an extension
 Returns a list of all versions for an extension
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param extensionId
+	@param extension
 	@return ApiExtensionsListVersionsRequest
 */
-func (a *ExtensionAPIService) ExtensionsListVersions(ctx context.Context, extensionId string) ApiExtensionsListVersionsRequest {
+func (a *ExtensionAPIService) ExtensionsListVersions(ctx context.Context, extension string) ApiExtensionsListVersionsRequest {
 	return ApiExtensionsListVersionsRequest{
-		ApiService:  a,
-		ctx:         ctx,
-		extensionId: extensionId,
+		ApiService: a,
+		ctx:        ctx,
+		extension:  extension,
 	}
 }
 
@@ -425,8 +425,8 @@ func (a *ExtensionAPIService) ExtensionsListVersionsExecute(r ApiExtensionsListV
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/extensions/{extensionId}/versions"
-	localVarPath = strings.Replace(localVarPath, "{"+"extensionId"+"}", url.PathEscape(parameterValueToString(r.extensionId, "extensionId")), -1)
+	localVarPath := localBasePath + "/api/v1/extensions/{extension}/versions"
+	localVarPath = strings.Replace(localVarPath, "{"+"extension"+"}", url.PathEscape(parameterValueToString(r.extension, "extension")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -495,14 +495,14 @@ func (a *ExtensionAPIService) ExtensionsListVersionsExecute(r ApiExtensionsListV
 }
 
 type ApiExtensionsPublishVersionRequest struct {
-	ctx         context.Context
-	ApiService  *ExtensionAPIService
-	extensionId string
-	versionId   string
-	body        *ExtensionsPublishVersionBody
+	ctx        context.Context
+	ApiService *ExtensionAPIService
+	extension  string
+	version    string
+	body       *map[string]interface{}
 }
 
-func (r ApiExtensionsPublishVersionRequest) Body(body ExtensionsPublishVersionBody) ApiExtensionsPublishVersionRequest {
+func (r ApiExtensionsPublishVersionRequest) Body(body map[string]interface{}) ApiExtensionsPublishVersionRequest {
 	r.body = &body
 	return r
 }
@@ -517,16 +517,16 @@ ExtensionsPublishVersion Publishes a draft version of an extension
 Publishes a draft version of an extension
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param extensionId
-	@param versionId
+	@param extension
+	@param version
 	@return ApiExtensionsPublishVersionRequest
 */
-func (a *ExtensionAPIService) ExtensionsPublishVersion(ctx context.Context, extensionId string, versionId string) ApiExtensionsPublishVersionRequest {
+func (a *ExtensionAPIService) ExtensionsPublishVersion(ctx context.Context, extension string, version string) ApiExtensionsPublishVersionRequest {
 	return ApiExtensionsPublishVersionRequest{
-		ApiService:  a,
-		ctx:         ctx,
-		extensionId: extensionId,
-		versionId:   versionId,
+		ApiService: a,
+		ctx:        ctx,
+		extension:  extension,
+		version:    version,
 	}
 }
 
@@ -546,9 +546,9 @@ func (a *ExtensionAPIService) ExtensionsPublishVersionExecute(r ApiExtensionsPub
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/extensions/{extensionId}/versions/{versionId}"
-	localVarPath = strings.Replace(localVarPath, "{"+"extensionId"+"}", url.PathEscape(parameterValueToString(r.extensionId, "extensionId")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"versionId"+"}", url.PathEscape(parameterValueToString(r.versionId, "versionId")), -1)
+	localVarPath := localBasePath + "/api/v1/extensions/{extension}/versions/{version}"
+	localVarPath = strings.Replace(localVarPath, "{"+"extension"+"}", url.PathEscape(parameterValueToString(r.extension, "extension")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"version"+"}", url.PathEscape(parameterValueToString(r.version, "version")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -622,11 +622,11 @@ func (a *ExtensionAPIService) ExtensionsPublishVersionExecute(r ApiExtensionsPub
 }
 
 type ApiExtensionsUpdateVersionRequest struct {
-	ctx         context.Context
-	ApiService  *ExtensionAPIService
-	extensionId string
-	versionId   string
-	body        *ExtensionsUpdateVersionBody
+	ctx        context.Context
+	ApiService *ExtensionAPIService
+	extension  string
+	version    string
+	body       *ExtensionsUpdateVersionBody
 }
 
 func (r ApiExtensionsUpdateVersionRequest) Body(body ExtensionsUpdateVersionBody) ApiExtensionsUpdateVersionRequest {
@@ -644,16 +644,16 @@ ExtensionsUpdateVersion Updates the version of an extension
 Updates the version of an extension
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param extensionId
-	@param versionId
+	@param extension
+	@param version
 	@return ApiExtensionsUpdateVersionRequest
 */
-func (a *ExtensionAPIService) ExtensionsUpdateVersion(ctx context.Context, extensionId string, versionId string) ApiExtensionsUpdateVersionRequest {
+func (a *ExtensionAPIService) ExtensionsUpdateVersion(ctx context.Context, extension string, version string) ApiExtensionsUpdateVersionRequest {
 	return ApiExtensionsUpdateVersionRequest{
-		ApiService:  a,
-		ctx:         ctx,
-		extensionId: extensionId,
-		versionId:   versionId,
+		ApiService: a,
+		ctx:        ctx,
+		extension:  extension,
+		version:    version,
 	}
 }
 
@@ -673,9 +673,9 @@ func (a *ExtensionAPIService) ExtensionsUpdateVersionExecute(r ApiExtensionsUpda
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/extensions/{extensionId}/versions/{versionId}"
-	localVarPath = strings.Replace(localVarPath, "{"+"extensionId"+"}", url.PathEscape(parameterValueToString(r.extensionId, "extensionId")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"versionId"+"}", url.PathEscape(parameterValueToString(r.versionId, "versionId")), -1)
+	localVarPath := localBasePath + "/api/v1/extensions/{extension}/versions/{version}"
+	localVarPath = strings.Replace(localVarPath, "{"+"extension"+"}", url.PathEscape(parameterValueToString(r.extension, "extension")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"version"+"}", url.PathEscape(parameterValueToString(r.version, "version")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

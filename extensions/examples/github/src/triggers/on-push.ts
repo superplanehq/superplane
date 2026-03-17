@@ -33,6 +33,8 @@ export const onPush = {
   integration: "github",
   label: "On Push",
   description: "Listen to GitHub push events",
+  icon: "github",
+  color: "gray",
   configuration: [
     {
       name: "repository",

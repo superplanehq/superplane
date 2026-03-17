@@ -1724,7 +1724,7 @@
         ]
       }
     },
-    "/api/v1/extensions/{extensionId}/versions": {
+    "/api/v1/extensions/{extension}/versions": {
       "get": {
         "summary": "List versions of an extension",
         "description": "Returns a list of all versions for an extension",
@@ -1745,7 +1745,7 @@
         },
         "parameters": [
           {
-            "name": "extensionId",
+            "name": "extension",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1775,7 +1775,7 @@
         },
         "parameters": [
           {
-            "name": "extensionId",
+            "name": "extension",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1794,7 +1794,7 @@
         ]
       }
     },
-    "/api/v1/extensions/{extensionId}/versions/{versionId}": {
+    "/api/v1/extensions/{extension}/versions/{version}": {
       "post": {
         "summary": "Publishes a draft version of an extension",
         "description": "Publishes a draft version of an extension",
@@ -1815,13 +1815,13 @@
         },
         "parameters": [
           {
-            "name": "extensionId",
+            "name": "extension",
             "in": "path",
             "required": true,
             "type": "string"
           },
           {
-            "name": "versionId",
+            "name": "version",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1859,13 +1859,13 @@
         },
         "parameters": [
           {
-            "name": "extensionId",
+            "name": "extension",
             "in": "path",
             "required": true,
             "type": "string"
           },
           {
-            "name": "versionId",
+            "name": "version",
             "in": "path",
             "required": true,
             "type": "string"
@@ -5880,6 +5880,9 @@
     "ExtensionsCreateVersionBody": {
       "type": "object",
       "properties": {
+        "version": {
+          "type": "string"
+        },
         "bundle": {
           "type": "string",
           "format": "byte"
@@ -5994,12 +5997,7 @@
       }
     },
     "ExtensionsPublishVersionBody": {
-      "type": "object",
-      "properties": {
-        "version": {
-          "type": "string"
-        }
-      }
+      "type": "object"
     },
     "ExtensionsPublishVersionResponse": {
       "type": "object",

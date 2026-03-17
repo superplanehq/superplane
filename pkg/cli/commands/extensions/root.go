@@ -32,7 +32,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	}
 
 	var extensionID string
-	listVersionsCmd.Flags().StringVarP(&extensionID, "extension-id", "e", "", "extension ID")
+	listVersionsCmd.Flags().StringVar(&extensionID, "extension-id", "", "extension ID")
 	listVersionsCmd.MarkFlagRequired("extension-id")
 	listVersionsCmd.RunE = bindExtensionsCommand(options, func() core.Command {
 		return &ListVersionsCommand{
@@ -51,8 +51,8 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 
 	var name string
 	var description string
-	createCmd.Flags().StringVarP(&name, "name", "n", "", "extension name")
-	createCmd.Flags().StringVarP(&description, "description", "d", "", "extension description")
+	createCmd.Flags().StringVar(&name, "name", "", "extension name")
+	createCmd.Flags().StringVar(&description, "description", "", "extension description")
 	createCmd.MarkFlagRequired("name")
 	createCmd.RunE = bindExtensionsCommand(options, func() core.Command {
 		return &CreateCommand{
@@ -70,16 +70,20 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.NoArgs,
 	}
 
-	var entryPoint string
 	var watch bool
-	createVersionCmd.Flags().StringVarP(&extensionID, "extension-id", "e", "", "extension ID")
-	createVersionCmd.Flags().StringVarP(&entryPoint, "entry-point", "t", "", "entry point")
+	var entryPoint string
+	var versionName string
+	createVersionCmd.Flags().StringVar(&extensionID, "extension-id", "", "extension ID")
+	createVersionCmd.Flags().StringVar(&versionName, "version", "", "version name")
+	createVersionCmd.Flags().StringVar(&entryPoint, "entry-point", "", "entry point")
 	createVersionCmd.Flags().BoolVarP(&watch, "watch", "w", false, "watch for changes")
 	createVersionCmd.MarkFlagRequired("extension-id")
+	createVersionCmd.MarkFlagRequired("version")
 	createVersionCmd.RunE = bindExtensionsCommand(options, func() core.Command {
 		return &CreateVersionCommand{
 			ExtensionID: extensionID,
 			EntryPoint:  entryPoint,
+			Version:     versionName,
 			Watch:       watch,
 		}
 	})
@@ -93,21 +97,18 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.NoArgs,
 	}
 
-	var updateVersionID string
-	var updateEntryPoint string
-	var updateWatch bool
-	updateVersionCmd.Flags().StringVarP(&extensionID, "extension-id", "e", "", "extension ID")
-	updateVersionCmd.Flags().StringVarP(&updateVersionID, "version-id", "v", "", "version ID")
-	updateVersionCmd.Flags().StringVarP(&updateEntryPoint, "entry-point", "t", "", "entry point")
-	updateVersionCmd.Flags().BoolVarP(&updateWatch, "watch", "w", false, "watch for changes")
+	updateVersionCmd.Flags().StringVar(&extensionID, "extension-id", "", "extension ID")
+	updateVersionCmd.Flags().StringVar(&versionName, "version", "", "version name")
+	updateVersionCmd.Flags().StringVar(&entryPoint, "entrypoint", "", "entry point")
+	updateVersionCmd.Flags().BoolVar(&watch, "watch", false, "watch for changes")
 	updateVersionCmd.MarkFlagRequired("extension-id")
-	updateVersionCmd.MarkFlagRequired("version-id")
+	updateVersionCmd.MarkFlagRequired("version")
 	updateVersionCmd.RunE = bindExtensionsCommand(options, func() core.Command {
 		return &UpdateVersionCommand{
 			ExtensionID: extensionID,
-			VersionID:   updateVersionID,
-			EntryPoint:  updateEntryPoint,
-			Watch:       updateWatch,
+			Version:     versionName,
+			EntryPoint:  entryPoint,
+			Watch:       watch,
 		}
 	})
 
@@ -122,8 +123,8 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 
 	var destination string
 	var packageEntryPoint string
-	packageVersionCmd.Flags().StringVarP(&destination, "destination", "d", "./dist", "destination directory")
-	packageVersionCmd.Flags().StringVarP(&packageEntryPoint, "entry-point", "t", "", "entry point")
+	packageVersionCmd.Flags().StringVar(&destination, "destination", "./dist", "destination directory")
+	packageVersionCmd.Flags().StringVar(&packageEntryPoint, "entry-point", "", "entry point")
 	packageVersionCmd.RunE = bindExtensionsCommand(options, func() core.Command {
 		return &PackageVersionCommand{
 			Destination: destination,
@@ -140,20 +141,15 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.NoArgs,
 	}
 
-	var versionID string
-	var version string
-	publishVersionCmd.Flags().StringVarP(&extensionID, "extension-id", "e", "", "extension ID")
-	publishVersionCmd.Flags().StringVarP(&versionID, "version-id", "v", "", "version ID")
-	publishVersionCmd.Flags().StringVarP(&version, "version", "", "", "version")
+	publishVersionCmd.Flags().StringVar(&extensionID, "extension-id", "", "extension ID")
+	publishVersionCmd.Flags().StringVar(&versionName, "version", "", "version name")
 	publishVersionCmd.MarkFlagRequired("extension-id")
-	publishVersionCmd.MarkFlagRequired("version-id")
 	publishVersionCmd.MarkFlagRequired("version")
 
 	publishVersionCmd.RunE = bindExtensionsCommand(options, func() core.Command {
 		return &PublishVersionCommand{
 			ExtensionID: extensionID,
-			VersionID:   versionID,
-			Version:     version,
+			Version:     versionName,
 		}
 	})
 

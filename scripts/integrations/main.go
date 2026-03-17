@@ -13,7 +13,8 @@ import (
 )
 
 func main() {
-	reg, _ := registry.NewRegistry(crypto.NewNoOpEncryptor(), extensions.NewStorage(artifactstorage.NewInMemoryStorage()), registry.HTTPOptions{})
+	extensionStorage, _ := extensions.NewStorage(artifactstorage.NewInMemoryStorage(), nil)
+	reg, _ := registry.NewRegistry(crypto.NewNoOpEncryptor(), extensionStorage, registry.HTTPOptions{})
 	integrations := reg.ListIntegrations()
 	coreComponents := reg.ListComponents()
 	coreTriggers := reg.ListTriggers()

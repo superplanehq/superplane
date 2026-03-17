@@ -20,8 +20,9 @@ var _ MappedNullable = &ExtensionsCreateVersionBody{}
 
 // ExtensionsCreateVersionBody struct for ExtensionsCreateVersionBody
 type ExtensionsCreateVersionBody struct {
-	Bundle *string `json:"bundle,omitempty" validate:"regexp=^(?:[A-Za-z0-9+\\/]{4})*(?:[A-Za-z0-9+\\/]{2}==|[A-Za-z0-9+\\/]{3}=)?$"`
-	Digest *string `json:"digest,omitempty"`
+	Version *string `json:"version,omitempty"`
+	Bundle  *string `json:"bundle,omitempty" validate:"regexp=^(?:[A-Za-z0-9+\\/]{4})*(?:[A-Za-z0-9+\\/]{2}==|[A-Za-z0-9+\\/]{3}=)?$"`
+	Digest  *string `json:"digest,omitempty"`
 }
 
 // NewExtensionsCreateVersionBody instantiates a new ExtensionsCreateVersionBody object
@@ -39,6 +40,38 @@ func NewExtensionsCreateVersionBody() *ExtensionsCreateVersionBody {
 func NewExtensionsCreateVersionBodyWithDefaults() *ExtensionsCreateVersionBody {
 	this := ExtensionsCreateVersionBody{}
 	return &this
+}
+
+// GetVersion returns the Version field value if set, zero value otherwise.
+func (o *ExtensionsCreateVersionBody) GetVersion() string {
+	if o == nil || IsNil(o.Version) {
+		var ret string
+		return ret
+	}
+	return *o.Version
+}
+
+// GetVersionOk returns a tuple with the Version field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ExtensionsCreateVersionBody) GetVersionOk() (*string, bool) {
+	if o == nil || IsNil(o.Version) {
+		return nil, false
+	}
+	return o.Version, true
+}
+
+// HasVersion returns a boolean if a field has been set.
+func (o *ExtensionsCreateVersionBody) HasVersion() bool {
+	if o != nil && !IsNil(o.Version) {
+		return true
+	}
+
+	return false
+}
+
+// SetVersion gets a reference to the given string and assigns it to the Version field.
+func (o *ExtensionsCreateVersionBody) SetVersion(v string) {
+	o.Version = &v
 }
 
 // GetBundle returns the Bundle field value if set, zero value otherwise.
@@ -115,6 +148,9 @@ func (o ExtensionsCreateVersionBody) MarshalJSON() ([]byte, error) {
 
 func (o ExtensionsCreateVersionBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
+	if !IsNil(o.Version) {
+		toSerialize["version"] = o.Version
+	}
 	if !IsNil(o.Bundle) {
 		toSerialize["bundle"] = o.Bundle
 	}
