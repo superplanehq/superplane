@@ -51,6 +51,19 @@ func Test__IndexDocument__Setup(t *testing.T) {
 	})
 }
 
+func Test__IndexDocument__Configuration(t *testing.T) {
+	c := &IndexDocument{}
+
+	fields := c.Configuration()
+	require.Len(t, fields, 3)
+
+	documentField := fields[1]
+	assert.Equal(t, "document", documentField.Name)
+	assert.Equal(t, map[string]any{
+		onDocumentIndexedTimeField: defaultDocumentTimestampTemplate,
+	}, documentField.Default)
+}
+
 func Test__IndexDocument__Execute(t *testing.T) {
 	integrationCtx := func(authType string) *contexts.IntegrationContext {
 		cfg := map[string]any{
