@@ -12,7 +12,6 @@ import (
 )
 
 type StopVMComponent struct {
-	integration *AzureIntegration
 }
 
 type StopVMConfiguration struct {
@@ -142,7 +141,7 @@ func (c *StopVMComponent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	provider, err := c.integration.ensureProvider(ctx.Integration)
+	provider, err := newProvider(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("Azure provider not available: %w", err)
 	}
