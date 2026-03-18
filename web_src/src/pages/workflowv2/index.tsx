@@ -656,7 +656,6 @@ export function WorkflowPageV2() {
   const getNodeData = useNodeExecutionStore((state) => state.getNodeData);
   const loadNodeDataMethod = useNodeExecutionStore((state) => state.loadNodeData);
   const initializeFromWorkflow = useNodeExecutionStore((state) => state.initializeFromWorkflow);
-  const clearNodeExecutionStore = useNodeExecutionStore((state) => state.clear);
 
   // Redirect to home page if workflow is not found (404)
   // Use replace to avoid back button issues and prevent 404 flash
@@ -676,14 +675,27 @@ export function WorkflowPageV2() {
     }
   }, [canvasError, canvasLoading, navigate, organizationId, canvasDeletedRemotely]);
 
-  // Initialize store from workflow.status on workflow load (only once per workflow).
-  // Skip initialization while the canvas is being refetched to avoid populating
-  // the store with stale cached data when switching between canvases.
+  // Initialize store from workflow.status on workflow load.
+  // On canvas switch with cached data, the store initializes immediately from the
+  // cache (no loading gap) and then re-initializes once when the background refetch
+  // completes with fresh data (pendingStoreReinitRef).
   const hasInitializedStoreRef = useRef<string | null>(null);
+  const pendingStoreReinitRef = useRef(false);
   useEffect(() => {
-    if (canvas?.metadata?.id && !canvasFetching && hasInitializedStoreRef.current !== canvas.metadata.id) {
+    if (!canvas?.metadata?.id) return;
+
+    if (hasInitializedStoreRef.current !== canvas.metadata.id) {
       initializeFromWorkflow(canvas);
       hasInitializedStoreRef.current = canvas.metadata.id;
+      if (!canvasFetching) {
+        pendingStoreReinitRef.current = false;
+      }
+      return;
+    }
+
+    if (pendingStoreReinitRef.current && !canvasFetching) {
+      initializeFromWorkflow(canvas);
+      pendingStoreReinitRef.current = false;
     }
   }, [canvas, canvasFetching, initializeFromWorkflow]);
 
@@ -707,8 +719,8 @@ export function WorkflowPageV2() {
     lastSavedWorkflowRef.current = null;
     lastLocalCanvasSaveAtRef.current = 0;
     hasInitializedStoreRef.current = null;
-    clearNodeExecutionStore();
-  }, [canvasId, clearNodeExecutionStore]);
+    pendingStoreReinitRef.current = true;
+  }, [canvasId]);
 
   useEffect(() => {
     if (isTemplate) {
