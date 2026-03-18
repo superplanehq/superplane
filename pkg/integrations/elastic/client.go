@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"strings"
@@ -209,6 +210,72 @@ func (c *Client) ListKibanaRules() ([]KibanaRule, error) {
 	return nil, fmt.Errorf("exceeded maximum Kibana rule pages (%d)", maxPages)
 }
 
+// CreateKibanaCaseQueryRule creates a Kibana Elasticsearch query rule that
+// signals SuperPlane whenever cases are updated in the current 1-minute window.
+func (c *Client) CreateKibanaCaseQueryRule(connectorID, routeKey string) (*KibanaRule, error) {
+	actionBody, err := json.Marshal(map[string]any{
+		"eventType": "case_status_changed",
+		"routeKey":  routeKey,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling action body: %v", err)
+	}
+
+	esQuery, err := json.Marshal(map[string]any{"query": map[string]any{"match_all": map[string]any{}}})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling esQuery: %v", err)
+	}
+
+	payload := map[string]any{
+		"name":         "SuperPlane \u2022 Cases",
+		"rule_type_id": ".es-query",
+		"consumer":     "alerts",
+		"schedule":     map[string]any{"interval": "1m"},
+		"params": map[string]any{
+			"index":                      []string{".kibana_alerting_cases"},
+			"timeField":                  "cases.updated_at",
+			"esQuery":                    string(esQuery),
+			"size":                       100,
+			"threshold":                  []int{0},
+			"thresholdComparator":        ">",
+			"timeWindowSize":             1,
+			"timeWindowUnit":             "m",
+			"excludeHitsFromPreviousRun": true,
+		},
+		"actions": []any{
+			map[string]any{
+				"id":    connectorID,
+				"group": "query matched",
+				"params": map[string]any{
+					"body": string(actionBody),
+				},
+				"frequency": map[string]any{
+					"notify_when": "onActiveAlert",
+					"throttle":    nil,
+					"summary":     false,
+				},
+			},
+		},
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling rule payload: %v", err)
+	}
+
+	responseBody, err := c.execKibanaRequest(http.MethodPost, "/api/alerting/rule", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var resp KibanaRule
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing rule response: %v", err)
+	}
+
+	return &resp, nil
+}
+
 // KibanaSpace is the relevant subset of a Kibana space.
 type KibanaSpace struct {
 	ID   string `json:"id"`
@@ -232,6 +299,12 @@ func (c *Client) ListKibanaSpaces() ([]KibanaSpace, error) {
 
 // KibanaConnectorResponse is the relevant subset of the Kibana connector API response.
 type KibanaConnectorResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// KibanaConnector is the relevant subset of a Kibana actions connector.
+type KibanaConnector struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
@@ -272,12 +345,42 @@ func (c *Client) CreateKibanaConnector(name, webhookURL, secret string) (*Kibana
 	return &resp, nil
 }
 
+// ListKibanaConnectors returns all connectors from Kibana.
+func (c *Client) ListKibanaConnectors() ([]KibanaConnector, error) {
+	body, err := c.execKibanaRequest(http.MethodGet, "/api/actions/connectors", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var connectors []KibanaConnector
+	if err := json.Unmarshal(body, &connectors); err != nil {
+		return nil, fmt.Errorf("error parsing connectors response: %v", err)
+	}
+
+	return connectors, nil
+}
+
 // DeleteKibanaConnector removes a Kibana connector by ID.
 // A 404 response is treated as success: the connector is already gone.
 func (c *Client) DeleteKibanaConnector(connectorID string) error {
 	_, err := c.execKibanaRequest(
 		http.MethodDelete,
 		fmt.Sprintf("/api/actions/connector/%s", url.PathEscape(connectorID)),
+		nil,
+	)
+	var kibanaErr *KibanaAPIError
+	if errors.As(err, &kibanaErr) && kibanaErr.StatusCode == http.StatusNotFound {
+		return nil
+	}
+	return err
+}
+
+// DeleteKibanaRule removes a Kibana alerting rule by ID.
+// A 404 response is treated as success: the rule is already gone.
+func (c *Client) DeleteKibanaRule(ruleID string) error {
+	_, err := c.execKibanaRequest(
+		http.MethodDelete,
+		fmt.Sprintf("/api/alerting/rule/%s", url.PathEscape(ruleID)),
 		nil,
 	)
 	var kibanaErr *KibanaAPIError
@@ -366,4 +469,170 @@ func (c *Client) IndexDocument(index, documentID string, doc map[string]any) (*I
 	}
 
 	return &resp, nil
+}
+
+// CaseResponse is the relevant subset of a Kibana case.
+type CaseResponse struct {
+	ID          string   `json:"id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Status      string   `json:"status"`
+	Severity    string   `json:"severity"`
+	Tags        []string `json:"tags"`
+	Version     string   `json:"version"`
+	CreatedAt   string   `json:"created_at"`
+	UpdatedAt   string   `json:"updated_at"`
+}
+
+// CreateCase creates a new case in Kibana. connector is always set to none.
+// owner must be one of: "cases", "securitySolution", "observability".
+func (c *Client) CreateCase(title, description, severity, owner string, tags []string) (*CaseResponse, error) {
+	if tags == nil {
+		tags = []string{}
+	}
+
+	payload := map[string]any{
+		"title":       title,
+		"description": description,
+		"severity":    severity,
+		"owner":       owner,
+		"tags":        tags,
+		"connector": map[string]any{
+			"id":     "none",
+			"name":   "none",
+			"type":   ".none",
+			"fields": nil,
+		},
+		"settings": map[string]any{
+			"syncAlerts": false,
+		},
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling create case payload: %v", err)
+	}
+
+	responseBody, err := c.execKibanaRequest(http.MethodPost, "/api/cases", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var resp CaseResponse
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing create case response: %v", err)
+	}
+
+	return &resp, nil
+}
+
+// GetCase retrieves a Kibana case by ID.
+func (c *Client) GetCase(caseID string) (*CaseResponse, error) {
+	responseBody, err := c.execKibanaRequest(http.MethodGet, fmt.Sprintf("/api/cases/%s", url.PathEscape(caseID)), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp CaseResponse
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing get case response: %v", err)
+	}
+
+	return &resp, nil
+}
+
+// UpdateCase applies a partial update to an existing Kibana case.
+// updates is a map of fields to change; id and version are always included.
+// version is required by Kibana for optimistic concurrency.
+func (c *Client) UpdateCase(caseID, version string, updates map[string]any) (*CaseResponse, error) {
+	caseUpdate := map[string]any{
+		"id":      caseID,
+		"version": version,
+	}
+	maps.Copy(caseUpdate, updates)
+
+	payload := map[string]any{
+		"cases": []any{caseUpdate},
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling update case payload: %v", err)
+	}
+
+	responseBody, err := c.execKibanaRequest(http.MethodPatch, "/api/cases", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var resp []CaseResponse
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing update case response: %v", err)
+	}
+
+	if len(resp) == 0 {
+		return nil, fmt.Errorf("update case response contained no cases")
+	}
+
+	return &resp[0], nil
+}
+
+// ListCases returns all cases sorted by updatedAt descending.
+func (c *Client) ListCases() ([]CaseResponse, error) {
+	const perPage = 100
+	responseBody, err := c.execKibanaRequest(http.MethodGet,
+		fmt.Sprintf("/api/cases/_find?sortField=updatedAt&sortOrder=desc&perPage=%d", perPage), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp struct {
+		Cases []CaseResponse `json:"cases"`
+	}
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing cases list response: %v", err)
+	}
+
+	return resp.Cases, nil
+}
+
+// ListCasesUpdatedSince returns cases sorted by updatedAt descending, filtered
+// to those updated strictly after the given ISO timestamp. Stops fetching pages
+// once it encounters a case updated before or at the checkpoint.
+func (c *Client) ListCasesUpdatedSince(since string, statuses, severities, tags []string) ([]CaseResponse, error) {
+	const perPage = 100
+	var result []CaseResponse
+
+	path := fmt.Sprintf("/api/cases/_find?sortField=updatedAt&sortOrder=desc&perPage=%d", perPage)
+	if len(statuses) == 1 {
+		// Kibana accepts a single status filter via query param
+		path += "&status=" + url.QueryEscape(statuses[0])
+	}
+	if len(severities) == 1 {
+		path += "&severity=" + url.QueryEscape(severities[0])
+	}
+	for _, tag := range tags {
+		path += "&tags[]=" + url.QueryEscape(tag)
+	}
+
+	responseBody, err := c.execKibanaRequest(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp struct {
+		Cases []CaseResponse `json:"cases"`
+	}
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing cases list response: %v", err)
+	}
+
+	for _, c := range resp.Cases {
+		if c.UpdatedAt <= since {
+			break
+		}
+		result = append(result, c)
+	}
+
+	return result, nil
 }
