@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
@@ -394,21 +395,15 @@ export function IntegrationCreateDialog({
         <DialogFooter className="gap-2 sm:justify-start mt-6">
           {pendingWebhookSetup ? (
             <>
-              <Button
+              <LoadingButton
                 color="blue"
                 onClick={() => void handleCompleteWebhookSetup()}
-                disabled={updateIntegrationMutation.isPending}
+                loading={updateIntegrationMutation.isPending}
+                loadingText="Completing..."
                 className="flex items-center gap-2"
               >
-                {updateIntegrationMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Completing...
-                  </>
-                ) : (
-                  "Complete setup"
-                )}
-              </Button>
+                Complete setup
+              </LoadingButton>
               <Button variant="outline" onClick={handleClose} disabled={updateIntegrationMutation.isPending}>
                 Done
               </Button>
@@ -440,21 +435,16 @@ export function IntegrationCreateDialog({
             </>
           ) : (
             <>
-              <Button
+              <LoadingButton
                 color="blue"
                 onClick={() => void handleSubmit()}
-                disabled={isCreatePending || !integrationName?.trim()}
+                disabled={!integrationName?.trim()}
+                loading={isCreatePending}
+                loadingText="Connecting..."
                 className="flex items-center gap-2"
               >
-                {isCreatePending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Connecting...
-                  </>
-                ) : (
-                  "Connect"
-                )}
-              </Button>
+                Connect
+              </LoadingButton>
               <Button variant="outline" onClick={handleClose} disabled={isCreatePending}>
                 Cancel
               </Button>

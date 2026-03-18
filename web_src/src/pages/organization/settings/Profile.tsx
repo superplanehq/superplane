@@ -9,6 +9,7 @@ import { Icon } from "../../../components/Icon";
 import { Input } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { useOrganizationId, withOrganizationHeader } from "../../../utils/withOrganizationHeader";
 import { meKeys, useMe } from "@/hooks/useMe";
 
@@ -145,10 +146,15 @@ export function Profile() {
             )}
 
             <div className="flex items-center gap-4">
-              <Button onClick={handleRegenerateToken} disabled={regeneratingToken} className="flex items-center gap-2">
+              <LoadingButton
+                onClick={handleRegenerateToken}
+                loading={regeneratingToken}
+                loadingText="Regenerating..."
+                className="flex items-center gap-2"
+              >
                 <Icon name="refresh-ccw" />
-                {regeneratingToken ? "Regenerating..." : user.hasToken ? "Regenerate Token" : "Generate Token"}
-              </Button>
+                {user.hasToken ? "Regenerate Token" : "Generate Token"}
+              </LoadingButton>
 
               {user.hasToken && !token && (
                 <Text className="text-gray-500 dark:text-gray-400 text-sm">

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -157,10 +158,15 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit, in
             >
               Cancel
             </Button>
-            <Button data-testid="emit-event-submit-button" onClick={handleSubmit} disabled={isSubmitting}>
+            <LoadingButton
+              data-testid="emit-event-submit-button"
+              onClick={handleSubmit}
+              loading={isSubmitting}
+              loadingText="Emitting..."
+            >
               <Play size={16} />
-              {isSubmitting ? "Emitting..." : "Emit Event"}
-            </Button>
+              Emit Event
+            </LoadingButton>
           </DialogFooter>
         </div>
       </DialogContent>
