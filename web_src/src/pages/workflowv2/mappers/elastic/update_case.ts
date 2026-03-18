@@ -56,11 +56,15 @@ export const updateCaseMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default: OutputPayload[] };
+    const details: Record<string, string> = {};
+    if (context.execution.createdAt) {
+      details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+    }
     if (!outputs?.default?.[0]?.data) {
-      return {};
+      return details;
     }
     const doc = outputs.default[0].data as UpdateCaseOutputData;
-    return getDetailsForUpdateCase(doc);
+    return { ...details, ...getDetailsForUpdateCase(doc) };
   },
 
   subtitle(context: SubtitleContext): string {
@@ -109,10 +113,6 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
 
 function getDetailsForUpdateCase(doc: UpdateCaseOutputData): Record<string, string> {
   const details: Record<string, string> = {};
-
-  if (doc?.updatedAt) {
-    details["Updated At"] = new Date(doc.updatedAt).toLocaleString();
-  }
 
   if (doc?.id) {
     details["Case ID"] = String(doc.id);

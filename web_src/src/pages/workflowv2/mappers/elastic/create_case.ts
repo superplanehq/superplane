@@ -52,11 +52,15 @@ export const createCaseMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default: OutputPayload[] };
+    const details: Record<string, string> = {};
+    if (context.execution.createdAt) {
+      details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+    }
     if (!outputs?.default?.[0]?.data) {
-      return {};
+      return details;
     }
     const doc = outputs.default[0].data as CreateCaseOutputData;
-    return getDetailsForCreateCase(doc);
+    return { ...details, ...getDetailsForCreateCase(doc) };
   },
 
   subtitle(context: SubtitleContext): string {
@@ -99,10 +103,6 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
 
 function getDetailsForCreateCase(doc: CreateCaseOutputData): Record<string, string> {
   const details: Record<string, string> = {};
-
-  if (doc?.createdAt) {
-    details["Created At"] = new Date(doc.createdAt).toLocaleString();
-  }
 
   if (doc?.id) {
     details["Case ID"] = String(doc.id);

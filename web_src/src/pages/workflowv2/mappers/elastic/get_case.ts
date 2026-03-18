@@ -57,11 +57,15 @@ export const getCaseMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default: OutputPayload[] };
+    const details: Record<string, string> = {};
+    if (context.execution.createdAt) {
+      details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+    }
     if (!outputs?.default?.[0]?.data) {
-      return {};
+      return details;
     }
     const doc = outputs.default[0].data as GetCaseOutputData;
-    return getDetailsForGetCase(doc);
+    return { ...details, ...getDetailsForGetCase(doc) };
   },
 
   subtitle(context: SubtitleContext): string {
@@ -77,7 +81,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   const caseName = nodeMetadata?.caseName || configuration?.caseId;
   if (caseName) {
-    metadata.push({ icon: "hash", label: `Case: ${caseName}` });
+    metadata.push({ icon: "folder", label: caseName });
   }
 
   return metadata;
@@ -102,14 +106,6 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
 
 function getDetailsForGetCase(doc: GetCaseOutputData): Record<string, string> {
   const details: Record<string, string> = {};
-
-  if (doc?.createdAt) {
-    details["Created At"] = new Date(doc.createdAt).toLocaleString();
-  }
-
-  if (doc?.updatedAt) {
-    details["Updated At"] = new Date(doc.updatedAt).toLocaleString();
-  }
 
   if (doc?.id) {
     details["Case ID"] = String(doc.id);
