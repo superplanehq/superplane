@@ -158,9 +158,6 @@ dev.pr.clean.checkout:
 dev.agent.console:
 	$(COMPOSE) exec agent uv run python -m repl.main --interactive --canvas-id "$(CANVAS_ID)" --start-repl-web
 
-dev.agent.web:
-	$(COMPOSE) exec agent uv run python -m repl.main --serve-repl-web --test-repl-web-host 0.0.0.0 --test-repl-web-port 8090
-
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
 
