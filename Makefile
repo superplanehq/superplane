@@ -100,10 +100,17 @@ dev.setup:
 	@touch agent/.env
 	$(COMPOSE) build
 	$(COMPOSE) pull
-	$(COMPOSE) run --rm app go mod download
-	$(COMPOSE) run --rm app go build cmd/server/main.go
+	$(MAKE) dev.setup.app
+	$(MAKE) dev.setup.agent
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
+
+dev.setup.app:
+	$(COMPOSE) run --rm app go mod download
+	$(COMPOSE) run --rm app go build cmd/server/main.go
+
+dev.setup.agent:
+	$(COMPOSE) run --rm agent uv sync --frozen || $(COMPOSE) run --rm agent uv sync
 
 dev.setup.no.cache:
 	rm -rf tmp
@@ -147,6 +154,9 @@ dev.db.console:
 
 dev.pr.clean.checkout:
 	bash ./scripts/clean-pr-checkout $(PR)
+
+dev.agent.console:
+	$(COMPOSE) exec agent uv run python -m ai.main --interactive --canvas-id "$(CANVAS_ID)"
 
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
