@@ -43,14 +43,12 @@ type armSubnet struct {
 
 func (a *AzureIntegration) ListResourceGroups(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	ctx.Logger.Info("listing Azure resource groups")
-	provider, err := newProvider(ctx.Integration)
+
+	provider, err := a.ensureProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
-	return listResourceGroups(ctx, provider)
-}
 
-func listResourceGroups(ctx core.ListResourcesContext, provider *AzureProvider) ([]core.IntegrationResource, error) {
 	listURL := fmt.Sprintf("%s/subscriptions/%s/resourcegroups?api-version=%s",
 		armBaseURL, provider.GetSubscriptionID(), armAPIVersionResources)
 
@@ -104,15 +102,12 @@ func (a *AzureIntegration) ListResourceGroupLocations(ctx core.ListResourcesCont
 	if resourceGroup == "" {
 		return []core.IntegrationResource{}, nil
 	}
-	provider, err := newProvider(ctx.Integration)
+	resourceGroup = azureResourceName(resourceGroup)
+
+	provider, err := a.ensureProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
-	return listResourceGroupLocations(ctx, provider, resourceGroup)
-}
-
-func listResourceGroupLocations(ctx core.ListResourcesContext, provider *AzureProvider, resourceGroup string) ([]core.IntegrationResource, error) {
-	resourceGroup = azureResourceName(resourceGroup)
 
 	location, err := getResourceGroupLocation(context.Background(), provider, resourceGroup)
 	if err != nil {
@@ -138,18 +133,16 @@ func listResourceGroupLocations(ctx core.ListResourcesContext, provider *AzurePr
 
 func (a *AzureIntegration) ListVMSizes(ctx core.ListResourcesContext, resourceGroup string) ([]core.IntegrationResource, error) {
 	ctx.Logger.Infof("listing Azure VM sizes for resourceGroup=%s", resourceGroup)
+
 	if resourceGroup == "" {
 		return []core.IntegrationResource{}, nil
 	}
-	provider, err := newProvider(ctx.Integration)
+	resourceGroup = azureResourceName(resourceGroup)
+
+	provider, err := a.ensureProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
-	return listVMSizes(ctx, provider, resourceGroup)
-}
-
-func listVMSizes(ctx core.ListResourcesContext, provider *AzureProvider, resourceGroup string) ([]core.IntegrationResource, error) {
-	resourceGroup = azureResourceName(resourceGroup)
 
 	location, err := getResourceGroupLocation(context.Background(), provider, resourceGroup)
 	if err != nil {
@@ -194,18 +187,16 @@ func listVMSizes(ctx core.ListResourcesContext, provider *AzureProvider, resourc
 
 func (a *AzureIntegration) ListVirtualNetworks(ctx core.ListResourcesContext, resourceGroup string) ([]core.IntegrationResource, error) {
 	ctx.Logger.Infof("listing Azure virtual networks for resourceGroup=%s", resourceGroup)
+
 	if resourceGroup == "" {
 		return []core.IntegrationResource{}, nil
 	}
-	provider, err := newProvider(ctx.Integration)
+	resourceGroup = azureResourceName(resourceGroup)
+
+	provider, err := a.ensureProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
-	return listVirtualNetworks(ctx, provider, resourceGroup)
-}
-
-func listVirtualNetworks(ctx core.ListResourcesContext, provider *AzureProvider, resourceGroup string) ([]core.IntegrationResource, error) {
-	resourceGroup = azureResourceName(resourceGroup)
 
 	listURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks?api-version=%s",
 		armBaseURL, provider.GetSubscriptionID(), resourceGroup, armAPIVersionNetwork)
@@ -251,19 +242,17 @@ func listVirtualNetworks(ctx core.ListResourcesContext, provider *AzureProvider,
 
 func (a *AzureIntegration) ListSubnets(ctx core.ListResourcesContext, resourceGroup, vnetName string) ([]core.IntegrationResource, error) {
 	ctx.Logger.Infof("listing Azure subnets for resourceGroup=%s vnet=%s", resourceGroup, vnetName)
+
 	if resourceGroup == "" || vnetName == "" {
 		return []core.IntegrationResource{}, nil
 	}
-	provider, err := newProvider(ctx.Integration)
+	resourceGroup = azureResourceName(resourceGroup)
+	vnetName = azureResourceName(vnetName)
+
+	provider, err := a.ensureProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
-	return listSubnets(ctx, provider, resourceGroup, vnetName)
-}
-
-func listSubnets(ctx core.ListResourcesContext, provider *AzureProvider, resourceGroup, vnetName string) ([]core.IntegrationResource, error) {
-	resourceGroup = azureResourceName(resourceGroup)
-	vnetName = azureResourceName(vnetName)
 
 	listURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks/%s/subnets?api-version=%s",
 		armBaseURL, provider.GetSubscriptionID(), resourceGroup, vnetName, armAPIVersionNetwork)
@@ -322,14 +311,12 @@ type armContainerRegistry struct {
 
 func (a *AzureIntegration) ListContainerRegistries(ctx core.ListResourcesContext, resourceGroup string) ([]core.IntegrationResource, error) {
 	ctx.Logger.Infof("listing Azure container registries for resource group: %s", resourceGroup)
-	provider, err := newProvider(ctx.Integration)
+
+	provider, err := a.ensureProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
-	return listContainerRegistries(provider, resourceGroup)
-}
 
-func listContainerRegistries(provider *AzureProvider, resourceGroup string) ([]core.IntegrationResource, error) {
 	var listURL string
 	if resourceGroup != "" {
 		listURL = fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.ContainerRegistry/registries?api-version=2023-07-01",
@@ -346,22 +333,22 @@ func listContainerRegistries(provider *AzureProvider, resourceGroup string) ([]c
 
 	resources := []core.IntegrationResource{}
 	for _, raw := range items {
-		var reg armContainerRegistry
-		if err := json.Unmarshal(raw, &reg); err != nil {
+		var registry armContainerRegistry
+		if err := json.Unmarshal(raw, &registry); err != nil {
 			continue
 		}
-		if reg.Name == "" {
+		if registry.Name == "" {
 			continue
 		}
 
-		id := reg.Name
-		if reg.ID != "" {
-			id = reg.ID
+		id := registry.Name
+		if registry.ID != "" {
+			id = registry.ID
 		}
 
 		resources = append(resources, core.IntegrationResource{
 			Type: ResourceTypeContainerRegistryDropdown,
-			Name: reg.Name,
+			Name: registry.Name,
 			ID:   id,
 		})
 	}

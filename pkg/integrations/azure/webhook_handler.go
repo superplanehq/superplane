@@ -21,13 +21,15 @@ type AzureWebhookConfiguration struct {
 }
 
 // AzureWebhookHandler manages webhook lifecycle for Azure integration triggers.
-type AzureWebhookHandler struct{}
+type AzureWebhookHandler struct {
+	integration *AzureIntegration
+}
 
 func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	webhookURL := ctx.Webhook.GetURL()
 	ctx.Logger.Infof("Setting up Azure Event Grid subscription for webhook: %s", webhookURL)
 
-	provider, err := newProvider(ctx.Integration)
+	provider, err := h.integration.ensureProvider(ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("Azure provider not available: %w", err)
 	}
@@ -129,7 +131,7 @@ func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error)
 func (h *AzureWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	ctx.Logger.Info("Cleaning up Azure Event Grid subscription")
 
-	provider, err := newProvider(ctx.Integration)
+	provider, err := h.integration.ensureProvider(ctx.Integration)
 	if err != nil {
 		ctx.Logger.Warnf("Azure provider not available; skipping Event Grid cleanup: %v", err)
 		return nil

@@ -12,6 +12,7 @@ import (
 )
 
 type DeleteVMComponent struct {
+	integration *AzureIntegration
 }
 
 type DeleteVMConfiguration struct {
@@ -152,7 +153,7 @@ func (c *DeleteVMComponent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	provider, err := newProvider(ctx.Integration)
+	provider, err := c.integration.ensureProvider(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("Azure provider not available: %w", err)
 	}

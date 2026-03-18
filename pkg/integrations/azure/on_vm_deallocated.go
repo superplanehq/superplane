@@ -14,6 +14,7 @@ import (
 )
 
 type OnVMDeallocated struct {
+	integration *AzureIntegration
 }
 
 type OnVMDeallocatedConfiguration struct {

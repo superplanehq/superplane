@@ -164,11 +164,7 @@ export const useUpdateIntegration = (organizationId: string, integrationId: stri
         }),
       );
     },
-    onSuccess: (response) => {
-      const integration = response.data?.integration;
-      if (integration) {
-        queryClient.setQueryData(integrationKeys.integration(organizationId, integrationId), integration);
-      }
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: integrationKeys.connected(organizationId),
       });

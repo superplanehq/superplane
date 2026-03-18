@@ -14,6 +14,7 @@ import (
 )
 
 type OnVMDeleted struct {
+	integration *AzureIntegration
 }
 
 type OnVMDeletedConfiguration struct {

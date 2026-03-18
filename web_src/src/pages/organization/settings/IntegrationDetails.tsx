@@ -153,7 +153,6 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
         name: nextName,
         configuration: configValues,
       });
-      showSuccessToast("Integration saved");
     } catch (_error) {
       showErrorToast("Failed to update integration");
     }

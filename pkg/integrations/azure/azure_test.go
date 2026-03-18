@@ -235,23 +235,28 @@ func TestAzureIntegration_HandleRequest_Unknown(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
-func TestNewProvider_FailsWithoutOIDCKeysPath(t *testing.T) {
-	t.Setenv("OIDC_KEYS_PATH", "")
-	t.Setenv("BASE_URL", "")
-	t.Setenv("WEBHOOKS_BASE_URL", "")
-
-	ctx := &mockIntegrationContext{
-		id: "00000000-0000-0000-0000-000000000002",
-		config: map[string]string{
-			"tenantId":       "test-tenant",
-			"clientId":       "test-client",
-			"subscriptionId": "test-sub",
-		},
+func TestAzureIntegration_EnsureProvider_ReturnsCachedProvider(t *testing.T) {
+	testID := "00000000-0000-0000-0000-000000000001"
+	provider := &AzureProvider{}
+	integration := &AzureIntegration{
+		provider:      provider,
+		integrationID: testID,
 	}
-	result, err := newProvider(ctx)
+
+	ctx := &mockIntegrationContext{id: testID}
+	result, err := integration.ensureProvider(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, provider, result)
+}
+
+func TestAzureIntegration_EnsureProvider_FailsWithoutOIDC(t *testing.T) {
+	integration := &AzureIntegration{}
+
+	ctx := &mockIntegrationContext{id: "00000000-0000-0000-0000-000000000002"}
+	result, err := integration.ensureProvider(ctx)
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "OIDC_KEYS_PATH")
+	assert.Contains(t, err.Error(), "OIDC provider not available")
 }
 
 func TestConfiguration_Struct(t *testing.T) {
@@ -268,7 +273,7 @@ func TestConfiguration_Struct(t *testing.T) {
 
 const testIntegrationID = "00000000-0000-0000-0000-000000000001"
 
-func newTestProvider(t *testing.T, handler http.HandlerFunc) (*AzureProvider, *httptest.Server) {
+func newTestIntegration(t *testing.T, handler http.HandlerFunc) (*AzureIntegration, *httptest.Server) {
 	t.Helper()
 	server := httptest.NewServer(handler)
 
@@ -286,7 +291,12 @@ func newTestProvider(t *testing.T, handler http.HandlerFunc) (*AzureProvider, *h
 		logger:         logrus.NewEntry(logrus.New()),
 	}
 
-	return provider, server
+	integration := &AzureIntegration{
+		provider:      provider,
+		integrationID: testIntegrationID,
+	}
+
+	return integration, server
 }
 
 func newTestListCtx() core.ListResourcesContext {
@@ -306,7 +316,7 @@ func TestListResourceGroupLocations_EmptyResourceGroup(t *testing.T) {
 }
 
 func TestListResourceGroupLocations_Success(t *testing.T) {
-	provider, server := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+	integration, server := newTestIntegration(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"name":     "my-rg",
@@ -316,7 +326,7 @@ func TestListResourceGroupLocations_Success(t *testing.T) {
 	})
 	defer server.Close()
 
-	resources, err := listResourceGroupLocations(newTestListCtx(), provider, "my-rg")
+	resources, err := integration.ListResourceGroupLocations(newTestListCtx(), "my-rg")
 	require.NoError(t, err)
 	require.Len(t, resources, 1)
 	assert.Equal(t, ResourceTypeResourceGroupLocation, resources[0].Type)
@@ -325,7 +335,7 @@ func TestListResourceGroupLocations_Success(t *testing.T) {
 }
 
 func TestListResourceGroupLocations_NotFound(t *testing.T) {
-	provider, server := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+	integration, server := newTestIntegration(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]any{
@@ -337,7 +347,7 @@ func TestListResourceGroupLocations_NotFound(t *testing.T) {
 	})
 	defer server.Close()
 
-	resources, err := listResourceGroupLocations(newTestListCtx(), provider, "my-rg")
+	resources, err := integration.ListResourceGroupLocations(newTestListCtx(), "my-rg")
 	assert.NoError(t, err)
 	assert.Empty(t, resources)
 }

@@ -14,6 +14,7 @@ import (
 )
 
 type OnVMStarted struct {
+	integration *AzureIntegration
 }
 
 type OnVMStartedConfiguration struct {
