@@ -2,6 +2,7 @@ package elastic
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -126,12 +127,15 @@ func (e *Elastic) Configuration() []configuration.Field {
 func (e *Elastic) Components() []core.Component {
 	return []core.Component{
 		&IndexDocument{},
+		&GetDocument{},
+		&UpdateDocument{},
 	}
 }
 
 func (e *Elastic) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnAlertFires{},
+		&OnDocumentIndexed{},
 	}
 }
 
@@ -194,6 +198,7 @@ func (e *Elastic) HandleRequest(_ core.HTTPRequestContext) {}
 
 const (
 	ResourceTypeIndex       = "elastic.index"
+	ResourceTypeDocument    = "elastic.document"
 	ResourceTypeKibanaRule  = "elastic.kibana.rule"
 	ResourceTypeKibanaSpace = "elastic.kibana.space"
 )
@@ -213,6 +218,27 @@ func (e *Elastic) ListResources(resourceType string, ctx core.ListResourcesConte
 		resources := make([]core.IntegrationResource, 0, len(indices))
 		for _, idx := range indices {
 			resources = append(resources, core.IntegrationResource{ID: idx.Index, Name: idx.Index})
+		}
+		return resources, nil
+
+	case ResourceTypeDocument:
+		index := ctx.Parameters["index"]
+		if index == "" || strings.Contains(index, "{{") {
+			return []core.IntegrationResource{}, nil
+		}
+
+		documents, err := client.ListDocuments(index)
+		if err != nil {
+			return nil, fmt.Errorf("error listing documents: %v", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(documents))
+		for _, doc := range documents {
+			resources = append(resources, core.IntegrationResource{
+				ID:   doc.ID,
+				Name: doc.ID,
+				Type: ResourceTypeDocument,
+			})
 		}
 		return resources, nil
 

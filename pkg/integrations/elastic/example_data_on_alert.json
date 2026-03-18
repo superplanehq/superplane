@@ -1,6 +1,7 @@
 {
   "type": "elastic.alert",
   "data": {
+    "eventType": "alert_fired",
     "ruleId": "abc-123",
     "ruleName": "High error rate detected",
     "spaceId": "default",

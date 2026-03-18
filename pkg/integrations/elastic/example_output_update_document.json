@@ -1,0 +1,10 @@
+{
+  "type": "elastic.document.updated",
+  "data": {
+    "id": "aB3kLmN4oPqR",
+    "index": "workflow-audit",
+    "result": "updated",
+    "version": 4
+  },
+  "timestamp": "2026-03-12T09:00:00Z"
+}
