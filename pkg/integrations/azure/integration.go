@@ -4,35 +4,23 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+const secretAccessToken = "accessToken"
+
 func init() {
 	integration := &AzureIntegration{}
-	registry.RegisterIntegrationWithWebhookHandler("azure", integration, &AzureWebhookHandler{integration: integration})
+	registry.RegisterIntegrationWithWebhookHandler("azure", integration, &AzureWebhookHandler{})
 }
 
-type AzureIntegration struct {
-	mu       sync.Mutex
-	provider *AzureProvider
-
-	// oidcProvider is populated during Sync from SyncContext.OIDC and
-	// reused by ensureProvider to lazily create Azure clients.
-	oidcProvider oidc.Provider
-
-	// Cached from the last ensureProvider / Sync call so the provider
-	// can be reused across requests without re-reading the DB.
-	integrationID string
-	config        *Configuration
-}
+type AzureIntegration struct{}
 
 type Configuration struct {
 	TenantID       string `json:"tenantId" mapstructure:"tenantId"`
@@ -110,24 +98,24 @@ func (a *AzureIntegration) Configuration() []configuration.Field {
 
 func (a *AzureIntegration) Components() []core.Component {
 	return []core.Component{
-		&CreateVMComponent{integration: a},
-		&DeleteVMComponent{integration: a},
-		&StartVMComponent{integration: a},
-		&StopVMComponent{integration: a},
-		&DeallocateVMComponent{integration: a},
-		&RestartVMComponent{integration: a},
+		&CreateVMComponent{},
+		&DeleteVMComponent{},
+		&StartVMComponent{},
+		&StopVMComponent{},
+		&DeallocateVMComponent{},
+		&RestartVMComponent{},
 	}
 }
 
 func (a *AzureIntegration) Triggers() []core.Trigger {
 	return []core.Trigger{
-		&OnVMDeleted{integration: a},
-		&OnImagePushed{integration: a},
-		&OnImageDeleted{integration: a},
-		&OnVMStarted{integration: a},
-		&OnVMStopped{integration: a},
-		&OnVMDeallocated{integration: a},
-		&OnVMRestarted{integration: a},
+		&OnVMDeleted{},
+		&OnImagePushed{},
+		&OnImageDeleted{},
+		&OnVMStarted{},
+		&OnVMStopped{},
+		&OnVMDeallocated{},
+		&OnVMRestarted{},
 	}
 }
 
@@ -158,19 +146,22 @@ func (a *AzureIntegration) Sync(ctx core.SyncContext) error {
 		config.TenantID, config.SubscriptionID)
 
 	integrationID := ctx.Integration.ID().String()
+	getAssertion := func(_ context.Context) (string, error) {
+		subject := fmt.Sprintf("app-installation:%s", integrationID)
+		return ctx.OIDC.Sign(subject, 5*time.Minute, integrationID, nil)
+	}
 
-	a.mu.Lock()
-	a.oidcProvider = ctx.OIDC
-	a.integrationID = integrationID
-	a.config = &config
-
-	provider, err := a.initProviderLocked()
+	provider, err := NewAzureProvider(
+		context.Background(),
+		config.TenantID,
+		config.ClientID,
+		config.SubscriptionID,
+		getAssertion,
+		logrus.NewEntry(logrus.StandardLogger()),
+	)
 	if err != nil {
-		a.mu.Unlock()
 		return fmt.Errorf("failed to initialize Azure provider: %w", err)
 	}
-	a.provider = provider
-	a.mu.Unlock()
 
 	// Verify credentials by listing resource groups.
 	// This proves that the federated identity credential is configured correctly.
@@ -182,6 +173,22 @@ func (a *AzureIntegration) Sync(ctx core.SyncContext) error {
 		ctx.Logger.Infof("Credential verification failed: %v", err)
 		ctx.Logger.Info("Showing setup instructions for federated identity credential")
 		return a.showBrowserAction(ctx)
+	}
+
+	// Verification succeeded. The MSAL cache already holds the access token —
+	// fetch it and store it as a secret so ListResources and Execute can use it
+	// without needing OIDC or any environment variables.
+	token, err := provider.getClient().bearerToken(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to get access token: %w", err)
+	}
+
+	if err := ctx.Integration.SetSecret(secretAccessToken, []byte(token)); err != nil {
+		return fmt.Errorf("failed to store access token: %w", err)
+	}
+
+	if err := ctx.Integration.ScheduleResync(30 * time.Minute); err != nil {
+		return fmt.Errorf("failed to schedule resync: %w", err)
 	}
 
 	ctx.Integration.Ready()
@@ -285,41 +292,50 @@ func (a *AzureIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Response.Write([]byte("not found"))
 }
 
-// ensureProvider returns the cached Azure provider, or lazily creates one
-// by reading the integration configuration from the database and using the
-// OIDC provider stored during Sync. This is the single entry point for all
-// code paths that need an authenticated Azure client (ListResources,
-// Execute, WebhookHandler).
-func (a *AzureIntegration) ensureProvider(integrationCtx core.IntegrationContext) (*AzureProvider, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	integrationID := integrationCtx.ID().String()
-
-	// Return the cached provider when it matches the current integration.
-	if a.provider != nil && a.integrationID == integrationID {
-		return a.provider, nil
-	}
-
-	if a.oidcProvider == nil {
-		return nil, fmt.Errorf("Azure OIDC provider not available; server may not have finished starting")
-	}
-
-	config, err := loadConfig(integrationCtx)
+// newProvider creates a new AzureProvider by reading config and the stored access
+// token from the integration context. The token is written during Sync and refreshed
+// every 30 minutes. Called on each request that needs an authenticated Azure client
+// (ListResources, Execute, webhook handling).
+func newProvider(ctx core.IntegrationContext) (*AzureProvider, error) {
+	config, err := loadConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load Azure configuration: %w", err)
 	}
 
-	a.integrationID = integrationID
-	a.config = config
-
-	provider, err := a.initProviderLocked()
+	token, err := accessTokenFromSecrets(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize Azure provider: %w", err)
+		return nil, err
 	}
 
-	a.provider = provider
-	return a.provider, nil
+	logger := logrus.NewEntry(logrus.StandardLogger())
+	client := &armClient{
+		subscriptionID: config.SubscriptionID,
+		tokenFunc:      func(_ context.Context) (string, error) { return token, nil },
+		httpClient:     &http.Client{Timeout: 120 * time.Second},
+		logger:         logger,
+	}
+
+	return &AzureProvider{
+		subscriptionID: config.SubscriptionID,
+		client:         client,
+		logger:         logger,
+	}, nil
+}
+
+// accessTokenFromSecrets reads the Azure AD access token stored by Sync.
+func accessTokenFromSecrets(ctx core.IntegrationContext) (string, error) {
+	secrets, err := ctx.GetSecrets()
+	if err != nil {
+		return "", fmt.Errorf("failed to get integration secrets: %w", err)
+	}
+
+	for _, s := range secrets {
+		if s.Name == secretAccessToken {
+			return string(s.Value), nil
+		}
+	}
+
+	return "", fmt.Errorf("Azure access token not found: integration needs to sync")
 }
 
 // loadConfig reads the Azure integration configuration from the database
@@ -345,29 +361,4 @@ func loadConfig(ctx core.IntegrationContext) (*Configuration, error) {
 		ClientID:       string(clientID),
 		SubscriptionID: string(subscriptionID),
 	}, nil
-}
-
-// initProviderLocked creates a new AzureProvider using the stored OIDC credentials.
-// Caller must hold a.mu.
-func (a *AzureIntegration) initProviderLocked() (*AzureProvider, error) {
-	if a.oidcProvider == nil || a.config == nil {
-		return nil, fmt.Errorf("OIDC provider or config not available")
-	}
-
-	oidcProv := a.oidcProvider
-	integrationID := a.integrationID
-
-	getAssertion := func(_ context.Context) (string, error) {
-		subject := fmt.Sprintf("app-installation:%s", integrationID)
-		return oidcProv.Sign(subject, 5*time.Minute, integrationID, nil)
-	}
-
-	return NewAzureProvider(
-		context.Background(),
-		a.config.TenantID,
-		a.config.ClientID,
-		a.config.SubscriptionID,
-		getAssertion,
-		logrus.NewEntry(logrus.StandardLogger()),
-	)
 }
