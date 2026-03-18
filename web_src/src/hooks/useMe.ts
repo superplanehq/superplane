@@ -3,15 +3,15 @@ import { meMe } from "@/api-client";
 import { useOrganizationId, withOrganizationHeader } from "@/utils/withOrganizationHeader";
 
 export const meKeys = {
-  me: ["me"] as const,
+  me: (organizationId: string) => ["me", organizationId] as const,
 };
 
 export const useMe = () => {
   const organizationId = useOrganizationId();
   return useQuery({
-    queryKey: meKeys.me,
+    queryKey: organizationId ? meKeys.me(organizationId) : ["me", "unknown"],
     queryFn: async () => {
-      const response = await meMe(withOrganizationHeader());
+      const response = await meMe(withOrganizationHeader({ organizationId }));
       return response.data ?? null;
     },
     staleTime: 5 * 60 * 1000,

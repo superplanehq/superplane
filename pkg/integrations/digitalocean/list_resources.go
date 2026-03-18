@@ -18,6 +18,16 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listImages(ctx)
 	case "snapshot":
 		return listSnapshots(ctx)
+	case "domain":
+		return listDomains(ctx)
+	case "dns_record":
+		return listDNSRecords(ctx)
+	case "load_balancer":
+		return listLoadBalancers(ctx)
+	case "reserved_ip":
+		return listReservedIPs(ctx)
+	case "ssh_key":
+		return listSSHKeys(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -141,6 +151,124 @@ func listSnapshots(ctx core.ListResourcesContext) ([]core.IntegrationResource, e
 			Type: "snapshot",
 			Name: snapshot.Name,
 			ID:   snapshot.ID.String(),
+		})
+	}
+
+	return resources, nil
+}
+
+func listDomains(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	domains, err := client.ListDomains()
+	if err != nil {
+		return nil, fmt.Errorf("error listing domains: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(domains))
+	for _, domain := range domains {
+		resources = append(resources, core.IntegrationResource{
+			Type: "domain",
+			Name: domain.Name,
+			ID:   domain.Name,
+		})
+	}
+	return resources, nil
+}
+
+func listDNSRecords(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	domain := ctx.Parameters["domain"]
+	if domain == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	records, err := client.ListDNSRecords(domain)
+	if err != nil {
+		return nil, fmt.Errorf("error listing DNS records: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(records))
+	for _, record := range records {
+		resources = append(resources, core.IntegrationResource{
+			Type: "dns_record",
+			Name: fmt.Sprintf("%s (%s)", record.Name, record.Type),
+			ID:   fmt.Sprintf("%d", record.ID),
+		})
+	}
+	return resources, nil
+}
+
+func listLoadBalancers(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	loadBalancers, err := client.ListLoadBalancers()
+	if err != nil {
+		return nil, fmt.Errorf("error listing load balancers: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(loadBalancers))
+	for _, lb := range loadBalancers {
+		resources = append(resources, core.IntegrationResource{
+			Type: "load_balancer",
+			Name: lb.Name,
+			ID:   lb.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listReservedIPs(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	reservedIPs, err := client.ListReservedIPs()
+	if err != nil {
+		return nil, fmt.Errorf("error listing reserved IPs: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(reservedIPs))
+	for _, ip := range reservedIPs {
+		resources = append(resources, core.IntegrationResource{
+			Type: "reserved_ip",
+			Name: ip.IP,
+			ID:   ip.IP,
+		})
+	}
+
+	return resources, nil
+}
+
+func listSSHKeys(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	keys, err := client.ListSSHKeys()
+	if err != nil {
+		return nil, fmt.Errorf("error listing SSH keys: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(keys))
+	for _, key := range keys {
+		resources = append(resources, core.IntegrationResource{
+			Type: "ssh_key",
+			Name: key.Name,
+			ID:   key.Fingerprint,
 		})
 	}
 

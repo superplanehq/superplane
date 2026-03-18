@@ -1,5 +1,6 @@
 import { CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import {
   Dialog,
   DialogContent,
@@ -183,9 +184,14 @@ export function CreateChangeRequestModal({
               Outdated draft
             </div>
           ) : null}
-          <Button onClick={handlePublish} disabled={!version || pending || !title.trim()}>
-            {pending ? "Creating..." : "Create"}
-          </Button>
+          <LoadingButton
+            onClick={handlePublish}
+            disabled={!version || !title.trim()}
+            loading={pending}
+            loadingText="Creating..."
+          >
+            Create
+          </LoadingButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

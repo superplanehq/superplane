@@ -19,6 +19,7 @@ import {
   organizationKeys,
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { AddMembersSection, AddMembersSectionRef } from "./AddMembersSection";
 import { showErrorToast } from "@/utils/toast";
 
@@ -186,9 +187,13 @@ export function GroupMembersPage() {
                   autoFocus
                 />
                 <div className="flex items-center gap-2">
-                  <Button onClick={handleSaveGroupName} disabled={updateGroupMutation.isPending}>
-                    {updateGroupMutation.isPending ? "Saving..." : "Save"}
-                  </Button>
+                  <LoadingButton
+                    onClick={handleSaveGroupName}
+                    loading={updateGroupMutation.isPending}
+                    loadingText="Saving..."
+                  >
+                    Save
+                  </LoadingButton>
                   <Button variant="outline" onClick={handleCancelGroupName} disabled={updateGroupMutation.isPending}>
                     Cancel
                   </Button>

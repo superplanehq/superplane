@@ -8,6 +8,7 @@ import { Input } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
 import { Textarea } from "../../components/ui/textarea";
 import { Button } from "../../components/ui/button";
+import { LoadingButton } from "../../components/ui/loading-button";
 import { useCreateCanvas, useCanvasTemplates } from "../../hooks/useCanvasData";
 import { showErrorToast } from "../../utils/toast";
 import type { ComponentsEdge, ComponentsNode } from "@/api-client";
@@ -140,13 +141,15 @@ export function CreateCanvasPage() {
               </Field>
 
               <div className="flex justify-start gap-3">
-                <Button
+                <LoadingButton
                   onClick={handleSubmit}
-                  disabled={!name.trim() || createMutation.isPending || !!nameError}
+                  disabled={!name.trim() || !!nameError}
+                  loading={createMutation.isPending}
+                  loadingText="Creating Canvas..."
                   data-testid="create-canvas-button"
                 >
-                  {createMutation.isPending ? "Creating Canvas..." : "Create Canvas"}
-                </Button>
+                  Create Canvas
+                </LoadingButton>
                 <Button variant="outline" onClick={handleCancel}>
                   Cancel
                 </Button>

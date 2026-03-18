@@ -54,12 +54,11 @@ type Field struct {
 	/*
 	 * Type of the field. Supported types are defined by FieldType* constants above.
 	 */
-	Type               string `json:"type"`
-	Description        string `json:"description"`
-	Required           bool   `json:"required"`
-	Default            any    `json:"default"`
-	Togglable          bool   `json:"togglable"`
-	DisallowExpression bool   `json:"disallowExpression"`
+	Type        string `json:"type"`
+	Description string `json:"description"`
+	Required    bool   `json:"required"`
+	Default     any    `json:"default"`
+	Togglable   bool   `json:"togglable"`
 
 	/*
 	 * Whether the field is sensitive (e.g., password, API token)
@@ -83,12 +82,6 @@ type Field struct {
 	 * If specified, the field is only required when these conditions are met.
 	 */
 	RequiredConditions []RequiredCondition `json:"requiredConditions,omitempty"`
-
-	/*
-	 * Used for defining validation rules that compare this field with other fields.
-	 * For example, ensuring startTime < endTime or startDateTime < endDateTime.
-	 */
-	ValidationRules []ValidationRule `json:"validationRules,omitempty"`
 }
 
 /*
@@ -108,9 +101,6 @@ type TypeOptions struct {
 	Time             *TimeTypeOptions             `json:"time,omitempty"`
 	Date             *DateTypeOptions             `json:"date,omitempty"`
 	DateTime         *DateTimeTypeOptions         `json:"dateTime,omitempty"`
-	DayInYear        *DayInYearTypeOptions        `json:"dayInYear,omitempty"`
-	Cron             *CronTypeOptions             `json:"cron,omitempty"`
-	Timezone         *TimezoneTypeOptions         `json:"timezone,omitempty"`
 }
 
 /*
@@ -154,18 +144,18 @@ type NumberTypeOptions struct {
  * StringTypeOptions specifies constraints for string fields
  */
 type StringTypeOptions struct {
-	MinLength *int `json:"min_length,omitempty"`
-	MaxLength *int `json:"max_length,omitempty"`
+	MinLength *int `json:"minLength,omitempty"`
+	MaxLength *int `json:"maxLength,omitempty"`
 }
 
 type ExpressionTypeOptions struct {
-	MinLength *int `json:"min_length,omitempty"`
-	MaxLength *int `json:"max_length,omitempty"`
+	MinLength *int `json:"minLength,omitempty"`
+	MaxLength *int `json:"maxLength,omitempty"`
 }
 
 type TextTypeOptions struct {
-	MinLength *int `json:"min_length,omitempty"`
-	MaxLength *int `json:"max_length,omitempty"`
+	MinLength *int `json:"minLength,omitempty"`
+	MaxLength *int `json:"maxLength,omitempty"`
 }
 
 /*
@@ -187,27 +177,6 @@ type DateTypeOptions struct {
  */
 type DateTimeTypeOptions struct {
 	Format string `json:"format,omitempty"` // Expected format, e.g., "2006-01-02T15:04", "YYYY-MM-DDTHH:MM"
-}
-
-/*
- * DayInYearTypeOptions specifies format and constraints for day-in-year fields
- */
-type DayInYearTypeOptions struct {
-	Format string `json:"format,omitempty"` // Expected format, defaults to "MM/DD", e.g., "12/25"
-}
-
-/*
- * CronTypeOptions specifies constraints for cron expression fields
- */
-type CronTypeOptions struct {
-	AllowedFields []string `json:"allowed_fields,omitempty"` // Optional: limit which cron fields are allowed
-}
-
-/*
- * TimezoneTypeOptions specifies constraints for timezone fields
- */
-type TimezoneTypeOptions struct {
-	// Could add supported timezones list here if needed in the future
 }
 
 /*
@@ -264,20 +233,4 @@ type VisibilityCondition struct {
 type RequiredCondition struct {
 	Field  string   `json:"field"`
 	Values []string `json:"values"`
-}
-
-const (
-	ValidationRuleLessThan    = "less_than"
-	ValidationRuleGreaterThan = "greater_than"
-	ValidationRuleEqual       = "equal"
-	ValidationRuleNotEqual    = "not_equal"
-	ValidationRuleMaxLength   = "max_length"
-	ValidationRuleMinLength   = "min_length"
-)
-
-type ValidationRule struct {
-	Type        string `json:"type"`        // less_than, greater_than, equal, not_equal, max_length, min_length
-	CompareWith string `json:"compareWith"` // field name to compare with (for field comparisons)
-	Value       any    `json:"value"`       // static value to compare with (for direct validation)
-	Message     string `json:"message"`     // custom error message
 }

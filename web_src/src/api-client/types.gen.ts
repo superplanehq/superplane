@@ -103,24 +103,6 @@ export type CanvasesCanvas = {
   status?: CanvasesCanvasStatus;
 };
 
-export type CanvasesCanvasAiBlockContext = {
-  name?: string;
-  label?: string;
-  type?: string;
-};
-
-export type CanvasesCanvasAiContext = {
-  nodes?: Array<CanvasesCanvasAiNodeContext>;
-  availableBlocks?: Array<CanvasesCanvasAiBlockContext>;
-};
-
-export type CanvasesCanvasAiNodeContext = {
-  id?: string;
-  name?: string;
-  label?: string;
-  type?: string;
-};
-
 export type CanvasesCanvasAutoLayout = {
   algorithm?: CanvasAutoLayoutAlgorithm;
   nodeIds?: Array<string>;
@@ -226,7 +208,7 @@ export type CanvasesCanvasMetadata = {
   updatedAt?: string;
   createdBy?: SuperplaneCanvasesUserRef;
   isTemplate?: boolean;
-  canvasVersioningEnabled?: boolean;
+  versioningEnabled?: boolean;
   changeRequestApprovalConfig?: CanvasesCanvasChangeRequestApprovalConfig;
 };
 
@@ -462,22 +444,10 @@ export type CanvasesResolveExecutionErrorsResponse = {
   [key: string]: unknown;
 };
 
-export type CanvasesSendAiMessageBody = {
-  prompt?: string;
-  canvasContext?: CanvasesCanvasAiContext;
-};
-
-export type CanvasesSendAiMessageResponse = {
-  assistantMessage?: string;
-  operations?: Array<{
-    [key: string]: unknown;
-  }>;
-};
-
 export type CanvasesUpdateCanvasBody = {
   name?: string;
   description?: string;
-  canvasVersioningEnabled?: boolean;
+  versioningEnabled?: boolean;
   changeRequestApprovalConfig?: CanvasesCanvasChangeRequestApprovalConfig;
 };
 
@@ -601,11 +571,9 @@ export type ConfigurationField = {
   visibilityConditions?: Array<ConfigurationVisibilityCondition>;
   typeOptions?: ConfigurationTypeOptions;
   requiredConditions?: Array<ConfigurationRequiredCondition>;
-  validationRules?: Array<ConfigurationValidationRule>;
   placeholder?: string;
   sensitive?: boolean;
   togglable?: boolean;
-  disallowExpression?: boolean;
 };
 
 export type ConfigurationListItemDefinition = {
@@ -691,12 +659,6 @@ export type ConfigurationTypeOptions = {
   string?: ConfigurationStringTypeOptions;
   expression?: ConfigurationExpressionTypeOptions;
   text?: ConfigurationTextTypeOptions;
-};
-
-export type ConfigurationValidationRule = {
-  type?: string;
-  compareWith?: string;
-  message?: string;
 };
 
 export type ConfigurationVisibilityCondition = {
@@ -1043,7 +1005,7 @@ export type OrganizationsOrganizationMetadata = {
   description?: string;
   createdAt?: string;
   updatedAt?: string;
-  canvasVersioningEnabled?: boolean;
+  versioningEnabled?: boolean;
 };
 
 export type OrganizationsRemoveInvitationResponse = {
@@ -1644,33 +1606,6 @@ export type CanvasesCreateCanvasResponses = {
 };
 
 export type CanvasesCreateCanvasResponse2 = CanvasesCreateCanvasResponses[keyof CanvasesCreateCanvasResponses];
-
-export type CanvasesSendAiMessageData = {
-  body: CanvasesSendAiMessageBody;
-  path: {
-    canvasId: string;
-  };
-  query?: never;
-  url: "/api/v1/canvases/{canvasId}/ai/messages";
-};
-
-export type CanvasesSendAiMessageErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type CanvasesSendAiMessageError = CanvasesSendAiMessageErrors[keyof CanvasesSendAiMessageErrors];
-
-export type CanvasesSendAiMessageResponses = {
-  /**
-   * A successful response.
-   */
-  200: CanvasesSendAiMessageResponse;
-};
-
-export type CanvasesSendAiMessageResponse2 = CanvasesSendAiMessageResponses[keyof CanvasesSendAiMessageResponses];
 
 export type CanvasesListCanvasChangeRequestsData = {
   body?: never;

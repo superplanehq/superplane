@@ -119,6 +119,11 @@ import {
   triggerRenderers as jfrogArtifactoryTriggerRenderers,
   eventStateRegistry as jfrogArtifactoryEventStateRegistry,
 } from "./jfrogArtifactory/index";
+import {
+  componentMappers as azureComponentMappers,
+  triggerRenderers as azureTriggerRenderers,
+  eventStateRegistry as azureEventStateRegistry,
+} from "./azure/index";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
   componentMappers as digitaloceanComponentMappers,
@@ -172,6 +177,11 @@ import {
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
 import {
+  componentMappers as perplexityComponentMappers,
+  triggerRenderers as perplexityTriggerRenderers,
+  eventStateRegistry as perplexityEventStateRegistry,
+} from "./perplexity/index";
+import {
   componentMappers as prometheusComponentMappers,
   customFieldRenderers as prometheusCustomFieldRenderers,
   triggerRenderers as prometheusTriggerRenderers,
@@ -211,6 +221,11 @@ import {
   triggerRenderers as servicenowTriggerRenderers,
   eventStateRegistry as servicenowEventStateRegistry,
 } from "./servicenow/index";
+import {
+  componentMappers as elasticComponentMappers,
+  triggerRenderers as elasticTriggerRenderers,
+  eventStateRegistry as elasticEventStateRegistry,
+} from "./elastic/index";
 
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
@@ -269,6 +284,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   firehydrant: firehydrantComponentMappers,
   launchdarkly: launchdarklyComponentMappers,
   aws: awsComponentMappers,
+  azure: azureComponentMappers,
   discord: discordComponentMappers,
   telegram: telegramComponentMappers,
   octopus: octopusComponentMappers,
@@ -276,6 +292,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
+  perplexity: perplexityComponentMappers,
   gcp: gcpComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
@@ -286,6 +303,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   honeycomb: honeycombComponentMappers,
   harness: harnessComponentMappers,
   servicenow: servicenowComponentMappers,
+  elastic: elasticComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -308,6 +326,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   firehydrant: firehydrantTriggerRenderers,
   launchdarkly: launchdarklyTriggerRenderers,
   aws: awsTriggerRenderers,
+  azure: azureTriggerRenderers,
   discord: discordTriggerRenderers,
   telegram: telegramTriggerRenderers,
   octopus: octopusTriggerRenderers,
@@ -315,6 +334,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
+  perplexity: perplexityTriggerRenderers,
   gcp: gcpTriggerRenderers,
   grafana: grafanaTriggerRenderers,
   bitbucket: bitbucketTriggerRenderers,
@@ -326,6 +346,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   honeycomb: honeycombTriggerRenderers,
   harness: harnessTriggerRenderers,
   servicenow: servicenowTriggerRenderers,
+  elastic: elasticTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -353,18 +374,21 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
+  perplexity: perplexityEventStateRegistry,
   gcp: gcpEventStateRegistry,
   statuspage: statuspageEventStateRegistry,
   aws: awsEventStateRegistry,
   grafana: grafanaEventStateRegistry,
   prometheus: prometheusEventStateRegistry,
   cursor: cursorEventStateRegistry,
+  azure: azureEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
   honeycomb: honeycombEventStateRegistry,
   harness: harnessEventStateRegistry,
   servicenow: servicenowEventStateRegistry,
+  elastic: elasticEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {

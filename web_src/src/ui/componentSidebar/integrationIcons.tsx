@@ -13,9 +13,11 @@ import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
+import azureIcon from "@/assets/icons/integrations/azure.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
+import elasticIcon from "@/assets/icons/integrations/elastic.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import digitaloceanIcon from "@/assets/icons/integrations/digitalocean.svg";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
@@ -35,6 +37,7 @@ import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactreg
 import gcpPubSubIcon from "@/assets/icons/integrations/gcp.pubsub.svg";
 import gcpCloudDNSIcon from "@/assets/icons/integrations/gcp.clouddns.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
+import perplexityIcon from "@/assets/icons/integrations/perplexity.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
@@ -60,6 +63,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   aws: awsIcon,
   bitbucket: bitbucketIcon,
   circleci: circleciIcon,
+  azure: azureIcon,
   cloudflare: cloudflareIcon,
   dash0: dash0Icon,
   datadog: datadogIcon,
@@ -79,6 +83,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   "open-ai": openAiIcon,
   claude: claudeIcon,
   cursor: cursorIcon,
+  perplexity: perplexityIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   incident: incidentIcon,
@@ -97,6 +102,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   statuspage: statuspageIcon,
   launchdarkly: launchdarklyIcon,
   teams: teamsIcon,
+  elastic: elasticIcon,
 };
 
 /** Block name first part (e.g. "github") or compound (e.g. aws.lambda) → logo src for header. */
@@ -122,6 +128,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   "open-ai": openAiIcon,
   claude: claudeIcon,
   cursor: cursorIcon,
+  perplexity: perplexityIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   incident: incidentIcon,
@@ -138,6 +145,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   statuspage: statuspageIcon,
   launchdarkly: launchdarklyIcon,
   teams: teamsIcon,
+  azure: azureIcon,
   aws: {
     cloudwatch: awsCloudwatchIcon,
     codeArtifact: awsCodeArtifactIcon,
@@ -158,6 +166,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
     pubsub: gcpPubSubIcon,
     clouddns: gcpCloudDNSIcon,
   },
+  elastic: elasticIcon,
 };
 
 /**

@@ -1,6 +1,7 @@
 import { formatRelativeTime } from "@/utils/timezone";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { Icon } from "../../../components/Icon";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "../../../components/Link/link";
@@ -22,6 +23,7 @@ interface GroupsProps {
 }
 
 export function Groups({ organizationId }: GroupsProps) {
+  usePageTitle(["Groups"]);
   const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [sortConfig, setSortConfig] = useState<{

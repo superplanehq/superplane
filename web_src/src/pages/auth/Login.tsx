@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import superplaneLogo from "@/assets/superplane.svg";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAccount } from "../../contexts/AccountContext";
@@ -360,9 +361,9 @@ export const Login: React.FC = () => {
                 />
               </div>
 
-              <Button type="submit" disabled={submitLoading} className="w-full">
-                {submitLoading ? "Logging in..." : "Login"}
-              </Button>
+              <LoadingButton type="submit" loading={submitLoading} loadingText="Logging in..." className="w-full">
+                Login
+              </LoadingButton>
             </form>
           )}
 
@@ -434,9 +435,15 @@ export const Login: React.FC = () => {
                 />
               </div>
 
-              <Button type="submit" disabled={submitLoading || !canSignup} className="w-full">
-                {submitLoading ? "Creating account..." : "Create account"}
-              </Button>
+              <LoadingButton
+                type="submit"
+                disabled={!canSignup}
+                loading={submitLoading}
+                loadingText="Creating account..."
+                className="w-full"
+              >
+                Create account
+              </LoadingButton>
             </form>
           )}
 

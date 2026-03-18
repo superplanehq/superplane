@@ -8,11 +8,6 @@ export const useOrganizationId = (): string | null => {
 const getOrganizationIdFromUrl = (): string | null => {
   const pathSegments = window.location.pathname.split("/");
 
-  // Check if we're in the /:organizationId route pattern
-  if (pathSegments[1] === "" && pathSegments[2]) {
-    return pathSegments[2];
-  }
-
   // Check if we're in the /:organizationId route pattern (for settings, canvas, etc.)
   if (pathSegments[1] && pathSegments[1] !== "auth" && pathSegments[1] !== "login" && pathSegments[1] !== "register") {
     return pathSegments[1];
@@ -22,7 +17,9 @@ const getOrganizationIdFromUrl = (): string | null => {
 };
 
 export function withOrganizationHeader(options: any = {}): any {
-  const organizationId = getOrganizationIdFromUrl();
+  // Prefer an explicit organizationId (e.g. from route params) over window.location
+  // because window.location can be stale during router transitions.
+  const organizationId = options?.organizationId ?? getOrganizationIdFromUrl();
 
   const headers: Record<string, string> = {};
 
@@ -40,8 +37,13 @@ export function withOrganizationHeader(options: any = {}): any {
     headers["x-organization-id"] = organizationId;
   }
 
+  // Avoid leaking our internal option into fetch/init objects.
+  // Codegen clients ignore unknown top-level fields, but callers may also pass this to native fetch.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { organizationId: _ignored, ...rest } = options ?? {};
+
   return {
-    ...options,
+    ...rest,
     headers,
   };
 }

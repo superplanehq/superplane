@@ -1,5 +1,6 @@
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { isAgentReplEnabled } from "@/lib/env";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { GitBranch, Loader2, Puzzle } from "lucide-react";
@@ -26,7 +27,6 @@ import {
   OrganizationsIntegration,
 } from "@/api-client";
 import {
-  useOrganizationAgentSettings,
   useOrganization,
   useOrganizationGroups,
   useOrganizationRoles,
@@ -445,7 +445,7 @@ export function WorkflowPageV2() {
     };
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion]);
   const canReadOrg = canAct("org", "read");
-  const isVersioningDisabled = !(liveCanvas?.metadata?.canvasVersioningEnabled ?? false);
+  const isVersioningDisabled = !(liveCanvas?.metadata?.versioningEnabled ?? false);
   const showVersioningUI = !isVersioningDisabled;
   const hasEditableVersion =
     (!!activeCanvasVersionId && !selectedCanvasVersion?.metadata?.isPublished) ||
@@ -457,12 +457,11 @@ export function WorkflowPageV2() {
     error: canvasMemoryError,
   } = useCanvasMemoryEntries(canvasId!, isViewingLiveVersion);
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
-  const { data: agentSettings } = useOrganizationAgentSettings(organizationId || "", !!organizationId && canReadOrg);
   const { data: organization } = useOrganization(organizationId || "", !!organizationId && canReadOrg);
-  const isOrgVersioningEnabled = organization?.metadata?.canvasVersioningEnabled;
+  const isOrgVersioningEnabled = organization?.metadata?.versioningEnabled;
   const canUpdateCanvas = canAct("canvases", "update");
   const updateCanvasMutation = useUpdateCanvas(organizationId || "", canvasId || "");
-  const showAiBuilderTab = agentSettings?.agentModeEnabled ?? false;
+  const showAiBuilderTab = isAgentReplEnabled();
 
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
 
@@ -470,7 +469,6 @@ export function WorkflowPageV2() {
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
-  const isDev = import.meta.env.DEV;
   const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "memory" | "settings" | "versioning">("canvas");
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
@@ -4126,7 +4124,10 @@ export function WorkflowPageV2() {
         }) || [];
 
       const exportWorkflow = {
+        apiVersion: "v1",
+        kind: "Canvas",
         metadata: {
+          id: canvas.metadata?.id || "",
           name: canvas.metadata?.name || "Canvas",
           description: canvas.metadata?.description || "",
           isTemplate: canvas.metadata?.isTemplate ?? false,
@@ -4152,42 +4153,6 @@ export function WorkflowPageV2() {
       return { yamlText, filename };
     },
     [canvas],
-  );
-
-  const handleExportYamlDownload = useCallback(
-    (canvasNodes: CanvasNode[]) => {
-      const payload = getYamlExportPayload(canvasNodes);
-      if (!payload) return;
-
-      const blob = new Blob([payload.yamlText], { type: "text/yaml;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = payload.filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-
-      showSuccessToast("Canvas exported as YAML");
-    },
-    [getYamlExportPayload],
-  );
-
-  const handleExportYamlCopy = useCallback(
-    async (canvasNodes: CanvasNode[]) => {
-      const payload = getYamlExportPayload(canvasNodes);
-      if (!payload) return;
-
-      try {
-        await navigator.clipboard.writeText(payload.yamlText);
-        showSuccessToast("YAML copied to clipboard");
-      } catch (_error) {
-        showErrorToast("Failed to copy YAML to clipboard");
-      }
-    },
-    [getYamlExportPayload],
   );
 
   const handleUseTemplateSubmit = useCallback(
@@ -4323,7 +4288,7 @@ export function WorkflowPageV2() {
     () => ({
       name: liveCanvas?.metadata?.name || "",
       description: liveCanvas?.metadata?.description || "",
-      canvasVersioningEnabled: liveCanvas?.metadata?.canvasVersioningEnabled ?? false,
+      versioningEnabled: liveCanvas?.metadata?.versioningEnabled ?? false,
       changeRequestApprovalConfig: {
         items: (liveCanvas?.metadata?.changeRequestApprovalConfig?.items || [])
           .map((item) => {
@@ -4349,7 +4314,7 @@ export function WorkflowPageV2() {
       },
     }),
     [
-      liveCanvas?.metadata?.canvasVersioningEnabled,
+      liveCanvas?.metadata?.versioningEnabled,
       liveCanvas?.metadata?.changeRequestApprovalConfig?.items,
       liveCanvas?.metadata?.description,
       liveCanvas?.metadata?.name,
@@ -4406,7 +4371,7 @@ export function WorkflowPageV2() {
     async (values: {
       name: string;
       description: string;
-      canvasVersioningEnabled?: boolean;
+      versioningEnabled?: boolean;
       changeRequestApprovalConfig?: {
         items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
       };
@@ -4418,7 +4383,7 @@ export function WorkflowPageV2() {
       await updateCanvasMutation.mutateAsync({
         name: values.name,
         description: values.description,
-        canvasVersioningEnabled: values.canvasVersioningEnabled,
+        versioningEnabled: values.versioningEnabled,
         changeRequestApprovalConfig: values.changeRequestApprovalConfig,
       });
     },
@@ -4823,8 +4788,6 @@ export function WorkflowPageV2() {
           showPendingDraftBadge={showPendingDraftBadge}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
-          onExportYamlCopy={isDev ? handleExportYamlCopy : undefined}
-          onExportYamlDownload={isDev ? handleExportYamlDownload : undefined}
           runDisabled={runDisabled}
           runDisabledTooltip={runDisabledTooltip}
           onCancelQueueItem={onCancelQueueItem}

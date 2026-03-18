@@ -48,7 +48,7 @@ func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRe
 		req.Id,
 		req.Name,
 		req.Description,
-		req.CanvasVersioningEnabled,
+		req.VersioningEnabled,
 		req.ChangeRequestApprovalConfig,
 	)
 }
@@ -343,9 +343,4 @@ func (s *CanvasService) ResolveExecutionErrors(ctx context.Context, req *pb.Reso
 	}
 
 	return canvases.ResolveExecutionErrors(ctx, canvasID, executionIDs)
-}
-
-func (s *CanvasService) SendAiMessage(ctx context.Context, req *pb.SendAiMessageRequest) (*pb.SendAiMessageResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.SendAiMessage(ctx, s.registry, s.encryptor, organizationID, req)
 }

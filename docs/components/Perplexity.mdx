@@ -1,0 +1,76 @@
+---
+title: "Perplexity"
+---
+
+Run AI agents with Perplexity
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Run Agent" href="#run-agent" description="Run a Perplexity AI agent with web search and URL fetching capabilities" />
+</CardGrid>
+
+<a id="run-agent"></a>
+
+## Run Agent
+
+The Run Agent component uses Perplexity's Agent API to run AI agents that can search the web and fetch URLs.
+
+### Use Cases
+
+- **Research and synthesis**: Ask complex questions that require gathering and synthesizing information from multiple sources
+- **Automated analysis**: Run AI-powered analysis on web content
+- **Content generation with citations**: Generate text grounded in real-time web sources
+
+### Configuration
+
+- **Preset**: Agent preset to use (fast-search, pro-search, deep-research, advanced-deep-research). When set, model is ignored.
+- **Model**: Model to use when no preset is specified
+- **Input**: The prompt or question for the agent (supports expressions)
+- **Instructions**: Optional system-level instructions
+- **Web Search**: Enable the web_search tool (default: true)
+- **Fetch URL**: Enable the fetch_url tool (default: true)
+
+### Output
+
+Returns the agent response including:
+- **text**: The generated text response
+- **citations**: Source citations from web results
+- **model**: The model used
+- **usage**: Token and cost usage information
+
+### Example Output
+
+```json
+{
+  "data": {
+    "citations": [
+      {
+        "type": "citation",
+        "url": "https://example.com/ai-news"
+      },
+      {
+        "type": "citation",
+        "url": "https://example.com/research"
+      }
+    ],
+    "id": "resp_1234567890",
+    "model": "openai/gpt-5.2",
+    "status": "completed",
+    "text": "Recent developments in AI include significant advances in reasoning capabilities and safety research...",
+    "usage": {
+      "cost": {
+        "total_cost": 0.05
+      },
+      "input_tokens": 3681,
+      "output_tokens": 780,
+      "total_tokens": 4461
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "perplexity.agent.response"
+}
+```
+
