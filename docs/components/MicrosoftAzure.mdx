@@ -11,14 +11,22 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="On Image Deleted" href="#on-image-deleted" description="Listen to Azure Container Registry image deletion events" />
   <LinkCard title="On Image Pushed" href="#on-image-pushed" description="Listen to Azure Container Registry image push events" />
+  <LinkCard title="On VM Deallocated" href="#on-vm-deallocated" description="Listen to Azure VM deallocation events" />
   <LinkCard title="On VM Deleted" href="#on-vm-deleted" description="Listen to Azure VM deletion events" />
+  <LinkCard title="On VM Restarted" href="#on-vm-restarted" description="Listen to Azure VM restart events" />
+  <LinkCard title="On VM Started" href="#on-vm-started" description="Listen to Azure VM start events" />
+  <LinkCard title="On VM Stopped" href="#on-vm-stopped" description="Listen to Azure VM power-off events" />
 </CardGrid>
 
 ## Actions
 
 <CardGrid>
   <LinkCard title="Create Virtual Machine" href="#create-virtual-machine" description="Creates a new Azure Virtual Machine with the specified configuration" />
+  <LinkCard title="Deallocate Virtual Machine" href="#deallocate-virtual-machine" description="Deallocates an Azure Virtual Machine, releasing compute resources" />
   <LinkCard title="Delete Virtual Machine" href="#delete-virtual-machine" description="Deletes an existing Azure Virtual Machine" />
+  <LinkCard title="Restart Virtual Machine" href="#restart-virtual-machine" description="Restarts an Azure Virtual Machine" />
+  <LinkCard title="Start Virtual Machine" href="#start-virtual-machine" description="Starts a stopped or deallocated Azure Virtual Machine" />
+  <LinkCard title="Stop Virtual Machine" href="#stop-virtual-machine" description="Powers off an Azure Virtual Machine without deallocating" />
 </CardGrid>
 
 ## Instructions
@@ -195,6 +203,94 @@ Each push event includes:
 }
 ```
 
+<a id="on-vm-deallocated"></a>
+
+## On VM Deallocated
+
+The On VM Deallocated trigger starts a workflow execution when an Azure Virtual Machine is deallocated.
+
+### Use Cases
+
+- **Cost tracking**: Log when VMs are deallocated and compute charges stop
+- **Resource cleanup**: Clean up associated resources (DNS, monitoring) when VMs are deallocated
+- **Scheduling verification**: Confirm VMs are being deallocated according to cost-saving schedules
+- **Capacity planning**: Track deallocation patterns for capacity planning
+- **Notification workflows**: Alert teams when VMs go offline
+
+### How It Works
+
+This trigger listens to Azure Event Grid events for Virtual Machine deallocate actions.
+When a VM deallocate action succeeds (`status: Succeeded`), the trigger fires and
+provides the full Azure Event Grid event payload.
+
+Azure fires `Microsoft.Resources.ResourceActionSuccess` with operation name
+`Microsoft.Compute/virtualMachines/deallocate/action` when a VM is deallocated.
+Deallocation stops the VM and releases compute resources — the VM no longer incurs compute
+charges (only storage charges remain).
+
+**Important**: This trigger fires on deallocate, not on power-off (stop without deallocation).
+Use the "On VM Stopped" trigger for power-off events.
+
+### Configuration
+
+- **Resource Group** (optional): Filter events to only trigger for VMs in a specific
+  resource group. Leave empty to trigger for all resource groups in the subscription.
+- **VM Name Filter** (optional): A regex pattern to filter VMs by name. Only VMs whose name
+  matches the pattern will trigger the workflow. Leave empty to trigger for all VM names.
+
+### Event Data
+
+Each VM deallocate event includes the full Azure Event Grid event:
+
+- **id**: Unique event ID
+- **topic**: The Azure subscription topic
+- **subject**: The full ARM resource ID of the VM (with /deallocate appended)
+- **eventType**: The event type (`Microsoft.Resources.ResourceActionSuccess`)
+- **eventTime**: The timestamp when the event occurred
+- **data**: The event data including operationName, status, resourceProvider, resourceUri, subscriptionId, tenantId
+
+### Azure Event Grid Setup
+
+Event Grid subscriptions are created automatically when the trigger is set up. SuperPlane will:
+
+1. Create an Event Grid subscription at the Azure subscription scope
+2. Configure it to forward `Microsoft.Resources.ResourceActionSuccess` events to the trigger webhook
+3. Apply subject filters based on the configured resource group and resource type
+4. Handle the Event Grid validation handshake automatically
+
+No manual setup is required.
+
+### Notes
+
+- The trigger fires when a VM is deallocated (stopped and compute resources released)
+- After deallocation, only storage charges remain — compute charges stop
+- It does not fire on power-off (stop without deallocation) — use "On VM Stopped" for that
+- Failed deallocate operations do not trigger the workflow
+- The trigger processes events from Azure Event Grid in real-time
+- Multiple triggers can share the same Event Grid subscription if configured correctly
+
+### Example Data
+
+```json
+{
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/deallocate/action",
+    "resourceProvider": "Microsoft.Compute",
+    "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+    "status": "Succeeded",
+    "subscriptionId": "12345678-1234-1234-1234-123456789abc",
+    "tenantId": "12345678-1234-1234-1234-123456789abc"
+  },
+  "dataVersion": "2",
+  "eventTime": "2026-02-11T10:30:00Z",
+  "eventType": "Microsoft.Resources.ResourceActionSuccess",
+  "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+  "metadataVersion": "1",
+  "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/deallocate",
+  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
+}
+```
+
 <a id="on-vm-deleted"></a>
 
 ## On VM Deleted
@@ -277,6 +373,267 @@ No manual setup is required.
 }
 ```
 
+<a id="on-vm-restarted"></a>
+
+## On VM Restarted
+
+The On VM Restarted trigger starts a workflow execution when an Azure Virtual Machine is restarted.
+
+### Use Cases
+
+- **Post-restart validation**: Run health checks or smoke tests after a VM restarts
+- **Configuration reapplication**: Reapply configuration that may not persist across restarts
+- **Monitoring alerts**: Notify teams when VMs are restarted unexpectedly
+- **Audit logging**: Track VM restart events for compliance and troubleshooting
+
+### How It Works
+
+This trigger listens to Azure Event Grid events for Virtual Machine restart actions.
+When a VM restart action succeeds (`status: Succeeded`), the trigger fires and
+provides the full Azure Event Grid event payload.
+
+Azure fires `Microsoft.Resources.ResourceActionSuccess` with operation name
+`Microsoft.Compute/virtualMachines/restart/action` when a VM is restarted.
+This reboots the VM in place without deallocating — the VM keeps its compute allocation
+and IP addresses.
+
+**Important**: This trigger fires only on explicit restart actions. It does not fire on
+start (after stop/deallocate) or power-off. Use the "On VM Started" or "On VM Stopped"
+triggers for those events.
+
+### Configuration
+
+- **Resource Group** (optional): Filter events to only trigger for VMs in a specific
+  resource group. Leave empty to trigger for all resource groups in the subscription.
+- **VM Name Filter** (optional): A regex pattern to filter VMs by name. Only VMs whose name
+  matches the pattern will trigger the workflow. Leave empty to trigger for all VM names.
+
+### Event Data
+
+Each VM restart event includes the full Azure Event Grid event:
+
+- **id**: Unique event ID
+- **topic**: The Azure subscription topic
+- **subject**: The full ARM resource ID of the VM (with /restart appended)
+- **eventType**: The event type (`Microsoft.Resources.ResourceActionSuccess`)
+- **eventTime**: The timestamp when the event occurred
+- **data**: The event data including operationName, status, resourceProvider, resourceUri, subscriptionId, tenantId
+
+### Azure Event Grid Setup
+
+Event Grid subscriptions are created automatically when the trigger is set up. SuperPlane will:
+
+1. Create an Event Grid subscription at the Azure subscription scope
+2. Configure it to forward `Microsoft.Resources.ResourceActionSuccess` events to the trigger webhook
+3. Apply subject filters based on the configured resource group and resource type
+4. Handle the Event Grid validation handshake automatically
+
+No manual setup is required.
+
+### Notes
+
+- The trigger fires when a VM is explicitly restarted (rebooted in place)
+- The VM keeps its compute allocation and IP addresses during a restart
+- It does not fire on start (after stop/deallocate) — use "On VM Started" for that
+- It does not fire on power-off or deallocate — use "On VM Stopped" or "On VM Deallocated"
+- Failed restart operations do not trigger the workflow
+- The trigger processes events from Azure Event Grid in real-time
+- Multiple triggers can share the same Event Grid subscription if configured correctly
+
+### Example Data
+
+```json
+{
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/restart/action",
+    "resourceProvider": "Microsoft.Compute",
+    "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+    "status": "Succeeded",
+    "subscriptionId": "12345678-1234-1234-1234-123456789abc",
+    "tenantId": "12345678-1234-1234-1234-123456789abc"
+  },
+  "dataVersion": "2",
+  "eventTime": "2026-02-11T10:30:00Z",
+  "eventType": "Microsoft.Resources.ResourceActionSuccess",
+  "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
+  "metadataVersion": "1",
+  "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/restart",
+  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
+}
+```
+
+<a id="on-vm-started"></a>
+
+## On VM Started
+
+The On VM Started trigger starts a workflow execution when an Azure Virtual Machine is started.
+
+### Use Cases
+
+- **Post-boot configuration**: Apply configuration, install agents, or run setup scripts when a VM starts
+- **Health checks**: Run health checks or readiness probes after a VM boots
+- **Notification workflows**: Notify teams when VMs come online
+- **Monitoring setup**: Register VMs with monitoring systems when they start
+- **Auto-scaling workflows**: Trigger downstream actions when new capacity comes online
+
+### How It Works
+
+This trigger listens to Azure Event Grid events for Virtual Machine start actions.
+When a VM start action succeeds (`status: Succeeded`), the trigger fires and
+provides the full Azure Event Grid event payload.
+
+Azure fires `Microsoft.Resources.ResourceActionSuccess` with operation name
+`Microsoft.Compute/virtualMachines/start/action` when a VM is explicitly started.
+This event fires specifically when a stopped/deallocated VM is started via the Azure portal,
+CLI, or API. It does not fire on initial VM creation, restarts, or other VM actions.
+
+### Configuration
+
+- **Resource Group** (optional): Filter events to only trigger for VMs in a specific
+  resource group. Leave empty to trigger for all resource groups in the subscription.
+- **VM Name Filter** (optional): A regex pattern to filter VMs by name. Only VMs whose name
+  matches the pattern will trigger the workflow. Leave empty to trigger for all VM names.
+
+### Event Data
+
+Each VM start event includes the full Azure Event Grid event:
+
+- **id**: Unique event ID
+- **topic**: The Azure subscription topic
+- **subject**: The full ARM resource ID of the VM (with /start appended)
+- **eventType**: The event type (`Microsoft.Resources.ResourceActionSuccess`)
+- **eventTime**: The timestamp when the event occurred
+- **data**: The event data including operationName, status, resourceProvider, resourceUri, subscriptionId, tenantId
+
+### Azure Event Grid Setup
+
+Event Grid subscriptions are created automatically when the trigger is set up. SuperPlane will:
+
+1. Create an Event Grid subscription at the Azure subscription scope
+2. Configure it to forward `Microsoft.Resources.ResourceActionSuccess` events to the trigger webhook
+3. Apply subject filters based on the configured resource group and resource type
+4. Handle the Event Grid validation handshake automatically
+
+No manual setup is required.
+
+### Notes
+
+- The trigger fires when a stopped/deallocated VM is explicitly started
+- It does not fire on initial VM creation (use On VM Deleted's write counterpart for that)
+- It does not fire on VM restart — restart uses a separate `restart/action` operation
+- Failed start operations do not trigger the workflow
+- The trigger processes events from Azure Event Grid in real-time
+- Multiple triggers can share the same Event Grid subscription if configured correctly
+
+### Example Data
+
+```json
+{
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/start/action",
+    "resourceProvider": "Microsoft.Compute",
+    "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+    "status": "Succeeded",
+    "subscriptionId": "12345678-1234-1234-1234-123456789abc",
+    "tenantId": "12345678-1234-1234-1234-123456789abc"
+  },
+  "dataVersion": "2",
+  "eventTime": "2026-02-11T10:30:00Z",
+  "eventType": "Microsoft.Resources.ResourceActionSuccess",
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "metadataVersion": "1",
+  "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/start",
+  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
+}
+```
+
+<a id="on-vm-stopped"></a>
+
+## On VM Stopped
+
+The On VM Stopped trigger starts a workflow execution when an Azure Virtual Machine is powered off.
+
+### Use Cases
+
+- **Cost alerts**: Notify teams when VMs are stopped but still allocated (still incurring compute charges)
+- **Shutdown workflows**: Run cleanup scripts or save state when a VM is powered off
+- **Compliance monitoring**: Track VM power-off events for audit trails
+- **Scheduling validation**: Verify that VMs are being stopped according to schedule
+
+### How It Works
+
+This trigger listens to Azure Event Grid events for Virtual Machine power-off actions.
+When a VM power-off action succeeds (`status: Succeeded`), the trigger fires and
+provides the full Azure Event Grid event payload.
+
+Azure fires `Microsoft.Resources.ResourceActionSuccess` with operation name
+`Microsoft.Compute/virtualMachines/powerOff/action` when a VM is powered off.
+This stops the VM OS but keeps the compute allocation — the VM still incurs compute charges.
+To fully release compute resources, use deallocate instead.
+
+**Important**: This trigger fires on power-off (stop without deallocation), not on deallocate.
+Use the "On VM Deallocated" trigger for deallocate events.
+
+### Configuration
+
+- **Resource Group** (optional): Filter events to only trigger for VMs in a specific
+  resource group. Leave empty to trigger for all resource groups in the subscription.
+- **VM Name Filter** (optional): A regex pattern to filter VMs by name. Only VMs whose name
+  matches the pattern will trigger the workflow. Leave empty to trigger for all VM names.
+
+### Event Data
+
+Each VM stop event includes the full Azure Event Grid event:
+
+- **id**: Unique event ID
+- **topic**: The Azure subscription topic
+- **subject**: The full ARM resource ID of the VM (with /powerOff appended)
+- **eventType**: The event type (`Microsoft.Resources.ResourceActionSuccess`)
+- **eventTime**: The timestamp when the event occurred
+- **data**: The event data including operationName, status, resourceProvider, resourceUri, subscriptionId, tenantId
+
+### Azure Event Grid Setup
+
+Event Grid subscriptions are created automatically when the trigger is set up. SuperPlane will:
+
+1. Create an Event Grid subscription at the Azure subscription scope
+2. Configure it to forward `Microsoft.Resources.ResourceActionSuccess` events to the trigger webhook
+3. Apply subject filters based on the configured resource group and resource type
+4. Handle the Event Grid validation handshake automatically
+
+No manual setup is required.
+
+### Notes
+
+- The trigger fires when a VM is powered off (stopped without deallocation)
+- The VM still incurs compute charges after a power-off — use deallocate to release resources
+- It does not fire on deallocate — use the "On VM Deallocated" trigger for that
+- Failed power-off operations do not trigger the workflow
+- The trigger processes events from Azure Event Grid in real-time
+- Multiple triggers can share the same Event Grid subscription if configured correctly
+
+### Example Data
+
+```json
+{
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/powerOff/action",
+    "resourceProvider": "Microsoft.Compute",
+    "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+    "status": "Succeeded",
+    "subscriptionId": "12345678-1234-1234-1234-123456789abc",
+    "tenantId": "12345678-1234-1234-1234-123456789abc"
+  },
+  "dataVersion": "2",
+  "eventTime": "2026-02-11T10:30:00Z",
+  "eventType": "Microsoft.Resources.ResourceActionSuccess",
+  "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+  "metadataVersion": "1",
+  "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/powerOff",
+  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
+}
+```
+
 <a id="create-virtual-machine"></a>
 
 ## Create Virtual Machine
@@ -337,6 +694,58 @@ Returns the created VM information including:
 }
 ```
 
+<a id="deallocate-virtual-machine"></a>
+
+## Deallocate Virtual Machine
+
+The Deallocate Virtual Machine component deallocates an existing Azure VM, stopping it and
+releasing its compute resources.
+
+### Use Cases
+
+- **Cost optimization**: Deallocate VMs to stop compute charges during off-hours
+- **Scheduled shutdown**: Deallocate VMs on a schedule to reduce costs
+- **Pre-resize operations**: Deallocate a VM before changing its size
+- **Environment teardown**: Deallocate VMs without deleting them
+
+### How It Works
+
+1. Validates the VM parameters
+2. Initiates VM deallocation via the Azure Compute API
+3. Waits for the VM to be fully deallocated (using Azure's Long-Running Operation pattern)
+4. Returns the VM details including ID and name
+
+### Configuration
+
+- **Resource Group**: The Azure resource group containing the VM
+- **VM Name**: The name of the virtual machine to deallocate
+
+### Output
+
+Returns the deallocated VM information including:
+- **id**: The Azure resource ID of the VM
+- **name**: The name of the VM
+- **resourceGroup**: The resource group containing the VM
+
+### Notes
+
+- Deallocation stops the VM and releases compute resources — **compute charges stop**
+- Only storage charges remain for the VM's disks
+- Dynamic public IP addresses are released on deallocation
+- The operation is a Long-Running Operation (LRO) that typically takes 1-3 minutes
+- The component waits for the VM to be fully deallocated before completing
+- To power off without releasing compute resources, use the "Stop Virtual Machine" action
+
+### Example Output
+
+```json
+{
+  "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+  "name": "my-vm",
+  "resourceGroup": "my-rg"
+}
+```
+
 <a id="delete-virtual-machine"></a>
 
 ## Delete Virtual Machine
@@ -361,6 +770,7 @@ The Delete Virtual Machine component deletes an existing Azure VM.
 
 - **Resource Group**: The Azure resource group containing the VM
 - **VM Name**: The name of the virtual machine to delete
+- **Delete Associated Resources**: When enabled, also deletes the VM's OS disk, data disks, network interfaces, and public IPs
 
 ### Output
 
@@ -373,8 +783,155 @@ Returns the deleted VM information including:
 
 - The VM deletion is a Long-Running Operation (LRO) that typically takes 1-3 minutes
 - The component waits for the VM to be fully deleted before completing
-- Deleting a VM does not delete associated resources (NICs, disks, public IPs)
+- When "Delete Associated Resources" is enabled, Azure cascade-deletes OS disk, data disks, NICs, and public IPs along with the VM
+- Shared resources like virtual networks, subnets, and network security groups are never deleted
 - This operation is irreversible
+
+### Example Output
+
+```json
+{
+  "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+  "name": "my-vm",
+  "resourceGroup": "my-rg"
+}
+```
+
+<a id="restart-virtual-machine"></a>
+
+## Restart Virtual Machine
+
+The Restart Virtual Machine component restarts an existing Azure VM in place.
+
+### Use Cases
+
+- **Apply updates**: Restart VMs after applying OS or software updates
+- **Troubleshooting**: Restart VMs to recover from transient issues
+- **Configuration changes**: Restart VMs after configuration changes that require a reboot
+- **Automated maintenance**: Restart VMs as part of maintenance workflows
+
+### How It Works
+
+1. Validates the VM parameters
+2. Initiates VM restart via the Azure Compute API
+3. Waits for the VM to be fully restarted (using Azure's Long-Running Operation pattern)
+4. Returns the VM details including ID and name
+
+### Configuration
+
+- **Resource Group**: The Azure resource group containing the VM
+- **VM Name**: The name of the virtual machine to restart
+
+### Output
+
+Returns the restarted VM information including:
+- **id**: The Azure resource ID of the VM
+- **name**: The name of the VM
+- **resourceGroup**: The resource group containing the VM
+
+### Notes
+
+- The VM is rebooted in place — it keeps its compute allocation and IP addresses
+- The operation is a Long-Running Operation (LRO) that typically takes 1-3 minutes
+- The component waits for the VM to be fully restarted before completing
+- This performs a graceful restart of the VM
+
+### Example Output
+
+```json
+{
+  "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+  "name": "my-vm",
+  "resourceGroup": "my-rg"
+}
+```
+
+<a id="start-virtual-machine"></a>
+
+## Start Virtual Machine
+
+The Start Virtual Machine component starts a stopped or deallocated Azure VM.
+
+### Use Cases
+
+- **Resume workloads**: Start VMs that were previously stopped or deallocated
+- **Scheduled startup**: Start VMs as part of scheduled workflows
+- **Auto-scaling**: Start pre-provisioned VMs to handle increased demand
+- **Disaster recovery**: Start standby VMs as part of failover workflows
+
+### How It Works
+
+1. Validates the VM parameters
+2. Initiates VM start via the Azure Compute API
+3. Waits for the VM to be fully started (using Azure's Long-Running Operation pattern)
+4. Returns the VM details including ID and name
+
+### Configuration
+
+- **Resource Group**: The Azure resource group containing the VM
+- **VM Name**: The name of the virtual machine to start
+
+### Output
+
+Returns the started VM information including:
+- **id**: The Azure resource ID of the VM
+- **name**: The name of the VM
+- **resourceGroup**: The resource group containing the VM
+
+### Notes
+
+- The VM must be in a stopped or deallocated state to be started
+- The operation is a Long-Running Operation (LRO) that typically takes 1-3 minutes
+- The component waits for the VM to be fully started before completing
+- Once started, the VM will begin incurring compute charges
+
+### Example Output
+
+```json
+{
+  "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+  "name": "my-vm",
+  "resourceGroup": "my-rg"
+}
+```
+
+<a id="stop-virtual-machine"></a>
+
+## Stop Virtual Machine
+
+The Stop Virtual Machine component powers off an existing Azure VM without deallocating it.
+
+### Use Cases
+
+- **Temporary shutdown**: Stop a VM temporarily while keeping its compute allocation
+- **Maintenance windows**: Power off VMs during maintenance periods
+- **Pre-deallocate workflows**: Stop VMs before performing other operations
+
+### How It Works
+
+1. Validates the VM parameters
+2. Initiates VM power-off via the Azure Compute API
+3. Waits for the VM to be fully powered off (using Azure's Long-Running Operation pattern)
+4. Returns the VM details including ID and name
+
+### Configuration
+
+- **Resource Group**: The Azure resource group containing the VM
+- **VM Name**: The name of the virtual machine to stop
+
+### Output
+
+Returns the stopped VM information including:
+- **id**: The Azure resource ID of the VM
+- **name**: The name of the VM
+- **resourceGroup**: The resource group containing the VM
+
+### Notes
+
+- The VM is powered off but compute resources remain allocated — **you still incur compute charges**
+- To fully release compute resources and stop charges, use the "Deallocate Virtual Machine" action
+- The operation is a Long-Running Operation (LRO) that typically takes 1-2 minutes
+- The component waits for the VM to be fully powered off before completing
 
 ### Example Output
 
