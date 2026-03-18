@@ -33,6 +33,7 @@ To connect Elastic to SuperPlane:
    - **API Key** (recommended for Elastic Cloud): Go to Kibana → Stack Management → API Keys and create a new key. Paste the base64-encoded ` + "`id:api_key`" + ` value.
    - **Username / Password**: Provide the credentials for a user with the required privileges.
 4. **Kibana alerts (trigger)**: SuperPlane automatically creates a signed Kibana Webhook connector. You still need to attach that connector to your alert rules in Kibana.
+5. **Kibana case change trigger**: For ` + "`When Case Status Changes`" + `, create an **Elasticsearch query** rule in Kibana that watches ` + "`.cases-*`" + ` using the case update time field, then attach the same SuperPlane connector with a body containing ` + "`{\"eventType\":\"case_status_changed\"}`" + `.
 `
 
 func (e *Elastic) Name() string {
@@ -48,7 +49,7 @@ func (e *Elastic) Icon() string {
 }
 
 func (e *Elastic) Description() string {
-	return "Index documents into Elasticsearch and receive Kibana alert webhooks"
+	return "Index documents into Elasticsearch and receive Kibana webhooks"
 }
 
 func (e *Elastic) Instructions() string {
@@ -126,12 +127,16 @@ func (e *Elastic) Configuration() []configuration.Field {
 func (e *Elastic) Components() []core.Component {
 	return []core.Component{
 		&IndexDocument{},
+		&CreateCase{},
+		&GetCase{},
+		&UpdateCase{},
 	}
 }
 
 func (e *Elastic) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnAlertFires{},
+		&OnCaseStatusChange{},
 	}
 }
 
@@ -193,9 +198,12 @@ func (e *Elastic) Sync(ctx core.SyncContext) error {
 func (e *Elastic) HandleRequest(_ core.HTTPRequestContext) {}
 
 const (
-	ResourceTypeIndex       = "elastic.index"
-	ResourceTypeKibanaRule  = "elastic.kibana.rule"
-	ResourceTypeKibanaSpace = "elastic.kibana.space"
+	ResourceTypeIndex        = "elastic.index"
+	ResourceTypeKibanaRule   = "elastic.kibana.rule"
+	ResourceTypeKibanaSpace  = "elastic.kibana.space"
+	ResourceTypeCaseStatus   = "elastic.case.status"
+	ResourceTypeCaseSeverity = "elastic.case.severity"
+	ResourceTypeCaseVersion  = "elastic.case.version"
 )
 
 func (e *Elastic) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -237,6 +245,33 @@ func (e *Elastic) ListResources(resourceType string, ctx core.ListResourcesConte
 			resources = append(resources, core.IntegrationResource{ID: s.ID, Name: s.Name})
 		}
 		return resources, nil
+
+	case ResourceTypeCaseStatus:
+		return []core.IntegrationResource{
+			{ID: "open", Name: "Open"},
+			{ID: "in-progress", Name: "In Progress"},
+			{ID: "closed", Name: "Closed"},
+		}, nil
+
+	case ResourceTypeCaseSeverity:
+		return []core.IntegrationResource{
+			{ID: "critical", Name: "Critical"},
+			{ID: "high", Name: "High"},
+			{ID: "medium", Name: "Medium"},
+			{ID: "low", Name: "Low"},
+		}, nil
+
+	case ResourceTypeCaseVersion:
+		caseID := ctx.Parameters["caseId"]
+		if caseID == "" {
+			return nil, nil
+		}
+		c, err := client.GetCase(caseID)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching case: %v", err)
+		}
+		return []core.IntegrationResource{{ID: c.Version, Name: c.Version}}, nil
+
 	}
 
 	return nil, fmt.Errorf("unsupported resourceType %q", resourceType)

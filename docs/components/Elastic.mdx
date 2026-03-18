@@ -2,7 +2,7 @@
 title: "Elastic"
 ---
 
-Index documents into Elasticsearch and receive Kibana alert webhooks
+Index documents into Elasticsearch and receive Kibana webhooks
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -10,12 +10,16 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="When Alert Fires" href="#when-alert-fires" description="Trigger a workflow when a Kibana alert rule fires" />
+  <LinkCard title="When Case Status Changes" href="#when-case-status-changes" description="React when an Elastic Security case status changes" />
 </CardGrid>
 
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Case" href="#create-case" description="Create a new case in Kibana Security" />
+  <LinkCard title="Get Case" href="#get-case" description="Retrieve a Kibana Security case by ID" />
   <LinkCard title="Index Document" href="#index-document" description="Write a JSON document to an Elasticsearch index" />
+  <LinkCard title="Update Case" href="#update-case" description="Update an existing Kibana Security case" />
 </CardGrid>
 
 ## Instructions
@@ -28,6 +32,7 @@ To connect Elastic to SuperPlane:
    - **API Key** (recommended for Elastic Cloud): Go to Kibana → Stack Management → API Keys and create a new key. Paste the base64-encoded `id:api_key` value.
    - **Username / Password**: Provide the credentials for a user with the required privileges.
 4. **Kibana alerts (trigger)**: SuperPlane automatically creates a signed Kibana Webhook connector. You still need to attach that connector to your alert rules in Kibana.
+5. **Kibana case change trigger**: For `When Case Status Changes`, create an **Elasticsearch query** rule in Kibana that watches `.cases-*` using the case update time field, then attach the same SuperPlane connector with a body containing `{"eventType":"case_status_changed"}`.
 
 <a id="when-alert-fires"></a>
 
@@ -96,6 +101,158 @@ Each received alert emits the parsed JSON body sent by Kibana directly as the ev
 }
 ```
 
+<a id="when-case-status-changes"></a>
+
+## When Case Status Changes
+
+The When Case Status Changes trigger fires a workflow execution when a Kibana Security case is updated.
+
+### How it works
+
+1. When the trigger is saved, SuperPlane automatically creates a signed Kibana Webhook connector.
+2. In Kibana, open **Stack Management → Rules** and create an **Elasticsearch query** rule.
+3. Configure the rule to watch the cases index pattern `.cases-*` and use the case update time field as the time field.
+4. Attach the **SuperPlane Alert** connector as an action on that rule.
+5. Configure the action body to send this JSON:
+
+```json
+{
+  "eventType": "case_status_changed"
+}
+```
+
+6. Enable the rule. Each time the rule detects case updates, Kibana calls the SuperPlane webhook.
+7. SuperPlane receives the webhook, queries Kibana for cases updated since the last checkpoint, and fires one event per matching case.
+
+### Recommended Kibana setup
+
+- Use an **Elasticsearch query** rule as the default choice.
+- Use the cases index pattern `.cases-*`.
+- Use the case update time field as the rule time field.
+- Use a rule condition based on case updates, not case creation only.
+- Run the rule frequently enough for your workflow latency needs.
+- The webhook body only needs `eventType` because SuperPlane retrieves the matching case details from Kibana after the webhook arrives.
+
+### Configuration
+
+- **Statuses** *(optional)*: Only fire when a case has one of these statuses. Leave empty to fire for any case update.
+- **Severities** *(optional)*: Only fire for cases with one of these severities. Leave empty to accept all severities.
+- **Tags** *(optional)*: Only fire for cases that include at least one tag matching any of these predicates. Leave empty to accept all cases.
+
+### Event Data
+
+The trigger emits the full case details including id, title, status, severity, version, tags, description, and timestamps.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "createdAt": "2026-03-12T09:00:00.000Z",
+    "description": "Elevated error rate detected in production.",
+    "id": "3c0a2b10-4e5f-11ee-be56-0242ac120002",
+    "severity": "high",
+    "status": "in-progress",
+    "tags": [
+      "production",
+      "incident"
+    ],
+    "title": "Production incident",
+    "updatedAt": "2026-03-12T10:00:00.000Z",
+    "version": "WzE3LDFd"
+  },
+  "timestamp": "2026-03-12T10:00:00Z",
+  "type": "elastic.case.status.changed"
+}
+```
+
+<a id="create-case"></a>
+
+## Create Case
+
+The Create Case component opens a new case in Kibana Security.
+
+### Configuration
+
+- **Title**: The case title
+- **Description**: A description of the case
+- **Severity**: Case severity (low, medium, high, or critical)
+- **Owner**: The Kibana application that owns the case
+- **Tags**: Optional list of tags to attach to the case
+
+### Outputs
+
+The component emits an event containing:
+- `id`: The case ID assigned by Kibana
+- `title`: The case title
+- `status`: The initial case status
+- `severity`: The case severity
+- `version`: The case version (required for subsequent updates)
+- `createdAt`: The timestamp when the case was created
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2026-03-12T09:00:00.000Z",
+    "id": "3c0a2b10-4e5f-11ee-be56-0242ac120002",
+    "severity": "high",
+    "status": "open",
+    "title": "Production incident",
+    "version": "WzE2LDFd"
+  },
+  "timestamp": "2026-03-12T09:00:00Z",
+  "type": "elastic.case.created"
+}
+```
+
+<a id="get-case"></a>
+
+## Get Case
+
+The Get Case component retrieves an existing case from Kibana Security by its ID.
+
+### Configuration
+
+- **Case ID**: The ID of the Kibana case to retrieve
+
+### Outputs
+
+The component emits an event containing:
+- `id`: The case ID
+- `title`: The case title
+- `description`: The case description
+- `status`: The case status
+- `severity`: The case severity
+- `tags`: The case tags
+- `version`: The case version (required for subsequent updates)
+- `createdAt`: The timestamp when the case was created
+- `updatedAt`: The timestamp when the case was last updated
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2026-03-12T09:00:00.000Z",
+    "description": "Elevated error rate detected in production.",
+    "id": "3c0a2b10-4e5f-11ee-be56-0242ac120002",
+    "severity": "high",
+    "status": "open",
+    "tags": [
+      "production",
+      "incident"
+    ],
+    "title": "Production incident",
+    "updatedAt": "2026-03-12T10:00:00.000Z",
+    "version": "WzE2LDFd"
+  },
+  "timestamp": "2026-03-12T09:00:00Z",
+  "type": "elastic.case.retrieved"
+}
+```
+
 <a id="index-document"></a>
 
 ## Index Document
@@ -134,6 +291,47 @@ The component emits an event containing:
   },
   "timestamp": "2026-03-12T09:00:00Z",
   "type": "elastic.document.indexed"
+}
+```
+
+<a id="update-case"></a>
+
+## Update Case
+
+The Update Case component applies a partial update to an existing Kibana Security case.
+
+### Configuration
+
+- **Case ID**: The ID of the case to update
+- **Version**: The current case version for optimistic locking (obtain from a preceding Get Case step)
+- **Title**: New title for the case (optional)
+- **Description**: New description for the case (optional)
+- **Status**: New status for the case (optional)
+- **Severity**: New severity for the case (optional)
+- **Tags**: New tags for the case (optional)
+
+### Outputs
+
+The component emits an event containing:
+- `id`: The case ID
+- `title`: The updated case title
+- `status`: The updated case status
+- `severity`: The updated case severity
+- `version`: The new case version
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "3c0a2b10-4e5f-11ee-be56-0242ac120002",
+    "severity": "high",
+    "status": "in-progress",
+    "title": "Production incident",
+    "version": "WzE3LDFd"
+  },
+  "timestamp": "2026-03-12T09:00:00Z",
+  "type": "elastic.case.updated"
 }
 ```
 

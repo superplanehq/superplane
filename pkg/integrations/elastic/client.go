@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"strings"
@@ -366,4 +367,151 @@ func (c *Client) IndexDocument(index, documentID string, doc map[string]any) (*I
 	}
 
 	return &resp, nil
+}
+
+// CaseResponse is the relevant subset of a Kibana case.
+type CaseResponse struct {
+	ID          string   `json:"id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Status      string   `json:"status"`
+	Severity    string   `json:"severity"`
+	Tags        []string `json:"tags"`
+	Version     string   `json:"version"`
+	CreatedAt   string   `json:"created_at"`
+	UpdatedAt   string   `json:"updated_at"`
+}
+
+// CreateCase creates a new case in Kibana. connector is always set to none.
+// owner must be one of: "cases", "securitySolution", "observability".
+func (c *Client) CreateCase(title, description, severity, owner string, tags []string) (*CaseResponse, error) {
+	if tags == nil {
+		tags = []string{}
+	}
+
+	payload := map[string]any{
+		"title":       title,
+		"description": description,
+		"severity":    severity,
+		"owner":       owner,
+		"tags":        tags,
+		"connector": map[string]any{
+			"id":     "none",
+			"name":   "none",
+			"type":   ".none",
+			"fields": nil,
+		},
+		"settings": map[string]any{
+			"syncAlerts": false,
+		},
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling create case payload: %v", err)
+	}
+
+	responseBody, err := c.execKibanaRequest(http.MethodPost, "/api/cases", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var resp CaseResponse
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing create case response: %v", err)
+	}
+
+	return &resp, nil
+}
+
+// GetCase retrieves a Kibana case by ID.
+func (c *Client) GetCase(caseID string) (*CaseResponse, error) {
+	responseBody, err := c.execKibanaRequest(http.MethodGet, fmt.Sprintf("/api/cases/%s", url.PathEscape(caseID)), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp CaseResponse
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing get case response: %v", err)
+	}
+
+	return &resp, nil
+}
+
+// UpdateCase applies a partial update to an existing Kibana case.
+// updates is a map of fields to change; id and version are always included.
+// version is required by Kibana for optimistic concurrency.
+func (c *Client) UpdateCase(caseID, version string, updates map[string]any) (*CaseResponse, error) {
+	caseUpdate := map[string]any{
+		"id":      caseID,
+		"version": version,
+	}
+	maps.Copy(caseUpdate, updates)
+
+	payload := map[string]any{
+		"cases": []any{caseUpdate},
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling update case payload: %v", err)
+	}
+
+	responseBody, err := c.execKibanaRequest(http.MethodPatch, "/api/cases", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var resp []CaseResponse
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing update case response: %v", err)
+	}
+
+	if len(resp) == 0 {
+		return nil, fmt.Errorf("update case response contained no cases")
+	}
+
+	return &resp[0], nil
+}
+
+// ListCasesUpdatedSince returns cases sorted by updatedAt descending, filtered
+// to those updated strictly after the given ISO timestamp. Stops fetching pages
+// once it encounters a case updated before or at the checkpoint.
+func (c *Client) ListCasesUpdatedSince(since string, statuses, severities, tags []string) ([]CaseResponse, error) {
+	const perPage = 100
+	var result []CaseResponse
+
+	path := fmt.Sprintf("/api/cases/_find?sortField=updatedAt&sortOrder=desc&perPage=%d", perPage)
+	if len(statuses) == 1 {
+		// Kibana accepts a single status filter via query param
+		path += "&status=" + url.QueryEscape(statuses[0])
+	}
+	if len(severities) == 1 {
+		path += "&severity=" + url.QueryEscape(severities[0])
+	}
+	for _, tag := range tags {
+		path += "&tags[]=" + url.QueryEscape(tag)
+	}
+
+	responseBody, err := c.execKibanaRequest(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp struct {
+		Cases []CaseResponse `json:"cases"`
+	}
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing cases list response: %v", err)
+	}
+
+	for _, c := range resp.Cases {
+		if c.UpdatedAt <= since {
+			break
+		}
+		result = append(result, c)
+	}
+
+	return result, nil
 }
