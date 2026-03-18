@@ -37,8 +37,6 @@ func ValidateConfiguration(fields []Field, config map[string]any) error {
 		if err != nil {
 			return fmt.Errorf("field '%s': %w", field.Name, err)
 		}
-
-		return nil
 	}
 
 	return nil
@@ -729,7 +727,6 @@ func validateFieldValue(field Field, value any) error {
 	return nil
 }
 
-// isRequiredByCondition checks if a field should be required based on RequiredConditions
 func isRequiredByCondition(field Field, config map[string]any) bool {
 	for _, condition := range field.RequiredConditions {
 		conditionValue, exists := config[condition.Field]
@@ -737,12 +734,8 @@ func isRequiredByCondition(field Field, config map[string]any) bool {
 			continue
 		}
 
-		conditionValueStr := fmt.Sprintf("%v", conditionValue)
-		for _, requiredValue := range condition.Values {
-			if conditionValueStr == requiredValue {
-				return true
-			}
-		}
+		return slices.Contains(condition.Values, fmt.Sprintf("%v", conditionValue))
 	}
+
 	return false
 }
