@@ -2,13 +2,14 @@ import { Icon } from "@/components/Icon";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/Textarea/textarea";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { Bot, Copy, Loader2, ArrowLeft } from "lucide-react";
+import { Bot, Copy, ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -220,20 +221,15 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
                 />
               </div>
               <div className="flex gap-2">
-                <Button
+                <LoadingButton
                   type="submit"
-                  disabled={updateMutation.isPending || !editName?.trim()}
+                  disabled={!editName?.trim()}
+                  loading={updateMutation.isPending}
+                  loadingText="Saving..."
                   className="flex items-center gap-2"
                 >
-                  {updateMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    "Save"
-                  )}
-                </Button>
+                  Save
+                </LoadingButton>
                 <Button type="button" variant="outline" onClick={handleEditCancel} disabled={updateMutation.isPending}>
                   Cancel
                 </Button>
@@ -265,24 +261,17 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
             allowed={canUpdate || permissionsLoading}
             message="You don't have permission to manage service account tokens."
           >
-            <Button
+            <LoadingButton
               variant="outline"
               onClick={handleRegenerateToken}
-              disabled={!canUpdate || regenerateTokenMutation.isPending}
+              disabled={!canUpdate}
+              loading={regenerateTokenMutation.isPending}
+              loadingText="Regenerating..."
               data-testid="sa-detail-regenerate-token"
             >
-              {regenerateTokenMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                  Regenerating...
-                </>
-              ) : (
-                <>
-                  <Icon name="refresh-cw" size="sm" />
-                  Regenerate Token
-                </>
-              )}
-            </Button>
+              <Icon name="refresh-cw" size="sm" />
+              Regenerate Token
+            </LoadingButton>
           </PermissionTooltip>
         </div>
       </div>

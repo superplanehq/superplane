@@ -5,7 +5,6 @@ import type {
   SuperplaneBlueprintsOutputChannel,
   SuperplaneComponentsOutputChannel,
 } from "@/api-client";
-import { canvasesSendAiMessage } from "@/api-client/sdk.gen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -14,9 +13,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { resolveIcon } from "@/lib/utils";
-import { isCustomComponentsEnabled } from "@/lib/env";
+import { getAgentReplWebUrl, isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getComponentSubtype } from "../buildingBlocks";
 import {
   ChevronRight,
@@ -35,6 +33,7 @@ import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
 import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
+import { AiBuilderMessage, AiBuilderProposal, pushAiMessages, sendAgentReplPrompt } from "./agentRepl";
 
 export interface BuildingBlock {
   name: string;
@@ -63,6 +62,7 @@ export interface BuildingBlocksSidebarProps {
   blocks: BuildingBlockCategory[];
   showAiBuilderTab?: boolean;
   canvasId?: string;
+  organizationId?: string;
   canvasNodes?: Array<{
     id: string;
     name?: string;
@@ -121,75 +121,13 @@ export type AiCanvasOperation =
       target: { nodeKey?: string; nodeId?: string; nodeName?: string };
     };
 
-type AiBuilderMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-};
-
-type AiBuilderProposal = {
-  id: string;
-  summary: string;
-  operations: AiCanvasOperation[];
-};
-
-const AI_HISTORY_RECENT_TURNS = 8;
-const AI_HISTORY_OLDER_TURNS = 6;
-const AI_HISTORY_MAX_MESSAGE_CHARS = 320;
-const AI_MAX_STORED_MESSAGES = 50;
-
-function compactMessageContent(content: string): string {
-  const normalized = content.replace(/\s+/g, " ").trim();
-  if (normalized.length <= AI_HISTORY_MAX_MESSAGE_CHARS) {
-    return normalized;
-  }
-
-  return `${normalized.slice(0, AI_HISTORY_MAX_MESSAGE_CHARS)}...`;
-}
-
-function formatConversationTurns(messages: AiBuilderMessage[]): string[] {
-  return messages
-    .map((message) => `${message.role}: ${compactMessageContent(message.content)}`)
-    .filter((line) => line.length > 0);
-}
-
-function buildPromptWithConversationContext(messages: AiBuilderMessage[], prompt: string): string {
-  const turns = formatConversationTurns(messages);
-  if (turns.length === 0) {
-    return prompt;
-  }
-
-  const recentTurns = turns.slice(-AI_HISTORY_RECENT_TURNS);
-  const olderTurns = turns.slice(0, -AI_HISTORY_RECENT_TURNS).slice(-AI_HISTORY_OLDER_TURNS);
-  const contextSections = [
-    "Conversation context (use this for continuity and intent resolution):",
-    ...(olderTurns.length > 0 ? [`Earlier turns summary:\n${olderTurns.join("\n")}`] : []),
-    `Recent turns:\n${recentTurns.join("\n")}`,
-    `Current user request:\n${prompt}`,
-  ];
-
-  return contextSections.join("\n\n");
-}
-
-function pushAiMessages(previous: AiBuilderMessage[], next: AiBuilderMessage | AiBuilderMessage[]): AiBuilderMessage[] {
-  const nextMessages = Array.isArray(next) ? next : [next];
-  const merged = [...previous, ...nextMessages];
-  if (merged.length <= AI_MAX_STORED_MESSAGES) {
-    return merged;
-  }
-
-  return merged.slice(-AI_MAX_STORED_MESSAGES);
-}
-
 export function BuildingBlocksSidebar({
   isOpen,
   onToggle,
   blocks,
   showAiBuilderTab = false,
   canvasId,
-  canvasNodes = [],
-  aiCanvas,
-  selectedNodeIds = [],
+  organizationId,
   onApplyAiOperations,
   integrations = [],
   canvasZoom = 1,
@@ -292,109 +230,28 @@ export function BuildingBlocksSidebar({
     const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
     return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
   }, []);
+  const agentReplWebUrl = getAgentReplWebUrl().replace(/\/+$/, "");
 
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
     async (value?: string) => {
-      const nextPrompt = (value ?? aiInput).trim();
-      if (!nextPrompt || isGeneratingResponse || !canvasId) {
-        return;
-      }
-
-      if (nextPrompt.toLowerCase() === "/clear") {
-        setAiMessages([]);
-        setPendingProposal(null);
-        setAiError(null);
-        setAiInput("");
-        requestAnimationFrame(() => {
-          aiInputRef.current?.focus();
-        });
-        return;
-      }
-
-      const contextualPrompt = buildPromptWithConversationContext(aiMessages, nextPrompt);
-
-      const userMessage: AiBuilderMessage = {
-        id: `user-${Date.now()}`,
-        role: "user",
-        content: nextPrompt,
-      };
-      setAiMessages((prev) => pushAiMessages(prev, userMessage));
-      setAiInput("");
-      requestAnimationFrame(() => {
-        aiInputRef.current?.focus();
+      await sendAgentReplPrompt({
+        value,
+        aiInput,
+        aiMessages,
+        canvasId,
+        organizationId,
+        agentReplWebUrl,
+        isGeneratingResponse,
+        setAiMessages,
+        setAiInput,
+        setAiError,
+        setIsGeneratingResponse,
+        setPendingProposal,
+        focusInput: () => aiInputRef.current?.focus(),
       });
-      setAiError(null);
-      setIsGeneratingResponse(true);
-
-      try {
-        const availableBlocks = (blocks || []).flatMap((category) =>
-          category.blocks
-            .filter((block) => block.isLive && !block.deprecated)
-            .map((block) => ({
-              name: block.name,
-              label: block.label || block.name,
-              type: block.type,
-            })),
-        );
-
-        const apiResponse = await canvasesSendAiMessage(
-          withOrganizationHeader({
-            path: { canvasId },
-            body: {
-              prompt: contextualPrompt,
-              canvasContext: {
-                nodes: canvasNodes,
-                availableBlocks,
-                canvas: {
-                  metadata: {
-                    name: aiCanvas?.name || "",
-                    description: aiCanvas?.description || "",
-                  },
-                  spec: {
-                    nodes: aiCanvas?.nodes || [],
-                    edges: aiCanvas?.edges || [],
-                  },
-                },
-                selectedNodeIds,
-              },
-            },
-          }),
-        );
-
-        const payload = apiResponse.data as { assistantMessage?: string; operations?: AiCanvasOperation[] } | undefined;
-        const proposal: AiBuilderProposal = {
-          id: `proposal-${Date.now()}`,
-          summary: payload?.assistantMessage || "I prepared a draft change set you can review and apply.",
-          operations: payload?.operations || [],
-        };
-
-        const assistantMessage: AiBuilderMessage = {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: proposal.summary,
-        };
-        setAiMessages((prev) => pushAiMessages(prev, assistantMessage));
-        if (proposal.operations.length > 0) {
-          setPendingProposal(proposal);
-        } else {
-          setPendingProposal(null);
-        }
-      } catch (error) {
-        const fallbackMessage = "I couldn't generate changes right now. Please try again.";
-        setAiError(error instanceof Error ? error.message : fallbackMessage);
-        setAiMessages((prev) =>
-          pushAiMessages(prev, {
-            id: `assistant-${Date.now()}`,
-            role: "assistant",
-            content: fallbackMessage,
-          }),
-        );
-      } finally {
-        setIsGeneratingResponse(false);
-      }
     },
-    [aiInput, aiMessages, blocks, canvasId, canvasNodes, isGeneratingResponse],
+    [aiInput, aiMessages, agentReplWebUrl, canvasId, isGeneratingResponse, organizationId],
   );
 
   const handleDiscardProposal = useCallback(() => {

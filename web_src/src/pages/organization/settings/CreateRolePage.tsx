@@ -9,6 +9,7 @@ import { Input } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";
 import { useCreateRole, useRole, useUpdateRole } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Checkbox } from "@/ui/checkbox";
 import { showErrorToast } from "@/utils/toast";
 import { isCustomComponentsEnabled } from "@/lib/env";
@@ -607,18 +608,14 @@ export function CreateRolePage() {
           {/* Action Buttons */}
           <div className="flex justify-start gap-3">
             {!isReadOnly && (
-              <Button
+              <LoadingButton
                 onClick={handleSubmitRole}
-                disabled={!roleName.trim() || selectedPermissions.size === 0 || isSubmitting || isLoading}
+                disabled={!roleName.trim() || selectedPermissions.size === 0 || isLoading}
+                loading={isSubmitting}
+                loadingText={isEditMode ? "Updating..." : "Creating..."}
               >
-                {isSubmitting
-                  ? isEditMode
-                    ? "Updating..."
-                    : "Creating..."
-                  : isEditMode
-                    ? "Update Role"
-                    : "Create Role"}
-              </Button>
+                {isEditMode ? "Update Role" : "Create Role"}
+              </LoadingButton>
             )}
             <Link to={`/${orgId}/settings/roles`}>
               <Button variant="outline">{isReadOnly ? "Back to Roles" : "Cancel"}</Button>

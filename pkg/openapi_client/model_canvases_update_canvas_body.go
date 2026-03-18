@@ -22,7 +22,7 @@ var _ MappedNullable = &CanvasesUpdateCanvasBody{}
 type CanvasesUpdateCanvasBody struct {
 	Name                        *string                                    `json:"name,omitempty"`
 	Description                 *string                                    `json:"description,omitempty"`
-	CanvasVersioningEnabled     *bool                                      `json:"canvasVersioningEnabled,omitempty"`
+	VersioningEnabled           *bool                                      `json:"versioningEnabled,omitempty"`
 	ChangeRequestApprovalConfig *CanvasesCanvasChangeRequestApprovalConfig `json:"changeRequestApprovalConfig,omitempty"`
 }
 
@@ -107,36 +107,36 @@ func (o *CanvasesUpdateCanvasBody) SetDescription(v string) {
 	o.Description = &v
 }
 
-// GetCanvasVersioningEnabled returns the CanvasVersioningEnabled field value if set, zero value otherwise.
-func (o *CanvasesUpdateCanvasBody) GetCanvasVersioningEnabled() bool {
-	if o == nil || IsNil(o.CanvasVersioningEnabled) {
+// GetVersioningEnabled returns the VersioningEnabled field value if set, zero value otherwise.
+func (o *CanvasesUpdateCanvasBody) GetVersioningEnabled() bool {
+	if o == nil || IsNil(o.VersioningEnabled) {
 		var ret bool
 		return ret
 	}
-	return *o.CanvasVersioningEnabled
+	return *o.VersioningEnabled
 }
 
-// GetCanvasVersioningEnabledOk returns a tuple with the CanvasVersioningEnabled field value if set, nil otherwise
+// GetVersioningEnabledOk returns a tuple with the VersioningEnabled field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesUpdateCanvasBody) GetCanvasVersioningEnabledOk() (*bool, bool) {
-	if o == nil || IsNil(o.CanvasVersioningEnabled) {
+func (o *CanvasesUpdateCanvasBody) GetVersioningEnabledOk() (*bool, bool) {
+	if o == nil || IsNil(o.VersioningEnabled) {
 		return nil, false
 	}
-	return o.CanvasVersioningEnabled, true
+	return o.VersioningEnabled, true
 }
 
-// HasCanvasVersioningEnabled returns a boolean if a field has been set.
-func (o *CanvasesUpdateCanvasBody) HasCanvasVersioningEnabled() bool {
-	if o != nil && !IsNil(o.CanvasVersioningEnabled) {
+// HasVersioningEnabled returns a boolean if a field has been set.
+func (o *CanvasesUpdateCanvasBody) HasVersioningEnabled() bool {
+	if o != nil && !IsNil(o.VersioningEnabled) {
 		return true
 	}
 
 	return false
 }
 
-// SetCanvasVersioningEnabled gets a reference to the given bool and assigns it to the CanvasVersioningEnabled field.
-func (o *CanvasesUpdateCanvasBody) SetCanvasVersioningEnabled(v bool) {
-	o.CanvasVersioningEnabled = &v
+// SetVersioningEnabled gets a reference to the given bool and assigns it to the VersioningEnabled field.
+func (o *CanvasesUpdateCanvasBody) SetVersioningEnabled(v bool) {
+	o.VersioningEnabled = &v
 }
 
 // GetChangeRequestApprovalConfig returns the ChangeRequestApprovalConfig field value if set, zero value otherwise.
@@ -187,8 +187,8 @@ func (o CanvasesUpdateCanvasBody) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Description) {
 		toSerialize["description"] = o.Description
 	}
-	if !IsNil(o.CanvasVersioningEnabled) {
-		toSerialize["canvasVersioningEnabled"] = o.CanvasVersioningEnabled
+	if !IsNil(o.VersioningEnabled) {
+		toSerialize["versioningEnabled"] = o.VersioningEnabled
 	}
 	if !IsNil(o.ChangeRequestApprovalConfig) {
 		toSerialize["changeRequestApprovalConfig"] = o.ChangeRequestApprovalConfig
