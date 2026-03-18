@@ -52,6 +52,27 @@ def elapsed_since(started_at: float) -> str:
     return f"{(time.perf_counter() - started_at):7.3f}s"
 
 
+def _type_out(text: str, chars_per_second: float | None = None) -> None:
+    if not text:
+        return
+    if not sys.stdout.isatty():
+        print(text, end="", flush=True)
+        return
+
+    configured_rate = chars_per_second
+    if configured_rate is None:
+        configured_rate = float(os.getenv("AI_REPL_TYPEWRITER_CPS", "500"))
+    if configured_rate <= 0:
+        print(text, end="", flush=True)
+        return
+
+    delay_seconds = 1.0 / configured_rate
+    for char in text:
+        print(char, end="", flush=True)
+        if char not in {" ", "\n", "\t"}:
+            time.sleep(delay_seconds)
+
+
 def _render_answer(answer: str, started_at: float, max_width: int = 140) -> str:
     timestamp_width = len(elapsed_since(started_at))
     status_column = timestamp_width + 1  # account for one space after timestamp
@@ -197,7 +218,7 @@ def _stream_repl_answer(
                         if first_model_delta_elapsed_ms is None:
                             first_model_delta_elapsed_ms = (time.perf_counter() - started_at) * 1000
                         chunks.append(content)
-                        print(content, end="", flush=True)
+                        _type_out(content)
                     continue
                 if event_type == "final_answer":
                     output = event.get("output")
@@ -211,14 +232,14 @@ def _stream_repl_answer(
                     if isinstance(output, str):
                         if not chunks:
                             chunks.append(output)
-                            print(output, end="", flush=True)
+                            _type_out(output)
                         continue
                     if isinstance(output, dict):
                         answer = output.get("answer")
                         if isinstance(answer, str):
                             if not chunks:
                                 chunks.append(answer)
-                                print(answer, end="", flush=True)
+                                _type_out(answer)
                     continue
                 if event_type == "run_failed":
                     error_message = event.get("error")

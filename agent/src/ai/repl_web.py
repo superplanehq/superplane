@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import threading
@@ -12,10 +13,14 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from pydantic_ai.messages import (
+    FinalResultEvent,
     FunctionToolCallEvent,
     FunctionToolResultEvent,
     PartDeltaEvent,
+    PartStartEvent,
     TextPartDelta,
+    ToolCallPart,
+    ToolCallPartDelta,
 )
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
@@ -56,6 +61,12 @@ def _resolve_required(value: str | None, env_name: str) -> str:
 def _encode_sse_event(data: dict[str, Any]) -> str:
     serialized = json.dumps(data, separators=(",", ":"))
     return f"data: {serialized}\n\n"
+
+
+def _iter_text_chunks(text: str, chunk_size: int = 28) -> list[str]:
+    if not text:
+        return []
+    return [text[index : index + chunk_size] for index in range(0, len(text), chunk_size)]
 
 
 def _to_jsonable(value: Any) -> Any:
@@ -132,8 +143,81 @@ async def _stream_agent_run(payload: ReplStreamRequest) -> AsyncIterator[dict[st
     deps.waiting_message_printed = False
     deps.allow_canvas_details = False
 
+    output_tool_call_id: str | None = None
+    output_tool_name_hints = {"final_result", "return_canvasanswer", "canvasanswer"}
+    output_args_buffer_by_call_id: dict[str, str] = {}
+    streamed_answer_length_by_call_id: dict[str, int] = {}
+    streamed_any_answer_delta = False
+
+    def emit_answer_delta_from_output_args(call_id: str, output_args: Any) -> dict[str, Any] | None:
+        nonlocal streamed_any_answer_delta
+        if not isinstance(output_args, dict):
+            return None
+        answer = output_args.get("answer")
+        if not isinstance(answer, str):
+            return None
+        already_streamed = streamed_answer_length_by_call_id.get(call_id, 0)
+        if len(answer) <= already_streamed:
+            return None
+        delta = answer[already_streamed:]
+        streamed_answer_length_by_call_id[call_id] = len(answer)
+        streamed_any_answer_delta = True
+        return {
+            "type": "model_delta",
+            "content": delta,
+        }
+
+    def likely_output_tool_name(tool_name: str | None) -> bool:
+        if not isinstance(tool_name, str):
+            return False
+        normalized = tool_name.strip().lower()
+        return normalized in output_tool_name_hints
+
     tool_started_at_by_call_id: dict[str, float] = {}
     async for event in agent.run_stream_events(user_prompt=payload.question, deps=deps):
+        if isinstance(event, PartStartEvent) and isinstance(event.part, ToolCallPart):
+            tool_call_id = event.part.tool_call_id
+            if tool_call_id and likely_output_tool_name(event.part.tool_name):
+                output_tool_call_id = tool_call_id
+            continue
+
+        if isinstance(event, FinalResultEvent):
+            if event.tool_call_id:
+                output_tool_call_id = event.tool_call_id
+            continue
+
+        if isinstance(event, PartDeltaEvent) and isinstance(event.delta, ToolCallPartDelta):
+            tool_call_id = event.delta.tool_call_id
+            if tool_call_id is None:
+                continue
+
+            # Some models stream output-tool JSON args incrementally.
+            # Surface answer deltas as they become parseable.
+            if output_tool_call_id is None and likely_output_tool_name(event.delta.tool_name_delta):
+                output_tool_call_id = tool_call_id
+            if output_tool_call_id != tool_call_id:
+                continue
+
+            args_delta = event.delta.args_delta
+            if isinstance(args_delta, dict):
+                maybe_delta = emit_answer_delta_from_output_args(tool_call_id, args_delta)
+                if maybe_delta is not None:
+                    yield maybe_delta
+                continue
+
+            if isinstance(args_delta, str):
+                buffer = output_args_buffer_by_call_id.get(tool_call_id, "")
+                buffer += args_delta
+                output_args_buffer_by_call_id[tool_call_id] = buffer
+                try:
+                    parsed_args = json.loads(buffer)
+                except json.JSONDecodeError:
+                    continue
+                maybe_delta = emit_answer_delta_from_output_args(tool_call_id, parsed_args)
+                if maybe_delta is not None:
+                    yield maybe_delta
+            continue
+
         if isinstance(event, FunctionToolCallEvent):
             tool_call_id = event.part.tool_call_id or event.part.tool_name
             tool_started_at_by_call_id[tool_call_id] = time.perf_counter()
@@ -168,9 +252,19 @@ async def _stream_agent_run(payload: ReplStreamRequest) -> AsyncIterator[dict[st
 
         if isinstance(event, AgentRunResultEvent):
             result = event.result
+            output = _to_jsonable(result.output)
+            if isinstance(output, dict) and not streamed_any_answer_delta:
+                answer = output.get("answer")
+                if isinstance(answer, str) and answer:
+                    for chunk in _iter_text_chunks(answer):
+                        yield {
+                            "type": "model_delta",
+                            "content": chunk,
+                        }
+                        await asyncio.sleep(0.01)
             yield {
                 "type": "final_answer",
-                "output": _to_jsonable(result.output),
+                "output": output,
                 "usage": _to_jsonable(result.usage()),
             }
 
