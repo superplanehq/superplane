@@ -552,10 +552,6 @@ func validateDayInYear(field Field, value any) error {
 	}
 
 	format := "MM/DD"
-	if field.TypeOptions != nil && field.TypeOptions.DayInYear != nil && field.TypeOptions.DayInYear.Format != "" {
-		format = field.TypeOptions.DayInYear.Format
-	}
-
 	var month, day int
 	var extra string
 	n, err := fmt.Sscanf(dayStr, "%d/%d%s", &month, &day, &extra)

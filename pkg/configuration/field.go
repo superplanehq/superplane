@@ -101,9 +101,6 @@ type TypeOptions struct {
 	Time             *TimeTypeOptions             `json:"time,omitempty"`
 	Date             *DateTypeOptions             `json:"date,omitempty"`
 	DateTime         *DateTimeTypeOptions         `json:"dateTime,omitempty"`
-	DayInYear        *DayInYearTypeOptions        `json:"dayInYear,omitempty"`
-	Cron             *CronTypeOptions             `json:"cron,omitempty"`
-	Timezone         *TimezoneTypeOptions         `json:"timezone,omitempty"`
 }
 
 /*
@@ -180,27 +177,6 @@ type DateTypeOptions struct {
  */
 type DateTimeTypeOptions struct {
 	Format string `json:"format,omitempty"` // Expected format, e.g., "2006-01-02T15:04", "YYYY-MM-DDTHH:MM"
-}
-
-/*
- * DayInYearTypeOptions specifies format and constraints for day-in-year fields
- */
-type DayInYearTypeOptions struct {
-	Format string `json:"format,omitempty"` // Expected format, defaults to "MM/DD", e.g., "12/25"
-}
-
-/*
- * CronTypeOptions specifies constraints for cron expression fields
- */
-type CronTypeOptions struct {
-	AllowedFields []string `json:"allowedFields,omitempty"` // Optional: limit which cron fields are allowed
-}
-
-/*
- * TimezoneTypeOptions specifies constraints for timezone fields
- */
-type TimezoneTypeOptions struct {
-	// Could add supported timezones list here if needed in the future
 }
 
 /*
