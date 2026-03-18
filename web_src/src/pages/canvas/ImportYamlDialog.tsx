@@ -157,7 +157,7 @@ export function ImportYamlDialog({ open, onOpenChange, organizationId, onSuccess
           <DialogDescription>Upload a YAML file or paste a Canvas definition to create a new Canvas.</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 overflow-y-auto min-h-0">
+        <div className="space-y-4">
           <div>
             <Label htmlFor="yaml-file-input" className="mb-2">
               Upload YAML file
@@ -210,7 +210,7 @@ export function ImportYamlDialog({ open, onOpenChange, organizationId, onSuccess
               }}
               placeholder={`apiVersion: v1\nkind: Canvas\nmetadata:\n  name: my-canvas\nspec:\n  nodes: []\n  edges: []`}
               rows={12}
-              className="font-mono text-sm"
+              className="font-mono text-sm max-h-[50vh] overflow-y-auto"
             />
           </div>
 
