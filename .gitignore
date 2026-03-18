@@ -15,4 +15,5 @@ vendor/bundle
 .claude/settings.local.json
 CLAUDE.local.md
 .env
-.idea/go1.25.0.linux-amd64.tar.gz
+.idea/
+go1.25.0.linux-amd64.tar.gz
