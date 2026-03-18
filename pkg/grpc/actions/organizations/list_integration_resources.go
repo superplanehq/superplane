@@ -53,10 +53,19 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 
 	// If the integration can accept an OIDC provider, inject it so that
 	// ListResources works even before the first Sync (e.g. after a server restart).
+	// Unwrap the PanicableIntegration wrapper first so the type assertion reaches
+	// the underlying implementation.
 	type oidcProviderSetter interface {
 		SetOIDCProvider(oidc.Provider)
 	}
-	if setter, ok := integration.(oidcProviderSetter); ok && oidcProvider != nil {
+	type unwrapper interface {
+		Unwrap() core.Integration
+	}
+	target := integration
+	if u, ok := integration.(unwrapper); ok {
+		target = u.Unwrap()
+	}
+	if setter, ok := target.(oidcProviderSetter); ok && oidcProvider != nil {
 		setter.SetOIDCProvider(oidcProvider)
 	}
 
