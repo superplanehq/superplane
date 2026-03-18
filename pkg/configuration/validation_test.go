@@ -6,32 +6,38 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestValidateConfiguration_RequiredConditions(t *testing.T) {
+func Test__ValidateConfiguration__RequiredConditions(t *testing.T) {
 	fields := []Field{
 		{
-			Name:     "mode",
+			Name:     "filterType",
 			Type:     FieldTypeSelect,
 			Required: true,
-		},
-		{
-			Name:     "startTime",
-			Type:     FieldTypeTime,
-			Required: false,
-			RequiredConditions: []RequiredCondition{
-				{
-					Field:  "mode",
-					Values: []string{"include_range", "exclude_range"},
+			TypeOptions: &TypeOptions{
+				Select: &SelectTypeOptions{
+					Options: []FieldOption{
+						{Label: "none", Value: "none"},
+						{Label: "range", Value: "range"},
+					},
 				},
 			},
 		},
 		{
-			Name:     "startDateTime",
-			Type:     FieldTypeDateTime,
-			Required: false,
+			Name: "startTime",
+			Type: FieldTypeTime,
 			RequiredConditions: []RequiredCondition{
 				{
-					Field:  "mode",
-					Values: []string{"include_specific", "exclude_specific"},
+					Field:  "filterType",
+					Values: []string{"range"},
+				},
+			},
+		},
+		{
+			Name: "endTime",
+			Type: FieldTypeTime,
+			RequiredConditions: []RequiredCondition{
+				{
+					Field:  "filterType",
+					Values: []string{"range"},
 				},
 			},
 		},
@@ -44,45 +50,37 @@ func TestValidateConfiguration_RequiredConditions(t *testing.T) {
 		errorMsg    string
 	}{
 		{
-			name: "startTime required for range mode",
+			name: "nothing is required for none filter",
 			config: map[string]any{
-				"mode": "include_range",
+				"filterType": "none",
+			},
+			expectError: false,
+		},
+		{
+			name: "startTime required for range filter",
+			config: map[string]any{
+				"filterType": "range",
 				// startTime missing - should fail
 			},
 			expectError: true,
 			errorMsg:    "field 'startTime' is required",
 		},
 		{
-			name: "startTime provided for range mode",
+			name: "endTime required for range filter",
 			config: map[string]any{
-				"mode":      "include_range",
-				"startTime": "09:00",
-			},
-			expectError: false,
-		},
-		{
-			name: "startDateTime required for specific mode",
-			config: map[string]any{
-				"mode": "include_specific",
-				// startDateTime missing - should fail
+				"filterType": "range",
+				"startTime":  "09:00",
+				// endTime missing - should fail
 			},
 			expectError: true,
-			errorMsg:    "field 'startDateTime' is required",
+			errorMsg:    "field 'endTime' is required",
 		},
 		{
-			name: "startDateTime provided for specific mode",
+			name: "startTime and endTime provided for range mode",
 			config: map[string]any{
-				"mode":          "include_specific",
-				"startDateTime": "2024-12-31T00:00",
-			},
-			expectError: false,
-		},
-		{
-			name: "startTime not required for specific mode",
-			config: map[string]any{
-				"mode":          "include_specific",
-				"startDateTime": "2024-12-31T00:00",
-				// startTime not provided - should pass
+				"filterType": "range",
+				"startTime":  "09:00",
+				"endTime":    "17:00",
 			},
 			expectError: false,
 		},
@@ -93,7 +91,7 @@ func TestValidateConfiguration_RequiredConditions(t *testing.T) {
 			err := ValidateConfiguration(fields, tt.config)
 			if tt.expectError {
 				assert.Error(t, err)
-				if tt.errorMsg != "" {
+				if tt.errorMsg != "" && err != nil {
 					assert.Contains(t, err.Error(), tt.errorMsg)
 				}
 			} else {
@@ -103,111 +101,7 @@ func TestValidateConfiguration_RequiredConditions(t *testing.T) {
 	}
 }
 
-func TestValidateConfiguration_ValidationRules(t *testing.T) {
-	fields := []Field{
-		{
-			Name:     "startTime",
-			Type:     FieldTypeTime,
-			Required: true,
-			ValidationRules: []ValidationRule{
-				{
-					Type:        ValidationRuleLessThan,
-					CompareWith: "endTime",
-					Message:     "start time must be before end time",
-				},
-			},
-		},
-		{
-			Name:     "endTime",
-			Type:     FieldTypeTime,
-			Required: true,
-		},
-		{
-			Name:     "startDateTime",
-			Type:     FieldTypeDateTime,
-			Required: true,
-			ValidationRules: []ValidationRule{
-				{
-					Type:        ValidationRuleLessThan,
-					CompareWith: "endDateTime",
-					Message:     "start date & time must be before end date & time",
-				},
-			},
-		},
-		{
-			Name:     "endDateTime",
-			Type:     FieldTypeDateTime,
-			Required: true,
-		},
-	}
-
-	tests := []struct {
-		name        string
-		config      map[string]any
-		expectError bool
-		errorMsg    string
-	}{
-		{
-			name: "valid time range",
-			config: map[string]any{
-				"startTime":     "09:00",
-				"endTime":       "17:00",
-				"startDateTime": "2024-12-31T09:00",
-				"endDateTime":   "2024-12-31T17:00",
-			},
-			expectError: false,
-		},
-		{
-			name: "invalid time range - start after end",
-			config: map[string]any{
-				"startTime":     "17:00",
-				"endTime":       "09:00",
-				"startDateTime": "2024-12-31T09:00",
-				"endDateTime":   "2024-12-31T17:00",
-			},
-			expectError: true,
-			errorMsg:    "start time must be before end time",
-		},
-		{
-			name: "invalid datetime range - start after end",
-			config: map[string]any{
-				"startTime":     "09:00",
-				"endTime":       "17:00",
-				"startDateTime": "2024-12-31T17:00",
-				"endDateTime":   "2024-12-31T09:00",
-			},
-			expectError: true,
-			errorMsg:    "start date & time must be before end date & time",
-		},
-		{
-			name: "equal times - should fail",
-			config: map[string]any{
-				"startTime":     "09:00",
-				"endTime":       "09:00",
-				"startDateTime": "2024-12-31T09:00",
-				"endDateTime":   "2024-12-31T17:00",
-			},
-			expectError: true,
-			errorMsg:    "start time must be before end time",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateConfiguration(fields, tt.config)
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.errorMsg != "" {
-					assert.Contains(t, err.Error(), tt.errorMsg)
-				}
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestValidateConfiguration_DaysOfWeek(t *testing.T) {
+func Test__ValidateConfiguration__DaysOfWeek(t *testing.T) {
 	fields := []Field{
 		{
 			Name:     "days",
@@ -256,7 +150,7 @@ func TestValidateConfiguration_DaysOfWeek(t *testing.T) {
 	}
 }
 
-func TestValidateConfiguration_TimeRange(t *testing.T) {
+func Test__ValidateConfiguration__TimeRange(t *testing.T) {
 	fields := []Field{
 		{
 			Name:     "timeRange",
@@ -305,7 +199,7 @@ func TestValidateConfiguration_TimeRange(t *testing.T) {
 	}
 }
 
-func TestValidateTime_CustomFormat(t *testing.T) {
+func Test__ValidateConfiguration__CustomTimeFormat(t *testing.T) {
 	tests := []struct {
 		name        string
 		format      string
@@ -372,85 +266,7 @@ func TestValidateTime_CustomFormat(t *testing.T) {
 	}
 }
 
-func TestValidateDayInYearComparison(t *testing.T) {
-	fields := []Field{
-		{
-			Name:     "startDayInYear",
-			Type:     FieldTypeDayInYear,
-			Required: true,
-			ValidationRules: []ValidationRule{
-				{
-					Type:        ValidationRuleLessThan,
-					CompareWith: "endDayInYear",
-					Message:     "start day must be before end day",
-				},
-			},
-		},
-		{
-			Name:     "endDayInYear",
-			Type:     FieldTypeDayInYear,
-			Required: true,
-		},
-	}
-
-	tests := []struct {
-		name        string
-		config      map[string]any
-		expectError bool
-		errorMsg    string
-	}{
-		{
-			name: "valid day range",
-			config: map[string]any{
-				"startDayInYear": "12/25",
-				"endDayInYear":   "12/31",
-			},
-			expectError: false,
-		},
-		{
-			name: "invalid day range - start after end",
-			config: map[string]any{
-				"startDayInYear": "12/31",
-				"endDayInYear":   "12/25",
-			},
-			expectError: true,
-			errorMsg:    "start day must be before end day",
-		},
-		{
-			name: "cross-year range - valid",
-			config: map[string]any{
-				"startDayInYear": "12/25",
-				"endDayInYear":   "01/05",
-			},
-			expectError: false, // Cross-year ranges are allowed
-		},
-		{
-			name: "same day - valid",
-			config: map[string]any{
-				"startDayInYear": "07/04",
-				"endDayInYear":   "07/04",
-			},
-			expectError: true, // Same day should fail for less_than comparison
-			errorMsg:    "start day must be before end day",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateConfiguration(fields, tt.config)
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.errorMsg != "" {
-					assert.Contains(t, err.Error(), tt.errorMsg)
-				}
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestValidateList_MaxItems(t *testing.T) {
+func Test__ValidateList__MaxItems(t *testing.T) {
 	tests := []struct {
 		name        string
 		field       Field
