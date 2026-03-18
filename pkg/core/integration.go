@@ -160,7 +160,6 @@ type ListResourcesContext struct {
 	HTTP        HTTPContext
 	Integration IntegrationContext
 	Parameters  map[string]string
-	OIDC        oidc.Provider
 }
 
 type WebhookOptions struct {

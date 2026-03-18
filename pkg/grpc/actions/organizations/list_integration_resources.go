@@ -51,6 +51,15 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 		nil,
 	)
 
+	// If the integration can accept an OIDC provider, inject it so that
+	// ListResources works even before the first Sync (e.g. after a server restart).
+	type oidcProviderSetter interface {
+		SetOIDCProvider(oidc.Provider)
+	}
+	if setter, ok := integration.(oidcProviderSetter); ok && oidcProvider != nil {
+		setter.SetOIDCProvider(oidcProvider)
+	}
+
 	listCtx := core.ListResourcesContext{
 		Logger: log.WithFields(log.Fields{
 			"integration_id":   instance.ID.String(),
@@ -60,7 +69,6 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 		HTTP:        registry.HTTPContext(),
 		Integration: integrationCtx,
 		Parameters:  parameters,
-		OIDC:        oidcProvider,
 	}
 
 	resources, err := integration.ListResources(resourceType, listCtx)
