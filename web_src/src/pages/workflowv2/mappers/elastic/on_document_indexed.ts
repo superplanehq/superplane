@@ -29,10 +29,9 @@ export const onDocumentIndexedTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const payload = context.event?.data as OnDocumentIndexedPayload | undefined;
     const details: Record<string, string> = {};
+    if (context.event?.createdAt) details["Triggered At"] = new Date(context.event.createdAt).toLocaleString();
     if (payload?.id) details["Document ID"] = String(payload.id);
     if (payload?.index) details["Index"] = String(payload.index);
-    if (payload?.source?.["@timestamp"]) details["Document Time"] = payload.source["@timestamp"];
-    if (context.event?.createdAt) details["Triggered At"] = new Date(context.event.createdAt).toLocaleString();
 
     const preview = getSourcePreview(payload?.source);
     if (preview) {
