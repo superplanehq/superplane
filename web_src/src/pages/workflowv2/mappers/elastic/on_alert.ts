@@ -19,6 +19,11 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
     const payload = context.event?.data as Record<string, any> | undefined;
 
     const details: Record<string, string> = {};
+    const receivedAt = payload?.timestamp || context.event?.createdAt;
+
+    if (receivedAt) {
+      details["Received At"] = new Date(receivedAt).toLocaleString();
+    }
 
     const rule = payload?.ruleName || payload?.alertName || payload?.ruleId;
     if (rule) details["Rule"] = String(rule);

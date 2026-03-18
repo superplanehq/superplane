@@ -25,22 +25,19 @@ const installationInstructions = `
 To connect Elastic to SuperPlane:
 
 1. **Elasticsearch URL**:
-   - Paste your Elasticsearch endpoint.
+   - **Elastic Cloud**: Go to **Elastic Cloud → Deployments**, open your deployment, go to **Manage**, and copy the **Elasticsearch endpoint** from the deployment management section.
+   - **Self-managed Elastic**: Use your Elasticsearch server URL.
    - Example: ` + "`https://my-cluster.es.us-east-1.aws.found.io:9243`" + `.
 2. **Kibana URL**:
-   - Open Kibana in your browser and copy the URL from the address bar.
+   - **Elastic Cloud**: From the same **Manage** section for that deployment, copy the **Kibana endpoint**.
+   - **Self-managed Elastic**: Use the base URL of your Kibana instance.
    - Keep only the base URL: protocol, host, and port.
-   - Remove anything after that, such as ` + "`/app/...`" + `, anything starting with ` + "`?`" + `, or anything starting with ` + "`#`" + `.
-   - Example browser URL: ` + "`https://my-cluster.kb.us-east-1.aws.found.io:9243/app/home`" + `.
-   - Paste into SuperPlane: ` + "`https://my-cluster.kb.us-east-1.aws.found.io:9243`" + `.
-3. **Where to find these URLs**:
-   - **Elastic Cloud**: Go to **Elastic Cloud → Deployments**, open your deployment, and copy the **Elasticsearch endpoint** and **Kibana endpoint** from the Overview page.
-   - **Self-managed Elastic**: Use the Elasticsearch server URL for **Elasticsearch URL**, and the normal browser URL you use to open Kibana for **Kibana URL**.
-4. **API Key**:
+   - Example: ` + "`https://my-cluster.kb.us-east-1.aws.found.io:9243`" + `.
+3. **API Key**:
    - In Kibana, go to **Stack Management → API Keys**.
    - Create an API key that can index documents in Elasticsearch and manage Kibana connectors.
    - Paste that API key into SuperPlane.
-5. **Alert rules**:
+4. **Alert rules**:
    - SuperPlane automatically creates the Kibana webhook connector.
    - In Kibana, add that connector to the alert rules you want to send to SuperPlane.
 `
@@ -79,7 +76,7 @@ func (e *Elastic) Configuration() []configuration.Field {
 			Label:       "Kibana URL",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Base URL of your Kibana instance. Copy the browser address up to the host and port only, without /app/... or query parameters.",
+			Description: "Base URL of your Kibana instance, such as https://my-cluster.kb.us-east-1.aws.found.io:9243. In Elastic Cloud, get it from Deployments -> your deployment -> Manage.",
 		},
 		{
 			Name:      "apiKey",
