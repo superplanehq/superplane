@@ -25,7 +25,7 @@ const installationInstructions = `
 To connect Elastic to SuperPlane:
 
 1. **Elasticsearch URL**:
-   - **Elastic Cloud**: Go to **Elastic Cloud → Deployments**, open your deployment, go to **Manage**, and copy the **Elasticsearch endpoint** from the deployment management section.
+   - **Elastic Cloud**: Go to **Elastic Cloud → Deployments**, open your deployment, go to **Manage**, and copy the **Elasticsearch endpoint** from the **Application endpoints, cluster and component IDs** section.
    - **Self-managed Elastic**: Use your Elasticsearch server URL.
    - Example: ` + "`https://my-cluster.es.us-east-1.aws.found.io:9243`" + `.
 2. **Kibana URL**:
