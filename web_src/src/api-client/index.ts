@@ -413,7 +413,6 @@ export type {
   ConfigurationTextTypeOptions,
   ConfigurationTimeTypeOptions,
   ConfigurationTypeOptions,
-  ConfigurationValidationRule,
   ConfigurationVisibilityCondition,
   GooglerpcStatus,
   GroupsAddUserToGroupBody,

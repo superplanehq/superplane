@@ -14,11 +14,9 @@ message Field {
   repeated VisibilityCondition visibility_conditions = 7;
   optional TypeOptions type_options = 8;
   repeated RequiredCondition required_conditions = 9;
-  repeated ValidationRule validation_rules = 10;
-  optional string placeholder = 11;
-  optional bool sensitive = 12;
-  optional bool togglable = 13;
-  optional bool disallow_expression = 14;
+  optional string placeholder = 10;
+  optional bool sensitive = 11;
+  optional bool togglable = 12;
 }
 
 message TypeOptions {
@@ -122,12 +120,6 @@ message ListItemDefinition {
 message RequiredCondition {
   string field = 1;
   repeated string values = 2;
-}
-
-message ValidationRule {
-  string type = 1;
-  string compare_with = 2;
-  optional string message = 3;
 }
 
 message AnyPredicateListTypeOptions {

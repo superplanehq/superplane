@@ -124,7 +124,7 @@ func requestObjectSchema() []configuration.Field {
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
-							{Name: "name", Label: "Name", Type: configuration.FieldTypeString, Required: true, DisallowExpression: true, Placeholder: "Content-Type"},
+							{Name: "name", Label: "Name", Type: configuration.FieldTypeString, Required: true, Placeholder: "Content-Type"},
 							{Name: "value", Label: "Value", Type: configuration.FieldTypeString, Required: true, Placeholder: "application/json"},
 						},
 					},
@@ -260,7 +260,7 @@ func checkRuleGracePeriodOptions() []configuration.FieldOption {
 // keyValueListSchema returns the list fields for labels/annotations (key-value pairs).
 func keyValueListSchema() []configuration.Field {
 	return []configuration.Field{
-		{Name: "key", Label: "Key", Type: configuration.FieldTypeString, Required: true, DisallowExpression: true, Placeholder: "environment"},
+		{Name: "key", Label: "Key", Type: configuration.FieldTypeString, Required: true, Placeholder: "environment"},
 		{Name: "value", Label: "Value", Type: configuration.FieldTypeString, Required: true, Placeholder: "production"},
 	}
 }

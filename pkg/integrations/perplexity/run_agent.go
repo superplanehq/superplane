@@ -94,13 +94,12 @@ func (c *runAgent) OutputChannels(configuration any) []core.OutputChannel {
 func (c *runAgent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:               "modelSource",
-			Label:              "Model Source",
-			Type:               configuration.FieldTypeSelect,
-			Required:           true,
-			Default:            "preset",
-			DisallowExpression: true,
-			Description:        "Choose between a preset or a specific model",
+			Name:        "modelSource",
+			Label:       "Model Source",
+			Type:        configuration.FieldTypeSelect,
+			Required:    true,
+			Default:     "preset",
+			Description: "Choose between a preset or a specific model",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{

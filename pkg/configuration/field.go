@@ -54,12 +54,11 @@ type Field struct {
 	/*
 	 * Type of the field. Supported types are defined by FieldType* constants above.
 	 */
-	Type               string `json:"type"`
-	Description        string `json:"description"`
-	Required           bool   `json:"required"`
-	Default            any    `json:"default"`
-	Togglable          bool   `json:"togglable"`
-	DisallowExpression bool   `json:"disallow_expression"`
+	Type        string `json:"type"`
+	Description string `json:"description"`
+	Required    bool   `json:"required"`
+	Default     any    `json:"default"`
+	Togglable   bool   `json:"togglable"`
 
 	/*
 	 * Whether the field is sensitive (e.g., password, API token)
@@ -70,25 +69,19 @@ type Field struct {
 	 * Type-specific options for fields.
 	 * The structure depends on the field type.
 	 */
-	TypeOptions *TypeOptions `json:"type_options,omitempty"`
+	TypeOptions *TypeOptions `json:"typeOptions,omitempty"`
 
 	/*
 	 * Used for controlling when the field is visible.
 	 * No visibility conditions - always visible.
 	 */
-	VisibilityConditions []VisibilityCondition `json:"visibility_conditions,omitempty"`
+	VisibilityConditions []VisibilityCondition `json:"visibilityConditions,omitempty"`
 
 	/*
 	 * Used for controlling when the field is required based on other field values.
 	 * If specified, the field is only required when these conditions are met.
 	 */
-	RequiredConditions []RequiredCondition `json:"required_conditions,omitempty"`
-
-	/*
-	 * Used for defining validation rules that compare this field with other fields.
-	 * For example, ensuring startTime < endTime or startDateTime < endDateTime.
-	 */
-	ValidationRules []ValidationRule `json:"validation_rules,omitempty"`
+	RequiredConditions []RequiredCondition `json:"requiredConditions,omitempty"`
 }
 
 /*
@@ -100,15 +93,15 @@ type TypeOptions struct {
 	Text             *TextTypeOptions             `json:"text,omitempty"`
 	Expression       *ExpressionTypeOptions       `json:"expression,omitempty"`
 	Select           *SelectTypeOptions           `json:"select,omitempty"`
-	MultiSelect      *MultiSelectTypeOptions      `json:"multi_select,omitempty"`
+	MultiSelect      *MultiSelectTypeOptions      `json:"multiSelect,omitempty"`
 	Resource         *ResourceTypeOptions         `json:"resource,omitempty"`
 	List             *ListTypeOptions             `json:"list,omitempty"`
-	AnyPredicateList *AnyPredicateListTypeOptions `json:"any_predicate_list,omitempty"`
+	AnyPredicateList *AnyPredicateListTypeOptions `json:"anyPredicateList,omitempty"`
 	Object           *ObjectTypeOptions           `json:"object,omitempty"`
 	Time             *TimeTypeOptions             `json:"time,omitempty"`
 	Date             *DateTypeOptions             `json:"date,omitempty"`
-	DateTime         *DateTimeTypeOptions         `json:"datetime,omitempty"`
-	DayInYear        *DayInYearTypeOptions        `json:"day_in_year,omitempty"`
+	DateTime         *DateTimeTypeOptions         `json:"dateTime,omitempty"`
+	DayInYear        *DayInYearTypeOptions        `json:"dayInYear,omitempty"`
 	Cron             *CronTypeOptions             `json:"cron,omitempty"`
 	Timezone         *TimezoneTypeOptions         `json:"timezone,omitempty"`
 }
@@ -118,7 +111,7 @@ type TypeOptions struct {
  */
 type ResourceTypeOptions struct {
 	Type           string `json:"type"`
-	UseNameAsValue bool   `json:"use_name_as_value,omitempty"`
+	UseNameAsValue bool   `json:"useNameAsValue,omitempty"`
 
 	//
 	// If true, render as multi-select instead of single select
@@ -135,7 +128,7 @@ type ResourceTypeOptions struct {
 type ParameterRef struct {
 	Name      string              `json:"name"`
 	Value     *string             `json:"value"`
-	ValueFrom *ParameterValueFrom `json:"value_from"`
+	ValueFrom *ParameterValueFrom `json:"valueFrom"`
 }
 
 type ParameterValueFrom struct {
@@ -154,18 +147,18 @@ type NumberTypeOptions struct {
  * StringTypeOptions specifies constraints for string fields
  */
 type StringTypeOptions struct {
-	MinLength *int `json:"min_length,omitempty"`
-	MaxLength *int `json:"max_length,omitempty"`
+	MinLength *int `json:"minLength,omitempty"`
+	MaxLength *int `json:"maxLength,omitempty"`
 }
 
 type ExpressionTypeOptions struct {
-	MinLength *int `json:"min_length,omitempty"`
-	MaxLength *int `json:"max_length,omitempty"`
+	MinLength *int `json:"minLength,omitempty"`
+	MaxLength *int `json:"maxLength,omitempty"`
 }
 
 type TextTypeOptions struct {
-	MinLength *int `json:"min_length,omitempty"`
-	MaxLength *int `json:"max_length,omitempty"`
+	MinLength *int `json:"minLength,omitempty"`
+	MaxLength *int `json:"maxLength,omitempty"`
 }
 
 /*
@@ -200,7 +193,7 @@ type DayInYearTypeOptions struct {
  * CronTypeOptions specifies constraints for cron expression fields
  */
 type CronTypeOptions struct {
-	AllowedFields []string `json:"allowed_fields,omitempty"` // Optional: limit which cron fields are allowed
+	AllowedFields []string `json:"allowedFields,omitempty"` // Optional: limit which cron fields are allowed
 }
 
 /*
@@ -228,9 +221,9 @@ type MultiSelectTypeOptions struct {
  * ListTypeOptions defines the structure of list items
  */
 type ListTypeOptions struct {
-	ItemDefinition *ListItemDefinition `json:"item_definition"`
-	ItemLabel      string              `json:"item_label,omitempty"`
-	MaxItems       *int                `json:"max_items,omitempty"`
+	ItemDefinition *ListItemDefinition `json:"itemDefinition"`
+	ItemLabel      string              `json:"itemLabel,omitempty"`
+	MaxItems       *int                `json:"maxItems,omitempty"`
 }
 
 /*
@@ -244,16 +237,16 @@ type ObjectTypeOptions struct {
  * FieldOption represents a selectable option for select / multi_select field types
  */
 type FieldOption struct {
-	Label string
-	Value string
+	Label string `json:"label"`
+	Value string `json:"value"`
 }
 
 /*
  * ListItemDefinition defines the structure of items in an 'list' field
  */
 type ListItemDefinition struct {
-	Type   string
-	Schema []Field
+	Type   string  `json:"type"`
+	Schema []Field `json:"schema,omitempty"`
 }
 
 type VisibilityCondition struct {
@@ -267,17 +260,17 @@ type RequiredCondition struct {
 }
 
 const (
-	ValidationRuleLessThan    = "less_than"
-	ValidationRuleGreaterThan = "greater_than"
+	ValidationRuleLessThan    = "less-than"
+	ValidationRuleGreaterThan = "greater-than"
 	ValidationRuleEqual       = "equal"
-	ValidationRuleNotEqual    = "not_equal"
-	ValidationRuleMaxLength   = "max_length"
-	ValidationRuleMinLength   = "min_length"
+	ValidationRuleNotEqual    = "not-equal"
+	ValidationRuleMaxLength   = "max-length"
+	ValidationRuleMinLength   = "min-length"
 )
 
 type ValidationRule struct {
-	Type        string `json:"type"`         // less_than, greater_than, equal, not_equal, max_length, min_length
-	CompareWith string `json:"compare_with"` // field name to compare with (for field comparisons)
-	Value       any    `json:"value"`        // static value to compare with (for direct validation)
-	Message     string `json:"message"`      // custom error message
+	Type        string `json:"type"`        // less-than, greater-than, equal, not-equal, max-length, min-length
+	CompareWith string `json:"compareWith"` // field name to compare with (for field comparisons)
+	Value       any    `json:"value"`       // static value to compare with (for direct validation)
+	Message     string `json:"message"`     // custom error message
 }
