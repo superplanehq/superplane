@@ -73,4 +73,3 @@ class CanvasAnswer(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0, default=0.5)
     citations: list[AnswerCitation] = Field(default_factory=list)
     follow_up_questions: list[str] = Field(default_factory=list)
-

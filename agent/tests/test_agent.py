@@ -10,4 +10,3 @@ def test_build_prompt_contains_question() -> None:
 def test_build_agent_returns_agent_instance() -> None:
     agent = build_agent()
     assert agent is not None
-
