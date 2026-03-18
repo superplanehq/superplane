@@ -33,6 +33,7 @@ To connect Elastic to SuperPlane:
    - **API Key** (recommended for Elastic Cloud): Go to Kibana → Stack Management → API Keys and create a new key. Paste the base64-encoded ` + "`id:api_key`" + ` value.
    - **Username / Password**: Provide the credentials for a user with the required privileges.
 4. **Kibana alerts (trigger)**: SuperPlane automatically creates a signed Kibana Webhook connector. You still need to attach that connector to your alert rules in Kibana.
+5. **Kibana case change trigger**: For ` + "`When Case Status Changes`" + `, create an **Elasticsearch query** rule in Kibana that watches ` + "`.cases-*`" + ` using the case update time field, then attach the same SuperPlane connector with a body containing ` + "`{\"eventType\":\"case_status_changed\"}`" + `.
 `
 
 func (e *Elastic) Name() string {
@@ -48,7 +49,7 @@ func (e *Elastic) Icon() string {
 }
 
 func (e *Elastic) Description() string {
-	return "Index documents into Elasticsearch and receive Kibana alert webhooks"
+	return "Index documents into Elasticsearch and receive Kibana webhooks"
 }
 
 func (e *Elastic) Instructions() string {

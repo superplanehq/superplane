@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -25,9 +24,7 @@ type OnCaseStatusChangeConfiguration struct {
 
 type OnCaseStatusChangeMetadata struct {
 	LastPollTime string `json:"lastPollTime,omitempty" mapstructure:"lastPollTime"`
-	RouteKey     string `json:"routeKey,omitempty" mapstructure:"routeKey"`
 }
-
 
 func (t *OnCaseStatusChange) Name() string  { return "elastic.onCaseStatusChange" }
 func (t *OnCaseStatusChange) Label() string { return "When Case Status Changes" }
@@ -38,43 +35,43 @@ func (t *OnCaseStatusChange) Icon() string  { return "alert-circle" }
 func (t *OnCaseStatusChange) Color() string { return "gray" }
 
 func (t *OnCaseStatusChange) Documentation() string {
-	return `The When Case Status Changes trigger starts a workflow execution when a Kibana Security case is updated.
-
-## Shared Connector
-
-SuperPlane creates **one Kibana Webhook connector per integration**, shared across all triggers that use the same Kibana instance. Each incoming request is routed to the correct trigger instance using two fields in the request body:
-
-- ` + "`eventType`" + `: must be ` + "`\"case_status_changed\"`" + ` — requests with any other value are silently ignored.
-- ` + "`routeKey`" + `: a unique ID assigned per trigger node — allows multiple When Case Status Changes nodes on the same canvas to each react independently.
+	return `The When Case Status Changes trigger fires a workflow execution when a Kibana Security case is updated.
 
 ## How it works
 
-1. When the trigger is saved, SuperPlane creates or reuses the shared Kibana Webhook connector.
-2. Configure a Kibana rule or automation to POST to the connector with the required body (see below) when a case changes.
-3. SuperPlane receives the webhook, queries the Kibana Cases API for cases updated since its stored checkpoint, applies the status filter, and emits one event per matching case.
-
-### Required connector action body
+1. When the trigger is saved, SuperPlane automatically creates a signed Kibana Webhook connector.
+2. In Kibana, open **Stack Management → Rules** and create an **Elasticsearch query** rule.
+3. Configure the rule to watch the cases index pattern ` + "`.cases-*`" + ` and use the case update time field as the time field.
+4. Attach the **SuperPlane Alert** connector as an action on that rule.
+5. Configure the action body to send this JSON:
 
 ` + "```" + `json
 {
-  "eventType": "case_status_changed",
-  "routeKey":  "<routeKey shown in trigger settings>"
+  "eventType": "case_status_changed"
 }
 ` + "```" + `
 
-The ` + "`routeKey`" + ` value is generated when the trigger is saved and is visible in the trigger metadata. It ensures that multiple instances of this trigger on the same canvas each react only to their own events.
+6. Enable the rule. Each time the rule detects case updates, Kibana calls the SuperPlane webhook.
+7. SuperPlane receives the webhook, queries Kibana for cases updated since the last checkpoint, and fires one event per matching case.
+
+## Recommended Kibana setup
+
+- Use an **Elasticsearch query** rule as the default choice.
+- Use the cases index pattern ` + "`.cases-*`" + `.
+- Use the case update time field as the rule time field.
+- Use a rule condition based on case updates, not case creation only.
+- Run the rule frequently enough for your workflow latency needs.
+- The webhook body only needs ` + "`eventType`" + ` because SuperPlane retrieves the matching case details from Kibana after the webhook arrives.
 
 ## Configuration
 
-- **Statuses** *(optional)*: Only fire when a case transitions to one of these statuses. Leave empty to fire for any case update.
-
-## Webhook Verification
-
-SuperPlane generates a random signing secret and configures the Kibana connector to include it on every request. Requests without the correct secret are rejected automatically.
+- **Statuses** *(optional)*: Only fire when a case has one of these statuses. Leave empty to fire for any case update.
+- **Severities** *(optional)*: Only fire for cases with one of these severities. Leave empty to accept all severities.
+- **Tags** *(optional)*: Only fire for cases that include at least one tag matching any of these predicates. Leave empty to accept all cases.
 
 ## Event Data
 
-The trigger emits the full case details including id, title, status, severity, version, and timestamps.`
+The trigger emits the full case details including id, title, status, severity, version, tags, description, and timestamps.`
 }
 
 func (t *OnCaseStatusChange) Configuration() []configuration.Field {
@@ -121,21 +118,11 @@ func (t *OnCaseStatusChange) Configuration() []configuration.Field {
 }
 
 func (t *OnCaseStatusChange) Setup(ctx core.TriggerContext) error {
-	if ctx.Metadata != nil {
-		meta := loadCaseStatusChangeMetadata(ctx.Metadata)
-		changed := false
-		if meta.LastPollTime == "" {
-			meta.LastPollTime = time.Now().UTC().Format(time.RFC3339Nano)
-			changed = true
-		}
-		if meta.RouteKey == "" {
-			meta.RouteKey = uuid.NewString()
-			changed = true
-		}
-		if changed {
-			if err := ctx.Metadata.Set(meta); err != nil {
-				return fmt.Errorf("failed to save metadata: %w", err)
-			}
+	meta := loadCaseStatusChangeMetadata(ctx.Metadata)
+	if meta.LastPollTime == "" {
+		meta.LastPollTime = time.Now().UTC().Format(time.RFC3339Nano)
+		if err := ctx.Metadata.Set(meta); err != nil {
+			return fmt.Errorf("failed to save metadata: %w", err)
 		}
 	}
 
@@ -144,14 +131,12 @@ func (t *OnCaseStatusChange) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to get Kibana URL: %w", err)
 	}
 
-	if err := ctx.Integration.RequestWebhook(map[string]any{"kibanaUrl": string(kibanaURL)}); err != nil {
-		return fmt.Errorf("failed to request webhook: %w", err)
-	}
-
-	return nil
+	return ctx.Integration.RequestWebhook(map[string]any{"kibanaUrl": string(kibanaURL)})
 }
 
-func (t *OnCaseStatusChange) Actions() []core.Action { return nil }
+func (t *OnCaseStatusChange) Actions() []core.Action {
+	return []core.Action{}
+}
 
 func (t *OnCaseStatusChange) HandleAction(_ core.TriggerActionContext) (map[string]any, error) {
 	return nil, nil
@@ -176,12 +161,12 @@ func (t *OnCaseStatusChange) HandleWebhook(ctx core.WebhookRequestContext) (int,
 		return http.StatusBadRequest, nil, fmt.Errorf("invalid JSON payload: %w", err)
 	}
 
-	if extractString(payload, "eventType") != "case_status_changed" {
+	if eventType := extractString(payload, "eventType"); eventType != "" && eventType != "case_status_changed" {
 		return http.StatusOK, nil, nil
 	}
 
 	meta := loadCaseStatusChangeMetadata(ctx.Metadata)
-	if meta.RouteKey == "" || extractString(payload, "routeKey") != meta.RouteKey {
+	if meta.LastPollTime == "" {
 		return http.StatusOK, nil, nil
 	}
 
@@ -190,32 +175,23 @@ func (t *OnCaseStatusChange) HandleWebhook(ctx core.WebhookRequestContext) (int,
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if meta.LastPollTime == "" {
-		meta.LastPollTime = time.Now().UTC().Format(time.RFC3339Nano)
-		if ctx.Metadata != nil {
-			if err := ctx.Metadata.Set(meta); err != nil {
-				return http.StatusInternalServerError, nil, fmt.Errorf("failed to initialize metadata: %w", err)
-			}
-		}
-		return http.StatusOK, nil, nil
-	}
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to create client: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to create client: %v", err)
 	}
 
 	cases, err := client.ListCasesUpdatedSince(meta.LastPollTime, config.Statuses, config.Severities, nil)
 	if err != nil {
-		if ctx.Logger != nil {
-			ctx.Logger.Warnf("elastic onCaseStatusChange: failed to list cases: %v", err)
-		}
-		return http.StatusOK, nil, nil
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to list cases: %v", err)
 	}
 
 	newLastPollTime := meta.LastPollTime
 	for _, c := range cases {
 		if len(config.Statuses) > 0 && !slices.Contains(config.Statuses, strings.ToLower(c.Status)) {
+			continue
+		}
+
+		if len(config.Severities) > 0 && !slices.Contains(config.Severities, strings.ToLower(c.Severity)) {
 			continue
 		}
 
@@ -252,7 +228,7 @@ func (t *OnCaseStatusChange) HandleWebhook(ctx core.WebhookRequestContext) (int,
 		}
 	}
 
-	if newLastPollTime != meta.LastPollTime && ctx.Metadata != nil {
+	if newLastPollTime != meta.LastPollTime {
 		meta.LastPollTime = newLastPollTime
 		if err := ctx.Metadata.Set(meta); err != nil {
 			return http.StatusInternalServerError, nil, fmt.Errorf("failed to update metadata: %w", err)
