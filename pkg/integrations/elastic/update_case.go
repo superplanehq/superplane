@@ -146,11 +146,7 @@ func (c *UpdateCase) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("at least one field to update is required")
 	}
 
-	if err := c.resolveMetadata(ctx, config.CaseID); err != nil {
-		return err
-	}
-
-	return nil
+	return c.resolveMetadata(ctx, config.CaseID)
 }
 
 func (c *UpdateCase) resolveMetadata(ctx core.SetupContext, caseID string) error {

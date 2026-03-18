@@ -41,7 +41,7 @@ The component emits an event containing:
 - ` + "`status`" + `: The case status
 - ` + "`severity`" + `: The case severity
 - ` + "`tags`" + `: The case tags
-- ` + "`version`" + `: The case version (required for subsequent updates)
+- ` + "`version`" + `: The current case version returned by Kibana
 - ` + "`createdAt`" + `: The timestamp when the case was created
 - ` + "`updatedAt`" + `: The timestamp when the case was last updated`
 }
