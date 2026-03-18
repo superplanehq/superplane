@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -15,7 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListIntegrationResources(ctx context.Context, registry *registry.Registry, orgID string, integrationID string, parameters map[string]string) (*pb.ListIntegrationResourcesResponse, error) {
+func ListIntegrationResources(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, orgID string, integrationID string, parameters map[string]string) (*pb.ListIntegrationResourcesResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
@@ -59,6 +60,7 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 		HTTP:        registry.HTTPContext(),
 		Integration: integrationCtx,
 		Parameters:  parameters,
+		OIDC:        oidcProvider,
 	}
 
 	resources, err := integration.ListResources(resourceType, listCtx)
