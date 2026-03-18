@@ -51,7 +51,7 @@ export const getDocumentMapper: ComponentBaseMapper = {
     const outputs = context.execution.outputs as { default: OutputPayload[] };
     const details: Record<string, string> = {};
     if (context.execution.createdAt) {
-      details["Executed"] = formatTimeAgo(new Date(context.execution.createdAt));
+      details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
     }
     if (!outputs?.default?.[0]?.data) {
       return details;

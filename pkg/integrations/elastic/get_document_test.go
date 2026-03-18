@@ -8,9 +8,32 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
+
+func Test__GetDocument__Configuration(t *testing.T) {
+	fields := (&GetDocument{}).Configuration()
+
+	var documentIDField *configuration.Field
+	for i := range fields {
+		if fields[i].Name == "documentId" {
+			documentIDField = &fields[i]
+			break
+		}
+	}
+
+	require.NotNil(t, documentIDField)
+	assert.Equal(t, configuration.FieldTypeIntegrationResource, documentIDField.Type)
+	require.NotNil(t, documentIDField.TypeOptions)
+	require.NotNil(t, documentIDField.TypeOptions.Resource)
+	assert.Equal(t, ResourceTypeDocument, documentIDField.TypeOptions.Resource.Type)
+	require.Len(t, documentIDField.TypeOptions.Resource.Parameters, 1)
+	assert.Equal(t, "index", documentIDField.TypeOptions.Resource.Parameters[0].Name)
+	require.NotNil(t, documentIDField.TypeOptions.Resource.Parameters[0].ValueFrom)
+	assert.Equal(t, "index", documentIDField.TypeOptions.Resource.Parameters[0].ValueFrom.Field)
+}
 
 func Test__GetDocument__Setup(t *testing.T) {
 	c := &GetDocument{}
@@ -152,5 +175,76 @@ func Test__GetDocument__Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, state.Passed)
 		assert.Contains(t, state.FailureMessage, "failed to get document")
+	})
+}
+
+func Test__Elastic__ListResources__Document(t *testing.T) {
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"url":      "https://elastic.example.com",
+			"authType": "apiKey",
+			"apiKey":   "test-api-key",
+		},
+	}
+
+	t.Run("lists documents for selected index", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"hits": {
+							"hits": [
+								{"_id": "doc-1", "_index": "workflow-audit"},
+								{"_id": "doc-2", "_index": "workflow-audit"}
+							]
+						}
+					}`)),
+				},
+			},
+		}
+
+		resources, err := (&Elastic{}).ListResources(ResourceTypeDocument, core.ListResourcesContext{
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Parameters:  map[string]string{"index": "workflow-audit"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, ResourceTypeDocument, resources[0].Type)
+		assert.Equal(t, "doc-1", resources[0].Name)
+		assert.Equal(t, "doc-1", resources[0].ID)
+		assert.Equal(t, "doc-2", resources[1].Name)
+		assert.Equal(t, "https://elastic.example.com/workflow-audit/_search", httpCtx.Requests[0].URL.String())
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
+	})
+
+	t.Run("returns empty resources when index is not selected", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{}
+
+		resources, err := (&Elastic{}).ListResources(ResourceTypeDocument, core.ListResourcesContext{
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Parameters:  map[string]string{},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+		assert.Empty(t, httpCtx.Requests)
+	})
+
+	t.Run("returns empty resources when index is an expression", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{}
+
+		resources, err := (&Elastic{}).ListResources(ResourceTypeDocument, core.ListResourcesContext{
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Parameters:  map[string]string{"index": "{{ previous().data.index }}"},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+		assert.Empty(t, httpCtx.Requests)
 	})
 }

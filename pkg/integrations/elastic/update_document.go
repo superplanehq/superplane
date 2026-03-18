@@ -66,9 +66,21 @@ func (c *UpdateDocument) Configuration() []configuration.Field {
 		{
 			Name:        "documentId",
 			Label:       "Document ID",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The ID of the document to update.",
+			Description: "The document to update from the selected index.",
+			Placeholder: "Select a document",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeDocument,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "index",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "index"},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:     "fields",
