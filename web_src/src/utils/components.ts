@@ -260,10 +260,7 @@ export function isFieldRequired(field: ConfigurationField, allValues: Record<str
 /**
  * Validates a single field value for form submission (includes type-specific validation)
  */
-export function validateFieldForSubmission(
-  field: ConfigurationField,
-  value: unknown,
-): string[] {
+export function validateFieldForSubmission(field: ConfigurationField, value: unknown): string[] {
   const errors: string[] = [];
 
   // Add type-specific validation for form submission
