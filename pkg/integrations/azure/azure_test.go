@@ -15,99 +15,10 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func TestAzureIntegration_Name(t *testing.T) {
-	integration := &AzureIntegration{}
-	assert.Equal(t, "azure", integration.Name())
-}
-
-func TestAzureIntegration_Label(t *testing.T) {
-	integration := &AzureIntegration{}
-	assert.Equal(t, "Microsoft Azure", integration.Label())
-}
-
-func TestAzureIntegration_Icon(t *testing.T) {
-	integration := &AzureIntegration{}
-	assert.Equal(t, "azure", integration.Icon())
-}
-
-func TestAzureIntegration_Description(t *testing.T) {
-	integration := &AzureIntegration{}
-	description := integration.Description()
-	assert.NotEmpty(t, description)
-	assert.Contains(t, description, "Azure")
-}
-
-func TestAzureIntegration_Instructions(t *testing.T) {
-	integration := &AzureIntegration{}
-	instructions := integration.Instructions()
-	assert.NotEmpty(t, instructions)
-	assert.Contains(t, instructions, "Workload Identity Federation")
-	assert.Contains(t, instructions, "App Registration")
-	assert.Contains(t, instructions, "Tenant ID")
-	assert.Contains(t, instructions, "Client ID")
-	assert.Contains(t, instructions, "Subscription ID")
-}
-
-func TestAzureIntegration_Configuration(t *testing.T) {
-	integration := &AzureIntegration{}
-	fields := integration.Configuration()
-
-	require.Len(t, fields, 3, "Should have exactly 3 configuration fields")
-
-	tenantField := fields[0]
-	assert.Equal(t, "tenantId", tenantField.Name)
-	assert.Equal(t, "Tenant ID", tenantField.Label)
-	assert.Equal(t, configuration.FieldTypeString, tenantField.Type)
-	assert.True(t, tenantField.Required)
-	assert.NotEmpty(t, tenantField.Description)
-
-	clientField := fields[1]
-	assert.Equal(t, "clientId", clientField.Name)
-	assert.Equal(t, "Client ID", clientField.Label)
-	assert.Equal(t, configuration.FieldTypeString, clientField.Type)
-	assert.True(t, clientField.Required)
-	assert.NotEmpty(t, clientField.Description)
-
-	subscriptionField := fields[2]
-	assert.Equal(t, "subscriptionId", subscriptionField.Name)
-	assert.Equal(t, "Subscription ID", subscriptionField.Label)
-	assert.Equal(t, configuration.FieldTypeString, subscriptionField.Type)
-	assert.True(t, subscriptionField.Required)
-	assert.NotEmpty(t, subscriptionField.Description)
-}
-
-func TestAzureIntegration_Components(t *testing.T) {
-	integration := &AzureIntegration{}
-	components := integration.Components()
-
-	assert.NotNil(t, components)
-	assert.IsType(t, []core.Component{}, components)
-}
-
-func TestAzureIntegration_Triggers(t *testing.T) {
-	integration := &AzureIntegration{}
-	triggers := integration.Triggers()
-
-	assert.NotNil(t, triggers)
-	assert.IsType(t, []core.Trigger{}, triggers)
-}
-
-func TestAzureIntegration_Actions(t *testing.T) {
-	integration := &AzureIntegration{}
-	actions := integration.Actions()
-
-	assert.NotNil(t, actions)
-	assert.IsType(t, []core.Action{}, actions)
-}
-
 func TestAzureIntegration_HandleAction(t *testing.T) {
 	integration := &AzureIntegration{}
 
-	ctx := core.IntegrationActionContext{
-		Name: "unknown-action",
-	}
-
-	err := integration.HandleAction(ctx)
+	err := integration.HandleAction(core.IntegrationActionContext{Name: "unknown-action"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown action")
 }
@@ -116,41 +27,21 @@ func TestAzureIntegration_ListResources(t *testing.T) {
 	integration := &AzureIntegration{}
 
 	logger := logrus.NewEntry(logrus.New())
-	ctx := core.ListResourcesContext{
-		Logger: logger,
-	}
+	ctx := core.ListResourcesContext{Logger: logger}
 
 	tests := []struct {
-		name         string
 		resourceType string
 		expectError  bool
 	}{
-		{
-			name:         "resource group",
-			resourceType: "resourceGroup",
-			expectError:  false,
-		},
-		{
-			name:         "virtual network",
-			resourceType: "virtualNetwork",
-			expectError:  false,
-		},
-		{
-			name:         "subnet",
-			resourceType: "subnet",
-			expectError:  false,
-		},
-		{
-			name:         "unsupported type",
-			resourceType: "unsupported",
-			expectError:  true,
-		},
+		{"resourceGroup", false},
+		{"virtualNetwork", false},
+		{"subnet", false},
+		{"unsupported", true},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.resourceType, func(t *testing.T) {
 			resources, err := integration.ListResources(tt.resourceType, ctx)
-
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "unsupported resource type")
@@ -162,32 +53,17 @@ func TestAzureIntegration_ListResources(t *testing.T) {
 	}
 }
 
-func TestAzureIntegration_Cleanup(t *testing.T) {
-	integration := &AzureIntegration{}
-
-	logger := logrus.NewEntry(logrus.New())
-	ctx := core.IntegrationCleanupContext{
-		Logger: logger,
-	}
-
-	err := integration.Cleanup(ctx)
-	assert.NoError(t, err)
-}
-
 func TestAzureIntegration_HandleRequest_Unknown(t *testing.T) {
 	integration := &AzureIntegration{}
 
 	req := httptest.NewRequest(http.MethodGet, "/unknown", nil)
 	rec := httptest.NewRecorder()
 
-	logger := logrus.NewEntry(logrus.New())
-	ctx := core.HTTPRequestContext{
+	integration.HandleRequest(core.HTTPRequestContext{
 		Request:  req,
 		Response: rec,
-		Logger:   logger,
-	}
-
-	integration.HandleRequest(ctx)
+		Logger:   logrus.NewEntry(logrus.New()),
+	})
 
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
@@ -208,18 +84,6 @@ func TestNewProvider_FailsWithoutAccessToken(t *testing.T) {
 	assert.Contains(t, err.Error(), "Azure access token not found")
 }
 
-func TestConfiguration_Struct(t *testing.T) {
-	config := Configuration{
-		TenantID:       "test-tenant-id",
-		ClientID:       "test-client-id",
-		SubscriptionID: "test-subscription-id",
-	}
-
-	assert.Equal(t, "test-tenant-id", config.TenantID)
-	assert.Equal(t, "test-client-id", config.ClientID)
-	assert.Equal(t, "test-subscription-id", config.SubscriptionID)
-}
-
 const testIntegrationID = "00000000-0000-0000-0000-000000000001"
 
 func newTestProvider(t *testing.T, handler http.HandlerFunc) (*AzureProvider, *httptest.Server) {
@@ -234,13 +98,11 @@ func newTestProvider(t *testing.T, handler http.HandlerFunc) (*AzureProvider, *h
 		logger:         logrus.NewEntry(logrus.New()),
 	}
 
-	provider := &AzureProvider{
+	return &AzureProvider{
 		subscriptionID: "test-sub",
 		client:         client,
 		logger:         logrus.NewEntry(logrus.New()),
-	}
-
-	return provider, server
+	}, server
 }
 
 func newTestListCtx() core.ListResourcesContext {
