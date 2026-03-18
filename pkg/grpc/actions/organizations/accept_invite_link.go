@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -35,6 +36,10 @@ func AcceptInviteLink(ctx context.Context, authService authorization.Authorizati
 	org, err := models.FindOrganizationByID(inviteLink.OrganizationID.String())
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "organization not found")
+	}
+
+	if err := usage.CheckMemberLimit(org.ID); err != nil {
+		return nil, status.Errorf(codes.ResourceExhausted, "%s", err.Error())
 	}
 
 	statusValue := "joined"
