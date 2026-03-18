@@ -90,8 +90,8 @@ func UpdateCanvas(
 		}
 	}
 
-	if versioningEnabled != nil && canvas.CanvasVersioningEnabled != *versioningEnabled {
-		canvas.CanvasVersioningEnabled = *versioningEnabled
+	if versioningEnabled != nil && canvas.VersioningEnabled != *versioningEnabled {
+		canvas.VersioningEnabled = *versioningEnabled
 		changed = true
 	}
 

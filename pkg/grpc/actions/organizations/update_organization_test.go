@@ -58,7 +58,7 @@ func Test__UpdateOrganization(t *testing.T) {
 
 		organization, err := models.FindOrganizationByID(r.Organization.ID.String())
 		require.NoError(t, err)
-		assert.Equal(t, versioningEnabled, organization.CanvasVersioningEnabled)
+		assert.Equal(t, versioningEnabled, organization.VersioningEnabled)
 	})
 
 	t.Run("nil organization -> error", func(t *testing.T) {

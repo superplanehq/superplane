@@ -17,7 +17,7 @@ func isCanvasVersioningEnabledForCanvasInTransaction(tx *gorm.DB, canvas *models
 
 	// Template canvases are not user-editable, but keep the value stable if needed.
 	if canvas.IsTemplate {
-		return canvas.CanvasVersioningEnabled, nil
+		return canvas.VersioningEnabled, nil
 	}
 
 	organizationVersioningEnabled, err := models.IsCanvasVersioningEnabledInTransaction(tx, canvas.OrganizationID)
@@ -28,5 +28,5 @@ func isCanvasVersioningEnabledForCanvasInTransaction(tx *gorm.DB, canvas *models
 		return true, nil
 	}
 
-	return canvas.CanvasVersioningEnabled, nil
+	return canvas.VersioningEnabled, nil
 }

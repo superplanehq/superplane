@@ -23,11 +23,11 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		require.NoError(
 			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("canvas_versioning_enabled", false).Error,
+			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
 		)
 		require.NoError(
 			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("canvas_versioning_enabled", true).Error,
+			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", true).Error,
 		)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -54,11 +54,11 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		require.NoError(
 			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("canvas_versioning_enabled", true).Error,
+			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", true).Error,
 		)
 		require.NoError(
 			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("canvas_versioning_enabled", false).Error,
+			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", false).Error,
 		)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -85,11 +85,11 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		require.NoError(
 			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("canvas_versioning_enabled", false).Error,
+			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
 		)
 		require.NoError(
 			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("canvas_versioning_enabled", false).Error,
+			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", false).Error,
 		)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -116,11 +116,11 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		require.NoError(
 			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("canvas_versioning_enabled", false).Error,
+			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
 		)
 		require.NoError(
 			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("canvas_versioning_enabled", false).Error,
+			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", false).Error,
 		)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -145,11 +145,11 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		require.NoError(
 			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("canvas_versioning_enabled", false).Error,
+			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
 		)
 		require.NoError(
 			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("canvas_versioning_enabled", true).Error,
+			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", true).Error,
 		)
 
 		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)

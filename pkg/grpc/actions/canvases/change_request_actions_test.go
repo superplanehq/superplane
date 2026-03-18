@@ -250,7 +250,7 @@ func createCanvasWithNoopNode(ctx context.Context, t *testing.T, r *support.Reso
 		database.Conn().
 			Model(&models.Organization{}).
 			Where("id = ?", r.Organization.ID).
-			Update("canvas_versioning_enabled", true).
+			Update("versioning_enabled", true).
 			Error,
 	)
 

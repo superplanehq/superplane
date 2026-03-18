@@ -43,7 +43,7 @@ func TestCreateCanvasInheritsOrganizationVersioningWhenEnabled(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
 	nowEnabled := true
-	require.NoError(t, database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("canvas_versioning_enabled", nowEnabled).Error)
+	require.NoError(t, database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", nowEnabled).Error)
 
 	workflow := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
@@ -68,5 +68,5 @@ func TestCreateCanvasInheritsOrganizationVersioningWhenEnabled(t *testing.T) {
 	require.NoError(t, parseErr)
 	createdCanvas, findErr := models.FindCanvas(r.Organization.ID, createdCanvasUUID)
 	require.NoError(t, findErr)
-	require.True(t, createdCanvas.CanvasVersioningEnabled)
+	require.True(t, createdCanvas.VersioningEnabled)
 }
