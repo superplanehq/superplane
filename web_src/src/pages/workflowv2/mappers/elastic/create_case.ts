@@ -100,6 +100,10 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
 function getDetailsForCreateCase(doc: CreateCaseOutputData): Record<string, string> {
   const details: Record<string, string> = {};
 
+  if (doc?.createdAt) {
+    details["Created At"] = new Date(doc.createdAt).toLocaleString();
+  }
+
   if (doc?.id) {
     details["Case ID"] = String(doc.id);
   }
@@ -114,10 +118,6 @@ function getDetailsForCreateCase(doc: CreateCaseOutputData): Record<string, stri
 
   if (doc?.severity) {
     details["Severity"] = doc.severity;
-  }
-
-  if (doc?.createdAt) {
-    details["Created"] = formatTimeAgo(new Date(doc.createdAt));
   }
 
   return details;

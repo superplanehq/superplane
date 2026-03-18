@@ -110,6 +110,10 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
 function getDetailsForUpdateCase(doc: UpdateCaseOutputData): Record<string, string> {
   const details: Record<string, string> = {};
 
+  if (doc?.updatedAt) {
+    details["Updated At"] = new Date(doc.updatedAt).toLocaleString();
+  }
+
   if (doc?.id) {
     details["Case ID"] = String(doc.id);
   }
@@ -124,10 +128,6 @@ function getDetailsForUpdateCase(doc: UpdateCaseOutputData): Record<string, stri
 
   if (doc?.severity) {
     details["Severity"] = doc.severity;
-  }
-
-  if (doc?.updatedAt) {
-    details["Updated"] = formatTimeAgo(new Date(doc.updatedAt));
   }
 
   return details;

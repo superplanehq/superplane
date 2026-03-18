@@ -97,6 +97,14 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
 function getDetailsForGetCase(doc: GetCaseOutputData): Record<string, string> {
   const details: Record<string, string> = {};
 
+  if (doc?.createdAt) {
+    details["Created At"] = new Date(doc.createdAt).toLocaleString();
+  }
+
+  if (doc?.updatedAt) {
+    details["Updated At"] = new Date(doc.updatedAt).toLocaleString();
+  }
+
   if (doc?.id) {
     details["Case ID"] = String(doc.id);
   }
@@ -116,14 +124,6 @@ function getDetailsForGetCase(doc: GetCaseOutputData): Record<string, string> {
   if (doc?.description) {
     const desc = doc.description;
     details["Description"] = desc.length > 100 ? desc.slice(0, 100) + "…" : desc;
-  }
-
-  if (doc?.createdAt) {
-    details["Created"] = formatTimeAgo(new Date(doc.createdAt));
-  }
-
-  if (doc?.updatedAt) {
-    details["Updated"] = formatTimeAgo(new Date(doc.updatedAt));
   }
 
   return details;

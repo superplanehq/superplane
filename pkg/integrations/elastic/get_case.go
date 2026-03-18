@@ -30,7 +30,7 @@ func (c *GetCase) Documentation() string {
 
 ## Configuration
 
-- **Case ID**: The ID of the Kibana case to retrieve
+- **Case**: The Kibana case to retrieve
 
 ## Outputs
 
@@ -54,10 +54,16 @@ func (c *GetCase) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "caseId",
-			Label:       "Case ID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Case",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The ID of the Kibana case to retrieve.",
+			Description: "The Kibana case to retrieve.",
+			Placeholder: "Select a case",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeCase,
+				},
+			},
 		},
 	}
 }

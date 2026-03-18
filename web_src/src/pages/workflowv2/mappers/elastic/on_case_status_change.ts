@@ -28,6 +28,7 @@ export const onCaseStatusChangeTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const payload = context.event?.data as Record<string, any> | undefined;
     const details: Record<string, string> = {};
+    if (context.event?.createdAt) details["Triggered At"] = new Date(context.event.createdAt).toLocaleString();
     if (payload?.id) details["Case ID"] = String(payload.id);
     if (payload?.title) details["Title"] = String(payload.title);
     if (payload?.status) details["Status"] = String(payload.status);

@@ -8,9 +8,22 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
+
+func Test__GetCase__Configuration(t *testing.T) {
+	fields := (&GetCase{}).Configuration()
+
+	require.Len(t, fields, 1)
+	assert.Equal(t, "caseId", fields[0].Name)
+	assert.Equal(t, "Case", fields[0].Label)
+	assert.Equal(t, configuration.FieldTypeIntegrationResource, fields[0].Type)
+	require.NotNil(t, fields[0].TypeOptions)
+	require.NotNil(t, fields[0].TypeOptions.Resource)
+	assert.Equal(t, ResourceTypeCase, fields[0].TypeOptions.Resource.Type)
+}
 
 func Test__GetCase__Setup(t *testing.T) {
 	c := &GetCase{}
