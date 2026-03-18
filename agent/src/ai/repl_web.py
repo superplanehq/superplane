@@ -9,6 +9,7 @@ from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
@@ -38,7 +39,7 @@ class ReplWebServerConfig:
 class ReplStreamRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     canvas_id: str | None = Field(default=None, min_length=1, max_length=200)
-    model: str = Field(default="test", min_length=1, max_length=200)
+    model: str = Field(default=(os.getenv("AI_MODEL", "test").strip() or "test"), min_length=1, max_length=200)
     base_url: str | None = None
     token: str | None = None
     org_id: str | None = None
@@ -51,10 +52,31 @@ def _normalize_optional(value: str | None) -> str | None:
     return normalized or None
 
 
+def _debug_enabled() -> bool:
+    return os.getenv("REPL_WEB_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _debug_log(message: str, **fields: Any) -> None:
+    if not _debug_enabled():
+        return
+    if fields:
+        field_str = " ".join(f"{key}={_to_jsonable(value)}" for key, value in fields.items())
+        print(f"[repl_web] {message} {field_str}", flush=True)
+        return
+    print(f"[repl_web] {message}", flush=True)
+
+
 def _resolve_required(value: str | None, env_name: str) -> str:
     resolved = _normalize_optional(value) or _normalize_optional(os.getenv(env_name))
     if resolved is None:
         raise ValueError(f"Missing required setting: {env_name}")
+    return resolved
+
+
+def _resolve_required_payload(value: str | None, field_name: str) -> str:
+    resolved = _normalize_optional(value)
+    if resolved is None:
+        raise ValueError(f"Missing required request field: {field_name}")
     return resolved
 
 
@@ -88,12 +110,23 @@ def _build_deps(payload: ReplStreamRequest) -> AgentDeps:
     if payload.canvas_id is None:
         raise ValueError("canvas_id is required for non-test models.")
 
+    base_url = _resolve_required(payload.base_url, "SUPERPLANE_BASE_URL")
+    api_token = _resolve_required(payload.token, "SUPERPLANE_API_TOKEN")
+    organization_id = _resolve_required_payload(payload.org_id, "org_id")
     client = SuperplaneClient(
         SuperplaneClientConfig(
-            base_url=_resolve_required(payload.base_url, "SUPERPLANE_BASE_URL"),
-            api_token=_resolve_required(payload.token, "SUPERPLANE_API_TOKEN"),
-            organization_id=_resolve_required(payload.org_id, "SUPERPLANE_ORG_ID"),
+            base_url=base_url,
+            api_token=api_token,
+            organization_id=organization_id,
         )
+    )
+    _debug_log(
+        "resolved non-test deps",
+        model=payload.model,
+        canvas_id=payload.canvas_id,
+        base_url=base_url,
+        organization_id=organization_id,
+        has_token=bool(api_token),
     )
     return AgentDeps(
         client=client,
@@ -277,16 +310,38 @@ async def _stream_agent_run(payload: ReplStreamRequest) -> AsyncIterator[dict[st
 
 def _create_app() -> FastAPI:
     app = FastAPI()
+    cors_origins_raw = os.getenv("REPL_WEB_CORS_ORIGINS", "*")
+    cors_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
+    if not cors_origins:
+        cors_origins = ["*"]
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.post("/v1/repl/stream")
     async def stream_repl(payload: ReplStreamRequest, request: Request) -> StreamingResponse:
+        _debug_log(
+            "incoming stream request",
+            model=payload.model,
+            canvas_id=payload.canvas_id,
+            org_id=payload.org_id,
+            has_base_url=bool(_normalize_optional(payload.base_url)),
+            has_token=bool(_normalize_optional(payload.token)),
+        )
+
         async def event_generator() -> AsyncIterator[str]:
             try:
                 async for event in _stream_agent_run(payload):
                     if await request.is_disconnected():
+                        _debug_log("client disconnected")
                         break
                     yield _encode_sse_event(event)
             except Exception as error:
+                _debug_log("stream failed", error=str(error))
                 yield _encode_sse_event(
                     {
                         "type": "run_failed",
