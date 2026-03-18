@@ -5,7 +5,8 @@
     "title": "Production incident",
     "status": "in-progress",
     "severity": "high",
-    "version": "WzE3LDFd"
+    "version": "WzE3LDFd",
+    "updatedAt": "2026-03-12T10:00:00.000Z"
   },
   "timestamp": "2026-03-12T09:00:00Z"
 }
