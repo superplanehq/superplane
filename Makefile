@@ -32,6 +32,7 @@ tidy:
 	$(COMPOSE) exec app go mod tidy
 
 test.setup:
+	@touch agent/.env
 	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) build
@@ -96,6 +97,7 @@ format.js.check:
 #
 
 dev.setup:
+	@touch agent/.env
 	$(COMPOSE) build
 	$(COMPOSE) pull
 	$(COMPOSE) run --rm app go mod download

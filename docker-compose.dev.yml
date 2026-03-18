@@ -96,11 +96,34 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      agent:
+        condition: service_healthy
 
     volumes:
       - go-pkg-cache:/go
       - .:/app
       - /tmp:/tmp
+
+  agent:
+    build:
+      context: agent
+      dockerfile: Dockerfile
+      target: dev
+    env_file:
+      - agent/.env
+    environment:
+      IN_DOCKER: "1"
+    command: bash -lc "sleep infinity"
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./agent:/app
+      - uv-cache:/root/.cache/uv
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "uv --version >/dev/null && python --version >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
@@ -156,4 +179,7 @@ volumes:
     driver: local
 
   postgres-data:
+    driver: local
+
+  uv-cache:
     driver: local
