@@ -28,6 +28,9 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
+import remarkGfm from "remark-gfm";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
@@ -292,38 +295,6 @@ export function BuildingBlocksSidebar({
       default:
         return "Update canvas";
     }
-  }, []);
-
-  const extractAssistantOptions = useCallback((content: string): string[] => {
-    const optionSet = new Set<string>();
-
-    const lines = content
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    for (const line of lines) {
-      const bulletMatch = line.match(/^[-*]\s+(.+)$/);
-      const numberedMatch = line.match(/^\d+[.)]\s+(.+)$/);
-      const optionText = bulletMatch?.[1] || numberedMatch?.[1];
-      if (!optionText) continue;
-
-      const normalized = optionText.replace(/\s+/g, " ").trim();
-      if (normalized.length < 2 || normalized.length > 140) continue;
-      optionSet.add(normalized.replace(/[.;,\s]+$/, ""));
-    }
-
-    if (optionSet.size === 0) {
-      const codeMatches = [...content.matchAll(/`([^`]+)`/g)];
-      for (const match of codeMatches) {
-        const value = (match[1] || "").trim();
-        if (!value || value.length > 80) continue;
-        if (value.toLowerCase() === "etc.") continue;
-        optionSet.add(value);
-      }
-    }
-
-    return Array.from(optionSet).slice(0, 8);
   }, []);
 
   const handleApplyProposal = useCallback(async () => {
@@ -690,7 +661,7 @@ export function BuildingBlocksSidebar({
         {showAiBuilderTab && (
           <TabsContent value="ai" className="mt-0 flex-1 overflow-hidden px-5 pb-5">
             <div className="h-full rounded-md border border-border bg-slate-50/30 flex flex-col">
-              <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+              <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
                 {aiMessages.length === 0 ? (
                   <div className="text-sm text-gray-600">
                     <div className="flex items-start gap-2">
@@ -699,45 +670,56 @@ export function BuildingBlocksSidebar({
                   </div>
                 ) : (
                   <>
-                    {aiMessages.map((message) => (
-                      <div key={message.id} className={message.role === "user" ? "ml-6" : "mr-6"}>
+                    {aiMessages.map((message) => {
+                      const isEmptyAssistantPlaceholder =
+                        message.role === "assistant" && message.content.trim().length === 0;
+                      if (isEmptyAssistantPlaceholder) {
+                        return null;
+                      }
+
+                      const isToolMessage = message.role === "tool";
+                      const isRunningToolMessage = isToolMessage && message.toolStatus === "running";
+                      return (
                         <div
-                          className={
-                            message.role === "user"
-                              ? "rounded-md bg-blue-600 text-white px-3 py-2 text-sm"
-                              : "rounded-md bg-white border border-border px-3 py-2 text-sm text-gray-800"
-                          }
+                          key={message.id}
+                          className={message.role === "user" ? "w-full" : isToolMessage ? "mr-6 pl-1" : "mr-6"}
                         >
-                          {message.content}
+                          <div
+                            className={
+                              message.role === "user"
+                                ? "w-full rounded-md bg-blue-600 text-white px-3 py-2 text-sm"
+                                : isToolMessage
+                                  ? `px-0.5 py-0.5 text-[11px] leading-relaxed text-gray-500 ${
+                                      isRunningToolMessage ? "sp-ai-thinking" : ""
+                                    }`
+                                  : "px-0.5 py-0.5 text-sm text-gray-800"
+                            }
+                          >
+                            {message.role === "assistant" ? (
+                              <div className="max-w-none [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal [&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_li]:mb-1 [&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs [&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-100 [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold">
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkGfm, remarkBreaks]}
+                                  components={{
+                                    a: ({ children, href }) => (
+                                      <a href={href} target="_blank" rel="noopener noreferrer" className="underline">
+                                        {children}
+                                      </a>
+                                    ),
+                                  }}
+                                >
+                                  {message.content}
+                                </ReactMarkdown>
+                              </div>
+                            ) : (
+                              message.content
+                            )}
+                          </div>
                         </div>
-                        {message.role === "assistant" && !pendingProposal
-                          ? (() => {
-                              const options = extractAssistantOptions(message.content);
-                              if (options.length === 0) return null;
-                              return (
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {options.map((option) => (
-                                    <Button
-                                      key={`${message.id}-${option}`}
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 text-xs"
-                                      onClick={() => handleSendPrompt(option)}
-                                      disabled={disabled || isGeneratingResponse || !canvasId}
-                                    >
-                                      {option}
-                                    </Button>
-                                  ))}
-                                </div>
-                              );
-                            })()
-                          : null}
-                      </div>
-                    ))}
+                      );
+                    })}
                     {isGeneratingResponse ? (
                       <div className="sp-ai-thinking text-xs text-gray-500 px-1 py-1 rounded-sm">
-                        Planing next steps...
+                        Planning next steps...
                       </div>
                     ) : null}
                   </>
@@ -776,7 +758,7 @@ export function BuildingBlocksSidebar({
                 {!pendingProposal && aiError ? <p className="text-xs text-red-700">{aiError}</p> : null}
               </div>
 
-              <div className="border-t border-border px-4 py-3">
+              <div className="border-t border-border px-3 py-2">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
