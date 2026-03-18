@@ -180,6 +180,7 @@ export function ImportYamlDialog({ open, onOpenChange, organizationId, onSuccess
               <input
                 ref={fileInputRef}
                 id="yaml-file-input"
+                data-testid="import-yaml-file-input"
                 type="file"
                 accept=".yaml,.yml"
                 className="hidden"
@@ -200,6 +201,7 @@ export function ImportYamlDialog({ open, onOpenChange, organizationId, onSuccess
             </Label>
             <Textarea
               id="yaml-paste-input"
+              data-testid="import-yaml-textarea"
               value={yamlText}
               onChange={(e) => {
                 setYamlText(e.target.value);
@@ -213,7 +215,10 @@ export function ImportYamlDialog({ open, onOpenChange, organizationId, onSuccess
           </div>
 
           {parseError && (
-            <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3">
+            <div
+              data-testid="import-yaml-error"
+              className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3"
+            >
               <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
               <span className="text-sm text-red-700">{parseError}</span>
             </div>
@@ -224,7 +229,11 @@ export function ImportYamlDialog({ open, onOpenChange, organizationId, onSuccess
           <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleImport} disabled={!yamlText.trim() || createMutation.isPending}>
+          <Button
+            data-testid="import-yaml-submit"
+            onClick={handleImport}
+            disabled={!yamlText.trim() || createMutation.isPending}
+          >
             {createMutation.isPending ? "Importing..." : "Import Canvas"}
           </Button>
         </DialogFooter>

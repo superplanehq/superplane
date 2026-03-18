@@ -339,7 +339,13 @@ function PageHeader({
       <div className="flex items-center gap-2">
         {activeTab === "canvases" && (
           <PermissionTooltip allowed={canCreate || permissionsLoading} message={createMessage}>
-            <Button variant="outline" size="sm" onClick={onImportYamlClick} disabled={!canCreate}>
+            <Button
+              data-testid="import-yaml-button"
+              variant="outline"
+              size="sm"
+              onClick={onImportYamlClick}
+              disabled={!canCreate}
+            >
               <Upload size={16} />
               Import YAML
             </Button>
