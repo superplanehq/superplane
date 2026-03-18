@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -60,6 +61,24 @@ func Test__UpdateDocument__Configuration(t *testing.T) {
 
 	fields := c.Configuration()
 	require.Len(t, fields, 3)
+
+	var documentIDField *configuration.Field
+	for i := range fields {
+		if fields[i].Name == "documentId" {
+			documentIDField = &fields[i]
+			break
+		}
+	}
+
+	require.NotNil(t, documentIDField)
+	assert.Equal(t, configuration.FieldTypeIntegrationResource, documentIDField.Type)
+	require.NotNil(t, documentIDField.TypeOptions)
+	require.NotNil(t, documentIDField.TypeOptions.Resource)
+	assert.Equal(t, ResourceTypeDocument, documentIDField.TypeOptions.Resource.Type)
+	require.Len(t, documentIDField.TypeOptions.Resource.Parameters, 1)
+	assert.Equal(t, "index", documentIDField.TypeOptions.Resource.Parameters[0].Name)
+	require.NotNil(t, documentIDField.TypeOptions.Resource.Parameters[0].ValueFrom)
+	assert.Equal(t, "index", documentIDField.TypeOptions.Resource.Parameters[0].ValueFrom.Field)
 
 	updateFields := fields[2]
 	assert.Equal(t, "fields", updateFields.Name)

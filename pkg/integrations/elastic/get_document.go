@@ -64,9 +64,21 @@ func (c *GetDocument) Configuration() []configuration.Field {
 		{
 			Name:        "documentId",
 			Label:       "Document ID",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The ID of the document to retrieve.",
+			Description: "The document to retrieve from the selected index.",
+			Placeholder: "Select a document",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeDocument,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "index",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "index"},
+						},
+					},
+				},
+			},
 		},
 	}
 }

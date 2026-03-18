@@ -428,6 +428,37 @@ type SearchHit struct {
 	Source map[string]any `json:"_source"`
 }
 
+// ListDocuments returns up to 100 documents from an index for use in resource pickers.
+func (c *Client) ListDocuments(index string) ([]SearchHit, error) {
+	query := map[string]any{
+		"query":   map[string]any{"match_all": map[string]any{}},
+		"_source": false,
+		"size":    100,
+	}
+
+	data, err := json.Marshal(query)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling list documents query: %v", err)
+	}
+
+	fullURL := fmt.Sprintf("%s/%s/_search", c.baseURL, url.PathEscape(index))
+	responseBody, err := c.execRequest(http.MethodPost, fullURL, bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Hits struct {
+			Hits []SearchHit `json:"hits"`
+		} `json:"hits"`
+	}
+	if err := json.Unmarshal(responseBody, &result); err != nil {
+		return nil, fmt.Errorf("error parsing list documents response: %v", err)
+	}
+
+	return result.Hits.Hits, nil
+}
+
 // TimestampValue extracts the @timestamp value from the source as a string.
 // Returns "" if the field is absent or not a string.
 func (h *SearchHit) TimestampValue() string {
