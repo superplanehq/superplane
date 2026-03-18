@@ -18,6 +18,10 @@ interface GetCaseConfiguration {
   caseId?: string;
 }
 
+interface GetCaseNodeMetadata {
+  caseName?: string;
+}
+
 interface GetCaseOutputData {
   id?: string;
   title?: string;
@@ -69,9 +73,11 @@ export const getCaseMapper: ComponentBaseMapper = {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as GetCaseConfiguration | undefined;
+  const nodeMetadata = node.metadata as GetCaseNodeMetadata | undefined;
 
-  if (configuration?.caseId) {
-    metadata.push({ icon: "hash", label: `Case: ${configuration.caseId}` });
+  const caseName = nodeMetadata?.caseName || configuration?.caseId;
+  if (caseName) {
+    metadata.push({ icon: "hash", label: `Case: ${caseName}` });
   }
 
   return metadata;

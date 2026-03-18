@@ -13,6 +13,10 @@ import (
 
 type GetCase struct{}
 
+type GetCaseNodeMetadata struct {
+	CaseName string `json:"caseName,omitempty" mapstructure:"caseName"`
+}
+
 type GetCaseConfiguration struct {
 	CaseID string `json:"caseId" mapstructure:"caseId"`
 }
@@ -78,7 +82,25 @@ func (c *GetCase) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("caseId is required")
 	}
 
-	return nil
+	return c.resolveMetadata(ctx, config.CaseID)
+}
+
+func (c *GetCase) resolveMetadata(ctx core.SetupContext, caseID string) error {
+	meta := GetCaseNodeMetadata{}
+	if strings.Contains(caseID, "{{") {
+		meta.CaseName = caseID
+	} else {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create Elastic client: %w", err)
+		}
+		caseResp, err := client.GetCase(caseID)
+		if err != nil {
+			return fmt.Errorf("failed to get case: %w", err)
+		}
+		meta.CaseName = caseResp.Title
+	}
+	return ctx.Metadata.Set(meta)
 }
 
 func (c *GetCase) Execute(ctx core.ExecutionContext) error {

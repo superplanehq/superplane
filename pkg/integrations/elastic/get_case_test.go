@@ -27,6 +27,12 @@ func Test__GetCase__Configuration(t *testing.T) {
 
 func Test__GetCase__Setup(t *testing.T) {
 	c := &GetCase{}
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
+		"url":       "https://elastic.example.com",
+		"kibanaUrl": "https://kibana.example.com",
+		"authType":  "apiKey",
+		"apiKey":    "test-api-key",
+	}}
 
 	t.Run("missing caseId -> error", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
@@ -45,11 +51,36 @@ func Test__GetCase__Setup(t *testing.T) {
 	})
 
 	t.Run("valid config -> success", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"id": "case-abc",
+						"title": "Incident 42"
+					}`)),
+				},
+			},
+		}
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{"caseId": "case-abc"},
-			Metadata:      &contexts.MetadataContext{},
+			HTTP:          httpCtx,
+			Integration:   integrationCtx,
+			Metadata:      metadata,
 		})
 		require.NoError(t, err)
+		assert.Equal(t, GetCaseNodeMetadata{CaseName: "Incident 42"}, metadata.Metadata)
+	})
+
+	t.Run("expression caseId -> stores expression as metadata", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{}
+		err := c.Setup(core.SetupContext{
+			Configuration: map[string]any{"caseId": "{{ previous().data.id }}"},
+			Metadata:      metadata,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, GetCaseNodeMetadata{CaseName: "{{ previous().data.id }}"}, metadata.Metadata)
 	})
 }
 
