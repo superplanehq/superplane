@@ -9,6 +9,8 @@ services:
         condition: service_healthy
     env_file:
       - superplane.env
+    environment:
+      VITE_ENABLE_AGENT_REPL: ${VITE_ENABLE_AGENT_REPL:-false}
     volumes:
       - ${OIDC_KEYS_HOST_PATH:-./oidc}:${OIDC_KEYS_CONTAINER_PATH:-/app/oidc-keys}
     healthcheck:

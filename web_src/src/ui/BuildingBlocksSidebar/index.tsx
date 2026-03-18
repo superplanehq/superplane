@@ -5,7 +5,6 @@ import type {
   SuperplaneBlueprintsOutputChannel,
   SuperplaneComponentsOutputChannel,
 } from "@/api-client";
-import { canvasesSendAiMessage } from "@/api-client/sdk.gen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -14,9 +13,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { resolveIcon } from "@/lib/utils";
-import { isCustomComponentsEnabled } from "@/lib/env";
+import { getAgentReplWebUrl, isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getComponentSubtype } from "../buildingBlocks";
 import {
   ChevronRight,
@@ -63,6 +61,7 @@ export interface BuildingBlocksSidebarProps {
   blocks: BuildingBlockCategory[];
   showAiBuilderTab?: boolean;
   canvasId?: string;
+  organizationId?: string;
   canvasNodes?: Array<{
     id: string;
     name?: string;
@@ -133,10 +132,16 @@ type AiBuilderProposal = {
   operations: AiCanvasOperation[];
 };
 
+type ReplStreamEvent = {
+  type?: string;
+  [key: string]: unknown;
+};
+
 const AI_HISTORY_RECENT_TURNS = 8;
 const AI_HISTORY_OLDER_TURNS = 6;
 const AI_HISTORY_MAX_MESSAGE_CHARS = 320;
 const AI_MAX_STORED_MESSAGES = 50;
+const TEST_MODEL_SENTINEL = "success (no tool calls)";
 
 function compactMessageContent(content: string): string {
   const normalized = content.replace(/\s+/g, " ").trim();
@@ -181,15 +186,48 @@ function pushAiMessages(previous: AiBuilderMessage[], next: AiBuilderMessage | A
   return merged.slice(-AI_MAX_STORED_MESSAGES);
 }
 
+function parseSseChunk(rawChunk: string): ReplStreamEvent[] {
+  const chunks = rawChunk.split("\n\n");
+  const events: ReplStreamEvent[] = [];
+
+  for (const chunk of chunks) {
+    const lines = chunk.split("\n");
+    const dataLines: string[] = [];
+    for (const line of lines) {
+      if (line.startsWith("data:")) {
+        dataLines.push(line.replace(/^data:\s*/, ""));
+      }
+    }
+
+    if (!dataLines.length) {
+      continue;
+    }
+
+    const merged = dataLines.join("\n").trim();
+    if (!merged) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(merged);
+      if (parsed && typeof parsed === "object") {
+        events.push(parsed as ReplStreamEvent);
+      }
+    } catch {
+      events.push({ type: "raw_data", content: merged });
+    }
+  }
+
+  return events;
+}
+
 export function BuildingBlocksSidebar({
   isOpen,
   onToggle,
   blocks,
   showAiBuilderTab = false,
   canvasId,
-  canvasNodes = [],
-  aiCanvas,
-  selectedNodeIds = [],
+  organizationId,
   onApplyAiOperations,
   integrations = [],
   canvasZoom = 1,
@@ -292,6 +330,7 @@ export function BuildingBlocksSidebar({
     const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
     return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
   }, []);
+  const agentReplWebUrl = getAgentReplWebUrl().replace(/\/+$/, "");
 
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
@@ -328,57 +367,136 @@ export function BuildingBlocksSidebar({
       setIsGeneratingResponse(true);
 
       try {
-        const availableBlocks = (blocks || []).flatMap((category) =>
-          category.blocks
-            .filter((block) => block.isLive && !block.deprecated)
-            .map((block) => ({
-              name: block.name,
-              label: block.label || block.name,
-              type: block.type,
-            })),
-        );
-
-        const apiResponse = await canvasesSendAiMessage(
-          withOrganizationHeader({
-            path: { canvasId },
-            body: {
-              prompt: contextualPrompt,
-              canvasContext: {
-                nodes: canvasNodes,
-                availableBlocks,
-                canvas: {
-                  metadata: {
-                    name: aiCanvas?.name || "",
-                    description: aiCanvas?.description || "",
-                  },
-                  spec: {
-                    nodes: aiCanvas?.nodes || [],
-                    edges: aiCanvas?.edges || [],
-                  },
-                },
-                selectedNodeIds,
-              },
-            },
+        const assistantMessageId = `assistant-${Date.now()}`;
+        setAiMessages((prev) =>
+          pushAiMessages(prev, {
+            id: assistantMessageId,
+            role: "assistant",
+            content: "",
           }),
         );
+        setPendingProposal(null);
 
-        const payload = apiResponse.data as { assistantMessage?: string; operations?: AiCanvasOperation[] } | undefined;
-        const proposal: AiBuilderProposal = {
-          id: `proposal-${Date.now()}`,
-          summary: payload?.assistantMessage || "I prepared a draft change set you can review and apply.",
-          operations: payload?.operations || [],
+        const response = await fetch(`${agentReplWebUrl}/v1/repl/stream`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+          },
+          body: JSON.stringify({
+            question: contextualPrompt,
+            canvas_id: canvasId,
+            org_id: organizationId || undefined,
+          }),
+        });
+
+        if (!response.ok || !response.body) {
+          const responseText = await response.text();
+          throw new Error(responseText || `Request failed with status ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let streamedAnyAnswer = false;
+        let assistantContentSnapshot = "";
+        let runModel = "";
+
+        const appendAssistantContent = (value: string) => {
+          if (!value) return;
+          assistantContentSnapshot += value;
+          streamedAnyAnswer = true;
+          setAiMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantMessageId ? { ...message, content: `${message.content}${value}` } : message,
+            ),
+          );
+        };
+        const replaceAssistantContent = (value: string) => {
+          assistantContentSnapshot = value;
+          streamedAnyAnswer = true;
+          setAiMessages((prev) =>
+            prev.map((message) => (message.id === assistantMessageId ? { ...message, content: value } : message)),
+          );
         };
 
-        const assistantMessage: AiBuilderMessage = {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: proposal.summary,
-        };
-        setAiMessages((prev) => pushAiMessages(prev, assistantMessage));
-        if (proposal.operations.length > 0) {
-          setPendingProposal(proposal);
-        } else {
-          setPendingProposal(null);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop() ?? "";
+
+          for (const part of parts) {
+            const parsedEvents = parseSseChunk(part);
+            for (const event of parsedEvents) {
+              if (event.type === "run_started" && typeof event.model === "string") {
+                runModel = event.model.trim().toLowerCase();
+                continue;
+              }
+
+              if (event.type === "model_delta" && typeof event.content === "string") {
+                appendAssistantContent(event.content);
+                continue;
+              }
+
+              if (event.type === "final_answer") {
+                const output = event.output;
+                if (
+                  !streamedAnyAnswer &&
+                  runModel === "test" &&
+                  typeof output === "string" &&
+                  output.trim().toLowerCase() === TEST_MODEL_SENTINEL
+                ) {
+                  appendAssistantContent(
+                    "Agent is running in test mode. Set AI_MODEL in agent/.env to a real model and configure agent credentials to get canvas-aware answers.",
+                  );
+                  continue;
+                }
+                if (!streamedAnyAnswer && typeof output === "string") {
+                  appendAssistantContent(output);
+                  continue;
+                }
+
+                if (
+                  !streamedAnyAnswer &&
+                  output &&
+                  typeof output === "object" &&
+                  typeof (output as { answer?: unknown }).answer === "string"
+                ) {
+                  appendAssistantContent((output as { answer: string }).answer);
+                }
+                continue;
+              }
+
+              if (event.type === "run_failed" && typeof event.error === "string") {
+                throw new Error(event.error);
+              }
+            }
+          }
+        }
+
+        if (runModel === "test" && assistantContentSnapshot.trim().toLowerCase() === TEST_MODEL_SENTINEL) {
+          replaceAssistantContent(
+            "Agent is running in test mode. Set AI_MODEL in agent/.env to a real model and configure agent credentials to get canvas-aware answers.",
+          );
+        }
+
+        if (!streamedAnyAnswer) {
+          setAiMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantMessageId
+                ? {
+                    ...message,
+                    content:
+                      runModel === "test"
+                        ? "Agent is running in test mode. Set AI_MODEL in agent/.env to a real model and configure agent credentials to get canvas-aware answers."
+                        : "I finished the run, but no text response was returned.",
+                  }
+                : message,
+            ),
+          );
         }
       } catch (error) {
         const fallbackMessage = "I couldn't generate changes right now. Please try again.";
@@ -394,7 +512,7 @@ export function BuildingBlocksSidebar({
         setIsGeneratingResponse(false);
       }
     },
-    [aiInput, aiMessages, blocks, canvasId, canvasNodes, isGeneratingResponse],
+    [aiInput, aiMessages, agentReplWebUrl, canvasId, isGeneratingResponse, organizationId],
   );
 
   const handleDiscardProposal = useCallback(() => {

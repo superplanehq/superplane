@@ -18,6 +18,15 @@ from ai.models import (
 )
 
 
+def _debug_enabled() -> bool:
+    return os.getenv("REPL_WEB_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _debug_log(message: str) -> None:
+    if _debug_enabled():
+        print(f"[repl_web][superplane_client] {message}", flush=True)
+
+
 @dataclass(frozen=True)
 class SuperplaneClientConfig:
     base_url: str
@@ -47,20 +56,26 @@ class SuperplaneClient:
         }
 
     def _request_json(self, path: str, query: dict[str, str | int] | None = None) -> dict[str, Any]:
+        url = self._build_url(path, query)
+        _debug_log(
+            f"request method=GET url={url} org_id={self._config.organization_id} timeout={self._config.timeout_seconds}s"
+        )
         request = Request(
-            url=self._build_url(path, query),
+            url=url,
             method="GET",
             headers=self._headers(),
         )
         try:
             with urlopen(request, timeout=self._config.timeout_seconds) as response:
                 raw = response.read().decode("utf-8")
+                _debug_log(f"response status={response.status} bytes={len(raw.encode('utf-8'))}")
         except HTTPError as error:
             response_text = ""
             try:
                 response_text = error.read().decode("utf-8")
             except Exception:
                 response_text = ""
+            _debug_log(f"http_error status={error.code} body={response_text[:400]}")
 
             guidance = (
                 "Check SUPERPLANE_API_TOKEN, SUPERPLANE_ORG_ID, and canvas access permissions."
@@ -72,6 +87,7 @@ class SuperplaneClient:
             )
             raise RuntimeError(f"Superplane API request failed.{details} {guidance}") from error
         except URLError as error:
+            _debug_log(f"url_error reason={error}")
             raise RuntimeError(
                 "Failed to reach Superplane API. "
                 "Check SUPERPLANE_BASE_URL and network connectivity."

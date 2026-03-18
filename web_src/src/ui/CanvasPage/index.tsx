@@ -949,6 +949,7 @@ function CanvasPage(props: CanvasPageProps) {
             blocks={props.buildingBlocks || []}
             showAiBuilderTab={props.showAiBuilderTab}
             canvasId={props.canvasId}
+            organizationId={props.organizationId}
             canvasNodes={canvasNodesForAiContext}
             onApplyAiOperations={props.onApplyAiOperations}
             integrations={props.integrations}

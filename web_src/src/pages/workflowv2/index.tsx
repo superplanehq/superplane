@@ -1,5 +1,6 @@
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { isAgentReplEnabled } from "@/lib/env";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { GitBranch, Loader2, Puzzle } from "lucide-react";
@@ -26,7 +27,6 @@ import {
   OrganizationsIntegration,
 } from "@/api-client";
 import {
-  useOrganizationAgentSettings,
   useOrganization,
   useOrganizationGroups,
   useOrganizationRoles,
@@ -457,12 +457,11 @@ export function WorkflowPageV2() {
     error: canvasMemoryError,
   } = useCanvasMemoryEntries(canvasId!, isViewingLiveVersion);
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
-  const { data: agentSettings } = useOrganizationAgentSettings(organizationId || "", !!organizationId && canReadOrg);
   const { data: organization } = useOrganization(organizationId || "", !!organizationId && canReadOrg);
   const isOrgVersioningEnabled = organization?.metadata?.versioningEnabled;
   const canUpdateCanvas = canAct("canvases", "update");
   const updateCanvasMutation = useUpdateCanvas(organizationId || "", canvasId || "");
-  const showAiBuilderTab = agentSettings?.agentModeEnabled ?? false;
+  const showAiBuilderTab = isAgentReplEnabled();
 
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
 
