@@ -32,6 +32,8 @@ func NewOrganizationService(
 	baseURL string,
 	webhooksBaseURL string,
 ) *OrganizationService {
+	registry.InitializeOIDC(oidcProvider)
+
 	return &OrganizationService{
 		registry:             registry,
 		oidcProvider:         oidcProvider,
@@ -157,7 +159,7 @@ func (s *OrganizationService) DescribeIntegration(ctx context.Context, req *pb.D
 
 func (s *OrganizationService) ListIntegrationResources(ctx context.Context, req *pb.ListIntegrationResourcesRequest) (*pb.ListIntegrationResourcesResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.ListIntegrationResources(ctx, s.registry, s.oidcProvider, orgID, req.IntegrationId, req.Parameters)
+	return organizations.ListIntegrationResources(ctx, s.registry, orgID, req.IntegrationId, req.Parameters)
 }
 
 func (s *OrganizationService) CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {

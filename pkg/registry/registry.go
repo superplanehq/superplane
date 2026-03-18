@@ -8,6 +8,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/oidc"
 )
 
 var (
@@ -224,6 +225,26 @@ func (r *Registry) GetWebhookHandler(name string) (core.WebhookHandler, error) {
 	}
 
 	return webhookHandler, nil
+}
+
+// InitializeOIDC injects the server-wide OIDC provider into any registered
+// integration that opts in via SetOIDCProvider. Called once at startup.
+func (r *Registry) InitializeOIDC(p oidc.Provider) {
+	type oidcSetter interface {
+		SetOIDCProvider(oidc.Provider)
+	}
+	type unwrapper interface {
+		Unwrap() core.Integration
+	}
+	for _, integration := range r.Integrations {
+		target := core.Integration(integration)
+		if u, ok := integration.(unwrapper); ok {
+			target = u.Unwrap()
+		}
+		if setter, ok := target.(oidcSetter); ok {
+			setter.SetOIDCProvider(p)
+		}
+	}
 }
 
 func (r *Registry) ListIntegrations() []core.Integration {
