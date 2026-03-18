@@ -113,7 +113,9 @@ func TruncateTables() error {
 			workflow_node_executions,
 			workflow_node_queue_items,
 			workflow_node_requests,
-			webhooks
+			webhooks,
+			usage_profiles,
+			org_usage_overrides
 		restart identity cascade;
 	`).Error
 }

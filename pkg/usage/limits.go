@@ -12,16 +12,16 @@ import (
 const DefaultProfileName = "basic"
 
 type EffectiveLimits struct {
-	ProfileName          string
-	MaxOrgsPerAccount    int
-	MaxCanvasesPerOrg    int
-	MaxNodesPerCanvas    int
-	MaxUsersPerOrg       int
+	ProfileName           string
+	MaxOrgsPerAccount     int
+	MaxCanvasesPerOrg     int
+	MaxNodesPerCanvas     int
+	MaxUsersPerOrg        int
 	MaxIntegrationsPerOrg int
-	MaxEventsPerMonth    int
-	RetentionDays        int
-	IsUnlimited          bool
-	HasOverrides         bool
+	MaxEventsPerMonth     int
+	RetentionDays         int
+	IsUnlimited           bool
+	HasOverrides          bool
 }
 
 func isEnforcementDisabled() bool {

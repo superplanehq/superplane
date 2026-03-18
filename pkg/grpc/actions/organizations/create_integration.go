@@ -33,7 +33,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 	}
 
 	if err := usage.CheckIntegrationLimit(org); err != nil {
-		return nil, status.Errorf(codes.ResourceExhausted, err.Error())
+		return nil, status.Errorf(codes.ResourceExhausted, "%s", err.Error())
 	}
 
 	//

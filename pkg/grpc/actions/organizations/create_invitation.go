@@ -32,7 +32,7 @@ func CreateInvitation(ctx context.Context, authService authorization.Authorizati
 	authenticatedUser := uuid.MustParse(authenticatedUserID)
 
 	if err := usage.CheckMemberLimit(org); err != nil {
-		return nil, status.Errorf(codes.ResourceExhausted, err.Error())
+		return nil, status.Errorf(codes.ResourceExhausted, "%s", err.Error())
 	}
 
 	//

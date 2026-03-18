@@ -17,10 +17,12 @@ import { Secrets } from "./Secrets";
 import { SecretDetail } from "./SecretDetail";
 import { ServiceAccounts } from "./ServiceAccounts";
 import { ServiceAccountDetail } from "./ServiceAccountDetail";
+import { Usage } from "./Usage";
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { cn } from "@/lib/utils";
 import {
   ArrowRightLeft,
+  BarChart3,
   Bot,
   CircleUser,
   Home,
@@ -98,6 +100,7 @@ export function OrganizationSettings() {
     "integrations",
     "secrets",
     "service-accounts",
+    "usage",
   ];
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
   const settingsIndex = pathSegments.indexOf("settings");
@@ -172,6 +175,13 @@ export function OrganizationSettings() {
       Icon: Key,
       permission: { resource: "secrets", action: "read" },
     },
+    {
+      id: "usage",
+      label: "Usage",
+      href: `/${organizationId}/settings/usage`,
+      Icon: BarChart3,
+      permission: { resource: "org", action: "read" },
+    },
     { id: "change-org", label: "Change Organization", href: "/", Icon: ArrowRightLeft },
   ];
 
@@ -194,6 +204,9 @@ export function OrganizationSettings() {
       return true;
     }
     if (link.id === "service-accounts" && currentSection === "service-accounts") {
+      return true;
+    }
+    if (link.id === "usage" && currentSection === "usage") {
       return true;
     }
     return currentSection === link.id;
@@ -239,6 +252,10 @@ export function OrganizationSettings() {
     "service-accounts": {
       title: "Service Accounts",
       description: "Create and manage service accounts for programmatic API access.",
+    },
+    usage: {
+      title: "Usage",
+      description: "View your organization's resource usage, limits, and profile.",
     },
     profile: {
       title: "Profile",
@@ -493,6 +510,14 @@ export function OrganizationSettings() {
             />
             <Route path="secrets" element={<Secrets organizationId={organizationId || ""} />} />
             <Route path="secrets/:secretId" element={<SecretDetail organizationId={organizationId || ""} />} />
+            <Route
+              path="usage"
+              element={
+                <RequirePermission resource="org" action="read">
+                  <Usage />
+                </RequirePermission>
+              }
+            />
             <Route
               path="service-accounts"
               element={

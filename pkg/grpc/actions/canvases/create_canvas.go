@@ -54,7 +54,7 @@ func CreateCanvasWithAutoLayout(
 
 	orgUUID := uuid.MustParse(organizationID)
 	if err := usage.CheckCanvasCreationLimit(orgUUID); err != nil {
-		return nil, status.Errorf(codes.ResourceExhausted, err.Error())
+		return nil, status.Errorf(codes.ResourceExhausted, "%s", err.Error())
 	}
 
 	createdBy := uuid.MustParse(userID)

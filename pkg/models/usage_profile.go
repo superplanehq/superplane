@@ -9,17 +9,17 @@ import (
 )
 
 type UsageProfile struct {
-	ID                   uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Name                 string
-	MaxOrgsPerAccount    int
-	MaxCanvasesPerOrg    int
-	MaxNodesPerCanvas    int
-	MaxUsersPerOrg       int
+	ID                    uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Name                  string
+	MaxOrgsPerAccount     int
+	MaxCanvasesPerOrg     int
+	MaxNodesPerCanvas     int
+	MaxUsersPerOrg        int
 	MaxIntegrationsPerOrg int
-	MaxEventsPerMonth    int
-	RetentionDays        int
-	CreatedAt            *time.Time
-	UpdatedAt            *time.Time
+	MaxEventsPerMonth     int
+	RetentionDays         int
+	CreatedAt             *time.Time
+	UpdatedAt             *time.Time
 }
 
 func FindUsageProfileByName(name string) (*UsageProfile, error) {
