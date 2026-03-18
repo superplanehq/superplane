@@ -12,4 +12,3 @@ def test_canvas_question_request_accepts_valid_question() -> None:
 def test_canvas_question_request_rejects_empty_question() -> None:
     with pytest.raises(ValidationError):
         CanvasQuestionRequest(question="")
-

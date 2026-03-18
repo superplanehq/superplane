@@ -68,9 +68,7 @@ class SuperplaneClient:
                 else "Check SUPERPLANE_BASE_URL and request parameters."
             )
             details = (
-                f" HTTP {error.code}: {response_text}"
-                if response_text
-                else f" HTTP {error.code}."
+                f" HTTP {error.code}: {response_text}" if response_text else f" HTTP {error.code}."
             )
             raise RuntimeError(f"Superplane API request failed.{details} {guidance}") from error
         except URLError as error:
@@ -91,9 +89,7 @@ class SuperplaneClient:
             raise ValueError("Canvas response is missing 'canvas'.")
 
         metadata = (
-            raw_canvas.get("metadata")
-            if isinstance(raw_canvas.get("metadata"), dict)
-            else {}
+            raw_canvas.get("metadata") if isinstance(raw_canvas.get("metadata"), dict) else {}
         )
         spec = raw_canvas.get("spec") if isinstance(raw_canvas.get("spec"), dict) else {}
 
@@ -181,8 +177,7 @@ class SuperplaneClient:
             for edge in summary.edges
         }
         shape_edges = [
-            CanvasShapeEdge(s=source, t=target)
-            for (source, target) in sorted(edge_pairs)
+            CanvasShapeEdge(s=source, t=target) for (source, target) in sorted(edge_pairs)
         ]
         return CanvasShape(
             canvas_id=summary.canvas_id,
@@ -213,9 +208,7 @@ class SuperplaneClient:
                     node_id=item.get("nodeId") if isinstance(item.get("nodeId"), str) else None,
                     channel=item.get("channel") if isinstance(item.get("channel"), str) else None,
                     created_at=(
-                        item.get("createdAt")
-                        if isinstance(item.get("createdAt"), str)
-                        else None
+                        item.get("createdAt") if isinstance(item.get("createdAt"), str) else None
                     ),
                     data=data if isinstance(data, dict) else {},
                 )

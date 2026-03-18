@@ -97,9 +97,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
     )
 
     @agent.tool
-    def get_canvas_shape(
-        ctx: RunContext[AgentDeps], canvas_id: str | None = None
-    ) -> CanvasShape:
+    def get_canvas_shape(ctx: RunContext[AgentDeps], canvas_id: str | None = None) -> CanvasShape:
         resolved_canvas_id = (canvas_id or ctx.deps.default_canvas_id or "").strip()
         if not resolved_canvas_id:
             raise ValueError("canvas_id is required.")
@@ -108,8 +106,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             timestamp = _color(_elapsed_since_question_started(ctx), "90")
             tool_label = _color("[tool]", "36")
             print(
-                f"{timestamp} {tool_label} "
-                f"get_canvas_shape(canvas_id={resolved_canvas_id})",
+                f"{timestamp} {tool_label} get_canvas_shape(canvas_id={resolved_canvas_id})",
                 flush=True,
             )
         cached_shape = ctx.deps.canvas_shape_cache.get(resolved_canvas_id)
@@ -150,25 +147,20 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         return shape
 
     @agent.tool
-    def request_canvas_details(
-        ctx: RunContext[AgentDeps], reason: str = ""
-    ) -> str:
+    def request_canvas_details(ctx: RunContext[AgentDeps], reason: str = "") -> str:
         if ctx.deps.show_tool_calls:
             timestamp = _color(_elapsed_since_question_started(ctx), "90")
             status_label = _color("[status]", "33")
             printable_reason = reason.strip() or "no reason provided"
             print(
-                f"{timestamp} {status_label} "
-                f"request_canvas_details(reason={printable_reason})",
+                f"{timestamp} {status_label} request_canvas_details(reason={printable_reason})",
                 flush=True,
             )
         ctx.deps.allow_canvas_details = True
         return "Full canvas details enabled for this question."
 
     @agent.tool
-    def get_canvas(
-        ctx: RunContext[AgentDeps], canvas_id: str | None = None
-    ) -> CanvasSummary:
+    def get_canvas(ctx: RunContext[AgentDeps], canvas_id: str | None = None) -> CanvasSummary:
         resolved_canvas_id = (canvas_id or ctx.deps.default_canvas_id or "").strip()
         if not resolved_canvas_id:
             raise ValueError("canvas_id is required.")
@@ -182,8 +174,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             timestamp = _color(_elapsed_since_question_started(ctx), "90")
             tool_label = _color("[tool]", "36")
             print(
-                f"{timestamp} {tool_label} "
-                f"get_canvas(canvas_id={resolved_canvas_id})",
+                f"{timestamp} {tool_label} get_canvas(canvas_id={resolved_canvas_id})",
                 flush=True,
             )
         cached_summary = ctx.deps.canvas_cache.get(resolved_canvas_id)
@@ -266,4 +257,3 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         return details
 
     return agent
-

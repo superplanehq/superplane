@@ -156,7 +156,7 @@ dev.pr.clean.checkout:
 	bash ./scripts/clean-pr-checkout $(PR)
 
 dev.agent.console:
-	$(COMPOSE) exec agent uv run python -m ai.main --interactive --canvas-id "$(CANVAS_ID)"
+	$(COMPOSE) exec agent uv run python -m repl.main --interactive --canvas-id "$(CANVAS_ID)" --start-repl-web
 
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
