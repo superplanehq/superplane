@@ -14,9 +14,9 @@ import (
 type UpdateDocument struct{}
 
 type UpdateDocumentConfiguration struct {
-	Index      string         `json:"index" mapstructure:"index"`
-	DocumentID string         `json:"documentId" mapstructure:"documentId"`
-	Fields     map[string]any `json:"fields" mapstructure:"fields"`
+	Index    string         `json:"index" mapstructure:"index"`
+	Document string         `json:"document" mapstructure:"document"`
+	Fields   map[string]any `json:"fields" mapstructure:"fields"`
 }
 
 func (c *UpdateDocument) Name() string  { return "elastic.updateDocument" }
@@ -33,7 +33,7 @@ func (c *UpdateDocument) Documentation() string {
 ## Configuration
 
 - **Index**: The Elasticsearch index containing the document
-- **Document ID**: The ID of the document to update
+- **Document**: The document to update
 - **Fields**: The fields to merge into the existing document (partial update). The editor starts with an ` + "`@timestamp`" + ` template for convenience.
 
 ## Outputs
@@ -64,8 +64,8 @@ func (c *UpdateDocument) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "documentId",
-			Label:       "Document ID",
+			Name:        "document",
+			Label:       "Document",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The document to update from the selected index.",
@@ -105,8 +105,9 @@ func (c *UpdateDocument) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("index is required")
 	}
 
-	if strings.TrimSpace(config.DocumentID) == "" {
-		return fmt.Errorf("documentId is required")
+	config.Document = strings.TrimSpace(config.Document)
+	if config.Document == "" {
+		return fmt.Errorf("document is required")
 	}
 
 	if config.Fields == nil {
@@ -127,9 +128,9 @@ func (c *UpdateDocument) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", "index is required")
 	}
 
-	config.DocumentID = strings.TrimSpace(config.DocumentID)
-	if config.DocumentID == "" {
-		return ctx.ExecutionState.Fail("error", "documentId is required")
+	config.Document = strings.TrimSpace(config.Document)
+	if config.Document == "" {
+		return ctx.ExecutionState.Fail("error", "document is required")
 	}
 
 	if config.Fields == nil {
@@ -141,7 +142,7 @@ func (c *UpdateDocument) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create Elastic client: %v", err))
 	}
 
-	resp, err := client.UpdateDocument(config.Index, config.DocumentID, config.Fields)
+	resp, err := client.UpdateDocument(config.Index, config.Document, config.Fields)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to update document: %v", err))
 	}

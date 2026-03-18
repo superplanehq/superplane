@@ -14,8 +14,8 @@ import (
 type GetDocument struct{}
 
 type GetDocumentConfiguration struct {
-	Index      string `json:"index" mapstructure:"index"`
-	DocumentID string `json:"documentId" mapstructure:"documentId"`
+	Index    string `json:"index" mapstructure:"index"`
+	Document string `json:"document" mapstructure:"document"`
 }
 
 func (c *GetDocument) Name() string  { return "elastic.getDocument" }
@@ -32,7 +32,7 @@ func (c *GetDocument) Documentation() string {
 ## Configuration
 
 - **Index**: The Elasticsearch index to read from
-- **Document ID**: The ID of the document to retrieve
+- **Document**: The document to retrieve
 
 ## Outputs
 
@@ -62,8 +62,8 @@ func (c *GetDocument) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "documentId",
-			Label:       "Document ID",
+			Name:        "document",
+			Label:       "Document",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The document to retrieve from the selected index.",
@@ -93,8 +93,9 @@ func (c *GetDocument) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("index is required")
 	}
 
-	if strings.TrimSpace(config.DocumentID) == "" {
-		return fmt.Errorf("documentId is required")
+	config.Document = strings.TrimSpace(config.Document)
+	if config.Document == "" {
+		return fmt.Errorf("document is required")
 	}
 
 	return nil
@@ -111,9 +112,9 @@ func (c *GetDocument) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", "index is required")
 	}
 
-	config.DocumentID = strings.TrimSpace(config.DocumentID)
-	if config.DocumentID == "" {
-		return ctx.ExecutionState.Fail("error", "documentId is required")
+	config.Document = strings.TrimSpace(config.Document)
+	if config.Document == "" {
+		return ctx.ExecutionState.Fail("error", "document is required")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -121,7 +122,7 @@ func (c *GetDocument) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create Elastic client: %v", err))
 	}
 
-	resp, err := client.GetDocument(config.Index, config.DocumentID)
+	resp, err := client.GetDocument(config.Index, config.Document)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to get document: %v", err))
 	}

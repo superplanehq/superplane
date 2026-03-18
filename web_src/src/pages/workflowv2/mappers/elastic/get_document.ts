@@ -16,7 +16,7 @@ import { formatTimeAgo } from "@/utils/date";
 
 interface GetDocumentConfiguration {
   index?: string;
-  documentId?: string;
+  document?: string;
 }
 
 interface GetDocumentOutputData {
@@ -74,8 +74,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "database", label: configuration.index });
   }
 
-  if (configuration?.documentId) {
-    metadata.push({ icon: "hash", label: `ID: ${configuration.documentId}` });
+  if (configuration?.document) {
+    metadata.push({ icon: "hash", label: configuration.document });
   }
 
   return metadata;
@@ -102,7 +102,7 @@ function getDetailsForGetDocument(doc: GetDocumentOutputData): Record<string, st
   const details: Record<string, string> = {};
 
   if (doc?.id) {
-    details["Document ID"] = String(doc.id);
+    details["Document"] = String(doc.id);
   }
 
   if (doc?.index) {
