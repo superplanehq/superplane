@@ -192,11 +192,7 @@ func TestAzureIntegration_HandleRequest_Unknown(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
-func TestNewProvider_FailsWithoutOIDCKeysPath(t *testing.T) {
-	t.Setenv("OIDC_KEYS_PATH", "")
-	t.Setenv("BASE_URL", "")
-	t.Setenv("WEBHOOKS_BASE_URL", "")
-
+func TestNewProvider_FailsWithoutAccessToken(t *testing.T) {
 	ctx := &contexts.IntegrationContext{
 		IntegrationID: "00000000-0000-0000-0000-000000000002",
 		Configuration: map[string]any{
@@ -204,11 +200,12 @@ func TestNewProvider_FailsWithoutOIDCKeysPath(t *testing.T) {
 			"clientId":       "test-client",
 			"subscriptionId": "test-sub",
 		},
+		// No secrets set — simulates integration that has not yet synced.
 	}
 	result, err := newProvider(ctx)
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "OIDC_KEYS_PATH")
+	assert.Contains(t, err.Error(), "Azure access token not found")
 }
 
 func TestConfiguration_Struct(t *testing.T) {

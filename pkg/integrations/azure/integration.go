@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
+
+const secretAccessToken = "accessToken"
 
 func init() {
 	integration := &AzureIntegration{}
@@ -175,6 +175,22 @@ func (a *AzureIntegration) Sync(ctx core.SyncContext) error {
 		return a.showBrowserAction(ctx)
 	}
 
+	// Verification succeeded. The MSAL cache already holds the access token —
+	// fetch it and store it as a secret so ListResources and Execute can use it
+	// without needing OIDC or any environment variables.
+	token, err := provider.getClient().bearerToken(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to get access token: %w", err)
+	}
+
+	if err := ctx.Integration.SetSecret(secretAccessToken, []byte(token)); err != nil {
+		return fmt.Errorf("failed to store access token: %w", err)
+	}
+
+	if err := ctx.Integration.ScheduleResync(30 * time.Minute); err != nil {
+		return fmt.Errorf("failed to schedule resync: %w", err)
+	}
+
 	ctx.Integration.Ready()
 	ctx.Integration.RemoveBrowserAction()
 	ctx.Logger.Info("Azure integration synchronized successfully")
@@ -276,52 +292,50 @@ func (a *AzureIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Response.Write([]byte("not found"))
 }
 
-// newProvider creates a new AzureProvider by reading config from the integration
-// context and loading OIDC keys from the environment. Called on each request that
-// needs an authenticated Azure client (ListResources, Execute, webhook handling).
+// newProvider creates a new AzureProvider by reading config and the stored access
+// token from the integration context. The token is written during Sync and refreshed
+// every 30 minutes. Called on each request that needs an authenticated Azure client
+// (ListResources, Execute, webhook handling).
 func newProvider(ctx core.IntegrationContext) (*AzureProvider, error) {
 	config, err := loadConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load Azure configuration: %w", err)
 	}
 
-	oidcProv, err := oidcProviderFromEnv()
+	token, err := accessTokenFromSecrets(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load OIDC provider: %w", err)
+		return nil, err
 	}
 
-	integrationID := ctx.ID().String()
-	getAssertion := func(_ context.Context) (string, error) {
-		subject := fmt.Sprintf("app-installation:%s", integrationID)
-		return oidcProv.Sign(subject, 5*time.Minute, integrationID, nil)
+	logger := logrus.NewEntry(logrus.StandardLogger())
+	client := &armClient{
+		subscriptionID: config.SubscriptionID,
+		tokenFunc:      func(_ context.Context) (string, error) { return token, nil },
+		httpClient:     &http.Client{Timeout: 120 * time.Second},
+		logger:         logger,
 	}
 
-	return NewAzureProvider(
-		context.Background(),
-		config.TenantID,
-		config.ClientID,
-		config.SubscriptionID,
-		getAssertion,
-		logrus.NewEntry(logrus.StandardLogger()),
-	)
+	return &AzureProvider{
+		subscriptionID: config.SubscriptionID,
+		client:         client,
+		logger:         logger,
+	}, nil
 }
 
-// oidcProviderFromEnv creates an OIDC provider using keys and issuer from environment variables.
-func oidcProviderFromEnv() (oidc.Provider, error) {
-	keysPath := os.Getenv("OIDC_KEYS_PATH")
-	if keysPath == "" {
-		return nil, fmt.Errorf("OIDC_KEYS_PATH environment variable is not set")
+// accessTokenFromSecrets reads the Azure AD access token stored by Sync.
+func accessTokenFromSecrets(ctx core.IntegrationContext) (string, error) {
+	secrets, err := ctx.GetSecrets()
+	if err != nil {
+		return "", fmt.Errorf("failed to get integration secrets: %w", err)
 	}
 
-	issuer := os.Getenv("WEBHOOKS_BASE_URL")
-	if issuer == "" {
-		issuer = os.Getenv("BASE_URL")
-	}
-	if issuer == "" {
-		return nil, fmt.Errorf("BASE_URL or WEBHOOKS_BASE_URL environment variable must be set")
+	for _, s := range secrets {
+		if s.Name == secretAccessToken {
+			return string(s.Value), nil
+		}
 	}
 
-	return oidc.NewProviderFromKeyDir(issuer, keysPath)
+	return "", fmt.Errorf("Azure access token not found: integration needs to sync")
 }
 
 // loadConfig reads the Azure integration configuration from the database
