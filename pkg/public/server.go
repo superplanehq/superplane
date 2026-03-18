@@ -504,7 +504,7 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	integration, err := s.registry.GetIntegration(integrationInstance.OrganizationID.String(), integrationInstance.AppName)
+	integration, err := s.registry.GetIntegration(database.Conn(), integrationInstance.OrganizationID.String(), integrationInstance.AppName)
 	if err != nil {
 		http.Error(w, "integration not found", http.StatusNotFound)
 		return
@@ -836,7 +836,7 @@ func (s *Server) executeWebhookNode(ctx context.Context, organizationID string, 
 
 func (s *Server) executeTriggerNode(ctx context.Context, organizationID string, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
 	ref := node.Ref.Data()
-	trigger, err := s.registry.GetTrigger(organizationID, ref.Trigger.Name)
+	trigger, err := s.registry.GetTrigger(database.Conn(), organizationID, ref.Trigger.Name)
 	if err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("trigger not found: %w", err)
 	}
@@ -871,7 +871,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, organizationID string, 
 
 func (s *Server) executeComponentNode(ctx context.Context, organizationID string, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
 	ref := node.Ref.Data()
-	component, err := s.registry.GetComponent(organizationID, ref.Component.Name)
+	component, err := s.registry.GetComponent(database.Conn(), organizationID, ref.Component.Name)
 	if err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("component not found: %w", err)
 	}

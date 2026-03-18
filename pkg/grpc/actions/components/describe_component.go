@@ -3,6 +3,7 @@ package components
 import (
 	"context"
 
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/components"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
@@ -11,7 +12,7 @@ import (
 )
 
 func DescribeComponent(ctx context.Context, registry *registry.Registry, organizationID string, name string) (*pb.DescribeComponentResponse, error) {
-	component, err := registry.GetComponent(organizationID, name)
+	component, err := registry.GetComponent(database.Conn(), organizationID, name)
 	if err != nil {
 		return nil, err
 	}

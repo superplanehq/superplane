@@ -21,7 +21,7 @@ import (
 )
 
 func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string, orgID string, integrationName, name string, appConfig *structpb.Struct) (*pb.CreateIntegrationResponse, error) {
-	integration, err := registry.GetIntegration(orgID, integrationName)
+	integration, err := registry.GetIntegration(database.Conn(), orgID, integrationName)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationName)
 	}
@@ -104,7 +104,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 }
 
 func serializeIntegration(registry *registry.Registry, instance *models.Integration, nodeRefs []models.CanvasNodeReference) (*pb.Integration, error) {
-	integration, err := registry.GetIntegration(instance.OrganizationID.String(), instance.AppName)
+	integration, err := registry.GetIntegration(database.Conn(), instance.OrganizationID.String(), instance.AppName)
 	if err != nil {
 		return nil, err
 	}

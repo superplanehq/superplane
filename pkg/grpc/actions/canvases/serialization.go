@@ -363,7 +363,7 @@ func findAndValidateTrigger(registry *registry.Registry, organizationID string, 
 	}
 
 	if len(parts) == 1 {
-		return registry.GetTrigger(organizationID, parts[0])
+		return registry.GetTrigger(database.Conn(), organizationID, parts[0])
 	}
 
 	err := validateIntegration(organizationID, node.Integration)
@@ -371,7 +371,7 @@ func findAndValidateTrigger(registry *registry.Registry, organizationID string, 
 		return nil, err
 	}
 
-	return registry.GetIntegrationTrigger(organizationID, parts[0], node.Trigger.Name)
+	return registry.GetIntegrationTrigger(database.Conn(), organizationID, parts[0], node.Trigger.Name)
 }
 
 func findAndValidateWidget(registry *registry.Registry, organizationID string, node *compb.Node) (core.Widget, error) {
@@ -389,7 +389,7 @@ func findAndValidateComponent(registry *registry.Registry, organizationID string
 	}
 
 	if len(parts) == 1 {
-		return registry.GetComponent(organizationID, parts[0])
+		return registry.GetComponent(database.Conn(), organizationID, parts[0])
 	}
 
 	err := validateIntegration(organizationID, node.Integration)
@@ -397,7 +397,7 @@ func findAndValidateComponent(registry *registry.Registry, organizationID string
 		return nil, err
 	}
 
-	return registry.GetIntegrationComponent(organizationID, parts[0], node.Component.Name)
+	return registry.GetIntegrationComponent(database.Conn(), organizationID, parts[0], node.Component.Name)
 }
 
 func validateIntegration(organizationID string, ref *compb.IntegrationRef) error {

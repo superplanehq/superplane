@@ -63,7 +63,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToComponent(message any) err
 	}
 
 	componentName := nodeRef.Component.Name
-	component, err := c.registry.GetComponent(c.integration.OrganizationID.String(), componentName)
+	component, err := c.registry.GetComponent(c.tx, c.integration.OrganizationID.String(), componentName)
 	if err != nil {
 		return fmt.Errorf("component %s not found", componentName)
 	}
@@ -94,7 +94,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 	}
 
 	triggerName := nodeRef.Trigger.Name
-	trigger, err := c.registry.GetTrigger(c.integration.OrganizationID.String(), triggerName)
+	trigger, err := c.registry.GetTrigger(c.tx, c.integration.OrganizationID.String(), triggerName)
 	if err != nil {
 		return fmt.Errorf("trigger %s not found", triggerName)
 	}

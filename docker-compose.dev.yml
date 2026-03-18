@@ -79,6 +79,8 @@ services:
       OWNER_SETUP_ENABLED: "yes"
       VITE_ENABLE_CUSTOM_COMPONENTS: "true"
       EXTENSIONS_DIR: "/tmp/extensions"
+      START_HUB: "yes"
+      EXTENSION_WORKER_HUB_ADDR: ${EXTENSION_WORKER_HUB_ADDR:-:8092}
 
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}
@@ -86,6 +88,7 @@ services:
       - ${STORYBOOK_PORT:-6006}:${STORYBOOK_PORT:-6006}
       - ${PUBLIC_API_PORT:-8000}:${PUBLIC_API_PORT:-8000}
       - ${INTERNAL_API_PORT:-50051}:${INTERNAL_API_PORT:-50051}
+      - ${EXTENSION_WORKER_HUB_PORT:-8092}:${EXTENSION_WORKER_HUB_PORT:-8092}
 
     links:
       - db:db

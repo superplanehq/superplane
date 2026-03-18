@@ -171,7 +171,7 @@ func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, reg
 
 func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, organizationID string, node *models.CanvasNode, webhookBaseURL string) error {
 	ref := node.Ref.Data()
-	trigger, err := registry.GetTrigger(organizationID, ref.Trigger.Name)
+	trigger, err := registry.GetTrigger(tx, organizationID, ref.Trigger.Name)
 	if err != nil {
 		return err
 	}
@@ -213,7 +213,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 
 func setupComponent(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, organizationID string, node *models.CanvasNode, webhookBaseURL string) error {
 	ref := node.Ref.Data()
-	component, err := registry.GetComponent(organizationID, ref.Component.Name)
+	component, err := registry.GetComponent(tx, organizationID, ref.Component.Name)
 	if err != nil {
 		return err
 	}

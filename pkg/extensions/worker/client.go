@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -17,7 +19,6 @@ type JobHandler func(context.Context, protocol.JobAssignMessage) (json.RawMessag
 
 type ClientConfig struct {
 	HubURL            string
-	WorkerID          string
 	RegistrationToken string
 	ReconnectDelay    time.Duration
 }
@@ -48,25 +49,18 @@ func NewClient(config ClientConfig, handleJob JobHandler) *Client {
 	}
 
 	return &Client{
-		config:    config,
-		wsDialer:  websocket.DefaultDialer,
+		config: config,
+		wsDialer: &websocket.Dialer{
+			Proxy:            http.ProxyFromEnvironment,
+			HandshakeTimeout: 10 * time.Second,
+		},
 		handleJob: handleJob,
 	}
 }
 
 func (c *Client) Run(ctx context.Context) error {
-	registration := protocol.Registration{
-		WorkerID: c.config.WorkerID,
-	}
-	if registration.WorkerID == "" {
-		return fmt.Errorf("worker ID is required")
-	}
-	if c.config.RegistrationToken == "" {
-		return fmt.Errorf("registration token is required")
-	}
-
 	for {
-		err := c.runOnce(ctx, registration)
+		err := c.runOnce(ctx)
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -82,15 +76,14 @@ func (c *Client) Run(ctx context.Context) error {
 	}
 }
 
-func (c *Client) runOnce(ctx context.Context, registration protocol.Registration) error {
+func (c *Client) runOnce(ctx context.Context) error {
 	wsURL, err := joinWebsocketURL(c.config.HubURL, "/api/v1/register")
 	if err != nil {
 		return err
 	}
 
 	wsURL, err = addQuery(wsURL, map[string]string{
-		protocol.QueryWorkerID: registration.WorkerID,
-		protocol.QueryToken:    c.config.RegistrationToken,
+		protocol.QueryToken: c.config.RegistrationToken,
 	})
 
 	if err != nil {
@@ -102,6 +95,8 @@ func (c *Client) runOnce(ctx context.Context, registration protocol.Registration
 		return err
 	}
 	defer conn.Close()
+
+	log.Printf("Connected to hub")
 
 	c.sendMu.Lock()
 	c.currentConn = conn
@@ -139,9 +134,11 @@ func (c *Client) handleMessage(ctx context.Context, payload []byte) error {
 
 	switch envelope.Type {
 	case protocol.MessageTypePing:
+		log.Printf("Received ping message")
 		return c.writeMessage(protocol.NewPong())
 
 	case protocol.MessageTypeJobAssign:
+		log.Printf("Received job assign message")
 		var message protocol.JobAssignMessage
 		if err := json.Unmarshal(payload, &message); err != nil {
 			return err
@@ -151,9 +148,11 @@ func (c *Client) handleMessage(ctx context.Context, payload []byte) error {
 		return nil
 
 	case protocol.MessageTypeJobCancel:
+		log.Printf("Received job cancel message")
 		return nil
 
 	default:
+		log.Printf("Received unknown message: %s", envelope.Type)
 		return nil
 	}
 }
@@ -161,11 +160,18 @@ func (c *Client) handleMessage(ctx context.Context, payload []byte) error {
 func (c *Client) processJob(ctx context.Context, message protocol.JobAssignMessage) {
 	output, err := c.handleJob(ctx, message)
 	if err != nil {
-		_ = c.writeMessage(protocol.NewJobFailure(message.JobID, "job_execution_failed", err.Error()))
+		log.Printf("Error handling job: %v", err)
+		_ = c.writeMessage(
+			protocol.NewFailedInvokeExtensionOutput(message.JobID, message.JobType, &protocol.JobError{
+				Code:    "error",
+				Message: err.Error(),
+			}),
+		)
 		return
 	}
 
-	_ = c.writeMessage(protocol.NewJobSuccess(message.JobID, output))
+	log.Printf("Job %s completed successfully", message.JobID)
+	_ = c.writeMessage(protocol.NewSuccessfulInvokeExtensionOutput(message.JobID, message.JobType, output))
 }
 
 func (c *Client) writeMessage(message any) error {

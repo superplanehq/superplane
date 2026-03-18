@@ -40,6 +40,15 @@ type ComponentManifest struct {
 	OutputChannels []core.OutputChannel  `json:"outputChannels"`
 	Configuration  []configuration.Field `json:"configuration"`
 	Actions        []core.Action         `json:"actions"`
+
+	//
+	// TODO: Not sure about this.
+	// I need it to be able to know which extension version
+	// a component belongs to, so I can create the RunnerJob in ExtensionComponent.Execute()
+	// ExtensionID and VersionID are not part of the manifest, but are dynamically set by LoadManifestInTransaction().
+	//
+	ExtensionID string `json:"-"`
+	VersionID   string `json:"-"`
 }
 
 type TriggerManifest struct {

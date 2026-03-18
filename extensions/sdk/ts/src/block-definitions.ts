@@ -1,11 +1,13 @@
 import type {
   ActionHandlerContext,
   CompareWebhookConfigContext,
+  ExecutionHandlerContext,
   HandlerContext,
   IntegrationWebhookHandlerContext,
   IntegrationMessageHandlerContext,
   MergeWebhookConfigContext,
   RuntimeValue,
+  SetupHandlerContext,
   WebhookHandlerContext,
 } from "./runtime-context.js";
 import type {
@@ -32,11 +34,6 @@ export interface WebhookResponse {
   headers?: Record<string, string>;
   body?: Uint8Array | string;
   contentType?: string;
-}
-
-export interface QueueProcessingResult {
-  handled?: boolean;
-  executionId?: string;
 }
 
 export interface ListResourcesInput {
@@ -121,31 +118,29 @@ export interface IntegrationDefinition<TConfiguration = RuntimeValue>
   webhook?(): IntegrationWebhookHandler<TConfiguration>;
 }
 
-export interface ComponentDefinition<TConfiguration = RuntimeValue>
-  extends BaseBlockDefinition {
+export interface ComponentDefinition<
+  TConfiguration = RuntimeValue,
+  TExecutionData = RuntimeValue,
+> extends BaseBlockDefinition {
   integration?: string;
   documentation?: string;
   color: string;
   outputChannels?: readonly OutputChannel[];
   configuration: readonly ConfigurationField[];
   actions?: readonly ActionDefinition[];
-  setup?(context: HandlerContext<TConfiguration>): Promise<void> | void;
-  processQueueItem?(
-    context: HandlerContext<TConfiguration>,
-  ):
-    | Promise<QueueProcessingResult | string | void>
-    | QueueProcessingResult
-    | string
-    | void;
-  execute(context: HandlerContext<TConfiguration>): Promise<void> | void;
+  setup?(context: SetupHandlerContext<TConfiguration>): Promise<void> | void;
+  execute(
+    context: ExecutionHandlerContext<TConfiguration, TExecutionData>,
+  ): Promise<void> | void;
   handleAction?(
     context: ActionHandlerContext<TConfiguration, Record<string, RuntimeValue>>,
   ): Promise<void> | void;
   handleWebhook?(
     context: WebhookHandlerContext<TConfiguration>,
   ): Promise<WebhookResponse | void> | WebhookResponse | void;
-  cancel?(context: HandlerContext<TConfiguration>): Promise<void> | void;
-  cleanup?(context: HandlerContext<TConfiguration>): Promise<void> | void;
+  cancel?(
+    context: ExecutionHandlerContext<TConfiguration, TExecutionData>,
+  ): Promise<void> | void;
   onIntegrationMessage?(
     context: IntegrationMessageHandlerContext<TConfiguration>,
   ): Promise<void> | void;
@@ -174,13 +169,14 @@ export interface TriggerDefinition<TConfiguration = RuntimeValue>
 export interface ExtensionDefinition {
   metadata: ExtensionMetadata;
   runtime?: RuntimeDescriptor;
-  integrations?: readonly IntegrationDefinition<any>[];
   components?: readonly ComponentDefinition<any>[];
-  triggers?: readonly TriggerDefinition<any>[];
 }
 
+type NoExtraKeys<TShape, TValue extends TShape> = TValue &
+  Record<Exclude<keyof TValue, keyof TShape>, never>;
+
 export function defineExtension<TDefinition extends ExtensionDefinition>(
-  definition: TDefinition,
+  definition: NoExtraKeys<ExtensionDefinition, TDefinition>,
 ): TDefinition {
   return definition;
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/components"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
@@ -11,7 +12,7 @@ import (
 )
 
 func ListComponentActions(ctx context.Context, registry *registry.Registry, organizationID string, name string) (*pb.ListComponentActionsResponse, error) {
-	component, err := registry.GetComponent(organizationID, name)
+	component, err := registry.GetComponent(database.Conn(), organizationID, name)
 	if err != nil {
 		return nil, fmt.Errorf("component not found: %w", err)
 	}

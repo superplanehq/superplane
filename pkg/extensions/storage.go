@@ -9,15 +9,16 @@ import (
 
 	"github.com/dgraph-io/ristretto/v2"
 	storage "github.com/superplanehq/superplane/pkg/storage"
+	"gorm.io/gorm"
 )
 
 type Storage struct {
 	underlying    storage.Storage
 	manifestCache *ristretto.Cache[string, *Manifest]
-	loadManifest  func(organizationID string) (*Manifest, error)
+	loadManifest  func(tx *gorm.DB, organizationID string) (*Manifest, error)
 }
 
-func NewStorage(underlying storage.Storage, loadManifest func(organizationID string) (*Manifest, error)) (*Storage, error) {
+func NewStorage(underlying storage.Storage, loadManifest func(tx *gorm.DB, organizationID string) (*Manifest, error)) (*Storage, error) {
 	if loadManifest == nil {
 		return nil, fmt.Errorf("loadManifest is required")
 	}
@@ -43,13 +44,13 @@ func NewStorage(underlying storage.Storage, loadManifest func(organizationID str
 	}, nil
 }
 
-func (s *Storage) ListIntegrations(organizationID string) ([]IntegrationManifest, error) {
+func (s *Storage) ListIntegrations(tx *gorm.DB, organizationID string) ([]IntegrationManifest, error) {
 	manifest, ok := s.manifestCache.Get(organizationID)
 	if ok {
 		return manifest.Integrations, nil
 	}
 
-	manifest, err := s.loadManifest(organizationID)
+	manifest, err := s.loadManifest(tx, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -58,13 +59,13 @@ func (s *Storage) ListIntegrations(organizationID string) ([]IntegrationManifest
 	return manifest.Integrations, nil
 }
 
-func (s *Storage) ListComponents(organizationID string) ([]ComponentManifest, error) {
+func (s *Storage) ListComponents(tx *gorm.DB, organizationID string) ([]ComponentManifest, error) {
 	manifest, ok := s.manifestCache.Get(organizationID)
 	if ok {
 		return manifest.Components, nil
 	}
 
-	manifest, err := s.loadManifest(organizationID)
+	manifest, err := s.loadManifest(tx, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -73,13 +74,13 @@ func (s *Storage) ListComponents(organizationID string) ([]ComponentManifest, er
 	return manifest.Components, nil
 }
 
-func (s *Storage) ListTriggers(organizationID string) ([]TriggerManifest, error) {
+func (s *Storage) ListTriggers(tx *gorm.DB, organizationID string) ([]TriggerManifest, error) {
 	manifest, ok := s.manifestCache.Get(organizationID)
 	if ok {
 		return manifest.Triggers, nil
 	}
 
-	manifest, err := s.loadManifest(organizationID)
+	manifest, err := s.loadManifest(tx, organizationID)
 	if err != nil {
 		return nil, err
 	}

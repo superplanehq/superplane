@@ -2,12 +2,10 @@ package protocol
 
 import (
 	"encoding/json"
-	"fmt"
 )
 
 const (
-	QueryWorkerID = "workerId"
-	QueryToken    = "token"
+	QueryToken = "token"
 )
 
 const (
@@ -16,48 +14,51 @@ const (
 	MessageTypeJobCancel   = "job.cancel"
 	MessageTypePing        = "ping"
 	MessageTypePong        = "pong"
+
+	JobTypeInvokeExtension = "invoke-extension"
 )
-
-type Registration struct {
-	WorkerID       string `json:"workerId"`
-	OrganizationID string `json:"organizationId"`
-	WorkerPoolID   string `json:"workerPoolId"`
-}
-
-func (r Registration) Validate() error {
-	if r.WorkerID == "" {
-		return fmt.Errorf("worker ID is required")
-	}
-	if r.OrganizationID == "" {
-		return fmt.Errorf("organization ID is required")
-	}
-	if r.WorkerPoolID == "" {
-		return fmt.Errorf("worker pool ID is required")
-	}
-
-	return nil
-}
 
 type Envelope struct {
 	Type string `json:"type"`
 }
 
 type JobAssignMessage struct {
-	Type        string          `json:"type"`
-	JobID       string          `json:"jobId"`
-	ExtensionID string          `json:"extensionId"`
-	VersionID   string          `json:"versionId"`
-	Digest      string          `json:"digest,omitempty"`
-	BundleToken string          `json:"bundleToken"`
-	Invocation  json.RawMessage `json:"invocation,omitempty"`
+	Type            string           `json:"type"`
+	JobID           string           `json:"jobId"`
+	JobType         string           `json:"jobType"`
+	InvokeExtension *InvokeExtension `json:"invokeExtension"`
+}
+
+type InvokeExtension struct {
+	OrganizationID string          `json:"organizationId"`
+	Extension      *ExtensionRef   `json:"extension"`
+	Version        *VersionRef     `json:"version"`
+	BundleToken    string          `json:"bundleToken"`
+	Invocation     json.RawMessage `json:"invocation,omitempty"`
+}
+
+type ExtensionRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type VersionRef struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Digest string `json:"digest"`
 }
 
 type JobCompleteMessage struct {
-	Type    string          `json:"type"`
-	JobID   string          `json:"jobId"`
+	Type            string                 `json:"type"`
+	JobID           string                 `json:"jobId"`
+	JobType         string                 `json:"jobType"`
+	InvokeExtension *InvokeExtensionOutput `json:"invokeExtension,omitempty"`
+}
+
+type InvokeExtensionOutput struct {
 	Success bool            `json:"success"`
-	Output  json.RawMessage `json:"output,omitempty"`
 	Error   *JobError       `json:"error,omitempty"`
+	Output  json.RawMessage `json:"output,omitempty"`
 }
 
 type JobError struct {
@@ -65,23 +66,26 @@ type JobError struct {
 	Message string `json:"message"`
 }
 
-func NewJobSuccess(jobID string, output json.RawMessage) JobCompleteMessage {
+func NewSuccessfulInvokeExtensionOutput(jobID string, jobType string, output json.RawMessage) JobCompleteMessage {
 	return JobCompleteMessage{
 		Type:    MessageTypeJobComplete,
 		JobID:   jobID,
-		Success: true,
-		Output:  output,
+		JobType: jobType,
+		InvokeExtension: &InvokeExtensionOutput{
+			Success: true,
+			Output:  output,
+		},
 	}
 }
 
-func NewJobFailure(jobID string, code string, message string) JobCompleteMessage {
+func NewFailedInvokeExtensionOutput(jobID string, jobType string, error *JobError) JobCompleteMessage {
 	return JobCompleteMessage{
 		Type:    MessageTypeJobComplete,
 		JobID:   jobID,
-		Success: false,
-		Error: &JobError{
-			Code:    code,
-			Message: message,
+		JobType: jobType,
+		InvokeExtension: &InvokeExtensionOutput{
+			Success: false,
+			Error:   error,
 		},
 	}
 }

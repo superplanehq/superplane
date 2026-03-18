@@ -6,6 +6,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -48,7 +49,7 @@ func ValidateNodeConfiguration(node models.Node, organizationID string, registry
 			return fmt.Errorf("node %s: component is required", node.ID)
 		}
 
-		component, err := registry.GetComponent(organizationID, node.Ref.Component.Name)
+		component, err := registry.GetComponent(database.Conn(), organizationID, node.Ref.Component.Name)
 		if err != nil {
 			return fmt.Errorf("node %s: unknown component %s", node.ID, node.Ref.Component.Name)
 		}

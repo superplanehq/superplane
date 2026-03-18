@@ -2,17 +2,13 @@ import {
   DEFAULT_OUTPUT_CHANNEL,
   type ComponentDefinition,
   type ExtensionDefinition,
-  type IntegrationDefinition,
-  type TriggerDefinition,
 } from "../block-definitions.js";
 import type {
   ActionDefinition,
   ComponentBlock,
   ConfigurationField,
-  IntegrationBlock,
   ManifestV1,
   RuntimeDescriptor,
-  TriggerBlock,
 } from "../manifest-schema.js";
 
 export function deriveManifest(definition: ExtensionDefinition): ManifestV1 {
@@ -28,9 +24,9 @@ export function deriveManifest(definition: ExtensionDefinition): ManifestV1 {
       description: definition.metadata.description,
     },
     runtime: definition.runtime ?? defaultRuntime(),
-    integrations: (definition.integrations ?? []).map(serializeIntegration),
+    integrations: [],
     components: (definition.components ?? []).map(serializeComponent),
-    triggers: (definition.triggers ?? []).map(serializeTrigger),
+    triggers: [],
   };
 }
 
@@ -42,23 +38,6 @@ export function validateExtensionDefinition(
   assertNonEmpty(definition.metadata.version, "extension metadata.version");
 
   const seenNames = new Set<string>();
-
-  for (const integration of definition.integrations ?? []) {
-    assertUniqueName(seenNames, integration.name);
-    assertNonEmpty(integration.label, `integration ${integration.name} label`);
-    assertNonEmpty(
-      integration.description,
-      `integration ${integration.name} description`,
-    );
-    assertArray(
-      integration.configuration,
-      `integration ${integration.name} configuration`,
-    );
-    assertActionDefinitions(
-      integration.actions ?? [],
-      `integration ${integration.name} actions`,
-    );
-  }
 
   for (const component of definition.components ?? []) {
     assertUniqueName(seenNames, component.name);
@@ -85,41 +64,6 @@ export function validateExtensionDefinition(
       );
     }
   }
-
-  for (const trigger of definition.triggers ?? []) {
-    assertUniqueName(seenNames, trigger.name);
-    assertNonEmpty(trigger.label, `trigger ${trigger.name} label`);
-    assertNonEmpty(trigger.description, `trigger ${trigger.name} description`);
-    assertArray(trigger.configuration, `trigger ${trigger.name} configuration`);
-    assertActionDefinitions(
-      trigger.actions ?? [],
-      `trigger ${trigger.name} actions`,
-    );
-
-    if (
-      usesIntegrationResource(trigger.configuration) &&
-      !trigger.integration
-    ) {
-      throw new Error(
-        `trigger ${trigger.name} uses integration-resource fields and must declare integration`,
-      );
-    }
-  }
-}
-
-function serializeIntegration(
-  integration: IntegrationDefinition,
-): IntegrationBlock {
-  return {
-    name: integration.name,
-    label: integration.label,
-    icon: integration.icon,
-    description: integration.description,
-    instructions: integration.instructions,
-    configuration: cloneFields(integration.configuration),
-    actions: cloneActions(integration.actions ?? []),
-    resourceTypes: [...(integration.resourceTypes ?? [])],
-  };
 }
 
 function serializeComponent(component: ComponentDefinition): ComponentBlock {
@@ -133,19 +77,6 @@ function serializeComponent(component: ComponentDefinition): ComponentBlock {
     outputChannels: [...(component.outputChannels ?? [DEFAULT_OUTPUT_CHANNEL])],
     configuration: cloneFields(component.configuration),
     actions: cloneActions(component.actions ?? []),
-  };
-}
-
-function serializeTrigger(trigger: TriggerDefinition): TriggerBlock {
-  return {
-    name: trigger.name,
-    integration: trigger.integration,
-    label: trigger.label,
-    description: trigger.description,
-    icon: trigger.icon,
-    color: trigger.color,
-    configuration: cloneFields(trigger.configuration),
-    actions: cloneActions(trigger.actions ?? []),
   };
 }
 

@@ -45,8 +45,12 @@ func CreateExtension(organizationID uuid.UUID, name string, description string) 
 }
 
 func ListExtensions(organizationID uuid.UUID) ([]Extension, error) {
+	return ListExtensionsInTransaction(database.Conn(), organizationID)
+}
+
+func ListExtensionsInTransaction(tx *gorm.DB, organizationID uuid.UUID) ([]Extension, error) {
 	extensions := []Extension{}
-	err := database.Conn().
+	err := tx.
 		Where("organization_id = ?", organizationID).
 		Find(&extensions).
 		Error
@@ -59,8 +63,12 @@ func ListExtensions(organizationID uuid.UUID) ([]Extension, error) {
 }
 
 func FindExtension(organizationID uuid.UUID, id string) (*Extension, error) {
+	return FindExtensionInTransaction(database.Conn(), organizationID, id)
+}
+
+func FindExtensionInTransaction(tx *gorm.DB, organizationID uuid.UUID, id string) (*Extension, error) {
 	extension := &Extension{}
-	err := database.Conn().
+	err := tx.
 		Where("organization_id = ?", organizationID).
 		Where("id = ?", id).
 		First(&extension).
@@ -141,9 +149,9 @@ func (e *Extension) FindVersion(versionName string) (*ExtensionVersion, error) {
 	return version, nil
 }
 
-func (e *Extension) FindLatestVersion() (*ExtensionVersion, error) {
+func (e *Extension) FindLatestVersion(tx *gorm.DB) (*ExtensionVersion, error) {
 	version := &ExtensionVersion{}
-	err := database.Conn().
+	err := tx.
 		Where("organization_id = ?", e.OrganizationID).
 		Where("extension_id = ?", e.ID).
 		Order("created_at DESC").
@@ -187,13 +195,13 @@ func (v *ExtensionVersion) Publish() error {
 	return database.Conn().Save(v).Error
 }
 
-func LoadManifest(organizationID string) (*extensions.Manifest, error) {
+func LoadManifestInTransaction(tx *gorm.DB, organizationID string) (*extensions.Manifest, error) {
 	orgID, err := uuid.Parse(organizationID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid organization ID: %w", err)
 	}
 
-	extensionList, err := ListExtensions(orgID)
+	extensionList, err := ListExtensionsInTransaction(tx, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("error listing extensions: %w", err)
 	}
@@ -205,14 +213,33 @@ func LoadManifest(organizationID string) (*extensions.Manifest, error) {
 	}
 
 	for _, extension := range extensionList {
-		version, err := extension.FindLatestVersion()
+		version, err := extension.FindLatestVersion(tx)
 		if err != nil {
 			return nil, fmt.Errorf("error finding latest version: %w", err)
 		}
 
 		manifest.Integrations = append(manifest.Integrations, version.Manifest.Data().Integrations...)
-		manifest.Components = append(manifest.Components, version.Manifest.Data().Components...)
 		manifest.Triggers = append(manifest.Triggers, version.Manifest.Data().Triggers...)
+
+		//
+		// Add extension version information
+		// TODO: we need to improve this, and not have it here.
+		//
+		for _, component := range version.Manifest.Data().Components {
+			manifest.Components = append(manifest.Components, extensions.ComponentManifest{
+				Name:           component.Name,
+				Integration:    component.Integration,
+				Label:          component.Label,
+				Description:    component.Description,
+				Icon:           component.Icon,
+				Color:          component.Color,
+				OutputChannels: component.OutputChannels,
+				Configuration:  component.Configuration,
+				Actions:        component.Actions,
+				ExtensionID:    extension.ID.String(),
+				VersionID:      version.ID.String(),
+			})
+		}
 	}
 
 	return manifest, nil

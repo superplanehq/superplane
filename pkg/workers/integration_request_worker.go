@@ -100,7 +100,7 @@ func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.
 		return fmt.Errorf("failed to find integration: %v", err)
 	}
 
-	integration, err := w.registry.GetIntegration(instance.OrganizationID.String(), instance.AppName)
+	integration, err := w.registry.GetIntegration(tx, instance.OrganizationID.String(), instance.AppName)
 	if err != nil {
 		return fmt.Errorf("integration %s not found", instance.AppName)
 	}
@@ -137,7 +137,7 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request 
 		return fmt.Errorf("failed to find app installation: %v", err)
 	}
 
-	integrationImpl, err := w.registry.GetIntegration(integration.OrganizationID.String(), integration.AppName)
+	integrationImpl, err := w.registry.GetIntegration(tx, integration.OrganizationID.String(), integration.AppName)
 	if err != nil {
 		return fmt.Errorf("integration %s not found", integration.AppName)
 	}

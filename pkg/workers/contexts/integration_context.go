@@ -215,7 +215,7 @@ func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
 		return nil, fmt.Errorf("config %s not found", name)
 	}
 
-	impl, err := c.registry.GetIntegration(c.integration.OrganizationID.String(), c.integration.AppName)
+	impl, err := c.registry.GetIntegration(c.tx, c.integration.OrganizationID.String(), c.integration.AppName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get integration %s: %w", c.integration.AppName, err)
 	}
@@ -250,7 +250,7 @@ func (c *IntegrationContext) GetOptionalConfig(name string) ([]byte, error) {
 	config := c.integration.Configuration.Data()
 	_, ok := config[name]
 	if !ok {
-		impl, err := c.registry.GetIntegration(c.integration.OrganizationID.String(), c.integration.AppName)
+		impl, err := c.registry.GetIntegration(c.tx, c.integration.OrganizationID.String(), c.integration.AppName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get integration %s: %w", c.integration.AppName, err)
 		}

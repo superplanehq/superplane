@@ -308,13 +308,13 @@ func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.Canva
 func (w *NodeExecutor) configurationFieldsForBlueprintNode(tx *gorm.DB, organizationID string, node models.Node) ([]configuration.Field, error) {
 	switch {
 	case node.Ref.Component != nil && node.Ref.Component.Name != "":
-		comp, err := w.registry.GetComponent(organizationID, node.Ref.Component.Name)
+		comp, err := w.registry.GetComponent(tx, organizationID, node.Ref.Component.Name)
 		if err != nil {
 			return nil, fmt.Errorf("component %s not found: %w", node.Ref.Component.Name, err)
 		}
 		return comp.Configuration(), nil
 	case node.Ref.Trigger != nil && node.Ref.Trigger.Name != "":
-		trigger, err := w.registry.GetTrigger(organizationID, node.Ref.Trigger.Name)
+		trigger, err := w.registry.GetTrigger(tx, organizationID, node.Ref.Trigger.Name)
 		if err != nil {
 			return nil, fmt.Errorf("trigger %s not found: %w", node.Ref.Trigger.Name, err)
 		}
@@ -344,7 +344,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, organizationID string, 
 	}
 
 	ref := node.Ref.Data()
-	component, err := w.registry.GetComponent(organizationID, ref.Component.Name)
+	component, err := w.registry.GetComponent(tx, organizationID, ref.Component.Name)
 	if err != nil {
 		logger.Errorf("component %s not found: %v", ref.Component.Name, err)
 		return fmt.Errorf("component %s not found: %w", ref.Component.Name, err)

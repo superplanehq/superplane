@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/extensions"
+	"gorm.io/gorm"
 )
 
 var (
@@ -139,13 +140,13 @@ func (r *Registry) ListTriggers() []core.Trigger {
 	return triggers
 }
 
-func (r *Registry) GetTrigger(organizationID string, name string) (core.Trigger, error) {
-	trigger, err := r.getTriggerFromCore(organizationID, name)
+func (r *Registry) GetTrigger(tx *gorm.DB, organizationID string, name string) (core.Trigger, error) {
+	trigger, err := r.getTriggerFromCore(tx, organizationID, name)
 	if err == nil {
 		return trigger, nil
 	}
 
-	triggers, err := r.ExtensionStorage.ListTriggers(organizationID)
+	triggers, err := r.ExtensionStorage.ListTriggers(tx, organizationID)
 	if err != nil {
 		return nil, fmt.Errorf("error listing triggers from extensions: %w", err)
 	}
@@ -159,7 +160,7 @@ func (r *Registry) GetTrigger(organizationID string, name string) (core.Trigger,
 	return nil, fmt.Errorf("trigger %s not found", name)
 }
 
-func (r *Registry) getTriggerFromCore(organizationID string, name string) (core.Trigger, error) {
+func (r *Registry) getTriggerFromCore(tx *gorm.DB, organizationID string, name string) (core.Trigger, error) {
 	parts := strings.SplitN(name, ".", 2)
 	if len(parts) > 2 {
 		return nil, fmt.Errorf("invalid trigger name: %s", name)
@@ -173,7 +174,7 @@ func (r *Registry) getTriggerFromCore(organizationID string, name string) (core.
 		return trigger, nil
 	}
 
-	return r.GetIntegrationTrigger(organizationID, parts[0], name)
+	return r.GetIntegrationTrigger(tx, organizationID, parts[0], name)
 }
 
 func (r *Registry) ListComponents() []core.Component {
@@ -189,10 +190,10 @@ func (r *Registry) ListComponents() []core.Component {
 	return components
 }
 
-func (r *Registry) ListComponentsForOrganization(organizationID string) []core.Component {
+func (r *Registry) ListComponentsForOrganization(tx *gorm.DB, organizationID string) []core.Component {
 	components := r.ListComponents()
 
-	fromExtensions, err := r.ExtensionStorage.ListComponents(organizationID)
+	fromExtensions, err := r.ExtensionStorage.ListComponents(tx, organizationID)
 	if err != nil {
 		return components
 	}
@@ -204,10 +205,10 @@ func (r *Registry) ListComponentsForOrganization(organizationID string) []core.C
 	return components
 }
 
-func (r *Registry) ListTriggersForOrganization(organizationID string) []core.Trigger {
+func (r *Registry) ListTriggersForOrganization(tx *gorm.DB, organizationID string) []core.Trigger {
 	triggers := r.ListTriggers()
 
-	fromExtensions, err := r.ExtensionStorage.ListTriggers(organizationID)
+	fromExtensions, err := r.ExtensionStorage.ListTriggers(tx, organizationID)
 	if err != nil {
 		return triggers
 	}
@@ -219,27 +220,27 @@ func (r *Registry) ListTriggersForOrganization(organizationID string) []core.Tri
 	return triggers
 }
 
-func (r *Registry) GetComponent(organizationID string, name string) (core.Component, error) {
-	component, err := r.getComponentFromCore(organizationID, name)
+func (r *Registry) GetComponent(tx *gorm.DB, organizationID string, name string) (core.Component, error) {
+	component, err := r.getComponentFromCore(tx, organizationID, name)
 	if err == nil {
 		return component, nil
 	}
 
-	components, err := r.ExtensionStorage.ListComponents(organizationID)
+	components, err := r.ExtensionStorage.ListComponents(tx, organizationID)
 	if err != nil {
 		return nil, fmt.Errorf("error listing components from extensions: %w", err)
 	}
 
 	for _, component := range components {
 		if component.Name == name {
-			return NewExtensionComponent(component), nil
+			return NewExtensionComponent(tx, component), nil
 		}
 	}
 
 	return nil, fmt.Errorf("component %s not found", name)
 }
 
-func (r *Registry) getComponentFromCore(organizationID string, name string) (core.Component, error) {
+func (r *Registry) getComponentFromCore(tx *gorm.DB, organizationID string, name string) (core.Component, error) {
 	parts := strings.SplitN(name, ".", 2)
 	if len(parts) > 2 {
 		return nil, fmt.Errorf("invalid component name: %s", name)
@@ -254,7 +255,7 @@ func (r *Registry) getComponentFromCore(organizationID string, name string) (cor
 		return component, nil
 	}
 
-	return r.GetIntegrationComponent(organizationID, parts[0], name)
+	return r.GetIntegrationComponent(tx, organizationID, parts[0], name)
 }
 
 func (r *Registry) GetWidget(name string) (core.Widget, error) {
@@ -280,25 +281,25 @@ func (r *Registry) ListWidgets() []core.Widget {
 	return widgets
 }
 
-func (r *Registry) GetIntegration(organizationID string, name string) (core.Integration, error) {
+func (r *Registry) GetIntegration(tx *gorm.DB, organizationID string, name string) (core.Integration, error) {
 	integration, ok := r.Integrations[name]
 	if ok {
 		return integration, nil
 	}
 
-	integrations, err := r.ExtensionStorage.ListIntegrations(organizationID)
+	integrations, err := r.ExtensionStorage.ListIntegrations(tx, organizationID)
 	if err != nil {
 		return nil, fmt.Errorf("error listing integrations from extensions: %w", err)
 	}
 
 	for _, integration := range integrations {
 		if integration.Name == name {
-			components, err := r.getIntegrationComponentsForExtension(organizationID, name)
+			components, err := r.getIntegrationComponentsForExtension(tx, organizationID, name)
 			if err != nil {
 				return nil, err
 			}
 
-			triggers, err := r.getIntegrationTriggersForExtension(organizationID, name)
+			triggers, err := r.getIntegrationTriggersForExtension(tx, organizationID, name)
 			if err != nil {
 				return nil, err
 			}
@@ -333,21 +334,21 @@ func (r *Registry) ListIntegrations() []core.Integration {
 	return integrations
 }
 
-func (r *Registry) ListIntegrationsForOrganization(organizationID string) []core.Integration {
+func (r *Registry) ListIntegrationsForOrganization(tx *gorm.DB, organizationID string) []core.Integration {
 	integrations := r.ListIntegrations()
 
-	manifests, err := r.ExtensionStorage.ListIntegrations(organizationID)
+	manifests, err := r.ExtensionStorage.ListIntegrations(tx, organizationID)
 	if err != nil {
 		return integrations
 	}
 
 	for _, manifest := range manifests {
-		components, err := r.getIntegrationComponentsForExtension(organizationID, manifest.Name)
+		components, err := r.getIntegrationComponentsForExtension(tx, organizationID, manifest.Name)
 		if err != nil {
 			return integrations
 		}
 
-		triggers, err := r.getIntegrationTriggersForExtension(organizationID, manifest.Name)
+		triggers, err := r.getIntegrationTriggersForExtension(tx, organizationID, manifest.Name)
 		if err != nil {
 			return integrations
 		}
@@ -362,8 +363,8 @@ func (r *Registry) ListIntegrationsForOrganization(organizationID string) []core
 	return integrations
 }
 
-func (r *Registry) getIntegrationComponentsForExtension(organizationID string, integrationName string) ([]core.Component, error) {
-	manifests, err := r.ExtensionStorage.ListComponents(organizationID)
+func (r *Registry) getIntegrationComponentsForExtension(tx *gorm.DB, organizationID string, integrationName string) ([]core.Component, error) {
+	manifests, err := r.ExtensionStorage.ListComponents(tx, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -378,8 +379,8 @@ func (r *Registry) getIntegrationComponentsForExtension(organizationID string, i
 	return components, nil
 }
 
-func (r *Registry) getIntegrationTriggersForExtension(organizationID string, integrationName string) ([]core.Trigger, error) {
-	manifests, err := r.ExtensionStorage.ListTriggers(organizationID)
+func (r *Registry) getIntegrationTriggersForExtension(tx *gorm.DB, organizationID string, integrationName string) ([]core.Trigger, error) {
+	manifests, err := r.ExtensionStorage.ListTriggers(tx, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -394,8 +395,8 @@ func (r *Registry) getIntegrationTriggersForExtension(organizationID string, int
 	return triggers, nil
 }
 
-func (r *Registry) GetIntegrationTrigger(organizationID string, appName, triggerName string) (core.Trigger, error) {
-	integration, err := r.GetIntegration(organizationID, appName)
+func (r *Registry) GetIntegrationTrigger(tx *gorm.DB, organizationID string, appName, triggerName string) (core.Trigger, error) {
+	integration, err := r.GetIntegration(tx, organizationID, appName)
 	if err != nil {
 		return nil, err
 	}
@@ -409,8 +410,8 @@ func (r *Registry) GetIntegrationTrigger(organizationID string, appName, trigger
 	return nil, fmt.Errorf("trigger %s not found for integration %s", triggerName, appName)
 }
 
-func (r *Registry) GetIntegrationComponent(organizationID string, appName, componentName string) (core.Component, error) {
-	integration, err := r.GetIntegration(organizationID, appName)
+func (r *Registry) GetIntegrationComponent(tx *gorm.DB, organizationID string, appName, componentName string) (core.Component, error) {
+	integration, err := r.GetIntegration(tx, organizationID, appName)
 	if err != nil {
 		return nil, err
 	}

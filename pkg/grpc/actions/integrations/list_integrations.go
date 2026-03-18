@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -11,7 +12,7 @@ import (
 )
 
 func ListIntegrations(ctx context.Context, registry *registry.Registry, organizationID string) (*pb.ListIntegrationsResponse, error) {
-	integrations := registry.ListIntegrationsForOrganization(organizationID)
+	integrations := registry.ListIntegrationsForOrganization(database.Conn(), organizationID)
 
 	return &pb.ListIntegrationsResponse{
 		Integrations: serializeIntegrations(integrations),

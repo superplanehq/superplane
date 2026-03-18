@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/extensions"
+	"github.com/superplanehq/superplane/pkg/extensions/hub"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -24,6 +25,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/templates"
 	"github.com/superplanehq/superplane/pkg/workers"
+	"gorm.io/gorm"
 
 	// Import integrations, components and triggers to register them via init()
 	_ "github.com/superplanehq/superplane/pkg/components/addmemory"
@@ -322,6 +324,16 @@ func setupOtelMetrics() {
 	}
 }
 
+func startHub(extensionStorage *extensions.Storage, jwtSigner *jwt.Signer) {
+	addr := os.Getenv("EXTENSION_WORKER_HUB_ADDR")
+	if addr == "" {
+		addr = ":8092"
+	}
+
+	hub := hub.New(addr, extensionStorage, jwtSigner)
+	go hub.Start(context.Background())
+}
+
 func Start() {
 	configureLogging()
 	setupOtelMetrics()
@@ -401,6 +413,10 @@ func Start() {
 		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, authService, extensionStorage, registry, oidcProvider)
 	}
 
+	if os.Getenv("START_HUB") == "yes" {
+		go startHub(extensionStorage, jwtSigner)
+	}
+
 	startWorkers(encryptorInstance, registry, oidcProvider, baseURL, authService)
 
 	log.Println("SuperPlane is UP.")
@@ -421,8 +437,8 @@ func getWebhookBaseURL(baseURL string) string {
 }
 
 func newExtensionStorage() (*extensions.Storage, error) {
-	manifestLoader := func(organizationID string) (*extensions.Manifest, error) {
-		return models.LoadManifest(organizationID)
+	manifestLoader := func(tx *gorm.DB, organizationID string) (*extensions.Manifest, error) {
+		return models.LoadManifestInTransaction(tx, organizationID)
 	}
 
 	extensionsDir := os.Getenv("EXTENSIONS_DIR")

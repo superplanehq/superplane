@@ -15,75 +15,120 @@ import type {
   RuntimeLogger,
   RuntimeValue,
 } from "../runtime-context.js";
-import type { InvocationEnvelope, InvocationPayload, RuntimeHarness } from "../runtime/types.js";
+import type {
+  ComponentCancelInvocationPayload,
+  ComponentExecuteInvocationPayload,
+  ComponentHandleActionInvocationPayload,
+  ComponentHandleWebhookInvocationPayload,
+  ComponentOnIntegrationMessageInvocationPayload,
+  ComponentSetupInvocationPayload,
+  InvocationEnvelope,
+  InvocationContext,
+  InvocationEffects,
+  InvocationIntegrationContext,
+  InvocationPayload,
+  NormalizedInvocationContext,
+  RuntimeHarness,
+} from "../runtime/types.js";
 
-export function normalizeInvocationEnvelope(payload: InvocationPayload): InvocationEnvelope {
-  const configuration = payload.configuration ?? {};
-  const input = payload.input ?? {};
-  const current = payload.current ?? {};
-  const requested = payload.requested ?? {};
-  const parameters = payload.parameters ?? {};
-  const actionName = payload.actionName ?? "";
-  const headers = payload.headers ?? {};
-  const body = normalizeBody(payload.body);
-  const message = payload.message ?? input;
-  const integrationRecord = payload.integration ?? null;
-  const webhookRecord = payload.webhook ?? null;
-  const integrationConfig = asRecord(integrationRecord?.configuration) ?? {};
-  const integrationMetadata = integrationRecord?.metadata ?? null;
-  const integrationID = typeof integrationRecord?.id === "string" ? integrationRecord.id : "";
-  const webhookID = typeof webhookRecord?.id === "string" ? webhookRecord.id : "";
-  const webhookURL = typeof webhookRecord?.url === "string" ? webhookRecord.url : "";
-  const webhookSecret = normalizeBody(webhookRecord?.secret);
-  const webhookMetadata = webhookRecord?.metadata ?? null;
-  const webhookConfiguration = webhookRecord?.configuration ?? null;
+export function normalizeInvocationEnvelope(
+  payload: InvocationPayload,
+): InvocationEnvelope {
+  const context = normalizeInvocationContext(payload.context);
 
-  return {
-    target: payload.target,
-    configuration,
-    input,
-    current,
-    requested,
-    parameters,
-    actionName,
-    headers,
-    body,
-    message,
-    integration: {
-      id: integrationID,
-      configuration: integrationConfig,
-      metadata: integrationMetadata,
-    },
-    webhook: {
-      id: webhookID,
-      url: webhookURL,
-      secret: webhookSecret,
-      metadata: webhookMetadata,
-      configuration: webhookConfiguration,
-    },
-    metadata: payload.metadata ?? null,
-  };
+  switch (payload.target.operation) {
+    case "setup":
+      payload = payload as ComponentSetupInvocationPayload;
+      return {
+        target: payload.target,
+        context,
+        invocation: payload.invocation ?? {},
+      };
+    case "execute":
+      payload = payload as ComponentExecuteInvocationPayload;
+      return {
+        target: payload.target,
+        context,
+        invocation: {
+          data: payload.invocation?.data ?? null,
+        },
+      };
+    case "cancel":
+      payload = payload as ComponentCancelInvocationPayload;
+      return {
+        target: payload.target,
+        context,
+        invocation: {
+          data: payload.invocation?.data ?? null,
+        },
+      };
+    case "handleAction":
+      payload = payload as ComponentHandleActionInvocationPayload;
+      return {
+        target: payload.target,
+        context,
+        invocation: {
+          name: payload.invocation.name,
+          parameters: payload.invocation.parameters ?? {},
+        },
+      };
+    case "handleWebhook":
+      payload = payload as ComponentHandleWebhookInvocationPayload;
+      return {
+        target: payload.target,
+        context,
+        invocation: {
+          headers: payload.invocation?.headers ?? {},
+          body: normalizeBody(payload.invocation?.body),
+        },
+      };
+    case "onIntegrationMessage":
+      payload = payload as ComponentOnIntegrationMessageInvocationPayload;
+      return {
+        target: payload.target,
+        context,
+        invocation: {
+          message: payload.invocation?.message ?? null,
+        },
+      };
+  }
 }
 
-export function createRuntimeHarness(invocation: InvocationEnvelope): RuntimeHarness {
-  let metadataState: RuntimeValue = invocation.metadata;
-  let integrationMetadataState: RuntimeValue = invocation.integration.metadata;
+export function createRuntimeHarness(
+  invocation: InvocationEnvelope,
+): RuntimeHarness {
+  let metadataState: RuntimeValue = invocation.context.metadata;
+  let integrationMetadataState: RuntimeValue =
+    invocation.context.integration.metadata;
   let integrationReady = false;
   let integrationErrorMessage = "";
   let browserAction: BrowserAction | null = null;
   let nodeWebhookSecret: Uint8Array = new Uint8Array(0);
-  let provisionedWebhookSecret: Uint8Array = invocation.webhook.secret;
-  let provisionedWebhookMetadata: RuntimeValue = invocation.webhook.metadata;
-  let provisionedWebhookConfiguration: RuntimeValue = invocation.webhook.configuration;
   const requestedWebhooks: RuntimeValue[] = [];
-  const scheduledRequests: Array<{ actionName: string; parameters: Record<string, RuntimeValue>; intervalMs: number }> = [];
-  const emittedEvents: Array<{ payloadType: string; payload: RuntimeValue }> = [];
+  const scheduledRequests: Array<{
+    actionName: string;
+    parameters: Record<string, RuntimeValue>;
+    intervalMs: number;
+  }> = [];
+  const emittedEvents: Array<{ payloadType: string; payload: RuntimeValue }> =
+    [];
   const integrationSecrets = new Map<string, Uint8Array>();
-  const integrationSubscriptions = new Map<string, { configuration: RuntimeValue; messages: RuntimeValue[] }>();
-  const integrationScheduledActions: Array<{ actionName: string; parameters: RuntimeValue; intervalMs: number }> = [];
+  const integrationSubscriptions = new Map<
+    string,
+    { configuration: RuntimeValue; messages: RuntimeValue[] }
+  >();
+  const integrationScheduledActions: Array<{
+    actionName: string;
+    parameters: RuntimeValue;
+    intervalMs: number;
+  }> = [];
   let integrationResyncIntervalMs: number | null = null;
   const executionKV = new Map<string, string>();
-  const emissions: Array<{ channel: string; payloadType: string; payloads: RuntimeValue[] }> = [];
+  const emissions: Array<{
+    channel: string;
+    payloadType: string;
+    payloads: RuntimeValue[];
+  }> = [];
   let executionPassed = false;
   let executionFailed: { reason: string; message: string } | null = null;
   let executionFinished = false;
@@ -150,6 +195,7 @@ export function createRuntimeHarness(invocation: InvocationEnvelope): RuntimeHar
     emit(channel, payloadType, payloads) {
       emissions.push({ channel, payloadType, payloads });
       executionFinished = true;
+      executionPassed = true;
     },
     pass() {
       executionPassed = true;
@@ -163,7 +209,7 @@ export function createRuntimeHarness(invocation: InvocationEnvelope): RuntimeHar
 
   const integration: IntegrationContext = {
     id() {
-      return invocation.integration.id;
+      return invocation.context.integration.id;
     },
     getMetadata() {
       return integrationMetadataState;
@@ -172,7 +218,7 @@ export function createRuntimeHarness(invocation: InvocationEnvelope): RuntimeHar
       integrationMetadataState = value;
     },
     getConfig(name) {
-      const value = invocation.integration.configuration[name];
+      const value = invocation.context.integration.configuration[name];
       if (typeof value === "string") {
         return new TextEncoder().encode(value);
       }
@@ -233,7 +279,10 @@ export function createRuntimeHarness(invocation: InvocationEnvelope): RuntimeHar
 
   const webhook: NodeWebhookContext = {
     setup() {
-      return typeof asRecord(invocation.metadata)?.webhookURL === "string" ? String(asRecord(invocation.metadata)?.webhookURL) : "";
+      return typeof asRecord(invocation.context.metadata)?.webhookURL ===
+        "string"
+        ? String(asRecord(invocation.context.metadata)?.webhookURL)
+        : "";
     },
     getSecret() {
       return nodeWebhookSecret;
@@ -249,34 +298,14 @@ export function createRuntimeHarness(invocation: InvocationEnvelope): RuntimeHar
       return { previous, current: nodeWebhookSecret };
     },
     getBaseURL() {
-      return typeof asRecord(invocation.metadata)?.webhookBaseURL === "string"
-        ? String(asRecord(invocation.metadata)?.webhookBaseURL)
+      return typeof asRecord(invocation.context.metadata)?.webhookBaseURL ===
+        "string"
+        ? String(asRecord(invocation.context.metadata)?.webhookBaseURL)
         : "";
     },
   };
 
-  const provisionedWebhook = {
-    getID() {
-      return invocation.webhook.id;
-    },
-    getURL() {
-      return invocation.webhook.url;
-    },
-    getSecret() {
-      return provisionedWebhookSecret;
-    },
-    getMetadata() {
-      return provisionedWebhookMetadata;
-    },
-    getConfiguration() {
-      return provisionedWebhookConfiguration;
-    },
-    setSecret(secret: Uint8Array) {
-      provisionedWebhookSecret = secret;
-    },
-  };
-
-  const runtime: RuntimeContext = {
+  const context: RuntimeContext = {
     logger,
     http,
     metadata,
@@ -288,10 +317,9 @@ export function createRuntimeHarness(invocation: InvocationEnvelope): RuntimeHar
   };
 
   return {
-    runtime,
-    webhook: provisionedWebhook,
+    context,
     snapshot() {
-      return normalizeForJSON({
+      const effects: InvocationEffects = {
         metadata: metadataState,
         requests: {
           scheduledActions: scheduledRequests,
@@ -305,34 +333,66 @@ export function createRuntimeHarness(invocation: InvocationEnvelope): RuntimeHar
           emissions,
         },
         integration: {
-          id: invocation.integration.id,
+          id: invocation.context.integration.id,
           ready: integrationReady,
           error: integrationErrorMessage || undefined,
           metadata: integrationMetadataState,
-          browserAction,
+          browserAction: normalizeForJSON(browserAction),
           requestedWebhooks,
           scheduledResyncIntervalMs: integrationResyncIntervalMs,
           scheduledActions: integrationScheduledActions,
-          secrets: Array.from(integrationSecrets.entries()).map(([name, value]) => ({ name, value })),
-          subscriptions: Array.from(integrationSubscriptions.entries()).map(([id, entry]) => ({
-            id,
-            configuration: entry.configuration,
-            messages: entry.messages,
-          })),
+          secrets: Array.from(integrationSecrets.entries()).map(
+            ([name, value]) => ({ name, value: normalizeForJSON(value) }),
+          ),
+          subscriptions: Array.from(integrationSubscriptions.entries()).map(
+            ([id, entry]) => ({
+              id,
+              configuration: entry.configuration,
+              messages: entry.messages,
+            }),
+          ),
         },
         webhook: {
-          id: invocation.webhook.id,
-          url: invocation.webhook.url,
-          metadata: provisionedWebhookMetadata,
-          configuration: provisionedWebhookConfiguration,
-          provisionedSecret: provisionedWebhookSecret,
-          baseURL: typeof asRecord(invocation.metadata)?.webhookBaseURL === "string"
-            ? String(asRecord(invocation.metadata)?.webhookBaseURL)
-            : "",
-          secret: nodeWebhookSecret,
+          url:
+            typeof asRecord(invocation.context.metadata)?.webhookURL ===
+            "string"
+              ? String(asRecord(invocation.context.metadata)?.webhookURL)
+              : "",
+          baseURL:
+            typeof asRecord(invocation.context.metadata)?.webhookBaseURL ===
+            "string"
+              ? String(asRecord(invocation.context.metadata)?.webhookBaseURL)
+              : "",
+          secret: normalizeForJSON(nodeWebhookSecret),
         },
-      });
+      };
+
+      return effects;
     },
+  };
+}
+
+function normalizeInvocationContext(
+  context?: InvocationContext,
+): NormalizedInvocationContext {
+  const integration = normalizeInvocationIntegrationContext(
+    context?.integration,
+  );
+
+  return {
+    configuration: context?.configuration ?? {},
+    integration,
+    metadata: context?.metadata ?? null,
+  };
+}
+
+function normalizeInvocationIntegrationContext(
+  integration?: InvocationIntegrationContext,
+) {
+  return {
+    id: typeof integration?.id === "string" ? integration.id : "",
+    configuration: asRecord(integration?.configuration) ?? {},
+    metadata: integration?.metadata ?? null,
   };
 }
 
@@ -341,7 +401,12 @@ export function normalizeForJSON(value: unknown): RuntimeValue {
     return null;
   }
 
-  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
     return value;
   }
 
@@ -361,7 +426,9 @@ export function normalizeForJSON(value: unknown): RuntimeValue {
   }
 
   if (typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>).map(([key, entryValue]) => [key, normalizeForJSON(entryValue)]);
+    const entries = Object.entries(value as Record<string, unknown>).map(
+      ([key, entryValue]) => [key, normalizeForJSON(entryValue)],
+    );
     return Object.fromEntries(entries) as Record<string, RuntimeValue>;
   }
 
@@ -376,26 +443,6 @@ function asRecord(value: unknown): Record<string, RuntimeValue> | null {
   return value as Record<string, RuntimeValue>;
 }
 
-function normalizeHeaders(value: Record<string, RuntimeValue> | null): Record<string, string[]> {
-  if (!value) {
-    return {};
-  }
-
-  const headers: Record<string, string[]> = {};
-  for (const [key, headerValue] of Object.entries(value)) {
-    if (typeof headerValue === "string") {
-      headers[key] = [headerValue];
-      continue;
-    }
-
-    if (Array.isArray(headerValue)) {
-      headers[key] = headerValue.map((item) => String(item));
-    }
-  }
-
-  return headers;
-}
-
 function normalizeBody(value: RuntimeValue | undefined): Uint8Array {
   if (typeof value === "string") {
     return new TextEncoder().encode(value);
@@ -408,7 +455,9 @@ function normalizeBody(value: RuntimeValue | undefined): Uint8Array {
   return new Uint8Array(0);
 }
 
-function normalizeRequestBody(body: string | Uint8Array | undefined): BodyInit | undefined {
+function normalizeRequestBody(
+  body: string | Uint8Array | undefined,
+): BodyInit | undefined {
   if (body === undefined) {
     return undefined;
   }
@@ -422,7 +471,11 @@ function normalizeRequestBody(body: string | Uint8Array | undefined): BodyInit |
   return new Blob([copy]);
 }
 
-function writeLog(level: string, message: string, fields?: Record<string, RuntimeValue>): void {
+function writeLog(
+  level: string,
+  message: string,
+  fields?: Record<string, RuntimeValue>,
+): void {
   const payload = fields ? ` ${JSON.stringify(fields)}` : "";
   console.error(`[${level}] ${message}${payload}`);
 }

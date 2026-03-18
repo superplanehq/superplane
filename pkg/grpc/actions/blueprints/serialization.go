@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/blueprints"
@@ -134,7 +135,7 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 			}
 		}
 
-		_, err := registry.GetComponent(organizationID, node.Component.Name)
+		_, err := registry.GetComponent(database.Conn(), organizationID, node.Component.Name)
 		if err != nil {
 			return fmt.Errorf("component %s not found", node.Component.Name)
 		}

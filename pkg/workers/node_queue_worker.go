@@ -270,7 +270,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		 * For component nodes, delegate to the component's ProcessQueueItem implementation to handle
 		 * the processing.
 		 */
-		executionID, err = w.processComponentNode(ctx, canvas.OrganizationID.String(), node)
+		executionID, err = w.processComponentNode(ctx, tx, canvas.OrganizationID.String(), node)
 	case models.NodeTypeBlueprint:
 		/*
 		 * For blueprint nodes, use the default processing logic.
@@ -292,7 +292,7 @@ func (w *NodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, organizationID
 			return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
 		}
 
-		comp, err := w.registry.GetComponent(organizationID, ref.Component.Name)
+		comp, err := w.registry.GetComponent(tx, organizationID, ref.Component.Name)
 		if err != nil {
 			return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
 		}
@@ -314,14 +314,14 @@ func (w *NodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, organizationID
 	}
 }
 
-func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, organizationID string, node *models.CanvasNode) (*uuid.UUID, error) {
+func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, tx *gorm.DB, organizationID string, node *models.CanvasNode) (*uuid.UUID, error) {
 	ref := node.Ref.Data()
 
 	if ref.Component == nil || ref.Component.Name == "" {
 		return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
 	}
 
-	comp, err := w.registry.GetComponent(organizationID, ref.Component.Name)
+	comp, err := w.registry.GetComponent(tx, organizationID, ref.Component.Name)
 	if err != nil {
 		return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
 	}

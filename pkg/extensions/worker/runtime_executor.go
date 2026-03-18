@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -79,25 +80,53 @@ func NewRuntimeExecutor(config RuntimeExecutorConfig) *RuntimeExecutor {
 }
 
 func (e *RuntimeExecutor) HandleJob(ctx context.Context, message protocol.JobAssignMessage) (json.RawMessage, error) {
+	switch message.JobType {
+	case protocol.JobTypeInvokeExtension:
+		return e.handleInvokeExtensionJob(ctx, message)
+	default:
+		return nil, fmt.Errorf("job type %s is not supported", message.JobType)
+	}
+}
+
+func (e *RuntimeExecutor) handleInvokeExtensionJob(ctx context.Context, message protocol.JobAssignMessage) (json.RawMessage, error) {
+	log.Printf("Handling invoke extension job %s", message.JobID)
+
+	if message.InvokeExtension == nil {
+		return nil, fmt.Errorf("missing invoke extension specification")
+	}
+
 	bundlePath, err := e.ensureBundle(ctx, message)
 	if err != nil {
 		return nil, err
 	}
 
-	return e.invokeBundle(ctx, bundlePath, message.Invocation)
+	return e.invokeBundle(ctx, bundlePath, message.InvokeExtension.Invocation)
 }
 
 func (e *RuntimeExecutor) ensureBundle(ctx context.Context, message protocol.JobAssignMessage) (string, error) {
-	bundlePath := filepath.Join(e.bundleCacheDir(message), "bundle.js")
+	log.Printf("Ensuring bundle for job %s", message.JobID)
+
+	bundlePath := filepath.Join(
+		e.cacheDir,
+		message.InvokeExtension.OrganizationID,
+		message.InvokeExtension.Extension.Name,
+		message.InvokeExtension.Version.Name,
+		message.InvokeExtension.Version.Digest,
+		"bundle.js",
+	)
+
 	if _, err := os.Stat(bundlePath); err == nil {
+		log.Printf("Bundle for job %s already exists at %s", message.JobID, bundlePath)
 		return bundlePath, nil
 	}
 
+	log.Printf("Creating bundle cache directory for job %s", message.JobID)
 	if err := os.MkdirAll(filepath.Dir(bundlePath), 0o755); err != nil {
 		return "", fmt.Errorf("create bundle cache directory: %w", err)
 	}
 
-	bundleURL, err := e.bundleURL(message)
+	log.Printf("Downloading bundle for job %s", message.JobID)
+	bundleURL, err := e.bundleURL(message.InvokeExtension)
 	if err != nil {
 		return "", err
 	}
@@ -179,28 +208,15 @@ func (e *RuntimeExecutor) invokeBundle(ctx context.Context, bundlePath string, i
 	return json.RawMessage(output), nil
 }
 
-func (e *RuntimeExecutor) bundleURL(message protocol.JobAssignMessage) (string, error) {
-	bundleURL, err := joinHTTPURL(e.hubURL, fmt.Sprintf(
-		"/api/v1/extensions/%s/versions/%s/bundle.js",
-		url.PathEscape(message.ExtensionID),
-		url.PathEscape(message.VersionID),
-	))
+func (e *RuntimeExecutor) bundleURL(invokeExtension *protocol.InvokeExtension) (string, error) {
+	bundleURL, err := joinHTTPURL(e.hubURL, "/api/v1/extensions/bundle.js")
 	if err != nil {
 		return "", err
 	}
 
 	return addQuery(bundleURL, map[string]string{
-		protocol.QueryToken: message.BundleToken,
+		protocol.QueryToken: invokeExtension.BundleToken,
 	})
-}
-
-func (e *RuntimeExecutor) bundleCacheDir(message protocol.JobAssignMessage) string {
-	return filepath.Join(
-		e.cacheDir,
-		cachePathSegment(message.ExtensionID),
-		cachePathSegment(message.VersionID),
-		cachePathSegment(message.Digest),
-	)
 }
 
 func fileURL(path string) string {
@@ -234,9 +250,4 @@ func joinHTTPURL(base string, path string) (string, error) {
 	}
 
 	return parsed.String(), nil
-}
-
-func cachePathSegment(value string) string {
-	replacer := strings.NewReplacer("/", "_", "\\", "_")
-	return replacer.Replace(value)
 }

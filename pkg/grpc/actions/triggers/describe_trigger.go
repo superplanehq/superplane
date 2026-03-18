@@ -3,6 +3,7 @@ package triggers
 import (
 	"context"
 
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/triggers"
@@ -11,7 +12,7 @@ import (
 )
 
 func DescribeTrigger(ctx context.Context, registry *registry.Registry, organizationID string, name string) (*pb.DescribeTriggerResponse, error) {
-	trigger, err := registry.GetTrigger(organizationID, name)
+	trigger, err := registry.GetTrigger(database.Conn(), organizationID, name)
 	if err != nil {
 		return nil, err
 	}

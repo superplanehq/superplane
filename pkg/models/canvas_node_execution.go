@@ -231,6 +231,20 @@ func CountRunningExecutionsForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUI
 	return runningCount, nil
 }
 
+func FindUnscopedNodeExecution(id uuid.UUID) (*CanvasNodeExecution, error) {
+	var execution CanvasNodeExecution
+	err := database.Conn().
+		Where("id = ?", id).
+		First(&execution).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution, nil
+}
+
 func FindNodeExecution(workflowID, id uuid.UUID) (*CanvasNodeExecution, error) {
 	return FindNodeExecutionInTransaction(database.Conn(), workflowID, id)
 }

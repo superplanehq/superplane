@@ -153,7 +153,7 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 		return fmt.Errorf("node %s is not a trigger", node.NodeID)
 	}
 
-	trigger, err := w.registry.GetTrigger(canvas.OrganizationID.String(), nodeRef.Trigger.Name)
+	trigger, err := w.registry.GetTrigger(tx, canvas.OrganizationID.String(), nodeRef.Trigger.Name)
 	if err != nil {
 		return fmt.Errorf("trigger not found: %w", err)
 	}
@@ -222,7 +222,7 @@ func (w *NodeRequestWorker) invokeNodeComponentAction(tx *gorm.DB, request *mode
 		return err
 	}
 
-	component, err := w.registry.GetComponent(canvas.OrganizationID.String(), nodeRef.Component.Name)
+	component, err := w.registry.GetComponent(tx, canvas.OrganizationID.String(), nodeRef.Component.Name)
 	if err != nil {
 		return fmt.Errorf("component not found: %w", err)
 	}
@@ -307,7 +307,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(
 		return err
 	}
 
-	component, err := w.registry.GetComponent(canvas.OrganizationID.String(), node.Ref.Data().Component.Name)
+	component, err := w.registry.GetComponent(tx, canvas.OrganizationID.String(), node.Ref.Data().Component.Name)
 	if err != nil {
 		return fmt.Errorf("component not found: %w", err)
 	}
@@ -398,7 +398,7 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(
 		return err
 	}
 
-	component, err := w.registry.GetComponent(canvas.OrganizationID.String(), childNode.Ref.Component.Name)
+	component, err := w.registry.GetComponent(tx, canvas.OrganizationID.String(), childNode.Ref.Component.Name)
 	if err != nil {
 		return fmt.Errorf("component not found: %w", err)
 	}

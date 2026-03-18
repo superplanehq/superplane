@@ -397,6 +397,52 @@ CREATE TABLE public.role_metadata (
 
 
 --
+-- Name: runner_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runner_jobs (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    type character varying(64) NOT NULL,
+    spec jsonb NOT NULL,
+    state character varying(64) NOT NULL,
+    result character varying(64) NOT NULL,
+    result_reason character varying(255) NOT NULL,
+    runner_id uuid,
+    reference_id uuid NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: runner_pools; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runner_pools (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    name character varying(128) NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: runners; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runners (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    pool_id uuid NOT NULL,
+    state character varying(64) NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -946,6 +992,38 @@ ALTER TABLE ONLY public.role_metadata
 
 
 --
+-- Name: runner_jobs runner_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_jobs
+    ADD CONSTRAINT runner_jobs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: runner_pools runner_pools_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_pools
+    ADD CONSTRAINT runner_pools_organization_id_name_key UNIQUE (organization_id, name);
+
+
+--
+-- Name: runner_pools runner_pools_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_pools
+    ADD CONSTRAINT runner_pools_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: runners runners_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runners
+    ADD CONSTRAINT runners_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1300,6 +1378,20 @@ CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (d
 --
 
 CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_runner_pools_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_runner_pools_organization_id ON public.runner_pools USING btree (organization_id);
+
+
+--
+-- Name: idx_runners_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_runners_organization_id ON public.runners USING btree (organization_id);
 
 
 --
@@ -1747,6 +1839,46 @@ ALTER TABLE ONLY public.organization_invite_links
 
 
 --
+-- Name: runner_jobs runner_jobs_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_jobs
+    ADD CONSTRAINT runner_jobs_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
+-- Name: runner_jobs runner_jobs_runner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_jobs
+    ADD CONSTRAINT runner_jobs_runner_id_fkey FOREIGN KEY (runner_id) REFERENCES public.runners(id);
+
+
+--
+-- Name: runner_pools runner_pools_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_pools
+    ADD CONSTRAINT runner_pools_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
+-- Name: runners runners_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runners
+    ADD CONSTRAINT runners_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
+-- Name: runners runners_pool_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runners
+    ADD CONSTRAINT runners_pool_id_fkey FOREIGN KEY (pool_id) REFERENCES public.runner_pools(id);
+
+
+--
 -- Name: users users_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2050,7 +2182,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260317005239	f
+20260317200436	f
 \.
 
 

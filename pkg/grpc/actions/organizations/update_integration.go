@@ -61,7 +61,7 @@ func UpdateIntegration(
 		instance.InstallationName = name
 	}
 
-	integration, err := registry.GetIntegration(instance.OrganizationID.String(), instance.AppName)
+	integration, err := registry.GetIntegration(database.Conn(), instance.OrganizationID.String(), instance.AppName)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "integration %s not found", instance.AppName)
 	}

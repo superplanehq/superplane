@@ -3,10 +3,22 @@ import type { ManifestJSONValue } from "./manifest-schema.js";
 export type RuntimeValue = ManifestJSONValue;
 
 export interface RuntimeLogger {
-  debug(message: string, fields?: Record<string, RuntimeValue>): void | Promise<void>;
-  info(message: string, fields?: Record<string, RuntimeValue>): void | Promise<void>;
-  warn(message: string, fields?: Record<string, RuntimeValue>): void | Promise<void>;
-  error(message: string, fields?: Record<string, RuntimeValue>): void | Promise<void>;
+  debug(
+    message: string,
+    fields?: Record<string, RuntimeValue>,
+  ): void | Promise<void>;
+  info(
+    message: string,
+    fields?: Record<string, RuntimeValue>,
+  ): void | Promise<void>;
+  warn(
+    message: string,
+    fields?: Record<string, RuntimeValue>,
+  ): void | Promise<void>;
+  error(
+    message: string,
+    fields?: Record<string, RuntimeValue>,
+  ): void | Promise<void>;
 }
 
 export interface HTTPRequest {
@@ -32,7 +44,11 @@ export interface MetadataContext {
 }
 
 export interface RequestContext {
-  scheduleActionCall(actionName: string, parameters: Record<string, RuntimeValue>, intervalMs: number): Promise<void> | void;
+  scheduleActionCall(
+    actionName: string,
+    parameters: Record<string, RuntimeValue>,
+    intervalMs: number,
+  ): Promise<void> | void;
 }
 
 export interface EventContext {
@@ -42,7 +58,11 @@ export interface EventContext {
 export interface ExecutionStateContext {
   isFinished(): Promise<boolean> | boolean;
   setKV(key: string, value: string): Promise<void> | void;
-  emit(channel: string, payloadType: string, payloads: RuntimeValue[]): Promise<void> | void;
+  emit(
+    channel: string,
+    payloadType: string,
+    payloads: RuntimeValue[],
+  ): Promise<void> | void;
   pass(): Promise<void> | void;
   fail(reason: string, message: string): Promise<void> | void;
 }
@@ -78,8 +98,14 @@ export interface IntegrationContext {
   requestWebhook(configuration: RuntimeValue): Promise<void> | void;
   subscribe(configuration: RuntimeValue): Promise<string> | string;
   scheduleResync(intervalMs: number): Promise<void> | void;
-  scheduleActionCall(actionName: string, parameters: RuntimeValue, intervalMs: number): Promise<void> | void;
-  listSubscriptions(): Promise<IntegrationSubscription[]> | IntegrationSubscription[];
+  scheduleActionCall(
+    actionName: string,
+    parameters: RuntimeValue,
+    intervalMs: number,
+  ): Promise<void> | void;
+  listSubscriptions():
+    | Promise<IntegrationSubscription[]>
+    | IntegrationSubscription[];
 }
 
 export interface WebhookContext {
@@ -95,7 +121,9 @@ export interface NodeWebhookContext {
   setup(): Promise<string> | string;
   getSecret(): Promise<Uint8Array> | Uint8Array;
   setSecret(secret: Uint8Array): Promise<void> | void;
-  resetSecret(): Promise<{ previous: Uint8Array; current: Uint8Array }> | { previous: Uint8Array; current: Uint8Array };
+  resetSecret():
+    | Promise<{ previous: Uint8Array; current: Uint8Array }>
+    | { previous: Uint8Array; current: Uint8Array };
   getBaseURL(): Promise<string> | string;
 }
 
@@ -110,14 +138,31 @@ export interface RuntimeContext {
   webhook: NodeWebhookContext;
 }
 
-export interface HandlerContext<TConfiguration = RuntimeValue, TInput = RuntimeValue> {
+export interface SetupHandlerContext<TConfiguration = RuntimeValue> {
+  configuration: TConfiguration;
+  context: RuntimeContext;
+}
+
+export interface ExecutionHandlerContext<
+  TConfiguration = RuntimeValue,
+  TData = RuntimeValue,
+> {
+  configuration: TConfiguration;
+  data: TData;
+  context: RuntimeContext;
+}
+
+export interface HandlerContext<
+  TConfiguration = RuntimeValue,
+  TInput = RuntimeValue,
+> {
   configuration: TConfiguration;
   input: TInput;
-  runtime: RuntimeContext;
+  context: RuntimeContext;
 }
 
 export interface IntegrationWebhookHandlerContext {
-  runtime: RuntimeContext;
+  context: RuntimeContext;
   webhook: WebhookContext;
 }
 
@@ -135,20 +180,25 @@ export interface WebhookHandlerContext<TConfiguration = RuntimeValue> {
   configuration: TConfiguration;
   body: Uint8Array;
   headers: Record<string, string[]>;
-  runtime: RuntimeContext;
+  context: RuntimeContext;
   findExecutionByKV?(key: string, value: string): Promise<RuntimeValue | null>;
 }
 
-export interface ActionHandlerContext<TConfiguration = RuntimeValue, TParameters = Record<string, RuntimeValue>> {
+export interface ActionHandlerContext<
+  TConfiguration = RuntimeValue,
+  TParameters = Record<string, RuntimeValue>,
+> {
   name: string;
   configuration: TConfiguration;
   parameters: TParameters;
-  runtime: RuntimeContext;
+  context: RuntimeContext;
 }
 
-export interface IntegrationMessageHandlerContext<TConfiguration = RuntimeValue> {
+export interface IntegrationMessageHandlerContext<
+  TConfiguration = RuntimeValue,
+> {
   message: RuntimeValue;
   configuration: TConfiguration;
-  runtime: RuntimeContext;
+  context: RuntimeContext;
   findExecutionByKV?(key: string, value: string): Promise<RuntimeValue | null>;
 }

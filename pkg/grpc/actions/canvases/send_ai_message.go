@@ -850,7 +850,7 @@ func loadBlockSchemaFromRegistry(
 	kind := strings.TrimSpace(strings.ToLower(blockType))
 	switch kind {
 	case "component":
-		component, err := registry.GetComponent(organizationID, name)
+		component, err := registry.GetComponent(database.Conn(), organizationID, name)
 		if err != nil {
 			return nil, err
 		}
@@ -861,7 +861,7 @@ func loadBlockSchemaFromRegistry(
 			"outputChannels": component.OutputChannels(nil),
 		}, nil
 	case "trigger":
-		trigger, err := registry.GetTrigger(organizationID, name)
+		trigger, err := registry.GetTrigger(database.Conn(), organizationID, name)
 		if err != nil {
 			return nil, err
 		}
@@ -871,7 +871,7 @@ func loadBlockSchemaFromRegistry(
 			"configuration": trigger.Configuration(),
 		}, nil
 	default:
-		component, componentErr := registry.GetComponent(organizationID, name)
+		component, componentErr := registry.GetComponent(database.Conn(), organizationID, name)
 		if componentErr == nil {
 			return map[string]any{
 				"type":           "component",
@@ -881,7 +881,7 @@ func loadBlockSchemaFromRegistry(
 			}, nil
 		}
 
-		trigger, triggerErr := registry.GetTrigger(organizationID, name)
+		trigger, triggerErr := registry.GetTrigger(database.Conn(), organizationID, name)
 		if triggerErr == nil {
 			return map[string]any{
 				"type":          "trigger",
@@ -908,7 +908,7 @@ func loadBlockExampleOutputFromRegistry(
 	kind := strings.TrimSpace(strings.ToLower(blockType))
 	switch kind {
 	case "component":
-		component, err := registry.GetComponent(organizationID, name)
+		component, err := registry.GetComponent(database.Conn(), organizationID, name)
 		if err != nil {
 			return nil, err
 		}
@@ -918,7 +918,7 @@ func loadBlockExampleOutputFromRegistry(
 			"exampleOutput": component.ExampleOutput(),
 		}, nil
 	case "trigger":
-		trigger, err := registry.GetTrigger(organizationID, name)
+		trigger, err := registry.GetTrigger(database.Conn(), organizationID, name)
 		if err != nil {
 			return nil, err
 		}
@@ -928,7 +928,7 @@ func loadBlockExampleOutputFromRegistry(
 			"exampleOutput": trigger.ExampleData(),
 		}, nil
 	default:
-		component, componentErr := registry.GetComponent(organizationID, name)
+		component, componentErr := registry.GetComponent(database.Conn(), organizationID, name)
 		if componentErr == nil {
 			return map[string]any{
 				"type":          "component",
@@ -937,7 +937,7 @@ func loadBlockExampleOutputFromRegistry(
 			}, nil
 		}
 
-		trigger, triggerErr := registry.GetTrigger(organizationID, name)
+		trigger, triggerErr := registry.GetTrigger(database.Conn(), organizationID, name)
 		if triggerErr == nil {
 			return map[string]any{
 				"type":          "trigger",
