@@ -44,7 +44,7 @@ type armSubnet struct {
 func (a *AzureIntegration) ListResourceGroups(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	ctx.Logger.Info("listing Azure resource groups")
 
-	provider, err := a.ensureProvider(ctx.Integration)
+	provider, err := a.ensureProvider(ctx.Integration, ctx.OIDC)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func (a *AzureIntegration) ListResourceGroupLocations(ctx core.ListResourcesCont
 	}
 	resourceGroup = azureResourceName(resourceGroup)
 
-	provider, err := a.ensureProvider(ctx.Integration)
+	provider, err := a.ensureProvider(ctx.Integration, ctx.OIDC)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (a *AzureIntegration) ListVMSizes(ctx core.ListResourcesContext, resourceGr
 	}
 	resourceGroup = azureResourceName(resourceGroup)
 
-	provider, err := a.ensureProvider(ctx.Integration)
+	provider, err := a.ensureProvider(ctx.Integration, ctx.OIDC)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func (a *AzureIntegration) ListVirtualNetworks(ctx core.ListResourcesContext, re
 	}
 	resourceGroup = azureResourceName(resourceGroup)
 
-	provider, err := a.ensureProvider(ctx.Integration)
+	provider, err := a.ensureProvider(ctx.Integration, ctx.OIDC)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,7 @@ func (a *AzureIntegration) ListSubnets(ctx core.ListResourcesContext, resourceGr
 	resourceGroup = azureResourceName(resourceGroup)
 	vnetName = azureResourceName(vnetName)
 
-	provider, err := a.ensureProvider(ctx.Integration)
+	provider, err := a.ensureProvider(ctx.Integration, ctx.OIDC)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +312,7 @@ type armContainerRegistry struct {
 func (a *AzureIntegration) ListContainerRegistries(ctx core.ListResourcesContext, resourceGroup string) ([]core.IntegrationResource, error) {
 	ctx.Logger.Infof("listing Azure container registries for resource group: %s", resourceGroup)
 
-	provider, err := a.ensureProvider(ctx.Integration)
+	provider, err := a.ensureProvider(ctx.Integration, ctx.OIDC)
 	if err != nil {
 		return nil, err
 	}

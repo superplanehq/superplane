@@ -282,9 +282,16 @@ func (a *AzureIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 // OIDC provider stored during Sync. This is the single entry point for all
 // code paths that need an authenticated Azure client (ListResources,
 // Execute, WebhookHandler).
-func (a *AzureIntegration) ensureProvider(integrationCtx core.IntegrationContext) (*AzureProvider, error) {
+func (a *AzureIntegration) ensureProvider(integrationCtx core.IntegrationContext, fallbackOIDC ...oidc.Provider) (*AzureProvider, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+
+	// If the stored OIDC provider is nil and a fallback was supplied (e.g. from
+	// ListResourcesContext after a server restart), adopt it so we can create a
+	// provider without requiring an explicit re-sync.
+	if a.oidcProvider == nil && len(fallbackOIDC) > 0 && fallbackOIDC[0] != nil {
+		a.oidcProvider = fallbackOIDC[0]
+	}
 
 	integrationID := integrationCtx.ID().String()
 
