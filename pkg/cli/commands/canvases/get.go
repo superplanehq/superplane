@@ -32,7 +32,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 
 	canvas := *response.Canvas
 	if c.draft != nil && *c.draft {
-		if canvas.Metadata == nil || !canvas.Metadata.GetCanvasVersioningEnabled() {
+		if canvas.Metadata == nil || !canvas.Metadata.GetVersioningEnabled() {
 			return fmt.Errorf("--draft cannot be used when effective canvas versioning is disabled; remove --draft to get the live canvas directly")
 		}
 
