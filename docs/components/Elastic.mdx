@@ -105,7 +105,7 @@ Each received alert emits the parsed JSON body sent by Kibana directly as the ev
 
 ## When Case Status Changes
 
-The When Case Status Changes trigger fires a workflow execution when a Kibana Security case is updated.
+The When Case Status Changes trigger fires a workflow execution when a Kibana Security case changes status.
 
 ### Shared Connector
 
@@ -120,10 +120,12 @@ SuperPlane creates **one Kibana Webhook connector per integration**, shared acro
 2. SuperPlane automatically provisions a Kibana **Elasticsearch query** rule against `.kibana_alerting_cases` using `cases.updated_at` as the time field.
 3. Every minute, that Kibana rule checks for case updates in the current window and fires the shared connector when matches are found.
 4. SuperPlane receives the webhook, verifies the secret, validates the routing fields, then queries Kibana for cases updated since the stored checkpoint.
-5. SuperPlane emits one `elastic.case.status.changed` event per matching case.
+5. SuperPlane compares each returned case's current status to the last status stored in trigger metadata and only emits when the value changed.
+6. SuperPlane emits one `elastic.case.status.changed` event per matching case whose status actually changed.
 
 ### Configuration
 
+- **Cases** *(optional)*: Only fire for these specific cases. Leave empty to monitor all cases.
 - **Statuses** *(optional)*: Only fire when a case has one of these statuses. Leave empty to fire for any case update.
 - **Severities** *(optional)*: Only fire for cases with one of these severities. Leave empty to accept all severities.
 - **Tags** *(optional)*: Only fire for cases that include at least one tag matching any of these predicates. Leave empty to accept all cases.
@@ -176,7 +178,7 @@ The component emits an event containing:
 - `title`: The case title
 - `status`: The initial case status
 - `severity`: The case severity
-- `version`: The case version (required for subsequent updates)
+- `version`: The case version (can be provided to later updates for explicit optimistic locking)
 - `createdAt`: The timestamp when the case was created
 
 ### Example Output
@@ -215,7 +217,7 @@ The component emits an event containing:
 - `status`: The case status
 - `severity`: The case severity
 - `tags`: The case tags
-- `version`: The case version (required for subsequent updates)
+- `version`: The case version (can be provided to later updates for explicit optimistic locking)
 - `createdAt`: The timestamp when the case was created
 - `updatedAt`: The timestamp when the case was last updated
 
@@ -292,7 +294,6 @@ The Update Case component applies a partial update to an existing Kibana Securit
 ### Configuration
 
 - **Case ID**: The ID of the case to update
-- **Version**: Optional. The current case version for optimistic locking. If omitted, SuperPlane fetches the latest version before updating.
 - **Title**: New title for the case (optional)
 - **Description**: New description for the case (optional)
 - **Status**: New status for the case (optional)
@@ -307,6 +308,7 @@ The component emits an event containing:
 - `status`: The updated case status
 - `severity`: The updated case severity
 - `version`: The new case version
+- `updatedAt`: The timestamp when the case was last updated
 
 ### Example Output
 
@@ -317,6 +319,7 @@ The component emits an event containing:
     "severity": "high",
     "status": "in-progress",
     "title": "Production incident",
+    "updatedAt": "2026-03-12T10:00:00.000Z",
     "version": "WzE3LDFd"
   },
   "timestamp": "2026-03-12T09:00:00Z",

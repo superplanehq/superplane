@@ -32,6 +32,7 @@ type OnCaseStatusChangeConfiguration struct {
 type OnCaseStatusChangeMetadata struct {
 	LastPollTime string            `json:"lastPollTime,omitempty" mapstructure:"lastPollTime"`
 	CaseNames    map[string]string `json:"caseNames,omitempty" mapstructure:"caseNames"`
+	CaseStatuses map[string]string `json:"caseStatuses,omitempty" mapstructure:"caseStatuses"`
 	RouteKey     string            `json:"routeKey,omitempty" mapstructure:"routeKey"`
 	RuleID       string            `json:"ruleId,omitempty" mapstructure:"ruleId"`
 }
@@ -45,7 +46,7 @@ func (t *OnCaseStatusChange) Icon() string  { return "alert-circle" }
 func (t *OnCaseStatusChange) Color() string { return "gray" }
 
 func (t *OnCaseStatusChange) Documentation() string {
-	return `The When Case Status Changes trigger fires a workflow execution when a Kibana Security case is updated.
+	return `The When Case Status Changes trigger fires a workflow execution when a Kibana Security case changes status.
 
 ## Shared Connector
 
@@ -60,10 +61,12 @@ SuperPlane creates **one Kibana Webhook connector per integration**, shared acro
 2. SuperPlane automatically provisions a Kibana **Elasticsearch query** rule against ` + "`.kibana_alerting_cases`" + ` using ` + "`cases.updated_at`" + ` as the time field.
 3. Every minute, that Kibana rule checks for case updates in the current window and fires the shared connector when matches are found.
 4. SuperPlane receives the webhook, verifies the secret, validates the routing fields, then queries Kibana for cases updated since the stored checkpoint.
-5. SuperPlane emits one ` + "`elastic.case.status.changed`" + ` event per matching case.
+5. SuperPlane compares each returned case's current status to the last status stored in trigger metadata and only emits when the value changed.
+6. SuperPlane emits one ` + "`elastic.case.status.changed`" + ` event per matching case whose status actually changed.
 
 ## Configuration
 
+- **Cases** *(optional)*: Only fire for these specific cases. Leave empty to monitor all cases.
 - **Statuses** *(optional)*: Only fire when a case has one of these statuses. Leave empty to fire for any case update.
 - **Severities** *(optional)*: Only fire for cases with one of these severities. Leave empty to accept all severities.
 - **Tags** *(optional)*: Only fire for cases that include at least one tag matching any of these predicates. Leave empty to accept all cases.
@@ -147,17 +150,24 @@ func (t *OnCaseStatusChange) Setup(ctx core.TriggerContext) error {
 	}
 
 	if len(config.Cases) > 0 {
-		names, err := t.resolveCaseNames(ctx, config.Cases)
+		names, statuses, err := t.resolveCaseMetadata(ctx, config.Cases)
 		if err != nil {
 			return err
 		}
 		meta.CaseNames = names
+		meta.CaseStatuses = statuses
 		changed = true
 	} else {
 		if meta.CaseNames != nil {
 			meta.CaseNames = nil
 			changed = true
 		}
+		statuses, err := t.loadAllCaseStatuses(ctx)
+		if err != nil {
+			return err
+		}
+		meta.CaseStatuses = statuses
+		changed = true
 	}
 
 	if changed {
@@ -182,13 +192,14 @@ func (t *OnCaseStatusChange) Setup(ctx core.TriggerContext) error {
 	return ctx.Requests.ScheduleActionCall(checkCaseConnectorAction, map[string]any{}, checkCaseConnectorRetryInterval)
 }
 
-func (t *OnCaseStatusChange) resolveCaseNames(ctx core.TriggerContext, caseIDs []string) (map[string]string, error) {
+func (t *OnCaseStatusChange) resolveCaseMetadata(ctx core.TriggerContext, caseIDs []string) (map[string]string, map[string]string, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Elastic client: %w", err)
+		return nil, nil, fmt.Errorf("failed to create Elastic client: %w", err)
 	}
 
 	names := make(map[string]string, len(caseIDs))
+	statuses := make(map[string]string, len(caseIDs))
 	for _, id := range caseIDs {
 		if strings.Contains(id, "{{") {
 			names[id] = id
@@ -196,11 +207,31 @@ func (t *OnCaseStatusChange) resolveCaseNames(ctx core.TriggerContext, caseIDs [
 		}
 		caseResp, err := client.GetCase(id)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get case %s: %w", id, err)
+			return nil, nil, fmt.Errorf("failed to get case %s: %w", id, err)
 		}
 		names[id] = caseResp.Title
+		statuses[id] = strings.ToLower(caseResp.Status)
 	}
-	return names, nil
+	return names, statuses, nil
+}
+
+func (t *OnCaseStatusChange) loadAllCaseStatuses(ctx core.TriggerContext) (map[string]string, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Elastic client: %w", err)
+	}
+
+	cases, err := client.ListCases()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list cases: %w", err)
+	}
+
+	statuses := make(map[string]string, len(cases))
+	for _, c := range cases {
+		statuses[c.ID] = strings.ToLower(c.Status)
+	}
+
+	return statuses, nil
 }
 
 func (t *OnCaseStatusChange) Actions() []core.Action {
@@ -316,7 +347,7 @@ func (t *OnCaseStatusChange) HandleWebhook(ctx core.WebhookRequestContext) (int,
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to create client: %v", err)
 	}
 
-	cases, err := client.ListCasesUpdatedSince(meta.LastPollTime, config.Statuses, config.Severities, nil)
+	cases, err := client.ListCasesUpdatedSince(meta.LastPollTime, nil, nil, nil)
 	if err != nil {
 		if ctx.Logger != nil {
 			ctx.Logger.Warnf("elastic onCaseStatusChange: failed to list cases after webhook: %v", err)
@@ -325,7 +356,26 @@ func (t *OnCaseStatusChange) HandleWebhook(ctx core.WebhookRequestContext) (int,
 	}
 
 	newLastPollTime := meta.LastPollTime
+	if meta.CaseStatuses == nil {
+		meta.CaseStatuses = map[string]string{}
+	}
+	statusesChanged := false
 	for _, c := range cases {
+		currentStatus := strings.ToLower(c.Status)
+		previousStatus, hasPreviousStatus := meta.CaseStatuses[c.ID]
+		if previousStatus != currentStatus {
+			meta.CaseStatuses[c.ID] = currentStatus
+			statusesChanged = true
+		}
+
+		if c.UpdatedAt > newLastPollTime {
+			newLastPollTime = c.UpdatedAt
+		}
+
+		if !hasPreviousStatus || previousStatus == currentStatus {
+			continue
+		}
+
 		if len(config.Cases) > 0 && !slices.Contains(config.Cases, c.ID) {
 			continue
 		}
@@ -365,13 +415,9 @@ func (t *OnCaseStatusChange) HandleWebhook(ctx core.WebhookRequestContext) (int,
 		if err := ctx.Events.Emit("elastic.case.status.changed", eventPayload); err != nil {
 			return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 		}
-
-		if c.UpdatedAt > newLastPollTime {
-			newLastPollTime = c.UpdatedAt
-		}
 	}
 
-	if newLastPollTime != meta.LastPollTime {
+	if newLastPollTime != meta.LastPollTime || statusesChanged {
 		meta.LastPollTime = newLastPollTime
 		if err := ctx.Metadata.Set(meta); err != nil {
 			return http.StatusInternalServerError, nil, fmt.Errorf("failed to update metadata: %w", err)

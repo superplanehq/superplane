@@ -34,8 +34,7 @@ func Test__UpdateCase__Setup(t *testing.T) {
 	t.Run("no update fields -> error", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"case":    "case-abc",
-				"version": "WzEsMV0=",
+				"case": "case-abc",
 			},
 			Metadata: &contexts.MetadataContext{},
 		})
@@ -54,9 +53,8 @@ func Test__UpdateCase__Setup(t *testing.T) {
 		meta := &contexts.MetadataContext{}
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"case":    "case-abc",
-				"version": "WzEsMV0=",
-				"status":  "closed",
+				"case":   "case-abc",
+				"status": "closed",
 			},
 			Metadata:    meta,
 			HTTP:        httpCtx,
@@ -95,16 +93,21 @@ func Test__UpdateCase__Execute(t *testing.T) {
 
 	t.Run("updates case and emits payload", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
-			Responses: []*http.Response{successResponse()},
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"case-abc","title":"Incident 42","status":"open","severity":"high","version":"WzEsMV0="}`)),
+				},
+				successResponse(),
+			},
 		}
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
 		err := (&UpdateCase{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"case":    "case-abc",
-				"version": "WzEsMV0=",
-				"status":  "closed",
-				"title":   "Incident 42 - Resolved",
+				"case":   "case-abc",
+				"status": "closed",
+				"title":  "Incident 42 - Resolved",
 			},
 			HTTP:           httpCtx,
 			Integration:    integrationCtx(),
@@ -113,8 +116,9 @@ func Test__UpdateCase__Execute(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.True(t, state.Passed)
-		require.Len(t, httpCtx.Requests, 1)
-		req := httpCtx.Requests[0]
+		require.Len(t, httpCtx.Requests, 2)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+		req := httpCtx.Requests[1]
 		assert.Equal(t, http.MethodPatch, req.Method)
 		assert.Equal(t, "https://kibana.example.com/api/cases", req.URL.String())
 		assert.Equal(t, "ApiKey test-api-key", req.Header.Get("Authorization"))
@@ -135,6 +139,10 @@ func Test__UpdateCase__Execute(t *testing.T) {
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"case-abc","title":"Incident 42","status":"open","severity":"low","version":"WzEsMV0="}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
 					Body: io.NopCloser(strings.NewReader(`[{
 						"id": "case-abc",
 						"title": "Incident 42",
@@ -150,9 +158,8 @@ func Test__UpdateCase__Execute(t *testing.T) {
 
 		err := (&UpdateCase{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"case":    "case-abc",
-				"version": "WzEsMV0=",
-				"status":  "in-progress",
+				"case":   "case-abc",
+				"status": "in-progress",
 			},
 			HTTP:           httpCtx,
 			Integration:    integrationCtx(),
@@ -165,7 +172,7 @@ func Test__UpdateCase__Execute(t *testing.T) {
 		assert.Equal(t, "in-progress", data["status"])
 	})
 
-	t.Run("missing version -> fetches latest version before update", func(t *testing.T) {
+	t.Run("always fetches latest version before update", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -195,14 +202,45 @@ func Test__UpdateCase__Execute(t *testing.T) {
 		assert.Equal(t, http.MethodPatch, httpCtx.Requests[1].Method)
 	})
 
+	t.Run("provided version is ignored in favor of latest case version", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"case-abc","title":"Incident 42","status":"open","severity":"high","version":"LATEST-VERSION"}`)),
+				},
+				successResponse(),
+			},
+		}
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+		err := (&UpdateCase{}).Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"case":    "case-abc",
+				"version": "STALE-VERSION",
+				"status":  "closed",
+			},
+			HTTP:           httpCtx,
+			Integration:    integrationCtx(),
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		require.Len(t, httpCtx.Requests, 2)
+		body, err := io.ReadAll(httpCtx.Requests[1].Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(body), `"version":"LATEST-VERSION"`)
+		assert.NotContains(t, string(body), "STALE-VERSION")
+	})
+
 	t.Run("no update fields -> fails execution early", func(t *testing.T) {
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		httpCtx := &contexts.HTTPContext{}
 
 		err := (&UpdateCase{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"case":    "case-abc",
-				"version": "WzEsMV0=",
+				"case": "case-abc",
 			},
 			HTTP:           httpCtx,
 			Integration:    integrationCtx(),
@@ -219,6 +257,10 @@ func Test__UpdateCase__Execute(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"case-abc","title":"Incident 42","status":"open","severity":"high","version":"WzEsMV0="}`)),
+				},
+				{
 					StatusCode: http.StatusConflict,
 					Body:       io.NopCloser(strings.NewReader(`{"statusCode":409,"error":"Conflict","message":"Version mismatch"}`)),
 				},
@@ -228,9 +270,8 @@ func Test__UpdateCase__Execute(t *testing.T) {
 
 		err := (&UpdateCase{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"case":    "case-abc",
-				"version": "WzEsMV0=",
-				"status":  "closed",
+				"case":   "case-abc",
+				"status": "closed",
 			},
 			HTTP:           httpCtx,
 			Integration:    integrationCtx(),
@@ -242,7 +283,7 @@ func Test__UpdateCase__Execute(t *testing.T) {
 		assert.Contains(t, state.FailureMessage, "failed to update case")
 	})
 
-	t.Run("missing version and get case fails -> fails execution", func(t *testing.T) {
+	t.Run("get case version fails -> fails execution", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{

@@ -47,7 +47,7 @@ The component emits an event containing:
 - ` + "`title`" + `: The case title
 - ` + "`status`" + `: The initial case status
 - ` + "`severity`" + `: The case severity
-- ` + "`version`" + `: The case version (required for subsequent updates)
+- ` + "`version`" + `: The case version (can be provided to later updates for explicit optimistic locking)
 - ` + "`createdAt`" + `: The timestamp when the case was created`
 }
 

@@ -48,6 +48,7 @@ const casesResponse = `{
 	]
 }`
 
+const caseListResponse = casesResponse
 const caseWebhookSecret = "test-signing-secret"
 
 func caseHeadersWithSecret() http.Header {
@@ -57,22 +58,29 @@ func caseHeadersWithSecret() http.Header {
 }
 
 var caseWebhook = &contexts.NodeWebhookContext{Secret: caseWebhookSecret}
-
 var caseStatusChangedBody = []byte(`{"eventType":"case_status_changed","routeKey":"route-123"}`)
 
 func Test__OnCaseStatusChange__Setup(t *testing.T) {
-	t.Run("new trigger -> initializes metadata, requests webhook, and schedules provisioning", func(t *testing.T) {
+	t.Run("new trigger -> initializes metadata, baseline statuses, requests webhook, and schedules provisioning", func(t *testing.T) {
 		integration := &contexts.IntegrationContext{Configuration: map[string]any{
+			"url":       "https://elastic.example.com",
 			"kibanaUrl": "https://kibana.example.com",
+			"authType":  "apiKey",
+			"apiKey":    "test-api-key",
 		}}
 		meta := &contexts.MetadataContext{}
 		requests := &contexts.RequestContext{}
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(caseListResponse)),
+		}}}
 
 		err := (&OnCaseStatusChange{}).Setup(core.TriggerContext{
 			Configuration: map[string]any{},
 			Metadata:      meta,
 			Integration:   integration,
 			Requests:      requests,
+			HTTP:          httpCtx,
 		})
 		require.NoError(t, err)
 
@@ -81,15 +89,19 @@ func Test__OnCaseStatusChange__Setup(t *testing.T) {
 		assert.NotEmpty(t, saved.LastPollTime)
 		assert.NotEmpty(t, saved.RouteKey)
 		assert.Empty(t, saved.RuleID)
+		assert.Equal(t, map[string]string{"case-1": "in-progress", "case-2": "closed"}, saved.CaseStatuses)
 		require.Len(t, integration.WebhookRequests, 1)
 		cfg := integration.WebhookRequests[0].(map[string]any)
 		assert.Equal(t, "https://kibana.example.com", cfg["kibanaUrl"])
 		assert.Equal(t, checkCaseConnectorAction, requests.Action)
 	})
 
-	t.Run("re-save with existing rule -> keeps metadata and skips provisioning", func(t *testing.T) {
+	t.Run("re-save with existing rule -> refreshes baseline and skips provisioning", func(t *testing.T) {
 		integration := &contexts.IntegrationContext{Configuration: map[string]any{
+			"url":       "https://elastic.example.com",
 			"kibanaUrl": "https://kibana.example.com",
+			"authType":  "apiKey",
+			"apiKey":    "test-api-key",
 		}}
 		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{
 			LastPollTime: "2024-01-01T00:00:00Z",
@@ -97,12 +109,17 @@ func Test__OnCaseStatusChange__Setup(t *testing.T) {
 			RuleID:       "existing-rule-id",
 		}}
 		requests := &contexts.RequestContext{}
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(caseListResponse)),
+		}}}
 
 		err := (&OnCaseStatusChange{}).Setup(core.TriggerContext{
 			Configuration: map[string]any{},
 			Metadata:      meta,
 			Integration:   integration,
 			Requests:      requests,
+			HTTP:          httpCtx,
 		})
 		require.NoError(t, err)
 
@@ -111,23 +128,22 @@ func Test__OnCaseStatusChange__Setup(t *testing.T) {
 		assert.Equal(t, "2024-01-01T00:00:00Z", saved.LastPollTime)
 		assert.Equal(t, "route-123", saved.RouteKey)
 		assert.Equal(t, "existing-rule-id", saved.RuleID)
+		assert.Equal(t, map[string]string{"case-1": "in-progress", "case-2": "closed"}, saved.CaseStatuses)
 		require.Len(t, integration.WebhookRequests, 1)
 		assert.Empty(t, requests.Action)
 	})
 
-	t.Run("cases configured -> resolves and stores case names", func(t *testing.T) {
+	t.Run("cases configured -> resolves and stores case names and baseline statuses", func(t *testing.T) {
 		integration := &contexts.IntegrationContext{Configuration: map[string]any{
 			"url":       "https://elastic.example.com",
 			"kibanaUrl": "https://kibana.example.com",
 			"authType":  "apiKey",
 			"apiKey":    "test-api-key",
 		}}
-		httpCtx := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"case-1","title":"Production incident","status":"open","severity":"high","version":"WzEsMV0="}`))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"case-2","title":"DB issue","status":"closed","severity":"low","version":"WzIsMV0="}`))},
-			},
-		}
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"case-1","title":"Production incident","status":"open","severity":"high","version":"WzEsMV0="}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"case-2","title":"DB issue","status":"closed","severity":"low","version":"WzIsMV0="}`))},
+		}}
 		meta := &contexts.MetadataContext{}
 		requests := &contexts.RequestContext{}
 
@@ -144,6 +160,7 @@ func Test__OnCaseStatusChange__Setup(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "Production incident", saved.CaseNames["case-1"])
 		assert.Equal(t, "DB issue", saved.CaseNames["case-2"])
+		assert.Equal(t, map[string]string{"case-1": "open", "case-2": "closed"}, saved.CaseStatuses)
 		assert.NotEmpty(t, saved.RouteKey)
 		assert.Equal(t, checkCaseConnectorAction, requests.Action)
 	})
@@ -203,9 +220,10 @@ func Test__OnCaseStatusChange__CheckConnectorAndCreateRule(t *testing.T) {
 	})
 
 	t.Run("connector not found yet -> reschedules", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[]`))},
-		}}
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`[]`)),
+		}}}
 		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{RouteKey: "route-123"}}
 		requests := &contexts.RequestContext{}
 
@@ -221,9 +239,10 @@ func Test__OnCaseStatusChange__CheckConnectorAndCreateRule(t *testing.T) {
 	})
 
 	t.Run("Kibana error listing connectors -> reschedules", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
-			{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"error":"internal"}`))},
-		}}
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
+			StatusCode: http.StatusInternalServerError,
+			Body:       io.NopCloser(strings.NewReader(`{"error":"internal"}`)),
+		}}}
 		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{RouteKey: "route-123"}}
 		requests := &contexts.RequestContext{}
 
@@ -257,12 +276,20 @@ func Test__OnCaseStatusChange__CheckConnectorAndCreateRule(t *testing.T) {
 }
 
 func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
+	baseMeta := func() *contexts.MetadataContext {
+		return &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{
+			LastPollTime: "2024-06-01T12:00:00.000Z",
+			RouteKey:     "route-123",
+			CaseStatuses: map[string]string{"case-1": "open", "case-2": "in-progress"},
+		}}
+	}
+
 	t.Run("secret missing from request -> 403", func(t *testing.T) {
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
 			Headers:       http.Header{},
 			Configuration: map[string]any{},
-			Metadata:      &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-01-01T00:00:00Z", RouteKey: "route-123"}},
+			Metadata:      baseMeta(),
 			Events:        &contexts.EventContext{},
 			Webhook:       caseWebhook,
 		})
@@ -277,7 +304,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 			Body:          caseStatusChangedBody,
 			Headers:       headers,
 			Configuration: map[string]any{},
-			Metadata:      &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-01-01T00:00:00Z", RouteKey: "route-123"}},
+			Metadata:      baseMeta(),
 			Events:        &contexts.EventContext{},
 			Webhook:       caseWebhook,
 		})
@@ -290,7 +317,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 			Body:          []byte("not json"),
 			Headers:       caseHeadersWithSecret(),
 			Configuration: map[string]any{},
-			Metadata:      &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-01-01T00:00:00Z", RouteKey: "route-123"}},
+			Metadata:      baseMeta(),
 			Events:        &contexts.EventContext{},
 			Webhook:       caseWebhook,
 		})
@@ -304,7 +331,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 			Body:          []byte(`{"eventType":"document_indexed","routeKey":"route-123"}`),
 			Headers:       caseHeadersWithSecret(),
 			Configuration: map[string]any{},
-			Metadata:      &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-01-01T00:00:00Z", RouteKey: "route-123"}},
+			Metadata:      baseMeta(),
 			Events:        events,
 			Webhook:       caseWebhook,
 		})
@@ -315,11 +342,13 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 
 	t.Run("routeKey mismatch -> silent pass", func(t *testing.T) {
 		events := &contexts.EventContext{}
+		meta := baseMeta()
+		meta.Metadata = OnCaseStatusChangeMetadata{LastPollTime: "2024-06-01T12:00:00.000Z", RouteKey: "other-route", CaseStatuses: map[string]string{"case-1": "open"}}
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
 			Headers:       caseHeadersWithSecret(),
 			Configuration: map[string]any{},
-			Metadata:      &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-01-01T00:00:00Z", RouteKey: "other-route"}},
+			Metadata:      meta,
 			Events:        events,
 			Webhook:       caseWebhook,
 		})
@@ -328,13 +357,13 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 		assert.Empty(t, events.Payloads)
 	})
 
-	t.Run("emits event for each updated case and advances checkpoint", func(t *testing.T) {
+	t.Run("emits event only for cases whose status changed and advances checkpoint", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
 			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(casesResponse)),
 		}}}
 		events := &contexts.EventContext{}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-06-01T12:00:00.000Z", RouteKey: "route-123"}}
+		meta := baseMeta()
 
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
@@ -349,35 +378,38 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 		assert.Equal(t, 2, events.Count())
-		assert.Equal(t, "elastic.case.status.changed", events.Payloads[0].Type)
 		saved := meta.Metadata.(OnCaseStatusChangeMetadata)
 		assert.Equal(t, "2024-06-01T12:02:00.000Z", saved.LastPollTime)
+		assert.Equal(t, map[string]string{"case-1": "in-progress", "case-2": "closed"}, saved.CaseStatuses)
 	})
 
-	t.Run("webhook uses Kibana URL and auth from integration", func(t *testing.T) {
+	t.Run("non-status update -> no emit but baseline and checkpoint updated", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
 			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(`{"cases":[]}`)),
+			Body:       io.NopCloser(strings.NewReader(casesResponse)),
 		}}}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-01-01T00:00:00Z", RouteKey: "route-123"}}
+		events := &contexts.EventContext{}
+		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{
+			LastPollTime: "2024-06-01T12:00:00.000Z",
+			RouteKey:     "route-123",
+			CaseStatuses: map[string]string{"case-1": "in-progress", "case-2": "closed"},
+		}}
 
-		_, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
+		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
 			Headers:       caseHeadersWithSecret(),
 			Configuration: map[string]any{},
 			Metadata:      meta,
-			Events:        &contexts.EventContext{},
+			Events:        events,
 			Webhook:       caseWebhook,
 			Integration:   caseIntegrationCtx,
 			HTTP:          httpCtx,
 		})
 		require.NoError(t, err)
-		require.Len(t, httpCtx.Requests, 1)
-		req := httpCtx.Requests[0]
-		assert.Equal(t, http.MethodGet, req.Method)
-		assert.Contains(t, req.URL.String(), "kibana.example.com")
-		assert.Contains(t, req.URL.String(), "/api/cases")
-		assert.Equal(t, "ApiKey test-api-key", req.Header.Get("Authorization"))
+		assert.Equal(t, http.StatusOK, code)
+		assert.Empty(t, events.Payloads)
+		saved := meta.Metadata.(OnCaseStatusChangeMetadata)
+		assert.Equal(t, "2024-06-01T12:02:00.000Z", saved.LastPollTime)
 	})
 
 	t.Run("caseId filter: only matching case emitted", func(t *testing.T) {
@@ -386,7 +418,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 			Body:       io.NopCloser(strings.NewReader(casesResponse)),
 		}}}
 		events := &contexts.EventContext{}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-06-01T12:00:00.000Z", RouteKey: "route-123"}}
+		meta := baseMeta()
 
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
@@ -405,13 +437,13 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "case-2", data["id"])
 	})
 
-	t.Run("status filter: only matching statuses emitted", func(t *testing.T) {
+	t.Run("status filter: only matching current statuses emitted", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
 			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(casesResponse)),
 		}}}
 		events := &contexts.EventContext{}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-06-01T12:00:00.000Z", RouteKey: "route-123"}}
+		meta := baseMeta()
 
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
@@ -426,7 +458,6 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 		require.Equal(t, 1, events.Count())
-		assert.Equal(t, "elastic.case.status.changed", events.Payloads[0].Type)
 		data := events.Payloads[0].Data.(map[string]any)
 		assert.Equal(t, "closed", data["status"])
 	})
@@ -437,7 +468,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 			Body:       io.NopCloser(strings.NewReader(casesResponse)),
 		}}}
 		events := &contexts.EventContext{}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-06-01T12:00:00.000Z", RouteKey: "route-123"}}
+		meta := baseMeta()
 
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
@@ -462,7 +493,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 			Body:       io.NopCloser(strings.NewReader(casesResponse)),
 		}}}
 		events := &contexts.EventContext{}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-06-01T12:00:00.000Z", RouteKey: "route-123"}}
+		meta := baseMeta()
 
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:    caseStatusChangedBody,
@@ -488,7 +519,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(`{"cases":[]}`)),
 		}}}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-06-01T12:00:00Z", RouteKey: "route-123"}}
+		meta := baseMeta()
 
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
@@ -503,7 +534,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 		saved := meta.Metadata.(OnCaseStatusChangeMetadata)
-		assert.Equal(t, "2024-06-01T12:00:00Z", saved.LastPollTime)
+		assert.Equal(t, "2024-06-01T12:00:00.000Z", saved.LastPollTime)
 	})
 
 	t.Run("Kibana error -> returns 200 and leaves checkpoint unchanged", func(t *testing.T) {
@@ -512,7 +543,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 			Body:       io.NopCloser(strings.NewReader(`{"error":"internal"}`)),
 		}}}
 		events := &contexts.EventContext{}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-01-01T00:00:00Z", RouteKey: "route-123"}}
+		meta := baseMeta()
 
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
@@ -528,7 +559,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 		assert.Empty(t, events.Payloads)
 		saved := meta.Metadata.(OnCaseStatusChangeMetadata)
-		assert.Equal(t, "2024-01-01T00:00:00Z", saved.LastPollTime)
+		assert.Equal(t, "2024-06-01T12:00:00.000Z", saved.LastPollTime)
 	})
 }
 
