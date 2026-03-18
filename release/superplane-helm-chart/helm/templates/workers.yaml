@@ -67,6 +67,8 @@ spec:
               value: "yes"
             - name: START_CANVAS_CLEANUP_WORKER
               value: "yes"
+            - name: START_ORGANIZATION_CLEANUP_WORKER
+              value: "yes"
             - name: RBAC_MODEL_PATH
               value: /app/rbac/rbac_model.conf
             - name: PUBLIC_API_BASE_PATH

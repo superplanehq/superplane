@@ -166,6 +166,13 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		w := workers.NewCanvasCleanupWorker()
 		go w.Start(context.Background())
 	}
+
+	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Organization Cleanup Worker")
+
+		w := workers.NewOrganizationCleanupWorker()
+		go w.Start(context.Background())
+	}
 }
 
 func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string, authService authorization.Authorization) {

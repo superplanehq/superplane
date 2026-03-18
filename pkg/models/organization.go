@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -118,18 +119,145 @@ func SoftDeleteOrganization(id string) error {
 }
 
 func SoftDeleteOrganizationInTransaction(tx *gorm.DB, id string) error {
+	now := time.Now()
+	timestamp := now.Unix()
+
+	var org Organization
+	if err := tx.Where("id = ?", id).First(&org).Error; err != nil {
+		return err
+	}
+
+	newName := fmt.Sprintf("%s (deleted-%d)", org.Name, timestamp)
+	return tx.Model(&org).Updates(map[string]any{
+		"deleted_at": now,
+		"name":       newName,
+	}).Error
+}
+
+func HardDeleteOrganization(id string) error {
+	return HardDeleteOrganizationInTransaction(database.Conn(), id)
+}
+
+func HardDeleteOrganizationInTransaction(tx *gorm.DB, id string) error {
 	return tx.
+		Unscoped().
 		Where("id = ?", id).
 		Delete(&Organization{}).
 		Error
 }
 
-func HardDeleteOrganization(id string) error {
-	return database.Conn().
+func ListDeletedOrganizations() ([]Organization, error) {
+	var organizations []Organization
+	err := database.Conn().
 		Unscoped().
-		Where("id = ?", id).
-		Delete(&Organization{}).
+		Where("deleted_at IS NOT NULL").
+		Find(&organizations).
 		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return organizations, nil
+}
+
+func LockOrganization(tx *gorm.DB, id uuid.UUID) (*Organization, error) {
+	var org Organization
+
+	err := tx.
+		Unscoped().
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("id = ?", id).
+		Where("deleted_at IS NOT NULL").
+		First(&org).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &org, nil
+}
+
+func SoftDeleteOrganizationCanvasesInTransaction(tx *gorm.DB, orgID string) error {
+	now := time.Now()
+	timestamp := now.Unix()
+
+	var canvases []Canvas
+	if err := tx.Where("organization_id = ?", orgID).Find(&canvases).Error; err != nil {
+		return err
+	}
+
+	for _, c := range canvases {
+		newName := fmt.Sprintf("%s (deleted-%d)", c.Name, timestamp)
+		if err := tx.Model(&c).Updates(map[string]any{
+			"deleted_at": now,
+			"name":       newName,
+		}).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func SoftDeleteOrganizationIntegrationsInTransaction(tx *gorm.DB, orgID string) error {
+	now := time.Now()
+	timestamp := now.Unix()
+
+	var integrations []Integration
+	if err := tx.Where("organization_id = ?", orgID).Find(&integrations).Error; err != nil {
+		return err
+	}
+
+	for _, i := range integrations {
+		newName := fmt.Sprintf("%s (deleted-%d)", i.InstallationName, timestamp)
+		if err := tx.Model(&i).Updates(map[string]any{
+			"deleted_at":        now,
+			"installation_name": newName,
+		}).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func SoftDeleteOrganizationUsersInTransaction(tx *gorm.DB, orgID string) error {
+	now := time.Now()
+	return tx.
+		Model(&User{}).
+		Where("organization_id = ?", orgID).
+		Where("deleted_at IS NULL").
+		Updates(map[string]any{
+			"deleted_at": now,
+			"updated_at": now,
+			"token_hash": nil,
+		}).Error
+}
+
+func DeleteOrganizationBlueprintsInTransaction(tx *gorm.DB, orgID string) error {
+	return tx.Where("organization_id = ?", orgID).Delete(&Blueprint{}).Error
+}
+
+func DeleteOrganizationInvitationsInTransaction(tx *gorm.DB, orgID string) error {
+	return tx.Where("organization_id = ?", orgID).Delete(&OrganizationInvitation{}).Error
+}
+
+func DeleteOrganizationInviteLinksInTransaction(tx *gorm.DB, orgID string) error {
+	return tx.Where("organization_id = ?", orgID).Delete(&OrganizationInviteLink{}).Error
+}
+
+func DeleteOrganizationAgentSettingsInTransaction(tx *gorm.DB, orgID string) error {
+	return tx.Where("organization_id = ?", orgID).Delete(&OrganizationAgentSettings{}).Error
+}
+
+func DeleteOrganizationSecretsInTransaction(tx *gorm.DB, orgID uuid.UUID) error {
+	return tx.Where("domain_type = ? AND domain_id = ?", DomainTypeOrganization, orgID).Delete(&Secret{}).Error
+}
+
+func DeleteOrganizationIntegrationSecretsInTransaction(tx *gorm.DB, orgID string) error {
+	return tx.Where("organization_id = ?", orgID).Delete(&IntegrationSecret{}).Error
 }
 
 func GetActiveOrganizationIDs() ([]string, error) {
