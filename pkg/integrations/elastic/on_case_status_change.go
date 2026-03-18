@@ -9,21 +9,31 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+const (
+	checkCaseConnectorAction        = "checkCaseConnectorAvailability"
+	checkCaseConnectorRetryInterval = 10 * time.Second
+)
+
 type OnCaseStatusChange struct{}
 
 type OnCaseStatusChangeConfiguration struct {
+	Cases      []string                  `json:"cases" mapstructure:"cases"`
 	Statuses   []string                  `json:"statuses" mapstructure:"statuses"`
 	Severities []string                  `json:"severities" mapstructure:"severities"`
 	Tags       []configuration.Predicate `json:"tags" mapstructure:"tags"`
 }
 
 type OnCaseStatusChangeMetadata struct {
-	LastPollTime string `json:"lastPollTime,omitempty" mapstructure:"lastPollTime"`
+	LastPollTime string            `json:"lastPollTime,omitempty" mapstructure:"lastPollTime"`
+	CaseNames    map[string]string `json:"caseNames,omitempty" mapstructure:"caseNames"`
+	RouteKey     string            `json:"routeKey,omitempty" mapstructure:"routeKey"`
+	RuleID       string            `json:"ruleId,omitempty" mapstructure:"ruleId"`
 }
 
 func (t *OnCaseStatusChange) Name() string  { return "elastic.onCaseStatusChange" }
@@ -37,31 +47,20 @@ func (t *OnCaseStatusChange) Color() string { return "gray" }
 func (t *OnCaseStatusChange) Documentation() string {
 	return `The When Case Status Changes trigger fires a workflow execution when a Kibana Security case is updated.
 
+## Shared Connector
+
+SuperPlane creates **one Kibana Webhook connector per integration**, shared across Elastic triggers that use the same Kibana instance. Each incoming request is routed to the correct trigger instance using two fields in the request body:
+
+- ` + "`eventType`" + `: must be ` + "`\"case_status_changed\"`" + `.
+- ` + "`routeKey`" + `: a unique ID assigned per trigger node so multiple case-status triggers can coexist safely.
+
 ## How it works
 
-1. When the trigger is saved, SuperPlane automatically creates a signed Kibana Webhook connector.
-2. In Kibana, open **Stack Management → Rules** and create an **Elasticsearch query** rule.
-3. Configure the rule to watch the cases index pattern ` + "`.cases-*`" + ` and use the case update time field as the time field.
-4. Attach the **SuperPlane Alert** connector as an action on that rule.
-5. Configure the action body to send this JSON:
-
-` + "```" + `json
-{
-  "eventType": "case_status_changed"
-}
-` + "```" + `
-
-6. Enable the rule. Each time the rule detects case updates, Kibana calls the SuperPlane webhook.
-7. SuperPlane receives the webhook, queries Kibana for cases updated since the last checkpoint, and fires one event per matching case.
-
-## Recommended Kibana setup
-
-- Use an **Elasticsearch query** rule as the default choice.
-- Use the cases index pattern ` + "`.cases-*`" + `.
-- Use the case update time field as the rule time field.
-- Use a rule condition based on case updates, not case creation only.
-- Run the rule frequently enough for your workflow latency needs.
-- The webhook body only needs ` + "`eventType`" + ` because SuperPlane retrieves the matching case details from Kibana after the webhook arrives.
+1. When the trigger is saved, SuperPlane creates or reuses the shared Kibana Webhook connector.
+2. SuperPlane automatically provisions a Kibana **Elasticsearch query** rule against ` + "`.kibana_alerting_cases`" + ` using ` + "`cases.updated_at`" + ` as the time field.
+3. Every minute, that Kibana rule checks for case updates in the current window and fires the shared connector when matches are found.
+4. SuperPlane receives the webhook, verifies the secret, validates the routing fields, then queries Kibana for cases updated since the stored checkpoint.
+5. SuperPlane emits one ` + "`elastic.case.status.changed`" + ` event per matching case.
 
 ## Configuration
 
@@ -76,6 +75,19 @@ The trigger emits the full case details including id, title, status, severity, v
 
 func (t *OnCaseStatusChange) Configuration() []configuration.Field {
 	return []configuration.Field{
+		{
+			Name:        "cases",
+			Label:       "Cases",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Only fire for these specific cases. Leave empty to monitor all cases.",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:  ResourceTypeCase,
+					Multi: true,
+				},
+			},
+		},
 		{
 			Name:        "statuses",
 			Label:       "Statuses",
@@ -119,8 +131,36 @@ func (t *OnCaseStatusChange) Configuration() []configuration.Field {
 
 func (t *OnCaseStatusChange) Setup(ctx core.TriggerContext) error {
 	meta := loadCaseStatusChangeMetadata(ctx.Metadata)
+	changed := false
 	if meta.LastPollTime == "" {
 		meta.LastPollTime = time.Now().UTC().Format(time.RFC3339Nano)
+		changed = true
+	}
+	if meta.RouteKey == "" {
+		meta.RouteKey = uuid.NewString()
+		changed = true
+	}
+
+	var config OnCaseStatusChangeConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if len(config.Cases) > 0 {
+		names, err := t.resolveCaseNames(ctx, config.Cases)
+		if err != nil {
+			return err
+		}
+		meta.CaseNames = names
+		changed = true
+	} else {
+		if meta.CaseNames != nil {
+			meta.CaseNames = nil
+			changed = true
+		}
+	}
+
+	if changed {
 		if err := ctx.Metadata.Set(meta); err != nil {
 			return fmt.Errorf("failed to save metadata: %w", err)
 		}
@@ -131,15 +171,108 @@ func (t *OnCaseStatusChange) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to get Kibana URL: %w", err)
 	}
 
-	return ctx.Integration.RequestWebhook(map[string]any{"kibanaUrl": string(kibanaURL)})
+	if err := ctx.Integration.RequestWebhook(map[string]any{"kibanaUrl": string(kibanaURL)}); err != nil {
+		return fmt.Errorf("failed to request webhook: %w", err)
+	}
+
+	if meta.RuleID != "" {
+		return nil
+	}
+
+	return ctx.Requests.ScheduleActionCall(checkCaseConnectorAction, map[string]any{}, checkCaseConnectorRetryInterval)
+}
+
+func (t *OnCaseStatusChange) resolveCaseNames(ctx core.TriggerContext, caseIDs []string) (map[string]string, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Elastic client: %w", err)
+	}
+
+	names := make(map[string]string, len(caseIDs))
+	for _, id := range caseIDs {
+		if strings.Contains(id, "{{") {
+			names[id] = id
+			continue
+		}
+		caseResp, err := client.GetCase(id)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get case %s: %w", id, err)
+		}
+		names[id] = caseResp.Title
+	}
+	return names, nil
 }
 
 func (t *OnCaseStatusChange) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name:           checkCaseConnectorAction,
+			Description:    "Find the Kibana connector and create the case change rule",
+			UserAccessible: false,
+		},
+	}
 }
 
-func (t *OnCaseStatusChange) HandleAction(_ core.TriggerActionContext) (map[string]any, error) {
-	return nil, nil
+func (t *OnCaseStatusChange) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	if ctx.Name == checkCaseConnectorAction {
+		return nil, t.checkConnectorAndCreateRule(ctx)
+	}
+	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+}
+
+func (t *OnCaseStatusChange) checkConnectorAndCreateRule(ctx core.TriggerActionContext) error {
+	meta := loadCaseStatusChangeMetadata(ctx.Metadata)
+	if meta.RuleID != "" {
+		return nil
+	}
+	if meta.RouteKey == "" {
+		meta.RouteKey = uuid.NewString()
+		if err := ctx.Metadata.Set(meta); err != nil {
+			return fmt.Errorf("failed to save metadata: %w", err)
+		}
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onCaseStatusChange: failed to create client: %v", err)
+		}
+		return ctx.Requests.ScheduleActionCall(checkCaseConnectorAction, map[string]any{}, checkCaseConnectorRetryInterval)
+	}
+
+	connectors, err := client.ListKibanaConnectors()
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onCaseStatusChange: failed to list connectors: %v", err)
+		}
+		return ctx.Requests.ScheduleActionCall(checkCaseConnectorAction, map[string]any{}, checkCaseConnectorRetryInterval)
+	}
+
+	var connectorID string
+	for _, connector := range connectors {
+		if connector.Name == KibanaConnectorName {
+			connectorID = connector.ID
+			break
+		}
+	}
+
+	if connectorID == "" {
+		if ctx.Logger != nil {
+			ctx.Logger.Infof("elastic onCaseStatusChange: connector %q not found yet, retrying", KibanaConnectorName)
+		}
+		return ctx.Requests.ScheduleActionCall(checkCaseConnectorAction, map[string]any{}, checkCaseConnectorRetryInterval)
+	}
+
+	rule, err := client.CreateKibanaCaseQueryRule(connectorID, meta.RouteKey)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onCaseStatusChange: failed to create rule: %v", err)
+		}
+		return ctx.Requests.ScheduleActionCall(checkCaseConnectorAction, map[string]any{}, checkCaseConnectorRetryInterval)
+	}
+
+	meta.RuleID = rule.ID
+	return ctx.Metadata.Set(meta)
 }
 
 func (t *OnCaseStatusChange) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
@@ -161,12 +294,15 @@ func (t *OnCaseStatusChange) HandleWebhook(ctx core.WebhookRequestContext) (int,
 		return http.StatusBadRequest, nil, fmt.Errorf("invalid JSON payload: %w", err)
 	}
 
-	if eventType := extractString(payload, "eventType"); eventType != "" && eventType != "case_status_changed" {
+	if extractString(payload, "eventType") != "case_status_changed" {
 		return http.StatusOK, nil, nil
 	}
 
 	meta := loadCaseStatusChangeMetadata(ctx.Metadata)
 	if meta.LastPollTime == "" {
+		return http.StatusOK, nil, nil
+	}
+	if meta.RouteKey == "" || extractString(payload, "routeKey") != meta.RouteKey {
 		return http.StatusOK, nil, nil
 	}
 
@@ -182,11 +318,18 @@ func (t *OnCaseStatusChange) HandleWebhook(ctx core.WebhookRequestContext) (int,
 
 	cases, err := client.ListCasesUpdatedSince(meta.LastPollTime, config.Statuses, config.Severities, nil)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to list cases: %v", err)
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onCaseStatusChange: failed to list cases after webhook: %v", err)
+		}
+		return http.StatusOK, nil, nil
 	}
 
 	newLastPollTime := meta.LastPollTime
 	for _, c := range cases {
+		if len(config.Cases) > 0 && !slices.Contains(config.Cases, c.ID) {
+			continue
+		}
+
 		if len(config.Statuses) > 0 && !slices.Contains(config.Statuses, strings.ToLower(c.Status)) {
 			continue
 		}
@@ -238,8 +381,18 @@ func (t *OnCaseStatusChange) HandleWebhook(ctx core.WebhookRequestContext) (int,
 	return http.StatusOK, nil, nil
 }
 
-func (t *OnCaseStatusChange) Cleanup(_ core.TriggerContext) error {
-	return nil
+func (t *OnCaseStatusChange) Cleanup(ctx core.TriggerContext) error {
+	meta := loadCaseStatusChangeMetadata(ctx.Metadata)
+	if meta.RuleID == "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("error creating client: %v", err)
+	}
+
+	return client.DeleteKibanaRule(meta.RuleID)
 }
 
 func loadCaseStatusChangeMetadata(metadata core.MetadataContext) OnCaseStatusChangeMetadata {

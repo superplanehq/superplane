@@ -13,8 +13,12 @@ import (
 
 type UpdateCase struct{}
 
+type UpdateCaseNodeMetadata struct {
+	CaseName string `json:"caseName,omitempty" mapstructure:"caseName"`
+}
+
 type UpdateCaseConfiguration struct {
-	CaseID      string   `json:"caseId" mapstructure:"caseId"`
+	CaseID      string   `json:"case" mapstructure:"case"`
 	Version     string   `json:"version" mapstructure:"version"`
 	Title       string   `json:"title" mapstructure:"title"`
 	Description string   `json:"description" mapstructure:"description"`
@@ -37,7 +41,7 @@ func (c *UpdateCase) Documentation() string {
 ## Configuration
 
 - **Case ID**: The ID of the case to update
-- **Version**: The current case version for optimistic locking (obtain from a preceding Get Case step)
+- **Version**: Optional. The current case version for optimistic locking. If omitted, SuperPlane fetches the latest version before updating.
 - **Title**: New title for the case (optional)
 - **Description**: New description for the case (optional)
 - **Status**: New status for the case (optional)
@@ -61,25 +65,30 @@ func (c *UpdateCase) OutputChannels(_ any) []core.OutputChannel {
 func (c *UpdateCase) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "caseId",
-			Label:       "Case ID",
-			Type:        configuration.FieldTypeString,
+			Name:        "case",
+			Label:       "Case",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The ID of the Kibana case to update.",
+			Description: "The Kibana case to update.",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeCase,
+				},
+			},
 		},
 		{
 			Name:        "version",
 			Label:       "Version",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "The current case version for optimistic locking. Select the case above to auto-populate, or use an expression from a preceding Get Case step.",
+			Required:    false,
+			Description: "Optional. The current case version for optimistic locking. Select the case above to auto-populate, use an expression from a preceding Get Case step, or leave empty to fetch the latest version automatically.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: ResourceTypeCaseVersion,
 					Parameters: []configuration.ParameterRef{
 						{
 							Name:      "caseId",
-							ValueFrom: &configuration.ParameterValueFrom{Field: "caseId"},
+							ValueFrom: &configuration.ParameterValueFrom{Field: "case"},
 						},
 					},
 				},
@@ -152,15 +161,33 @@ func (c *UpdateCase) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("caseId is required")
 	}
 
-	if strings.TrimSpace(config.Version) == "" {
-		return fmt.Errorf("version is required")
-	}
-
 	if !hasCaseUpdates(config) {
 		return fmt.Errorf("at least one field to update is required")
 	}
 
+	if err := c.resolveMetadata(ctx, config.CaseID); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (c *UpdateCase) resolveMetadata(ctx core.SetupContext, caseID string) error {
+	meta := UpdateCaseNodeMetadata{}
+	if strings.Contains(caseID, "{{") {
+		meta.CaseName = caseID
+	} else {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create Elastic client: %w", err)
+		}
+		caseResp, err := client.GetCase(caseID)
+		if err != nil {
+			return fmt.Errorf("failed to get case: %w", err)
+		}
+		meta.CaseName = caseResp.Title
+	}
+	return ctx.Metadata.Set(meta)
 }
 
 func (c *UpdateCase) Execute(ctx core.ExecutionContext) error {
@@ -172,11 +199,6 @@ func (c *UpdateCase) Execute(ctx core.ExecutionContext) error {
 	config.CaseID = strings.TrimSpace(config.CaseID)
 	if config.CaseID == "" {
 		return ctx.ExecutionState.Fail("error", "caseId is required")
-	}
-
-	config.Version = strings.TrimSpace(config.Version)
-	if config.Version == "" {
-		return ctx.ExecutionState.Fail("error", "version is required")
 	}
 
 	if !hasCaseUpdates(config) {
@@ -205,7 +227,19 @@ func (c *UpdateCase) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create Elastic client: %v", err))
 	}
 
-	resp, err := client.UpdateCase(config.CaseID, config.Version, updates)
+	version := strings.TrimSpace(config.Version)
+	if version == "" {
+		caseResp, err := client.GetCase(config.CaseID)
+		if err != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to get case version: %v", err))
+		}
+		version = strings.TrimSpace(caseResp.Version)
+		if version == "" {
+			return ctx.ExecutionState.Fail("error", "failed to get case version: empty version returned")
+		}
+	}
+
+	resp, err := client.UpdateCase(config.CaseID, version, updates)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to update case: %v", err))
 	}

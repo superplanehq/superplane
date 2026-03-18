@@ -6,7 +6,14 @@ import { MetadataItem } from "@/ui/metadataList";
 import elasticIcon from "@/assets/icons/integrations/elastic.svg";
 
 interface OnCaseStatusChangeConfiguration {
+  cases?: string[];
   statuses?: string[];
+  severities?: string[];
+  tags?: { value?: string }[];
+}
+
+interface OnCaseStatusChangeNodeMetadata {
+  caseNames?: Record<string, string>;
 }
 
 export const onCaseStatusChangeTriggerRenderer: TriggerRenderer = {
@@ -31,9 +38,26 @@ export const onCaseStatusChangeTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
     const config = node.configuration as OnCaseStatusChangeConfiguration | undefined;
+    const nodeMetadata = node.metadata as OnCaseStatusChangeNodeMetadata | undefined;
     const metadata: MetadataItem[] = [];
+    if (config?.cases && config.cases.length > 0) {
+      const caseNames = config.cases.map((id) => nodeMetadata?.caseNames?.[id] ?? id);
+      metadata.push({ icon: "folder", label: caseNames.join(", ") });
+    }
     if (config?.statuses && config.statuses.length > 0) {
-      metadata.push({ icon: "filter", label: config.statuses.join(", ") });
+      metadata.push({ icon: "activity", label: config.statuses.join(", ") });
+    }
+    if (config?.severities && config.severities.length > 0) {
+      metadata.push({ icon: "alert-triangle", label: config.severities.join(", ") });
+    }
+    if (config?.tags && config.tags.length > 0) {
+      metadata.push({
+        icon: "tag",
+        label: config.tags
+          .map((t) => t.value)
+          .filter(Boolean)
+          .join(", "),
+      });
     }
 
     if (lastEvent) {

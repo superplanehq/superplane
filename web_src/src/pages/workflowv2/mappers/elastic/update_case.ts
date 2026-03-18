@@ -15,9 +15,13 @@ import elasticIcon from "@/assets/icons/integrations/elastic.svg";
 import { formatTimeAgo } from "@/utils/date";
 
 interface UpdateCaseConfiguration {
-  caseId?: string;
+  case?: string;
   status?: string;
   severity?: string;
+}
+
+interface UpdateCaseNodeMetadata {
+  caseName?: string;
 }
 
 interface UpdateCaseOutputData {
@@ -68,13 +72,19 @@ export const updateCaseMapper: ComponentBaseMapper = {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as UpdateCaseConfiguration | undefined;
+  const nodeMetadata = node.metadata as UpdateCaseNodeMetadata | undefined;
 
-  if (configuration?.caseId) {
-    metadata.push({ icon: "hash", label: `Case: ${configuration.caseId}` });
+  const caseName = nodeMetadata?.caseName || configuration?.case;
+  if (caseName) {
+    metadata.push({ icon: "hash", label: caseName });
   }
 
   if (configuration?.status) {
     metadata.push({ icon: "activity", label: configuration.status });
+  }
+
+  if (configuration?.severity) {
+    metadata.push({ icon: "alert-triangle", label: configuration.severity });
   }
 
   return metadata;

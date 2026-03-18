@@ -33,7 +33,7 @@ To connect Elastic to SuperPlane:
    - **API Key** (recommended for Elastic Cloud): Go to Kibana → Stack Management → API Keys and create a new key. Paste the base64-encoded ` + "`id:api_key`" + ` value.
    - **Username / Password**: Provide the credentials for a user with the required privileges.
 4. **Kibana alerts (trigger)**: SuperPlane automatically creates a signed Kibana Webhook connector. You still need to attach that connector to your alert rules in Kibana.
-5. **Kibana case change trigger**: For ` + "`When Case Status Changes`" + `, create an **Elasticsearch query** rule in Kibana that watches ` + "`.cases-*`" + ` using the case update time field, then attach the same SuperPlane connector with a body containing ` + "`{\"eventType\":\"case_status_changed\"}`" + `.
+5. **Kibana case change trigger**: For ` + "`When Case Status Changes`" + `, SuperPlane automatically provisions a Kibana **Elasticsearch query** rule that watches ` + "`.kibana_alerting_cases`" + ` using ` + "`cases.updated_at`" + `. No manual rule setup is required.
 `
 
 func (e *Elastic) Name() string {
@@ -201,6 +201,7 @@ const (
 	ResourceTypeIndex        = "elastic.index"
 	ResourceTypeKibanaRule   = "elastic.kibana.rule"
 	ResourceTypeKibanaSpace  = "elastic.kibana.space"
+	ResourceTypeCase         = "elastic.case"
 	ResourceTypeCaseStatus   = "elastic.case.status"
 	ResourceTypeCaseSeverity = "elastic.case.severity"
 	ResourceTypeCaseVersion  = "elastic.case.version"
@@ -243,6 +244,17 @@ func (e *Elastic) ListResources(resourceType string, ctx core.ListResourcesConte
 		resources := make([]core.IntegrationResource, 0, len(spaces))
 		for _, s := range spaces {
 			resources = append(resources, core.IntegrationResource{ID: s.ID, Name: s.Name})
+		}
+		return resources, nil
+
+	case ResourceTypeCase:
+		cases, err := client.ListCases()
+		if err != nil {
+			return nil, fmt.Errorf("error listing cases: %v", err)
+		}
+		resources := make([]core.IntegrationResource, 0, len(cases))
+		for _, c := range cases {
+			resources = append(resources, core.IntegrationResource{ID: c.ID, Name: c.Title})
 		}
 		return resources, nil
 

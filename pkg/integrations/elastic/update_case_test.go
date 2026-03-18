@@ -15,7 +15,7 @@ import (
 func Test__UpdateCase__Setup(t *testing.T) {
 	c := &UpdateCase{}
 
-	t.Run("missing caseId -> error", func(t *testing.T) {
+	t.Run("missing case -> error", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{},
 			Metadata:      &contexts.MetadataContext{},
@@ -23,18 +23,18 @@ func Test__UpdateCase__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "caseId is required")
 	})
 
-	t.Run("missing version -> error", func(t *testing.T) {
+	t.Run("missing version -> allowed", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
-			Configuration: map[string]any{"caseId": "case-abc"},
+			Configuration: map[string]any{"case": "case-abc"},
 			Metadata:      &contexts.MetadataContext{},
 		})
-		require.ErrorContains(t, err, "version is required")
+		require.ErrorContains(t, err, "at least one field to update is required")
 	})
 
 	t.Run("no update fields -> error", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"caseId":  "case-abc",
+				"case":    "case-abc",
 				"version": "WzEsMV0=",
 			},
 			Metadata: &contexts.MetadataContext{},
@@ -43,15 +43,29 @@ func Test__UpdateCase__Setup(t *testing.T) {
 	})
 
 	t.Run("valid config -> success", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"case-abc","title":"Production incident","status":"open","severity":"high","version":"WzEsMV0="}`)),
+				},
+			},
+		}
+		meta := &contexts.MetadataContext{}
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"caseId":  "case-abc",
+				"case":    "case-abc",
 				"version": "WzEsMV0=",
 				"status":  "closed",
 			},
-			Metadata: &contexts.MetadataContext{},
+			Metadata:    meta,
+			HTTP:        httpCtx,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"url": "https://elastic.example.com", "kibanaUrl": "https://kibana.example.com", "authType": "apiKey", "apiKey": "test-api-key"}},
 		})
 		require.NoError(t, err)
+		saved, ok := meta.Metadata.(UpdateCaseNodeMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "Production incident", saved.CaseName)
 	})
 }
 
@@ -87,7 +101,7 @@ func Test__UpdateCase__Execute(t *testing.T) {
 
 		err := (&UpdateCase{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"caseId":  "case-abc",
+				"case":    "case-abc",
 				"version": "WzEsMV0=",
 				"status":  "closed",
 				"title":   "Incident 42 - Resolved",
@@ -136,7 +150,7 @@ func Test__UpdateCase__Execute(t *testing.T) {
 
 		err := (&UpdateCase{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"caseId":  "case-abc",
+				"case":    "case-abc",
 				"version": "WzEsMV0=",
 				"status":  "in-progress",
 			},
@@ -151,13 +165,43 @@ func Test__UpdateCase__Execute(t *testing.T) {
 		assert.Equal(t, "in-progress", data["status"])
 	})
 
+	t.Run("missing version -> fetches latest version before update", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"case-abc","title":"Incident 42","status":"open","severity":"high","version":"WzEsMV0="}`)),
+				},
+				successResponse(),
+			},
+		}
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+		err := (&UpdateCase{}).Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"case":   "case-abc",
+				"status": "closed",
+			},
+			HTTP:           httpCtx,
+			Integration:    integrationCtx(),
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		require.Len(t, httpCtx.Requests, 2)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+		assert.Equal(t, "https://kibana.example.com/api/cases/case-abc", httpCtx.Requests[0].URL.String())
+		assert.Equal(t, http.MethodPatch, httpCtx.Requests[1].Method)
+	})
+
 	t.Run("no update fields -> fails execution early", func(t *testing.T) {
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		httpCtx := &contexts.HTTPContext{}
 
 		err := (&UpdateCase{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"caseId":  "case-abc",
+				"case":    "case-abc",
 				"version": "WzEsMV0=",
 			},
 			HTTP:           httpCtx,
@@ -184,7 +228,7 @@ func Test__UpdateCase__Execute(t *testing.T) {
 
 		err := (&UpdateCase{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"caseId":  "case-abc",
+				"case":    "case-abc",
 				"version": "WzEsMV0=",
 				"status":  "closed",
 			},
@@ -196,5 +240,33 @@ func Test__UpdateCase__Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, state.Passed)
 		assert.Contains(t, state.FailureMessage, "failed to update case")
+	})
+
+	t.Run("missing version and get case fails -> fails execution", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusNotFound,
+					Body:       io.NopCloser(strings.NewReader(`{"statusCode":404,"error":"Not Found"}`)),
+				},
+			},
+		}
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+		err := (&UpdateCase{}).Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"case":   "case-abc",
+				"status": "closed",
+			},
+			HTTP:           httpCtx,
+			Integration:    integrationCtx(),
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.False(t, state.Passed)
+		assert.Contains(t, state.FailureMessage, "failed to get case version")
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
 	})
 }
