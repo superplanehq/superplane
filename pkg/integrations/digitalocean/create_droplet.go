@@ -56,7 +56,7 @@ func (c *CreateDroplet) Documentation() string {
 - **Region**: Region slug where the droplet will be created (required)
 - **Size**: Size slug for the droplet (required)
 - **Image**: Image slug or ID for the droplet OS (required)
-- **SSH Keys**: SSH key fingerprints or IDs to add to the droplet (optional)
+- **SSH Keys**: SSH keys to add to the droplet. Must have been added to the DigitalOcean team. (optional)
 - **Tags**: Tags to apply to the droplet (optional)
 - **User Data**: Cloud-init user data script (optional)
 
@@ -133,16 +133,15 @@ func (c *CreateDroplet) Configuration() []configuration.Field {
 		{
 			Name:        "sshKeys",
 			Label:       "SSH Keys",
-			Type:        configuration.FieldTypeList,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Togglable:   true,
-			Description: "SSH key fingerprints or IDs to add to the droplet",
+			Description: "SSH keys to add to the droplet",
+			Placeholder: "Select SSH keys",
 			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "SSH Key",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeString,
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type:  "ssh_key",
+					Multi: true,
 				},
 			},
 		},
