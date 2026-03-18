@@ -8,7 +8,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -16,7 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListIntegrationResources(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, orgID string, integrationID string, parameters map[string]string) (*pb.ListIntegrationResourcesResponse, error) {
+func ListIntegrationResources(ctx context.Context, registry *registry.Registry, orgID string, integrationID string, parameters map[string]string) (*pb.ListIntegrationResourcesResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
@@ -50,24 +49,6 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 		registry,
 		nil,
 	)
-
-	// If the integration can accept an OIDC provider, inject it so that
-	// ListResources works even before the first Sync (e.g. after a server restart).
-	// Unwrap the PanicableIntegration wrapper first so the type assertion reaches
-	// the underlying implementation.
-	type oidcProviderSetter interface {
-		SetOIDCProvider(oidc.Provider)
-	}
-	type unwrapper interface {
-		Unwrap() core.Integration
-	}
-	target := integration
-	if u, ok := integration.(unwrapper); ok {
-		target = u.Unwrap()
-	}
-	if setter, ok := target.(oidcProviderSetter); ok && oidcProvider != nil {
-		setter.SetOIDCProvider(oidcProvider)
-	}
 
 	listCtx := core.ListResourcesContext{
 		Logger: log.WithFields(log.Fields{

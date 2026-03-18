@@ -278,13 +278,12 @@ func (a *AzureIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 // SetOIDCProvider supplies the server-wide OIDC provider to this integration.
-// Called once at startup so that ListResources works even before the first Sync.
+// Called once at startup by the registry so that ListResources works even
+// before the first Sync (e.g. after a server restart).
 func (a *AzureIntegration) SetOIDCProvider(p oidc.Provider) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.oidcProvider == nil {
-		a.oidcProvider = p
-	}
+	a.oidcProvider = p
 }
 
 // ensureProvider returns the cached Azure provider, or lazily creates one

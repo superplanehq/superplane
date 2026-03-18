@@ -20,12 +20,6 @@ func NewPanicableIntegration(i core.Integration) core.Integration {
 	return &PanicableIntegration{underlying: i}
 }
 
-// Unwrap returns the underlying integration, allowing callers to access
-// methods not defined in the core.Integration interface.
-func (s *PanicableIntegration) Unwrap() core.Integration {
-	return s.underlying
-}
-
 /*
  * Non-panicking methods.
  * These are mostly definition methods, so they won't panic.
