@@ -13,47 +13,51 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-type OnVMDeleted struct {
+type OnVMDeallocated struct {
 }
 
-type OnVMDeletedConfiguration struct {
+type OnVMDeallocatedConfiguration struct {
 	ResourceGroup string `json:"resourceGroup" mapstructure:"resourceGroup"`
 	NameFilter    string `json:"nameFilter" mapstructure:"nameFilter"`
 }
 
-func (t *OnVMDeleted) Name() string {
-	return "azure.onVirtualMachineDeleted"
+func (t *OnVMDeallocated) Name() string {
+	return "azure.onVirtualMachineDeallocated"
 }
 
-func (t *OnVMDeleted) Label() string {
-	return "On VM Deleted"
+func (t *OnVMDeallocated) Label() string {
+	return "On VM Deallocated"
 }
 
-func (t *OnVMDeleted) Description() string {
-	return "Listen to Azure VM deletion events"
+func (t *OnVMDeallocated) Description() string {
+	return "Listen to Azure VM deallocation events"
 }
 
-func (t *OnVMDeleted) Documentation() string {
+func (t *OnVMDeallocated) Documentation() string {
 	return `
-The On VM Deleted trigger starts a workflow execution when an Azure Virtual Machine is deleted.
+The On VM Deallocated trigger starts a workflow execution when an Azure Virtual Machine is deallocated.
 
 ## Use Cases
 
-- **Cleanup workflows**: Remove DNS records, monitoring agents, or other dependent resources when a VM is deleted
-- **Inventory tracking**: Update external inventory systems when VMs are removed
-- **Notification workflows**: Send notifications to teams when VMs are deleted
-- **Cost tracking**: Log VM deletion events for cost analysis and reporting
-- **Compliance auditing**: Track and audit VM deletions for security and compliance
+- **Cost tracking**: Log when VMs are deallocated and compute charges stop
+- **Resource cleanup**: Clean up associated resources (DNS, monitoring) when VMs are deallocated
+- **Scheduling verification**: Confirm VMs are being deallocated according to cost-saving schedules
+- **Capacity planning**: Track deallocation patterns for capacity planning
+- **Notification workflows**: Alert teams when VMs go offline
 
 ## How It Works
 
-This trigger listens to Azure Event Grid events for Virtual Machine resource delete operations.
-When a VM delete operation succeeds (` + "`status: Succeeded`" + `), the trigger fires and
+This trigger listens to Azure Event Grid events for Virtual Machine deallocate actions.
+When a VM deallocate action succeeds (` + "`status: Succeeded`" + `), the trigger fires and
 provides the full Azure Event Grid event payload.
 
-Azure fires ` + "`Microsoft.Resources.ResourceDeleteSuccess`" + ` when a VM is successfully deleted.
-This is a distinct event from write operations — it only fires when the VM is actually removed,
-not during creation or updates.
+Azure fires ` + "`Microsoft.Resources.ResourceActionSuccess`" + ` with operation name
+` + "`Microsoft.Compute/virtualMachines/deallocate/action`" + ` when a VM is deallocated.
+Deallocation stops the VM and releases compute resources — the VM no longer incurs compute
+charges (only storage charges remain).
+
+**Important**: This trigger fires on deallocate, not on power-off (stop without deallocation).
+Use the "On VM Stopped" trigger for power-off events.
 
 ## Configuration
 
@@ -64,12 +68,12 @@ not during creation or updates.
 
 ## Event Data
 
-Each VM delete event includes the full Azure Event Grid event:
+Each VM deallocate event includes the full Azure Event Grid event:
 
 - **id**: Unique event ID
 - **topic**: The Azure subscription topic
-- **subject**: The full ARM resource ID of the VM
-- **eventType**: The event type (` + "`Microsoft.Resources.ResourceDeleteSuccess`" + `)
+- **subject**: The full ARM resource ID of the VM (with /deallocate appended)
+- **eventType**: The event type (` + "`Microsoft.Resources.ResourceActionSuccess`" + `)
 - **eventTime**: The timestamp when the event occurred
 - **data**: The event data including operationName, status, resourceProvider, resourceUri, subscriptionId, tenantId
 
@@ -78,7 +82,7 @@ Each VM delete event includes the full Azure Event Grid event:
 Event Grid subscriptions are created automatically when the trigger is set up. SuperPlane will:
 
 1. Create an Event Grid subscription at the Azure subscription scope
-2. Configure it to forward ` + "`Microsoft.Resources.ResourceDeleteSuccess`" + ` events to the trigger webhook
+2. Configure it to forward ` + "`Microsoft.Resources.ResourceActionSuccess`" + ` events to the trigger webhook
 3. Apply subject filters based on the configured resource group and resource type
 4. Handle the Event Grid validation handshake automatically
 
@@ -86,32 +90,34 @@ No manual setup is required.
 
 ## Notes
 
-- The trigger fires only when a VM is successfully deleted
-- Failed delete operations do not trigger the workflow
+- The trigger fires when a VM is deallocated (stopped and compute resources released)
+- After deallocation, only storage charges remain — compute charges stop
+- It does not fire on power-off (stop without deallocation) — use "On VM Stopped" for that
+- Failed deallocate operations do not trigger the workflow
 - The trigger processes events from Azure Event Grid in real-time
 - Multiple triggers can share the same Event Grid subscription if configured correctly
 `
 }
 
-func (t *OnVMDeleted) Icon() string {
+func (t *OnVMDeallocated) Icon() string {
 	return "azure"
 }
 
-func (t *OnVMDeleted) Color() string {
+func (t *OnVMDeallocated) Color() string {
 	return "blue"
 }
 
-func (t *OnVMDeleted) ExampleData() map[string]any {
+func (t *OnVMDeallocated) ExampleData() map[string]any {
 	return map[string]any{
-		"id":              "96257b6d-17d3-49e2-8369-fb185b29e1b5",
+		"id":              "c3d4e5f6-a7b8-9012-cdef-123456789012",
 		"topic":           "/subscriptions/12345678-1234-1234-1234-123456789abc",
-		"subject":         "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-		"eventType":       "Microsoft.Resources.ResourceDeleteSuccess",
+		"subject":         "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/deallocate",
+		"eventType":       "Microsoft.Resources.ResourceActionSuccess",
 		"eventTime":       "2026-02-11T10:30:00Z",
 		"dataVersion":     "2",
 		"metadataVersion": "1",
 		"data": map[string]any{
-			"operationName":    "Microsoft.Compute/virtualMachines/delete",
+			"operationName":    "Microsoft.Compute/virtualMachines/deallocate/action",
 			"status":           "Succeeded",
 			"resourceProvider": "Microsoft.Compute",
 			"resourceUri":      "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
@@ -121,7 +127,7 @@ func (t *OnVMDeleted) ExampleData() map[string]any {
 	}
 }
 
-func (t *OnVMDeleted) Configuration() []configuration.Field {
+func (t *OnVMDeallocated) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "resourceGroup",
@@ -148,14 +154,14 @@ func (t *OnVMDeleted) Configuration() []configuration.Field {
 }
 
 // Setup configures trigger webhooks.
-func (t *OnVMDeleted) Setup(ctx core.TriggerContext) error {
-	config := OnVMDeletedConfiguration{}
+func (t *OnVMDeallocated) Setup(ctx core.TriggerContext) error {
+	config := OnVMDeallocatedConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	err := ctx.Integration.RequestWebhook(AzureWebhookConfiguration{
-		EventTypes:    []string{EventTypeResourceDeleteSuccess},
+		EventTypes:    []string{EventTypeResourceActionSuccess},
 		ResourceType:  ResourceTypeVirtualMachine,
 		ResourceGroup: config.ResourceGroup,
 	})
@@ -163,24 +169,24 @@ func (t *OnVMDeleted) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to request webhook: %w", err)
 	}
 
-	ctx.Logger.Info("Azure On VM Deleted trigger configured successfully")
+	ctx.Logger.Info("Azure On VM Deallocated trigger configured successfully")
 	if config.ResourceGroup != "" {
 		ctx.Logger.Infof("Filtering events for resource group: %s", config.ResourceGroup)
 	} else {
-		ctx.Logger.Info("Listening for VM delete events in all resource groups")
+		ctx.Logger.Info("Listening for VM deallocate events in all resource groups")
 	}
 
 	return nil
 }
 
 // HandleWebhook processes Event Grid webhook requests.
-func (t *OnVMDeleted) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (t *OnVMDeallocated) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	if err := t.authenticateWebhook(ctx); err != nil {
 		ctx.Logger.Warnf("Webhook authentication failed: %v", err)
 		return http.StatusUnauthorized, nil, err
 	}
 
-	config := OnVMDeletedConfiguration{}
+	config := OnVMDeallocatedConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -211,9 +217,9 @@ func (t *OnVMDeleted) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 			return http.StatusOK, resp, nil
 		}
 
-		if event.EventType == EventTypeResourceDeleteSuccess {
-			if err := t.handleVMDeletedEvent(ctx, event, rawEvents[i], config); err != nil {
-				ctx.Logger.Errorf("Failed to process VM deleted event: %v", err)
+		if event.EventType == EventTypeResourceActionSuccess {
+			if err := t.handleVMDeallocatedEvent(ctx, event, rawEvents[i], config); err != nil {
+				ctx.Logger.Errorf("Failed to process VM deallocated event: %v", err)
 				continue
 			}
 		}
@@ -224,7 +230,7 @@ func (t *OnVMDeleted) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 
 // handleSubscriptionValidation validates Event Grid subscription using the
 // synchronous handshake: return the validationCode in the HTTP response body.
-func (t *OnVMDeleted) handleSubscriptionValidation(ctx core.WebhookRequestContext, event EventGridEvent) (*core.WebhookResponseBody, error) {
+func (t *OnVMDeallocated) handleSubscriptionValidation(ctx core.WebhookRequestContext, event EventGridEvent) (*core.WebhookResponseBody, error) {
 	var validationData SubscriptionValidationEventData
 	if err := mapstructure.Decode(event.Data, &validationData); err != nil {
 		return nil, fmt.Errorf("failed to parse validation data: %w", err)
@@ -247,12 +253,12 @@ func (t *OnVMDeleted) handleSubscriptionValidation(ctx core.WebhookRequestContex
 	return &core.WebhookResponseBody{Body: body, ContentType: "application/json"}, nil
 }
 
-// handleVMDeletedEvent processes VM delete events.
-func (t *OnVMDeleted) handleVMDeletedEvent(
+// handleVMDeallocatedEvent processes VM deallocate action events.
+func (t *OnVMDeallocated) handleVMDeallocatedEvent(
 	ctx core.WebhookRequestContext,
 	event EventGridEvent,
 	rawEvent map[string]any,
-	config OnVMDeletedConfiguration,
+	config OnVMDeallocatedConfiguration,
 ) error {
 	ctx.Logger.Infof("Processing event: type=%s subject=%s", event.EventType, event.Subject)
 
@@ -264,6 +270,12 @@ func (t *OnVMDeleted) handleVMDeletedEvent(
 	var eventData ResourceDeleteSuccessData
 	if err := mapstructure.Decode(event.Data, &eventData); err != nil {
 		return fmt.Errorf("failed to parse event data: %w", err)
+	}
+
+	// Verify this is specifically a deallocate action.
+	if eventData.OperationName != "Microsoft.Compute/virtualMachines/deallocate/action" {
+		ctx.Logger.Infof("Skipping non-deallocate action: %s", eventData.OperationName)
+		return nil
 	}
 
 	ctx.Logger.Infof("VM event data: status=%s operationName=%s resourceURI=%s", eventData.Status, eventData.OperationName, eventData.ResourceURI)
@@ -283,7 +295,7 @@ func (t *OnVMDeleted) handleVMDeletedEvent(
 		return nil
 	}
 
-	vmName := extractVMName(event.Subject)
+	vmName := extractVMNameFromActionSubject(event.Subject)
 
 	// Apply name filter if configured
 	if config.NameFilter != "" {
@@ -298,19 +310,19 @@ func (t *OnVMDeleted) handleVMDeletedEvent(
 		}
 	}
 
-	ctx.Logger.Infof("VM deleted event: %s in resource group %s", vmName, resourceGroup)
+	ctx.Logger.Infof("VM deallocated event: %s in resource group %s", vmName, resourceGroup)
 
-	// Emit the full, unmodified Azure Event Grid event — same pattern as GitHub, GitLab, etc.
-	if err := ctx.Events.Emit("azure.vm.deleted", rawEvent); err != nil {
+	// Emit the full, unmodified Azure Event Grid event.
+	if err := ctx.Events.Emit("azure.vm.deallocated", rawEvent); err != nil {
 		return fmt.Errorf("failed to emit event: %w", err)
 	}
 
-	ctx.Logger.Infof("Successfully emitted azure.vm.deleted event for VM: %s", vmName)
+	ctx.Logger.Infof("Successfully emitted azure.vm.deallocated event for VM: %s", vmName)
 	return nil
 }
 
 // authenticateWebhook verifies the webhook secret if one is configured.
-func (t *OnVMDeleted) authenticateWebhook(ctx core.WebhookRequestContext) error {
+func (t *OnVMDeallocated) authenticateWebhook(ctx core.WebhookRequestContext) error {
 	if ctx.Webhook == nil {
 		return nil
 	}
@@ -347,16 +359,16 @@ func (t *OnVMDeleted) authenticateWebhook(ctx core.WebhookRequestContext) error 
 	return fmt.Errorf("webhook secret required but not provided in Authorization or X-Webhook-Secret header")
 }
 
-func (t *OnVMDeleted) Actions() []core.Action {
+func (t *OnVMDeallocated) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (t *OnVMDeleted) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnVMDeallocated) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
 	return nil, nil
 }
 
 // Cleanup is called when the trigger is removed.
-func (t *OnVMDeleted) Cleanup(ctx core.TriggerContext) error {
-	ctx.Logger.Info("Cleaning up Azure On VM Deleted trigger")
+func (t *OnVMDeallocated) Cleanup(ctx core.TriggerContext) error {
+	ctx.Logger.Info("Cleaning up Azure On VM Deallocated trigger")
 	return nil
 }

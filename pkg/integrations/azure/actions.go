@@ -43,6 +43,7 @@ type armVMProperties struct {
 	ProvisioningState string              `json:"provisioningState"`
 	HardwareProfile   *armHardwareProfile `json:"hardwareProfile"`
 	NetworkProfile    *armNetworkProfile  `json:"networkProfile"`
+	StorageProfile    *armStorageProfile  `json:"storageProfile"`
 }
 
 type armHardwareProfile struct {
@@ -54,11 +55,37 @@ type armNetworkProfile struct {
 }
 
 type armNetworkInterfaceRef struct {
+	ID         string                       `json:"id"`
+	Properties *armNetworkInterfaceRefProps `json:"properties,omitempty"`
+}
+
+type armNetworkInterfaceRefProps struct {
+	DeleteOption string `json:"deleteOption,omitempty"`
+}
+
+type armStorageProfile struct {
+	OsDisk    *armOsDisk    `json:"osDisk"`
+	DataDisks []armDataDisk `json:"dataDisks"`
+}
+
+type armOsDisk struct {
+	ManagedDisk  *armManagedDiskRef `json:"managedDisk"`
+	DeleteOption string             `json:"deleteOption"`
+}
+
+type armDataDisk struct {
+	Lun          int                `json:"lun"`
+	ManagedDisk  *armManagedDiskRef `json:"managedDisk"`
+	DeleteOption string             `json:"deleteOption"`
+}
+
+type armManagedDiskRef struct {
 	ID string `json:"id"`
 }
 
 type armNIC struct {
 	ID         string            `json:"id"`
+	Location   string            `json:"location"`
 	Properties *armNICProperties `json:"properties"`
 }
 
@@ -67,16 +94,23 @@ type armNICProperties struct {
 }
 
 type armIPConfiguration struct {
+	Name       string                 `json:"name"`
 	Properties *armIPConfigProperties `json:"properties"`
 }
 
 type armIPConfigProperties struct {
-	PrivateIPAddress string          `json:"privateIPAddress"`
-	PublicIPAddress  *armPublicIPRef `json:"publicIPAddress"`
+	PrivateIPAddress string             `json:"privateIPAddress"`
+	PublicIPAddress  *armPublicIPRef    `json:"publicIPAddress"`
+	Subnet           *armSubnetResponse `json:"subnet"`
 }
 
 type armPublicIPRef struct {
-	ID string `json:"id"`
+	ID         string               `json:"id"`
+	Properties *armPublicIPRefProps `json:"properties,omitempty"`
+}
+
+type armPublicIPRefProps struct {
+	DeleteOption string `json:"deleteOption,omitempty"`
 }
 
 type armPublicIP struct {
@@ -412,22 +446,158 @@ func ensurePublicIP(ctx context.Context, provider *AzureProvider, resourceGroup,
 	return pip.ID, nil
 }
 
-// DeleteVMRequest contains parameters for Azure VM deletion.
-type DeleteVMRequest struct {
+// VMActionRequest contains parameters for Azure VM actions (start, stop, deallocate, restart).
+type VMActionRequest struct {
 	ResourceGroup string
 	VMName        string
 }
 
+// validateVMActionRequest validates required VM action request fields.
+func validateVMActionRequest(req VMActionRequest) error {
+	if req.ResourceGroup == "" {
+		return fmt.Errorf("resource group is required")
+	}
+	if req.VMName == "" {
+		return fmt.Errorf("VM name is required")
+	}
+	return nil
+}
+
+// getVMRaw fetches the full VM resource and returns it as a raw map.
+func getVMRaw(ctx context.Context, provider *AzureProvider, resourceGroup, vmName string) (map[string]any, error) {
+	vmURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s?api-version=%s",
+		provider.getClient().getBaseURL(), provider.GetSubscriptionID(), resourceGroup, vmName, armAPIVersionCompute)
+
+	var raw map[string]any
+	if err := provider.getClient().get(ctx, vmURL, &raw); err != nil {
+		return nil, fmt.Errorf("failed to get VM: %w", err)
+	}
+
+	return raw, nil
+}
+
+// StartVM starts a stopped/deallocated VM and waits for completion.
+func StartVM(ctx context.Context, provider *AzureProvider, req VMActionRequest, logger *logrus.Entry) (map[string]any, error) {
+	if err := validateVMActionRequest(req); err != nil {
+		return nil, fmt.Errorf("invalid request: %w", err)
+	}
+
+	logger.Infof("Starting VM: name=%s, resourceGroup=%s", req.VMName, req.ResourceGroup)
+
+	actionURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s/start?api-version=%s",
+		provider.getClient().getBaseURL(), provider.GetSubscriptionID(), req.ResourceGroup, req.VMName, armAPIVersionCompute)
+
+	if err := provider.getClient().postAndPoll(ctx, actionURL, nil); err != nil {
+		return nil, fmt.Errorf("VM start failed: %w", err)
+	}
+
+	raw, err := getVMRaw(ctx, provider, req.ResourceGroup, req.VMName)
+	if err != nil {
+		return nil, fmt.Errorf("VM started but failed to fetch VM state: %w", err)
+	}
+
+	logger.Infof("VM started successfully: name=%s", req.VMName)
+	return raw, nil
+}
+
+// StopVM powers off a VM (without deallocating) and waits for completion.
+func StopVM(ctx context.Context, provider *AzureProvider, req VMActionRequest, logger *logrus.Entry) (map[string]any, error) {
+	if err := validateVMActionRequest(req); err != nil {
+		return nil, fmt.Errorf("invalid request: %w", err)
+	}
+
+	logger.Infof("Starting VM power-off: name=%s, resourceGroup=%s", req.VMName, req.ResourceGroup)
+
+	actionURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s/powerOff?api-version=%s",
+		provider.getClient().getBaseURL(), provider.GetSubscriptionID(), req.ResourceGroup, req.VMName, armAPIVersionCompute)
+
+	if err := provider.getClient().postAndPoll(ctx, actionURL, nil); err != nil {
+		return nil, fmt.Errorf("VM power-off failed: %w", err)
+	}
+
+	raw, err := getVMRaw(ctx, provider, req.ResourceGroup, req.VMName)
+	if err != nil {
+		return nil, fmt.Errorf("VM powered off but failed to fetch VM state: %w", err)
+	}
+
+	logger.Infof("VM powered off successfully: name=%s", req.VMName)
+	return raw, nil
+}
+
+// DeallocateVM deallocates a VM (stop + release compute resources) and waits for completion.
+func DeallocateVM(ctx context.Context, provider *AzureProvider, req VMActionRequest, logger *logrus.Entry) (map[string]any, error) {
+	if err := validateVMActionRequest(req); err != nil {
+		return nil, fmt.Errorf("invalid request: %w", err)
+	}
+
+	logger.Infof("Starting VM deallocation: name=%s, resourceGroup=%s", req.VMName, req.ResourceGroup)
+
+	actionURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s/deallocate?api-version=%s",
+		provider.getClient().getBaseURL(), provider.GetSubscriptionID(), req.ResourceGroup, req.VMName, armAPIVersionCompute)
+
+	if err := provider.getClient().postAndPoll(ctx, actionURL, nil); err != nil {
+		return nil, fmt.Errorf("VM deallocation failed: %w", err)
+	}
+
+	raw, err := getVMRaw(ctx, provider, req.ResourceGroup, req.VMName)
+	if err != nil {
+		return nil, fmt.Errorf("VM deallocated but failed to fetch VM state: %w", err)
+	}
+
+	logger.Infof("VM deallocated successfully: name=%s", req.VMName)
+	return raw, nil
+}
+
+// RestartVM restarts a VM in place and waits for completion.
+func RestartVM(ctx context.Context, provider *AzureProvider, req VMActionRequest, logger *logrus.Entry) (map[string]any, error) {
+	if err := validateVMActionRequest(req); err != nil {
+		return nil, fmt.Errorf("invalid request: %w", err)
+	}
+
+	logger.Infof("Starting VM restart: name=%s, resourceGroup=%s", req.VMName, req.ResourceGroup)
+
+	actionURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s/restart?api-version=%s",
+		provider.getClient().getBaseURL(), provider.GetSubscriptionID(), req.ResourceGroup, req.VMName, armAPIVersionCompute)
+
+	if err := provider.getClient().postAndPoll(ctx, actionURL, nil); err != nil {
+		return nil, fmt.Errorf("VM restart failed: %w", err)
+	}
+
+	raw, err := getVMRaw(ctx, provider, req.ResourceGroup, req.VMName)
+	if err != nil {
+		return nil, fmt.Errorf("VM restarted but failed to fetch VM state: %w", err)
+	}
+
+	logger.Infof("VM restarted successfully: name=%s", req.VMName)
+	return raw, nil
+}
+
+// DeleteVMRequest contains parameters for Azure VM deletion.
+type DeleteVMRequest struct {
+	ResourceGroup             string
+	VMName                    string
+	DeleteAssociatedResources bool
+}
+
 // DeleteVM deletes a VM and waits for the operation to complete.
+// If DeleteAssociatedResources is true, it first marks the VM's OS disk, data disks,
+// NICs, and public IPs for cascade deletion using Azure's deleteOption mechanism.
 func DeleteVM(ctx context.Context, provider *AzureProvider, req DeleteVMRequest, logger *logrus.Entry) (map[string]any, error) {
 	if err := validateDeleteVMRequest(req); err != nil {
 		return nil, fmt.Errorf("invalid request: %w", err)
 	}
 
-	logger.Infof("Starting VM deletion: name=%s, resourceGroup=%s", req.VMName, req.ResourceGroup)
+	logger.Infof("Starting VM deletion: name=%s, resourceGroup=%s, deleteAssociatedResources=%v",
+		req.VMName, req.ResourceGroup, req.DeleteAssociatedResources)
+
+	if req.DeleteAssociatedResources {
+		if err := markVMResourcesForDeletion(ctx, provider, req.ResourceGroup, req.VMName, logger); err != nil {
+			return nil, fmt.Errorf("failed to mark associated resources for deletion: %w", err)
+		}
+	}
 
 	vmURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s?api-version=%s",
-		armBaseURL, provider.GetSubscriptionID(), req.ResourceGroup, req.VMName, armAPIVersionCompute)
+		provider.getClient().getBaseURL(), provider.GetSubscriptionID(), req.ResourceGroup, req.VMName, armAPIVersionCompute)
 
 	if err := provider.getClient().deleteAndPoll(ctx, vmURL); err != nil {
 		return nil, fmt.Errorf("VM deletion failed: %w", err)
@@ -444,6 +614,178 @@ func DeleteVM(ctx context.Context, provider *AzureProvider, req DeleteVMRequest,
 
 	logger.Infof("VM deleted successfully: name=%s, id=%s", req.VMName, vmID)
 	return response, nil
+}
+
+// markVMResourcesForDeletion sets deleteOption=Delete on the VM's associated resources
+// (OS disk, data disks, NICs) and on each NIC's public IPs so that when the VM is deleted,
+// Azure automatically cascade-deletes these resources.
+func markVMResourcesForDeletion(ctx context.Context, provider *AzureProvider, resourceGroup, vmName string, logger *logrus.Entry) error {
+	client := provider.getClient()
+	subscriptionID := provider.GetSubscriptionID()
+
+	// Step 1: GET the VM to discover associated resources.
+	vmURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s?api-version=%s",
+		client.getBaseURL(), subscriptionID, resourceGroup, vmName, armAPIVersionCompute)
+
+	var vm armVM
+	if err := client.get(ctx, vmURL, &vm); err != nil {
+		return fmt.Errorf("failed to get VM: %w", err)
+	}
+
+	// Step 2: Build and send PATCH to set deleteOption on disks and NICs.
+	vmPatch := buildVMDeleteOptionPatch(&vm)
+	if vmPatch != nil {
+		logger.Info("Marking VM disks and NICs for cascade deletion")
+		resp, err := client.patch(ctx, vmURL, vmPatch)
+		if err != nil {
+			return fmt.Errorf("failed to patch VM delete options: %w", err)
+		}
+		resp.Body.Close()
+	}
+
+	// Step 3: For each NIC, mark its public IPs for cascade deletion.
+	if vm.Properties != nil && vm.Properties.NetworkProfile != nil {
+		for _, nicRef := range vm.Properties.NetworkProfile.NetworkInterfaces {
+			if nicRef.ID == "" {
+				continue
+			}
+			if err := markNICPublicIPsForDeletion(ctx, client, nicRef.ID, logger); err != nil {
+				logger.Warnf("Failed to mark public IPs for deletion on NIC %s: %v", nicRef.ID, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// buildVMDeleteOptionPatch constructs the PATCH body to set deleteOption=Delete
+// on the VM's OS disk, data disks, and network interfaces.
+func buildVMDeleteOptionPatch(vm *armVM) map[string]any {
+	if vm.Properties == nil {
+		return nil
+	}
+
+	patch := map[string]any{}
+	properties := map[string]any{}
+
+	// Mark OS disk and data disks.
+	if vm.Properties.StorageProfile != nil {
+		storageProfile := map[string]any{}
+
+		if vm.Properties.StorageProfile.OsDisk != nil {
+			storageProfile["osDisk"] = map[string]any{
+				"deleteOption": "Delete",
+			}
+		}
+
+		if len(vm.Properties.StorageProfile.DataDisks) > 0 {
+			dataDisks := make([]map[string]any, len(vm.Properties.StorageProfile.DataDisks))
+			for i, disk := range vm.Properties.StorageProfile.DataDisks {
+				dataDisks[i] = map[string]any{
+					"lun":          disk.Lun,
+					"deleteOption": "Delete",
+				}
+			}
+			storageProfile["dataDisks"] = dataDisks
+		}
+
+		properties["storageProfile"] = storageProfile
+	}
+
+	// Mark NICs.
+	if vm.Properties.NetworkProfile != nil && len(vm.Properties.NetworkProfile.NetworkInterfaces) > 0 {
+		nics := make([]map[string]any, len(vm.Properties.NetworkProfile.NetworkInterfaces))
+		for i, nic := range vm.Properties.NetworkProfile.NetworkInterfaces {
+			nics[i] = map[string]any{
+				"id": nic.ID,
+				"properties": map[string]any{
+					"deleteOption": "Delete",
+				},
+			}
+		}
+		properties["networkProfile"] = map[string]any{
+			"networkInterfaces": nics,
+		}
+	}
+
+	if len(properties) == 0 {
+		return nil
+	}
+
+	patch["properties"] = properties
+	return patch
+}
+
+// markNICPublicIPsForDeletion reads a NIC and patches it to set deleteOption=Delete
+// on any public IP references, so they are cascade-deleted with the VM.
+func markNICPublicIPsForDeletion(ctx context.Context, client *armClient, nicID string, logger *logrus.Entry) error {
+	nicURL := fmt.Sprintf("%s%s?api-version=%s", client.getBaseURL(), nicID, armAPIVersionNetwork)
+
+	var nic armNIC
+	if err := client.get(ctx, nicURL, &nic); err != nil {
+		return fmt.Errorf("failed to get NIC: %w", err)
+	}
+
+	if nic.Properties == nil {
+		return nil
+	}
+
+	// Check if any ip configuration has a public IP.
+	hasPublicIP := false
+	for _, ipConfig := range nic.Properties.IPConfigurations {
+		if ipConfig.Properties != nil && ipConfig.Properties.PublicIPAddress != nil && ipConfig.Properties.PublicIPAddress.ID != "" {
+			hasPublicIP = true
+			break
+		}
+	}
+
+	if !hasPublicIP {
+		return nil
+	}
+
+	// Build the PATCH body for the NIC, setting deleteOption on public IPs.
+	ipConfigs := make([]map[string]any, len(nic.Properties.IPConfigurations))
+	for i, ipConfig := range nic.Properties.IPConfigurations {
+		ipConfigPatch := map[string]any{
+			"name":       ipConfig.Name,
+			"properties": map[string]any{},
+		}
+
+		props := ipConfigPatch["properties"].(map[string]any)
+
+		// Subnet is required for NIC PATCH operations.
+		if ipConfig.Properties != nil && ipConfig.Properties.Subnet != nil {
+			props["subnet"] = map[string]any{"id": ipConfig.Properties.Subnet.ID}
+		}
+
+		if ipConfig.Properties != nil && ipConfig.Properties.PublicIPAddress != nil && ipConfig.Properties.PublicIPAddress.ID != "" {
+			props["publicIPAddress"] = map[string]any{
+				"id": ipConfig.Properties.PublicIPAddress.ID,
+				"properties": map[string]any{
+					"deleteOption": "Delete",
+				},
+			}
+			logger.Infof("Marking public IP %s for cascade deletion", ipConfig.Properties.PublicIPAddress.ID)
+		}
+
+		ipConfigs[i] = ipConfigPatch
+	}
+
+	nicPatch := map[string]any{
+		"location": nic.Location,
+		"properties": map[string]any{
+			"ipConfigurations": ipConfigs,
+		},
+	}
+
+	logger.Infof("Patching NIC %s to mark public IPs for deletion", nicID)
+	resp, err := client.patch(ctx, nicURL, nicPatch)
+	if err != nil {
+		return fmt.Errorf("failed to patch NIC: %w", err)
+	}
+	resp.Body.Close()
+
+	return nil
 }
 
 // validateDeleteVMRequest validates required VM deletion request fields.
