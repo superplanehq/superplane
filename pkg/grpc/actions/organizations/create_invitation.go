@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -29,6 +30,10 @@ func CreateInvitation(ctx context.Context, authService authorization.Authorizati
 
 	org := uuid.MustParse(orgID)
 	authenticatedUser := uuid.MustParse(authenticatedUserID)
+
+	if err := usage.CheckMemberLimit(org); err != nil {
+		return nil, status.Errorf(codes.ResourceExhausted, err.Error())
+	}
 
 	//
 	// Handle case where user already exists in organization,

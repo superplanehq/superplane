@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
@@ -49,6 +50,11 @@ func CreateCanvasWithAutoLayout(
 	expandedNodes, err := expandNodes(organizationID, nodes)
 	if err != nil {
 		return nil, err
+	}
+
+	orgUUID := uuid.MustParse(organizationID)
+	if err := usage.CheckCanvasCreationLimit(orgUUID); err != nil {
+		return nil, status.Errorf(codes.ResourceExhausted, err.Error())
 	}
 
 	createdBy := uuid.MustParse(userID)

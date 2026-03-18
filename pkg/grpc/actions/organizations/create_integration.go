@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -29,6 +30,10 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 	org, err := uuid.Parse(orgID)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid organization")
+	}
+
+	if err := usage.CheckIntegrationLimit(org); err != nil {
+		return nil, status.Errorf(codes.ResourceExhausted, err.Error())
 	}
 
 	//

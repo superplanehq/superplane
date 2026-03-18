@@ -2551,6 +2551,7 @@
           },
           {
             "name": "parameters",
+            "description": "This is a request variable of the map type. The query format is \"map_name[key]=value\", e.g. If the map name is Age, the key type is string, and the value type is integer, the query parameter is expressed as Age[\"bob\"]=18",
             "in": "query",
             "required": false,
             "type": "string"
@@ -2749,6 +2750,38 @@
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/OrganizationsResetInviteLinkResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/api/v1/organizations/{id}/usage": {
+      "get": {
+        "summary": "Get organization usage",
+        "description": "Returns the usage profile, effective limits, current usage counters, and override status for an organization",
+        "operationId": "Organizations_GetUsage",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsGetUsageResponse"
             }
           },
           "default": {
@@ -5944,6 +5977,14 @@
         }
       }
     },
+    "OrganizationsGetUsageResponse": {
+      "type": "object",
+      "properties": {
+        "usage": {
+          "$ref": "#/definitions/OrganizationsUsageInfo"
+        }
+      }
+    },
     "OrganizationsIntegration": {
       "type": "object",
       "properties": {
@@ -6226,6 +6267,80 @@
       "properties": {
         "organization": {
           "$ref": "#/definitions/OrganizationsOrganization"
+        }
+      }
+    },
+    "OrganizationsUsageCounters": {
+      "type": "object",
+      "properties": {
+        "canvases": {
+          "type": "string",
+          "format": "int64"
+        },
+        "users": {
+          "type": "string",
+          "format": "int64"
+        },
+        "integrations": {
+          "type": "string",
+          "format": "int64"
+        },
+        "eventsThisMonth": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
+    },
+    "OrganizationsUsageInfo": {
+      "type": "object",
+      "properties": {
+        "profileName": {
+          "type": "string"
+        },
+        "effectiveLimits": {
+          "$ref": "#/definitions/OrganizationsUsageLimits"
+        },
+        "currentUsage": {
+          "$ref": "#/definitions/OrganizationsUsageCounters"
+        },
+        "hasOverrides": {
+          "type": "boolean"
+        },
+        "isUnlimited": {
+          "type": "boolean"
+        }
+      }
+    },
+    "OrganizationsUsageLimits": {
+      "type": "object",
+      "properties": {
+        "maxOrgsPerAccount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxCanvasesPerOrg": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxNodesPerCanvas": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxUsersPerOrg": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxIntegrationsPerOrg": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxEventsPerMonth": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "retentionDays": {
+          "type": "integer",
+          "format": "int32"
         }
       }
     },

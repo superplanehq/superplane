@@ -18,6 +18,7 @@ type Organization struct {
 	Description       string
 	AllowedProviders  datatypes.JSONSlice[string]
 	VersioningEnabled bool
+	UsageProfileID    *uuid.UUID
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 	DeletedAt         gorm.DeletedAt `gorm:"index"`

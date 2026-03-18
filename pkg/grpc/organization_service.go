@@ -200,6 +200,11 @@ func (s *OrganizationService) DeleteIntegration(ctx context.Context, req *pb.Del
 	return organizations.DeleteIntegration(ctx, orgID, req.IntegrationId)
 }
 
+func (s *OrganizationService) GetUsage(ctx context.Context, req *pb.GetUsageRequest) (*pb.GetUsageResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.GetUsage(ctx, orgID)
+}
+
 func accountIDFromContext(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {

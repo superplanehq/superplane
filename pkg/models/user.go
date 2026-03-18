@@ -267,9 +267,13 @@ func FindMaybeDeletedUsersByIDs(ids []uuid.UUID) ([]User, error) {
 }
 
 func FindOrganizationsForAccount(email string) ([]Organization, error) {
+	return FindOrganizationsForAccountInTransaction(database.Conn(), email)
+}
+
+func FindOrganizationsForAccountInTransaction(tx *gorm.DB, email string) ([]Organization, error) {
 	var organizations []Organization
 
-	err := database.Conn().
+	err := tx.
 		Table("organizations").
 		Joins("JOIN users ON organizations.id = users.organization_id").
 		Where("users.email = ?", utils.NormalizeEmail(email)).

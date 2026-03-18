@@ -263,6 +263,17 @@ service Organizations {
       tags: "Organization";
     };
   }
+
+  rpc GetUsage(GetUsageRequest) returns (GetUsageResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/usage"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get organization usage";
+      description: "Returns the usage profile, effective limits, current usage counters, and override status for an organization";
+      tags: "Organization";
+    };
+  }
 }
 
 message Organization {
@@ -547,4 +558,37 @@ message OrganizationDeleted {
 message InvitationCreated {
   string invitation_id = 1;
   google.protobuf.Timestamp timestamp = 2;
+}
+
+message GetUsageRequest {
+  string id = 1;
+}
+
+message GetUsageResponse {
+  UsageInfo usage = 1;
+}
+
+message UsageInfo {
+  string profile_name = 1;
+  UsageLimits effective_limits = 2;
+  UsageCounters current_usage = 3;
+  bool has_overrides = 4;
+  bool is_unlimited = 5;
+}
+
+message UsageLimits {
+  int32 max_orgs_per_account = 1;
+  int32 max_canvases_per_org = 2;
+  int32 max_nodes_per_canvas = 3;
+  int32 max_users_per_org = 4;
+  int32 max_integrations_per_org = 5;
+  int32 max_events_per_month = 6;
+  int32 retention_days = 7;
+}
+
+message UsageCounters {
+  int64 canvases = 1;
+  int64 users = 2;
+  int64 integrations = 3;
+  int64 events_this_month = 4;
 }
