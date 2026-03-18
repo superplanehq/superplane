@@ -3,60 +3,17 @@ package azure
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
-
-// mockIntegrationContext implements core.IntegrationContext for testing.
-type mockIntegrationContext struct {
-	id     string
-	config map[string]string
-}
-
-func (m *mockIntegrationContext) ID() uuid.UUID {
-	id, _ := uuid.Parse(m.id)
-	return id
-}
-
-func (m *mockIntegrationContext) GetConfig(name string) ([]byte, error) {
-	if v, ok := m.config[name]; ok {
-		return []byte(v), nil
-	}
-	return nil, fmt.Errorf("config %s not found", name)
-}
-
-func (m *mockIntegrationContext) GetMetadata() any                    { return nil }
-func (m *mockIntegrationContext) SetMetadata(any)                     {}
-func (m *mockIntegrationContext) Ready()                              {}
-func (m *mockIntegrationContext) Error(string)                        {}
-func (m *mockIntegrationContext) NewBrowserAction(core.BrowserAction) {}
-func (m *mockIntegrationContext) RemoveBrowserAction()                {}
-func (m *mockIntegrationContext) SetSecret(string, []byte) error      { return nil }
-func (m *mockIntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
-	return nil, nil
-}
-func (m *mockIntegrationContext) RequestWebhook(any) error           { return nil }
-func (m *mockIntegrationContext) Subscribe(any) (*uuid.UUID, error)  { return nil, nil }
-func (m *mockIntegrationContext) ScheduleResync(time.Duration) error { return nil }
-func (m *mockIntegrationContext) ScheduleActionCall(string, any, time.Duration) error {
-	return nil
-}
-func (m *mockIntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
-	return nil, nil
-}
-func (m *mockIntegrationContext) FindSubscription(func(core.IntegrationSubscriptionContext) bool) (core.IntegrationSubscriptionContext, error) {
-	return nil, nil
-}
 
 func TestAzureIntegration_Name(t *testing.T) {
 	integration := &AzureIntegration{}
@@ -235,28 +192,20 @@ func TestAzureIntegration_HandleRequest_Unknown(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
-func TestAzureIntegration_EnsureProvider_ReturnsCachedProvider(t *testing.T) {
-	testID := "00000000-0000-0000-0000-000000000001"
-	provider := &AzureProvider{}
-	integration := &AzureIntegration{
-		provider:      provider,
-		integrationID: testID,
+func TestNewProvider_FailsWithoutAccessToken(t *testing.T) {
+	ctx := &contexts.IntegrationContext{
+		IntegrationID: "00000000-0000-0000-0000-000000000002",
+		Configuration: map[string]any{
+			"tenantId":       "test-tenant",
+			"clientId":       "test-client",
+			"subscriptionId": "test-sub",
+		},
+		// No secrets set — simulates integration that has not yet synced.
 	}
-
-	ctx := &mockIntegrationContext{id: testID}
-	result, err := integration.ensureProvider(ctx)
-	assert.NoError(t, err)
-	assert.Equal(t, provider, result)
-}
-
-func TestAzureIntegration_EnsureProvider_FailsWithoutOIDC(t *testing.T) {
-	integration := &AzureIntegration{}
-
-	ctx := &mockIntegrationContext{id: "00000000-0000-0000-0000-000000000002"}
-	result, err := integration.ensureProvider(ctx)
+	result, err := newProvider(ctx)
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "OIDC provider not available")
+	assert.Contains(t, err.Error(), "Azure access token not found")
 }
 
 func TestConfiguration_Struct(t *testing.T) {
@@ -273,7 +222,7 @@ func TestConfiguration_Struct(t *testing.T) {
 
 const testIntegrationID = "00000000-0000-0000-0000-000000000001"
 
-func newTestIntegration(t *testing.T, handler http.HandlerFunc) (*AzureIntegration, *httptest.Server) {
+func newTestProvider(t *testing.T, handler http.HandlerFunc) (*AzureProvider, *httptest.Server) {
 	t.Helper()
 	server := httptest.NewServer(handler)
 
@@ -291,19 +240,14 @@ func newTestIntegration(t *testing.T, handler http.HandlerFunc) (*AzureIntegrati
 		logger:         logrus.NewEntry(logrus.New()),
 	}
 
-	integration := &AzureIntegration{
-		provider:      provider,
-		integrationID: testIntegrationID,
-	}
-
-	return integration, server
+	return provider, server
 }
 
 func newTestListCtx() core.ListResourcesContext {
 	return core.ListResourcesContext{
 		Logger: logrus.NewEntry(logrus.New()),
-		Integration: &mockIntegrationContext{
-			id: testIntegrationID,
+		Integration: &contexts.IntegrationContext{
+			IntegrationID: testIntegrationID,
 		},
 	}
 }
@@ -316,7 +260,7 @@ func TestListResourceGroupLocations_EmptyResourceGroup(t *testing.T) {
 }
 
 func TestListResourceGroupLocations_Success(t *testing.T) {
-	integration, server := newTestIntegration(t, func(w http.ResponseWriter, r *http.Request) {
+	provider, server := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"name":     "my-rg",
@@ -326,7 +270,7 @@ func TestListResourceGroupLocations_Success(t *testing.T) {
 	})
 	defer server.Close()
 
-	resources, err := integration.ListResourceGroupLocations(newTestListCtx(), "my-rg")
+	resources, err := listResourceGroupLocations(newTestListCtx(), provider, "my-rg")
 	require.NoError(t, err)
 	require.Len(t, resources, 1)
 	assert.Equal(t, ResourceTypeResourceGroupLocation, resources[0].Type)
@@ -335,7 +279,7 @@ func TestListResourceGroupLocations_Success(t *testing.T) {
 }
 
 func TestListResourceGroupLocations_NotFound(t *testing.T) {
-	integration, server := newTestIntegration(t, func(w http.ResponseWriter, r *http.Request) {
+	provider, server := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]any{
@@ -347,7 +291,7 @@ func TestListResourceGroupLocations_NotFound(t *testing.T) {
 	})
 	defer server.Close()
 
-	resources, err := integration.ListResourceGroupLocations(newTestListCtx(), "my-rg")
+	resources, err := listResourceGroupLocations(newTestListCtx(), provider, "my-rg")
 	assert.NoError(t, err)
 	assert.Empty(t, resources)
 }
