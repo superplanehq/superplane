@@ -1,0 +1,25 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    env_file:
+      - .env
+    environment:
+      IN_DOCKER: "1"
+    command: bash -lc "sleep infinity"
+    tty: true
+    stdin_open: true
+    volumes:
+      - .:/app
+      - uv-cache:/root/.cache/uv
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "uv --version >/dev/null && python --version >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  uv-cache:
+    driver: local
