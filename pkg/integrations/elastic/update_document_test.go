@@ -24,19 +24,19 @@ func Test__UpdateDocument__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "index is required")
 	})
 
-	t.Run("missing documentId -> error", func(t *testing.T) {
+	t.Run("missing document -> error", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{"index": "my-index"},
 			Metadata:      &contexts.MetadataContext{},
 		})
-		require.ErrorContains(t, err, "documentId is required")
+		require.ErrorContains(t, err, "document is required")
 	})
 
 	t.Run("missing fields -> error", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"index":      "my-index",
-				"documentId": "doc-1",
+				"index":    "my-index",
+				"document": "doc-1",
 			},
 			Metadata: &contexts.MetadataContext{},
 		})
@@ -46,14 +46,15 @@ func Test__UpdateDocument__Setup(t *testing.T) {
 	t.Run("valid config -> success", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"index":      "my-index",
-				"documentId": "doc-1",
-				"fields":     map[string]any{"status": "done"},
+				"index":    "my-index",
+				"document": "doc-1",
+				"fields":   map[string]any{"status": "done"},
 			},
 			Metadata: &contexts.MetadataContext{},
 		})
 		require.NoError(t, err)
 	})
+
 }
 
 func Test__UpdateDocument__Configuration(t *testing.T) {
@@ -64,7 +65,7 @@ func Test__UpdateDocument__Configuration(t *testing.T) {
 
 	var documentIDField *configuration.Field
 	for i := range fields {
-		if fields[i].Name == "documentId" {
+		if fields[i].Name == "document" {
 			documentIDField = &fields[i]
 			break
 		}
@@ -122,9 +123,9 @@ func Test__UpdateDocument__Execute(t *testing.T) {
 
 		err := (&UpdateDocument{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"index":      "workflow-audit",
-				"documentId": "doc-1",
-				"fields":     map[string]any{"status": "done"},
+				"index":    "workflow-audit",
+				"document": "doc-1",
+				"fields":   map[string]any{"status": "done"},
 			},
 			HTTP:           httpCtx,
 			Integration:    integrationCtx("apiKey"),
@@ -156,9 +157,9 @@ func Test__UpdateDocument__Execute(t *testing.T) {
 
 		err := (&UpdateDocument{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"index":      "my-index",
-				"documentId": "doc-1",
-				"fields":     map[string]any{"k": "v"},
+				"index":    "my-index",
+				"document": "doc-1",
+				"fields":   map[string]any{"k": "v"},
 			},
 			HTTP:           httpCtx,
 			Integration:    integrationCtx("basic"),
@@ -186,9 +187,9 @@ func Test__UpdateDocument__Execute(t *testing.T) {
 
 		err := (&UpdateDocument{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"index":      "my-index",
-				"documentId": "doc-1",
-				"fields":     map[string]any{"k": "v"},
+				"index":    "my-index",
+				"document": "doc-1",
+				"fields":   map[string]any{"k": "v"},
 			},
 			HTTP:           httpCtx,
 			Integration:    integrationCtx("apiKey"),
@@ -205,8 +206,8 @@ func Test__UpdateDocument__Execute(t *testing.T) {
 
 		err := (&UpdateDocument{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"index":      "my-index",
-				"documentId": "doc-1",
+				"index":    "my-index",
+				"document": "doc-1",
 			},
 			HTTP:           &contexts.HTTPContext{},
 			Integration:    integrationCtx("apiKey"),
@@ -217,4 +218,5 @@ func Test__UpdateDocument__Execute(t *testing.T) {
 		assert.False(t, state.Passed)
 		assert.Contains(t, state.FailureMessage, "fields is required")
 	})
+
 }
