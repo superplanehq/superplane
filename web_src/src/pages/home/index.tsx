@@ -1,6 +1,6 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Box, GitBranch, MoreVertical, Palette, Pencil, Plus, Rainbow, Search, Trash2 } from "lucide-react";
+import { Box, GitBranch, MoreVertical, Palette, Pencil, Plus, Rainbow, Search, Trash2, Upload } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -19,6 +19,7 @@ import { useDeleteCanvas, useCanvases, canvasKeys } from "../../hooks/useCanvasD
 import { resolveIcon } from "../../lib/utils";
 import { isCustomComponentsEnabled } from "../../lib/env";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
+import { ImportYamlDialog } from "../canvas/ImportYamlDialog";
 
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
@@ -52,6 +53,7 @@ const HomePage = () => {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<TabType>("canvases");
+  const [isImportYamlOpen, setIsImportYamlOpen] = useState(false);
 
   const canvasModalState = useCreateCanvasModalState();
   const customComponentModalState = useCreateCustomComponentModalState();
@@ -167,6 +169,7 @@ const HomePage = () => {
               <PageHeader
                 activeTab={activeTab}
                 onNewClick={onNewClick}
+                onImportYamlClick={() => setIsImportYamlOpen(true)}
                 canCreateCanvases={canCreateCanvases}
                 canCreateBlueprints={canCreateBlueprints}
                 permissionsLoading={permissionsLoading}
@@ -203,6 +206,7 @@ const HomePage = () => {
                 searchQuery={searchQuery}
                 onEditCanvas={canvasModalState.onOpenEdit}
                 onNewClick={onNewClick}
+                onImportYamlClick={() => setIsImportYamlOpen(true)}
                 canCreateCanvases={canCreateCanvases}
                 canUpdateCanvases={canUpdateCanvases}
                 canDeleteCanvases={canDeleteCanvases}
@@ -217,6 +221,14 @@ const HomePage = () => {
 
       <CreateCanvasModal {...canvasModalState} />
       {isCustomComponentsEnabled() && <CreateCustomComponentModal {...customComponentModalState} />}
+      {organizationId && (
+        <ImportYamlDialog
+          open={isImportYamlOpen}
+          onOpenChange={setIsImportYamlOpen}
+          organizationId={organizationId}
+          onSuccess={(canvasId) => navigate(`/${organizationId}/canvases/${canvasId}`)}
+        />
+      )}
     </div>
   );
 };
@@ -291,6 +303,7 @@ function SearchBar({ activeTab, searchQuery, setSearchQuery }: SearchBarProps) {
 interface PageHeaderProps {
   activeTab: TabType;
   onNewClick: () => void;
+  onImportYamlClick: () => void;
   canCreateCanvases: boolean;
   canCreateBlueprints: boolean;
   permissionsLoading: boolean;
@@ -299,6 +312,7 @@ interface PageHeaderProps {
 function PageHeader({
   activeTab,
   onNewClick,
+  onImportYamlClick,
   canCreateCanvases,
   canCreateBlueprints,
   permissionsLoading,
@@ -324,12 +338,28 @@ function PageHeader({
         <Text className="text-gray-800 dark:text-gray-400">{description}</Text>
       </div>
 
-      <PermissionTooltip allowed={canCreate || permissionsLoading} message={createMessage}>
-        <Button onClick={onNewClick} size="sm" disabled={!canCreate}>
-          <Plus size={16} />
-          {buttonText}
-        </Button>
-      </PermissionTooltip>
+      <div className="flex items-center gap-2">
+        {activeTab === "canvases" && (
+          <PermissionTooltip allowed={canCreate || permissionsLoading} message={createMessage}>
+            <Button
+              data-testid="import-yaml-button"
+              variant="outline"
+              size="sm"
+              onClick={onImportYamlClick}
+              disabled={!canCreate}
+            >
+              <Upload size={16} />
+              Import YAML
+            </Button>
+          </PermissionTooltip>
+        )}
+        <PermissionTooltip allowed={canCreate || permissionsLoading} message={createMessage}>
+          <Button onClick={onNewClick} size="sm" disabled={!canCreate}>
+            <Plus size={16} />
+            {buttonText}
+          </Button>
+        </PermissionTooltip>
+      </div>
     </div>
   );
 }
@@ -358,6 +388,7 @@ function Content({
   searchQuery,
   onEditCanvas,
   onNewClick,
+  onImportYamlClick,
   canCreateCanvases,
   canUpdateCanvases,
   canDeleteCanvases,
@@ -372,6 +403,7 @@ function Content({
   searchQuery: string;
   onEditCanvas: (canvas: CanvasCardData) => void;
   onNewClick: () => void;
+  onImportYamlClick: () => void;
   canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
@@ -385,6 +417,7 @@ function Content({
         <CanvasesEmptyState
           searchQuery={searchQuery}
           onNewClick={onNewClick}
+          onImportYamlClick={onImportYamlClick}
           canCreateCanvases={canCreateCanvases}
           permissionsLoading={permissionsLoading}
         />
@@ -437,11 +470,13 @@ function CustomComponentsEmptyState({ searchQuery }: { searchQuery: string }) {
 function CanvasesEmptyState({
   searchQuery,
   onNewClick,
+  onImportYamlClick,
   canCreateCanvases,
   permissionsLoading,
 }: {
   searchQuery: string;
   onNewClick: () => void;
+  onImportYamlClick: () => void;
   canCreateCanvases: boolean;
   permissionsLoading: boolean;
 }) {
@@ -463,15 +498,32 @@ function CanvasesEmptyState({
     <div className="text-center py-12">
       <Palette className="mx-auto text-gray-800 dark:text-gray-300 mb-4" size={24} />
       <p className="text-sm text-gray-800 dark:text-gray-300 mb-6">Create your first Canvas</p>
-      <PermissionTooltip
-        allowed={canCreateCanvases || permissionsLoading}
-        message="You don't have permission to create canvases."
-      >
-        <Button onClick={onNewClick} size="sm" disabled={!canCreateCanvases}>
-          <Plus size={16} />
-          New Canvas
-        </Button>
-      </PermissionTooltip>
+      <div className="flex items-center justify-center gap-2">
+        <PermissionTooltip
+          allowed={canCreateCanvases || permissionsLoading}
+          message="You don't have permission to create canvases."
+        >
+          <Button
+            data-testid="import-yaml-button"
+            variant="outline"
+            size="sm"
+            onClick={onImportYamlClick}
+            disabled={!canCreateCanvases}
+          >
+            <Upload size={16} />
+            Import YAML
+          </Button>
+        </PermissionTooltip>
+        <PermissionTooltip
+          allowed={canCreateCanvases || permissionsLoading}
+          message="You don't have permission to create canvases."
+        >
+          <Button onClick={onNewClick} size="sm" disabled={!canCreateCanvases}>
+            <Plus size={16} />
+            New Canvas
+          </Button>
+        </PermissionTooltip>
+      </div>
     </div>
   );
 }
