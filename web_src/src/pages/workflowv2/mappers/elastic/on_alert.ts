@@ -19,6 +19,11 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
     const payload = context.event?.data as Record<string, any> | undefined;
 
     const details: Record<string, string> = {};
+    const receivedAt = payload?.timestamp || context.event?.createdAt;
+
+    if (receivedAt) {
+      details["Received At"] = new Date(receivedAt).toLocaleString();
+    }
 
     const rule = payload?.ruleName || payload?.alertName || payload?.ruleId;
     if (rule) details["Rule"] = String(rule);
@@ -85,14 +90,14 @@ function buildMetadataItems(config: Record<string, any> | undefined): MetadataIt
   const rules: string[] = Array.isArray(config.rules) ? config.rules : [];
   const spaces: string[] = Array.isArray(config.spaces) ? config.spaces : [];
   const tags: Predicate[] = Array.isArray(config.tags) ? config.tags : [];
-  const severities: Predicate[] = Array.isArray(config.severities) ? config.severities : [];
-  const statuses: Predicate[] = Array.isArray(config.statuses) ? config.statuses : [];
+  const severities: string[] = Array.isArray(config.severities) ? config.severities : [];
+  const statuses: string[] = Array.isArray(config.statuses) ? config.statuses : [];
 
   if (rules.length > 0) items.push({ icon: "bell", label: rules.join(", ") });
   if (spaces.length > 0) items.push({ icon: "layers", label: spaces.join(", ") });
   if (tags.length > 0) items.push({ icon: "tag", label: predicateLabel(tags) });
-  if (severities.length > 0) items.push({ icon: "alert-triangle", label: predicateLabel(severities) });
-  if (statuses.length > 0) items.push({ icon: "activity", label: predicateLabel(statuses) });
+  if (severities.length > 0) items.push({ icon: "alert-triangle", label: severities.join(", ") });
+  if (statuses.length > 0) items.push({ icon: "activity", label: statuses.join(", ") });
 
   return items;
 }

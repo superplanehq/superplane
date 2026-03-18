@@ -18,8 +18,8 @@ type OnAlertFiresConfiguration struct {
 	Rules      []string                  `json:"rules" mapstructure:"rules"`
 	Spaces     []string                  `json:"spaces" mapstructure:"spaces"`
 	Tags       []configuration.Predicate `json:"tags" mapstructure:"tags"`
-	Severities []configuration.Predicate `json:"severities" mapstructure:"severities"`
-	Statuses   []configuration.Predicate `json:"statuses" mapstructure:"statuses"`
+	Severities []string                  `json:"severities" mapstructure:"severities"`
+	Statuses   []string                  `json:"statuses" mapstructure:"statuses"`
 }
 
 func (t *OnAlertFires) Name() string  { return "elastic.onAlertFires" }
@@ -114,24 +114,26 @@ func (t *OnAlertFires) Configuration() []configuration.Field {
 		{
 			Name:        "severities",
 			Label:       "Severities",
-			Type:        configuration.FieldTypeAnyPredicateList,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Only fire for alerts whose severity matches any of these predicates. Leave empty to accept all severities.",
+			Description: "Only fire for alerts with these severity levels. Leave empty to accept all severities.",
 			TypeOptions: &configuration.TypeOptions{
-				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
-					Operators: configuration.AllPredicateOperators,
+				Resource: &configuration.ResourceTypeOptions{
+					Type:  ResourceTypeKibanaAlertSeverity,
+					Multi: true,
 				},
 			},
 		},
 		{
 			Name:        "statuses",
 			Label:       "Statuses",
-			Type:        configuration.FieldTypeAnyPredicateList,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Only fire for alerts whose status matches any of these predicates. Leave empty to accept all statuses.",
+			Description: "Only fire for alerts with these statuses. Leave empty to accept all statuses.",
 			TypeOptions: &configuration.TypeOptions{
-				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
-					Operators: configuration.AllPredicateOperators,
+				Resource: &configuration.ResourceTypeOptions{
+					Type:  ResourceTypeKibanaAlertStatus,
+					Multi: true,
 				},
 			},
 		},
@@ -223,13 +225,13 @@ func matchesFilters(payload map[string]any, config OnAlertFiresConfiguration) bo
 	}
 
 	if len(config.Severities) > 0 {
-		if !configuration.MatchesAnyPredicate(config.Severities, extractString(payload, "severity")) {
+		if !containsIgnoreCase(config.Severities, extractString(payload, "severity")) {
 			return false
 		}
 	}
 
 	if len(config.Statuses) > 0 {
-		if !configuration.MatchesAnyPredicate(config.Statuses, extractString(payload, "status")) {
+		if !containsIgnoreCase(config.Statuses, extractString(payload, "status")) {
 			return false
 		}
 	}
