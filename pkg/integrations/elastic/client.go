@@ -142,7 +142,11 @@ func (c *Client) execKibanaRequest(method, path string, body io.Reader) ([]byte,
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, &KibanaAPIError{StatusCode: res.StatusCode, Body: redactedResponseHint(responseBody)}
+		body := redactedResponseHint(responseBody)
+		if res.StatusCode >= 400 && res.StatusCode < 500 {
+			body = string(responseBody)
+		}
+		return nil, &KibanaAPIError{StatusCode: res.StatusCode, Body: body}
 	}
 
 	return responseBody, nil
@@ -366,4 +370,254 @@ func (c *Client) IndexDocument(index, documentID string, doc map[string]any) (*I
 	}
 
 	return &resp, nil
+}
+
+// GetDocumentResponse is returned by GET /{index}/_doc/{id}.
+type GetDocumentResponse struct {
+	ID      string         `json:"_id"`
+	Index   string         `json:"_index"`
+	Version int            `json:"_version"`
+	Found   bool           `json:"found"`
+	Source  map[string]any `json:"_source"`
+}
+
+// GetDocument retrieves a document by index and document ID.
+func (c *Client) GetDocument(index, documentID string) (*GetDocumentResponse, error) {
+	fullURL := fmt.Sprintf("%s/%s/_doc/%s", c.baseURL, url.PathEscape(index), url.PathEscape(documentID))
+	responseBody, err := c.execRequest(http.MethodGet, fullURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp GetDocumentResponse
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing get document response: %v", err)
+	}
+
+	return &resp, nil
+}
+
+// UpdateDocument applies a partial update to an existing document.
+// Uses POST /{index}/_update/{id} with body {"doc": fields}.
+// Reuses IndexDocumentResponse since the response shape is identical.
+func (c *Client) UpdateDocument(index, documentID string, fields map[string]any) (*IndexDocumentResponse, error) {
+	payload := map[string]any{"doc": fields}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling update payload: %v", err)
+	}
+
+	fullURL := fmt.Sprintf("%s/%s/_update/%s", c.baseURL, url.PathEscape(index), url.PathEscape(documentID))
+	responseBody, err := c.execRequest(http.MethodPost, fullURL, bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var resp IndexDocumentResponse
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing update document response: %v", err)
+	}
+
+	return &resp, nil
+}
+
+// SearchHit represents a single document result from an Elasticsearch search.
+type SearchHit struct {
+	ID     string         `json:"_id"`
+	Index  string         `json:"_index"`
+	Source map[string]any `json:"_source"`
+}
+
+// ListDocuments returns up to 100 documents from an index for use in resource pickers.
+func (c *Client) ListDocuments(index string) ([]SearchHit, error) {
+	query := map[string]any{
+		"query":   map[string]any{"match_all": map[string]any{}},
+		"_source": false,
+		"size":    100,
+	}
+
+	data, err := json.Marshal(query)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling list documents query: %v", err)
+	}
+
+	fullURL := fmt.Sprintf("%s/%s/_search", c.baseURL, url.PathEscape(index))
+	responseBody, err := c.execRequest(http.MethodPost, fullURL, bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Hits struct {
+			Hits []SearchHit `json:"hits"`
+		} `json:"hits"`
+	}
+	if err := json.Unmarshal(responseBody, &result); err != nil {
+		return nil, fmt.Errorf("error parsing list documents response: %v", err)
+	}
+
+	return result.Hits.Hits, nil
+}
+
+// TimestampValue extracts the @timestamp value from the source as a string.
+// Returns "" if the field is absent or not a string.
+func (h *SearchHit) TimestampValue() string {
+	if h.Source == nil {
+		return ""
+	}
+	if v, ok := h.Source[onDocumentIndexedTimeField]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+// SearchDocumentsAfter queries an index for documents where @timestamp is
+// strictly greater than afterTimestamp, sorted ascending.
+func (c *Client) SearchDocumentsAfter(index, afterTimestamp string, size int) ([]SearchHit, error) {
+	query := map[string]any{
+		"query": map[string]any{
+			"range": map[string]any{
+				onDocumentIndexedTimeField: map[string]any{
+					"gt": afterTimestamp,
+				},
+			},
+		},
+		"sort": []any{
+			map[string]any{onDocumentIndexedTimeField: map[string]any{"order": "asc"}},
+		},
+		"size": size,
+	}
+
+	data, err := json.Marshal(query)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling search query: %v", err)
+	}
+
+	fullURL := fmt.Sprintf("%s/%s/_search", c.baseURL, url.PathEscape(index))
+	responseBody, err := c.execRequest(http.MethodPost, fullURL, bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Hits struct {
+			Hits []SearchHit `json:"hits"`
+		} `json:"hits"`
+	}
+	if err := json.Unmarshal(responseBody, &result); err != nil {
+		return nil, fmt.Errorf("error parsing search response: %v", err)
+	}
+
+	return result.Hits.Hits, nil
+}
+
+// KibanaConnector is the relevant subset of a Kibana actions connector.
+type KibanaConnector struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ListKibanaConnectors returns all connectors from Kibana.
+func (c *Client) ListKibanaConnectors() ([]KibanaConnector, error) {
+	body, err := c.execKibanaRequest(http.MethodGet, "/api/actions/connectors", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var connectors []KibanaConnector
+	if err := json.Unmarshal(body, &connectors); err != nil {
+		return nil, fmt.Errorf("error parsing connectors response: %v", err)
+	}
+
+	return connectors, nil
+}
+
+// KibanaRuleResponse is the relevant subset of the Kibana alerting rule API response.
+type KibanaRuleResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// CreateKibanaQueryRule creates a Kibana Elasticsearch query rule that fires
+// connectorID whenever new documents appear in index within a 1-minute window.
+func (c *Client) CreateKibanaQueryRule(index, connectorID, routeKey string) (*KibanaRuleResponse, error) {
+	actionBody, err := json.Marshal(map[string]any{
+		"eventType": "document_indexed",
+		"index":     index,
+		"routeKey":  routeKey,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling action body: %v", err)
+	}
+
+	esQuery, err := json.Marshal(map[string]any{"query": map[string]any{"match_all": map[string]any{}}})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling esQuery: %v", err)
+	}
+
+	payload := map[string]any{
+		"name":         "SuperPlane \u2022 " + index,
+		"rule_type_id": ".es-query",
+		"consumer":     "alerts",
+		"schedule":     map[string]any{"interval": "1m"},
+		"params": map[string]any{
+			"index":                      []string{index},
+			"timeField":                  onDocumentIndexedTimeField,
+			"esQuery":                    string(esQuery),
+			"size":                       100,
+			"threshold":                  []int{0},
+			"thresholdComparator":        ">",
+			"timeWindowSize":             1,
+			"timeWindowUnit":             "m",
+			"excludeHitsFromPreviousRun": true,
+		},
+		"actions": []any{
+			map[string]any{
+				"id":    connectorID,
+				"group": "query matched",
+				"params": map[string]any{
+					"body": string(actionBody),
+				},
+				"frequency": map[string]any{
+					"notify_when": "onActiveAlert",
+					"throttle":    nil,
+					"summary":     false,
+				},
+			},
+		},
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling rule payload: %v", err)
+	}
+
+	responseBody, err := c.execKibanaRequest(http.MethodPost, "/api/alerting/rule", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var resp KibanaRuleResponse
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing rule response: %v", err)
+	}
+
+	return &resp, nil
+}
+
+// DeleteKibanaRule removes a Kibana alerting rule by ID.
+// A 404 response is treated as success: the rule is already gone.
+func (c *Client) DeleteKibanaRule(ruleID string) error {
+	_, err := c.execKibanaRequest(
+		http.MethodDelete,
+		fmt.Sprintf("/api/alerting/rule/%s", url.PathEscape(ruleID)),
+		nil,
+	)
+	var kibanaErr *KibanaAPIError
+	if errors.As(err, &kibanaErr) && kibanaErr.StatusCode == http.StatusNotFound {
+		return nil
+	}
+	return err
 }
