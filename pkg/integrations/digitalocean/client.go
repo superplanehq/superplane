@@ -973,3 +973,219 @@ func (c *Client) ListSnapshots() ([]Snapshot, error) {
 
 	return response.Snapshots, nil
 }
+
+// AlertPolicySlackDetails represents a Slack notification channel for an alert policy
+type AlertPolicySlackDetails struct {
+	URL     string `json:"url"`
+	Channel string `json:"channel"`
+}
+
+// AlertPolicyAlerts represents the notification channels configured on an alert policy
+type AlertPolicyAlerts struct {
+	Slack []AlertPolicySlackDetails `json:"slack,omitempty"`
+	Email []string                  `json:"email,omitempty"`
+}
+
+// AlertPolicy represents a DigitalOcean monitoring alert policy
+type AlertPolicy struct {
+	UUID        string            `json:"uuid"`
+	Type        string            `json:"type"`
+	Description string            `json:"description"`
+	Compare     string            `json:"compare"`
+	Value       float64           `json:"value"`
+	Window      string            `json:"window"`
+	Entities    []string          `json:"entities"`
+	Tags        []string          `json:"tags"`
+	Alerts      AlertPolicyAlerts `json:"alerts"`
+	Enabled     bool              `json:"enabled"`
+}
+
+// CreateAlertPolicyRequest is the payload for creating a monitoring alert policy
+type CreateAlertPolicyRequest struct {
+	Type        string            `json:"type"`
+	Description string            `json:"description"`
+	Compare     string            `json:"compare"`
+	Value       float64           `json:"value"`
+	Window      string            `json:"window"`
+	Entities    []string          `json:"entities,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
+	Alerts      AlertPolicyAlerts `json:"alerts"`
+	Enabled     bool              `json:"enabled"`
+}
+
+// CreateAlertPolicy creates a new monitoring alert policy
+func (c *Client) CreateAlertPolicy(req CreateAlertPolicyRequest) (*AlertPolicy, error) {
+	url := fmt.Sprintf("%s/monitoring/alerts", c.BaseURL)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Policy AlertPolicy `json:"policy"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Policy, nil
+}
+
+// GetAlertPolicy retrieves a monitoring alert policy by its UUID
+func (c *Client) GetAlertPolicy(policyUUID string) (*AlertPolicy, error) {
+	url := fmt.Sprintf("%s/monitoring/alerts/%s", c.BaseURL, policyUUID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Policy AlertPolicy `json:"policy"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Policy, nil
+}
+
+// DeleteAlertPolicy deletes a monitoring alert policy by its UUID
+func (c *Client) DeleteAlertPolicy(policyUUID string) error {
+	url := fmt.Sprintf("%s/monitoring/alerts/%s", c.BaseURL, policyUUID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
+// ListAlertPolicies retrieves all monitoring alert policies in the account
+func (c *Client) ListAlertPolicies() ([]AlertPolicy, error) {
+	url := fmt.Sprintf("%s/monitoring/alerts?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Policies []AlertPolicy `json:"policies"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Policies, nil
+}
+
+// AlertPolicyNodeMetadata stores metadata about an alert policy for display in the UI
+type AlertPolicyNodeMetadata struct {
+	PolicyUUID string `json:"policyUuid" mapstructure:"policyUuid"`
+	PolicyDesc string `json:"policyDesc" mapstructure:"policyDesc"`
+}
+
+// resolveAlertPolicyMetadata fetches the alert policy description from the API and stores it in metadata
+func resolveAlertPolicyMetadata(ctx core.SetupContext, policyUUID string) error {
+	if strings.Contains(policyUUID, "{{") {
+		return ctx.Metadata.Set(AlertPolicyNodeMetadata{
+			PolicyDesc: policyUUID,
+		})
+	}
+
+	var existing AlertPolicyNodeMetadata
+	err := mapstructure.Decode(ctx.Metadata.Get(), &existing)
+	if err == nil && existing.PolicyUUID == policyUUID && existing.PolicyDesc != "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client for metadata resolution: %w", err)
+	}
+
+	policy, err := client.GetAlertPolicy(policyUUID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch alert policy %s for metadata: %w", policyUUID, err)
+	}
+
+	return ctx.Metadata.Set(AlertPolicyNodeMetadata{
+		PolicyUUID: policyUUID,
+		PolicyDesc: policy.Description,
+	})
+}
+
+// MetricsValue represents a single data point in a metric series: [unix_timestamp, string_value]
+type MetricsValue []any
+
+// MetricsResult represents a single labeled metric time series
+type MetricsResult struct {
+	Metric map[string]string `json:"metric"`
+	Values []MetricsValue    `json:"values"`
+}
+
+// MetricsData is the data envelope returned by the monitoring metrics API
+type MetricsData struct {
+	ResultType string          `json:"resultType"`
+	Result     []MetricsResult `json:"result"`
+}
+
+// MetricsResponse is the top-level response from the monitoring metrics API
+type MetricsResponse struct {
+	Status string      `json:"status"`
+	Data   MetricsData `json:"data"`
+}
+
+// GetDropletCPUMetrics fetches CPU usage percentage metrics for a droplet
+func (c *Client) GetDropletCPUMetrics(dropletID string, start, end int64) (*MetricsResponse, error) {
+	url := fmt.Sprintf("%s/monitoring/metrics/droplet/cpu?host_id=%s&start=%d&end=%d", c.BaseURL, dropletID, start, end)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response MetricsResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response, nil
+}
+
+// GetDropletMemoryMetrics fetches memory utilization percentage metrics for a droplet
+func (c *Client) GetDropletMemoryMetrics(dropletID string, start, end int64) (*MetricsResponse, error) {
+	url := fmt.Sprintf("%s/monitoring/metrics/droplet/memory_utilization_percent?host_id=%s&start=%d&end=%d", c.BaseURL, dropletID, start, end)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response MetricsResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response, nil
+}
+
+// GetDropletBandwidthMetrics fetches network bandwidth metrics for a droplet.
+// iface must be "public" or "private"; direction must be "outbound" or "inbound".
+func (c *Client) GetDropletBandwidthMetrics(dropletID, iface, direction string, start, end int64) (*MetricsResponse, error) {
+	metric := fmt.Sprintf("%s_%s_bandwidth", iface, direction)
+	url := fmt.Sprintf("%s/monitoring/metrics/droplet/%s?host_id=%s&start=%d&end=%d", c.BaseURL, metric, dropletID, start, end)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response MetricsResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response, nil
+}

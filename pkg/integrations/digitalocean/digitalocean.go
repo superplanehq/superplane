@@ -82,6 +82,10 @@ func (d *DigitalOcean) Components() []core.Component {
 		&CreateLoadBalancer{},
 		&DeleteLoadBalancer{},
 		&AssignReservedIP{},
+		&CreateAlertPolicy{},
+		&GetAlertPolicy{},
+		&DeleteAlertPolicy{},
+		&GetDropletMetrics{},
 	}
 }
 
