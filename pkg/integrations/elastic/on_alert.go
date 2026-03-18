@@ -174,6 +174,10 @@ func (t *OnAlertFires) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 		return http.StatusBadRequest, nil, fmt.Errorf("invalid JSON payload: %w", err)
 	}
 
+	if eventType := extractString(payload, "eventType"); eventType != "" && eventType != "alert_fired" {
+		return http.StatusOK, nil, nil
+	}
+
 	var config OnAlertFiresConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
