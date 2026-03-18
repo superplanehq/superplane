@@ -14,7 +14,6 @@ import (
 )
 
 type OnImageDeleted struct {
-	integration *AzureIntegration
 }
 
 type OnImageDeletedConfiguration struct {
