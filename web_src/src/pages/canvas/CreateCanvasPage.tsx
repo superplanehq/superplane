@@ -11,8 +11,7 @@ import { Button } from "../../components/ui/button";
 import { useCreateCanvas, useCanvasTemplates } from "../../hooks/useCanvasData";
 import { showErrorToast } from "../../utils/toast";
 import type { ComponentsEdge, ComponentsNode } from "@/api-client";
-import { Rainbow, Upload } from "lucide-react";
-import { ImportYamlDialog } from "./ImportYamlDialog";
+import { Rainbow } from "lucide-react";
 
 const MAX_CANVAS_NAME_LENGTH = 50;
 const MAX_CANVAS_DESCRIPTION_LENGTH = 200;
@@ -25,7 +24,6 @@ export function CreateCanvasPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [nameError, setNameError] = useState("");
-  const [isImportYamlOpen, setIsImportYamlOpen] = useState(false);
 
   const createMutation = useCreateCanvas(organizationId || "");
   const { data: workflowTemplates = [] } = useCanvasTemplates(organizationId || "");
@@ -152,10 +150,6 @@ export function CreateCanvasPage() {
                 <Button variant="outline" onClick={handleCancel}>
                   Cancel
                 </Button>
-                <Button variant="outline" onClick={() => setIsImportYamlOpen(true)}>
-                  <Upload size={16} />
-                  Import YAML
-                </Button>
               </div>
             </div>
           </div>
@@ -183,14 +177,6 @@ export function CreateCanvasPage() {
           )}
         </div>
       </main>
-      {organizationId && (
-        <ImportYamlDialog
-          open={isImportYamlOpen}
-          onOpenChange={setIsImportYamlOpen}
-          organizationId={organizationId}
-          onSuccess={(canvasId) => navigate(`/${organizationId}/canvases/${canvasId}`)}
-        />
-      )}
     </div>
   );
 }
