@@ -32,8 +32,6 @@ func NewOrganizationService(
 	baseURL string,
 	webhooksBaseURL string,
 ) *OrganizationService {
-	registry.InitializeOIDC(oidcProvider)
-
 	return &OrganizationService{
 		registry:             registry,
 		oidcProvider:         oidcProvider,

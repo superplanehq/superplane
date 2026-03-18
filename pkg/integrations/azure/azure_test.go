@@ -3,60 +3,17 @@ package azure
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
-
-// mockIntegrationContext implements core.IntegrationContext for testing.
-type mockIntegrationContext struct {
-	id     string
-	config map[string]string
-}
-
-func (m *mockIntegrationContext) ID() uuid.UUID {
-	id, _ := uuid.Parse(m.id)
-	return id
-}
-
-func (m *mockIntegrationContext) GetConfig(name string) ([]byte, error) {
-	if v, ok := m.config[name]; ok {
-		return []byte(v), nil
-	}
-	return nil, fmt.Errorf("config %s not found", name)
-}
-
-func (m *mockIntegrationContext) GetMetadata() any                    { return nil }
-func (m *mockIntegrationContext) SetMetadata(any)                     {}
-func (m *mockIntegrationContext) Ready()                              {}
-func (m *mockIntegrationContext) Error(string)                        {}
-func (m *mockIntegrationContext) NewBrowserAction(core.BrowserAction) {}
-func (m *mockIntegrationContext) RemoveBrowserAction()                {}
-func (m *mockIntegrationContext) SetSecret(string, []byte) error      { return nil }
-func (m *mockIntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
-	return nil, nil
-}
-func (m *mockIntegrationContext) RequestWebhook(any) error           { return nil }
-func (m *mockIntegrationContext) Subscribe(any) (*uuid.UUID, error)  { return nil, nil }
-func (m *mockIntegrationContext) ScheduleResync(time.Duration) error { return nil }
-func (m *mockIntegrationContext) ScheduleActionCall(string, any, time.Duration) error {
-	return nil
-}
-func (m *mockIntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
-	return nil, nil
-}
-func (m *mockIntegrationContext) FindSubscription(func(core.IntegrationSubscriptionContext) bool) (core.IntegrationSubscriptionContext, error) {
-	return nil, nil
-}
 
 func TestAzureIntegration_Name(t *testing.T) {
 	integration := &AzureIntegration{}
@@ -240,9 +197,9 @@ func TestNewProvider_FailsWithoutOIDCKeysPath(t *testing.T) {
 	t.Setenv("BASE_URL", "")
 	t.Setenv("WEBHOOKS_BASE_URL", "")
 
-	ctx := &mockIntegrationContext{
-		id: "00000000-0000-0000-0000-000000000002",
-		config: map[string]string{
+	ctx := &contexts.IntegrationContext{
+		IntegrationID: "00000000-0000-0000-0000-000000000002",
+		Configuration: map[string]any{
 			"tenantId":       "test-tenant",
 			"clientId":       "test-client",
 			"subscriptionId": "test-sub",
@@ -292,8 +249,8 @@ func newTestProvider(t *testing.T, handler http.HandlerFunc) (*AzureProvider, *h
 func newTestListCtx() core.ListResourcesContext {
 	return core.ListResourcesContext{
 		Logger: logrus.NewEntry(logrus.New()),
-		Integration: &mockIntegrationContext{
-			id: testIntegrationID,
+		Integration: &contexts.IntegrationContext{
+			IntegrationID: testIntegrationID,
 		},
 	}
 }
