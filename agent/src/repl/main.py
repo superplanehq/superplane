@@ -10,7 +10,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from ai.models import CanvasQuestionRequest
-from ai.repl_web import ReplWebServer, ReplWebServerConfig
+from ai.repl_web import WebServer, WebServerConfig
 
 RELOAD_EXIT_CODE = 3
 
@@ -147,7 +147,7 @@ def _stream_repl_answer(
     request_payload["org_id"] = org_id
     request_body = json.dumps(request_payload).encode("utf-8")
     request = Request(
-        url=f"{repl_web_url.rstrip('/')}/v1/repl/stream",
+        url=f"{repl_web_url.rstrip('/')}/v1/agent/chat/stream",
         data=request_body,
         method="POST",
         headers={
@@ -297,14 +297,21 @@ def main() -> None:
     parser.add_argument("--token", help="Superplane API token.")
     parser.add_argument("--org-id", help="Superplane organization ID.")
     parser.add_argument(
+        "--server",
+        action="store_true",
+        help="Start web server and block.",
+    )
+    parser.add_argument(
         "--serve-repl-web",
         action="store_true",
-        help="Start REPL web server and block.",
+        dest="server",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--serve-test-repl-web",
         action="store_true",
-        help="Deprecated alias for --serve-repl-web.",
+        dest="server",
+        help="Deprecated alias for --server.",
     )
     parser.add_argument(
         "--test-repl-web-host",
@@ -344,9 +351,9 @@ def main() -> None:
         print("ok")
         return
 
-    if args.serve_repl_web or args.serve_test_repl_web:
-        server = ReplWebServer(
-            ReplWebServerConfig(host=args.test_repl_web_host, port=args.test_repl_web_port)
+    if args.server:
+        server = WebServer(
+            WebServerConfig(host=args.test_repl_web_host, port=args.test_repl_web_port)
         )
         print(f"Serving REPL web app at {server.base_url}", flush=True)
         try:
@@ -358,11 +365,11 @@ def main() -> None:
         raise ValueError("Provide --question or --interactive.")
 
     repl_web_url = normalize_optional_setting(args.repl_web_url)
-    server: ReplWebServer | None = None
+    server: WebServer | None = None
     should_start_server = args.start_repl_web or args.start_test_repl_web or repl_web_url is None
     if should_start_server:
-        server = ReplWebServer(
-            ReplWebServerConfig(
+        server = WebServer(
+            WebServerConfig(
                 host=args.test_repl_web_host,
                 port=args.test_repl_web_port,
             )
