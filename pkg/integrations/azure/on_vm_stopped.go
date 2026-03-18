@@ -14,7 +14,6 @@ import (
 )
 
 type OnVMStopped struct {
-	integration *AzureIntegration
 }
 
 type OnVMStoppedConfiguration struct {

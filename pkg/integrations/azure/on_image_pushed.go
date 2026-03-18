@@ -14,7 +14,6 @@ import (
 )
 
 type OnImagePushed struct {
-	integration *AzureIntegration
 }
 
 type OnImagePushedConfiguration struct {
