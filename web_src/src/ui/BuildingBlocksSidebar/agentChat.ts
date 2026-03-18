@@ -15,7 +15,7 @@ export type AiBuilderProposal = {
   operations: AiCanvasOperation[];
 };
 
-type ReplStreamEvent = {
+type AgentChatStreamEvent = {
   type?: string;
   [key: string]: unknown;
 };
@@ -117,9 +117,9 @@ function formatToolLabel(toolName: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-function parseSseChunk(rawChunk: string): ReplStreamEvent[] {
+function parseSseChunk(rawChunk: string): AgentChatStreamEvent[] {
   const chunks = rawChunk.split("\n\n");
-  const events: ReplStreamEvent[] = [];
+  const events: AgentChatStreamEvent[] = [];
 
   for (const chunk of chunks) {
     const lines = chunk.split("\n");
@@ -142,7 +142,7 @@ function parseSseChunk(rawChunk: string): ReplStreamEvent[] {
     try {
       const parsed = JSON.parse(merged);
       if (parsed && typeof parsed === "object") {
-        events.push(parsed as ReplStreamEvent);
+        events.push(parsed as AgentChatStreamEvent);
       }
     } catch {
       events.push({ type: "raw_data", content: merged });
@@ -158,13 +158,13 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
-type SendAgentReplPromptArgs = {
+type SendAgentChatPromptArgs = {
   value?: string;
   aiInput: string;
   aiMessages: AiBuilderMessage[];
   canvasId?: string;
   organizationId?: string;
-  agentReplWebUrl: string;
+  agentUrl: string;
   isGeneratingResponse: boolean;
   setAiMessages: Dispatch<SetStateAction<AiBuilderMessage[]>>;
   setAiInput: Dispatch<SetStateAction<string>>;
@@ -174,13 +174,13 @@ type SendAgentReplPromptArgs = {
   focusInput: () => void;
 };
 
-export async function sendAgentReplPrompt({
+export async function sendAgentChatPrompt({
   value,
   aiInput,
   aiMessages,
   canvasId,
   organizationId,
-  agentReplWebUrl,
+  agentUrl,
   isGeneratingResponse,
   setAiMessages,
   setAiInput,
@@ -188,7 +188,7 @@ export async function sendAgentReplPrompt({
   setIsGeneratingResponse,
   setPendingProposal,
   focusInput,
-}: SendAgentReplPromptArgs): Promise<void> {
+}: SendAgentChatPromptArgs): Promise<void> {
   const nextPrompt = (value ?? aiInput).trim();
   if (!nextPrompt || isGeneratingResponse || !canvasId) {
     return;
@@ -231,7 +231,7 @@ export async function sendAgentReplPrompt({
     );
     setPendingProposal(null);
 
-    const response = await fetch(`${agentReplWebUrl}/v1/repl/stream`, {
+    const response = await fetch(`${agentUrl}/v1/agent/chat/stream`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -316,7 +316,7 @@ export async function sendAgentReplPrompt({
       );
     };
 
-    const processEvent = async (event: ReplStreamEvent) => {
+    const processEvent = async (event: AgentChatStreamEvent) => {
       if (event.type === "run_started" && typeof event.model === "string") {
         runModel = event.model.trim().toLowerCase();
         return;

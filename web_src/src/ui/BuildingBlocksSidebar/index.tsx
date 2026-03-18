@@ -13,7 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { resolveIcon } from "@/lib/utils";
-import { getAgentReplWebUrl, isCustomComponentsEnabled } from "@/lib/env";
+import { getAgentUrl, isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getComponentSubtype } from "../buildingBlocks";
 import {
@@ -36,7 +36,7 @@ import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
 import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
-import { AiBuilderMessage, AiBuilderProposal, pushAiMessages, sendAgentReplPrompt } from "./agentRepl";
+import { AiBuilderMessage, AiBuilderProposal, pushAiMessages, sendAgentChatPrompt } from "./agentChat";
 
 export interface BuildingBlock {
   name: string;
@@ -233,18 +233,18 @@ export function BuildingBlocksSidebar({
     const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
     return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
   }, []);
-  const agentReplWebUrl = getAgentReplWebUrl().replace(/\/+$/, "");
+  const agentUrl = getAgentUrl().replace(/\/+$/, "");
 
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
     async (value?: string) => {
-      await sendAgentReplPrompt({
+      await sendAgentChatPrompt({
         value,
         aiInput,
         aiMessages,
         canvasId,
         organizationId,
-        agentReplWebUrl,
+        agentUrl,
         isGeneratingResponse,
         setAiMessages,
         setAiInput,
@@ -254,7 +254,7 @@ export function BuildingBlocksSidebar({
         focusInput: () => aiInputRef.current?.focus(),
       });
     },
-    [aiInput, aiMessages, agentReplWebUrl, canvasId, isGeneratingResponse, organizationId],
+    [aiInput, aiMessages, agentUrl, canvasId, isGeneratingResponse, organizationId],
   );
 
   const handleDiscardProposal = useCallback(() => {
