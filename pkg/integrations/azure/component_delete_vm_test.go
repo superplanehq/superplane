@@ -155,7 +155,7 @@ func TestDeleteVMComponent_Setup_MissingName(t *testing.T) {
 }
 
 func TestDeleteVM_WithoutAssociatedResources(t *testing.T) {
-	_, server := newTestIntegration(t, func(w http.ResponseWriter, r *http.Request) {
+	_, server := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "virtualMachines/test-vm") {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -247,7 +247,7 @@ func TestDeleteVM_WithAssociatedResources(t *testing.T) {
 		},
 	}
 
-	_, server := newTestIntegration(t, func(w http.ResponseWriter, r *http.Request) {
+	_, server := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		requestLog = append(requestLog, r.Method+" "+r.URL.Path)
 		mu.Unlock()
@@ -397,7 +397,7 @@ func TestDeleteVM_WithAssociatedResources_NoPublicIP(t *testing.T) {
 		},
 	}
 
-	_, server := newTestIntegration(t, func(w http.ResponseWriter, r *http.Request) {
+	_, server := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		requestLog = append(requestLog, r.Method+" "+r.URL.Path)
 		mu.Unlock()
