@@ -33,6 +33,7 @@ import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
 import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
+import { AiBuilderMessage, AiBuilderProposal, pushAiMessages, sendAgentReplPrompt } from "./agentRepl";
 
 export interface BuildingBlock {
   name: string;
@@ -119,107 +120,6 @@ export type AiCanvasOperation =
       type: "delete_node";
       target: { nodeKey?: string; nodeId?: string; nodeName?: string };
     };
-
-type AiBuilderMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-};
-
-type AiBuilderProposal = {
-  id: string;
-  summary: string;
-  operations: AiCanvasOperation[];
-};
-
-type ReplStreamEvent = {
-  type?: string;
-  [key: string]: unknown;
-};
-
-const AI_HISTORY_RECENT_TURNS = 8;
-const AI_HISTORY_OLDER_TURNS = 6;
-const AI_HISTORY_MAX_MESSAGE_CHARS = 320;
-const AI_MAX_STORED_MESSAGES = 50;
-const TEST_MODEL_SENTINEL = "success (no tool calls)";
-
-function compactMessageContent(content: string): string {
-  const normalized = content.replace(/\s+/g, " ").trim();
-  if (normalized.length <= AI_HISTORY_MAX_MESSAGE_CHARS) {
-    return normalized;
-  }
-
-  return `${normalized.slice(0, AI_HISTORY_MAX_MESSAGE_CHARS)}...`;
-}
-
-function formatConversationTurns(messages: AiBuilderMessage[]): string[] {
-  return messages
-    .map((message) => `${message.role}: ${compactMessageContent(message.content)}`)
-    .filter((line) => line.length > 0);
-}
-
-function buildPromptWithConversationContext(messages: AiBuilderMessage[], prompt: string): string {
-  const turns = formatConversationTurns(messages);
-  if (turns.length === 0) {
-    return prompt;
-  }
-
-  const recentTurns = turns.slice(-AI_HISTORY_RECENT_TURNS);
-  const olderTurns = turns.slice(0, -AI_HISTORY_RECENT_TURNS).slice(-AI_HISTORY_OLDER_TURNS);
-  const contextSections = [
-    "Conversation context (use this for continuity and intent resolution):",
-    ...(olderTurns.length > 0 ? [`Earlier turns summary:\n${olderTurns.join("\n")}`] : []),
-    `Recent turns:\n${recentTurns.join("\n")}`,
-    `Current user request:\n${prompt}`,
-  ];
-
-  return contextSections.join("\n\n");
-}
-
-function pushAiMessages(previous: AiBuilderMessage[], next: AiBuilderMessage | AiBuilderMessage[]): AiBuilderMessage[] {
-  const nextMessages = Array.isArray(next) ? next : [next];
-  const merged = [...previous, ...nextMessages];
-  if (merged.length <= AI_MAX_STORED_MESSAGES) {
-    return merged;
-  }
-
-  return merged.slice(-AI_MAX_STORED_MESSAGES);
-}
-
-function parseSseChunk(rawChunk: string): ReplStreamEvent[] {
-  const chunks = rawChunk.split("\n\n");
-  const events: ReplStreamEvent[] = [];
-
-  for (const chunk of chunks) {
-    const lines = chunk.split("\n");
-    const dataLines: string[] = [];
-    for (const line of lines) {
-      if (line.startsWith("data:")) {
-        dataLines.push(line.replace(/^data:\s*/, ""));
-      }
-    }
-
-    if (!dataLines.length) {
-      continue;
-    }
-
-    const merged = dataLines.join("\n").trim();
-    if (!merged) {
-      continue;
-    }
-
-    try {
-      const parsed = JSON.parse(merged);
-      if (parsed && typeof parsed === "object") {
-        events.push(parsed as ReplStreamEvent);
-      }
-    } catch {
-      events.push({ type: "raw_data", content: merged });
-    }
-  }
-
-  return events;
-}
 
 export function BuildingBlocksSidebar({
   isOpen,
@@ -335,182 +235,21 @@ export function BuildingBlocksSidebar({
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
     async (value?: string) => {
-      const nextPrompt = (value ?? aiInput).trim();
-      if (!nextPrompt || isGeneratingResponse || !canvasId) {
-        return;
-      }
-
-      if (nextPrompt.toLowerCase() === "/clear") {
-        setAiMessages([]);
-        setPendingProposal(null);
-        setAiError(null);
-        setAiInput("");
-        requestAnimationFrame(() => {
-          aiInputRef.current?.focus();
-        });
-        return;
-      }
-
-      const contextualPrompt = buildPromptWithConversationContext(aiMessages, nextPrompt);
-
-      const userMessage: AiBuilderMessage = {
-        id: `user-${Date.now()}`,
-        role: "user",
-        content: nextPrompt,
-      };
-      setAiMessages((prev) => pushAiMessages(prev, userMessage));
-      setAiInput("");
-      requestAnimationFrame(() => {
-        aiInputRef.current?.focus();
+      await sendAgentReplPrompt({
+        value,
+        aiInput,
+        aiMessages,
+        canvasId,
+        organizationId,
+        agentReplWebUrl,
+        isGeneratingResponse,
+        setAiMessages,
+        setAiInput,
+        setAiError,
+        setIsGeneratingResponse,
+        setPendingProposal,
+        focusInput: () => aiInputRef.current?.focus(),
       });
-      setAiError(null);
-      setIsGeneratingResponse(true);
-
-      try {
-        const assistantMessageId = `assistant-${Date.now()}`;
-        setAiMessages((prev) =>
-          pushAiMessages(prev, {
-            id: assistantMessageId,
-            role: "assistant",
-            content: "",
-          }),
-        );
-        setPendingProposal(null);
-
-        const response = await fetch(`${agentReplWebUrl}/v1/repl/stream`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "text/event-stream",
-          },
-          body: JSON.stringify({
-            question: contextualPrompt,
-            canvas_id: canvasId,
-            org_id: organizationId || undefined,
-          }),
-        });
-
-        if (!response.ok || !response.body) {
-          const responseText = await response.text();
-          throw new Error(responseText || `Request failed with status ${response.status}`);
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let streamedAnyAnswer = false;
-        let assistantContentSnapshot = "";
-        let runModel = "";
-
-        const appendAssistantContent = (value: string) => {
-          if (!value) return;
-          assistantContentSnapshot += value;
-          streamedAnyAnswer = true;
-          setAiMessages((prev) =>
-            prev.map((message) =>
-              message.id === assistantMessageId ? { ...message, content: `${message.content}${value}` } : message,
-            ),
-          );
-        };
-        const replaceAssistantContent = (value: string) => {
-          assistantContentSnapshot = value;
-          streamedAnyAnswer = true;
-          setAiMessages((prev) =>
-            prev.map((message) => (message.id === assistantMessageId ? { ...message, content: value } : message)),
-          );
-        };
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const parts = buffer.split("\n\n");
-          buffer = parts.pop() ?? "";
-
-          for (const part of parts) {
-            const parsedEvents = parseSseChunk(part);
-            for (const event of parsedEvents) {
-              if (event.type === "run_started" && typeof event.model === "string") {
-                runModel = event.model.trim().toLowerCase();
-                continue;
-              }
-
-              if (event.type === "model_delta" && typeof event.content === "string") {
-                appendAssistantContent(event.content);
-                continue;
-              }
-
-              if (event.type === "final_answer") {
-                const output = event.output;
-                if (
-                  !streamedAnyAnswer &&
-                  runModel === "test" &&
-                  typeof output === "string" &&
-                  output.trim().toLowerCase() === TEST_MODEL_SENTINEL
-                ) {
-                  appendAssistantContent(
-                    "Agent is running in test mode. Set AI_MODEL in agent/.env to a real model and configure agent credentials to get canvas-aware answers.",
-                  );
-                  continue;
-                }
-                if (!streamedAnyAnswer && typeof output === "string") {
-                  appendAssistantContent(output);
-                  continue;
-                }
-
-                if (
-                  !streamedAnyAnswer &&
-                  output &&
-                  typeof output === "object" &&
-                  typeof (output as { answer?: unknown }).answer === "string"
-                ) {
-                  appendAssistantContent((output as { answer: string }).answer);
-                }
-                continue;
-              }
-
-              if (event.type === "run_failed" && typeof event.error === "string") {
-                throw new Error(event.error);
-              }
-            }
-          }
-        }
-
-        if (runModel === "test" && assistantContentSnapshot.trim().toLowerCase() === TEST_MODEL_SENTINEL) {
-          replaceAssistantContent(
-            "Agent is running in test mode. Set AI_MODEL in agent/.env to a real model and configure agent credentials to get canvas-aware answers.",
-          );
-        }
-
-        if (!streamedAnyAnswer) {
-          setAiMessages((prev) =>
-            prev.map((message) =>
-              message.id === assistantMessageId
-                ? {
-                    ...message,
-                    content:
-                      runModel === "test"
-                        ? "Agent is running in test mode. Set AI_MODEL in agent/.env to a real model and configure agent credentials to get canvas-aware answers."
-                        : "I finished the run, but no text response was returned.",
-                  }
-                : message,
-            ),
-          );
-        }
-      } catch (error) {
-        const fallbackMessage = "I couldn't generate changes right now. Please try again.";
-        setAiError(error instanceof Error ? error.message : fallbackMessage);
-        setAiMessages((prev) =>
-          pushAiMessages(prev, {
-            id: `assistant-${Date.now()}`,
-            role: "assistant",
-            content: fallbackMessage,
-          }),
-        );
-      } finally {
-        setIsGeneratingResponse(false);
-      }
     },
     [aiInput, aiMessages, agentReplWebUrl, canvasId, isGeneratingResponse, organizationId],
   );
