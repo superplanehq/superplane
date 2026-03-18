@@ -478,14 +478,20 @@ func (c *Client) UpdateCase(caseID, version string, updates map[string]any) (*Ca
 // ListCasesUpdatedSince returns cases sorted by updatedAt descending, filtered
 // to those updated strictly after the given ISO timestamp. Stops fetching pages
 // once it encounters a case updated before or at the checkpoint.
-func (c *Client) ListCasesUpdatedSince(since string, statuses []string) ([]CaseResponse, error) {
+func (c *Client) ListCasesUpdatedSince(since string, statuses, severities, tags []string) ([]CaseResponse, error) {
 	const perPage = 100
 	var result []CaseResponse
 
-	path := fmt.Sprintf("/api/cases?sortField=updatedAt&sortOrder=desc&perPage=%d", perPage)
+	path := fmt.Sprintf("/api/cases/_find?sortField=updatedAt&sortOrder=desc&perPage=%d", perPage)
 	if len(statuses) == 1 {
 		// Kibana accepts a single status filter via query param
 		path += "&status=" + url.QueryEscape(statuses[0])
+	}
+	if len(severities) == 1 {
+		path += "&severity=" + url.QueryEscape(severities[0])
+	}
+	for _, tag := range tags {
+		path += "&tags[]=" + url.QueryEscape(tag)
 	}
 
 	responseBody, err := c.execKibanaRequest(http.MethodGet, path, nil)

@@ -197,9 +197,12 @@ func (e *Elastic) Sync(ctx core.SyncContext) error {
 func (e *Elastic) HandleRequest(_ core.HTTPRequestContext) {}
 
 const (
-	ResourceTypeIndex       = "elastic.index"
-	ResourceTypeKibanaRule  = "elastic.kibana.rule"
-	ResourceTypeKibanaSpace = "elastic.kibana.space"
+	ResourceTypeIndex        = "elastic.index"
+	ResourceTypeKibanaRule   = "elastic.kibana.rule"
+	ResourceTypeKibanaSpace  = "elastic.kibana.space"
+	ResourceTypeCaseStatus   = "elastic.case.status"
+	ResourceTypeCaseSeverity = "elastic.case.severity"
+	ResourceTypeCaseVersion  = "elastic.case.version"
 )
 
 func (e *Elastic) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -241,6 +244,33 @@ func (e *Elastic) ListResources(resourceType string, ctx core.ListResourcesConte
 			resources = append(resources, core.IntegrationResource{ID: s.ID, Name: s.Name})
 		}
 		return resources, nil
+
+	case ResourceTypeCaseStatus:
+		return []core.IntegrationResource{
+			{ID: "open", Name: "Open"},
+			{ID: "in-progress", Name: "In Progress"},
+			{ID: "closed", Name: "Closed"},
+		}, nil
+
+	case ResourceTypeCaseSeverity:
+		return []core.IntegrationResource{
+			{ID: "critical", Name: "Critical"},
+			{ID: "high", Name: "High"},
+			{ID: "medium", Name: "Medium"},
+			{ID: "low", Name: "Low"},
+		}, nil
+
+	case ResourceTypeCaseVersion:
+		caseID := ctx.Parameters["caseId"]
+		if caseID == "" {
+			return nil, nil
+		}
+		c, err := client.GetCase(caseID)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching case: %v", err)
+		}
+		return []core.IntegrationResource{{ID: c.Version, Name: c.Version}}, nil
+
 	}
 
 	return nil, fmt.Errorf("unsupported resourceType %q", resourceType)

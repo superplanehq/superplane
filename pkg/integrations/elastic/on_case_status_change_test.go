@@ -13,37 +13,56 @@ import (
 )
 
 func Test__OnCaseStatusChange__Setup(t *testing.T) {
-	t.Run("valid config -> initializes metadata and schedules poll", func(t *testing.T) {
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
+		"kibanaUrl": "https://kibana.example.com",
+	}}
+
+	t.Run("new trigger -> initializes LastPollTime, RouteKey, and requests webhook", func(t *testing.T) {
 		meta := &contexts.MetadataContext{}
-		requests := &contexts.RequestContext{}
 		ctx := core.TriggerContext{
 			Configuration: map[string]any{},
 			Metadata:      meta,
-			Requests:      requests,
+			Integration:   integrationCtx,
 		}
 		err := (&OnCaseStatusChange{}).Setup(ctx)
 		require.NoError(t, err)
-		assert.NotNil(t, meta.Metadata)
-		assert.Equal(t, onCaseStatusChangePollAction, requests.Action)
+
+		saved, ok := meta.Metadata.(OnCaseStatusChangeMetadata)
+		require.True(t, ok)
+		assert.NotEmpty(t, saved.LastPollTime)
+		assert.NotEmpty(t, saved.RouteKey)
+		require.Len(t, integrationCtx.WebhookRequests, 1)
 	})
 
-	t.Run("re-save preserves existing checkpoint", func(t *testing.T) {
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-01-01T00:00:00Z"}}
-		requests := &contexts.RequestContext{}
+	t.Run("re-save preserves existing LastPollTime and RouteKey", func(t *testing.T) {
+		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{
+			LastPollTime: "2024-01-01T00:00:00Z",
+			RouteKey:     "existing-route-key",
+		}}
+		integrationCtx2 := &contexts.IntegrationContext{Configuration: map[string]any{
+			"kibanaUrl": "https://kibana.example.com",
+		}}
 		ctx := core.TriggerContext{
 			Configuration: map[string]any{},
 			Metadata:      meta,
-			Requests:      requests,
+			Integration:   integrationCtx2,
 		}
 		err := (&OnCaseStatusChange{}).Setup(ctx)
 		require.NoError(t, err)
+
 		saved, ok := meta.Metadata.(OnCaseStatusChangeMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "2024-01-01T00:00:00Z", saved.LastPollTime)
+		assert.Equal(t, "existing-route-key", saved.RouteKey)
 	})
 }
 
-func Test__OnCaseStatusChange__Poll(t *testing.T) {
+func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
+	trigger := &OnCaseStatusChange{}
+	secret := "test-webhook-secret"
+	routeKey := "test-route-key"
+	webhook := &contexts.NodeWebhookContext{Secret: secret}
+
 	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
 		"url":       "https://elastic.example.com",
 		"kibanaUrl": "https://kibana.example.com",
@@ -78,7 +97,149 @@ func Test__OnCaseStatusChange__Poll(t *testing.T) {
 		]
 	}`
 
-	t.Run("emits event for each updated case", func(t *testing.T) {
+	headersWithSecret := func() http.Header {
+		h := http.Header{}
+		h.Set(SigningHeaderName, secret)
+		return h
+	}
+
+	bodyWithRouteKey := func(routeKeyVal string) []byte {
+		return []byte(`{"eventType":"case_status_changed","routeKey":"` + routeKeyVal + `"}`)
+	}
+
+	metaWithRouteKey := func() *contexts.MetadataContext {
+		return &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{
+			LastPollTime: "2024-06-01T12:00:00.000Z",
+			RouteKey:     routeKey,
+		}}
+	}
+
+	// --- auth ---
+
+	t.Run("secret missing -> 403", func(t *testing.T) {
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          bodyWithRouteKey(routeKey),
+			Headers:       http.Header{},
+			Configuration: map[string]any{},
+			Metadata:      metaWithRouteKey(),
+			Events:        &contexts.EventContext{},
+			Webhook:       webhook,
+			Integration:   integrationCtx,
+		})
+		assert.Equal(t, http.StatusForbidden, code)
+		assert.ErrorContains(t, err, "missing required header")
+	})
+
+	t.Run("secret wrong value -> 403", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set(SigningHeaderName, "wrong-secret")
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          bodyWithRouteKey(routeKey),
+			Headers:       headers,
+			Configuration: map[string]any{},
+			Metadata:      metaWithRouteKey(),
+			Events:        &contexts.EventContext{},
+			Webhook:       webhook,
+			Integration:   integrationCtx,
+		})
+		assert.Equal(t, http.StatusForbidden, code)
+		assert.ErrorContains(t, err, "invalid value for header")
+	})
+
+	t.Run("invalid JSON -> 400", func(t *testing.T) {
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          []byte("not json"),
+			Headers:       headersWithSecret(),
+			Configuration: map[string]any{},
+			Metadata:      metaWithRouteKey(),
+			Events:        &contexts.EventContext{},
+			Webhook:       webhook,
+			Integration:   integrationCtx,
+		})
+		assert.Equal(t, http.StatusBadRequest, code)
+		assert.ErrorContains(t, err, "invalid JSON payload")
+	})
+
+	// --- routing ---
+
+	t.Run("wrong eventType -> silent pass, no events", func(t *testing.T) {
+		eventsCtx := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          []byte(`{"eventType":"alert_fired","routeKey":"` + routeKey + `"}`),
+			Headers:       headersWithSecret(),
+			Configuration: map[string]any{},
+			Metadata:      metaWithRouteKey(),
+			Events:        eventsCtx,
+			Webhook:       webhook,
+			Integration:   integrationCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Empty(t, eventsCtx.Payloads)
+	})
+
+	t.Run("routeKey mismatch -> silent pass, no events", func(t *testing.T) {
+		eventsCtx := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          bodyWithRouteKey("different-route-key"),
+			Headers:       headersWithSecret(),
+			Configuration: map[string]any{},
+			Metadata:      metaWithRouteKey(),
+			Events:        eventsCtx,
+			Webhook:       webhook,
+			Integration:   integrationCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Empty(t, eventsCtx.Payloads)
+	})
+
+	t.Run("empty routeKey in metadata -> silent pass", func(t *testing.T) {
+		eventsCtx := &contexts.EventContext{}
+		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{
+			LastPollTime: "2024-06-01T12:00:00.000Z",
+			RouteKey:     "",
+		}}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          bodyWithRouteKey(routeKey),
+			Headers:       headersWithSecret(),
+			Configuration: map[string]any{},
+			Metadata:      meta,
+			Events:        eventsCtx,
+			Webhook:       webhook,
+			Integration:   integrationCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Empty(t, eventsCtx.Payloads)
+	})
+
+	// --- checkpoint initialization ---
+
+	t.Run("no LastPollTime -> initializes checkpoint, returns 200 with no events", func(t *testing.T) {
+		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{
+			RouteKey: routeKey,
+		}}
+		eventsCtx := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          bodyWithRouteKey(routeKey),
+			Headers:       headersWithSecret(),
+			Configuration: map[string]any{},
+			Metadata:      meta,
+			Events:        eventsCtx,
+			Webhook:       webhook,
+			Integration:   integrationCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Empty(t, eventsCtx.Payloads)
+		saved := meta.Metadata.(OnCaseStatusChangeMetadata)
+		assert.NotEmpty(t, saved.LastPollTime)
+	})
+
+	// --- cases API + event emission ---
+
+	t.Run("valid webhook -> emits event per updated case", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -87,29 +248,81 @@ func Test__OnCaseStatusChange__Poll(t *testing.T) {
 				},
 			},
 		}
-		events := &contexts.EventContext{}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-06-01T12:00:00.000Z"}}
-		requests := &contexts.RequestContext{}
+		eventsCtx := &contexts.EventContext{}
+		meta := metaWithRouteKey()
 
-		_, err := (&OnCaseStatusChange{}).HandleAction(core.TriggerActionContext{
-			Name:          onCaseStatusChangePollAction,
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          bodyWithRouteKey(routeKey),
+			Headers:       headersWithSecret(),
 			Configuration: map[string]any{},
-			HTTP:          httpCtx,
-			Integration:   integrationCtx,
-			Events:        events,
 			Metadata:      meta,
-			Requests:      requests,
+			Events:        eventsCtx,
+			Webhook:       webhook,
+			Integration:   integrationCtx,
+			HTTP:          httpCtx,
 		})
-
 		require.NoError(t, err)
-		assert.Equal(t, 2, events.Count())
-		assert.Equal(t, onCaseStatusChangePollAction, requests.Action)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 2, eventsCtx.Count())
+		assert.Equal(t, "elastic.case.status.changed", eventsCtx.Payloads[0].Type)
+	})
 
+	t.Run("status filter -> only matching cases emitted", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(casesResponse)),
+				},
+			},
+		}
+		eventsCtx := &contexts.EventContext{}
+		meta := metaWithRouteKey()
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          bodyWithRouteKey(routeKey),
+			Headers:       headersWithSecret(),
+			Configuration: map[string]any{"statuses": []string{"closed"}},
+			Metadata:      meta,
+			Events:        eventsCtx,
+			Webhook:       webhook,
+			Integration:   integrationCtx,
+			HTTP:          httpCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 1, eventsCtx.Count())
+		data := eventsCtx.Payloads[0].Data.(map[string]any)
+		assert.Equal(t, "closed", data["status"])
+	})
+
+	t.Run("checkpoint advances to latest updated_at", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(casesResponse)),
+				},
+			},
+		}
+		meta := metaWithRouteKey()
+
+		_, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          bodyWithRouteKey(routeKey),
+			Headers:       headersWithSecret(),
+			Configuration: map[string]any{},
+			Metadata:      meta,
+			Events:        &contexts.EventContext{},
+			Webhook:       webhook,
+			Integration:   integrationCtx,
+			HTTP:          httpCtx,
+		})
+		require.NoError(t, err)
 		saved := meta.Metadata.(OnCaseStatusChangeMetadata)
 		assert.Equal(t, "2024-06-01T12:02:00.000Z", saved.LastPollTime)
 	})
 
-	t.Run("poll uses correct Kibana URL and auth", func(t *testing.T) {
+	t.Run("no cases returned -> checkpoint unchanged", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -118,86 +331,25 @@ func Test__OnCaseStatusChange__Poll(t *testing.T) {
 				},
 			},
 		}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-01-01T00:00:00Z"}}
-		requests := &contexts.RequestContext{}
+		meta := metaWithRouteKey()
+		origCheckpoint := meta.Metadata.(OnCaseStatusChangeMetadata).LastPollTime
 
-		_, err := (&OnCaseStatusChange{}).HandleAction(core.TriggerActionContext{
-			Name:          onCaseStatusChangePollAction,
+		_, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          bodyWithRouteKey(routeKey),
+			Headers:       headersWithSecret(),
 			Configuration: map[string]any{},
-			HTTP:          httpCtx,
-			Integration:   integrationCtx,
+			Metadata:      meta,
 			Events:        &contexts.EventContext{},
-			Metadata:      meta,
-			Requests:      requests,
-		})
-
-		require.NoError(t, err)
-		require.Len(t, httpCtx.Requests, 1)
-		req := httpCtx.Requests[0]
-		assert.Equal(t, http.MethodGet, req.Method)
-		assert.Contains(t, req.URL.String(), "kibana.example.com")
-		assert.Contains(t, req.URL.String(), "/api/cases")
-		assert.Equal(t, "ApiKey test-api-key", req.Header.Get("Authorization"))
-	})
-
-	t.Run("status filter: only matching statuses emitted", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(casesResponse)),
-				},
-			},
-		}
-		events := &contexts.EventContext{}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-06-01T12:00:00.000Z"}}
-		requests := &contexts.RequestContext{}
-
-		_, err := (&OnCaseStatusChange{}).HandleAction(core.TriggerActionContext{
-			Name:          onCaseStatusChangePollAction,
-			Configuration: map[string]any{"statuses": []string{"closed"}},
-			HTTP:          httpCtx,
+			Webhook:       webhook,
 			Integration:   integrationCtx,
-			Events:        events,
-			Metadata:      meta,
-			Requests:      requests,
-		})
-
-		require.NoError(t, err)
-		assert.Equal(t, 1, events.Count())
-		assert.Equal(t, "elastic.case.status.changed", events.Payloads[0].Type)
-		data := events.Payloads[0].Data.(map[string]any)
-		assert.Equal(t, "closed", data["status"])
-	})
-
-	t.Run("no updated cases -> checkpoint unchanged", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"cases":[]}`)),
-				},
-			},
-		}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-06-01T12:00:00Z"}}
-		requests := &contexts.RequestContext{}
-
-		_, err := (&OnCaseStatusChange{}).HandleAction(core.TriggerActionContext{
-			Name:          onCaseStatusChangePollAction,
-			Configuration: map[string]any{},
 			HTTP:          httpCtx,
-			Integration:   integrationCtx,
-			Events:        &contexts.EventContext{},
-			Metadata:      meta,
-			Requests:      requests,
 		})
-
 		require.NoError(t, err)
 		saved := meta.Metadata.(OnCaseStatusChangeMetadata)
-		assert.Equal(t, "2024-06-01T12:00:00Z", saved.LastPollTime)
+		assert.Equal(t, origCheckpoint, saved.LastPollTime)
 	})
 
-	t.Run("Kibana error -> schedules next poll without error", func(t *testing.T) {
+	t.Run("Kibana error -> 200 with no events", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -206,20 +358,49 @@ func Test__OnCaseStatusChange__Poll(t *testing.T) {
 				},
 			},
 		}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-01-01T00:00:00Z"}}
-		requests := &contexts.RequestContext{}
+		eventsCtx := &contexts.EventContext{}
 
-		_, err := (&OnCaseStatusChange{}).HandleAction(core.TriggerActionContext{
-			Name:          onCaseStatusChangePollAction,
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          bodyWithRouteKey(routeKey),
+			Headers:       headersWithSecret(),
 			Configuration: map[string]any{},
-			HTTP:          httpCtx,
+			Metadata:      metaWithRouteKey(),
+			Events:        eventsCtx,
+			Webhook:       webhook,
 			Integration:   integrationCtx,
-			Events:        &contexts.EventContext{},
-			Metadata:      meta,
-			Requests:      requests,
+			HTTP:          httpCtx,
 		})
-
 		require.NoError(t, err)
-		assert.Equal(t, onCaseStatusChangePollAction, requests.Action)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Empty(t, eventsCtx.Payloads)
+	})
+
+	t.Run("webhook uses Kibana URL from integration config", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"cases":[]}`)),
+				},
+			},
+		}
+
+		_, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          bodyWithRouteKey(routeKey),
+			Headers:       headersWithSecret(),
+			Configuration: map[string]any{},
+			Metadata:      metaWithRouteKey(),
+			Events:        &contexts.EventContext{},
+			Webhook:       webhook,
+			Integration:   integrationCtx,
+			HTTP:          httpCtx,
+		})
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 1)
+		req := httpCtx.Requests[0]
+		assert.Equal(t, http.MethodGet, req.Method)
+		assert.Contains(t, req.URL.String(), "kibana.example.com")
+		assert.Contains(t, req.URL.String(), "/api/cases")
+		assert.Equal(t, "ApiKey test-api-key", req.Header.Get("Authorization"))
 	})
 }

@@ -10,6 +10,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="When Alert Fires" href="#when-alert-fires" description="Trigger a workflow when a Kibana alert rule fires" />
+  <LinkCard title="When Case Status Changes" href="#when-case-status-changes" description="React when an Elastic Security case status changes" />
 </CardGrid>
 
 ## Actions
@@ -96,6 +97,80 @@ Each received alert emits the parsed JSON body sent by Kibana directly as the ev
   },
   "timestamp": "2026-03-12T09:00:00Z",
   "type": "elastic.alert"
+}
+```
+
+<a id="when-case-status-changes"></a>
+
+## When Case Status Changes
+
+The When Case Status Changes trigger fires a workflow execution when a Kibana Security case is updated.
+
+### Setup
+
+1. Save this trigger — SuperPlane automatically creates a signed Kibana Webhook connector (shared with the When Alert Fires trigger).
+2. In Kibana, go to **Stack Management → Rules → Create rule**.
+3. Choose a rule type that monitors your cases index, such as **Elasticsearch → ES|QL** or **Elasticsearch → EQL**, and set the query interval to match how quickly you want to detect changes (e.g. every 1 minute).
+
+   Example ES|QL query that detects any case updated in the last run interval:
+
+   ```esql
+   FROM .cases*
+   | WHERE updated_at >= NOW() - 1 MINUTES
+   | LIMIT 1
+   ```
+
+4. Under **Actions**, add the SuperPlane connector and set the action body to:
+
+   ```json
+   {
+     "eventType": "case_status_changed"
+   }
+   ```
+
+5. Save the rule. When the rule fires, SuperPlane queries Kibana for all cases updated since the last run, applies your configured filters, and emits one event per matching case.
+
+### Filtering
+
+All filter fields are optional. Leave them empty to fire for every case update. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
+
+### Webhook Verification
+
+SuperPlane generates a random signing secret and configures the Kibana connector to include it on every request. Requests without the correct secret are rejected automatically.
+
+### Event Data
+
+Each matching case emits an event containing the full case details:
+- `id`: The case ID
+- `title`: The case title
+- `status`: The current case status (`open`, `in-progress`, or `closed`)
+- `severity`: The case severity (`low`, `medium`, `high`, or `critical`)
+- `version`: The case version (required for subsequent Update Case steps)
+- `tags`: The case tags
+- `description`: The case description
+- `createdAt`: The timestamp when the case was created
+- `updatedAt`: The timestamp when the case was last updated
+
+### Example Data
+
+```json
+{
+  "data": {
+    "createdAt": "2026-03-12T09:00:00.000Z",
+    "description": "Elevated error rate detected in production.",
+    "id": "3c0a2b10-4e5f-11ee-be56-0242ac120002",
+    "severity": "high",
+    "status": "in-progress",
+    "tags": [
+      "production",
+      "incident"
+    ],
+    "title": "Production incident",
+    "updatedAt": "2026-03-12T10:15:00.000Z",
+    "version": "WzE3LDFd"
+  },
+  "timestamp": "2026-03-12T10:15:00Z",
+  "type": "elastic.case.status.changed"
 }
 ```
 

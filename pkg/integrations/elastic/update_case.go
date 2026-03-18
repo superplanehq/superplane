@@ -70,9 +70,20 @@ func (c *UpdateCase) Configuration() []configuration.Field {
 		{
 			Name:        "version",
 			Label:       "Version",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The current case version for optimistic locking. Obtain from a preceding Get Case step.",
+			Description: "The current case version for optimistic locking. Select the case above to auto-populate, or use an expression from a preceding Get Case step.",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeCaseVersion,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "caseId",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "caseId"},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "title",
