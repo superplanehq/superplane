@@ -75,7 +75,7 @@ func (s *canvasVersioningEnforcementSteps) setOrganizationVersioningInDB(enabled
 	err := database.Conn().
 		Model(&models.Organization{}).
 		Where("id = ?", s.session.OrgID).
-		Update("canvas_versioning_enabled", enabled).
+		Update("versioning_enabled", enabled).
 		Error
 	require.NoError(s.t, err)
 }
@@ -84,7 +84,7 @@ func (s *canvasVersioningEnforcementSteps) setCanvasVersioningInDB(enabled bool)
 	err := database.Conn().
 		Model(&models.Canvas{}).
 		Where("id = ?", s.canvas.WorkflowID).
-		Update("canvas_versioning_enabled", enabled).
+		Update("versioning_enabled", enabled).
 		Error
 	require.NoError(s.t, err)
 }
@@ -145,12 +145,12 @@ func (s *canvasVersioningEnforcementSteps) assertCanvasVersioningInDB(expected b
 	for {
 		canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
 		require.NoError(s.t, err)
-		if canvas.CanvasVersioningEnabled == expected {
+		if canvas.VersioningEnabled == expected {
 			return
 		}
 
 		if time.Now().After(deadline) {
-			s.t.Fatalf("expected canvas_versioning_enabled=%t, got %t", expected, canvas.CanvasVersioningEnabled)
+			s.t.Fatalf("expected versioning_enabled=%t, got %t", expected, canvas.VersioningEnabled)
 		}
 
 		time.Sleep(200 * time.Millisecond)

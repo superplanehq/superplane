@@ -17,7 +17,7 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	organizationLabel := response.GetOrganizationId()
-	var canvasVersioningEnabled *bool
+	var versioningEnabled *bool
 	if response.HasOrganizationId() && response.GetOrganizationId() != "" {
 		orgResponse, _, err := ctx.API.OrganizationAPI.
 			OrganizationsDescribeOrganization(ctx.Context, response.GetOrganizationId()).
@@ -29,8 +29,8 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 				organizationLabel = *metadata.Name
 			}
 
-			if enabled, ok := metadata.GetCanvasVersioningEnabledOk(); ok {
-				canvasVersioningEnabled = enabled
+			if enabled, ok := metadata.GetVersioningEnabledOk(); ok {
+				versioningEnabled = enabled
 			}
 		}
 	}
@@ -38,8 +38,8 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 	if ctx.Renderer.IsText() {
 		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 			versioningLabel := "unknown"
-			if canvasVersioningEnabled != nil {
-				if *canvasVersioningEnabled {
+			if versioningEnabled != nil {
+				if *versioningEnabled {
 					versioningLabel = "enabled"
 				} else {
 					versioningLabel = "disabled"
@@ -56,11 +56,11 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.Render(map[string]any{
-		"id":                      response.GetId(),
-		"email":                   response.GetEmail(),
-		"organizationId":          response.GetOrganizationId(),
-		"organizationName":        organizationLabel,
-		"canvasVersioningEnabled": canvasVersioningEnabled,
+		"id":                response.GetId(),
+		"email":             response.GetEmail(),
+		"organizationId":    response.GetOrganizationId(),
+		"organizationName":  organizationLabel,
+		"versioningEnabled": versioningEnabled,
 	})
 }
 

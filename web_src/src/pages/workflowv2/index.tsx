@@ -445,7 +445,7 @@ export function WorkflowPageV2() {
     };
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion]);
   const canReadOrg = canAct("org", "read");
-  const isVersioningDisabled = !(liveCanvas?.metadata?.canvasVersioningEnabled ?? false);
+  const isVersioningDisabled = !(liveCanvas?.metadata?.versioningEnabled ?? false);
   const showVersioningUI = !isVersioningDisabled;
   const hasEditableVersion =
     (!!activeCanvasVersionId && !selectedCanvasVersion?.metadata?.isPublished) ||
@@ -459,7 +459,7 @@ export function WorkflowPageV2() {
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
   const { data: agentSettings } = useOrganizationAgentSettings(organizationId || "", !!organizationId && canReadOrg);
   const { data: organization } = useOrganization(organizationId || "", !!organizationId && canReadOrg);
-  const isOrgVersioningEnabled = organization?.metadata?.canvasVersioningEnabled;
+  const isOrgVersioningEnabled = organization?.metadata?.versioningEnabled;
   const canUpdateCanvas = canAct("canvases", "update");
   const updateCanvasMutation = useUpdateCanvas(organizationId || "", canvasId || "");
   const showAiBuilderTab = agentSettings?.agentModeEnabled ?? false;
@@ -4326,7 +4326,7 @@ export function WorkflowPageV2() {
     () => ({
       name: liveCanvas?.metadata?.name || "",
       description: liveCanvas?.metadata?.description || "",
-      canvasVersioningEnabled: liveCanvas?.metadata?.canvasVersioningEnabled ?? false,
+      versioningEnabled: liveCanvas?.metadata?.versioningEnabled ?? false,
       changeRequestApprovalConfig: {
         items: (liveCanvas?.metadata?.changeRequestApprovalConfig?.items || [])
           .map((item) => {
@@ -4352,7 +4352,7 @@ export function WorkflowPageV2() {
       },
     }),
     [
-      liveCanvas?.metadata?.canvasVersioningEnabled,
+      liveCanvas?.metadata?.versioningEnabled,
       liveCanvas?.metadata?.changeRequestApprovalConfig?.items,
       liveCanvas?.metadata?.description,
       liveCanvas?.metadata?.name,
@@ -4409,7 +4409,7 @@ export function WorkflowPageV2() {
     async (values: {
       name: string;
       description: string;
-      canvasVersioningEnabled?: boolean;
+      versioningEnabled?: boolean;
       changeRequestApprovalConfig?: {
         items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
       };
@@ -4421,7 +4421,7 @@ export function WorkflowPageV2() {
       await updateCanvasMutation.mutateAsync({
         name: values.name,
         description: values.description,
-        canvasVersioningEnabled: values.canvasVersioningEnabled,
+        versioningEnabled: values.versioningEnabled,
         changeRequestApprovalConfig: values.changeRequestApprovalConfig,
       });
     },

@@ -669,7 +669,7 @@ type UpdateCanvasRequest struct {
 	Id                          string                             `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name                        *string                            `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
 	Description                 *string                            `protobuf:"bytes,3,opt,name=description,proto3,oneof" json:"description,omitempty"`
-	CanvasVersioningEnabled     *bool                              `protobuf:"varint,4,opt,name=canvas_versioning_enabled,json=canvasVersioningEnabled,proto3,oneof" json:"canvas_versioning_enabled,omitempty"`
+	VersioningEnabled           *bool                              `protobuf:"varint,4,opt,name=versioning_enabled,json=versioningEnabled,proto3,oneof" json:"versioning_enabled,omitempty"`
 	ChangeRequestApprovalConfig *CanvasChangeRequestApprovalConfig `protobuf:"bytes,5,opt,name=change_request_approval_config,json=changeRequestApprovalConfig,proto3,oneof" json:"change_request_approval_config,omitempty"`
 	unknownFields               protoimpl.UnknownFields
 	sizeCache                   protoimpl.SizeCache
@@ -726,9 +726,9 @@ func (x *UpdateCanvasRequest) GetDescription() string {
 	return ""
 }
 
-func (x *UpdateCanvasRequest) GetCanvasVersioningEnabled() bool {
-	if x != nil && x.CanvasVersioningEnabled != nil {
-		return *x.CanvasVersioningEnabled
+func (x *UpdateCanvasRequest) GetVersioningEnabled() bool {
+	if x != nil && x.VersioningEnabled != nil {
+		return *x.VersioningEnabled
 	}
 	return false
 }
@@ -5258,7 +5258,7 @@ type Canvas_Metadata struct {
 	UpdatedAt                   *timestamp.Timestamp               `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	CreatedBy                   *UserRef                           `protobuf:"bytes,7,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	IsTemplate                  bool                               `protobuf:"varint,8,opt,name=is_template,json=isTemplate,proto3" json:"is_template,omitempty"`
-	CanvasVersioningEnabled     bool                               `protobuf:"varint,9,opt,name=canvas_versioning_enabled,json=canvasVersioningEnabled,proto3" json:"canvas_versioning_enabled,omitempty"`
+	VersioningEnabled           bool                               `protobuf:"varint,9,opt,name=versioning_enabled,json=versioningEnabled,proto3" json:"versioning_enabled,omitempty"`
 	ChangeRequestApprovalConfig *CanvasChangeRequestApprovalConfig `protobuf:"bytes,10,opt,name=change_request_approval_config,json=changeRequestApprovalConfig,proto3" json:"change_request_approval_config,omitempty"`
 	unknownFields               protoimpl.UnknownFields
 	sizeCache                   protoimpl.SizeCache
@@ -5350,9 +5350,9 @@ func (x *Canvas_Metadata) GetIsTemplate() bool {
 	return false
 }
 
-func (x *Canvas_Metadata) GetCanvasVersioningEnabled() bool {
+func (x *Canvas_Metadata) GetVersioningEnabled() bool {
 	if x != nil {
-		return x.CanvasVersioningEnabled
+		return x.VersioningEnabled
 	}
 	return false
 }
@@ -5712,16 +5712,16 @@ const file_canvases_proto_rawDesc = "" +
 	"\x15DescribeCanvasRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"M\n" +
 	"\x16DescribeCanvasResponse\x123\n" +
-	"\x06canvas\x18\x01 \x01(\v2\x1b.Superplane.Canvases.CanvasR\x06canvas\"\x83\x03\n" +
+	"\x06canvas\x18\x01 \x01(\v2\x1b.Superplane.Canvases.CanvasR\x06canvas\"\xef\x02\n" +
 	"\x13UpdateCanvasRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12%\n" +
-	"\vdescription\x18\x03 \x01(\tH\x01R\vdescription\x88\x01\x01\x12?\n" +
-	"\x19canvas_versioning_enabled\x18\x04 \x01(\bH\x02R\x17canvasVersioningEnabled\x88\x01\x01\x12\x80\x01\n" +
+	"\vdescription\x18\x03 \x01(\tH\x01R\vdescription\x88\x01\x01\x122\n" +
+	"\x12versioning_enabled\x18\x04 \x01(\bH\x02R\x11versioningEnabled\x88\x01\x01\x12\x80\x01\n" +
 	"\x1echange_request_approval_config\x18\x05 \x01(\v26.Superplane.Canvases.CanvasChangeRequestApprovalConfigH\x03R\x1bchangeRequestApprovalConfig\x88\x01\x01B\a\n" +
 	"\x05_nameB\x0e\n" +
-	"\f_descriptionB\x1c\n" +
-	"\x1a_canvas_versioning_enabledB!\n" +
+	"\f_descriptionB\x15\n" +
+	"\x13_versioning_enabledB!\n" +
 	"\x1f_change_request_approval_config\"K\n" +
 	"\x14UpdateCanvasResponse\x123\n" +
 	"\x06canvas\x18\x01 \x01(\v2\x1b.Superplane.Canvases.CanvasR\x06canvas\"\x92\x01\n" +
@@ -5824,11 +5824,11 @@ const file_canvases_proto_rawDesc = "" +
 	"\x14DeleteCanvasResponse\"-\n" +
 	"\aUserRef\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\xa8\b\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\x9b\b\n" +
 	"\x06Canvas\x12@\n" +
 	"\bmetadata\x18\x01 \x01(\v2$.Superplane.Canvases.Canvas.MetadataR\bmetadata\x124\n" +
 	"\x04spec\x18\x02 \x01(\v2 .Superplane.Canvases.Canvas.SpecR\x04spec\x12:\n" +
-	"\x06status\x18\x03 \x01(\v2\".Superplane.Canvases.Canvas.StatusR\x06status\x1a\x86\x04\n" +
+	"\x06status\x18\x03 \x01(\v2\".Superplane.Canvases.Canvas.StatusR\x06status\x1a\xf9\x03\n" +
 	"\bMetadata\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\x12\x12\n" +
@@ -5841,8 +5841,8 @@ const file_canvases_proto_rawDesc = "" +
 	"\n" +
 	"created_by\x18\a \x01(\v2\x1c.Superplane.Canvases.UserRefR\tcreatedBy\x12\x1f\n" +
 	"\vis_template\x18\b \x01(\bR\n" +
-	"isTemplate\x12:\n" +
-	"\x19canvas_versioning_enabled\x18\t \x01(\bR\x17canvasVersioningEnabled\x12{\n" +
+	"isTemplate\x12-\n" +
+	"\x12versioning_enabled\x18\t \x01(\bR\x11versioningEnabled\x12{\n" +
 	"\x1echange_request_approval_config\x18\n" +
 	" \x01(\v26.Superplane.Canvases.CanvasChangeRequestApprovalConfigR\x1bchangeRequestApprovalConfig\x1al\n" +
 	"\x04Spec\x121\n" +

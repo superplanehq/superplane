@@ -89,7 +89,7 @@ func (s *canvasChangeRequestSteps) setOrganizationVersioningInDB(enabled bool) {
 	err := database.Conn().
 		Model(&models.Organization{}).
 		Where("id = ?", s.session.OrgID).
-		Update("canvas_versioning_enabled", enabled).
+		Update("versioning_enabled", enabled).
 		Error
 	require.NoError(s.t, err)
 }

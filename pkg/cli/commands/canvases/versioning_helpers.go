@@ -24,7 +24,7 @@ func resolveCanvasVersioningContext(ctx core.CommandContext, canvasID string) (*
 	}
 
 	return &canvasVersioningContext{
-		versioningEnabled: canvasResponse.Canvas.Metadata.GetCanvasVersioningEnabled(),
+		versioningEnabled: canvasResponse.Canvas.Metadata.GetVersioningEnabled(),
 	}, nil
 }
 

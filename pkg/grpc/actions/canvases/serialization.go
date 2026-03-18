@@ -47,15 +47,15 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 	if !includeStatus {
 		return &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{
-				Id:                      canvas.ID.String(),
-				OrganizationId:          canvas.OrganizationID.String(),
-				Name:                    canvas.Name,
-				Description:             canvas.Description,
-				CreatedAt:               timestamppb.New(*canvas.CreatedAt),
-				UpdatedAt:               timestamppb.New(*canvas.UpdatedAt),
-				CreatedBy:               createdBy,
-				IsTemplate:              canvas.IsTemplate,
-				CanvasVersioningEnabled: canvasVersioningEnabled,
+				Id:                canvas.ID.String(),
+				OrganizationId:    canvas.OrganizationID.String(),
+				Name:              canvas.Name,
+				Description:       canvas.Description,
+				CreatedAt:         timestamppb.New(*canvas.CreatedAt),
+				UpdatedAt:         timestamppb.New(*canvas.UpdatedAt),
+				CreatedBy:         createdBy,
+				IsTemplate:        canvas.IsTemplate,
+				VersioningEnabled: canvasVersioningEnabled,
 				ChangeRequestApprovalConfig: serializeCanvasChangeRequestApprovalConfig(
 					canvas.EffectiveChangeRequestApprovers(),
 				),
@@ -113,15 +113,15 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 
 	return &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Id:                      canvas.ID.String(),
-			OrganizationId:          canvas.OrganizationID.String(),
-			Name:                    canvas.Name,
-			Description:             canvas.Description,
-			CreatedAt:               timestamppb.New(*canvas.CreatedAt),
-			UpdatedAt:               timestamppb.New(*canvas.UpdatedAt),
-			CreatedBy:               createdBy,
-			IsTemplate:              canvas.IsTemplate,
-			CanvasVersioningEnabled: canvasVersioningEnabled,
+			Id:                canvas.ID.String(),
+			OrganizationId:    canvas.OrganizationID.String(),
+			Name:              canvas.Name,
+			Description:       canvas.Description,
+			CreatedAt:         timestamppb.New(*canvas.CreatedAt),
+			UpdatedAt:         timestamppb.New(*canvas.UpdatedAt),
+			CreatedBy:         createdBy,
+			IsTemplate:        canvas.IsTemplate,
+			VersioningEnabled: canvasVersioningEnabled,
 			ChangeRequestApprovalConfig: serializeCanvasChangeRequestApprovalConfig(
 				canvas.EffectiveChangeRequestApprovers(),
 			),

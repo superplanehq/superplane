@@ -4457,7 +4457,7 @@
         "isTemplate": {
           "type": "boolean"
         },
-        "canvasVersioningEnabled": {
+        "versioningEnabled": {
           "type": "boolean"
         },
         "changeRequestApprovalConfig": {
@@ -5039,7 +5039,7 @@
         "description": {
           "type": "string"
         },
-        "canvasVersioningEnabled": {
+        "versioningEnabled": {
           "type": "boolean"
         },
         "changeRequestApprovalConfig": {
@@ -6239,7 +6239,7 @@
           "type": "string",
           "format": "date-time"
         },
-        "canvasVersioningEnabled": {
+        "versioningEnabled": {
           "type": "boolean"
         }
       }

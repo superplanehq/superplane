@@ -46,9 +46,7 @@ export function General({ organization }: GeneralProps) {
   const [agentApiKey, setAgentApiKey] = useState("");
   const [agentApiKeyError, setAgentApiKeyError] = useState<string | null>(null);
   const [showAgentConfigureModal, setShowAgentConfigureModal] = useState(false);
-  const [canvasVersioningEnabled, setCanvasVersioningEnabled] = useState(
-    organization.metadata?.canvasVersioningEnabled ?? false,
-  );
+  const [versioningEnabled, setVersioningEnabled] = useState(organization.metadata?.versioningEnabled ?? false);
 
   // Use React Query mutation hook
   const updateOrganizationMutation = useUpdateOrganization(organizationId || "");
@@ -61,8 +59,8 @@ export function General({ organization }: GeneralProps) {
   const canDeleteOrg = canAct("org", "delete");
 
   useEffect(() => {
-    setCanvasVersioningEnabled(organization.metadata?.canvasVersioningEnabled ?? false);
-  }, [organization.metadata?.canvasVersioningEnabled]);
+    setVersioningEnabled(organization.metadata?.versioningEnabled ?? false);
+  }, [organization.metadata?.versioningEnabled]);
 
   const agentModeEnabled = agentSettings?.agentModeEnabled ?? false;
   const openAIKey = agentSettings?.openaiKey;
@@ -177,18 +175,18 @@ export function General({ organization }: GeneralProps) {
       return;
     }
 
-    const previous = canvasVersioningEnabled;
-    setCanvasVersioningEnabled(enabled);
+    const previous = versioningEnabled;
+    setVersioningEnabled(enabled);
     setVersioningMessage(null);
 
     try {
       await updateOrganizationMutation.mutateAsync({
-        canvasVersioningEnabled: enabled,
+        versioningEnabled: enabled,
       });
       setVersioningMessage(`Canvas versioning ${enabled ? "enabled" : "disabled"}`);
       setTimeout(() => setVersioningMessage(null), 3000);
     } catch {
-      setCanvasVersioningEnabled(previous);
+      setVersioningEnabled(previous);
       setVersioningMessage("Failed to update canvas versioning");
       setTimeout(() => setVersioningMessage(null), 3000);
     }
@@ -370,10 +368,10 @@ export function General({ organization }: GeneralProps) {
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                {canvasVersioningEnabled ? "Enabled" : "Disabled"}
+                {versioningEnabled ? "Enabled" : "Disabled"}
               </span>
               <Switch
-                checked={canvasVersioningEnabled}
+                checked={versioningEnabled}
                 onCheckedChange={handleCanvasVersioningToggle}
                 disabled={updateOrganizationMutation.isPending || !canUpdateOrg}
                 aria-label="Toggle canvas versioning"

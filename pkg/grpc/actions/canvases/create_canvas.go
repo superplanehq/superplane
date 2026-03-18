@@ -69,16 +69,16 @@ func CreateCanvasWithAutoLayout(
 	liveVersionID := uuid.New()
 
 	canvas := models.Canvas{
-		ID:                      uuid.New(),
-		OrganizationID:          targetOrganizationID,
-		LiveVersionID:           &liveVersionID,
-		IsTemplate:              isTemplate,
-		CanvasVersioningEnabled: canvasVersioningEnabled,
-		Name:                    pbCanvas.Metadata.Name,
-		Description:             pbCanvas.Metadata.Description,
-		CreatedBy:               &createdBy,
-		CreatedAt:               &now,
-		UpdatedAt:               &now,
+		ID:                uuid.New(),
+		OrganizationID:    targetOrganizationID,
+		LiveVersionID:     &liveVersionID,
+		IsTemplate:        isTemplate,
+		VersioningEnabled: canvasVersioningEnabled,
+		Name:              pbCanvas.Metadata.Name,
+		Description:       pbCanvas.Metadata.Description,
+		CreatedBy:         &createdBy,
+		CreatedAt:         &now,
+		UpdatedAt:         &now,
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {

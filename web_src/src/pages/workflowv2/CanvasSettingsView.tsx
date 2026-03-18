@@ -19,7 +19,7 @@ type CanvasSettingsApprover = {
 type CanvasSettingsValues = {
   name: string;
   description: string;
-  canvasVersioningEnabled: boolean;
+  versioningEnabled: boolean;
   changeRequestApprovalConfig?: {
     items?: CanvasSettingsApprover[];
   };
@@ -117,7 +117,7 @@ interface CanvasSettingsViewProps {
   onSave: (values: {
     name: string;
     description: string;
-    canvasVersioningEnabled?: boolean;
+    versioningEnabled?: boolean;
     changeRequestApprovalConfig?: {
       items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
     };
@@ -148,20 +148,20 @@ export function CanvasSettingsView({
 }: CanvasSettingsViewProps) {
   const [name, setName] = useState(initialValues.name);
   const [description, setDescription] = useState(initialValues.description);
-  const [canvasVersioningEnabled, setCanvasVersioningEnabled] = useState(initialValues.canvasVersioningEnabled);
+  const [versioningEnabled, setVersioningEnabled] = useState(initialValues.versioningEnabled);
   const [approvers, setApprovers] = useState<CanvasSettingsApprover[]>(
     normalizeApprovers(initialValues.changeRequestApprovalConfig?.items),
   );
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const isVersioningEnforcedByOrganization = orgVersioningEnabled === true;
-  const effectiveCanvasVersioningEnabled = isVersioningEnforcedByOrganization ? true : canvasVersioningEnabled;
+  const effectiveCanvasVersioningEnabled = isVersioningEnforcedByOrganization ? true : versioningEnabled;
   const isVersioningToggleDisabled = !canUpdateCanvas || isVersioningEnforcedByOrganization;
   const versioningEnforcedTooltip = "Versioning is enabled by your organization settings for all canvases.";
 
   useEffect(() => {
     setName(initialValues.name);
     setDescription(initialValues.description);
-    setCanvasVersioningEnabled(isVersioningEnforcedByOrganization ? true : initialValues.canvasVersioningEnabled);
+    setVersioningEnabled(isVersioningEnforcedByOrganization ? true : initialValues.versioningEnabled);
     setApprovers(normalizeApprovers(initialValues.changeRequestApprovalConfig?.items));
   }, [initialValues, isVersioningEnforcedByOrganization]);
 
@@ -174,19 +174,19 @@ export function CanvasSettingsView({
     return (
       name !== initialValues.name ||
       description !== initialValues.description ||
-      effectiveCanvasVersioningEnabled !== initialValues.canvasVersioningEnabled ||
+      effectiveCanvasVersioningEnabled !== initialValues.versioningEnabled ||
       JSON.stringify(approvers) !== JSON.stringify(normalizedInitialApprovers)
     );
   }, [
-    canvasVersioningEnabled,
     description,
-    initialValues.canvasVersioningEnabled,
+    initialValues.versioningEnabled,
     initialValues.description,
     initialValues.name,
     isVersioningEnforcedByOrganization,
     name,
     approvers,
     normalizedInitialApprovers,
+    versioningEnabled,
   ]);
   const approverValidation = useMemo(() => {
     if (!effectiveCanvasVersioningEnabled) {
@@ -215,7 +215,7 @@ export function CanvasSettingsView({
       await onSave({
         name,
         description,
-        canvasVersioningEnabled: isVersioningEnforcedByOrganization ? undefined : canvasVersioningEnabled,
+        versioningEnabled: isVersioningEnforcedByOrganization ? undefined : versioningEnabled,
         changeRequestApprovalConfig: effectiveCanvasVersioningEnabled
           ? {
               items: normalizeApprovers(approvers),
@@ -290,11 +290,11 @@ export function CanvasSettingsView({
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-gray-500">
-            {isVersioningEnforcedByOrganization ? "Enabled" : canvasVersioningEnabled ? "Enabled" : "Disabled"}
+            {isVersioningEnforcedByOrganization ? "Enabled" : versioningEnabled ? "Enabled" : "Disabled"}
           </span>
           <Switch
-            checked={isVersioningEnforcedByOrganization ? true : canvasVersioningEnabled}
-            onCheckedChange={setCanvasVersioningEnabled}
+            checked={isVersioningEnforcedByOrganization ? true : versioningEnabled}
+            onCheckedChange={setVersioningEnabled}
             disabled={isVersioningToggleDisabled}
             aria-label="Toggle canvas versioning"
           />
