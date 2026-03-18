@@ -258,19 +258,3 @@ type RequiredCondition struct {
 	Field  string   `json:"field"`
 	Values []string `json:"values"`
 }
-
-const (
-	ValidationRuleLessThan    = "less-than"
-	ValidationRuleGreaterThan = "greater-than"
-	ValidationRuleEqual       = "equal"
-	ValidationRuleNotEqual    = "not-equal"
-	ValidationRuleMaxLength   = "max-length"
-	ValidationRuleMinLength   = "min-length"
-)
-
-type ValidationRule struct {
-	Type        string `json:"type"`        // less-than, greater-than, equal, not-equal, max-length, min-length
-	CompareWith string `json:"compareWith"` // field name to compare with (for field comparisons)
-	Value       any    `json:"value"`       // static value to compare with (for direct validation)
-	Message     string `json:"message"`     // custom error message
-}
