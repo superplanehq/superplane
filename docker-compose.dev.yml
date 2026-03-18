@@ -117,7 +117,7 @@ services:
     tty: true
     stdin_open: true
     volumes:
-      - agent:/app
+      - ./agent:/app
       - uv-cache:/root/.cache/uv
     healthcheck:
       test: ["CMD", "bash", "-lc", "uv --version >/dev/null && python --version >/dev/null"]
@@ -179,4 +179,7 @@ volumes:
     driver: local
 
   postgres-data:
+    driver: local
+
+  uv-cache:
     driver: local
