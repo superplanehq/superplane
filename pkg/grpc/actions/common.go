@@ -279,15 +279,14 @@ func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 
 func ConfigurationFieldToProto(field configuration.Field) *configpb.Field {
 	pbField := &configpb.Field{
-		Name:               field.Name,
-		Label:              field.Label,
-		Type:               field.Type,
-		Description:        field.Description,
-		Required:           field.Required,
-		Sensitive:          &field.Sensitive,
-		Togglable:          &field.Togglable,
-		DisallowExpression: &field.DisallowExpression,
-		TypeOptions:        typeOptionsToProto(field.TypeOptions),
+		Name:        field.Name,
+		Label:       field.Label,
+		Type:        field.Type,
+		Description: field.Description,
+		Required:    field.Required,
+		Sensitive:   &field.Sensitive,
+		Togglable:   &field.Togglable,
+		TypeOptions: typeOptionsToProto(field.TypeOptions),
 	}
 
 	if field.Default != nil {
@@ -314,19 +313,6 @@ func ConfigurationFieldToProto(field configuration.Field) *configpb.Field {
 			pbField.RequiredConditions[i] = &configpb.RequiredCondition{
 				Field:  cond.Field,
 				Values: cond.Values,
-			}
-		}
-	}
-
-	if len(field.ValidationRules) > 0 {
-		pbField.ValidationRules = make([]*configpb.ValidationRule, len(field.ValidationRules))
-		for i, rule := range field.ValidationRules {
-			pbField.ValidationRules[i] = &configpb.ValidationRule{
-				Type:        rule.Type,
-				CompareWith: rule.CompareWith,
-			}
-			if rule.Message != "" {
-				pbField.ValidationRules[i].Message = &rule.Message
 			}
 		}
 	}
@@ -636,10 +622,6 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 		field.Placeholder = *pbField.Placeholder
 	}
 
-	if pbField.DisallowExpression != nil {
-		field.DisallowExpression = *pbField.DisallowExpression
-	}
-
 	if pbField.Sensitive != nil {
 		field.Sensitive = *pbField.Sensitive
 	}
@@ -664,19 +646,6 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 			field.RequiredConditions[i] = configuration.RequiredCondition{
 				Field:  pbCond.Field,
 				Values: pbCond.Values,
-			}
-		}
-	}
-
-	if len(pbField.ValidationRules) > 0 {
-		field.ValidationRules = make([]configuration.ValidationRule, len(pbField.ValidationRules))
-		for i, pbRule := range pbField.ValidationRules {
-			field.ValidationRules[i] = configuration.ValidationRule{
-				Type:        pbRule.Type,
-				CompareWith: pbRule.CompareWith,
-			}
-			if pbRule.Message != nil {
-				field.ValidationRules[i].Message = *pbRule.Message
 			}
 		}
 	}

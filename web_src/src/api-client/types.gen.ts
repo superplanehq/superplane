@@ -571,11 +571,9 @@ export type ConfigurationField = {
   visibilityConditions?: Array<ConfigurationVisibilityCondition>;
   typeOptions?: ConfigurationTypeOptions;
   requiredConditions?: Array<ConfigurationRequiredCondition>;
-  validationRules?: Array<ConfigurationValidationRule>;
   placeholder?: string;
   sensitive?: boolean;
   togglable?: boolean;
-  disallowExpression?: boolean;
 };
 
 export type ConfigurationListItemDefinition = {
@@ -661,12 +659,6 @@ export type ConfigurationTypeOptions = {
   string?: ConfigurationStringTypeOptions;
   expression?: ConfigurationExpressionTypeOptions;
   text?: ConfigurationTextTypeOptions;
-};
-
-export type ConfigurationValidationRule = {
-  type?: string;
-  compareWith?: string;
-  message?: string;
 };
 
 export type ConfigurationVisibilityCondition = {

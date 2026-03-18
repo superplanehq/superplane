@@ -29,11 +29,9 @@ type ConfigurationField struct {
 	VisibilityConditions []ConfigurationVisibilityCondition `json:"visibilityConditions,omitempty"`
 	TypeOptions          *ConfigurationTypeOptions          `json:"typeOptions,omitempty"`
 	RequiredConditions   []ConfigurationRequiredCondition   `json:"requiredConditions,omitempty"`
-	ValidationRules      []ConfigurationValidationRule      `json:"validationRules,omitempty"`
 	Placeholder          *string                            `json:"placeholder,omitempty"`
 	Sensitive            *bool                              `json:"sensitive,omitempty"`
 	Togglable            *bool                              `json:"togglable,omitempty"`
-	DisallowExpression   *bool                              `json:"disallowExpression,omitempty"`
 }
 
 // NewConfigurationField instantiates a new ConfigurationField object
@@ -341,38 +339,6 @@ func (o *ConfigurationField) SetRequiredConditions(v []ConfigurationRequiredCond
 	o.RequiredConditions = v
 }
 
-// GetValidationRules returns the ValidationRules field value if set, zero value otherwise.
-func (o *ConfigurationField) GetValidationRules() []ConfigurationValidationRule {
-	if o == nil || IsNil(o.ValidationRules) {
-		var ret []ConfigurationValidationRule
-		return ret
-	}
-	return o.ValidationRules
-}
-
-// GetValidationRulesOk returns a tuple with the ValidationRules field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ConfigurationField) GetValidationRulesOk() ([]ConfigurationValidationRule, bool) {
-	if o == nil || IsNil(o.ValidationRules) {
-		return nil, false
-	}
-	return o.ValidationRules, true
-}
-
-// HasValidationRules returns a boolean if a field has been set.
-func (o *ConfigurationField) HasValidationRules() bool {
-	if o != nil && !IsNil(o.ValidationRules) {
-		return true
-	}
-
-	return false
-}
-
-// SetValidationRules gets a reference to the given []ConfigurationValidationRule and assigns it to the ValidationRules field.
-func (o *ConfigurationField) SetValidationRules(v []ConfigurationValidationRule) {
-	o.ValidationRules = v
-}
-
 // GetPlaceholder returns the Placeholder field value if set, zero value otherwise.
 func (o *ConfigurationField) GetPlaceholder() string {
 	if o == nil || IsNil(o.Placeholder) {
@@ -469,38 +435,6 @@ func (o *ConfigurationField) SetTogglable(v bool) {
 	o.Togglable = &v
 }
 
-// GetDisallowExpression returns the DisallowExpression field value if set, zero value otherwise.
-func (o *ConfigurationField) GetDisallowExpression() bool {
-	if o == nil || IsNil(o.DisallowExpression) {
-		var ret bool
-		return ret
-	}
-	return *o.DisallowExpression
-}
-
-// GetDisallowExpressionOk returns a tuple with the DisallowExpression field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ConfigurationField) GetDisallowExpressionOk() (*bool, bool) {
-	if o == nil || IsNil(o.DisallowExpression) {
-		return nil, false
-	}
-	return o.DisallowExpression, true
-}
-
-// HasDisallowExpression returns a boolean if a field has been set.
-func (o *ConfigurationField) HasDisallowExpression() bool {
-	if o != nil && !IsNil(o.DisallowExpression) {
-		return true
-	}
-
-	return false
-}
-
-// SetDisallowExpression gets a reference to the given bool and assigns it to the DisallowExpression field.
-func (o *ConfigurationField) SetDisallowExpression(v bool) {
-	o.DisallowExpression = &v
-}
-
 func (o ConfigurationField) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -538,9 +472,6 @@ func (o ConfigurationField) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.RequiredConditions) {
 		toSerialize["requiredConditions"] = o.RequiredConditions
 	}
-	if !IsNil(o.ValidationRules) {
-		toSerialize["validationRules"] = o.ValidationRules
-	}
 	if !IsNil(o.Placeholder) {
 		toSerialize["placeholder"] = o.Placeholder
 	}
@@ -549,9 +480,6 @@ func (o ConfigurationField) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Togglable) {
 		toSerialize["togglable"] = o.Togglable
-	}
-	if !IsNil(o.DisallowExpression) {
-		toSerialize["disallowExpression"] = o.DisallowExpression
 	}
 	return toSerialize, nil
 }
