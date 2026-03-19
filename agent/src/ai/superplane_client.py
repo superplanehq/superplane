@@ -1,7 +1,19 @@
 import os
+import warnings
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode
+
+# Suppress a known pydantic warning emitted by generated OpenAPI models.
+# Keep this narrow to avoid hiding unrelated warnings.
+warnings.filterwarnings(
+    "ignore",
+    message=(
+        r'Field name "validate" in "OrganizationsSetAgentOpenAIKeyBody" '
+        r'shadows an attribute in parent "BaseModel"'
+    ),
+    category=UserWarning,
+)
 
 from ai.models import (
     CanvasEdge,

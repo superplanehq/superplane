@@ -12,6 +12,7 @@ from ai.superplane_client import SuperplaneClient
 @dataclass
 class AgentDeps:
     client: SuperplaneClient
+    canvas_id: str
     canvas_cache: dict[str, CanvasSummary] = field(default_factory=dict)
 
 
@@ -41,14 +42,15 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
     )
 
     @agent.tool
-    def get_canvas(ctx: RunContext[AgentDeps], canvas_id: str) -> CanvasSummary:
-        """Fetch a canvas summary (nodes/edges) by canvas ID."""
-        cached_summary = ctx.deps.canvas_cache.get(canvas_id)
+    def get_canvas(ctx: RunContext[AgentDeps]) -> CanvasSummary:
+        """Fetch the current request canvas summary (nodes/edges)."""
+        resolved_canvas_id = ctx.deps.canvas_id
+        cached_summary = ctx.deps.canvas_cache.get(resolved_canvas_id)
         if cached_summary is not None:
             return cached_summary
 
-        summary = ctx.deps.client.describe_canvas(canvas_id)
-        ctx.deps.canvas_cache[canvas_id] = summary
+        summary = ctx.deps.client.describe_canvas(resolved_canvas_id)
+        ctx.deps.canvas_cache[resolved_canvas_id] = summary
         return summary
 
     @agent.tool
