@@ -159,7 +159,7 @@ export function SettingsTab({
 
         // Check validation rules (cross-field validation)
         if (value !== undefined && value !== null && value !== "") {
-          const validationErrors = validateFieldForSubmission(field, value, values);
+          const validationErrors = validateFieldForSubmission(field, value);
 
           if (validationErrors.length > 0) {
             // Add validation rule errors to the error set

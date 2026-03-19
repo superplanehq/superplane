@@ -138,7 +138,7 @@ export const ConfigurationFieldRenderer = ({
     // Only run this validation if real-time validation is disabled
     if (!field.name || !validationErrors || enableRealtimeValidation) return [];
 
-    const errors = validateFieldForSubmission(field, value, allValues);
+    const errors = validateFieldForSubmission(field, value);
     return errors.map((error) => ({
       field: field.name!,
       message: error,

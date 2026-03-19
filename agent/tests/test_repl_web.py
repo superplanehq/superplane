@@ -3,7 +3,7 @@ import socket
 import pytest
 
 from ai.models import CanvasQuestionRequest
-from ai.repl_web import ReplWebServer, ReplWebServerConfig
+from ai.repl_web import WebServer, WebServerConfig
 from repl.main import _parse_stream_event, _stream_repl_answer
 
 
@@ -22,7 +22,7 @@ def test_stream_repl_answer_reads_sse_response_end_to_end(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     port = _next_free_port()
-    server = ReplWebServer(ReplWebServerConfig(host="127.0.0.1", port=port))
+    server = WebServer(WebServerConfig(host="127.0.0.1", port=port))
     server.start()
 
     payload = CanvasQuestionRequest(question="hello from repl")

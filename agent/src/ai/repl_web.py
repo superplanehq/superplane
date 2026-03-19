@@ -31,7 +31,7 @@ from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 
 
 @dataclass(frozen=True)
-class ReplWebServerConfig:
+class WebServerConfig:
     host: str = "127.0.0.1"
     port: int = 8090
 
@@ -322,7 +322,7 @@ def _create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    @app.post("/v1/repl/stream")
+    @app.post("/v1/agent/chat/stream")
     async def stream_repl(payload: ReplStreamRequest, request: Request) -> StreamingResponse:
         _debug_log(
             "incoming stream request",
@@ -362,8 +362,8 @@ def _create_app() -> FastAPI:
     return app
 
 
-class ReplWebServer:
-    def __init__(self, config: ReplWebServerConfig) -> None:
+class WebServer:
+    def __init__(self, config: WebServerConfig) -> None:
         self._config = config
         self._app = _create_app()
         self._uvicorn_config = uvicorn.Config(

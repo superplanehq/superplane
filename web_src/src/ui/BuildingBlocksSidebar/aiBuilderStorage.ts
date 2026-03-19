@@ -2,8 +2,10 @@ const AI_BUILDER_STORAGE_KEY_PREFIX = "sp:canvas-ai-builder";
 
 export type PersistedAiBuilderMessage = {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "tool";
   content: string;
+  toolCallId?: string;
+  toolStatus?: "running" | "completed";
 };
 
 export type PersistedAiBuilderProposal<TOperation> = {
@@ -49,8 +51,12 @@ export function loadAiBuilderState<TOperation>(canvasId?: string): PersistedAiBu
           (message): message is PersistedAiBuilderMessage =>
             !!message &&
             typeof message.id === "string" &&
-            (message.role === "user" || message.role === "assistant") &&
-            typeof message.content === "string",
+            (message.role === "user" || message.role === "assistant" || message.role === "tool") &&
+            typeof message.content === "string" &&
+            (message.toolCallId === undefined || typeof message.toolCallId === "string") &&
+            (message.toolStatus === undefined ||
+              message.toolStatus === "running" ||
+              message.toolStatus === "completed"),
         )
       : [];
     const pendingProposal =
