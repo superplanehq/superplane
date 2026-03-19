@@ -41,6 +41,10 @@ Enterprise customers standardize on Okta for workforce identity. Without Okta:
    assignments end.
 5. **Admin UX**: Clear setup documentation and in-app (or admin-console) steps: redirect URIs,
    scopes, SCIM endpoint URL, and SCIM bearer token rotation.
+6. **Managed workforce users**: Identities introduced through **SCIM** (and thus Okta) are
+   **marked as managed accounts** and stay inside their employer’s SuperPlane organization — they
+   **must not** create new organizations or use self-serve “start your own org” flows (see
+   **Decisions**).
 
 ## Non-Goals (Initial Release)
 
@@ -111,6 +115,12 @@ unless we explicitly document a deviation:
 6. As an IT admin, when I unassign or deactivate a user in Okta, SuperPlane reflects deactivation
    (cannot sign in; existing sessions invalidated or expired per policy).
 
+### Governance
+
+7. As a security stakeholder, **managed** (SCIM-provisioned) accounts **cannot** create
+   additional SuperPlane organizations; only **unmanaged** self-serve accounts retain that
+   ability (until policy changes).
+
 ## Architecture (High Level)
 
 ### OIDC (Login)
@@ -149,6 +159,24 @@ unless we explicitly document a deviation:
 **Note:** SCIM is not part of the linked OIDC guide but is the standard way Okta provisions
 users into SaaS apps and is in scope for this PRD.
 
+### Identity: do workforce users need `accounts`?
+
+**For v1, yes.** SuperPlane’s browser session is **account-centric** today: the **`account_token`**
+cookie carries a JWT whose **`sub` is `accounts.id`**, and `authenticateUserByCookie` loads the
+**`accounts`** row, then resolves the active **`users`** row for the current org using **account
+email** plus **`x-organization-id`** (see `pkg/public/middleware/auth.go`). **`account_providers`**
+(including Okta) also hangs off **`accounts`**. **`managed_account`** (see **Database**) marks
+directory-provisioned identities on **`accounts`**.
+
+Conceptually a directory-only person might be “just an org member,” but **dropping `accounts`**
+would mean redesigning session issuance, middleware resolution, provider linkage, and several HTTP
+entry points — a **large auth project**, not an Okta add-on. **SCIM therefore keeps creating
+`accounts` + `users`** (thin global identity + org membership), same as the invitation path.
+
+**Future (non-commitment):** a **`(organization_id, user_id)`**-scoped session and provider rows
+keyed off **`users`** could reduce global state; track as follow-up if product wants true
+org-local identities without a shared account.
+
 ## Database schema
 
 Use `make db.migration.create NAME=<name>` for all DDL (see `AGENTS.md`); this section is the
@@ -176,7 +204,7 @@ token if you ever need “show once” UX (prefer hash-only if rotation is easy)
 
 ### `users`
 
-- **No schema changes** for Okta or SCIM — keep the existing `users` / `accounts` model stable.
+- **No schema changes** on **`users`** for Okta or SCIM.
 
 SCIM **User create** still follows the same pattern as an accepted invitation: create
 **`accounts`** + **`users`** with a real **`account_id`**, then first Okta login adds
@@ -197,9 +225,20 @@ in API responses remains **`users.id`**. If product later decides `externalId` i
 this table can stay minimal or merge into another artifact — but **do not** add columns to
 **`users`** for that purpose.
 
-### `accounts`
+### `accounts` (extend)
 
-No schema change required for v1; SCIM supplies `userName` / email / name to populate new rows.
+- **`managed_account`** (`boolean`, **NOT NULL**, default **`false`**) — set **`true`** when the
+  **account row is created by SCIM** (workforce / directory-managed identity). These accounts
+  **cannot** create new SuperPlane organizations: enforce in **`createOrganization`**
+  (`pkg/public/server.go` today: any logged-in account can create an org) and in the **web UI**
+  (hide or disable “Create organization”). **Break-glass** (support clearing the flag) is
+  optional unless ops asks for it.
+
+Self-serve accounts (GitHub/Google signup, password signup where allowed) stay **unmanaged**
+  (**`managed_account = false`**).
+
+**Today (without this work)**: any authenticated account can create a new organization; directory
+users would inherit that unless we add this guard.
 
 ### `account_providers` (behavior + constants)
 
@@ -237,12 +276,13 @@ table, treat it as ephemeral with periodic cleanup — document in detailed desi
 - **`pkg/authentication`**: Okta-specific OIDC flow alongside existing Goth providers (see
   **Technologies** — prefer `go-oidc` + `x/oauth2`, not Goth, for per-org issuers).
 - **`pkg/public/server.go`**: Wire org-based Okta config (one per org); callback routes may need
-  org id in path or state.
-- **`pkg/models`**: `organization_okta_idp`; `organization_scim_user_mappings`; provider
-  constants.
+  org id in path or state. **Reject organization creation** when **`accounts.managed_account`** is
+  **true** (repeat on any future org-creation API).
+- **`pkg/models`**: `organization_okta_idp`; `organization_scim_user_mappings`; **`accounts`**
+  `managed_account`; provider constants.
 - **`organizations.allowed_providers`**: Include an `okta` (or OIDC-generic) entry when enabled.
-- **`web_src`**: Login UI: Okta button when org or instance supports it; admin settings for SSO
-  + SCIM.
+- **`web_src`**: Okta login entry; SSO/SCIM settings; org-switcher / create-org UX respects
+  **`managed_account`** (no self-serve new org when **true**).
 - **Authorization / security docs**: Document token validation, secret encryption, and SCIM auth.
 
 ## Technologies
@@ -312,8 +352,9 @@ require a deliberate dependency add.
 
 ### Web UI
 
-- **Vite + React** (`web_src/`) — Okta sign-in entry when the org allows it; settings for SSO/SCIM
-  setup. Regenerate OpenAPI/TS client after proto changes (`make` targets in `AGENTS.md`).
+- **Vite + React** (`web_src/`) — Okta sign-in when the org allows it; SSO/SCIM admin settings;
+  **hide or disable “Create organization”** for **managed** accounts. Regenerate OpenAPI/TS
+  client after proto changes (`make` targets in `AGENTS.md`).
 
 ### Observability and quality
 
@@ -335,6 +376,8 @@ require a deliberate dependency add.
 - **Email trust**: Do not treat `email_verified` as sole proof of ownership where policy
   requires; Okta documents limitations for some claims in the same OIDC SSO guide linked in
   Overview.
+- **Managed accounts**: **`managed_account = true`** blocks self-serve org creation; enforce
+  **server-side** so UI-only hiding is not the sole control.
 
 ## Implementation Phases (Suggested)
 
@@ -362,6 +405,12 @@ require a deliberate dependency add.
 5. **Access token**: **Simplify** — SuperPlane does not call Okta APIs with the user’s access
    token in v1; **validate the ID token only** and do not introspect or verify the access token
    unless a later requirement appears.
+6. **Managed workforce accounts**: Accounts **created via SCIM** are marked **`managed_account`**
+   (**`true`**). They cannot create new organizations; IT keeps them inside the provisioned org.
+   Self-serve sign-ups remain **unmanaged** (**`managed_account = false`** default).
+7. **Keep `accounts` for SCIM users (v1)**: Required to fit existing cookie auth and
+   **`account_providers`**; org-only identity without accounts is **out of scope** (see
+   **Architecture → Identity**).
 
 ## Success Metrics
 
@@ -369,6 +418,8 @@ require a deliberate dependency add.
 - Okta **Run Profile** / provisioning tests pass for create, update, deactivate (or equivalent
   manual QA checklist).
 - No cross-tenant credential leakage in multi-org staging tests.
+- **Managed** (SCIM-created) accounts receive **403** (or equivalent) from org-creation APIs and
+  never see a working “new org” path in the UI.
 
 ## References
 
