@@ -33,6 +33,7 @@ import (
 	nooptrace "go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
+	directoryscim "github.com/superplanehq/superplane/pkg/directory/scim"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
@@ -386,6 +387,8 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	// Register authentication routes (no auth required)
 	s.authHandler.RegisterRoutes(r)
 
+	directoryscim.RegisterRoutes(r, s.authService)
+
 	//
 	// Public routes (no authentication required)
 	//
@@ -626,10 +629,11 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 }
 
 type AccountResponse struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Email     string `json:"email"`
-	AvatarURL string `json:"avatar_url"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Email          string `json:"email"`
+	AvatarURL      string `json:"avatar_url"`
+	ManagedAccount bool   `json:"managed_account"`
 }
 
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
@@ -647,10 +651,11 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accountResponse := AccountResponse{
-		ID:        account.ID.String(),
-		Name:      account.Name,
-		Email:     account.Email,
-		AvatarURL: getAvatarURL(providers),
+		ID:             account.ID.String(),
+		Name:           account.Name,
+		Email:          account.Email,
+		AvatarURL:      getAvatarURL(providers),
+		ManagedAccount: account.ManagedAccount,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

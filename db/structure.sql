@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -80,7 +80,8 @@ CREATE TABLE public.accounts (
     email character varying(255) NOT NULL,
     name character varying(255) NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    managed_account boolean DEFAULT false NOT NULL
 );
 
 
@@ -191,7 +192,7 @@ CREATE TABLE public.canvas_memories (
 
 CREATE TABLE public.casbin_rule (
     id integer NOT NULL,
-    ptype character varying(100) NOT NULL,
+    ptype character varying(100),
     v0 character varying(100),
     v1 character varying(100),
     v2 character varying(100),
@@ -327,6 +328,38 @@ CREATE TABLE public.organization_invite_links (
     enabled boolean DEFAULT true NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: organization_okta_idp; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_okta_idp (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    issuer_base_url character varying(512) NOT NULL,
+    oauth_client_id character varying(512) NOT NULL,
+    oauth_client_secret_ciphertext bytea,
+    oidc_enabled boolean DEFAULT false NOT NULL,
+    scim_bearer_token_hash character varying(64),
+    scim_enabled boolean DEFAULT false NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: organization_scim_user_mappings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_scim_user_mappings (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    external_id text,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 
@@ -856,6 +889,38 @@ ALTER TABLE ONLY public.organization_invite_links
 
 
 --
+-- Name: organization_okta_idp organization_okta_idp_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_okta_idp
+    ADD CONSTRAINT organization_okta_idp_organization_id_key UNIQUE (organization_id);
+
+
+--
+-- Name: organization_okta_idp organization_okta_idp_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_okta_idp
+    ADD CONSTRAINT organization_okta_idp_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_scim_user_mappings organization_scim_user_mappings_organization_id_user_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_scim_user_mappings
+    ADD CONSTRAINT organization_scim_user_mappings_organization_id_user_id_key UNIQUE (organization_id, user_id);
+
+
+--
+-- Name: organization_scim_user_mappings organization_scim_user_mappings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_scim_user_mappings
+    ADD CONSTRAINT organization_scim_user_mappings_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organizations organizations_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1153,6 +1218,13 @@ CREATE INDEX idx_canvas_memories_canvas_namespace ON public.canvas_memories USIN
 
 
 --
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
+
+
+--
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1199,6 +1271,27 @@ CREATE INDEX idx_node_requests_state_run_at ON public.workflow_node_requests USI
 --
 
 CREATE INDEX idx_organization_agent_settings_organization_id ON public.organization_agent_settings USING btree (organization_id);
+
+
+--
+-- Name: idx_organization_okta_idp_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_okta_idp_organization_id ON public.organization_okta_idp USING btree (organization_id);
+
+
+--
+-- Name: idx_organization_scim_user_mappings_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_scim_user_mappings_organization_id ON public.organization_scim_user_mappings USING btree (organization_id);
+
+
+--
+-- Name: idx_organization_scim_user_mappings_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_scim_user_mappings_user_id ON public.organization_scim_user_mappings USING btree (user_id);
 
 
 --
@@ -1454,6 +1547,13 @@ CREATE INDEX idx_workflows_organization_id ON public.workflows USING btree (orga
 
 
 --
+-- Name: organization_scim_user_mappings_org_external_id_uidx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX organization_scim_user_mappings_org_external_id_uidx ON public.organization_scim_user_mappings USING btree (organization_id, external_id) WHERE (external_id IS NOT NULL);
+
+
+--
 -- Name: unique_human_user_in_organization; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1633,6 +1733,30 @@ ALTER TABLE ONLY public.organization_invitations
 
 ALTER TABLE ONLY public.organization_invite_links
     ADD CONSTRAINT organization_invite_links_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_okta_idp organization_okta_idp_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_okta_idp
+    ADD CONSTRAINT organization_okta_idp_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_scim_user_mappings organization_scim_user_mappings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_scim_user_mappings
+    ADD CONSTRAINT organization_scim_user_mappings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_scim_user_mappings organization_scim_user_mappings_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_scim_user_mappings
+    ADD CONSTRAINT organization_scim_user_mappings_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --
@@ -1920,7 +2044,7 @@ ALTER TABLE ONLY public.workflows
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1939,7 +2063,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260318013637	f
+20260319221953	f
 \.
 
 
@@ -1956,7 +2080,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;

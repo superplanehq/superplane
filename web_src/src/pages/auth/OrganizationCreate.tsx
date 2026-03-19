@@ -1,12 +1,31 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Text } from "../../components/Text/text";
 import { LoadingButton } from "@/components/ui/loading-button";
 
 const OrganizationCreate: React.FC = () => {
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const res = await fetch("/account", { credentials: "include" });
+        if (!res.ok) {
+          return;
+        }
+        const data = (await res.json()) as { managed_account?: boolean };
+        if (data.managed_account) {
+          navigate("/", { replace: true });
+        }
+      } catch {
+        // ignore
+      }
+    };
+    void run();
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,15 +49,18 @@ const OrganizationCreate: React.FC = () => {
         // Redirect to the new organization
         window.location.href = `/${org.id}`;
       } else {
-        try {
-          const errorData = await response.json();
-          setError(errorData.message || "Failed to create organization");
-        } catch {
-          // If we can't parse the error response, show a generic message based on status
-          if (response.status === 409) {
-            setError("An organization with this name already exists");
-          } else {
-            setError(`Failed to create organization (${response.status})`);
+        if (response.status === 403) {
+          setError("This account cannot create organizations. Contact your administrator.");
+        } else {
+          try {
+            const errorData = await response.json();
+            setError(errorData.message || "Failed to create organization");
+          } catch {
+            if (response.status === 409) {
+              setError("An organization with this name already exists");
+            } else {
+              setError(`Failed to create organization (${response.status})`);
+            }
           }
         }
       }

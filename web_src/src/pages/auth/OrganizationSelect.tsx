@@ -107,7 +107,13 @@ const OrganizationSelect: React.FC = () => {
           {organizations.length === 0 && (
             <div className="text-left py-2 mb-4">
               <Text className="font-medium text-gray-800">You're not a member of any organizations yet.</Text>
-              <Text className="font-medium text-gray-800">Create a new organization to get started!</Text>
+              {account?.managed_account ? (
+                <Text className="font-medium text-gray-800">
+                  Ask your administrator to assign you to an organization in SuperPlane.
+                </Text>
+              ) : (
+                <Text className="font-medium text-gray-800">Create a new organization to get started!</Text>
+              )}
             </div>
           )}
 
@@ -140,17 +146,19 @@ const OrganizationSelect: React.FC = () => {
               </Link>
             ))}
 
-            <Link
-              to="/create"
-              className="h-48 bg-white/50 hover:bg-white border-1 border-dashed border-gray-400 rounded-lg p-6 flex flex-col items-center justify-center transition-colors cursor-pointer"
-            >
-              <div className="flex items-center">
-                <h4 className="text-lg font-medium text-gray-800 text-center">+ Create new</h4>
-              </div>
-              <Text className="text-[13px] text-gray-500 font-medium text-center">
-                Start fresh with a new organization
-              </Text>
-            </Link>
+            {!account?.managed_account && (
+              <Link
+                to="/create"
+                className="h-48 bg-white/50 hover:bg-white border-1 border-dashed border-gray-400 rounded-lg p-6 flex flex-col items-center justify-center transition-colors cursor-pointer"
+              >
+                <div className="flex items-center">
+                  <h4 className="text-lg font-medium text-gray-800 text-center">+ Create new</h4>
+                </div>
+                <Text className="text-[13px] text-gray-500 font-medium text-center">
+                  Start fresh with a new organization
+                </Text>
+              </Link>
+            )}
           </div>
         </div>
       </div>

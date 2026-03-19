@@ -5,6 +5,7 @@ interface Account {
   name: string;
   email: string;
   avatar_url: string;
+  managed_account?: boolean;
 }
 
 interface AccountContextType {
