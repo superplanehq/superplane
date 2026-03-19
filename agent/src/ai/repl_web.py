@@ -130,9 +130,6 @@ def _build_deps(payload: ReplStreamRequest) -> AgentDeps:
     )
     return AgentDeps(
         client=client,
-        default_canvas_id=payload.canvas_id,
-        show_tool_calls=False,
-        allow_canvas_details=False,
     )
 
 
@@ -172,9 +169,6 @@ async def _stream_agent_run(payload: ReplStreamRequest) -> AsyncIterator[dict[st
 
     agent = build_agent(model=payload.model)
     deps = _build_deps(payload)
-    deps.question_started_at = started_at
-    deps.waiting_message_printed = False
-    deps.allow_canvas_details = False
 
     output_tool_call_id: str | None = None
     output_tool_name_hints = {"final_result", "return_canvasanswer", "canvasanswer"}
