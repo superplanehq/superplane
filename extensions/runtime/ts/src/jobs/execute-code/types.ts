@@ -7,14 +7,20 @@ export interface ExecuteCodeJobContext {
   metadata?: RuntimeValue;
 }
 
+export interface ExecuteCodeInvocation {
+  input?: RuntimeValue;
+}
+
 export interface ExecuteCodeJob {
   type: "execute-code";
   context?: ExecuteCodeJobContext;
+  invocation?: ExecuteCodeInvocation;
 }
 
 export interface ExecuteCodeContext {
   http: HTTPContext;
   executionState: ExecutionStateContext;
+  input: RuntimeValue;
 }
 
 export interface ExecuteCodeModule {

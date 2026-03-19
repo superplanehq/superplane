@@ -19,7 +19,7 @@ export interface ExecuteCodeRuntime {
 }
 
 export function createExecuteCodeRuntime(
-  _job: ExecuteCodeJob,
+  job: ExecuteCodeJob,
 ): ExecuteCodeRuntime {
   const executionKV = new Map<string, string>();
   const emissions: Array<{
@@ -73,6 +73,7 @@ export function createExecuteCodeRuntime(
     context: {
       http,
       executionState,
+      input: job.invocation?.input ?? null,
     },
     snapshot() {
       return {

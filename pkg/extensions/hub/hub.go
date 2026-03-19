@@ -498,14 +498,27 @@ func (h *Hub) buildJobMessage(job *models.RunnerJob) (*protocol.JobAssignMessage
 }
 
 func (h *Hub) buildExecuteCodeJob(job *models.RunnerJob, executeCode *models.ExecuteCodeJobSpec) (*protocol.JobAssignMessage, error) {
+	input, err := h.findExecutionInput(job.ReferenceID)
+	if err != nil {
+		return nil, err
+	}
+
+	invocation, err := json.Marshal(map[string]any{
+		"input": input,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal execute code invocation: %w", err)
+	}
+
 	return &protocol.JobAssignMessage{
 		Type:           protocol.MessageTypeJobAssign,
 		OrganizationID: job.OrganizationID.String(),
 		JobType:        protocol.JobTypeExecuteCode,
 		JobID:          job.ID.String(),
 		ExecuteCode: &protocol.ExecuteCode{
-			Code:    executeCode.Code,
-			Timeout: executeCode.Timeout,
+			Code:       executeCode.Code,
+			Timeout:    executeCode.Timeout,
+			Invocation: invocation,
 		},
 	}, nil
 }
@@ -516,6 +529,11 @@ func (h *Hub) buildInvokeExtensionJobMessage(job *models.RunnerJob, invokeExtens
 		return nil, fmt.Errorf("generate bundle token: %w", err)
 	}
 
+	input, err := h.findExecutionInput(job.ReferenceID)
+	if err != nil {
+		return nil, err
+	}
+
 	payload := extensions.ExecuteInvocationPayload{
 		Target: *invokeExtension.Target,
 		Context: &extensions.InvocationContext{
@@ -523,9 +541,7 @@ func (h *Hub) buildInvokeExtensionJobMessage(job *models.RunnerJob, invokeExtens
 			Metadata:      nil,
 		},
 		Invocation: &extensions.ExecuteInvocation{
-			Data: map[string]any{
-				"foo": "bar",
-			},
+			Data: input,
 		},
 	}
 
@@ -553,6 +569,20 @@ func (h *Hub) buildInvokeExtensionJobMessage(job *models.RunnerJob, invokeExtens
 			Invocation:  invocation,
 		},
 	}, nil
+}
+
+func (h *Hub) findExecutionInput(referenceID uuid.UUID) (any, error) {
+	execution, err := models.FindUnscopedNodeExecution(referenceID)
+	if err != nil {
+		return nil, fmt.Errorf("error finding node execution: %w", err)
+	}
+
+	input, err := execution.GetInput(database.Conn())
+	if err != nil {
+		return nil, fmt.Errorf("error getting input: %w", err)
+	}
+
+	return input, nil
 }
 
 func (h *Hub) queueMessage(runner *RunnerSession, message any) error {

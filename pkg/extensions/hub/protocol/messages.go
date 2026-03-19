@@ -51,8 +51,9 @@ type VersionRef struct {
 }
 
 type ExecuteCode struct {
-	Code    string `json:"code"`
-	Timeout int    `json:"timeout"`
+	Code       string          `json:"code"`
+	Timeout    int             `json:"timeout"`
+	Invocation json.RawMessage `json:"invocation,omitempty"`
 }
 
 type JobCompleteMessage struct {

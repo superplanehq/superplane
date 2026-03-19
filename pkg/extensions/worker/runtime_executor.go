@@ -110,10 +110,10 @@ func (e *RuntimeExecutor) handleExecuteCodeJob(ctx context.Context, message prot
 		return nil, fmt.Errorf("missing execute code specification")
 	}
 
-	return e.executeCode(ctx, message.ExecuteCode.Code, message.ExecuteCode.Timeout)
+	return e.executeCode(ctx, message.ExecuteCode.Code, message.ExecuteCode.Timeout, message.ExecuteCode.Invocation)
 }
 
-func (e *RuntimeExecutor) executeCode(ctx context.Context, code string, timeout int) (json.RawMessage, error) {
+func (e *RuntimeExecutor) executeCode(ctx context.Context, code string, timeout int, invocation json.RawMessage) (json.RawMessage, error) {
 	if strings.TrimSpace(code) == "" {
 		return nil, fmt.Errorf("execute-code job is missing code")
 	}
@@ -143,7 +143,7 @@ func (e *RuntimeExecutor) executeCode(ctx context.Context, code string, timeout 
 		return nil, fmt.Errorf("write execute-code module: %w", err)
 	}
 
-	jobPayload, err := buildExecuteCodeJob()
+	jobPayload, err := buildExecuteCodeJob(invocation)
 	if err != nil {
 		return nil, err
 	}
@@ -330,10 +330,16 @@ func buildInvokeExtensionJob(invocation json.RawMessage) ([]byte, error) {
 	})
 }
 
-func buildExecuteCodeJob() ([]byte, error) {
-	return json.Marshal(map[string]any{
+func buildExecuteCodeJob(invocation json.RawMessage) ([]byte, error) {
+	job := map[string]any{
 		"type": protocol.JobTypeExecuteCode,
-	})
+	}
+
+	if len(invocation) > 0 {
+		job["invocation"] = json.RawMessage(invocation)
+	}
+
+	return json.Marshal(job)
 }
 
 func (e *RuntimeExecutor) bundleURL(invokeExtension *protocol.InvokeExtension) (string, error) {
