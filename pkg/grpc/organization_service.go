@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -22,6 +23,7 @@ type OrganizationService struct {
 	oidcProvider         oidc.Provider
 	baseURL              string
 	webhooksBaseURL      string
+	usageService         usage.Service
 }
 
 func NewOrganizationService(
@@ -31,12 +33,14 @@ func NewOrganizationService(
 	oidcProvider oidc.Provider,
 	baseURL string,
 	webhooksBaseURL string,
+	usageService usage.Service,
 ) *OrganizationService {
 	return &OrganizationService{
 		registry:             registry,
 		oidcProvider:         oidcProvider,
 		baseURL:              baseURL,
 		webhooksBaseURL:      webhooksBaseURL,
+		usageService:         usageService,
 		encryptor:            encryptor,
 		authorizationService: authorizationService,
 	}
@@ -134,6 +138,14 @@ func (s *OrganizationService) DeleteAgentOpenAIKey(
 		return nil, err
 	}
 	return organizations.DeleteAgentOpenAIKey(orgID, userID)
+}
+
+func (s *OrganizationService) DescribeUsage(
+	ctx context.Context,
+	req *pb.DescribeUsageRequest,
+) (*pb.DescribeUsageResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.DescribeUsage(ctx, s.usageService, orgID)
 }
 
 func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.InviteLink) (*structpb.Struct, error) {

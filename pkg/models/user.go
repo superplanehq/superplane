@@ -321,3 +321,26 @@ func FindAnyUserByEmail(email string) (*User, error) {
 
 	return &user, err
 }
+
+func FindFirstHumanUserByOrganization(orgID string) (*User, error) {
+	return FindFirstHumanUserByOrganizationInTransaction(database.Conn(), orgID)
+}
+
+func FindFirstHumanUserByOrganizationInTransaction(tx *gorm.DB, orgID string) (*User, error) {
+	var user User
+
+	err := tx.
+		Unscoped().
+		Where("organization_id = ?", orgID).
+		Where("account_id IS NOT NULL").
+		Where("type = ?", UserTypeHuman).
+		Order("created_at ASC").
+		First(&user).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}

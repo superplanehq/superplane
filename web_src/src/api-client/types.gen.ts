@@ -853,6 +853,13 @@ export type OrganizationsDescribeOrganizationResponse = {
   organization?: OrganizationsOrganization;
 };
 
+export type OrganizationsDescribeUsageResponse = {
+  enabled?: boolean;
+  statusMessage?: string;
+  limits?: OrganizationsOrganizationLimits;
+  usage?: OrganizationsOrganizationUsage;
+};
+
 export type OrganizationsGetAgentSettingsResponse = {
   agentSettings?: OrganizationsAgentSettings;
 };
@@ -926,6 +933,15 @@ export type OrganizationsOrganization = {
   metadata?: OrganizationsOrganizationMetadata;
 };
 
+export type OrganizationsOrganizationLimits = {
+  maxCanvases?: number;
+  maxNodesPerCanvas?: number;
+  maxUsers?: number;
+  retentionWindowDays?: number;
+  maxEventsPerMonth?: string;
+  maxIntegrations?: number;
+};
+
 export type OrganizationsOrganizationMetadata = {
   id?: string;
   name?: string;
@@ -933,6 +949,13 @@ export type OrganizationsOrganizationMetadata = {
   createdAt?: string;
   updatedAt?: string;
   versioningEnabled?: boolean;
+};
+
+export type OrganizationsOrganizationUsage = {
+  canvases?: number;
+  eventBucketLevel?: number;
+  eventBucketCapacity?: number;
+  eventBucketLastUpdatedAt?: string;
 };
 
 export type OrganizationsRemoveInvitationResponse = {
@@ -3348,6 +3371,34 @@ export type OrganizationsResetInviteLinkResponses = {
 
 export type OrganizationsResetInviteLinkResponse2 =
   OrganizationsResetInviteLinkResponses[keyof OrganizationsResetInviteLinkResponses];
+
+export type OrganizationsDescribeUsageData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/organizations/{id}/usage";
+};
+
+export type OrganizationsDescribeUsageErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type OrganizationsDescribeUsageError = OrganizationsDescribeUsageErrors[keyof OrganizationsDescribeUsageErrors];
+
+export type OrganizationsDescribeUsageResponses = {
+  /**
+   * A successful response.
+   */
+  200: OrganizationsDescribeUsageResponse;
+};
+
+export type OrganizationsDescribeUsageResponse2 =
+  OrganizationsDescribeUsageResponses[keyof OrganizationsDescribeUsageResponses];
 
 export type OrganizationsRemoveUserData = {
   body?: never;

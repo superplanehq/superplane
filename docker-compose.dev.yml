@@ -77,6 +77,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4317"
       OTEL_SERVICE_NAME: "superplane-dev"
       OWNER_SETUP_ENABLED: "yes"
+      USAGE_GRPC_URL: ${USAGE_GRPC_URL:-}
       VITE_ENABLE_CUSTOM_COMPONENTS: "true"
       VITE_ENABLE_AGENT_REPL: ${VITE_ENABLE_AGENT_REPL:-true}
       VITE_AGENT_URL: ${VITE_AGENT_URL:-http://localhost:8090}
