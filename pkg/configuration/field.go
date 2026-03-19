@@ -154,8 +154,9 @@ type ExpressionTypeOptions struct {
 }
 
 type TextTypeOptions struct {
-	MinLength *int `json:"minLength,omitempty"`
-	MaxLength *int `json:"maxLength,omitempty"`
+	MinLength *int   `json:"minLength,omitempty"`
+	MaxLength *int   `json:"maxLength,omitempty"`
+	Language  string `json:"language,omitempty"`
 }
 
 /*

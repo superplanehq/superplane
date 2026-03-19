@@ -9,7 +9,7 @@ import type {
   RuntimeValue,
   SetupHandlerContext,
   WebhookHandlerContext,
-} from "./runtime-context.js";
+} from "@superplanehq/runtime";
 import type {
   ActionDefinition,
   ConfigurationField,

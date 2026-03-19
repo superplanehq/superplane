@@ -13,6 +13,9 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
+      "@superplanehq/runtime": [
+        "./runtime/ts/src/index.ts"
+      ],
       "@superplanehq/sdk": [
         "./sdk/ts/src/index.ts"
       ]

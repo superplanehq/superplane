@@ -16,6 +16,7 @@ const (
 	MessageTypePong        = "pong"
 
 	JobTypeInvokeExtension = "invoke-extension"
+	JobTypeExecuteCode     = "execute-code"
 )
 
 type Envelope struct {
@@ -26,15 +27,16 @@ type JobAssignMessage struct {
 	Type            string           `json:"type"`
 	JobID           string           `json:"jobId"`
 	JobType         string           `json:"jobType"`
+	OrganizationID  string           `json:"organizationId"`
 	InvokeExtension *InvokeExtension `json:"invokeExtension"`
+	ExecuteCode     *ExecuteCode     `json:"executeCode"`
 }
 
 type InvokeExtension struct {
-	OrganizationID string          `json:"organizationId"`
-	Extension      *ExtensionRef   `json:"extension"`
-	Version        *VersionRef     `json:"version"`
-	BundleToken    string          `json:"bundleToken"`
-	Invocation     json.RawMessage `json:"invocation,omitempty"`
+	Extension   *ExtensionRef   `json:"extension"`
+	Version     *VersionRef     `json:"version"`
+	BundleToken string          `json:"bundleToken"`
+	Invocation  json.RawMessage `json:"invocation,omitempty"`
 }
 
 type ExtensionRef struct {
@@ -48,14 +50,19 @@ type VersionRef struct {
 	Digest string `json:"digest"`
 }
 
-type JobCompleteMessage struct {
-	Type            string                 `json:"type"`
-	JobID           string                 `json:"jobId"`
-	JobType         string                 `json:"jobType"`
-	InvokeExtension *InvokeExtensionOutput `json:"invokeExtension,omitempty"`
+type ExecuteCode struct {
+	Code    string `json:"code"`
+	Timeout int    `json:"timeout"`
 }
 
-type InvokeExtensionOutput struct {
+type JobCompleteMessage struct {
+	Type    string     `json:"type"`
+	JobID   string     `json:"jobId"`
+	JobType string     `json:"jobType"`
+	Result  *JobOutput `json:"result,omitempty"`
+}
+
+type JobOutput struct {
 	Success bool            `json:"success"`
 	Error   *JobError       `json:"error,omitempty"`
 	Output  json.RawMessage `json:"output,omitempty"`
@@ -66,24 +73,24 @@ type JobError struct {
 	Message string `json:"message"`
 }
 
-func NewSuccessfulInvokeExtensionOutput(jobID string, jobType string, output json.RawMessage) JobCompleteMessage {
+func NewSuccessfulJobOutput(jobID string, jobType string, output json.RawMessage) JobCompleteMessage {
 	return JobCompleteMessage{
 		Type:    MessageTypeJobComplete,
 		JobID:   jobID,
 		JobType: jobType,
-		InvokeExtension: &InvokeExtensionOutput{
+		Result: &JobOutput{
 			Success: true,
 			Output:  output,
 		},
 	}
 }
 
-func NewFailedInvokeExtensionOutput(jobID string, jobType string, error *JobError) JobCompleteMessage {
+func NewFailedJobOutput(jobID string, jobType string, error *JobError) JobCompleteMessage {
 	return JobCompleteMessage{
 		Type:    MessageTypeJobComplete,
 		JobID:   jobID,
 		JobType: jobType,
-		InvokeExtension: &InvokeExtensionOutput{
+		Result: &JobOutput{
 			Success: false,
 			Error:   error,
 		},

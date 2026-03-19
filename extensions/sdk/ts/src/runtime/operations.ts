@@ -3,29 +3,31 @@ import type {
   ExtensionDefinition,
 } from "../block-definitions.js";
 import {
-  createRuntimeHarness,
+  createInvokeExtensionRuntime,
   normalizeForJSON,
-} from "../contexts/runtime-harness.js";
+  normalizeInvocationEnvelope,
+  type ComponentCancelInvocationEnvelope,
+  type ComponentCancelInvocationOutput,
+  type ComponentExecuteInvocationEnvelope,
+  type ComponentExecuteInvocationOutput,
+  type ComponentHandleActionInvocationEnvelope,
+  type ComponentHandleActionInvocationOutput,
+  type ComponentHandleWebhookInvocationEnvelope,
+  type ComponentHandleWebhookInvocationOutput,
+  type ComponentInvocationTarget,
+  type ComponentOnIntegrationMessageInvocationEnvelope,
+  type ComponentOnIntegrationMessageInvocationOutput,
+  type ComponentSetupInvocationEnvelope,
+  type ComponentSetupInvocationOutput,
+  type InvokeExtensionJob,
+  type InvokeExtensionRuntime,
+  type InvocationEnvelope,
+  type InvocationOutput,
+} from "@superplanehq/runtime";
 import type {
-  ComponentCancelInvocationEnvelope,
-  ComponentCancelInvocationOutput,
-  ComponentExecuteInvocationEnvelope,
-  ComponentExecuteInvocationOutput,
-  ComponentHandleActionInvocationEnvelope,
-  ComponentHandleActionInvocationOutput,
-  ComponentHandleWebhookInvocationEnvelope,
-  ComponentHandleWebhookInvocationOutput,
-  ComponentOnIntegrationMessageInvocationEnvelope,
-  ComponentOnIntegrationMessageInvocationOutput,
-  ComponentSetupInvocationEnvelope,
-  ComponentSetupInvocationOutput,
-  ComponentInvocationTarget,
   DiscoveredOperation,
-  InvocationEnvelope,
-  InvocationOutput,
   OperationDescriptor,
   OperationHandler,
-  RuntimeHarness,
 } from "./types.js";
 
 export function deriveOperations(
@@ -63,12 +65,12 @@ function registerComponentOperations(
         async (invocation) => {
           const setupInvocation =
             invocation as ComponentSetupInvocationEnvelope;
-          const harness = createRuntimeHarness(invocation);
+          const runtime = createInvokeExtensionRuntime(invocation);
           await component.setup?.({
             configuration: setupInvocation.context.configuration,
-            context: harness.context,
+            context: runtime.context,
           });
-          return finalizeInvocation(setupInvocation, harness);
+          return finalizeInvocation(setupInvocation, runtime);
         },
       ),
     );
@@ -83,13 +85,13 @@ function registerComponentOperations(
       async (invocation) => {
         const executionInvocation =
           invocation as ComponentExecuteInvocationEnvelope;
-        const harness = createRuntimeHarness(invocation);
+        const runtime = createInvokeExtensionRuntime(invocation);
         await component.execute({
           configuration: executionInvocation.context.configuration,
           data: executionInvocation.invocation.data,
-          context: harness.context,
+          context: runtime.context,
         });
-        return finalizeInvocation(executionInvocation, harness);
+        return finalizeInvocation(executionInvocation, runtime);
       },
     ),
   );
@@ -104,14 +106,14 @@ function registerComponentOperations(
         async (invocation) => {
           const actionInvocation =
             invocation as ComponentHandleActionInvocationEnvelope;
-          const harness = createRuntimeHarness(invocation);
+          const runtime = createInvokeExtensionRuntime(invocation);
           const result = await component.handleAction?.({
             name: actionInvocation.invocation.name,
             configuration: actionInvocation.context.configuration,
             parameters: actionInvocation.invocation.parameters,
-            context: harness.context,
+            context: runtime.context,
           });
-          return finalizeInvocation(actionInvocation, harness, result);
+          return finalizeInvocation(actionInvocation, runtime, result);
         },
       ),
     );
@@ -127,14 +129,14 @@ function registerComponentOperations(
         async (invocation) => {
           const webhookInvocation =
             invocation as ComponentHandleWebhookInvocationEnvelope;
-          const harness = createRuntimeHarness(invocation);
+          const runtime = createInvokeExtensionRuntime(invocation);
           const result = await component.handleWebhook?.({
             configuration: webhookInvocation.context.configuration,
             body: webhookInvocation.invocation.body,
             headers: webhookInvocation.invocation.headers,
-            context: harness.context,
+            context: runtime.context,
           });
-          return finalizeInvocation(webhookInvocation, harness, result);
+          return finalizeInvocation(webhookInvocation, runtime, result);
         },
       ),
     );
@@ -150,13 +152,13 @@ function registerComponentOperations(
         async (invocation) => {
           const cancelInvocation =
             invocation as ComponentCancelInvocationEnvelope;
-          const harness = createRuntimeHarness(invocation);
+          const runtime = createInvokeExtensionRuntime(invocation);
           await component.cancel?.({
             configuration: cancelInvocation.context.configuration,
             data: cancelInvocation.invocation.data,
-            context: harness.context,
+            context: runtime.context,
           });
-          return finalizeInvocation(cancelInvocation, harness);
+          return finalizeInvocation(cancelInvocation, runtime);
         },
       ),
     );
@@ -172,13 +174,13 @@ function registerComponentOperations(
         async (invocation) => {
           const messageInvocation =
             invocation as ComponentOnIntegrationMessageInvocationEnvelope;
-          const harness = createRuntimeHarness(invocation);
+          const runtime = createInvokeExtensionRuntime(invocation);
           const result = await component.onIntegrationMessage?.({
             configuration: messageInvocation.context.configuration,
             message: messageInvocation.invocation.message,
-            context: harness.context,
+            context: runtime.context,
           });
-          return finalizeInvocation(messageInvocation, harness, result);
+          return finalizeInvocation(messageInvocation, runtime, result);
         },
       ),
     );
@@ -187,10 +189,10 @@ function registerComponentOperations(
 
 function finalizeInvocation(
   invocation: InvocationEnvelope,
-  harness: RuntimeHarness,
+  runtime: InvokeExtensionRuntime,
   result?: unknown,
 ): InvocationOutput {
-  const effects = harness.snapshot();
+  const effects = runtime.snapshot();
 
   switch (invocation.target.operation) {
     case "setup":
@@ -227,6 +229,30 @@ function finalizeInvocation(
   }
 }
 
+export async function runInvokeExtensionJob(
+  operationIndex: Map<string, OperationDescriptor>,
+  job: InvokeExtensionJob,
+): Promise<InvocationOutput> {
+  if (job.type !== "invoke-extension") {
+    throw new Error(`Unsupported job type ${job.type}`);
+  }
+
+  return invokeOperation(operationIndex, job.payload);
+}
+
+async function invokeOperation(
+  operationIndex: Map<string, OperationDescriptor>,
+  payload: InvokeExtensionJob["payload"],
+): Promise<InvocationOutput> {
+  const operationName = formatOperationName(payload.target);
+  const operation = operationIndex.get(operationName);
+  if (!operation) {
+    throw new Error(`Operation ${operationName} is not registered`);
+  }
+
+  return operation.invoke(normalizeInvocationEnvelope(payload));
+}
+
 function operation(
   blockType: ComponentInvocationTarget["blockType"],
   blockName: string,
@@ -244,4 +270,10 @@ function operation(
     description,
     invoke,
   };
+}
+
+function formatOperationName(
+  target: InvokeExtensionJob["payload"]["target"],
+): string {
+  return `${target.blockType}.${target.blockName}.${target.operation}`;
 }

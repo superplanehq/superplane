@@ -1,20 +1,27 @@
 import type {
-  BrowserAction,
-  EventContext,
-  ExecutionStateContext,
+  RuntimeContext,
+  RuntimeLogger,
+} from "../../context/runtime-context.js";
+import type {
   HTTPContext,
   HTTPRequest,
   HTTPResponse,
+} from "../../context/http.js";
+import type {
+  EventContext,
+  ExecutionStateContext,
+  MetadataContext,
+  RequestContext,
+} from "../../context/execution.js";
+import type {
+  BrowserAction,
   IntegrationContext,
   IntegrationSecret,
   IntegrationSubscription,
-  MetadataContext,
-  NodeWebhookContext,
-  RequestContext,
-  RuntimeContext,
-  RuntimeLogger,
-  RuntimeValue,
-} from "../runtime-context.js";
+} from "../../context/integration.js";
+import type { NodeWebhookContext } from "../../context/webhook.js";
+import type { RuntimeValue } from "../../context/runtime-value.js";
+import type { InvocationEffects } from "../../effects/invoke-extension.js";
 import type {
   ComponentCancelInvocationPayload,
   ComponentExecuteInvocationPayload,
@@ -22,14 +29,17 @@ import type {
   ComponentHandleWebhookInvocationPayload,
   ComponentOnIntegrationMessageInvocationPayload,
   ComponentSetupInvocationPayload,
-  InvocationEnvelope,
   InvocationContext,
-  InvocationEffects,
+  InvocationEnvelope,
   InvocationIntegrationContext,
   InvocationPayload,
   NormalizedInvocationContext,
-  RuntimeHarness,
-} from "../runtime/types.js";
+} from "./types.js";
+
+export interface InvokeExtensionRuntime {
+  context: RuntimeContext;
+  snapshot(): InvocationEffects;
+}
 
 export function normalizeInvocationEnvelope(
   payload: InvocationPayload,
@@ -94,9 +104,9 @@ export function normalizeInvocationEnvelope(
   }
 }
 
-export function createRuntimeHarness(
+export function createInvokeExtensionRuntime(
   invocation: InvocationEnvelope,
-): RuntimeHarness {
+): InvokeExtensionRuntime {
   let metadataState: RuntimeValue = invocation.context.metadata;
   let integrationMetadataState: RuntimeValue =
     invocation.context.integration.metadata;
@@ -222,6 +232,7 @@ export function createRuntimeHarness(
       if (typeof value === "string") {
         return new TextEncoder().encode(value);
       }
+
       return new TextEncoder().encode(JSON.stringify(value ?? null));
     },
     ready() {
@@ -319,7 +330,7 @@ export function createRuntimeHarness(
   return {
     context,
     snapshot() {
-      const effects: InvocationEffects = {
+      return {
         metadata: metadataState,
         requests: {
           scheduledActions: scheduledRequests,
@@ -366,33 +377,7 @@ export function createRuntimeHarness(
           secret: normalizeForJSON(nodeWebhookSecret),
         },
       };
-
-      return effects;
     },
-  };
-}
-
-function normalizeInvocationContext(
-  context?: InvocationContext,
-): NormalizedInvocationContext {
-  const integration = normalizeInvocationIntegrationContext(
-    context?.integration,
-  );
-
-  return {
-    configuration: context?.configuration ?? {},
-    integration,
-    metadata: context?.metadata ?? null,
-  };
-}
-
-function normalizeInvocationIntegrationContext(
-  integration?: InvocationIntegrationContext,
-) {
-  return {
-    id: typeof integration?.id === "string" ? integration.id : "",
-    configuration: asRecord(integration?.configuration) ?? {},
-    metadata: integration?.metadata ?? null,
   };
 }
 
@@ -433,6 +418,30 @@ export function normalizeForJSON(value: unknown): RuntimeValue {
   }
 
   return String(value);
+}
+
+function normalizeInvocationContext(
+  context?: InvocationContext,
+): NormalizedInvocationContext {
+  const integration = normalizeInvocationIntegrationContext(
+    context?.integration,
+  );
+
+  return {
+    configuration: context?.configuration ?? {},
+    integration,
+    metadata: context?.metadata ?? null,
+  };
+}
+
+function normalizeInvocationIntegrationContext(
+  integration?: InvocationIntegrationContext,
+): NormalizedInvocationContext["integration"] {
+  return {
+    id: typeof integration?.id === "string" ? integration.id : "",
+    configuration: asRecord(integration?.configuration) ?? {},
+    metadata: integration?.metadata ?? null,
+  };
 }
 
 function asRecord(value: unknown): Record<string, RuntimeValue> | null {

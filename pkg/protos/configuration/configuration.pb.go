@@ -453,6 +453,7 @@ type TextTypeOptions struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	MinLength     *int32                 `protobuf:"varint,1,opt,name=min_length,json=minLength,proto3,oneof" json:"min_length,omitempty"`
 	MaxLength     *int32                 `protobuf:"varint,2,opt,name=max_length,json=maxLength,proto3,oneof" json:"max_length,omitempty"`
+	Language      *string                `protobuf:"bytes,3,opt,name=language,proto3,oneof" json:"language,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -499,6 +500,13 @@ func (x *TextTypeOptions) GetMaxLength() int32 {
 		return *x.MaxLength
 	}
 	return 0
+}
+
+func (x *TextTypeOptions) GetLanguage() string {
+	if x != nil && x.Language != nil {
+		return *x.Language
+	}
+	return ""
 }
 
 type TimeTypeOptions struct {
@@ -1324,14 +1332,16 @@ const file_configuration_proto_rawDesc = "" +
 	"\n" +
 	"max_length\x18\x02 \x01(\x05H\x01R\tmaxLength\x88\x01\x01B\r\n" +
 	"\v_min_lengthB\r\n" +
-	"\v_max_length\"w\n" +
+	"\v_max_length\"\xa5\x01\n" +
 	"\x0fTextTypeOptions\x12\"\n" +
 	"\n" +
 	"min_length\x18\x01 \x01(\x05H\x00R\tminLength\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"max_length\x18\x02 \x01(\x05H\x01R\tmaxLength\x88\x01\x01B\r\n" +
+	"max_length\x18\x02 \x01(\x05H\x01R\tmaxLength\x88\x01\x01\x12\x1f\n" +
+	"\blanguage\x18\x03 \x01(\tH\x02R\blanguage\x88\x01\x01B\r\n" +
 	"\v_min_lengthB\r\n" +
-	"\v_max_length\"9\n" +
+	"\v_max_lengthB\v\n" +
+	"\t_language\"9\n" +
 	"\x0fTimeTypeOptions\x12\x1b\n" +
 	"\x06format\x18\x01 \x01(\tH\x00R\x06format\x88\x01\x01B\t\n" +
 	"\a_format\"9\n" +

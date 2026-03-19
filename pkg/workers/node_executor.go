@@ -383,6 +383,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, organizationID string, 
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
 		Webhook:        contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
+		Runner:         contexts.NewRunnerContext(tx, workflow.OrganizationID, execution),
 	}
 	ctx.ExpressionEnv = func(expression string) (map[string]any, error) {
 		builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).

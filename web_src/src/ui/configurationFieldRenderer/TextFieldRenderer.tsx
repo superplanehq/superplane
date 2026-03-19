@@ -9,9 +9,10 @@ import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomple
 export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, autocompleteExampleObj }) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+  const languageId = field.typeOptions?.text?.language || "plaintext";
   const { handleEditorMount } = useMonacoExpressionAutocomplete({
     autocompleteExampleObj,
-    languageId: "plaintext",
+    languageId,
   });
 
   const copyToClipboard = () => {
@@ -75,7 +76,7 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
           </div>
           <Editor
             height="100%"
-            defaultLanguage="plaintext"
+            defaultLanguage={languageId}
             value={editorValue}
             onChange={handleEditorChange}
             onMount={handleEditorMount}
@@ -109,7 +110,7 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
           <div className="flex-1 border border-gray-200 dark:border-gray-700 rounded-md">
             <Editor
               height="600px"
-              defaultLanguage="plaintext"
+              defaultLanguage={languageId}
               value={editorValue}
               onChange={handleEditorChange}
               onMount={handleEditorMount}

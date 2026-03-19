@@ -402,26 +402,34 @@ func (h *Hub) handleJobCompleteMessage(payload []byte) error {
 
 	switch message.JobType {
 	case protocol.JobTypeInvokeExtension:
-		return h.handleInvokeExtensionJobCompleteMessage(message.JobType, message.JobID, message.InvokeExtension)
+		return h.handleJobCompletionOutput(message.JobType, message.JobID, message.Result)
+	case protocol.JobTypeExecuteCode:
+		return h.handleJobCompletionOutput(message.JobType, message.JobID, message.Result)
 	default:
 		return fmt.Errorf("job type %s is not supported", message.JobType)
 	}
 }
 
-func (h *Hub) handleInvokeExtensionJobCompleteMessage(jobType, jobID string, output *protocol.InvokeExtensionOutput) error {
+func (h *Hub) handleJobCompletionOutput(jobType, jobID string, output *protocol.JobOutput) error {
+	if output == nil {
+		logrus.Infof("Job %s failed without output details", jobID)
+		h.failJob(jobType, jobID, fmt.Errorf("job completed without output details"))
+		return nil
+	}
+
 	if output.Success {
-		logrus.Infof("Invoke extension job %s completed successfully", jobID)
+		logrus.Infof("Job %s completed successfully", jobID)
 		h.completeJob(jobType, jobID, output.Output)
 		return nil
 	}
 
 	if output.Error == nil {
-		logrus.Infof("Invoke extension job %s failed without error details", jobID)
+		logrus.Infof("Job %s failed without error details", jobID)
 		h.failJob(jobType, jobID, fmt.Errorf("job failed without error details"))
 		return nil
 	}
 
-	logrus.Infof("Invoke extension job %s failed with error: %s: %s", jobID, output.Error.Code, output.Error.Message)
+	logrus.Infof("Job %s failed with error: %s: %s", jobID, output.Error.Code, output.Error.Message)
 	h.failJob(jobType, jobID, fmt.Errorf("%s: %s", output.Error.Code, output.Error.Message))
 	return nil
 }
@@ -482,9 +490,24 @@ func (h *Hub) buildJobMessage(job *models.RunnerJob) (*protocol.JobAssignMessage
 	switch job.Type {
 	case models.RunnerJobTypeInvokeExtension:
 		return h.buildInvokeExtensionJobMessage(job, spec.InvokeExtension)
+	case models.RunnerJobTypeExecuteCode:
+		return h.buildExecuteCodeJob(job, spec.ExecuteCode)
 	default:
 		return nil, fmt.Errorf("job type %s is not supported", job.Type)
 	}
+}
+
+func (h *Hub) buildExecuteCodeJob(job *models.RunnerJob, executeCode *models.ExecuteCodeJobSpec) (*protocol.JobAssignMessage, error) {
+	return &protocol.JobAssignMessage{
+		Type:           protocol.MessageTypeJobAssign,
+		OrganizationID: job.OrganizationID.String(),
+		JobType:        protocol.JobTypeExecuteCode,
+		JobID:          job.ID.String(),
+		ExecuteCode: &protocol.ExecuteCode{
+			Code:    executeCode.Code,
+			Timeout: executeCode.Timeout,
+		},
+	}, nil
 }
 
 func (h *Hub) buildInvokeExtensionJobMessage(job *models.RunnerJob, invokeExtension *models.InvokeExtensionJobSpec) (*protocol.JobAssignMessage, error) {
@@ -512,11 +535,11 @@ func (h *Hub) buildInvokeExtensionJobMessage(job *models.RunnerJob, invokeExtens
 	}
 
 	return &protocol.JobAssignMessage{
-		Type:    protocol.MessageTypeJobAssign,
-		JobType: protocol.JobTypeInvokeExtension,
-		JobID:   job.ID.String(),
+		Type:           protocol.MessageTypeJobAssign,
+		OrganizationID: job.OrganizationID.String(),
+		JobType:        protocol.JobTypeInvokeExtension,
+		JobID:          job.ID.String(),
 		InvokeExtension: &protocol.InvokeExtension{
-			OrganizationID: invokeExtension.OrganizationID,
 			Extension: &protocol.ExtensionRef{
 				ID:   invokeExtension.Extension.ID,
 				Name: invokeExtension.Extension.Name,
@@ -545,6 +568,9 @@ func (h *Hub) queueMessage(runner *RunnerSession, message any) error {
 
 func (h *Hub) completeJob(jobType string, jobID string, output json.RawMessage) {
 	switch jobType {
+	case protocol.JobTypeExecuteCode:
+		h.completeExecuteCodeJob(jobType, jobID, output)
+
 	case protocol.JobTypeInvokeExtension:
 		h.completeInvokeExtensionJob(jobType, jobID, output)
 
@@ -599,24 +625,76 @@ func (h *Hub) completeInvokeExtensionExecuteJob(job *models.RunnerJob, payload j
 		return nil, nil, fmt.Errorf("error finding node execution: %w", err)
 	}
 
-	if !output.Effects.ExecutionState.Passed {
-		return execution, nil, execution.Fail(models.CanvasNodeExecutionResultReasonError, "execution failed")
+	return h.completeExecutionStateEffects(execution, output.Effects.ExecutionState)
+}
+
+func (h *Hub) completeExecuteCodeJob(_ string, jobID string, output json.RawMessage) {
+	job, err := models.FindRunnerJob(uuid.MustParse(jobID))
+	if err != nil {
+		logrus.Errorf("Error finding job %s: %v", jobID, err)
+		return
 	}
 
-	if len(output.Effects.ExecutionState.Emissions) == 0 {
-		events, err := execution.Pass(map[string][]any{})
-		return execution, events, err
+	h.finishJob(jobID, models.RunnerJobResultPassed, "")
+
+	execution, events, err := h.completeExecuteCodeExecutionJob(job, output)
+	if err != nil {
+		logrus.Errorf("Error completing execute code job %s: %v", jobID, err)
+		return
 	}
 
-	for _, emission := range output.Effects.ExecutionState.Emissions {
-		events, err := execution.Pass(map[string][]any{
-			emission.Channel: emission.Payloads,
-		})
+	messages.NewCanvasExecutionMessage(
+		execution.WorkflowID.String(),
+		execution.ID.String(),
+		execution.NodeID,
+	).Publish()
 
-		return execution, events, err
+	for _, event := range events {
+		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+	}
+}
+
+func (h *Hub) completeExecuteCodeExecutionJob(job *models.RunnerJob, payload json.RawMessage) (*models.CanvasNodeExecution, []models.CanvasEvent, error) {
+	var output struct {
+		Effects struct {
+			ExecutionState extensions.InvocationExecutionStateEffects `json:"executionState"`
+		} `json:"effects"`
 	}
 
-	return execution, []models.CanvasEvent{}, nil
+	if err := json.Unmarshal(payload, &output); err != nil {
+		return nil, nil, fmt.Errorf("unmarshal output: %w", err)
+	}
+
+	logrus.Infof("Complete execute code job %s with output: %+v", job.ID, output)
+
+	execution, err := models.FindUnscopedNodeExecution(job.ReferenceID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error finding node execution: %w", err)
+	}
+
+	return h.completeExecutionStateEffects(execution, output.Effects.ExecutionState)
+}
+
+func (h *Hub) completeExecutionStateEffects(
+	execution *models.CanvasNodeExecution,
+	state extensions.InvocationExecutionStateEffects,
+) (*models.CanvasNodeExecution, []models.CanvasEvent, error) {
+	if !state.Passed {
+		message := "execution failed"
+		if state.Failed != nil && strings.TrimSpace(state.Failed.Message) != "" {
+			message = state.Failed.Message
+		}
+
+		return execution, nil, execution.Fail(models.CanvasNodeExecutionResultReasonError, message)
+	}
+
+	outputs := map[string][]any{}
+	for _, emission := range state.Emissions {
+		outputs[emission.Channel] = append(outputs[emission.Channel], emission.Payloads...)
+	}
+
+	events, err := execution.Pass(outputs)
+	return execution, events, err
 }
 
 func (h *Hub) failJob(jobType string, jobID string, err error) {
@@ -629,9 +707,37 @@ func (h *Hub) failJob(jobType string, jobID string, err error) {
 	// Update runner job reference next.
 	//
 	switch jobType {
+	case protocol.JobTypeExecuteCode:
+		h.failExecuteCodeJob(jobID, err)
 	case protocol.JobTypeInvokeExtension:
 		h.failInvokeExtensionJob(jobID, err)
 	}
+}
+
+func (h *Hub) failExecuteCodeJob(jobID string, executionError error) {
+	job, err := models.FindRunnerJob(uuid.MustParse(jobID))
+	if err != nil {
+		logrus.Errorf("Error finding job %s: %v", jobID, err)
+		return
+	}
+
+	execution, err := models.FindUnscopedNodeExecution(job.ReferenceID)
+	if err != nil {
+		logrus.Errorf("Error finding node execution %s: %v", job.ReferenceID, err)
+		return
+	}
+
+	err = execution.Fail(models.CanvasNodeExecutionResultReasonError, executionError.Error())
+	if err != nil {
+		logrus.Errorf("Error failing node execution %s: %v", job.ReferenceID, err)
+		return
+	}
+
+	messages.NewCanvasExecutionMessage(
+		execution.WorkflowID.String(),
+		execution.ID.String(),
+		execution.NodeID,
+	).Publish()
 }
 
 func (h *Hub) failInvokeExtensionJob(jobID string, executionError error) {

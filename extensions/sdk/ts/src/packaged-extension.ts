@@ -1,21 +1,24 @@
-import { normalizeInvocationEnvelope } from "./contexts/runtime-harness.js";
+import {
+  type InvokeExtensionJob,
+  type InvocationOutput,
+  type InvocationPayload,
+} from "@superplanehq/runtime";
 import type { ExtensionDefinition } from "./block-definitions.js";
 import {
   deriveManifest,
   validateExtensionDefinition,
 } from "./runtime/manifest.js";
-import { collectOperations, deriveOperations } from "./runtime/operations.js";
-import type {
-  ExtensionDiscovery,
-  InvocationOutput,
-  InvocationPayload,
-  OperationDescriptor,
-} from "./runtime/types.js";
+import {
+  collectOperations,
+  deriveOperations,
+  runInvokeExtensionJob,
+} from "./runtime/operations.js";
+import type { ExtensionDiscovery } from "./runtime/types.js";
 
-export interface PackagedExtensionRuntime {
+export interface ExtensionRuntimeModule {
   manifest: ExtensionDiscovery["manifest"];
   operations: ExtensionDiscovery["operations"];
-  invoke(payload: InvocationPayload): Promise<InvocationOutput>;
+  run(job: InvokeExtensionJob): Promise<InvocationOutput>;
 }
 
 export { deriveManifest, deriveOperations, validateExtensionDefinition };
@@ -31,7 +34,13 @@ export function discoverExtension(
 
 export function createPackagedExtensionRuntime(
   definition: ExtensionDefinition,
-): PackagedExtensionRuntime {
+): ExtensionRuntimeModule {
+  return createRuntimeModule(definition);
+}
+
+export function createRuntimeModule(
+  definition: ExtensionDefinition,
+): ExtensionRuntimeModule {
   const discovery = discoverExtension(definition);
   const operationIndex = new Map(
     collectOperations(definition).map((operation) => [
@@ -43,8 +52,8 @@ export function createPackagedExtensionRuntime(
   return {
     manifest: discovery.manifest,
     operations: discovery.operations,
-    invoke(payload: InvocationPayload): Promise<InvocationOutput> {
-      return invokeOperation(operationIndex, payload);
+    run(job: InvokeExtensionJob): Promise<InvocationOutput> {
+      return runInvokeExtensionJob(operationIndex, job);
     },
   };
 }
@@ -53,22 +62,8 @@ export async function invokePackagedExtension(
   definition: ExtensionDefinition,
   payload: InvocationPayload,
 ): Promise<InvocationOutput> {
-  return createPackagedExtensionRuntime(definition).invoke(payload);
-}
-
-async function invokeOperation(
-  operationIndex: Map<string, OperationDescriptor>,
-  payload: InvocationPayload,
-): Promise<InvocationOutput> {
-  const operationName = formatOperationName(payload.target);
-  const operation = operationIndex.get(operationName);
-  if (!operation) {
-    throw new Error(`Operation ${operationName} is not registered`);
-  }
-
-  return operation.invoke(normalizeInvocationEnvelope(payload));
-}
-
-function formatOperationName(target: InvocationPayload["target"]): string {
-  return `${target.blockType}.${target.blockName}.${target.operation}`;
+  return createRuntimeModule(definition).run({
+    type: "invoke-extension",
+    payload,
+  });
 }

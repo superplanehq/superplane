@@ -219,6 +219,11 @@ func buildExtensionVersionArtifacts(
 		return extensionVersionArtifacts{}, err
 	}
 
+	runtimeEntryPoint, err := findRuntimeEntryPoint(projectDir)
+	if err != nil {
+		return extensionVersionArtifacts{}, err
+	}
+
 	tempDir, err := os.MkdirTemp("", "superplane-extension-*")
 	if err != nil {
 		return extensionVersionArtifacts{}, fmt.Errorf("create temp dir: %w", err)
@@ -228,11 +233,11 @@ func buildExtensionVersionArtifacts(
 	runtimeBundlePath := filepath.Join(tempDir, "index.js")
 	manifestScriptPath := filepath.Join(tempDir, "manifest.js")
 
-	if err := bundleRuntimeEntry(projectDir, entryPoint, sdkEntryPoint, runtimeBundlePath); err != nil {
+	if err := bundleRuntimeEntry(projectDir, entryPoint, sdkEntryPoint, runtimeEntryPoint, runtimeBundlePath); err != nil {
 		return extensionVersionArtifacts{}, err
 	}
 
-	if err := bundleManifestEntry(projectDir, entryPoint, sdkEntryPoint, manifestScriptPath); err != nil {
+	if err := bundleManifestEntry(projectDir, entryPoint, sdkEntryPoint, runtimeEntryPoint, manifestScriptPath); err != nil {
 		return extensionVersionArtifacts{}, err
 	}
 
@@ -258,10 +263,18 @@ func buildExtensionVersionArtifacts(
 }
 
 func findSDKEntryPoint(startDir string) (string, error) {
+	return findPackageEntryPoint(startDir, filepath.Join("extensions", "sdk", "ts", "src", "index.ts"))
+}
+
+func findRuntimeEntryPoint(startDir string) (string, error) {
+	return findPackageEntryPoint(startDir, filepath.Join("extensions", "runtime", "ts", "src", "index.ts"))
+}
+
+func findPackageEntryPoint(startDir string, relativePath string) (string, error) {
 	dir := startDir
 
 	for {
-		candidate := filepath.Join(dir, "extensions", "sdk", "ts", "src", "index.ts")
+		candidate := filepath.Join(dir, relativePath)
 		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
 			return candidate, nil
 		}
@@ -274,34 +287,35 @@ func findSDKEntryPoint(startDir string) (string, error) {
 		dir = parent
 	}
 
-	return "", fmt.Errorf("could not find extensions/sdk/ts/src/index.ts from %q", startDir)
+	return "", fmt.Errorf("could not find %s from %q", relativePath, startDir)
 }
 
-func bundleRuntimeEntry(projectDir, entryPoint, sdkEntryPoint, outfile string) error {
+func bundleRuntimeEntry(projectDir, entryPoint, sdkEntryPoint, runtimeEntryPoint, outfile string) error {
 	source := fmt.Sprintf(
-		"import { createPackagedExtensionRuntime } from %s;\nimport extension from %s;\nconst runtime = createPackagedExtensionRuntime(extension);\nexport const manifest = runtime.manifest;\nexport const operations = runtime.operations;\nexport async function invoke(payload) {\n  return await runtime.invoke(payload);\n}\n",
+		"import { createRuntimeModule } from %s;\nimport extension from %s;\nconst runtime = createRuntimeModule(extension);\nexport const manifest = runtime.manifest;\nexport const operations = runtime.operations;\nexport async function run(job) {\n  return await runtime.run(job);\n}\n",
 		jsonStringLiteral("@superplanehq/sdk"),
 		jsonStringLiteral(entryPoint),
 	)
 
-	return runRuntimeEsbuild(projectDir, sdkEntryPoint, outfile, source)
+	return runRuntimeEsbuild(projectDir, sdkEntryPoint, runtimeEntryPoint, outfile, source)
 }
 
-func bundleManifestEntry(projectDir, entryPoint, sdkEntryPoint, outfile string) error {
+func bundleManifestEntry(projectDir, entryPoint, sdkEntryPoint, runtimeEntryPoint, outfile string) error {
 	source := fmt.Sprintf(
 		"import { discoverExtension } from %s;\nimport extension from %s;\nprocess.stdout.write(JSON.stringify(discoverExtension(extension).manifest));\n",
 		jsonStringLiteral("@superplanehq/sdk"),
 		jsonStringLiteral(entryPoint),
 	)
 
-	return runManifestEsbuild(projectDir, sdkEntryPoint, outfile, source)
+	return runManifestEsbuild(projectDir, sdkEntryPoint, runtimeEntryPoint, outfile, source)
 }
 
-func runRuntimeEsbuild(projectDir, sdkEntryPoint, outfile, source string) error {
+func runRuntimeEsbuild(projectDir, sdkEntryPoint, runtimeEntryPoint, outfile, source string) error {
 	result := esbuild.Build(esbuild.BuildOptions{
 		AbsWorkingDir: projectDir,
 		Alias: map[string]string{
-			"@superplanehq/sdk": sdkEntryPoint,
+			"@superplanehq/runtime": runtimeEntryPoint,
+			"@superplanehq/sdk":     sdkEntryPoint,
 		},
 		Bundle:   true,
 		Format:   esbuild.FormatESModule,
@@ -324,11 +338,12 @@ func runRuntimeEsbuild(projectDir, sdkEntryPoint, outfile, source string) error 
 	return nil
 }
 
-func runManifestEsbuild(projectDir, sdkEntryPoint, outfile, source string) error {
+func runManifestEsbuild(projectDir, sdkEntryPoint, runtimeEntryPoint, outfile, source string) error {
 	result := esbuild.Build(esbuild.BuildOptions{
 		AbsWorkingDir: projectDir,
 		Alias: map[string]string{
-			"@superplanehq/sdk": sdkEntryPoint,
+			"@superplanehq/runtime": runtimeEntryPoint,
+			"@superplanehq/sdk":     sdkEntryPoint,
 		},
 		Bundle:   true,
 		Format:   esbuild.FormatCommonJS,

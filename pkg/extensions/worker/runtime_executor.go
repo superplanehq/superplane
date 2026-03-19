@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -18,14 +19,26 @@ import (
 	"github.com/superplanehq/superplane/pkg/extensions/hub/protocol"
 )
 
-const denoBootstrapSource = `
-const [bundleUrl, payloadPath] = Deno.args;
-const payload = JSON.parse(await Deno.readTextFile(payloadPath));
+const denoModuleRunnerSource = `
+const [bundleUrl, jobPath] = Deno.args;
+const job = JSON.parse(await Deno.readTextFile(jobPath));
 const mod = await import(bundleUrl);
-if (typeof mod.invoke !== "function") {
-  throw new Error("bundle does not export invoke");
+if (typeof mod.run !== "function") {
+  throw new Error("bundle does not export run");
 }
-const result = await mod.invoke(payload);
+const result = await mod.run(job);
+await Deno.stdout.write(new TextEncoder().encode(JSON.stringify(result)));
+`
+
+const denoExecuteCodeRunnerSource = `
+const [runtimeUrl, moduleUrl, jobPath] = Deno.args;
+const runtime = await import(runtimeUrl);
+if (typeof runtime.runExecuteCodeModule !== "function") {
+  throw new Error("runtime does not export runExecuteCodeModule");
+}
+const mod = await import(moduleUrl);
+const job = JSON.parse(await Deno.readTextFile(jobPath));
+const result = await runtime.runExecuteCodeModule(mod, job);
 await Deno.stdout.write(new TextEncoder().encode(JSON.stringify(result)));
 `
 
@@ -81,11 +94,103 @@ func NewRuntimeExecutor(config RuntimeExecutorConfig) *RuntimeExecutor {
 
 func (e *RuntimeExecutor) HandleJob(ctx context.Context, message protocol.JobAssignMessage) (json.RawMessage, error) {
 	switch message.JobType {
+	case protocol.JobTypeExecuteCode:
+		return e.handleExecuteCodeJob(ctx, message)
 	case protocol.JobTypeInvokeExtension:
 		return e.handleInvokeExtensionJob(ctx, message)
 	default:
 		return nil, fmt.Errorf("job type %s is not supported", message.JobType)
 	}
+}
+
+func (e *RuntimeExecutor) handleExecuteCodeJob(ctx context.Context, message protocol.JobAssignMessage) (json.RawMessage, error) {
+	log.Printf("Handling execute code job %s", message.JobID)
+
+	if message.ExecuteCode == nil {
+		return nil, fmt.Errorf("missing execute code specification")
+	}
+
+	return e.executeCode(ctx, message.ExecuteCode.Code, message.ExecuteCode.Timeout)
+}
+
+func (e *RuntimeExecutor) executeCode(ctx context.Context, code string, timeout int) (json.RawMessage, error) {
+	if strings.TrimSpace(code) == "" {
+		return nil, fmt.Errorf("execute-code job is missing code")
+	}
+
+	if timeout <= 0 {
+		timeout = 30
+	}
+
+	log.Printf("Executing code with timeout %d seconds", timeout)
+
+	runCtx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	tempDir, err := os.MkdirTemp("", "superplane-execute-code-*")
+	if err != nil {
+		return nil, fmt.Errorf("create execute-code temp dir: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	runnerPath := filepath.Join(tempDir, "runner.js")
+	if err := os.WriteFile(runnerPath, []byte(denoExecuteCodeRunnerSource), 0o600); err != nil {
+		return nil, fmt.Errorf("write execute-code runner: %w", err)
+	}
+
+	modulePath := filepath.Join(tempDir, "module.js")
+	if err := os.WriteFile(modulePath, []byte(code), 0o600); err != nil {
+		return nil, fmt.Errorf("write execute-code module: %w", err)
+	}
+
+	jobPayload, err := buildExecuteCodeJob()
+	if err != nil {
+		return nil, err
+	}
+
+	jobPath := filepath.Join(tempDir, "job.json")
+	if err := os.WriteFile(jobPath, jobPayload, 0o600); err != nil {
+		return nil, fmt.Errorf("write execute-code job: %w", err)
+	}
+
+	runtimePath, err := findPackageEntryPoint(".", filepath.Join("extensions", "runtime", "ts", "src", "index.ts"))
+	if err != nil {
+		return nil, err
+	}
+
+	args := []string{
+		"run",
+		"--quiet",
+		"--no-prompt",
+		"--sloppy-imports",
+		fmt.Sprintf("--allow-read=%s,%s,%s", tempDir, runtimePath, filepath.Dir(runtimePath)),
+		"--allow-net",
+		runnerPath,
+		fileURL(runtimePath),
+		fileURL(modulePath),
+		jobPath,
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := e.runner.Run(runCtx, e.denoBinary, args, &stdout, &stderr); err != nil {
+		if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
+			return nil, fmt.Errorf("execute code timed out after %d seconds", timeout)
+		}
+
+		message := strings.TrimSpace(stderr.String())
+		if message == "" {
+			message = err.Error()
+		}
+		return nil, fmt.Errorf("run execute-code module: %s", message)
+	}
+
+	output := bytes.TrimSpace(stdout.Bytes())
+	if !json.Valid(output) {
+		return nil, fmt.Errorf("execute-code returned invalid JSON: %s", string(output))
+	}
+
+	return json.RawMessage(output), nil
 }
 
 func (e *RuntimeExecutor) handleInvokeExtensionJob(ctx context.Context, message protocol.JobAssignMessage) (json.RawMessage, error) {
@@ -108,7 +213,7 @@ func (e *RuntimeExecutor) ensureBundle(ctx context.Context, message protocol.Job
 
 	bundlePath := filepath.Join(
 		e.cacheDir,
-		message.InvokeExtension.OrganizationID,
+		message.OrganizationID,
 		message.InvokeExtension.Extension.Name,
 		message.InvokeExtension.Version.Name,
 		message.InvokeExtension.Version.Digest,
@@ -164,30 +269,40 @@ func (e *RuntimeExecutor) ensureBundle(ctx context.Context, message protocol.Job
 }
 
 func (e *RuntimeExecutor) invokeBundle(ctx context.Context, bundlePath string, invocation json.RawMessage) (json.RawMessage, error) {
+	//
+	// TODO
+	// Since we have a temp dir for each execution,
+	// we can probably pass a ctx.fs in the RuntimeContext.
+	//
 	tempDir, err := os.MkdirTemp("", "superplane-extension-exec-*")
 	if err != nil {
 		return nil, fmt.Errorf("create execution temp dir: %w", err)
 	}
 	defer os.RemoveAll(tempDir)
 
-	bootstrapPath := filepath.Join(tempDir, "bootstrap.js")
-	if err := os.WriteFile(bootstrapPath, []byte(denoBootstrapSource), 0o600); err != nil {
-		return nil, fmt.Errorf("write bootstrap script: %w", err)
+	runnerPath := filepath.Join(tempDir, "runner.js")
+	if err := os.WriteFile(runnerPath, []byte(denoModuleRunnerSource), 0o600); err != nil {
+		return nil, fmt.Errorf("write runner script: %w", err)
 	}
 
-	payloadPath := filepath.Join(tempDir, "payload.json")
-	if err := os.WriteFile(payloadPath, invocation, 0o600); err != nil {
-		return nil, fmt.Errorf("write invocation payload: %w", err)
+	jobPayload, err := buildInvokeExtensionJob(invocation)
+	if err != nil {
+		return nil, err
+	}
+
+	jobPath := filepath.Join(tempDir, "job.json")
+	if err := os.WriteFile(jobPath, jobPayload, 0o600); err != nil {
+		return nil, fmt.Errorf("write invoke-extension job: %w", err)
 	}
 
 	bundleURL := fileURL(bundlePath)
 	args := []string{
 		"run",
 		"--quiet",
-		fmt.Sprintf("--allow-read=%s,%s,%s", bundlePath, bootstrapPath, payloadPath),
-		bootstrapPath,
+		fmt.Sprintf("--allow-read=%s,%s,%s", bundlePath, runnerPath, jobPath),
+		runnerPath,
 		bundleURL,
-		payloadPath,
+		jobPath,
 	}
 
 	var stdout bytes.Buffer
@@ -208,6 +323,19 @@ func (e *RuntimeExecutor) invokeBundle(ctx context.Context, bundlePath string, i
 	return json.RawMessage(output), nil
 }
 
+func buildInvokeExtensionJob(invocation json.RawMessage) ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"type":    protocol.JobTypeInvokeExtension,
+		"payload": json.RawMessage(invocation),
+	})
+}
+
+func buildExecuteCodeJob() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"type": protocol.JobTypeExecuteCode,
+	})
+}
+
 func (e *RuntimeExecutor) bundleURL(invokeExtension *protocol.InvokeExtension) (string, error) {
 	bundleURL, err := joinHTTPURL(e.hubURL, "/api/v1/extensions/bundle.js")
 	if err != nil {
@@ -226,6 +354,28 @@ func fileURL(path string) string {
 	}
 
 	return (&url.URL{Scheme: "file", Path: absolutePath}).String()
+}
+
+func findPackageEntryPoint(startDir string, relativePath string) (string, error) {
+	dir, err := filepath.Abs(startDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve start directory: %w", err)
+	}
+
+	for {
+		candidate := filepath.Join(dir, relativePath)
+		info, statErr := os.Stat(candidate)
+		if statErr == nil && !info.IsDir() {
+			return candidate, nil
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("could not find %s", relativePath)
+		}
+
+		dir = parent
+	}
 }
 
 type execRunner struct{}

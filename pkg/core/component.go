@@ -155,6 +155,11 @@ type ExecutionContext struct {
 	Secrets        SecretsContext
 	CanvasMemory   CanvasMemoryContext
 	Webhook        NodeWebhookContext
+	Runner         RunnerContext
+}
+
+type RunnerContext interface {
+	ExecuteCode(code string, timeout int) error
 }
 
 /*

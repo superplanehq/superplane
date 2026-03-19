@@ -16,6 +16,7 @@ const (
 	RunnerStateIdle    = "idle"
 	RunnerStateBusy    = "busy"
 
+	RunnerJobTypeExecuteCode     = "execute-code"
 	RunnerJobTypeInvokeExtension = "invoke-extension"
 
 	RunnerJobStatePending  = "pending"
@@ -196,13 +197,18 @@ type RunnerJob struct {
 
 type RunnerJobSpec struct {
 	InvokeExtension *InvokeExtensionJobSpec `json:"invokeExtension,omitempty"`
+	ExecuteCode     *ExecuteCodeJobSpec     `json:"executeCode,omitempty"`
 }
 
 type InvokeExtensionJobSpec struct {
-	OrganizationID string                       `json:"organizationId"`
-	Target         *extensions.InvocationTarget `json:"target"`
-	Extension      *ExtensionRef                `json:"extension"`
-	Version        *VersionRef                  `json:"version"`
+	Target    *extensions.InvocationTarget `json:"target"`
+	Extension *ExtensionRef                `json:"extension"`
+	Version   *VersionRef                  `json:"version"`
+}
+
+type ExecuteCodeJobSpec struct {
+	Code    string `json:"code"`
+	Timeout int    `json:"timeout,omitempty"`
 }
 
 type ExtensionRef struct {
@@ -214,6 +220,27 @@ type VersionRef struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	Digest string `json:"digest"`
+}
+
+func CreateExecuteCodeJob(tx *gorm.DB, organizationID uuid.UUID, referenceID uuid.UUID, spec *RunnerJobSpec) (*RunnerJob, error) {
+	now := time.Now()
+	job := &RunnerJob{
+		ID:             uuid.New(),
+		OrganizationID: organizationID,
+		State:          RunnerJobStatePending,
+		Type:           RunnerJobTypeExecuteCode,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+		Spec:           datatypes.NewJSONType(spec),
+		ReferenceID:    referenceID,
+	}
+
+	err := tx.Create(job).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return job, nil
 }
 
 func CreateInvokeExtensionJob(
@@ -230,8 +257,7 @@ func CreateInvokeExtensionJob(
 
 	spec := RunnerJobSpec{
 		InvokeExtension: &InvokeExtensionJobSpec{
-			Target:         target,
-			OrganizationID: organizationID.String(),
+			Target: target,
 			Extension: &ExtensionRef{
 				ID:   extension.ID.String(),
 				Name: extension.Name,

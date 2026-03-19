@@ -20,8 +20,9 @@ var _ MappedNullable = &ConfigurationTextTypeOptions{}
 
 // ConfigurationTextTypeOptions struct for ConfigurationTextTypeOptions
 type ConfigurationTextTypeOptions struct {
-	MinLength *int32 `json:"minLength,omitempty"`
-	MaxLength *int32 `json:"maxLength,omitempty"`
+	MinLength *int32  `json:"minLength,omitempty"`
+	MaxLength *int32  `json:"maxLength,omitempty"`
+	Language  *string `json:"language,omitempty"`
 }
 
 // NewConfigurationTextTypeOptions instantiates a new ConfigurationTextTypeOptions object
@@ -105,6 +106,38 @@ func (o *ConfigurationTextTypeOptions) SetMaxLength(v int32) {
 	o.MaxLength = &v
 }
 
+// GetLanguage returns the Language field value if set, zero value otherwise.
+func (o *ConfigurationTextTypeOptions) GetLanguage() string {
+	if o == nil || IsNil(o.Language) {
+		var ret string
+		return ret
+	}
+	return *o.Language
+}
+
+// GetLanguageOk returns a tuple with the Language field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationTextTypeOptions) GetLanguageOk() (*string, bool) {
+	if o == nil || IsNil(o.Language) {
+		return nil, false
+	}
+	return o.Language, true
+}
+
+// HasLanguage returns a boolean if a field has been set.
+func (o *ConfigurationTextTypeOptions) HasLanguage() bool {
+	if o != nil && !IsNil(o.Language) {
+		return true
+	}
+
+	return false
+}
+
+// SetLanguage gets a reference to the given string and assigns it to the Language field.
+func (o *ConfigurationTextTypeOptions) SetLanguage(v string) {
+	o.Language = &v
+}
+
 func (o ConfigurationTextTypeOptions) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -120,6 +153,9 @@ func (o ConfigurationTextTypeOptions) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.MaxLength) {
 		toSerialize["maxLength"] = o.MaxLength
+	}
+	if !IsNil(o.Language) {
+		toSerialize["language"] = o.Language
 	}
 	return toSerialize, nil
 }

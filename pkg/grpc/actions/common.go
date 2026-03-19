@@ -109,6 +109,9 @@ func textTypeOptionsToProto(opts *configuration.TextTypeOptions) *configpb.TextT
 		maxLength := int32(*opts.MaxLength)
 		pbOpts.MaxLength = &maxLength
 	}
+	if opts.Language != "" {
+		pbOpts.Language = &opts.Language
+	}
 
 	return pbOpts
 }
@@ -385,6 +388,9 @@ func protoToTextTypeOptions(pbOpts *configpb.TextTypeOptions) *configuration.Tex
 	if pbOpts.MaxLength != nil {
 		maxLength := int(*pbOpts.MaxLength)
 		opts.MaxLength = &maxLength
+	}
+	if pbOpts.Language != nil {
+		opts.Language = *pbOpts.Language
 	}
 
 	return opts

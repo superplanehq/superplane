@@ -639,6 +639,7 @@ export type ConfigurationStringTypeOptions = {
 export type ConfigurationTextTypeOptions = {
   minLength?: number;
   maxLength?: number;
+  language?: string;
 };
 
 export type ConfigurationTimeTypeOptions = {

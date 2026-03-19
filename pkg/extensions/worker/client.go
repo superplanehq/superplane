@@ -162,7 +162,7 @@ func (c *Client) processJob(ctx context.Context, message protocol.JobAssignMessa
 	if err != nil {
 		log.Printf("Error handling job: %v", err)
 		_ = c.writeMessage(
-			protocol.NewFailedInvokeExtensionOutput(message.JobID, message.JobType, &protocol.JobError{
+			protocol.NewFailedJobOutput(message.JobID, message.JobType, &protocol.JobError{
 				Code:    "error",
 				Message: err.Error(),
 			}),
@@ -171,7 +171,7 @@ func (c *Client) processJob(ctx context.Context, message protocol.JobAssignMessa
 	}
 
 	log.Printf("Job %s completed successfully", message.JobID)
-	_ = c.writeMessage(protocol.NewSuccessfulInvokeExtensionOutput(message.JobID, message.JobType, output))
+	_ = c.writeMessage(protocol.NewSuccessfulJobOutput(message.JobID, message.JobType, output))
 }
 
 func (c *Client) writeMessage(message any) error {
