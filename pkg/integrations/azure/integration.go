@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	secretAccessToken          = "accessToken"
+	secretAccessToken           = "accessToken"
 	secretServiceBusAccessToken = "serviceBusAccessToken"
 )
 
@@ -67,7 +67,11 @@ Enter the following information below and create the integration:
 
 After creation, you will be guided through configuring the Federated Identity Credential and granting the required permissions.
 
-SuperPlane will use Workload Identity Federation to authenticate without storing any credentials.`
+SuperPlane will use Workload Identity Federation to authenticate without storing any credentials.
+
+> **Using Service Bus?** The namespace must exist in Azure before you use any Service Bus actions or triggers — SuperPlane does not create it for you. You will also need to assign the **Azure Service Bus Data Owner** role to your app registration on the namespace.
+>
+> **Tier requirements:** The "On Message Available" and "On Dead-Letter Available" triggers rely on Azure Event Grid integration, which is only available on **Premium** tier namespaces. Topic actions (Create/Get/Delete Topic, Publish Message) require **Standard** tier or above — they are not available on Basic.`
 }
 
 func (a *AzureIntegration) Configuration() []configuration.Field {
@@ -133,6 +137,7 @@ func (a *AzureIntegration) Triggers() []core.Trigger {
 		&OnVMRestarted{},
 		&OnServiceBusMessageAvailable{},
 		&OnServiceBusDeadLetterAvailable{},
+		&OnServiceBusMessageReceived{},
 	}
 }
 
@@ -245,6 +250,11 @@ Assign Azure RBAC roles to your app registration at the subscription or resource
 - **EventGrid Contributor** – For Event Grid subscriptions
 - **Azure Service Bus Data Owner** – For Service Bus queue/topic management and message sending
 
+> **Service Bus setup notes:**
+> - Your Service Bus namespace must already exist — SuperPlane will not create it automatically. Assign the **Azure Service Bus Data Owner** role to your app registration directly on the namespace.
+> - The **On Message Available** and **On Dead-Letter Available** triggers require a **Premium** tier namespace (Event Grid integration is not available on Standard/Basic).
+> - Topic actions (Create/Get/Delete Topic, Publish Message) require **Standard** tier or above and are not supported on Basic namespaces.
+
 **3. Complete Setup**
 
 After configuring the credential and permissions above, click **Save** to re-sync the integration. SuperPlane will verify the connection automatically.
@@ -310,6 +320,12 @@ func (a *AzureIntegration) ListResources(resourceType string, ctx core.ListResou
 		return a.ListServiceBusTopics(ctx,
 			firstNonEmptyParameter(ctx.Parameters, "resourceGroup"),
 			firstNonEmptyParameter(ctx.Parameters, "namespaceName"),
+		)
+
+	case ResourceTypeServiceBusSubscription:
+		return a.ListServiceBusSubscriptions(ctx,
+			firstNonEmptyParameter(ctx.Parameters, "namespaceName"),
+			firstNonEmptyParameter(ctx.Parameters, "topicName"),
 		)
 
 	case "resourceGroup", "virtualNetwork", "subnet":

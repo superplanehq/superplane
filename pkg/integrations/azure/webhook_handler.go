@@ -202,10 +202,10 @@ func (h *AzureWebhookHandler) CompareConfig(a, b any) (bool, error) {
 		return false, nil
 	}
 
-	if left.Scope != right.Scope {		
+	if left.Scope != right.Scope {
 		return false, nil
 	}
-	
+
 	if left.TopicContains != right.TopicContains {
 		return false, nil
 	}

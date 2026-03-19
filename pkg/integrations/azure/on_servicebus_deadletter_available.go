@@ -124,7 +124,7 @@ func (t *OnServiceBusDeadLetterAvailable) Configuration() []configuration.Field 
 			Label:       "Resource Group",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Filter events to a specific resource group (optional - leave empty for all resource groups)",
+			Description: "Filter events to a specific resource group (optional – leave empty for all resource groups)",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:           ResourceTypeResourceGroupDropdown,
@@ -132,22 +132,8 @@ func (t *OnServiceBusDeadLetterAvailable) Configuration() []configuration.Field 
 				},
 			},
 		},
-		{
-			Name:        "namespaceName",
-			Label:       "Namespace",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "The Service Bus namespace to monitor (short name, not FQDN)",
-			Placeholder: "my-namespace",
-		},
-		{
-			Name:        "queueName",
-			Label:       "Queue Name",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Filter to a specific queue's dead-letter sub-queue (optional - leave empty for all queues)",
-			Placeholder: "my-queue",
-		},
+		serviceBusTriggerNamespaceField(),
+		serviceBusTriggerOptionalQueueNameField(),
 	}
 }
 
