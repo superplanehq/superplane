@@ -99,7 +99,7 @@ func (w *OrganizationCleanupWorker) processOrganization(tx *gorm.DB, org models.
 		return nil
 	}
 
-	hasRemaining, err := w.hasRemainingChildResources(tx, org)
+	hasRemaining, err := w.hasRemainingAsyncResources(tx, org)
 	if err != nil {
 		return fmt.Errorf("failed to check remaining child resources: %w", err)
 	}
@@ -107,6 +107,10 @@ func (w *OrganizationCleanupWorker) processOrganization(tx *gorm.DB, org models.
 	if hasRemaining {
 		w.logger.Infof("Organization %s still has child resources being cleaned up - skipping hard delete", org.ID)
 		return nil
+	}
+
+	if err := w.hardDeleteUsers(tx, org); err != nil {
+		return fmt.Errorf("failed to hard-delete users: %w", err)
 	}
 
 	if err := tx.Unscoped().Delete(&org).Error; err != nil {
@@ -117,7 +121,9 @@ func (w *OrganizationCleanupWorker) processOrganization(tx *gorm.DB, org models.
 	return nil
 }
 
-func (w *OrganizationCleanupWorker) hasRemainingChildResources(tx *gorm.DB, org models.Organization) (bool, error) {
+// hasRemainingAsyncResources checks for canvases and integrations that are
+// still being processed by their respective cleanup workers.
+func (w *OrganizationCleanupWorker) hasRemainingAsyncResources(tx *gorm.DB, org models.Organization) (bool, error) {
 	orgID := org.ID.String()
 
 	var canvasCount int64
@@ -136,13 +142,21 @@ func (w *OrganizationCleanupWorker) hasRemainingChildResources(tx *gorm.DB, org 
 		return true, nil
 	}
 
-	var userCount int64
-	if err := tx.Unscoped().Model(&models.User{}).Where("organization_id = ?", orgID).Count(&userCount).Error; err != nil {
-		return false, fmt.Errorf("failed to count users: %w", err)
-	}
-	if userCount > 0 {
-		return true, nil
+	return false, nil
+}
+
+// hardDeleteUsers permanently removes all soft-deleted users belonging to the
+// organization. Users don't have a dedicated cleanup worker, so the org
+// cleanup worker handles their removal directly.
+func (w *OrganizationCleanupWorker) hardDeleteUsers(tx *gorm.DB, org models.Organization) error {
+	result := tx.Unscoped().Where("organization_id = ?", org.ID).Delete(&models.User{})
+	if result.Error != nil {
+		return result.Error
 	}
 
-	return false, nil
+	if result.RowsAffected > 0 {
+		w.logger.Infof("Hard-deleted %d users from organization %s", result.RowsAffected, org.ID)
+	}
+
+	return nil
 }

@@ -51,10 +51,6 @@ func Test__OrganizationCleanupWorker_HardDeletesAfterGracePeriod(t *testing.T) {
 	err := models.SoftDeleteOrganization(r.Organization.ID.String())
 	require.NoError(t, err)
 
-	// Soft-delete users so they don't block hard-delete
-	err = models.SoftDeleteOrganizationUsersInTransaction(database.Conn(), r.Organization.ID.String())
-	require.NoError(t, err)
-
 	var org models.Organization
 	err = database.Conn().Unscoped().Where("id = ?", r.Organization.ID).First(&org).Error
 	require.NoError(t, err)
@@ -65,6 +61,10 @@ func Test__OrganizationCleanupWorker_HardDeletesAfterGracePeriod(t *testing.T) {
 	var count int64
 	database.Conn().Unscoped().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Count(&count)
 	assert.Equal(t, int64(0), count, "Organization should be hard-deleted after grace period")
+
+	var userCount int64
+	database.Conn().Unscoped().Model(&models.User{}).Where("organization_id = ?", r.Organization.ID).Count(&userCount)
+	assert.Equal(t, int64(0), userCount, "Users should be hard-deleted along with the organization")
 }
 
 func Test__OrganizationCleanupWorker_WaitsForChildResources(t *testing.T) {
@@ -123,13 +123,6 @@ func Test__OrganizationCleanupWorker_WaitsForChildResources(t *testing.T) {
 			break
 		}
 	}
-
-	// Soft-delete users so they don't block hard-delete
-	err = models.SoftDeleteOrganizationUsersInTransaction(database.Conn(), r.Organization.ID.String())
-	require.NoError(t, err)
-
-	// Hard-delete users since the org cleanup worker checks for remaining users
-	database.Conn().Unscoped().Where("organization_id = ?", r.Organization.ID).Delete(&models.User{})
 
 	err = worker.LockAndProcessOrganization(org)
 	require.NoError(t, err)
@@ -192,10 +185,6 @@ func Test__OrganizationCleanupWorker_WaitsForIntegrations(t *testing.T) {
 
 	database.Conn().Unscoped().Where("id = ?", integration.ID).Delete(&models.Integration{})
 
-	// Soft-delete and hard-delete users
-	models.SoftDeleteOrganizationUsersInTransaction(database.Conn(), r.Organization.ID.String())
-	database.Conn().Unscoped().Where("organization_id = ?", r.Organization.ID).Delete(&models.User{})
-
 	err = worker.LockAndProcessOrganization(org)
 	require.NoError(t, err)
 
@@ -209,9 +198,6 @@ func Test__OrganizationCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 
 	err := models.SoftDeleteOrganization(r.Organization.ID.String())
 	require.NoError(t, err)
-
-	models.SoftDeleteOrganizationUsersInTransaction(database.Conn(), r.Organization.ID.String())
-	database.Conn().Unscoped().Where("organization_id = ?", r.Organization.ID).Delete(&models.User{})
 
 	var org models.Organization
 	err = database.Conn().Unscoped().Where("id = ?", r.Organization.ID).First(&org).Error
