@@ -290,32 +290,13 @@ func buildReceivers(config Config, auth core.AuthContext) (core.NotificationRece
 	for _, r := range config.Recipients {
 		switch r.Type {
 		case RecipientTypeUser:
-			if r.User == "" {
-				continue
+			if err := resolveUserEmail(r.User, auth, emailSet); err != nil {
+				return core.NotificationReceivers{}, err
 			}
-
-			userID, err := uuid.Parse(r.User)
-			if err != nil {
-				return core.NotificationReceivers{}, fmt.Errorf("invalid user ID %q: %w", r.User, err)
-			}
-
-			user, err := auth.GetUser(userID)
-			if err != nil {
-				return core.NotificationReceivers{}, fmt.Errorf("failed to resolve user %q: %w", r.User, err)
-			}
-
-			if user.Email != "" {
-				emailSet[user.Email] = struct{}{}
-			}
-
 		case RecipientTypeRole:
-			if r.Role != "" {
-				roleSet[r.Role] = struct{}{}
-			}
+			addIfNotEmpty(r.Role, roleSet)
 		case RecipientTypeGroup:
-			if r.Group != "" {
-				groupSet[r.Group] = struct{}{}
-			}
+			addIfNotEmpty(r.Group, groupSet)
 		}
 	}
 
@@ -324,6 +305,34 @@ func buildReceivers(config Config, auth core.AuthContext) (core.NotificationRece
 		Groups: mapKeys(groupSet),
 		Roles:  mapKeys(roleSet),
 	}, nil
+}
+
+func resolveUserEmail(rawID string, auth core.AuthContext, dest map[string]struct{}) error {
+	if rawID == "" {
+		return nil
+	}
+
+	userID, err := uuid.Parse(rawID)
+	if err != nil {
+		return fmt.Errorf("invalid user ID %q: %w", rawID, err)
+	}
+
+	user, err := auth.GetUser(userID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve user %q: %w", rawID, err)
+	}
+
+	if user.Email != "" {
+		dest[user.Email] = struct{}{}
+	}
+
+	return nil
+}
+
+func addIfNotEmpty(value string, dest map[string]struct{}) {
+	if value != "" {
+		dest[value] = struct{}{}
+	}
 }
 
 func mapKeys(input map[string]struct{}) []string {
