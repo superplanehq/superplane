@@ -140,6 +140,9 @@ dev.logs.app:
 dev.logs.otel:
 	$(COMPOSE) logs -f otel
 
+dev.logs.agent:
+	$(COMPOSE) logs -f agent
+
 dev.down:
 	$(COMPOSE) down --remove-orphans
 

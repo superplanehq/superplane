@@ -112,6 +112,14 @@ def _to_jsonable(value: Any) -> Any:
 
 def _build_deps(payload: ReplStreamRequest) -> AgentDeps:
     if payload.canvas_id is None:
+        _debug_log(
+            "missing canvas_id in payload",
+            model=payload.model,
+            org_id=payload.org_id,
+            has_base_url=bool(_normalize_optional(payload.base_url)),
+            has_token=bool(_normalize_optional(payload.token)),
+            question_preview=payload.question[:120],
+        )
         raise ValueError("canvas_id is required for non-test models.")
 
     base_url = _resolve_required(payload.base_url, "SUPERPLANE_BASE_URL")
@@ -134,11 +142,19 @@ def _build_deps(payload: ReplStreamRequest) -> AgentDeps:
     )
     return AgentDeps(
         client=client,
+        canvas_id=payload.canvas_id,
     )
 
 
 async def _stream_agent_run(payload: ReplStreamRequest) -> AsyncIterator[dict[str, Any]]:
     started_at = time.perf_counter()
+    _debug_log(
+        "starting agent run",
+        model=payload.model,
+        canvas_id=payload.canvas_id,
+        org_id=payload.org_id,
+        question_preview=payload.question[:120],
+    )
     yield {
         "type": "run_started",
         "model": payload.model,
@@ -146,6 +162,7 @@ async def _stream_agent_run(payload: ReplStreamRequest) -> AsyncIterator[dict[st
     }
 
     if payload.model == "test":
+        _debug_log("using test model run path", canvas_id=payload.canvas_id)
         test_agent: Agent[None, str] = Agent(model=TestModel(), output_type=str)
         async for event in test_agent.run_stream_events(user_prompt=payload.question):
             if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
@@ -173,6 +190,12 @@ async def _stream_agent_run(payload: ReplStreamRequest) -> AsyncIterator[dict[st
 
     agent = build_agent(model=payload.model)
     deps = _build_deps(payload)
+    _debug_log(
+        "running non-test agent",
+        model=payload.model,
+        canvas_id=payload.canvas_id,
+        org_id=payload.org_id,
+    )
 
     output_tool_call_id: str | None = None
     output_tool_name_hints = {"final_result", "return_canvasanswer", "canvasanswer"}
@@ -358,6 +381,11 @@ def _create_app() -> FastAPI:
         )
 
     return app
+
+
+def create_app() -> FastAPI:
+    """Public app factory for uvicorn --factory usage."""
+    return _create_app()
 
 
 class WebServer:

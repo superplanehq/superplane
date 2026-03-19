@@ -117,7 +117,13 @@ services:
       IN_DOCKER: "1"
       SUPERPLANE_BASE_URL: ${SUPERPLANE_BASE_URL:-http://app:8000}
       REPL_WEB_DEBUG: ${REPL_WEB_DEBUG:-true}
-    command: bash -lc "uv run python -m repl.main --server --test-repl-web-host 0.0.0.0 --test-repl-web-port 8090"
+    command: >-
+      bash -lc "uv run uvicorn ai.repl_web:create_app
+      --factory
+      --host 0.0.0.0
+      --port 8090
+      --reload
+      --reload-dir /app/src"
     tty: true
     stdin_open: true
     ports:
