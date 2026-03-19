@@ -13,17 +13,23 @@ import {
 import { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { formatTimeAgo } from "@/utils/date";
-import { DropletNodeMetadata, GetDropletMetricsConfiguration } from "./types";
+import { UpdateAlertPolicyConfiguration } from "./types";
 
-const LOOKBACK_PERIOD_LABELS: Record<string, string> = {
-  "1h": "Last 1 hour",
-  "6h": "Last 6 hours",
-  "24h": "Last 24 hours",
-  "7d": "Last 7 days",
-  "14d": "Last 14 days",
+const METRIC_TYPE_LABELS: Record<string, string> = {
+  "v1/insights/droplet/cpu": "CPU Usage",
+  "v1/insights/droplet/memory_utilization_percent": "Memory Usage",
+  "v1/insights/droplet/disk_read": "Disk Read",
+  "v1/insights/droplet/disk_write": "Disk Write",
+  "v1/insights/droplet/public_outbound_bandwidth": "Public Outbound BW",
+  "v1/insights/droplet/public_inbound_bandwidth": "Public Inbound BW",
+  "v1/insights/droplet/private_outbound_bandwidth": "Private Outbound BW",
+  "v1/insights/droplet/private_inbound_bandwidth": "Private Inbound BW",
+  "v1/insights/droplet/load_1": "Load Avg (1 min)",
+  "v1/insights/droplet/load_5": "Load Avg (5 min)",
+  "v1/insights/droplet/load_15": "Load Avg (15 min)",
 };
 
-export const getDropletMetricsMapper: ComponentBaseMapper = {
+export const updateAlertPolicyMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name ?? "digitalocean";
@@ -40,7 +46,7 @@ export const getDropletMetricsMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
@@ -48,21 +54,26 @@ export const getDropletMetricsMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as Record<string, any> | undefined;
-    if (!result) return details;
+    const policy = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    if (!policy) return details;
 
-    details["Droplet ID"] = result.dropletId?.toString() || "-";
-    details["Period"] = LOOKBACK_PERIOD_LABELS[result.lookbackPeriod] || result.lookbackPeriod || "-";
-    details["From"] = result.start ? new Date(result.start).toLocaleString() : "-";
-    details["To"] = result.end ? new Date(result.end).toLocaleString() : "-";
+    details["Policy UUID"] = policy.uuid || "-";
+    details["Description"] = policy.description || "-";
+    details["Metric"] = METRIC_TYPE_LABELS[policy.type] || policy.type || "-";
+    details["Comparison"] = policy.compare || "-";
+    details["Threshold"] = policy.value?.toString() ?? "-";
+    details["Window"] = policy.window || "-";
+    details["Enabled"] = policy.enabled ? "Yes" : "No";
 
-    details["Avg. CPU Usage"] = result.avgCpuUsagePercent !== undefined ? `${result.avgCpuUsagePercent}%` : "-";
-    details["Avg. Memory Usage"] =
-      result.avgMemoryUsagePercent !== undefined ? `${result.avgMemoryUsagePercent}%` : "-";
-    details["Avg. Outbound Bandwidth"] =
-      result.avgPublicOutboundBandwidthMbps !== undefined ? `${result.avgPublicOutboundBandwidthMbps} Mbps` : "-";
-    details["Avg. Inbound Bandwidth"] =
-      result.avgPublicInboundBandwidthMbps !== undefined ? `${result.avgPublicInboundBandwidthMbps} Mbps` : "-";
+    const emails: string[] = policy.alerts?.email ?? [];
+    if (emails.length > 0) {
+      details["Email Notifications"] = emails.join(", ");
+    }
+
+    const slackChannels: { channel: string }[] = policy.alerts?.slack ?? [];
+    if (slackChannels.length > 0) {
+      details["Slack Channel"] = slackChannels.map((s) => s.channel).join(", ");
+    }
 
     return details;
   },
@@ -75,18 +86,20 @@ export const getDropletMetricsMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as DropletNodeMetadata | undefined;
-  const configuration = node.configuration as GetDropletMetricsConfiguration;
+  const configuration = node.configuration as UpdateAlertPolicyConfiguration;
 
-  if (nodeMetadata?.dropletName) {
-    metadata.push({ icon: "hard-drive", label: nodeMetadata.dropletName });
-  } else if (configuration?.droplet) {
-    metadata.push({ icon: "info", label: `Droplet: ${configuration.droplet}` });
+  if (configuration?.description) {
+    metadata.push({ icon: "bell", label: configuration.description });
   }
 
-  if (configuration?.lookbackPeriod) {
-    const label = LOOKBACK_PERIOD_LABELS[configuration.lookbackPeriod] || configuration.lookbackPeriod;
-    metadata.push({ icon: "clock", label });
+  if (configuration?.type) {
+    const label = METRIC_TYPE_LABELS[configuration.type] || configuration.type;
+    metadata.push({ icon: "chart-line", label });
+  }
+
+  if (configuration?.compare && configuration?.value !== undefined) {
+    const op = configuration.compare === "GreaterThan" ? ">" : "<";
+    metadata.push({ icon: "gauge", label: `${op} ${configuration.value}` });
   }
 
   return metadata;
@@ -94,7 +107,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? componentName);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode!.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   return [

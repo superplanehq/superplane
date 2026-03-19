@@ -1013,6 +1013,19 @@ type CreateAlertPolicyRequest struct {
 	Enabled     bool              `json:"enabled"`
 }
 
+// UpdateAlertPolicyRequest is the payload for updating a monitoring alert policy
+type UpdateAlertPolicyRequest struct {
+	Type        string            `json:"type"`
+	Description string            `json:"description"`
+	Compare     string            `json:"compare"`
+	Value       float64           `json:"value"`
+	Window      string            `json:"window"`
+	Entities    []string          `json:"entities,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
+	Alerts      AlertPolicyAlerts `json:"alerts"`
+	Enabled     bool              `json:"enabled"`
+}
+
 // CreateAlertPolicy creates a new monitoring alert policy
 func (c *Client) CreateAlertPolicy(req CreateAlertPolicyRequest) (*AlertPolicy, error) {
 	url := fmt.Sprintf("%s/monitoring/alerts", c.BaseURL)
@@ -1023,6 +1036,31 @@ func (c *Client) CreateAlertPolicy(req CreateAlertPolicyRequest) (*AlertPolicy, 
 	}
 
 	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Policy AlertPolicy `json:"policy"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Policy, nil
+}
+
+// UpdateAlertPolicy updates an existing monitoring alert policy
+func (c *Client) UpdateAlertPolicy(policyUUID string, req UpdateAlertPolicyRequest) (*AlertPolicy, error) {
+	url := fmt.Sprintf("%s/monitoring/alerts/%s", c.BaseURL, policyUUID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -1156,9 +1194,27 @@ func (c *Client) GetDropletCPUMetrics(dropletID string, start, end int64) (*Metr
 	return &response, nil
 }
 
-// GetDropletMemoryMetrics fetches memory utilization percentage metrics for a droplet
-func (c *Client) GetDropletMemoryMetrics(dropletID string, start, end int64) (*MetricsResponse, error) {
-	url := fmt.Sprintf("%s/monitoring/metrics/droplet/memory_utilization_percent?host_id=%s&start=%d&end=%d", c.BaseURL, dropletID, start, end)
+// GetDropletMemoryAvailableMetrics fetches available memory metrics for a droplet.
+// Available memory includes free memory and reclaimable cache, matching what
+// DigitalOcean's dashboard reports as memory utilization.
+func (c *Client) GetDropletMemoryAvailableMetrics(dropletID string, start, end int64) (*MetricsResponse, error) {
+	url := fmt.Sprintf("%s/monitoring/metrics/droplet/memory_available?host_id=%s&start=%d&end=%d", c.BaseURL, dropletID, start, end)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response MetricsResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response, nil
+}
+
+// GetDropletMemoryTotalMetrics fetches total memory metrics for a droplet
+func (c *Client) GetDropletMemoryTotalMetrics(dropletID string, start, end int64) (*MetricsResponse, error) {
+	url := fmt.Sprintf("%s/monitoring/metrics/droplet/memory_total?host_id=%s&start=%d&end=%d", c.BaseURL, dropletID, start, end)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -1175,8 +1231,7 @@ func (c *Client) GetDropletMemoryMetrics(dropletID string, start, end int64) (*M
 // GetDropletBandwidthMetrics fetches network bandwidth metrics for a droplet.
 // iface must be "public" or "private"; direction must be "outbound" or "inbound".
 func (c *Client) GetDropletBandwidthMetrics(dropletID, iface, direction string, start, end int64) (*MetricsResponse, error) {
-	metric := fmt.Sprintf("%s_%s_bandwidth", iface, direction)
-	url := fmt.Sprintf("%s/monitoring/metrics/droplet/%s?host_id=%s&start=%d&end=%d", c.BaseURL, metric, dropletID, start, end)
+	url := fmt.Sprintf("%s/monitoring/metrics/droplet/bandwidth?host_id=%s&interface=%s&direction=%s&start=%d&end=%d", c.BaseURL, dropletID, iface, direction, start, end)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err

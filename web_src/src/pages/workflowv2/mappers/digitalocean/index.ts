@@ -14,6 +14,7 @@ import { deleteLoadBalancerMapper } from "./delete_load_balancer";
 import { createAlertPolicyMapper } from "./create_alert_policy";
 import { getAlertPolicyMapper } from "./get_alert_policy";
 import { deleteAlertPolicyMapper } from "./delete_alert_policy";
+import { updateAlertPolicyMapper } from "./update_alert_policy";
 import { getDropletMetricsMapper } from "./get_droplet_metrics";
 import { buildActionStateRegistry } from "../utils";
 
@@ -33,6 +34,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   createAlertPolicy: createAlertPolicyMapper,
   getAlertPolicy: getAlertPolicyMapper,
   deleteAlertPolicy: deleteAlertPolicyMapper,
+  updateAlertPolicy: updateAlertPolicyMapper,
   getDropletMetrics: getDropletMetricsMapper,
 };
 
@@ -54,5 +56,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createAlertPolicy: buildActionStateRegistry("created"),
   getAlertPolicy: buildActionStateRegistry("fetched"),
   deleteAlertPolicy: buildActionStateRegistry("deleted"),
-  getDropletMetrics: buildActionStateRegistry("collected"),
+  updateAlertPolicy: buildActionStateRegistry("updated"),
+  getDropletMetrics: buildActionStateRegistry("fetched"),
 };
