@@ -185,6 +185,17 @@ service Organizations {
     };
   }
 
+  rpc DescribeUsage(DescribeUsageRequest) returns (DescribeUsageResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/usage"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe organization usage";
+      description: "Returns usage tracking and limits for an organization";
+      tags: "Organization";
+    };
+  }
+
   rpc AcceptInviteLink(InviteLink) returns (google.protobuf.Struct) {
     option (google.api.http) = {
       post: "/api/v1/invite-links/{token}/accept"
@@ -417,6 +428,33 @@ message DeleteAgentOpenAIKeyRequest {
 
 message DeleteAgentOpenAIKeyResponse {
   AgentSettings agent_settings = 1;
+}
+
+message OrganizationLimits {
+  int32 max_canvases = 1;
+  int32 max_nodes_per_canvas = 2;
+  int32 max_users = 3;
+  int32 retention_window_days = 4;
+  int64 max_events_per_month = 5;
+  int32 max_integrations = 6;
+}
+
+message OrganizationUsage {
+  int32 canvases = 1;
+  double event_bucket_level = 2;
+  double event_bucket_capacity = 3;
+  google.protobuf.Timestamp event_bucket_last_updated_at = 4;
+}
+
+message DescribeUsageRequest {
+  string id = 1;
+}
+
+message DescribeUsageResponse {
+  bool enabled = 1;
+  string status_message = 2;
+  OrganizationLimits limits = 3;
+  OrganizationUsage usage = 4;
 }
 
 message RemoveUserRequest {
