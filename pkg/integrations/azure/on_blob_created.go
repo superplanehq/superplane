@@ -18,10 +18,10 @@ type OnBlobCreated struct {
 }
 
 type OnBlobCreatedConfiguration struct {
-	ResourceGroup  string `json:"resourceGroup" mapstructure:"resourceGroup"`
-	StorageAccount string `json:"storageAccount" mapstructure:"storageAccount"`
+	ResourceGroup   string `json:"resourceGroup" mapstructure:"resourceGroup"`
+	StorageAccount  string `json:"storageAccount" mapstructure:"storageAccount"`
 	ContainerFilter string `json:"containerFilter" mapstructure:"containerFilter"`
-	BlobFilter     string `json:"blobFilter" mapstructure:"blobFilter"`
+	BlobFilter      string `json:"blobFilter" mapstructure:"blobFilter"`
 }
 
 func (t *OnBlobCreated) Name() string {

@@ -56,7 +56,7 @@ func TestOnBlobCreated_Setup(t *testing.T) {
 		ctx := core.TriggerContext{
 			Logger:        logrus.NewEntry(logrus.New()),
 			Configuration: map[string]any{},
-			Integration:   &mockIntegrationContext{},
+			Integration:   &contexts.IntegrationContext{},
 		}
 		err := trigger.Setup(ctx)
 		assert.Error(t, err)
@@ -69,7 +69,7 @@ func TestOnBlobCreated_Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"storageAccount": "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Storage/storageAccounts/mystorageaccount",
 			},
-			Integration: &mockIntegrationContext{},
+			Integration: &contexts.IntegrationContext{},
 		}
 		err := trigger.Setup(ctx)
 		assert.NoError(t, err)
