@@ -1,10 +1,6 @@
-import json
 import os
 from dataclasses import dataclass
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
 
 from ai.models import (
     CanvasEdge,
@@ -16,6 +12,14 @@ from ai.models import (
     NodeDetails,
     NodeEvent,
 )
+from superplaneapi.api.canvas_api import CanvasApi
+from superplaneapi.api.canvas_node_api import CanvasNodeApi
+from superplaneapi.api_client import ApiClient
+from superplaneapi.configuration import Configuration
+from superplaneapi.exceptions import ApiException
+from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
+from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
+from superplaneapi.models.components_node_type import ComponentsNodeType
 
 
 def _debug_enabled() -> bool:
@@ -38,129 +42,118 @@ class SuperplaneClientConfig:
 class SuperplaneClient:
     def __init__(self, config: SuperplaneClientConfig) -> None:
         self._config = config
-
-    def _build_url(self, path: str, query: dict[str, str | int] | None = None) -> str:
-        base = self._config.base_url.rstrip("/")
-        url = f"{base}{path}"
-        if query:
-            url = f"{url}?{urlencode(query)}"
-        return url
-
-    def _headers(self) -> dict[str, str]:
-        user_agent = os.getenv("SUPERPLANE_USER_AGENT", "curl/8.7.1")
-        return {
-            "Authorization": f"Bearer {self._config.api_token}",
-            "x-organization-id": self._config.organization_id,
-            "Accept": "application/json",
-            "User-Agent": user_agent,
-        }
-
-    def _request_json(self, path: str, query: dict[str, str | int] | None = None) -> dict[str, Any]:
-        url = self._build_url(path, query)
-        _debug_log(
-            f"request method=GET url={url} org_id={self._config.organization_id} timeout={self._config.timeout_seconds}s"
+        configuration = Configuration(
+            host=config.base_url.rstrip("/"),
+            ignore_operation_servers=True,
         )
-        request = Request(
-            url=url,
-            method="GET",
-            headers=self._headers(),
+        self._api_client = ApiClient(configuration=configuration)
+        self._api_client.set_default_header("Authorization", f"Bearer {self._config.api_token}")
+        self._api_client.set_default_header("x-organization-id", self._config.organization_id)
+        self._api_client.set_default_header("Accept", "application/json")
+        self._api_client.set_default_header(
+            "User-Agent",
+            os.getenv("SUPERPLANE_USER_AGENT", "curl/8.7.1"),
+        )
+        self._canvas_api = CanvasApi(self._api_client)
+        self._canvas_node_api = CanvasNodeApi(self._api_client)
+
+    def _with_error_guidance(self, callback: Any, operation: str) -> Any:
+        _debug_log(
+            f"request operation={operation} base_url={self._config.base_url.rstrip('/')} "
+            f"org_id={self._config.organization_id} timeout={self._config.timeout_seconds}s"
         )
         try:
-            with urlopen(request, timeout=self._config.timeout_seconds) as response:
-                raw = response.read().decode("utf-8")
-                _debug_log(f"response status={response.status} bytes={len(raw.encode('utf-8'))}")
-        except HTTPError as error:
-            response_text = ""
-            try:
-                response_text = error.read().decode("utf-8")
-            except Exception:
-                response_text = ""
-            _debug_log(f"http_error status={error.code} body={response_text[:400]}")
+            response = callback()
+            _debug_log(f"response operation={operation} status=ok")
+            return response
+        except ApiException as error:
+            status = error.status if isinstance(error.status, int) else None
+            response_text = error.body if isinstance(error.body, str) else ""
+            _debug_log(
+                f"http_error operation={operation} status={status} body={response_text[:400]}"
+            )
 
             guidance = (
                 "Check SUPERPLANE_API_TOKEN, SUPERPLANE_ORG_ID, and canvas access permissions."
-                if error.code in {401, 403}
+                if status in {401, 403}
                 else "Check SUPERPLANE_BASE_URL and request parameters."
             )
-            details = (
-                f" HTTP {error.code}: {response_text}" if response_text else f" HTTP {error.code}."
-            )
+            if response_text:
+                details = f" HTTP {status}: {response_text}"
+            else:
+                details = f" HTTP {status or 'unknown'}."
             raise RuntimeError(f"Superplane API request failed.{details} {guidance}") from error
-        except URLError as error:
-            _debug_log(f"url_error reason={error}")
+        except Exception as error:
+            _debug_log(f"url_error operation={operation} reason={error}")
             raise RuntimeError(
                 "Failed to reach Superplane API. "
                 "Check SUPERPLANE_BASE_URL and network connectivity."
             ) from error
 
-        payload = json.loads(raw)
-        if not isinstance(payload, dict):
-            raise ValueError("Expected JSON object response from Superplane API.")
-        return payload
-
     def describe_canvas(self, canvas_id: str) -> CanvasSummary:
-        payload = self._request_json(f"/api/v1/canvases/{canvas_id}")
-        raw_canvas = payload.get("canvas")
-        if not isinstance(raw_canvas, dict):
-            raise ValueError("Canvas response is missing 'canvas'.")
-
-        metadata = (
-            raw_canvas.get("metadata") if isinstance(raw_canvas.get("metadata"), dict) else {}
+        response = self._with_error_guidance(
+            lambda: self._canvas_api.canvases_describe_canvas(
+                canvas_id,
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="canvases_describe_canvas",
         )
-        spec = raw_canvas.get("spec") if isinstance(raw_canvas.get("spec"), dict) else {}
+        if not isinstance(response, CanvasesDescribeCanvasResponse):
+            raise ValueError("Expected typed response from Superplane API.")
 
-        raw_nodes = spec.get("nodes") if isinstance(spec.get("nodes"), list) else []
+        raw_canvas = response.canvas
+        if raw_canvas is None:
+            raise ValueError("Canvas response is missing 'canvas'.")
+        metadata = raw_canvas.metadata
+        spec = raw_canvas.spec
+        raw_nodes = spec.nodes if spec is not None and spec.nodes is not None else []
         nodes: list[CanvasNode] = []
         for item in raw_nodes:
-            if not isinstance(item, dict):
-                continue
-            node_id = item.get("id")
-            if not isinstance(node_id, str) or not node_id.strip():
+            node_id = item.id
+            if not isinstance(node_id, str) or not node_id:
                 continue
 
             block_name: str | None = None
-            trigger = item.get("trigger")
-            component = item.get("component")
-            if isinstance(trigger, dict) and isinstance(trigger.get("name"), str):
-                block_name = trigger["name"]
-            elif isinstance(component, dict) and isinstance(component.get("name"), str):
-                block_name = component["name"]
+            if item.trigger is not None and isinstance(item.trigger.name, str):
+                block_name = item.trigger.name
+            elif item.component is not None and isinstance(item.component.name, str):
+                block_name = item.component.name
 
             nodes.append(
                 CanvasNode(
                     id=node_id,
-                    name=item.get("name") if isinstance(item.get("name"), str) else None,
-                    type=item.get("type") if isinstance(item.get("type"), str) else None,
+                    name=item.name if isinstance(item.name, str) else None,
+                    type=item.type.value if isinstance(item.type, ComponentsNodeType) else None,
                     block_name=block_name,
                 )
             )
 
-        raw_edges = spec.get("edges") if isinstance(spec.get("edges"), list) else []
+        raw_edges = spec.edges if spec is not None and spec.edges is not None else []
         edges: list[CanvasEdge] = []
         for item in raw_edges:
-            if not isinstance(item, dict):
-                continue
-            source_id = item.get("sourceId")
-            target_id = item.get("targetId")
+            source_id = item.source_id
+            target_id = item.target_id
             if not isinstance(source_id, str) or not isinstance(target_id, str):
                 continue
-            channel = item.get("channel")
+            channel = item.channel
             edges.append(
                 CanvasEdge(
                     source_id=source_id,
                     target_id=target_id,
-                    channel=channel if isinstance(channel, str) and channel.strip() else "default",
+                    channel=channel if isinstance(channel, str) and channel else "default",
                 )
             )
 
         return CanvasSummary(
-            canvas_id=metadata.get("id") if isinstance(metadata.get("id"), str) else canvas_id,
-            name=metadata.get("name") if isinstance(metadata.get("name"), str) else None,
-            description=(
-                metadata.get("description")
-                if isinstance(metadata.get("description"), str)
-                else None
+            canvas_id=(
+                metadata.id
+                if metadata is not None and isinstance(metadata.id, str)
+                else canvas_id
             ),
+            name=metadata.name if metadata is not None and isinstance(metadata.name, str) else None,
+            description=metadata.description
+            if metadata is not None and isinstance(metadata.description, str)
+            else None,
             nodes=nodes,
             edges=edges,
         )
@@ -205,27 +198,31 @@ class SuperplaneClient:
         )
 
     def list_node_events(self, canvas_id: str, node_id: str, limit: int = 5) -> list[NodeEvent]:
-        payload = self._request_json(
-            f"/api/v1/canvases/{canvas_id}/nodes/{node_id}/events",
-            query={"limit": limit},
+        response = self._with_error_guidance(
+            lambda: self._canvas_node_api.canvases_list_node_events(
+                canvas_id,
+                node_id,
+                limit=limit,
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="canvases_list_node_events",
         )
-        raw_events = payload.get("events")
-        if not isinstance(raw_events, list):
+        if not isinstance(response, CanvasesListNodeEventsResponse) or not isinstance(
+            response.events, list
+        ):
             return []
 
         events: list[NodeEvent] = []
-        for item in raw_events:
-            if not isinstance(item, dict):
-                continue
-            data = item.get("data")
+        for item in response.events:
+            data = item.data
             events.append(
                 NodeEvent(
-                    id=item.get("id") if isinstance(item.get("id"), str) else None,
-                    node_id=item.get("nodeId") if isinstance(item.get("nodeId"), str) else None,
-                    channel=item.get("channel") if isinstance(item.get("channel"), str) else None,
-                    created_at=(
-                        item.get("createdAt") if isinstance(item.get("createdAt"), str) else None
-                    ),
+                    id=item.id if isinstance(item.id, str) else None,
+                    node_id=item.node_id if isinstance(item.node_id, str) else None,
+                    channel=item.channel if isinstance(item.channel, str) else None,
+                    created_at=item.created_at.isoformat()
+                    if item.created_at is not None
+                    else None,
                     data=data if isinstance(data, dict) else {},
                 )
             )

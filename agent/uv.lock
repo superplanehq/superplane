@@ -1678,6 +1678,8 @@ dependencies = [
     { name = "fastapi" },
     { name = "pydantic" },
     { name = "pydantic-ai" },
+    { name = "python-dateutil" },
+    { name = "urllib3" },
     { name = "uvicorn" },
 ]
 
@@ -1694,6 +1696,8 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.135.1" },
     { name = "pydantic", specifier = ">=2.11.0" },
     { name = "pydantic-ai", specifier = ">=0.4.0" },
+    { name = "python-dateutil", specifier = ">=2.9.0" },
+    { name = "urllib3", specifier = ">=2.0.0" },
     { name = "uvicorn", specifier = ">=0.42.0" },
 ]
 
