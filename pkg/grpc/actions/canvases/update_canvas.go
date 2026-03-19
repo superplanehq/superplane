@@ -108,7 +108,7 @@ func UpdateCanvas(
 		}
 	}
 
-	if publishErr := messages.NewCanvasUpdatedMessage(canvas.ID.String()).Publish(true); publishErr != nil {
+	if publishErr := messages.NewCanvasUpdatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishUpdated(); publishErr != nil {
 		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", publishErr)
 	}
 

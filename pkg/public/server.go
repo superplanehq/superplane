@@ -533,7 +533,7 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	for _, event := range newEvents {
-		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 }
 
@@ -799,7 +799,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, event := range newEvents {
-		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
 	if firstResponse != nil {

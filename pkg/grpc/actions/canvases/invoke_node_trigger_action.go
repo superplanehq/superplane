@@ -113,7 +113,7 @@ func InvokeNodeTriggerAction(
 	}
 
 	for _, event := range newEvents {
-		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
 	// Convert result to protobuf struct

@@ -53,13 +53,13 @@ func (e *EventDistributer) Start() error {
 		RoutingKey string
 		Handler    func(delivery tackle.Delivery) error
 	}{
-		{messages.WorkflowExchange, messages.WorkflowEventCreatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasEventCreated)},
-		{messages.WorkflowExchange, messages.WorkflowExecutionRoutingKey, e.createHandler(eventdistributer.HandleCanvasExecution)},
-		{messages.WorkflowExchange, messages.WorkflowQueueItemCreatedRoutingKey, e.createHandler(eventdistributer.HandleQueueItemCreated)},
-		{messages.WorkflowExchange, messages.WorkflowQueueItemConsumedRoutingKey, e.createHandler(eventdistributer.HandleQueueItemConsumed)},
-		{messages.WorkflowExchange, messages.WorkflowCanvasUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasUpdated)},
-		{messages.WorkflowExchange, messages.WorkflowCanvasVersionUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasVersionUpdated)},
-		{messages.WorkflowExchange, messages.WorkflowCanvasDeletedRoutingKey, e.createHandler(eventdistributer.HandleCanvasDeleted)},
+		{messages.CanvasExchange, messages.CanvasEventCreatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasEventCreated)},
+		{messages.CanvasExchange, messages.CanvasExecutionRoutingKey, e.createHandler(eventdistributer.HandleCanvasExecution)},
+		{messages.CanvasExchange, messages.CanvasQueueItemCreatedRoutingKey, e.createHandler(eventdistributer.HandleQueueItemCreated)},
+		{messages.CanvasExchange, messages.CanvasQueueItemConsumedRoutingKey, e.createHandler(eventdistributer.HandleQueueItemConsumed)},
+		{messages.CanvasExchange, messages.CanvasUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasUpdated)},
+		{messages.CanvasExchange, messages.CanvasVersionUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasVersionUpdated)},
+		{messages.CanvasExchange, messages.CanvasDeletedRoutingKey, e.createHandler(eventdistributer.HandleCanvasDeleted)},
 	}
 
 	// Start a consumer for each route

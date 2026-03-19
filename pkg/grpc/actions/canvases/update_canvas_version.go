@@ -288,7 +288,7 @@ func updateLiveCanvasWithoutVersioning(
 		return nil, status.Error(codes.Internal, "failed to update live canvas")
 	}
 
-	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String()).Publish(true); err != nil {
+	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishUpdated(); err != nil {
 		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", err)
 	}
 	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {

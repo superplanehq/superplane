@@ -54,7 +54,7 @@ func EmitNodeEvent(
 		return nil, fmt.Errorf("failed to create workflow event: %w", err)
 	}
 
-	err = messages.NewCanvasEventCreatedMessage(canvasID.String(), &event).Publish()
+	err = messages.NewCanvasEventCreatedMessage(canvasID.String(), canvas.OrganizationID.String(), &event).Publish()
 
 	if err != nil {
 		log.Errorf("failed to publish workflow event RabbitMQ message: %v", err)
