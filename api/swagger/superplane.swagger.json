@@ -2771,6 +2771,108 @@
         ]
       }
     },
+    "/api/v1/organizations/{id}/okta-idp": {
+      "get": {
+        "summary": "Get organization Okta IdP settings",
+        "description": "Returns Okta OIDC/SCIM configuration metadata for an organization (no secrets)",
+        "operationId": "Organizations_GetOktaIdpSettings",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsGetOktaIdpSettingsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      },
+      "patch": {
+        "summary": "Create or update organization Okta IdP settings",
+        "description": "Creates or updates Okta issuer URL, OAuth client id/secret, and OIDC/SCIM toggles",
+        "operationId": "Organizations_UpdateOktaIdpSettings",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateOktaIdpSettingsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateOktaIdpSettingsBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/api/v1/organizations/{id}/okta-idp/rotate-scim-token": {
+      "post": {
+        "summary": "Rotate organization SCIM bearer token",
+        "description": "Generates a new SCIM bearer token; the plaintext is returned once",
+        "operationId": "Organizations_RotateOktaScimBearerToken",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsRotateOktaScimBearerTokenResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
     "/api/v1/organizations/{id}/users/{userId}": {
       "delete": {
         "summary": "Remove a user from an organization",
@@ -5920,6 +6022,14 @@
         }
       }
     },
+    "OrganizationsGetOktaIdpSettingsResponse": {
+      "type": "object",
+      "properties": {
+        "settings": {
+          "$ref": "#/definitions/OrganizationsOktaIdpSettings"
+        }
+      }
+    },
     "OrganizationsIntegration": {
       "type": "object",
       "properties": {
@@ -6072,6 +6182,43 @@
         }
       }
     },
+    "OrganizationsOktaIdpSettings": {
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string"
+        },
+        "configured": {
+          "type": "boolean"
+        },
+        "issuerBaseUrl": {
+          "type": "string"
+        },
+        "oauthClientId": {
+          "type": "string"
+        },
+        "oauthClientSecretConfigured": {
+          "type": "boolean"
+        },
+        "oidcEnabled": {
+          "type": "boolean"
+        },
+        "scimEnabled": {
+          "type": "boolean"
+        },
+        "scimBearerTokenConfigured": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
     "OrganizationsOrganization": {
       "type": "object",
       "properties": {
@@ -6116,6 +6263,17 @@
       "properties": {
         "inviteLink": {
           "$ref": "#/definitions/OrganizationsInviteLink"
+        }
+      }
+    },
+    "OrganizationsRotateOktaScimBearerTokenResponse": {
+      "type": "object",
+      "properties": {
+        "scimBearerToken": {
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/definitions/OrganizationsOktaIdpSettings"
         }
       }
     },
@@ -6186,6 +6344,34 @@
       "properties": {
         "inviteLink": {
           "$ref": "#/definitions/OrganizationsInviteLink"
+        }
+      }
+    },
+    "OrganizationsUpdateOktaIdpSettingsBody": {
+      "type": "object",
+      "properties": {
+        "issuerBaseUrl": {
+          "type": "string"
+        },
+        "oauthClientId": {
+          "type": "string"
+        },
+        "oauthClientSecret": {
+          "type": "string"
+        },
+        "oidcEnabled": {
+          "type": "boolean"
+        },
+        "scimEnabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "OrganizationsUpdateOktaIdpSettingsResponse": {
+      "type": "object",
+      "properties": {
+        "settings": {
+          "$ref": "#/definitions/OrganizationsOktaIdpSettings"
         }
       }
     },

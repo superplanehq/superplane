@@ -180,6 +180,9 @@ import type {
   OrganizationsGetInviteLinkData,
   OrganizationsGetInviteLinkErrors,
   OrganizationsGetInviteLinkResponses,
+  OrganizationsGetOktaIdpSettingsData,
+  OrganizationsGetOktaIdpSettingsErrors,
+  OrganizationsGetOktaIdpSettingsResponses,
   OrganizationsListIntegrationResourcesData,
   OrganizationsListIntegrationResourcesErrors,
   OrganizationsListIntegrationResourcesResponses,
@@ -198,6 +201,9 @@ import type {
   OrganizationsResetInviteLinkData,
   OrganizationsResetInviteLinkErrors,
   OrganizationsResetInviteLinkResponses,
+  OrganizationsRotateOktaScimBearerTokenData,
+  OrganizationsRotateOktaScimBearerTokenErrors,
+  OrganizationsRotateOktaScimBearerTokenResponses,
   OrganizationsSetAgentOpenAiKeyData,
   OrganizationsSetAgentOpenAiKeyErrors,
   OrganizationsSetAgentOpenAiKeyResponses,
@@ -210,6 +216,9 @@ import type {
   OrganizationsUpdateInviteLinkData,
   OrganizationsUpdateInviteLinkErrors,
   OrganizationsUpdateInviteLinkResponses,
+  OrganizationsUpdateOktaIdpSettingsData,
+  OrganizationsUpdateOktaIdpSettingsErrors,
+  OrganizationsUpdateOktaIdpSettingsResponses,
   OrganizationsUpdateOrganizationData,
   OrganizationsUpdateOrganizationErrors,
   OrganizationsUpdateOrganizationResponses,
@@ -1398,6 +1407,55 @@ export const organizationsResetInviteLink = <ThrowOnError extends boolean = true
     OrganizationsResetInviteLinkErrors,
     ThrowOnError
   >({ url: "/api/v1/organizations/{id}/invite-link/reset", ...options });
+
+/**
+ * Get organization Okta IdP settings
+ *
+ * Returns Okta OIDC/SCIM configuration metadata for an organization (no secrets)
+ */
+export const organizationsGetOktaIdpSettings = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsGetOktaIdpSettingsData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<
+    OrganizationsGetOktaIdpSettingsResponses,
+    OrganizationsGetOktaIdpSettingsErrors,
+    ThrowOnError
+  >({ url: "/api/v1/organizations/{id}/okta-idp", ...options });
+
+/**
+ * Create or update organization Okta IdP settings
+ *
+ * Creates or updates Okta issuer URL, OAuth client id/secret, and OIDC/SCIM toggles
+ */
+export const organizationsUpdateOktaIdpSettings = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsUpdateOktaIdpSettingsData, ThrowOnError>,
+) =>
+  (options.client ?? client).patch<
+    OrganizationsUpdateOktaIdpSettingsResponses,
+    OrganizationsUpdateOktaIdpSettingsErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/okta-idp",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Rotate organization SCIM bearer token
+ *
+ * Generates a new SCIM bearer token; the plaintext is returned once
+ */
+export const organizationsRotateOktaScimBearerToken = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsRotateOktaScimBearerTokenData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    OrganizationsRotateOktaScimBearerTokenResponses,
+    OrganizationsRotateOktaScimBearerTokenErrors,
+    ThrowOnError
+  >({ url: "/api/v1/organizations/{id}/okta-idp/rotate-scim-token", ...options });
 
 /**
  * Remove a user from an organization

@@ -861,6 +861,10 @@ export type OrganizationsGetInviteLinkResponse = {
   inviteLink?: OrganizationsInviteLink;
 };
 
+export type OrganizationsGetOktaIdpSettingsResponse = {
+  settings?: OrganizationsOktaIdpSettings;
+};
+
 export type OrganizationsIntegration = {
   metadata?: OrganizationsIntegrationMetadata;
   spec?: OrganizationsIntegrationSpec;
@@ -922,6 +926,19 @@ export type OrganizationsListInvitationsResponse = {
   invitations?: Array<OrganizationsInvitation>;
 };
 
+export type OrganizationsOktaIdpSettings = {
+  organizationId?: string;
+  configured?: boolean;
+  issuerBaseUrl?: string;
+  oauthClientId?: string;
+  oauthClientSecretConfigured?: boolean;
+  oidcEnabled?: boolean;
+  scimEnabled?: boolean;
+  scimBearerTokenConfigured?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type OrganizationsOrganization = {
   metadata?: OrganizationsOrganizationMetadata;
 };
@@ -945,6 +962,11 @@ export type OrganizationsRemoveUserResponse = {
 
 export type OrganizationsResetInviteLinkResponse = {
   inviteLink?: OrganizationsInviteLink;
+};
+
+export type OrganizationsRotateOktaScimBearerTokenResponse = {
+  scimBearerToken?: string;
+  settings?: OrganizationsOktaIdpSettings;
 };
 
 export type OrganizationsSetAgentOpenAiKeyBody = {
@@ -981,6 +1003,18 @@ export type OrganizationsUpdateInviteLinkBody = {
 
 export type OrganizationsUpdateInviteLinkResponse = {
   inviteLink?: OrganizationsInviteLink;
+};
+
+export type OrganizationsUpdateOktaIdpSettingsBody = {
+  issuerBaseUrl?: string;
+  oauthClientId?: string;
+  oauthClientSecret?: string;
+  oidcEnabled?: boolean;
+  scimEnabled?: boolean;
+};
+
+export type OrganizationsUpdateOktaIdpSettingsResponse = {
+  settings?: OrganizationsOktaIdpSettings;
 };
 
 export type OrganizationsUpdateOrganizationBody = {
@@ -3348,6 +3382,93 @@ export type OrganizationsResetInviteLinkResponses = {
 
 export type OrganizationsResetInviteLinkResponse2 =
   OrganizationsResetInviteLinkResponses[keyof OrganizationsResetInviteLinkResponses];
+
+export type OrganizationsGetOktaIdpSettingsData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/organizations/{id}/okta-idp";
+};
+
+export type OrganizationsGetOktaIdpSettingsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type OrganizationsGetOktaIdpSettingsError =
+  OrganizationsGetOktaIdpSettingsErrors[keyof OrganizationsGetOktaIdpSettingsErrors];
+
+export type OrganizationsGetOktaIdpSettingsResponses = {
+  /**
+   * A successful response.
+   */
+  200: OrganizationsGetOktaIdpSettingsResponse;
+};
+
+export type OrganizationsGetOktaIdpSettingsResponse2 =
+  OrganizationsGetOktaIdpSettingsResponses[keyof OrganizationsGetOktaIdpSettingsResponses];
+
+export type OrganizationsUpdateOktaIdpSettingsData = {
+  body: OrganizationsUpdateOktaIdpSettingsBody;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/organizations/{id}/okta-idp";
+};
+
+export type OrganizationsUpdateOktaIdpSettingsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type OrganizationsUpdateOktaIdpSettingsError =
+  OrganizationsUpdateOktaIdpSettingsErrors[keyof OrganizationsUpdateOktaIdpSettingsErrors];
+
+export type OrganizationsUpdateOktaIdpSettingsResponses = {
+  /**
+   * A successful response.
+   */
+  200: OrganizationsUpdateOktaIdpSettingsResponse;
+};
+
+export type OrganizationsUpdateOktaIdpSettingsResponse2 =
+  OrganizationsUpdateOktaIdpSettingsResponses[keyof OrganizationsUpdateOktaIdpSettingsResponses];
+
+export type OrganizationsRotateOktaScimBearerTokenData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/organizations/{id}/okta-idp/rotate-scim-token";
+};
+
+export type OrganizationsRotateOktaScimBearerTokenErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type OrganizationsRotateOktaScimBearerTokenError =
+  OrganizationsRotateOktaScimBearerTokenErrors[keyof OrganizationsRotateOktaScimBearerTokenErrors];
+
+export type OrganizationsRotateOktaScimBearerTokenResponses = {
+  /**
+   * A successful response.
+   */
+  200: OrganizationsRotateOktaScimBearerTokenResponse;
+};
+
+export type OrganizationsRotateOktaScimBearerTokenResponse2 =
+  OrganizationsRotateOktaScimBearerTokenResponses[keyof OrganizationsRotateOktaScimBearerTokenResponses];
 
 export type OrganizationsRemoveUserData = {
   body?: never;

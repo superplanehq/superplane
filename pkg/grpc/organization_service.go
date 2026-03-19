@@ -136,6 +136,30 @@ func (s *OrganizationService) DeleteAgentOpenAIKey(
 	return organizations.DeleteAgentOpenAIKey(orgID, userID)
 }
 
+func (s *OrganizationService) GetOktaIdpSettings(
+	ctx context.Context,
+	req *pb.GetOktaIdpSettingsRequest,
+) (*pb.GetOktaIdpSettingsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.GetOktaIdpSettings(orgID)
+}
+
+func (s *OrganizationService) UpdateOktaIdpSettings(
+	ctx context.Context,
+	req *pb.UpdateOktaIdpSettingsRequest,
+) (*pb.UpdateOktaIdpSettingsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateOktaIdpSettings(ctx, s.encryptor, orgID, req)
+}
+
+func (s *OrganizationService) RotateOktaScimBearerToken(
+	ctx context.Context,
+	req *pb.RotateOktaScimBearerTokenRequest,
+) (*pb.RotateOktaScimBearerTokenResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.RotateOktaScimBearerToken(orgID)
+}
+
 func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.InviteLink) (*structpb.Struct, error) {
 	accountID, err := accountIDFromContext(ctx)
 	if err != nil {

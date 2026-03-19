@@ -20,27 +20,30 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Organizations_DescribeOrganization_FullMethodName     = "/Superplane.Organizations.Organizations/DescribeOrganization"
-	Organizations_UpdateOrganization_FullMethodName       = "/Superplane.Organizations.Organizations/UpdateOrganization"
-	Organizations_DeleteOrganization_FullMethodName       = "/Superplane.Organizations.Organizations/DeleteOrganization"
-	Organizations_RemoveUser_FullMethodName               = "/Superplane.Organizations.Organizations/RemoveUser"
-	Organizations_CreateInvitation_FullMethodName         = "/Superplane.Organizations.Organizations/CreateInvitation"
-	Organizations_ListInvitations_FullMethodName          = "/Superplane.Organizations.Organizations/ListInvitations"
-	Organizations_RemoveInvitation_FullMethodName         = "/Superplane.Organizations.Organizations/RemoveInvitation"
-	Organizations_GetInviteLink_FullMethodName            = "/Superplane.Organizations.Organizations/GetInviteLink"
-	Organizations_UpdateInviteLink_FullMethodName         = "/Superplane.Organizations.Organizations/UpdateInviteLink"
-	Organizations_ResetInviteLink_FullMethodName          = "/Superplane.Organizations.Organizations/ResetInviteLink"
-	Organizations_GetAgentSettings_FullMethodName         = "/Superplane.Organizations.Organizations/GetAgentSettings"
-	Organizations_UpdateAgentSettings_FullMethodName      = "/Superplane.Organizations.Organizations/UpdateAgentSettings"
-	Organizations_SetAgentOpenAIKey_FullMethodName        = "/Superplane.Organizations.Organizations/SetAgentOpenAIKey"
-	Organizations_DeleteAgentOpenAIKey_FullMethodName     = "/Superplane.Organizations.Organizations/DeleteAgentOpenAIKey"
-	Organizations_AcceptInviteLink_FullMethodName         = "/Superplane.Organizations.Organizations/AcceptInviteLink"
-	Organizations_ListIntegrations_FullMethodName         = "/Superplane.Organizations.Organizations/ListIntegrations"
-	Organizations_DescribeIntegration_FullMethodName      = "/Superplane.Organizations.Organizations/DescribeIntegration"
-	Organizations_ListIntegrationResources_FullMethodName = "/Superplane.Organizations.Organizations/ListIntegrationResources"
-	Organizations_CreateIntegration_FullMethodName        = "/Superplane.Organizations.Organizations/CreateIntegration"
-	Organizations_UpdateIntegration_FullMethodName        = "/Superplane.Organizations.Organizations/UpdateIntegration"
-	Organizations_DeleteIntegration_FullMethodName        = "/Superplane.Organizations.Organizations/DeleteIntegration"
+	Organizations_DescribeOrganization_FullMethodName      = "/Superplane.Organizations.Organizations/DescribeOrganization"
+	Organizations_UpdateOrganization_FullMethodName        = "/Superplane.Organizations.Organizations/UpdateOrganization"
+	Organizations_DeleteOrganization_FullMethodName        = "/Superplane.Organizations.Organizations/DeleteOrganization"
+	Organizations_RemoveUser_FullMethodName                = "/Superplane.Organizations.Organizations/RemoveUser"
+	Organizations_CreateInvitation_FullMethodName          = "/Superplane.Organizations.Organizations/CreateInvitation"
+	Organizations_ListInvitations_FullMethodName           = "/Superplane.Organizations.Organizations/ListInvitations"
+	Organizations_RemoveInvitation_FullMethodName          = "/Superplane.Organizations.Organizations/RemoveInvitation"
+	Organizations_GetInviteLink_FullMethodName             = "/Superplane.Organizations.Organizations/GetInviteLink"
+	Organizations_UpdateInviteLink_FullMethodName          = "/Superplane.Organizations.Organizations/UpdateInviteLink"
+	Organizations_ResetInviteLink_FullMethodName           = "/Superplane.Organizations.Organizations/ResetInviteLink"
+	Organizations_GetAgentSettings_FullMethodName          = "/Superplane.Organizations.Organizations/GetAgentSettings"
+	Organizations_UpdateAgentSettings_FullMethodName       = "/Superplane.Organizations.Organizations/UpdateAgentSettings"
+	Organizations_SetAgentOpenAIKey_FullMethodName         = "/Superplane.Organizations.Organizations/SetAgentOpenAIKey"
+	Organizations_DeleteAgentOpenAIKey_FullMethodName      = "/Superplane.Organizations.Organizations/DeleteAgentOpenAIKey"
+	Organizations_GetOktaIdpSettings_FullMethodName        = "/Superplane.Organizations.Organizations/GetOktaIdpSettings"
+	Organizations_UpdateOktaIdpSettings_FullMethodName     = "/Superplane.Organizations.Organizations/UpdateOktaIdpSettings"
+	Organizations_RotateOktaScimBearerToken_FullMethodName = "/Superplane.Organizations.Organizations/RotateOktaScimBearerToken"
+	Organizations_AcceptInviteLink_FullMethodName          = "/Superplane.Organizations.Organizations/AcceptInviteLink"
+	Organizations_ListIntegrations_FullMethodName          = "/Superplane.Organizations.Organizations/ListIntegrations"
+	Organizations_DescribeIntegration_FullMethodName       = "/Superplane.Organizations.Organizations/DescribeIntegration"
+	Organizations_ListIntegrationResources_FullMethodName  = "/Superplane.Organizations.Organizations/ListIntegrationResources"
+	Organizations_CreateIntegration_FullMethodName         = "/Superplane.Organizations.Organizations/CreateIntegration"
+	Organizations_UpdateIntegration_FullMethodName         = "/Superplane.Organizations.Organizations/UpdateIntegration"
+	Organizations_DeleteIntegration_FullMethodName         = "/Superplane.Organizations.Organizations/DeleteIntegration"
 )
 
 // OrganizationsClient is the client API for Organizations service.
@@ -61,6 +64,9 @@ type OrganizationsClient interface {
 	UpdateAgentSettings(ctx context.Context, in *UpdateAgentSettingsRequest, opts ...grpc.CallOption) (*UpdateAgentSettingsResponse, error)
 	SetAgentOpenAIKey(ctx context.Context, in *SetAgentOpenAIKeyRequest, opts ...grpc.CallOption) (*SetAgentOpenAIKeyResponse, error)
 	DeleteAgentOpenAIKey(ctx context.Context, in *DeleteAgentOpenAIKeyRequest, opts ...grpc.CallOption) (*DeleteAgentOpenAIKeyResponse, error)
+	GetOktaIdpSettings(ctx context.Context, in *GetOktaIdpSettingsRequest, opts ...grpc.CallOption) (*GetOktaIdpSettingsResponse, error)
+	UpdateOktaIdpSettings(ctx context.Context, in *UpdateOktaIdpSettingsRequest, opts ...grpc.CallOption) (*UpdateOktaIdpSettingsResponse, error)
+	RotateOktaScimBearerToken(ctx context.Context, in *RotateOktaScimBearerTokenRequest, opts ...grpc.CallOption) (*RotateOktaScimBearerTokenResponse, error)
 	AcceptInviteLink(ctx context.Context, in *InviteLink, opts ...grpc.CallOption) (*_struct.Struct, error)
 	ListIntegrations(ctx context.Context, in *ListIntegrationsRequest, opts ...grpc.CallOption) (*ListIntegrationsResponse, error)
 	DescribeIntegration(ctx context.Context, in *DescribeIntegrationRequest, opts ...grpc.CallOption) (*DescribeIntegrationResponse, error)
@@ -218,6 +224,36 @@ func (c *organizationsClient) DeleteAgentOpenAIKey(ctx context.Context, in *Dele
 	return out, nil
 }
 
+func (c *organizationsClient) GetOktaIdpSettings(ctx context.Context, in *GetOktaIdpSettingsRequest, opts ...grpc.CallOption) (*GetOktaIdpSettingsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOktaIdpSettingsResponse)
+	err := c.cc.Invoke(ctx, Organizations_GetOktaIdpSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) UpdateOktaIdpSettings(ctx context.Context, in *UpdateOktaIdpSettingsRequest, opts ...grpc.CallOption) (*UpdateOktaIdpSettingsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateOktaIdpSettingsResponse)
+	err := c.cc.Invoke(ctx, Organizations_UpdateOktaIdpSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) RotateOktaScimBearerToken(ctx context.Context, in *RotateOktaScimBearerTokenRequest, opts ...grpc.CallOption) (*RotateOktaScimBearerTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RotateOktaScimBearerTokenResponse)
+	err := c.cc.Invoke(ctx, Organizations_RotateOktaScimBearerToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *organizationsClient) AcceptInviteLink(ctx context.Context, in *InviteLink, opts ...grpc.CallOption) (*_struct.Struct, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(_struct.Struct)
@@ -306,6 +342,9 @@ type OrganizationsServer interface {
 	UpdateAgentSettings(context.Context, *UpdateAgentSettingsRequest) (*UpdateAgentSettingsResponse, error)
 	SetAgentOpenAIKey(context.Context, *SetAgentOpenAIKeyRequest) (*SetAgentOpenAIKeyResponse, error)
 	DeleteAgentOpenAIKey(context.Context, *DeleteAgentOpenAIKeyRequest) (*DeleteAgentOpenAIKeyResponse, error)
+	GetOktaIdpSettings(context.Context, *GetOktaIdpSettingsRequest) (*GetOktaIdpSettingsResponse, error)
+	UpdateOktaIdpSettings(context.Context, *UpdateOktaIdpSettingsRequest) (*UpdateOktaIdpSettingsResponse, error)
+	RotateOktaScimBearerToken(context.Context, *RotateOktaScimBearerTokenRequest) (*RotateOktaScimBearerTokenResponse, error)
 	AcceptInviteLink(context.Context, *InviteLink) (*_struct.Struct, error)
 	ListIntegrations(context.Context, *ListIntegrationsRequest) (*ListIntegrationsResponse, error)
 	DescribeIntegration(context.Context, *DescribeIntegrationRequest) (*DescribeIntegrationResponse, error)
@@ -363,6 +402,15 @@ func (UnimplementedOrganizationsServer) SetAgentOpenAIKey(context.Context, *SetA
 }
 func (UnimplementedOrganizationsServer) DeleteAgentOpenAIKey(context.Context, *DeleteAgentOpenAIKeyRequest) (*DeleteAgentOpenAIKeyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteAgentOpenAIKey not implemented")
+}
+func (UnimplementedOrganizationsServer) GetOktaIdpSettings(context.Context, *GetOktaIdpSettingsRequest) (*GetOktaIdpSettingsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetOktaIdpSettings not implemented")
+}
+func (UnimplementedOrganizationsServer) UpdateOktaIdpSettings(context.Context, *UpdateOktaIdpSettingsRequest) (*UpdateOktaIdpSettingsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateOktaIdpSettings not implemented")
+}
+func (UnimplementedOrganizationsServer) RotateOktaScimBearerToken(context.Context, *RotateOktaScimBearerTokenRequest) (*RotateOktaScimBearerTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RotateOktaScimBearerToken not implemented")
 }
 func (UnimplementedOrganizationsServer) AcceptInviteLink(context.Context, *InviteLink) (*_struct.Struct, error) {
 	return nil, status.Error(codes.Unimplemented, "method AcceptInviteLink not implemented")
@@ -657,6 +705,60 @@ func _Organizations_DeleteAgentOpenAIKey_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Organizations_GetOktaIdpSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOktaIdpSettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).GetOktaIdpSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_GetOktaIdpSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).GetOktaIdpSettings(ctx, req.(*GetOktaIdpSettingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_UpdateOktaIdpSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateOktaIdpSettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).UpdateOktaIdpSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_UpdateOktaIdpSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).UpdateOktaIdpSettings(ctx, req.(*UpdateOktaIdpSettingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_RotateOktaScimBearerToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RotateOktaScimBearerTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).RotateOktaScimBearerToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_RotateOktaScimBearerToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).RotateOktaScimBearerToken(ctx, req.(*RotateOktaScimBearerTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Organizations_AcceptInviteLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(InviteLink)
 	if err := dec(in); err != nil {
@@ -845,6 +947,18 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteAgentOpenAIKey",
 			Handler:    _Organizations_DeleteAgentOpenAIKey_Handler,
+		},
+		{
+			MethodName: "GetOktaIdpSettings",
+			Handler:    _Organizations_GetOktaIdpSettings_Handler,
+		},
+		{
+			MethodName: "UpdateOktaIdpSettings",
+			Handler:    _Organizations_UpdateOktaIdpSettings_Handler,
+		},
+		{
+			MethodName: "RotateOktaScimBearerToken",
+			Handler:    _Organizations_RotateOktaScimBearerToken_Handler,
 		},
 		{
 			MethodName: "AcceptInviteLink",

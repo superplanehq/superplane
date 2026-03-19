@@ -38,3 +38,17 @@ func FindOrganizationOktaIDPByOrganizationIDInTransaction(tx *gorm.DB, orgID str
 	}
 	return &row, nil
 }
+
+func CreateOrganizationOktaIDPInTransaction(tx *gorm.DB, row *OrganizationOktaIDP) error {
+	now := time.Now()
+	if row.CreatedAt.IsZero() {
+		row.CreatedAt = now
+	}
+	row.UpdatedAt = now
+	return tx.Create(row).Error
+}
+
+func SaveOrganizationOktaIDPInTransaction(tx *gorm.DB, row *OrganizationOktaIDP) error {
+	row.UpdatedAt = time.Now()
+	return tx.Save(row).Error
+}

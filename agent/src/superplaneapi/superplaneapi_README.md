@@ -123,16 +123,19 @@ Class | Method | HTTP request | Description
 *OrganizationApi* | [**organizations_describe_organization**](superplaneapi/docs/OrganizationApi.md#organizations_describe_organization) | **GET** /api/v1/organizations/{id} | Get organization details
 *OrganizationApi* | [**organizations_get_agent_settings**](superplaneapi/docs/OrganizationApi.md#organizations_get_agent_settings) | **GET** /api/v1/organizations/{id}/agent-settings | Get organization Agent Mode settings
 *OrganizationApi* | [**organizations_get_invite_link**](superplaneapi/docs/OrganizationApi.md#organizations_get_invite_link) | **GET** /api/v1/organizations/{id}/invite-link | Get an organization invite link
+*OrganizationApi* | [**organizations_get_okta_idp_settings**](superplaneapi/docs/OrganizationApi.md#organizations_get_okta_idp_settings) | **GET** /api/v1/organizations/{id}/okta-idp | Get organization Okta IdP settings
 *OrganizationApi* | [**organizations_list_integration_resources**](superplaneapi/docs/OrganizationApi.md#organizations_list_integration_resources) | **GET** /api/v1/organizations/{id}/integrations/{integrationId}/resources | List integration resources
 *OrganizationApi* | [**organizations_list_integrations**](superplaneapi/docs/OrganizationApi.md#organizations_list_integrations) | **GET** /api/v1/organizations/{id}/integrations | List integrations in an organization
 *OrganizationApi* | [**organizations_list_invitations**](superplaneapi/docs/OrganizationApi.md#organizations_list_invitations) | **GET** /api/v1/organizations/{id}/invitations | List organization invitations
 *OrganizationApi* | [**organizations_remove_invitation**](superplaneapi/docs/OrganizationApi.md#organizations_remove_invitation) | **DELETE** /api/v1/organizations/{id}/invitations/{invitationId} | Remove an organization invitation
 *OrganizationApi* | [**organizations_remove_user**](superplaneapi/docs/OrganizationApi.md#organizations_remove_user) | **DELETE** /api/v1/organizations/{id}/users/{userId} | Remove a user from an organization
 *OrganizationApi* | [**organizations_reset_invite_link**](superplaneapi/docs/OrganizationApi.md#organizations_reset_invite_link) | **POST** /api/v1/organizations/{id}/invite-link/reset | Reset an organization invite link
+*OrganizationApi* | [**organizations_rotate_okta_scim_bearer_token**](superplaneapi/docs/OrganizationApi.md#organizations_rotate_okta_scim_bearer_token) | **POST** /api/v1/organizations/{id}/okta-idp/rotate-scim-token | Rotate organization SCIM bearer token
 *OrganizationApi* | [**organizations_set_agent_open_ai_key**](superplaneapi/docs/OrganizationApi.md#organizations_set_agent_open_ai_key) | **PUT** /api/v1/organizations/{id}/agent-settings/openai-key | Create or update organization OpenAI key for Agent Mode
 *OrganizationApi* | [**organizations_update_agent_settings**](superplaneapi/docs/OrganizationApi.md#organizations_update_agent_settings) | **PATCH** /api/v1/organizations/{id}/agent-settings | Update organization Agent Mode settings
 *OrganizationApi* | [**organizations_update_integration**](superplaneapi/docs/OrganizationApi.md#organizations_update_integration) | **PATCH** /api/v1/organizations/{id}/integrations/{integrationId} | Update integration
 *OrganizationApi* | [**organizations_update_invite_link**](superplaneapi/docs/OrganizationApi.md#organizations_update_invite_link) | **PATCH** /api/v1/organizations/{id}/invite-link | Update an organization invite link
+*OrganizationApi* | [**organizations_update_okta_idp_settings**](superplaneapi/docs/OrganizationApi.md#organizations_update_okta_idp_settings) | **PATCH** /api/v1/organizations/{id}/okta-idp | Create or update organization Okta IdP settings
 *OrganizationApi* | [**organizations_update_organization**](superplaneapi/docs/OrganizationApi.md#organizations_update_organization) | **PATCH** /api/v1/organizations/{id} | Update an organization
 *RolesApi* | [**roles_assign_role**](superplaneapi/docs/RolesApi.md#roles_assign_role) | **POST** /api/v1/roles/{roleName}/users | Assign role
 *RolesApi* | [**roles_create_role**](superplaneapi/docs/RolesApi.md#roles_create_role) | **POST** /api/v1/roles | Create role
@@ -299,6 +302,7 @@ Class | Method | HTTP request | Description
  - [OrganizationsDescribeOrganizationResponse](superplaneapi/docs/OrganizationsDescribeOrganizationResponse.md)
  - [OrganizationsGetAgentSettingsResponse](superplaneapi/docs/OrganizationsGetAgentSettingsResponse.md)
  - [OrganizationsGetInviteLinkResponse](superplaneapi/docs/OrganizationsGetInviteLinkResponse.md)
+ - [OrganizationsGetOktaIdpSettingsResponse](superplaneapi/docs/OrganizationsGetOktaIdpSettingsResponse.md)
  - [OrganizationsIntegration](superplaneapi/docs/OrganizationsIntegration.md)
  - [OrganizationsIntegrationMetadata](superplaneapi/docs/OrganizationsIntegrationMetadata.md)
  - [OrganizationsIntegrationResourceRef](superplaneapi/docs/OrganizationsIntegrationResourceRef.md)
@@ -308,9 +312,11 @@ Class | Method | HTTP request | Description
  - [OrganizationsInviteLink](superplaneapi/docs/OrganizationsInviteLink.md)
  - [OrganizationsListIntegrationResourcesResponse](superplaneapi/docs/OrganizationsListIntegrationResourcesResponse.md)
  - [OrganizationsListInvitationsResponse](superplaneapi/docs/OrganizationsListInvitationsResponse.md)
+ - [OrganizationsOktaIdpSettings](superplaneapi/docs/OrganizationsOktaIdpSettings.md)
  - [OrganizationsOrganization](superplaneapi/docs/OrganizationsOrganization.md)
  - [OrganizationsOrganizationMetadata](superplaneapi/docs/OrganizationsOrganizationMetadata.md)
  - [OrganizationsResetInviteLinkResponse](superplaneapi/docs/OrganizationsResetInviteLinkResponse.md)
+ - [OrganizationsRotateOktaScimBearerTokenResponse](superplaneapi/docs/OrganizationsRotateOktaScimBearerTokenResponse.md)
  - [OrganizationsSetAgentOpenAIKeyBody](superplaneapi/docs/OrganizationsSetAgentOpenAIKeyBody.md)
  - [OrganizationsSetAgentOpenAIKeyResponse](superplaneapi/docs/OrganizationsSetAgentOpenAIKeyResponse.md)
  - [OrganizationsUpdateAgentSettingsBody](superplaneapi/docs/OrganizationsUpdateAgentSettingsBody.md)
@@ -319,6 +325,8 @@ Class | Method | HTTP request | Description
  - [OrganizationsUpdateIntegrationResponse](superplaneapi/docs/OrganizationsUpdateIntegrationResponse.md)
  - [OrganizationsUpdateInviteLinkBody](superplaneapi/docs/OrganizationsUpdateInviteLinkBody.md)
  - [OrganizationsUpdateInviteLinkResponse](superplaneapi/docs/OrganizationsUpdateInviteLinkResponse.md)
+ - [OrganizationsUpdateOktaIdpSettingsBody](superplaneapi/docs/OrganizationsUpdateOktaIdpSettingsBody.md)
+ - [OrganizationsUpdateOktaIdpSettingsResponse](superplaneapi/docs/OrganizationsUpdateOktaIdpSettingsResponse.md)
  - [OrganizationsUpdateOrganizationBody](superplaneapi/docs/OrganizationsUpdateOrganizationBody.md)
  - [OrganizationsUpdateOrganizationResponse](superplaneapi/docs/OrganizationsUpdateOrganizationResponse.md)
  - [ProtobufAny](superplaneapi/docs/ProtobufAny.md)
