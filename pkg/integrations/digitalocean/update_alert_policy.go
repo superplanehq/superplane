@@ -11,9 +11,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-type CreateAlertPolicy struct{}
+type UpdateAlertPolicy struct{}
 
-type CreateAlertPolicySpec struct {
+type UpdateAlertPolicySpec struct {
+	AlertPolicy  string   `json:"alertPolicy" mapstructure:"alertPolicy"`
 	Description  string   `json:"description" mapstructure:"description"`
 	Type         string   `json:"type" mapstructure:"type"`
 	Compare      string   `json:"compare" mapstructure:"compare"`
@@ -27,31 +28,33 @@ type CreateAlertPolicySpec struct {
 	SlackURL     string   `json:"slackUrl" mapstructure:"slackUrl"`
 }
 
-func (c *CreateAlertPolicy) Name() string {
-	return "digitalocean.createAlertPolicy"
+func (u *UpdateAlertPolicy) Name() string {
+	return "digitalocean.updateAlertPolicy"
 }
 
-func (c *CreateAlertPolicy) Label() string {
-	return "Create Alert Policy"
+func (u *UpdateAlertPolicy) Label() string {
+	return "Update Alert Policy"
 }
 
-func (c *CreateAlertPolicy) Description() string {
-	return "Create a DigitalOcean monitoring alert policy for droplet metrics"
+func (u *UpdateAlertPolicy) Description() string {
+	return "Update an existing DigitalOcean monitoring alert policy"
 }
 
-func (c *CreateAlertPolicy) Documentation() string {
-	return `The Create Alert Policy component creates a monitoring alert policy that triggers notifications when droplet metrics cross defined thresholds.
+func (u *UpdateAlertPolicy) Documentation() string {
+	return `The Update Alert Policy component modifies an existing monitoring alert policy with new settings.
 
 > **Note:** Monitoring is only available for droplets that had monitoring enabled during creation. Droplets created without monitoring will not report metrics or trigger alerts.
 
 ## Use Cases
 
-- **Capacity management**: Get notified when CPU or memory usage consistently exceeds a safe operating level
-- **Performance monitoring**: Detect and respond to high load averages or network saturation
-- **Automated workflows**: Chain downstream actions when infrastructure metrics breach limits
+- **Threshold tuning**: Adjust alert thresholds in response to changing baselines or scaling events
+- **Enable/disable policies**: Toggle alert policies on or off as part of maintenance windows or incident management
+- **Notification changes**: Update notification channels (email or Slack) without recreating the policy
+- **Automated policy management**: Programmatically adjust alert policies as part of infrastructure workflows
 
 ## Configuration
 
+- **Alert Policy**: The alert policy to update (required, supports expressions)
 - **Description**: Human-readable name for the alert policy (required)
 - **Metric Type**: The droplet metric to monitor, such as CPU Usage or Memory Usage (required)
 - **Comparison**: Alert when the value is GreaterThan or LessThan the threshold (required)
@@ -59,15 +62,15 @@ func (c *CreateAlertPolicy) Documentation() string {
 - **Evaluation Window**: The rolling time window over which the metric is averaged (required)
 - **Droplets**: Specific droplets to scope the policy to (optional)
 - **Tags**: Monitor all droplets with matching tags (optional)
-- **Enabled**: Whether the alert policy is immediately active (default: true)
+- **Enabled**: Whether the alert policy is active (default: true)
 - **Email Notifications**: Email addresses to notify when the alert fires (optional)
 - **Slack Channel**: Slack channel to post alerts to, e.g. #alerts (optional)
 - **Slack Webhook URL**: Incoming webhook URL for the Slack workspace (required when Slack Channel is set)
 
 ## Output
 
-Returns the created alert policy including:
-- **uuid**: Alert policy UUID for use in Get/Delete operations
+Returns the updated alert policy including:
+- **uuid**: Alert policy UUID
 - **description**: Human-readable description
 - **type**: Metric type being monitored
 - **compare**: Comparison operator (GreaterThan/LessThan)
@@ -78,31 +81,51 @@ Returns the created alert policy including:
 
 ## Important Notes
 
+- The update operation replaces the entire alert policy — all fields must be provided, not just the ones being changed
 - At least one notification channel (email or Slack) is required
 - **Slack Channel** and **Slack Webhook URL** must be provided together
 - Scoping by **Droplets** and **Tags** are independent — you can use either, both, or neither (applies to all droplets)`
 }
 
-func (c *CreateAlertPolicy) Icon() string {
+func (u *UpdateAlertPolicy) Icon() string {
 	return "bell"
 }
 
-func (c *CreateAlertPolicy) Color() string {
-	return "orange"
+func (u *UpdateAlertPolicy) Color() string {
+	return "yellow"
 }
 
-func (c *CreateAlertPolicy) OutputChannels(configuration any) []core.OutputChannel {
+func (u *UpdateAlertPolicy) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (c *CreateAlertPolicy) Configuration() []configuration.Field {
-	return alertPolicyConfigurationFields()
+func (u *UpdateAlertPolicy) Configuration() []configuration.Field {
+	alertPolicyField := configuration.Field{
+		Name:        "alertPolicy",
+		Label:       "Alert Policy",
+		Type:        configuration.FieldTypeIntegrationResource,
+		Required:    true,
+		Description: "The alert policy to update",
+		Placeholder: "Select alert policy",
+		TypeOptions: &configuration.TypeOptions{
+			Resource: &configuration.ResourceTypeOptions{
+				Type:           "alert_policy",
+				UseNameAsValue: false,
+			},
+		},
+	}
+
+	return append([]configuration.Field{alertPolicyField}, alertPolicyConfigurationFields()...)
 }
 
-func (c *CreateAlertPolicy) Setup(ctx core.SetupContext) error {
-	spec := CreateAlertPolicySpec{}
+func (u *UpdateAlertPolicy) Setup(ctx core.SetupContext) error {
+	spec := UpdateAlertPolicySpec{}
 	if err := mapstructure.WeakDecode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("error decoding configuration: %v", err)
+	}
+
+	if spec.AlertPolicy == "" {
+		return errors.New("alertPolicy is required")
 	}
 
 	if spec.Description == "" {
@@ -129,11 +152,15 @@ func (c *CreateAlertPolicy) Setup(ctx core.SetupContext) error {
 		return errors.New("at least one notification channel (email or Slack) is required")
 	}
 
+	if err := resolveAlertPolicyMetadata(ctx, spec.AlertPolicy); err != nil {
+		return fmt.Errorf("error resolving alert policy metadata: %v", err)
+	}
+
 	return nil
 }
 
-func (c *CreateAlertPolicy) Execute(ctx core.ExecutionContext) error {
-	spec := CreateAlertPolicySpec{}
+func (u *UpdateAlertPolicy) Execute(ctx core.ExecutionContext) error {
+	spec := UpdateAlertPolicySpec{}
 	if err := mapstructure.WeakDecode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
@@ -153,7 +180,7 @@ func (c *CreateAlertPolicy) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	req := CreateAlertPolicyRequest{
+	req := UpdateAlertPolicyRequest{
 		Type:        spec.Type,
 		Description: spec.Description,
 		Compare:     spec.Compare,
@@ -165,38 +192,38 @@ func (c *CreateAlertPolicy) Execute(ctx core.ExecutionContext) error {
 		Alerts:      alerts,
 	}
 
-	policy, err := client.CreateAlertPolicy(req)
+	policy, err := client.UpdateAlertPolicy(spec.AlertPolicy, req)
 	if err != nil {
-		return fmt.Errorf("failed to create alert policy: %v", err)
+		return fmt.Errorf("failed to update alert policy: %v", err)
 	}
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		"digitalocean.alertpolicy.created",
+		"digitalocean.alertpolicy.updated",
 		[]any{policy},
 	)
 }
 
-func (c *CreateAlertPolicy) Cancel(ctx core.ExecutionContext) error {
+func (u *UpdateAlertPolicy) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *CreateAlertPolicy) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+func (u *UpdateAlertPolicy) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateAlertPolicy) Actions() []core.Action {
+func (u *UpdateAlertPolicy) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (c *CreateAlertPolicy) HandleAction(ctx core.ActionContext) error {
+func (u *UpdateAlertPolicy) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *CreateAlertPolicy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (u *UpdateAlertPolicy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
-func (c *CreateAlertPolicy) Cleanup(ctx core.SetupContext) error {
+func (u *UpdateAlertPolicy) Cleanup(ctx core.SetupContext) error {
 	return nil
 }

@@ -157,6 +157,16 @@ func (d *DeleteAlertPolicy) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteAlertPolicyOnce, exampleOutputDeleteAlertPolicyBytes, &exampleOutputDeleteAlertPolicy)
 }
 
+//go:embed example_output_update_alert_policy.json
+var exampleOutputUpdateAlertPolicyBytes []byte
+
+var exampleOutputUpdateAlertPolicyOnce sync.Once
+var exampleOutputUpdateAlertPolicy map[string]any
+
+func (u *UpdateAlertPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAlertPolicyOnce, exampleOutputUpdateAlertPolicyBytes, &exampleOutputUpdateAlertPolicy)
+}
+
 //go:embed example_output_get_droplet_metrics.json
 var exampleOutputGetDropletMetricsBytes []byte
 

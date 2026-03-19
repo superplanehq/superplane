@@ -84,6 +84,7 @@ func (d *DigitalOcean) Components() []core.Component {
 		&AssignReservedIP{},
 		&CreateAlertPolicy{},
 		&GetAlertPolicy{},
+		&UpdateAlertPolicy{},
 		&DeleteAlertPolicy{},
 		&GetDropletMetrics{},
 	}
