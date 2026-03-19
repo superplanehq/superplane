@@ -103,10 +103,7 @@ export function Usage({ organizationId }: UsageProps) {
 
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
         <div className="mb-4">
-          <h2 className="text-base font-medium text-gray-900 dark:text-white">Plan limits</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Limits returned by the configured usage service for this organization.
-          </p>
+          <h2 className="text-base font-medium text-gray-900 dark:text-white">Limits</h2>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {usageCards.map((card) => (
