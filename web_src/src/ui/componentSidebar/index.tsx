@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1001,21 +1002,16 @@ export const ComponentSidebar = ({
                 )}
 
                 <DialogFooter className="gap-2 sm:justify-start pt-4">
-                  <Button
+                  <LoadingButton
                     type="submit"
                     color="blue"
-                    disabled={updateIntegrationMutation.isPending || !configureIntegrationName.trim()}
+                    disabled={!configureIntegrationName.trim()}
+                    loading={updateIntegrationMutation.isPending}
+                    loadingText="Saving..."
                     className="flex items-center gap-2"
                   >
-                    {updateIntegrationMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      "Save"
-                    )}
-                  </Button>
+                    Save
+                  </LoadingButton>
                   <Button
                     type="button"
                     variant="outline"

@@ -12,18 +12,18 @@ import (
 )
 
 type Canvas struct {
-	ID                      uuid.UUID
-	OrganizationID          uuid.UUID
-	LiveVersionID           *uuid.UUID
-	IsTemplate              bool
-	CanvasVersioningEnabled bool
-	ChangeRequestApprovers  datatypes.JSONSlice[CanvasChangeRequestApprover]
-	Name                    string
-	Description             string
-	CreatedBy               *uuid.UUID
-	CreatedAt               *time.Time
-	UpdatedAt               *time.Time
-	DeletedAt               gorm.DeletedAt `gorm:"index"`
+	ID                     uuid.UUID
+	OrganizationID         uuid.UUID
+	LiveVersionID          *uuid.UUID
+	IsTemplate             bool
+	VersioningEnabled      bool
+	ChangeRequestApprovers datatypes.JSONSlice[CanvasChangeRequestApprover]
+	Name                   string
+	Description            string
+	CreatedBy              *uuid.UUID
+	CreatedAt              *time.Time
+	UpdatedAt              *time.Time
+	DeletedAt              gorm.DeletedAt `gorm:"index"`
 }
 
 func (c *Canvas) EffectiveChangeRequestApprovers() []CanvasChangeRequestApprover {

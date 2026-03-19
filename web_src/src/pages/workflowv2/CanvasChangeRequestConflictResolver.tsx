@@ -1,5 +1,6 @@
 import { CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { cn } from "@/lib/utils";
 import Editor from "@monaco-editor/react";
 import type { Monaco } from "@monaco-editor/react";
@@ -728,10 +729,15 @@ export function CanvasChangeRequestConflictResolver({
                 </p>
               ) : null}
             </div>
-            <Button onClick={handleResolve} disabled={isSubmitting || !canvasName || !allConflictsMarkedResolved}>
+            <LoadingButton
+              onClick={handleResolve}
+              disabled={!canvasName || !allConflictsMarkedResolved}
+              loading={isSubmitting}
+              loadingText="Resolving..."
+            >
               <Check className="h-4 w-4" />
-              {isSubmitting ? "Resolving..." : "Save resolved result"}
-            </Button>
+              Save resolved result
+            </LoadingButton>
           </div>
           <p className="mt-2 text-[11px] text-slate-600">
             Canvas: {canvasName}

@@ -25,7 +25,7 @@ func TestUpdateLiveCanvasWithoutVersioningRemapsSoftDeletedNodeIDConflicts(t *te
 		database.Conn().
 			Model(&models.Organization{}).
 			Where("id = ?", r.Organization.ID).
-			Update("canvas_versioning_enabled", false).
+			Update("versioning_enabled", false).
 			Error,
 	)
 
@@ -97,7 +97,7 @@ func TestUpdateLiveCanvasWithoutVersioningReaddAfterDeletingReaddedNodeDoesNot50
 		database.Conn().
 			Model(&models.Organization{}).
 			Where("id = ?", r.Organization.ID).
-			Update("canvas_versioning_enabled", false).
+			Update("versioning_enabled", false).
 			Error,
 	)
 
@@ -212,7 +212,7 @@ func TestUpdateLiveCanvasWithoutVersioningRejectsMissingAppInstallationID(t *tes
 		database.Conn().
 			Model(&models.Organization{}).
 			Where("id = ?", r.Organization.ID).
-			Update("canvas_versioning_enabled", false).
+			Update("versioning_enabled", false).
 			Error,
 	)
 

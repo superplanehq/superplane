@@ -300,20 +300,11 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 		return
 	}
 
-	response, _, err := client.Apps.ListRepos(context.Background(), &github.ListOptions{})
+	repos, err := listInstallationRepositories(context.Background(), client)
 	if err != nil {
 		ctx.Logger.Errorf("failed to list repos: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
-	}
-
-	repos := []Repository{}
-	for _, r := range response.Repositories {
-		repos = append(repos, Repository{
-			ID:   *r.ID,
-			Name: r.GetName(),
-			URL:  r.GetHTMLURL(),
-		})
 	}
 
 	ctx.Logger.Infof("Updated repositories: %v", repos)
@@ -444,20 +435,11 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 		metadata.Owner = ghApp.Owner.GetLogin()
 	}
 
-	response, _, err := client.Apps.ListRepos(context.Background(), &github.ListOptions{})
+	repos, err := listInstallationRepositories(context.Background(), client)
 	if err != nil {
 		ctx.Logger.Errorf("failed to list repos: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
-	}
-
-	repos := []Repository{}
-	for _, r := range response.Repositories {
-		repos = append(repos, Repository{
-			ID:   *r.ID,
-			Name: r.GetName(),
-			URL:  r.GetHTMLURL(),
-		})
 	}
 
 	metadata.Repositories = repos
@@ -565,4 +547,39 @@ func (g *GitHub) Actions() []core.Action {
 
 func (g *GitHub) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
+}
+
+func listInstallationRepositories(ctx context.Context, client *github.Client) ([]Repository, error) {
+	var allRepos []*github.Repository
+	opts := &github.ListOptions{
+		PerPage: 100,
+	}
+
+	for {
+		repos, resp, err := client.Apps.ListRepos(ctx, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		allRepos = append(allRepos, repos.Repositories...)
+		if resp.NextPage == 0 {
+			break
+		}
+
+		opts.Page = resp.NextPage
+	}
+
+	out := make([]Repository, 0, len(allRepos))
+	for _, r := range allRepos {
+		if r == nil || r.ID == nil {
+			continue
+		}
+		out = append(out, Repository{
+			ID:   *r.ID,
+			Name: r.GetName(),
+			URL:  r.GetHTMLURL(),
+		})
+	}
+
+	return out, nil
 }

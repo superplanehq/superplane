@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 
 import { Check, Circle, MessageCircle, Paperclip, X } from "lucide-react";
 import { Button } from "../button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../hoverCard";
 import { Input } from "../input";
 import { Item, ItemContent, ItemTitle } from "../item";
@@ -22,8 +23,8 @@ export interface ApprovalItemProps {
   href?: string;
   className?: string;
   interactive?: boolean;
-  onApprove?: (artifacts?: Record<string, string>) => void;
-  onReject?: (comment?: string) => void;
+  onApprove?: (artifacts?: Record<string, string>) => void | Promise<void>;
+  onReject?: (comment?: string) => void | Promise<void>;
   approverName?: string;
   approverAvatar?: string;
   requireArtifacts?: ArtifactField[];
@@ -51,6 +52,8 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
   const [showApprovalForm, setShowApprovalForm] = React.useState(false);
   const [rejectionCommentInput, setRejectionCommentInput] = React.useState("");
   const [artifacts, setArtifacts] = React.useState<Record<string, string>>({});
+  const [isApproving, setIsApproving] = React.useState(false);
+  const [isRejecting, setIsRejecting] = React.useState(false);
 
   const content = (
     <>
@@ -118,6 +121,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
           <Button
             variant="outline"
             className="h-7 py-1 px-2"
+            disabled={isApproving}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -126,21 +130,28 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
           >
             Reject
           </Button>
-          <Button
+          <LoadingButton
             variant="default"
             className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
-            onClick={(e) => {
+            loading={isApproving}
+            loadingText="Approving..."
+            onClick={async (e) => {
               e.preventDefault();
               e.stopPropagation();
               if (requireArtifacts.length > 0) {
                 setShowApprovalForm(true);
               } else {
-                onApprove?.();
+                setIsApproving(true);
+                try {
+                  await onApprove?.();
+                } finally {
+                  setIsApproving(false);
+                }
               }
             }}
           >
             Approve
-          </Button>
+          </LoadingButton>
         </div>
       ) : (interactive && showRejectionForm) || (interactive && showApprovalForm) ? (
         <span></span>
@@ -203,6 +214,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                   variant="outline"
                   size="default"
                   className="h-7 py-1 px-2"
+                  disabled={isRejecting}
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowRejectionForm(false);
@@ -211,20 +223,27 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 >
                   Cancel
                 </Button>
-                <Button
+                <LoadingButton
                   variant="default"
                   size="default"
                   className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
-                  onClick={(e) => {
+                  loading={isRejecting}
+                  loadingText="Rejecting..."
+                  onClick={async (e) => {
                     e.stopPropagation();
-                    onReject?.(rejectionCommentInput);
+                    setIsRejecting(true);
+                    try {
+                      await onReject?.(rejectionCommentInput);
+                    } finally {
+                      setIsRejecting(false);
+                    }
                     setShowRejectionForm(false);
                     setRejectionCommentInput("");
                   }}
                   disabled={!rejectionCommentInput.trim()}
                 >
                   Confirm Rejection
-                </Button>
+                </LoadingButton>
               </div>
             </div>
           </div>
@@ -263,6 +282,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 <Button
                   variant="outline"
                   className="h-7 py-1 px-2"
+                  disabled={isApproving}
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowApprovalForm(false);
@@ -271,12 +291,19 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 >
                   Cancel
                 </Button>
-                <Button
+                <LoadingButton
                   variant="default"
                   className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
-                  onClick={(e) => {
+                  loading={isApproving}
+                  loadingText="Approving..."
+                  onClick={async (e) => {
                     e.stopPropagation();
-                    onApprove?.(artifacts);
+                    setIsApproving(true);
+                    try {
+                      await onApprove?.(artifacts);
+                    } finally {
+                      setIsApproving(false);
+                    }
                     setShowApprovalForm(false);
                     setArtifacts({});
                   }}
@@ -285,7 +312,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                     .some((artifact) => !artifacts[artifact.label]?.trim())}
                 >
                   Confirm Approval
-                </Button>
+                </LoadingButton>
               </div>
             </div>
           </div>

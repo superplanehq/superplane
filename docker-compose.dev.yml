@@ -78,6 +78,8 @@ services:
       OTEL_SERVICE_NAME: "superplane-dev"
       OWNER_SETUP_ENABLED: "yes"
       VITE_ENABLE_CUSTOM_COMPONENTS: "true"
+      VITE_ENABLE_AGENT_REPL: ${VITE_ENABLE_AGENT_REPL:-true}
+      VITE_AGENT_URL: ${VITE_AGENT_URL:-http://localhost:8090}
 
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}
@@ -96,11 +98,38 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      agent:
+        condition: service_healthy
 
     volumes:
       - go-pkg-cache:/go
       - .:/app
       - /tmp:/tmp
+
+  agent:
+    build:
+      context: agent
+      dockerfile: Dockerfile
+      target: dev
+    env_file:
+      - agent/.env
+    environment:
+      IN_DOCKER: "1"
+      SUPERPLANE_BASE_URL: ${SUPERPLANE_BASE_URL:-http://app:8000}
+      REPL_WEB_DEBUG: ${REPL_WEB_DEBUG:-true}
+    command: bash -lc "uv run python -m repl.main --server --test-repl-web-host 0.0.0.0 --test-repl-web-port 8090"
+    tty: true
+    stdin_open: true
+    ports:
+      - ${AGENT_REPL_WEB_PORT:-8090}:8090
+    volumes:
+      - ./agent:/app
+      - uv-cache:/root/.cache/uv
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "uv --version >/dev/null && python --version >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
@@ -156,4 +185,7 @@ volumes:
     driver: local
 
   postgres-data:
+    driver: local
+
+  uv-cache:
     driver: local

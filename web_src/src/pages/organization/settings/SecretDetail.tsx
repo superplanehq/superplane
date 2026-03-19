@@ -1,4 +1,5 @@
 import { Breadcrumbs } from "@/components/Breadcrumbs/breadcrumbs";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { Textarea } from "@/components/Textarea/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,9 @@ interface SecretDetailProps {
 export function SecretDetail({ organizationId }: SecretDetailProps) {
   const navigate = useNavigate();
   const { secretId } = useParams<{ secretId: string }>();
+
+  const { data: secret, isLoading, error } = useSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
+  usePageTitle(["Secrets", secret?.metadata?.name]);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editingKeyName, setEditingKeyName] = useState("");
   const [editingValue, setEditingValue] = useState("");
@@ -32,7 +36,6 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
   const [editingSecretName, setEditingSecretName] = useState(false);
   const [editingSecretNameValue, setEditingSecretNameValue] = useState("");
 
-  const { data: secret, isLoading, error } = useSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
   const setSecretKeyMutation = useSetSecretKey(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
   const deleteSecretKeyMutation = useDeleteSecretKey(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
   const updateSecretNameMutation = useUpdateSecretName(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");

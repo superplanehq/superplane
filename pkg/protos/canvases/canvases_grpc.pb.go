@@ -48,7 +48,6 @@ const (
 	Canvases_ListCanvasMemories_FullMethodName          = "/Superplane.Canvases.Canvases/ListCanvasMemories"
 	Canvases_DeleteCanvasMemory_FullMethodName          = "/Superplane.Canvases.Canvases/DeleteCanvasMemory"
 	Canvases_ListEventExecutions_FullMethodName         = "/Superplane.Canvases.Canvases/ListEventExecutions"
-	Canvases_SendAiMessage_FullMethodName               = "/Superplane.Canvases.Canvases/SendAiMessage"
 )
 
 // CanvasesClient is the client API for Canvases service.
@@ -84,7 +83,6 @@ type CanvasesClient interface {
 	ListCanvasMemories(ctx context.Context, in *ListCanvasMemoriesRequest, opts ...grpc.CallOption) (*ListCanvasMemoriesResponse, error)
 	DeleteCanvasMemory(ctx context.Context, in *DeleteCanvasMemoryRequest, opts ...grpc.CallOption) (*DeleteCanvasMemoryResponse, error)
 	ListEventExecutions(ctx context.Context, in *ListEventExecutionsRequest, opts ...grpc.CallOption) (*ListEventExecutionsResponse, error)
-	SendAiMessage(ctx context.Context, in *SendAiMessageRequest, opts ...grpc.CallOption) (*SendAiMessageResponse, error)
 }
 
 type canvasesClient struct {
@@ -385,16 +383,6 @@ func (c *canvasesClient) ListEventExecutions(ctx context.Context, in *ListEventE
 	return out, nil
 }
 
-func (c *canvasesClient) SendAiMessage(ctx context.Context, in *SendAiMessageRequest, opts ...grpc.CallOption) (*SendAiMessageResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SendAiMessageResponse)
-	err := c.cc.Invoke(ctx, Canvases_SendAiMessage_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // CanvasesServer is the server API for Canvases service.
 // All implementations should embed UnimplementedCanvasesServer
 // for forward compatibility.
@@ -428,7 +416,6 @@ type CanvasesServer interface {
 	ListCanvasMemories(context.Context, *ListCanvasMemoriesRequest) (*ListCanvasMemoriesResponse, error)
 	DeleteCanvasMemory(context.Context, *DeleteCanvasMemoryRequest) (*DeleteCanvasMemoryResponse, error)
 	ListEventExecutions(context.Context, *ListEventExecutionsRequest) (*ListEventExecutionsResponse, error)
-	SendAiMessage(context.Context, *SendAiMessageRequest) (*SendAiMessageResponse, error)
 }
 
 // UnimplementedCanvasesServer should be embedded to have
@@ -524,9 +511,6 @@ func (UnimplementedCanvasesServer) DeleteCanvasMemory(context.Context, *DeleteCa
 }
 func (UnimplementedCanvasesServer) ListEventExecutions(context.Context, *ListEventExecutionsRequest) (*ListEventExecutionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListEventExecutions not implemented")
-}
-func (UnimplementedCanvasesServer) SendAiMessage(context.Context, *SendAiMessageRequest) (*SendAiMessageResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method SendAiMessage not implemented")
 }
 func (UnimplementedCanvasesServer) testEmbeddedByValue() {}
 
@@ -1070,24 +1054,6 @@ func _Canvases_ListEventExecutions_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Canvases_SendAiMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SendAiMessageRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(CanvasesServer).SendAiMessage(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Canvases_SendAiMessage_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CanvasesServer).SendAiMessage(ctx, req.(*SendAiMessageRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // Canvases_ServiceDesc is the grpc.ServiceDesc for Canvases service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1210,10 +1176,6 @@ var Canvases_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListEventExecutions",
 			Handler:    _Canvases_ListEventExecutions_Handler,
-		},
-		{
-			MethodName: "SendAiMessage",
-			Handler:    _Canvases_SendAiMessage_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
