@@ -37,8 +37,11 @@ type armClient struct {
 	// baseURL overrides armBaseURL when set (used in tests).
 	baseURL string
 
-	// tokenFunc overrides credential-based token fetching when set (used in tests).
+	// tokenFunc overrides credential-based ARM token fetching when set.
 	tokenFunc func(context.Context) (string, error)
+
+	// serviceBusTokenFunc overrides credential-based Service Bus data plane token fetching when set.
+	serviceBusTokenFunc func(context.Context) (string, error)
 }
 
 func newARMClient(credential azcore.TokenCredential, subscriptionID string, logger *logrus.Entry) *armClient {
@@ -60,6 +63,20 @@ func (c *armClient) bearerToken(ctx context.Context) (string, error) {
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to get ARM token: %w", err)
+	}
+	return token.Token, nil
+}
+
+// serviceBusToken obtains an OAuth2 token for the Azure Service Bus data plane.
+func (c *armClient) serviceBusToken(ctx context.Context) (string, error) {
+	if c.serviceBusTokenFunc != nil {
+		return c.serviceBusTokenFunc(ctx)
+	}
+	token, err := c.credential.GetToken(ctx, policy.TokenRequestOptions{
+		Scopes: []string{"https://servicebus.azure.net/.default"},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to get Service Bus token: %w", err)
 	}
 	return token.Token, nil
 }
