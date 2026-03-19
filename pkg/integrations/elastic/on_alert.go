@@ -15,12 +15,25 @@ import (
 type OnAlertFires struct{}
 
 type OnAlertFiresConfiguration struct {
-	Rules      []string                  `json:"rules" mapstructure:"rules"`
+	Rule       string                    `json:"rule" mapstructure:"rule"`
 	Spaces     []string                  `json:"spaces" mapstructure:"spaces"`
 	Tags       []configuration.Predicate `json:"tags" mapstructure:"tags"`
-	Severities []configuration.Predicate `json:"severities" mapstructure:"severities"`
-	Statuses   []configuration.Predicate `json:"statuses" mapstructure:"statuses"`
+	Severities []string                  `json:"severities" mapstructure:"severities"`
+	Statuses   []string                  `json:"statuses" mapstructure:"statuses"`
 }
+
+type OnAlertFiresMetadata struct {
+	RuleName string `json:"ruleName" mapstructure:"ruleName"`
+}
+
+const kibanaAlertWebhookActionBody = `{
+  "ruleId": "{{rule.id}}",
+  "ruleName": "{{rule.name}}",
+  "spaceId": "{{rule.spaceId}}",
+  "tags": {{rule.tags}},
+  "severity": "{{context.severity}}",
+  "status": "{{rule.status}}"
+}`
 
 func (t *OnAlertFires) Name() string  { return "elastic.onAlertFires" }
 func (t *OnAlertFires) Label() string { return "When Alert Fires" }
@@ -36,30 +49,23 @@ func (t *OnAlertFires) Documentation() string {
 ## Setup
 
 1. Save this trigger — SuperPlane automatically creates a signed Kibana Webhook connector.
-2. In Kibana, attach the connector to one or more alert rules and configure the action body as shown below.
+2. Optionally select a Kibana alert rule in SuperPlane. When a rule is selected, SuperPlane checks that rule's actions and attaches the existing SuperPlane connector if it is missing.
 
 ### Recommended Kibana action body
 
-For filters to work reliably, configure the rule action body in Kibana to include these fields:
+SuperPlane configures the rule action body with these fields:
 
 ` + "```" + `json
-{
-  "ruleId":   "{{rule.id}}",
-  "ruleName": "{{rule.name}}",
-  "spaceId":  "{{rule.spaceId}}",
-  "tags":     {{rule.tags}},
-  "severity": "{{context.severity}}",
-  "status":   "{{rule.status}}"
-}
+` + kibanaAlertWebhookActionBody + `
 ` + "```" + `
 
 Kibana substitutes ` + "`{{rule.id}}`" + ` and ` + "`{{rule.name}}`" + ` at delivery time. Fields omitted from the body will not be filterable in SuperPlane.
 
 ## Filtering
 
-All filter fields are optional. Leave them empty to fire for every incoming alert. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
+The **Rule** field is optional. Leave it empty to keep the original manual connector workflow. Additional filters are optional refinements. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
 
-**Rule ID** is the most reliable filter because rule names are user-editable. Use it as the primary key when you need precise per-rule routing.
+When a **Rule** is selected, it becomes the primary filter. Additional filters like space, tags, severity, and status are optional refinements.
 
 ## Webhook Verification
 
@@ -73,16 +79,14 @@ Each received alert emits the parsed JSON body sent by Kibana directly as the ev
 func (t *OnAlertFires) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "rules",
-			Label:       "Rules",
+			Name:        "rule",
+			Label:       "Rule",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Only fire for alerts from these Kibana alert rules. Leave empty to accept alerts from all rules.",
+			Description: "Optionally listen only for alerts from this Kibana alert rule. When selected, SuperPlane also ensures its connector is attached to the rule.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type:           ResourceTypeKibanaRule,
-					UseNameAsValue: true,
-					Multi:          true,
+					Type: ResourceTypeKibanaRule,
 				},
 			},
 		},
@@ -114,24 +118,26 @@ func (t *OnAlertFires) Configuration() []configuration.Field {
 		{
 			Name:        "severities",
 			Label:       "Severities",
-			Type:        configuration.FieldTypeAnyPredicateList,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Only fire for alerts whose severity matches any of these predicates. Leave empty to accept all severities.",
+			Description: "Only fire for alerts with these severity levels. Leave empty to accept all severities.",
 			TypeOptions: &configuration.TypeOptions{
-				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
-					Operators: configuration.AllPredicateOperators,
+				Resource: &configuration.ResourceTypeOptions{
+					Type:  ResourceTypeKibanaAlertSeverity,
+					Multi: true,
 				},
 			},
 		},
 		{
 			Name:        "statuses",
 			Label:       "Statuses",
-			Type:        configuration.FieldTypeAnyPredicateList,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Only fire for alerts whose status matches any of these predicates. Leave empty to accept all statuses.",
+			Description: "Only fire for alerts with these statuses. Leave empty to accept all statuses.",
 			TypeOptions: &configuration.TypeOptions{
-				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
-					Operators: configuration.AllPredicateOperators,
+				Resource: &configuration.ResourceTypeOptions{
+					Type:  ResourceTypeKibanaAlertStatus,
+					Multi: true,
 				},
 			},
 		},
@@ -139,12 +145,39 @@ func (t *OnAlertFires) Configuration() []configuration.Field {
 }
 
 func (t *OnAlertFires) Setup(ctx core.TriggerContext) error {
+	var config OnAlertFiresConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
 	kibanaURL, err := ctx.Integration.GetConfig("kibanaUrl")
 	if err != nil {
 		return fmt.Errorf("failed to get Kibana URL: %w", err)
 	}
 
-	return ctx.Integration.RequestWebhook(map[string]any{"kibanaUrl": string(kibanaURL)})
+	metadata := OnAlertFiresMetadata{}
+	if strings.TrimSpace(config.Rule) != "" {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("error creating client: %v", err)
+		}
+
+		rule, err := client.GetKibanaRule(config.Rule)
+		if err != nil {
+			return fmt.Errorf("failed to get Kibana rule %s: %w", config.Rule, err)
+		}
+
+		metadata.RuleName = rule.Name
+	}
+
+	if err := ctx.Metadata.Set(metadata); err != nil {
+		return fmt.Errorf("failed to store rule metadata: %w", err)
+	}
+
+	return ctx.Integration.RequestWebhook(map[string]any{
+		"kibanaUrl": string(kibanaURL),
+		"ruleId":    strings.TrimSpace(config.Rule),
+	})
 }
 
 func (t *OnAlertFires) Actions() []core.Action {
@@ -197,8 +230,9 @@ func (t *OnAlertFires) Cleanup(_ core.TriggerContext) error {
 // matchesFilters returns true if the alert payload satisfies all configured filters.
 // An empty/nil filter is treated as a pass-through (no restriction).
 func matchesFilters(payload map[string]any, config OnAlertFiresConfiguration) bool {
-	if len(config.Rules) > 0 {
-		if !matchesAnyString(config.Rules, extractString(payload, "ruleName"), extractString(payload, "ruleId")) {
+	if config.Rule != "" {
+		ruleID := extractString(payload, "ruleId")
+		if ruleID != "" && !strings.EqualFold(strings.TrimSpace(config.Rule), strings.TrimSpace(ruleID)) {
 			return false
 		}
 	}
@@ -223,13 +257,13 @@ func matchesFilters(payload map[string]any, config OnAlertFiresConfiguration) bo
 	}
 
 	if len(config.Severities) > 0 {
-		if !configuration.MatchesAnyPredicate(config.Severities, extractString(payload, "severity")) {
+		if !containsIgnoreCase(config.Severities, extractString(payload, "severity")) {
 			return false
 		}
 	}
 
 	if len(config.Statuses) > 0 {
-		if !configuration.MatchesAnyPredicate(config.Statuses, extractString(payload, "status")) {
+		if !containsIgnoreCase(config.Statuses, extractString(payload, "status")) {
 			return false
 		}
 	}
