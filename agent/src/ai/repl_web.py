@@ -40,7 +40,11 @@ class WebServerConfig:
 class ReplStreamRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     canvas_id: str | None = Field(default=None, min_length=1, max_length=200)
-    model: str = Field(default=(os.getenv("AI_MODEL", "test").strip() or "test"), min_length=1, max_length=200)
+    model: str = Field(
+        default=(os.getenv("AI_MODEL", "test").strip() or "test"),
+        min_length=1,
+        max_length=200,
+    )
     base_url: str | None = None
     token: str | None = None
     org_id: str | None = None
@@ -131,6 +135,8 @@ def _build_deps(payload: ReplStreamRequest) -> AgentDeps:
     )
     return AgentDeps(
         client=client,
+        default_canvas_id=payload.canvas_id,
+        allow_canvas_details=False,
     )
 
 
