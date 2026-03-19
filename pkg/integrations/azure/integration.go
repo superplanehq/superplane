@@ -118,6 +118,8 @@ func (a *AzureIntegration) Components() []core.Component {
 func (a *AzureIntegration) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnVMDeleted{integration: a},
+		&OnBlobCreated{integration: a},
+		&OnBlobDeleted{integration: a},
 	}
 }
 
@@ -247,6 +249,9 @@ func (a *AzureIntegration) ListResources(resourceType string, ctx core.ListResou
 			firstNonEmptyParameter(ctx.Parameters, "resourceGroup"),
 			firstNonEmptyParameter(ctx.Parameters, "virtualNetworkName", "virtualNetwork", "vnetName"),
 		)
+
+	case ResourceTypeStorageAccountDropdown:
+		return a.ListStorageAccounts(ctx, firstNonEmptyParameter(ctx.Parameters, "resourceGroup"))
 
 	case "resourceGroup", "virtualNetwork", "subnet":
 		return []core.IntegrationResource{}, nil

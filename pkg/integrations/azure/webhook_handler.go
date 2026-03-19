@@ -15,6 +15,9 @@ type AzureWebhookConfiguration struct {
 	EventTypes    []string `json:"eventTypes" mapstructure:"eventTypes"`
 	ResourceType  string   `json:"resourceType" mapstructure:"resourceType"`
 	ResourceGroup string   `json:"resourceGroup,omitempty" mapstructure:"resourceGroup"`
+	// Scope is an optional ARM resource ID to use as the Event Grid subscription scope.
+	// When set, it overrides the default subscription-level scope.
+	Scope string `json:"scope,omitempty" mapstructure:"scope"`
 }
 
 // AzureWebhookHandler manages webhook lifecycle for Azure integration triggers.
@@ -44,16 +47,18 @@ func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error)
 	}
 
 	subName := fmt.Sprintf("superplane-%s", ctx.Webhook.GetID())
-	scope := fmt.Sprintf("/subscriptions/%s", provider.GetSubscriptionID())
 
-	// Build subject filter.
-	// Note: Event Grid subjects for resource events look like:
-	//   /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Compute/virtualMachines/{name}
-	// The subject ends with the resource name, so we cannot use subjectEndsWith
-	// to filter by resource type. Instead, we use subjectBeginsWith when a resource
-	// group is specified and rely on handler-side filtering for the resource type.
+	// Use custom scope if provided (e.g. for storage account or ACR registry-level subscriptions),
+	// otherwise default to the subscription-level scope.
+	scope := fmt.Sprintf("/subscriptions/%s", provider.GetSubscriptionID())
+	if config.Scope != "" {
+		scope = config.Scope
+	}
+
+	// Build subject filter only for subscription-level scopes where subjects are ARM resource IDs.
+	// Resource-scoped subscriptions use a different subject format.
 	var subjectBeginsWith string
-	if config.ResourceGroup != "" {
+	if config.Scope == "" && config.ResourceGroup != "" {
 		subjectBeginsWith = fmt.Sprintf(
 			"/subscriptions/%s/resourceGroups/%s",
 			provider.GetSubscriptionID(), config.ResourceGroup,
@@ -88,6 +93,16 @@ func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error)
 		})
 	}
 
+	filter := map[string]any{
+		"includedEventTypes": config.EventTypes,
+	}
+	if subjectBeginsWith != "" {
+		filter["subjectBeginsWith"] = subjectBeginsWith
+	}
+	if len(advancedFilters) > 0 {
+		filter["advancedFilters"] = advancedFilters
+	}
+
 	body := map[string]any{
 		"properties": map[string]any{
 			"destination": map[string]any{
@@ -97,11 +112,7 @@ func (h *AzureWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error)
 					"deliveryAttributeMappings": deliveryAttributes,
 				},
 			},
-			"filter": map[string]any{
-				"includedEventTypes": config.EventTypes,
-				"subjectBeginsWith":  subjectBeginsWith,
-				"advancedFilters":    advancedFilters,
-			},
+			"filter": filter,
 		},
 	}
 
@@ -133,7 +144,12 @@ func (h *AzureWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	}
 
 	subName := fmt.Sprintf("superplane-%s", ctx.Webhook.GetID())
+
+	config, err := decodeAzureWebhookConfiguration(ctx.Webhook.GetConfiguration())
 	scope := fmt.Sprintf("/subscriptions/%s", provider.GetSubscriptionID())
+	if err == nil && config.Scope != "" {
+		scope = config.Scope
+	}
 
 	url := fmt.Sprintf("%s%s/providers/Microsoft.EventGrid/eventSubscriptions/%s?api-version=%s",
 		armBaseURL, scope, subName, armAPIVersionEventGrid)
@@ -173,6 +189,10 @@ func (h *AzureWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	}
 
 	if left.ResourceGroup != right.ResourceGroup {
+		return false, nil
+	}
+
+	if left.Scope != right.Scope {
 		return false, nil
 	}
 
@@ -218,8 +238,8 @@ func decodeAzureWebhookConfiguration(raw any) (AzureWebhookConfiguration, error)
 		return AzureWebhookConfiguration{}, fmt.Errorf("failed to decode webhook configuration: %w", err)
 	}
 
-	if config.ResourceType == "" {
-		return AzureWebhookConfiguration{}, fmt.Errorf("resourceType is required")
+	if config.ResourceType == "" && config.Scope == "" {
+		return AzureWebhookConfiguration{}, fmt.Errorf("resourceType or scope is required")
 	}
 
 	if len(config.EventTypes) == 0 {
