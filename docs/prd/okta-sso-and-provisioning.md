@@ -151,8 +151,8 @@ users into SaaS apps and is in scope for this PRD.
 
 ## SuperPlane Codebase Touchpoints (Expected)
 
-- **`pkg/authentication`**: New Okta/OIDC provider or parallel implementation (Goth may not expose
-  all knobs for dynamic per-org endpoints — evaluate Goth vs. `core.HTTPContext` + manual OIDC).
+- **`pkg/authentication`**: Okta-specific OIDC flow alongside existing Goth providers (see
+  **Technologies** — prefer `go-oidc` + `x/oauth2`, not Goth, for per-org issuers).
 - **`pkg/public/server.go`**: Wire org-based Okta config (one per org); callback routes may need
   org id in path or state.
 - **`pkg/models`**: SSO connection model; SCIM token storage; provider constants.
@@ -160,6 +160,83 @@ users into SaaS apps and is in scope for this PRD.
 - **`web_src`**: Login UI: Okta button when org or instance supports it; admin settings for SSO
   + SCIM.
 - **Authorization / security docs**: Document token validation, secret encryption, and SCIM auth.
+
+## Technologies
+
+Selections below favor **what the repo already uses** and add **small, well-maintained** libraries
+where OIDC requires JWKS and discovery. Line items marked **(new)** are not in `go.mod` today and
+require a deliberate dependency add.
+
+### Runtime, routing, and data
+
+- **Go** (module at `go 1.25`) — same server binary as the rest of SuperPlane.
+- **`github.com/gorilla/mux`** — register Okta authorize/callback routes and SCIM routes next to
+  existing `pkg/authentication` and `pkg/public` wiring.
+- **PostgreSQL + GORM** (`gorm.io/gorm`, `gorm.io/driver/postgres`) — persist per-org Okta issuer,
+  client id, encrypted client secret, SCIM token material, and SCIM↔user id mapping.
+- **gRPC + gRPC-Gateway** — org-admin APIs for enabling SSO, rotating secrets, and surfacing
+  read-only setup metadata should follow existing API patterns (proto → generated REST).
+
+### OIDC: discovery, token exchange, and ID token verification
+
+- **`golang.org/x/oauth2`** (already required) — Authorization Code exchange at Okta’s **token**
+  endpoint (`client_secret` post), scoped config per org (`ClientID`, `ClientSecret`,
+  `RedirectURL`, `Endpoint` derived from issuer).
+- **`github.com/coreos/go-oidc/v3/oidc` (new)** — load issuer metadata via
+  `/.well-known/openid-configuration`, construct an **ID token verifier** (audience, expiry,
+  signature against Okta JWKS). This covers **JWKS fetch + rotation** without custom key-cache code
+  beyond what the library provides.
+- **Do not use `markbates/goth` for Okta v1** — Goth registers providers at process start with
+  static endpoints; SuperPlane needs **one issuer + client pair per org**. Keep Goth for
+  GitHub/Google unchanged.
+
+### SuperPlane session vs. Okta tokens
+
+- **`github.com/golang-jwt/jwt/v4`** (`pkg/jwt`) — continues to mint **SuperPlane session**
+  cookies (HMAC, internal `sub`). This is unrelated to verifying Okta’s **RS256 ID tokens**; do
+  not reuse the session `Signer` for Okta JWTs.
+
+### Secret storage
+
+- **`pkg/crypto` `Encryptor`** (AES-GCM in production) — encrypt Okta **client secret** and SCIM
+  **bearer token** (or a hash of the token for comparison plus encrypted backup if needed) using
+  the same patterns as other sensitive integration material.
+
+### Outbound HTTP to Okta
+
+- **`net/http`** with standard timeouts — sufficient for token exchange and discovery from the
+  auth handler. Component/trigger code uses `core.HTTPContext`; auth can use a small dedicated
+  `http.Client` with explicit `Transport` timeouts, or a shared internal helper if one exists for
+  server-side outbound calls.
+
+### SCIM 2.0 (server)
+
+- **`github.com/elimity-com/scim` (new)** — yes, **use this** for the SCIM MVP. It implements SCIM
+  v2 with **CRUD + PATCH**, **schema validation** before callbacks, built-in **`/Schemas`**,
+  **`/ServiceProviderConfig`**, and **`/ResourceTypes`** (all commonly probed by IdPs), plus a
+  **`filter`** package for list queries. We implement **`scim.ResourceHandler`** for **Users**
+  only (create/get/replace/delete/patch) and wire org context + bearer auth **outside** the
+  library (e.g. mux subrouter per org path prefix, then `StripPrefix` into the SCIM `http.Handler`
+  from `scim.NewServer`). See [elimity-com/scim](https://github.com/elimity-com/scim).
+- **Caveats** (from upstream README): project describes itself as **early stage**; **minor
+  version bumps may change APIs** — pin versions and read release notes. **Bulk, sorting**, and
+  other optional RFC features are **not** supported; confirm Okta’s provisioning profile does
+  not require them for v1. Immutable / writeOnly attribute rules need **explicit checks** in our
+  handlers where the library cannot enforce them alone.
+- **Fallback**: if adoption blocks on routing or Okta quirks, narrow hand-rolled endpoints remain
+  possible for a subset of operations; prefer staying on elimity-com/scim while we extend tests.
+
+### Web UI
+
+- **Vite + React** (`web_src/`) — Okta sign-in entry when the org allows it; settings for SSO/SCIM
+  setup. Regenerate OpenAPI/TS client after proto changes (`make` targets in `AGENTS.md`).
+
+### Observability and quality
+
+- **OpenTelemetry** (`otelmux` already wraps the router) — extend spans or attributes on new auth
+  and SCIM routes as needed; avoid logging secrets or raw tokens.
+- **`github.com/stretchr/testify`** — unit tests for handlers, token verification errors, and SCIM
+  edge cases; **`net/http/httptest`** for handler integration tests.
 
 ## Security Considerations
 
