@@ -25,11 +25,11 @@ const installationInstructions = `
 To connect Elastic to SuperPlane:
 
 1. **Elasticsearch URL**:
-   - **Elastic Cloud**: Go to **Elastic Cloud → Deployments**, open your deployment, go to **Manage**, and copy the **Elasticsearch endpoint** from the **Application endpoints, cluster and component IDs** section.
+   - **Elastic Cloud**: Start at https://cloud.elastic.co/home. In **Hosted deployments**, find your deployment, click **Manage** (or open it from **Open**), then copy the **Elasticsearch endpoint** from the **Application endpoints, cluster and component IDs** section.
    - **Self-managed Elastic**: Use your Elasticsearch server URL.
    - Example: ` + "`https://my-cluster.es.us-east-1.aws.found.io:9243`" + `.
 2. **Kibana URL**:
-   - **Elastic Cloud**: From the same **Manage** section for that deployment, copy the **Kibana endpoint**.
+   - **Elastic Cloud**: From the same deployment page opened from https://cloud.elastic.co/home, copy the **Kibana endpoint** from **Manage**.
    - **Self-managed Elastic**: Use the base URL of your Kibana instance.
    - Keep only the base URL: protocol, host, and port.
    - Example: ` + "`https://my-cluster.kb.us-east-1.aws.found.io:9243`" + `.
@@ -37,9 +37,6 @@ To connect Elastic to SuperPlane:
    - In Kibana, go to **Stack Management → API Keys**.
    - Create an API key that can index documents in Elasticsearch and manage Kibana connectors.
    - Paste that API key into SuperPlane.
-4. **Alert rules**:
-   - SuperPlane automatically creates the Kibana webhook connector.
-   - In Kibana, add that connector to the alert rules you want to send to SuperPlane.
 `
 
 func (e *Elastic) Name() string {

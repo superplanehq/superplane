@@ -1,7 +1,9 @@
 package elastic
 
 import (
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,6 +15,56 @@ import (
 
 func eq(value string) configuration.Predicate {
 	return configuration.Predicate{Type: configuration.PredicateTypeEquals, Value: value}
+}
+
+func Test__OnAlertFires__Configuration(t *testing.T) {
+	fields := (&OnAlertFires{}).Configuration()
+	require.NotEmpty(t, fields)
+
+	ruleField := fields[0]
+	assert.Equal(t, "rule", ruleField.Name)
+	assert.Equal(t, "Rule", ruleField.Label)
+	assert.Equal(t, configuration.FieldTypeIntegrationResource, ruleField.Type)
+	assert.True(t, ruleField.Required)
+	require.NotNil(t, ruleField.TypeOptions)
+	require.NotNil(t, ruleField.TypeOptions.Resource)
+	assert.Equal(t, ResourceTypeKibanaRule, ruleField.TypeOptions.Resource.Type)
+	assert.False(t, ruleField.TypeOptions.Resource.Multi)
+}
+
+func Test__OnAlertFires__Setup(t *testing.T) {
+	trigger := &OnAlertFires{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"id":"rule-123","name":"High error rate"}`)),
+			},
+		},
+	}
+	metadataCtx := &contexts.MetadataContext{}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"url":       "https://elastic.example.com",
+			"kibanaUrl": "https://kibana.example.com",
+			"apiKey":    "api-key",
+		},
+	}
+
+	err := trigger.Setup(core.TriggerContext{
+		Configuration: map[string]any{"rule": "rule-123"},
+		HTTP:          httpCtx,
+		Metadata:      metadataCtx,
+		Integration:   integrationCtx,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, OnAlertFiresMetadata{RuleName: "High error rate"}, metadataCtx.Metadata)
+	require.Len(t, integrationCtx.WebhookRequests, 1)
+	assert.Equal(t, map[string]any{
+		"kibanaUrl": "https://kibana.example.com",
+		"ruleId":    "rule-123",
+	}, integrationCtx.WebhookRequests[0])
 }
 
 func Test__OnAlertFires__HandleWebhook(t *testing.T) {
@@ -92,14 +144,14 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		assert.NotContains(t, eventData, "payload")
 	})
 
-	// --- rules ---
+	// --- rule ---
 
-	t.Run("rules matches by rule ID -> emits event", func(t *testing.T) {
+	t.Run("selected rule matches by rule ID -> emits event", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"rules": []string{"rule-123", "rule-456"}},
+			Configuration: map[string]any{"rule": "rule-123"},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
@@ -108,32 +160,38 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		require.Len(t, eventsCtx.Payloads, 1)
 	})
 
-	t.Run("rules matches by rule name -> emits event", func(t *testing.T) {
+	t.Run("selected rule mismatch -> silent pass", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          validBody,
 			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"rules": []string{"High error rate"}},
-			Events:        eventsCtx,
-			Webhook:       webhook,
-		})
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusOK, code)
-		require.Len(t, eventsCtx.Payloads, 1)
-	})
-
-	t.Run("rules does not match -> silent pass", func(t *testing.T) {
-		eventsCtx := &contexts.EventContext{}
-		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:          validBody,
-			Headers:       headersWithSecret(),
-			Configuration: map[string]any{"rules": []string{"rule-999"}},
+			Configuration: map[string]any{"rule": "rule-999"},
 			Events:        eventsCtx,
 			Webhook:       webhook,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 		assert.Empty(t, eventsCtx.Payloads)
+	})
+
+	t.Run("selected rule still emits when payload omits rule ID", func(t *testing.T) {
+		eventsCtx := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body: []byte(`{
+				"ruleName": "High error rate",
+				"spaceId": "default",
+				"tags": ["team:infra", "env:prod"],
+				"status": "active",
+				"severity": "critical"
+			}`),
+			Headers:       headersWithSecret(),
+			Configuration: map[string]any{"rule": "rule-123"},
+			Events:        eventsCtx,
+			Webhook:       webhook,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Len(t, eventsCtx.Payloads, 1)
 	})
 
 	// --- spaces ---
@@ -262,7 +320,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 			Body:    validBody,
 			Headers: headersWithSecret(),
 			Configuration: map[string]any{
-				"rules":      []string{"rule-123"},
+				"rule":       "rule-123",
 				"spaces":     []string{"default"},
 				"tags":       []configuration.Predicate{eq("team:infra")},
 				"severities": []string{"critical"},
@@ -282,7 +340,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 			Body:    validBody,
 			Headers: headersWithSecret(),
 			Configuration: map[string]any{
-				"rules":    []string{"rule-123"},
+				"rule":     "rule-123",
 				"statuses": []string{"recovered"}, // active != recovered
 			},
 			Events:  eventsCtx,

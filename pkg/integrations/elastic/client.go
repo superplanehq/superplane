@@ -140,6 +140,68 @@ type KibanaRule struct {
 	Name string `json:"name"`
 }
 
+type KibanaRuleActionFrequency struct {
+	NotifyWhen string  `json:"notify_when,omitempty"`
+	Summary    bool    `json:"summary"`
+	Throttle   *string `json:"throttle"`
+}
+
+type KibanaRuleAction struct {
+	ID                      string                     `json:"id"`
+	Group                   string                     `json:"group"`
+	Params                  map[string]any             `json:"params"`
+	Frequency               *KibanaRuleActionFrequency `json:"frequency,omitempty"`
+	UseAlertDataForTemplate bool                       `json:"use_alert_data_for_template,omitempty"`
+	UUID                    string                     `json:"uuid,omitempty"`
+	AlertsFilter            map[string]any             `json:"alerts_filter,omitempty"`
+}
+
+type KibanaRuleSchedule struct {
+	Interval string `json:"interval"`
+}
+
+type KibanaRuleFlapping struct {
+	LookBackWindow        int `json:"look_back_window"`
+	StatusChangeThreshold int `json:"status_change_threshold"`
+}
+
+type KibanaRuleAlertDelay struct {
+	Active int `json:"active"`
+}
+
+type KibanaRuleDetails struct {
+	ID             string                `json:"id"`
+	Name           string                `json:"name"`
+	Consumer       string                `json:"consumer"`
+	Enabled        bool                  `json:"enabled"`
+	Params         map[string]any        `json:"params"`
+	RuleTypeID     string                `json:"rule_type_id"`
+	Schedule       KibanaRuleSchedule    `json:"schedule"`
+	Tags           []string              `json:"tags"`
+	Actions        []KibanaRuleAction    `json:"actions"`
+	NotifyWhen     string                `json:"notify_when,omitempty"`
+	Throttle       *string               `json:"throttle,omitempty"`
+	Flapping       *KibanaRuleFlapping   `json:"flapping,omitempty"`
+	AlertDelay     *KibanaRuleAlertDelay `json:"alert_delay,omitempty"`
+	SnoozeSchedule []map[string]any      `json:"snooze_schedule,omitempty"`
+}
+
+type updateKibanaRuleRequest struct {
+	Name           string                `json:"name"`
+	Consumer       string                `json:"consumer"`
+	Enabled        bool                  `json:"enabled"`
+	Params         map[string]any        `json:"params"`
+	RuleTypeID     string                `json:"rule_type_id"`
+	Schedule       KibanaRuleSchedule    `json:"schedule"`
+	Tags           []string              `json:"tags"`
+	Actions        []KibanaRuleAction    `json:"actions"`
+	NotifyWhen     string                `json:"notify_when,omitempty"`
+	Throttle       *string               `json:"throttle,omitempty"`
+	Flapping       *KibanaRuleFlapping   `json:"flapping,omitempty"`
+	AlertDelay     *KibanaRuleAlertDelay `json:"alert_delay,omitempty"`
+	SnoozeSchedule []map[string]any      `json:"snooze_schedule,omitempty"`
+}
+
 type kibanaRulesResponse struct {
 	Page    int          `json:"page"`
 	PerPage int          `json:"per_page"`
@@ -179,6 +241,121 @@ func (c *Client) ListKibanaRules() ([]KibanaRule, error) {
 	}
 
 	return nil, fmt.Errorf("exceeded maximum Kibana rule pages (%d)", maxPages)
+}
+
+func (c *Client) GetKibanaRule(ruleID string) (*KibanaRuleDetails, error) {
+	body, err := c.execKibanaRequest(http.MethodGet, fmt.Sprintf("/api/alerting/rule/%s", url.PathEscape(ruleID)), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var rule KibanaRuleDetails
+	if err := json.Unmarshal(body, &rule); err != nil {
+		return nil, fmt.Errorf("error parsing Kibana rule response: %v", err)
+	}
+
+	return &rule, nil
+}
+
+func (c *Client) EnsureKibanaRuleHasConnector(ruleID, connectorID string) error {
+	rule, err := c.GetKibanaRule(ruleID)
+	if err != nil {
+		return err
+	}
+
+	for _, action := range rule.Actions {
+		if action.ID == connectorID {
+			return nil
+		}
+	}
+
+	rule.Actions = append(rule.Actions, superPlaneKibanaRuleAction(connectorID))
+	return c.updateKibanaRule(ruleID, rule)
+}
+
+func (c *Client) RemoveKibanaRuleConnector(ruleID, connectorID string) error {
+	rule, err := c.GetKibanaRule(ruleID)
+	if err != nil {
+		var kibanaErr *KibanaAPIError
+		if errors.As(err, &kibanaErr) && kibanaErr.StatusCode == http.StatusNotFound {
+			return nil
+		}
+		return err
+	}
+
+	filtered := make([]KibanaRuleAction, 0, len(rule.Actions))
+	for _, action := range rule.Actions {
+		if action.ID != connectorID {
+			filtered = append(filtered, action)
+		}
+	}
+
+	if len(filtered) == len(rule.Actions) {
+		return nil
+	}
+
+	rule.Actions = filtered
+	return c.updateKibanaRule(ruleID, rule)
+}
+
+func (c *Client) updateKibanaRule(ruleID string, rule *KibanaRuleDetails) error {
+	params := rule.Params
+	if params == nil {
+		params = map[string]any{}
+	}
+
+	tags := rule.Tags
+	if tags == nil {
+		tags = []string{}
+	}
+
+	actions := rule.Actions
+	if actions == nil {
+		actions = []KibanaRuleAction{}
+	}
+
+	payload := updateKibanaRuleRequest{
+		Name:           rule.Name,
+		Consumer:       rule.Consumer,
+		Enabled:        rule.Enabled,
+		Params:         params,
+		RuleTypeID:     rule.RuleTypeID,
+		Schedule:       rule.Schedule,
+		Tags:           tags,
+		Actions:        actions,
+		NotifyWhen:     rule.NotifyWhen,
+		Throttle:       rule.Throttle,
+		Flapping:       rule.Flapping,
+		AlertDelay:     rule.AlertDelay,
+		SnoozeSchedule: rule.SnoozeSchedule,
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("error marshaling Kibana rule payload: %v", err)
+	}
+
+	_, err = c.execKibanaRequest(
+		http.MethodPut,
+		fmt.Sprintf("/api/alerting/rule/%s", url.PathEscape(ruleID)),
+		bytes.NewReader(data),
+	)
+	return err
+}
+
+func superPlaneKibanaRuleAction(connectorID string) KibanaRuleAction {
+	return KibanaRuleAction{
+		ID:    connectorID,
+		Group: "default",
+		Params: map[string]any{
+			"body": kibanaAlertWebhookActionBody,
+		},
+		Frequency: &KibanaRuleActionFrequency{
+			NotifyWhen: "onActionGroupChange",
+			Summary:    false,
+			Throttle:   nil,
+		},
+	}
 }
 
 // KibanaSpace is the relevant subset of a Kibana space.
