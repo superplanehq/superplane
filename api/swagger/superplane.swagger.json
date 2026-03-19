@@ -5242,13 +5242,6 @@
             "$ref": "#/definitions/ConfigurationRequiredCondition"
           }
         },
-        "validationRules": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ConfigurationValidationRule"
-          }
-        },
         "placeholder": {
           "type": "string"
         },
@@ -5256,9 +5249,6 @@
           "type": "boolean"
         },
         "togglable": {
-          "type": "boolean"
-        },
-        "disallowExpression": {
           "type": "boolean"
         }
       }
@@ -5485,20 +5475,6 @@
         },
         "text": {
           "$ref": "#/definitions/ConfigurationTextTypeOptions"
-        }
-      }
-    },
-    "ConfigurationValidationRule": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string"
-        },
-        "compareWith": {
-          "type": "string"
-        },
-        "message": {
-          "type": "string"
         }
       }
     },

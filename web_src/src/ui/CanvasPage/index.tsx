@@ -198,8 +198,6 @@ export interface CanvasPageProps {
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
-  onExportYamlCopy?: (nodes: CanvasNode[]) => void;
-  onExportYamlDownload?: (nodes: CanvasNode[]) => void;
   // Undo functionality
   onUndo?: () => void;
   canUndo?: boolean;
@@ -928,8 +926,6 @@ function CanvasPage(props: CanvasPageProps) {
           showVersioningTab={props.showVersioningTab}
           memoryItemCount={props.memoryItemCount}
           versioningItemCount={props.versioningItemCount}
-          onExportYamlCopy={props.onExportYamlCopy}
-          onExportYamlDownload={props.onExportYamlDownload}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1437,8 +1433,6 @@ function CanvasContentHeader({
   showVersioningTab,
   memoryItemCount,
   versioningItemCount,
-  onExportYamlCopy,
-  onExportYamlDownload,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1478,8 +1472,6 @@ function CanvasContentHeader({
   showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;
-  onExportYamlCopy?: (nodes: CanvasNode[]) => void;
-  onExportYamlDownload?: (nodes: CanvasNode[]) => void;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1489,18 +1481,6 @@ function CanvasContentHeader({
       onSave(stateRef.current.nodes);
     }
   }, [onSave]);
-
-  const handleExportYamlCopy = useCallback(() => {
-    if (onExportYamlCopy) {
-      onExportYamlCopy(stateRef.current.nodes);
-    }
-  }, [onExportYamlCopy]);
-
-  const handleExportYamlDownload = useCallback(() => {
-    if (onExportYamlDownload) {
-      onExportYamlDownload(stateRef.current.nodes);
-    }
-  }, [onExportYamlDownload]);
 
   const handleLogoClick = useCallback(() => {
     if (organizationId) {
@@ -1549,8 +1529,6 @@ function CanvasContentHeader({
       showVersioningTab={showVersioningTab}
       memoryItemCount={memoryItemCount}
       versioningItemCount={versioningItemCount}
-      onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
-      onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
     />
   );
 }

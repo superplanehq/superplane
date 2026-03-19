@@ -131,7 +131,6 @@ docs/ConfigurationStringTypeOptions.md
 docs/ConfigurationTextTypeOptions.md
 docs/ConfigurationTimeTypeOptions.md
 docs/ConfigurationTypeOptions.md
-docs/ConfigurationValidationRule.md
 docs/ConfigurationVisibilityCondition.md
 docs/GooglerpcStatus.md
 docs/GroupsAPI.md
@@ -357,7 +356,6 @@ model_configuration_string_type_options.go
 model_configuration_text_type_options.go
 model_configuration_time_type_options.go
 model_configuration_type_options.go
-model_configuration_validation_rule.go
 model_configuration_visibility_condition.go
 model_googlerpc_status.go
 model_groups_add_user_to_group_body.go

@@ -424,10 +424,24 @@ export function IntegrationCreateDialog({
                 </Button>
               ) : (
                 <>
-                  <Button color="blue" onClick={handleClose}>
+                  <LoadingButton
+                    color="blue"
+                    onClick={async () => {
+                      try {
+                        await updateIntegrationMutation.mutateAsync({ configuration: { ...configuration } });
+                        await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
+                        if (createdIntegrationId) onCreated?.(createdIntegrationId);
+                        handleClose();
+                      } catch {
+                        showErrorToast("Failed to sync integration");
+                      }
+                    }}
+                    loading={updateIntegrationMutation.isPending}
+                    loadingText="Saving..."
+                  >
                     Save
-                  </Button>
-                  <Button variant="outline" onClick={handleClose}>
+                  </LoadingButton>
+                  <Button variant="outline" onClick={handleClose} disabled={updateIntegrationMutation.isPending}>
                     Cancel
                   </Button>
                 </>

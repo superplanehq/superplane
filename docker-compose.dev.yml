@@ -79,7 +79,7 @@ services:
       OWNER_SETUP_ENABLED: "yes"
       VITE_ENABLE_CUSTOM_COMPONENTS: "true"
       VITE_ENABLE_AGENT_REPL: ${VITE_ENABLE_AGENT_REPL:-true}
-      VITE_AGENT_REPL_WEB_URL: ${VITE_AGENT_REPL_WEB_URL:-http://localhost:8090}
+      VITE_AGENT_URL: ${VITE_AGENT_URL:-http://localhost:8090}
 
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}
@@ -117,7 +117,7 @@ services:
       IN_DOCKER: "1"
       SUPERPLANE_BASE_URL: ${SUPERPLANE_BASE_URL:-http://app:8000}
       REPL_WEB_DEBUG: ${REPL_WEB_DEBUG:-true}
-    command: bash -lc "uv run python -m repl.main --serve-repl-web --test-repl-web-host 0.0.0.0 --test-repl-web-port 8090"
+    command: bash -lc "uv run python -m repl.main --server --test-repl-web-host 0.0.0.0 --test-repl-web-port 8090"
     tty: true
     stdin_open: true
     ports:

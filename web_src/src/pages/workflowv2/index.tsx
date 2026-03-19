@@ -469,7 +469,6 @@ export function WorkflowPageV2() {
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
-  const isDev = import.meta.env.DEV;
   const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "memory" | "settings" | "versioning">("canvas");
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
@@ -4156,42 +4155,6 @@ export function WorkflowPageV2() {
     [canvas],
   );
 
-  const handleExportYamlDownload = useCallback(
-    (canvasNodes: CanvasNode[]) => {
-      const payload = getYamlExportPayload(canvasNodes);
-      if (!payload) return;
-
-      const blob = new Blob([payload.yamlText], { type: "text/yaml;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = payload.filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-
-      showSuccessToast("Canvas exported as YAML");
-    },
-    [getYamlExportPayload],
-  );
-
-  const handleExportYamlCopy = useCallback(
-    async (canvasNodes: CanvasNode[]) => {
-      const payload = getYamlExportPayload(canvasNodes);
-      if (!payload) return;
-
-      try {
-        await navigator.clipboard.writeText(payload.yamlText);
-        showSuccessToast("YAML copied to clipboard");
-      } catch (_error) {
-        showErrorToast("Failed to copy YAML to clipboard");
-      }
-    },
-    [getYamlExportPayload],
-  );
-
   const handleUseTemplateSubmit = useCallback(
     async (data: { name: string; description?: string; templateId?: string }) => {
       if (!canvas || !organizationId) return;
@@ -4825,8 +4788,6 @@ export function WorkflowPageV2() {
           showPendingDraftBadge={showPendingDraftBadge}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
-          onExportYamlCopy={isDev ? handleExportYamlCopy : undefined}
-          onExportYamlDownload={isDev ? handleExportYamlDownload : undefined}
           runDisabled={runDisabled}
           runDisabledTooltip={runDisabledTooltip}
           onCancelQueueItem={onCancelQueueItem}

@@ -125,10 +125,6 @@ func (b *NodeConfigurationBuilder) resolveWithSchema(config map[string]any, fiel
 }
 
 func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configuration.Field) (any, error) {
-	if field.DisallowExpression {
-		return value, nil
-	}
-
 	if field.TypeOptions != nil {
 		if field.TypeOptions.Object != nil && len(field.TypeOptions.Object.Schema) > 0 {
 			if obj, ok := asAnyMap(value); ok {
