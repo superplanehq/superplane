@@ -25,14 +25,43 @@ func Test__OnAlertFires__Configuration(t *testing.T) {
 	assert.Equal(t, "rule", ruleField.Name)
 	assert.Equal(t, "Rule", ruleField.Label)
 	assert.Equal(t, configuration.FieldTypeIntegrationResource, ruleField.Type)
-	assert.True(t, ruleField.Required)
+	assert.False(t, ruleField.Required)
 	require.NotNil(t, ruleField.TypeOptions)
 	require.NotNil(t, ruleField.TypeOptions.Resource)
 	assert.Equal(t, ResourceTypeKibanaRule, ruleField.TypeOptions.Resource.Type)
 	assert.False(t, ruleField.TypeOptions.Resource.Multi)
 }
 
-func Test__OnAlertFires__Setup(t *testing.T) {
+func Test__OnAlertFires__Setup__WithoutRule(t *testing.T) {
+	trigger := &OnAlertFires{}
+	httpCtx := &contexts.HTTPContext{}
+	metadataCtx := &contexts.MetadataContext{}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"url":       "https://elastic.example.com",
+			"kibanaUrl": "https://kibana.example.com",
+			"apiKey":    "api-key",
+		},
+	}
+
+	err := trigger.Setup(core.TriggerContext{
+		Configuration: map[string]any{},
+		HTTP:          httpCtx,
+		Metadata:      metadataCtx,
+		Integration:   integrationCtx,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, OnAlertFiresMetadata{}, metadataCtx.Metadata)
+	assert.Empty(t, httpCtx.Requests)
+	require.Len(t, integrationCtx.WebhookRequests, 1)
+	assert.Equal(t, map[string]any{
+		"kibanaUrl": "https://kibana.example.com",
+		"ruleId":    "",
+	}, integrationCtx.WebhookRequests[0])
+}
+
+func Test__OnAlertFires__Setup__WithRule(t *testing.T) {
 	trigger := &OnAlertFires{}
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{

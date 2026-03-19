@@ -49,7 +49,7 @@ func (t *OnAlertFires) Documentation() string {
 ## Setup
 
 1. Save this trigger — SuperPlane automatically creates a signed Kibana Webhook connector.
-2. Select the Kibana alert rule in SuperPlane. SuperPlane attaches its webhook connector to that rule automatically.
+2. Optionally select a Kibana alert rule in SuperPlane. When a rule is selected, SuperPlane checks that rule's actions and attaches the existing SuperPlane connector if it is missing.
 
 ### Recommended Kibana action body
 
@@ -63,9 +63,9 @@ Kibana substitutes ` + "`{{rule.id}}`" + ` and ` + "`{{rule.name}}`" + ` at deli
 
 ## Filtering
 
-The **Rule** field is required. Additional filters are optional refinements. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
+The **Rule** field is optional. Leave it empty to keep the original manual connector workflow. Additional filters are optional refinements. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
 
-The selected **Rule** is the primary filter. Additional filters like space, tags, severity, and status are optional refinements.
+When a **Rule** is selected, it becomes the primary filter. Additional filters like space, tags, severity, and status are optional refinements.
 
 ## Webhook Verification
 
@@ -82,8 +82,8 @@ func (t *OnAlertFires) Configuration() []configuration.Field {
 			Name:        "rule",
 			Label:       "Rule",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "Listen only for alerts from this Kibana alert rule.",
+			Required:    false,
+			Description: "Optionally listen only for alerts from this Kibana alert rule. When selected, SuperPlane also ensures its connector is attached to the rule.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: ResourceTypeKibanaRule,
@@ -150,32 +150,33 @@ func (t *OnAlertFires) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(config.Rule) == "" {
-		return fmt.Errorf("rule is required")
-	}
-
 	kibanaURL, err := ctx.Integration.GetConfig("kibanaUrl")
 	if err != nil {
 		return fmt.Errorf("failed to get Kibana URL: %w", err)
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("error creating client: %v", err)
+	metadata := OnAlertFiresMetadata{}
+	if strings.TrimSpace(config.Rule) != "" {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("error creating client: %v", err)
+		}
+
+		rule, err := client.GetKibanaRule(config.Rule)
+		if err != nil {
+			return fmt.Errorf("failed to get Kibana rule %s: %w", config.Rule, err)
+		}
+
+		metadata.RuleName = rule.Name
 	}
 
-	rule, err := client.GetKibanaRule(config.Rule)
-	if err != nil {
-		return fmt.Errorf("failed to get Kibana rule %s: %w", config.Rule, err)
-	}
-
-	if err := ctx.Metadata.Set(OnAlertFiresMetadata{RuleName: rule.Name}); err != nil {
+	if err := ctx.Metadata.Set(metadata); err != nil {
 		return fmt.Errorf("failed to store rule metadata: %w", err)
 	}
 
 	return ctx.Integration.RequestWebhook(map[string]any{
 		"kibanaUrl": string(kibanaURL),
-		"ruleId":    config.Rule,
+		"ruleId":    strings.TrimSpace(config.Rule),
 	})
 }
 

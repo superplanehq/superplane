@@ -170,36 +170,29 @@ type KibanaRuleAlertDelay struct {
 }
 
 type KibanaRuleDetails struct {
-	ID             string                `json:"id"`
-	Name           string                `json:"name"`
-	Consumer       string                `json:"consumer"`
-	Enabled        bool                  `json:"enabled"`
-	Params         map[string]any        `json:"params"`
-	RuleTypeID     string                `json:"rule_type_id"`
-	Schedule       KibanaRuleSchedule    `json:"schedule"`
-	Tags           []string              `json:"tags"`
-	Actions        []KibanaRuleAction    `json:"actions"`
-	NotifyWhen     string                `json:"notify_when,omitempty"`
-	Throttle       *string               `json:"throttle,omitempty"`
-	Flapping       *KibanaRuleFlapping   `json:"flapping,omitempty"`
-	AlertDelay     *KibanaRuleAlertDelay `json:"alert_delay,omitempty"`
-	SnoozeSchedule []map[string]any      `json:"snooze_schedule,omitempty"`
+	ID         string                `json:"id"`
+	Name       string                `json:"name"`
+	Consumer   string                `json:"consumer"`
+	Params     map[string]any        `json:"params"`
+	RuleTypeID string                `json:"rule_type_id"`
+	Schedule   KibanaRuleSchedule    `json:"schedule"`
+	Tags       []string              `json:"tags"`
+	Actions    []KibanaRuleAction    `json:"actions"`
+	AlertDelay *KibanaRuleAlertDelay `json:"alert_delay,omitempty"`
 }
 
 type updateKibanaRuleRequest struct {
-	Name           string                `json:"name"`
-	Consumer       string                `json:"consumer"`
-	Enabled        bool                  `json:"enabled"`
-	Params         map[string]any        `json:"params"`
-	RuleTypeID     string                `json:"rule_type_id"`
-	Schedule       KibanaRuleSchedule    `json:"schedule"`
-	Tags           []string              `json:"tags"`
-	Actions        []KibanaRuleAction    `json:"actions"`
-	NotifyWhen     string                `json:"notify_when,omitempty"`
-	Throttle       *string               `json:"throttle,omitempty"`
-	Flapping       *KibanaRuleFlapping   `json:"flapping,omitempty"`
-	AlertDelay     *KibanaRuleAlertDelay `json:"alert_delay,omitempty"`
-	SnoozeSchedule []map[string]any      `json:"snooze_schedule,omitempty"`
+	Name       string                `json:"name"`
+	Params     map[string]any        `json:"params"`
+	Schedule   KibanaRuleSchedule    `json:"schedule"`
+	Tags       []string              `json:"tags"`
+	Actions    []KibanaRuleAction    `json:"actions"`
+	AlertDelay *KibanaRuleAlertDelay `json:"alert_delay,omitempty"`
+}
+
+type KibanaRuleType struct {
+	ID                   string `json:"id"`
+	DefaultActionGroupID string `json:"default_action_group_id"`
 }
 
 type kibanaRulesResponse struct {
@@ -258,44 +251,39 @@ func (c *Client) GetKibanaRule(ruleID string) (*KibanaRuleDetails, error) {
 }
 
 func (c *Client) EnsureKibanaRuleHasConnector(ruleID, connectorID string) error {
-	rule, err := c.GetKibanaRule(ruleID)
-	if err != nil {
-		return err
-	}
-
-	for _, action := range rule.Actions {
-		if action.ID == connectorID {
-			return nil
+	return c.updateKibanaRuleWithRetry(ruleID, func(rule *KibanaRuleDetails) error {
+		for _, action := range rule.Actions {
+			if action.ID == connectorID {
+				return nil
+			}
 		}
-	}
 
-	rule.Actions = append(rule.Actions, superPlaneKibanaRuleAction(connectorID))
-	return c.updateKibanaRule(ruleID, rule)
+		actionGroupID, err := c.GetKibanaRuleDefaultActionGroupID(rule.RuleTypeID)
+		if err != nil {
+			return err
+		}
+
+		rule.Actions = append(rule.Actions, superPlaneKibanaRuleAction(connectorID, actionGroupID))
+		return c.updateKibanaRule(ruleID, rule)
+	})
 }
 
 func (c *Client) RemoveKibanaRuleConnector(ruleID, connectorID string) error {
-	rule, err := c.GetKibanaRule(ruleID)
-	if err != nil {
-		var kibanaErr *KibanaAPIError
-		if errors.As(err, &kibanaErr) && kibanaErr.StatusCode == http.StatusNotFound {
+	return c.updateKibanaRuleWithRetry(ruleID, func(rule *KibanaRuleDetails) error {
+		filtered := make([]KibanaRuleAction, 0, len(rule.Actions))
+		for _, action := range rule.Actions {
+			if action.ID != connectorID {
+				filtered = append(filtered, action)
+			}
+		}
+
+		if len(filtered) == len(rule.Actions) {
 			return nil
 		}
-		return err
-	}
 
-	filtered := make([]KibanaRuleAction, 0, len(rule.Actions))
-	for _, action := range rule.Actions {
-		if action.ID != connectorID {
-			filtered = append(filtered, action)
-		}
-	}
-
-	if len(filtered) == len(rule.Actions) {
-		return nil
-	}
-
-	rule.Actions = filtered
-	return c.updateKibanaRule(ruleID, rule)
+		rule.Actions = filtered
+		return c.updateKibanaRule(ruleID, rule)
+	})
 }
 
 func (c *Client) updateKibanaRule(ruleID string, rule *KibanaRuleDetails) error {
@@ -315,19 +303,12 @@ func (c *Client) updateKibanaRule(ruleID string, rule *KibanaRuleDetails) error 
 	}
 
 	payload := updateKibanaRuleRequest{
-		Name:           rule.Name,
-		Consumer:       rule.Consumer,
-		Enabled:        rule.Enabled,
-		Params:         params,
-		RuleTypeID:     rule.RuleTypeID,
-		Schedule:       rule.Schedule,
-		Tags:           tags,
-		Actions:        actions,
-		NotifyWhen:     rule.NotifyWhen,
-		Throttle:       rule.Throttle,
-		Flapping:       rule.Flapping,
-		AlertDelay:     rule.AlertDelay,
-		SnoozeSchedule: rule.SnoozeSchedule,
+		Name:       rule.Name,
+		Params:     params,
+		Schedule:   rule.Schedule,
+		Tags:       tags,
+		Actions:    actions,
+		AlertDelay: rule.AlertDelay,
 	}
 
 	data, err := json.Marshal(payload)
@@ -343,10 +324,62 @@ func (c *Client) updateKibanaRule(ruleID string, rule *KibanaRuleDetails) error 
 	return err
 }
 
-func superPlaneKibanaRuleAction(connectorID string) KibanaRuleAction {
+func (c *Client) updateKibanaRuleWithRetry(ruleID string, update func(*KibanaRuleDetails) error) error {
+	for attempt := 0; attempt < 2; attempt++ {
+		rule, err := c.GetKibanaRule(ruleID)
+		if err != nil {
+			var kibanaErr *KibanaAPIError
+			if errors.As(err, &kibanaErr) && kibanaErr.StatusCode == http.StatusNotFound {
+				return nil
+			}
+			return err
+		}
+
+		err = update(rule)
+		if err == nil {
+			return nil
+		}
+
+		var kibanaErr *KibanaAPIError
+		if !(errors.As(err, &kibanaErr) && kibanaErr.StatusCode == http.StatusConflict && attempt == 0) {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Client) GetKibanaRuleDefaultActionGroupID(ruleTypeID string) (string, error) {
+	body, err := c.execKibanaRequest(http.MethodGet, "/api/alerting/rule_types", nil)
+	if err != nil {
+		return "", err
+	}
+
+	var ruleTypes []KibanaRuleType
+	if err := json.Unmarshal(body, &ruleTypes); err != nil {
+		return "", fmt.Errorf("error parsing Kibana rule types response: %v", err)
+	}
+
+	for _, ruleType := range ruleTypes {
+		if ruleType.ID == ruleTypeID {
+			if ruleType.DefaultActionGroupID == "" {
+				return "default", nil
+			}
+			return ruleType.DefaultActionGroupID, nil
+		}
+	}
+
+	return "default", nil
+}
+
+func superPlaneKibanaRuleAction(connectorID, actionGroupID string) KibanaRuleAction {
+	if actionGroupID == "" {
+		actionGroupID = "default"
+	}
+
 	return KibanaRuleAction{
 		ID:    connectorID,
-		Group: "default",
+		Group: actionGroupID,
 		Params: map[string]any{
 			"body": kibanaAlertWebhookActionBody,
 		},
@@ -381,8 +414,47 @@ func (c *Client) ListKibanaSpaces() ([]KibanaSpace, error) {
 
 // KibanaConnectorResponse is the relevant subset of the Kibana connector API response.
 type KibanaConnectorResponse struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID                string `json:"id"`
+	Name              string `json:"name"`
+	ConnectorTypeID   string `json:"connector_type_id"`
+	ReferencedByCount int    `json:"referenced_by_count"`
+	Config            struct {
+		URL     string            `json:"url"`
+		Method  string            `json:"method"`
+		Headers map[string]string `json:"headers"`
+	} `json:"config"`
+}
+
+func (c *Client) ListKibanaConnectors() ([]KibanaConnectorResponse, error) {
+	responseBody, err := c.execKibanaRequest(http.MethodGet, "/api/actions/connectors", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var connectors []KibanaConnectorResponse
+	if err := json.Unmarshal(responseBody, &connectors); err != nil {
+		return nil, fmt.Errorf("error parsing Kibana connectors response: %v", err)
+	}
+
+	return connectors, nil
+}
+
+func (c *Client) FindKibanaWebhookConnector(webhookURL string) (*KibanaConnectorResponse, error) {
+	connectors, err := c.ListKibanaConnectors()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, connector := range connectors {
+		if connector.ConnectorTypeID != ".webhook" {
+			continue
+		}
+		if connector.Config.URL == webhookURL {
+			return &connector, nil
+		}
+	}
+
+	return nil, nil
 }
 
 // CreateKibanaConnector creates a Kibana Webhook connector that POSTs to
