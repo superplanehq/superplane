@@ -4,6 +4,7 @@ import { Activity, Database, Gauge, Layers3, Users } from "lucide-react";
 import type { OrganizationsDescribeUsageResponse, OrganizationsOrganizationLimits } from "@/api-client/types.gen";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useOrganizationUsage } from "@/hooks/useOrganizationData";
+import { isUsagePageForced } from "@/lib/env";
 import { EmptyState } from "@/ui/emptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 
@@ -24,6 +25,8 @@ export function Usage({ organizationId }: UsageProps) {
   usePageTitle(["Usage"]);
 
   const { data, isLoading, error } = useOrganizationUsage(organizationId);
+  const forceUsagePage = isUsagePageForced();
+  const isPreviewMode = forceUsagePage && data?.enabled !== true;
 
   const usageCards = useMemo(() => buildLimitCards(data?.limits), [data?.limits]);
   const eventUsage = useMemo(() => buildEventUsage(data), [data]);
@@ -65,7 +68,7 @@ export function Usage({ organizationId }: UsageProps) {
     );
   }
 
-  if (!data.enabled) {
+  if (!data.enabled && !forceUsagePage) {
     return <Navigate to={`/${organizationId}/settings/general`} replace />;
   }
 
@@ -73,9 +76,11 @@ export function Usage({ organizationId }: UsageProps) {
     <div className="pt-6 space-y-6">
       <Alert>
         <Gauge className="h-4 w-4" />
-        <AlertTitle>Usage service connected</AlertTitle>
+        <AlertTitle>{isPreviewMode ? "Usage preview mode" : "Usage service connected"}</AlertTitle>
         <AlertDescription>
-          {data.statusMessage || "Organization usage is being tracked by the configured service."}
+          {isPreviewMode
+            ? "Showing the organization usage page in local development without a configured usage service."
+            : data.statusMessage || "Organization usage is being tracked by the configured service."}
         </AlertDescription>
       </Alert>
 

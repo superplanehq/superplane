@@ -81,6 +81,7 @@ services:
       VITE_ENABLE_CUSTOM_COMPONENTS: "true"
       VITE_ENABLE_AGENT_REPL: ${VITE_ENABLE_AGENT_REPL:-true}
       VITE_AGENT_URL: ${VITE_AGENT_URL:-http://localhost:8090}
+      VITE_FORCE_USAGE_PAGE: ${VITE_FORCE_USAGE_PAGE:-true}
 
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}

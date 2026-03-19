@@ -19,6 +19,7 @@ import { ServiceAccounts } from "./ServiceAccounts";
 import { ServiceAccountDetail } from "./ServiceAccountDetail";
 import { Usage } from "./Usage";
 import SuperplaneLogo from "@/assets/superplane.svg";
+import { isUsagePageForced } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import {
   ArrowRightLeft,
@@ -120,7 +121,7 @@ export function OrganizationSettings() {
   const organizationName = organization?.metadata?.name || "Organization";
   const userName = user?.name || "My Account";
   const userEmail = user?.email || "";
-  const usageEnabled = usageStatus?.enabled === true;
+  const usageEnabled = usageStatus?.enabled === true || isUsagePageForced();
 
   const organizationLinks: NavLink[] = [
     {

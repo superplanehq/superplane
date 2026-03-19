@@ -9,3 +9,7 @@ export const isAgentReplEnabled = () => {
 export const getAgentUrl = () => {
   return (import.meta.env.VITE_AGENT_URL as string | undefined)?.trim() || "http://localhost:8090";
 };
+
+export const isUsagePageForced = () => {
+  return import.meta.env.VITE_FORCE_USAGE_PAGE === "true";
+};
