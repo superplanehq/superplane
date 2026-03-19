@@ -83,17 +83,8 @@ func (h *ElasticWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 			return nil, fmt.Errorf("failed to store webhook secret: %w", err)
 		}
 
-		connectorName := "SuperPlane Alert"
-		if config.RuleID != "" {
-			rule, err := client.GetKibanaRule(config.RuleID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get Kibana rule %s: %w", config.RuleID, err)
-			}
-			connectorName = fmt.Sprintf("SuperPlane Alert - %s", rule.Name)
-		}
-
 		connector, err = client.CreateKibanaConnector(
-			connectorName,
+			"SuperPlane Alert",
 			ctx.Webhook.GetURL(),
 			secret,
 		)

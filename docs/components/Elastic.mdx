@@ -45,7 +45,7 @@ The When Alert Fires trigger starts a workflow execution when a Kibana alert rul
 ### Setup
 
 1. Save this trigger — SuperPlane automatically creates a signed Kibana Webhook connector.
-2. Select the Kibana alert rule in SuperPlane. SuperPlane attaches its webhook connector to that rule automatically.
+2. Optionally select a Kibana alert rule in SuperPlane. When a rule is selected, SuperPlane checks that rule's actions and attaches the existing SuperPlane connector if it is missing.
 
 #### Recommended Kibana action body
 
@@ -66,9 +66,9 @@ Kibana substitutes `{{rule.id}}` and `{{rule.name}}` at delivery time. Fields om
 
 ### Filtering
 
-The **Rule** field is required. Additional filters are optional refinements. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
+The **Rule** field is optional. Leave it empty to keep the original manual connector workflow. Additional filters are optional refinements. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
 
-The selected **Rule** is the primary filter. Additional filters like space, tags, severity, and status are optional refinements.
+When a **Rule** is selected, it becomes the primary filter. Additional filters like space, tags, severity, and status are optional refinements.
 
 ### Webhook Verification
 
