@@ -216,22 +216,22 @@ function MembersLabel({ recipients }: { recipients: SendEmailConfiguration["reci
   const count = recipients.length;
   const label = `${count} recipient${count > 1 ? "s" : ""}`;
 
+  const counts = { user: 0, role: 0, group: 0 };
+  for (const r of recipients) {
+    if (r.type in counts) counts[r.type as keyof typeof counts]++;
+  }
+
+  const parts: string[] = [];
+  if (counts.user > 0) parts.push(`${counts.user} user${counts.user > 1 ? "s" : ""}`);
+  if (counts.role > 0) parts.push(`${counts.role} role${counts.role > 1 ? "s" : ""}`);
+  if (counts.group > 0) parts.push(`${counts.group} group${counts.group > 1 ? "s" : ""}`);
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="cursor-default underline underline-offset-3 decoration-dotted decoration-1">{label}</span>
       </TooltipTrigger>
-      <TooltipContent side="bottom">
-        <div className="flex flex-col gap-0.5">
-          {recipients.map((r, i) => (
-            <span key={i}>
-              {r.type === "user" && (r.user || "User")}
-              {r.type === "role" && `Role: ${r.role}`}
-              {r.type === "group" && `Group: ${r.group}`}
-            </span>
-          ))}
-        </div>
-      </TooltipContent>
+      <TooltipContent side="bottom">{parts.join(", ")}</TooltipContent>
     </Tooltip>
   );
 }
