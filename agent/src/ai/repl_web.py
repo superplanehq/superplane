@@ -26,8 +26,7 @@ from pydantic_ai.messages import (
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
 
-from ai.agent import build_agent
-from ai.deps import AgentDeps
+from ai.agent import AgentDeps, build_agent
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 
 
@@ -131,7 +130,6 @@ def _build_deps(payload: ReplStreamRequest) -> AgentDeps:
     )
     return AgentDeps(
         client=client,
-        allow_canvas_details=False,
     )
 
 
@@ -171,7 +169,6 @@ async def _stream_agent_run(payload: ReplStreamRequest) -> AsyncIterator[dict[st
 
     agent = build_agent(model=payload.model)
     deps = _build_deps(payload)
-    deps.allow_canvas_details = False
 
     output_tool_call_id: str | None = None
     output_tool_name_hints = {"final_result", "return_canvasanswer", "canvasanswer"}
