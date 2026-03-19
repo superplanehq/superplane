@@ -122,11 +122,9 @@ func NewServer(
 		registry:              registry,
 		authService:           authorizationService,
 		upgrader: &websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool {
-				// Allow all connections - you may want to restrict this in production
-				// TODO: implement origin checking
-				return true
-			},
+			// In development all origins are accepted.
+			// In production only the origin derived from BASE_URL is accepted.
+			CheckOrigin:     newWebSocketCheckOrigin(appEnv, baseURL),
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
