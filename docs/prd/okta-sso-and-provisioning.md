@@ -115,10 +115,9 @@ unless we explicitly document a deviation:
 
 ### OIDC (Login)
 
-1. **Configuration** (per SuperPlane `organization` or dedicated `organization_sso_connections`
-   table — TBD in detailed design): **one row per org**, Okta domain/issuer, client ID, encrypted
-   client secret, registered redirect URI(s). IdP-initiated / initiate-login URI: **deferred**
-   (see Decisions).
+1. **Configuration**: **one row per org** in **`organization_okta_idp`** (see **Database**). Holds
+   issuer, OAuth client fields, SCIM bearer hash, flags. IdP-initiated / initiate-login URI:
+   **deferred** (see Decisions).
 2. **Login start**: User selects Okta; backend builds authorize URL against
    `https://{oktaDomain}/oauth2/v1/authorize` with `response_type=code`,
    `scope=openid email profile` (exact set TBD), `state`, and PKCE if we adopt it (recommended
@@ -143,11 +142,95 @@ unless we explicitly document a deviation:
 2. **Supported resources** (minimum): **Users** — `POST` create, `GET` retrieve/list (if required
    by Okta tester), `PATCH` update, `PUT` optional, `DELETE` or `PATCH` active=false for
    deactivate.
-3. **Id mapping**: Store Okta `externalId` ↔ SuperPlane user id. OIDC first login attaches
-   `sub` to the existing SCIM-created user when identifiers align (e.g. `userName` / email).
+3. **Id mapping**: SCIM **`id`** returned to Okta is **`users.id`**. Optional IdP **`externalId`**
+   lives in **`organization_scim_user_mappings`** (not on `users`). OIDC first login attaches
+   `sub` via `account_providers` when `userName` / email matches the SCIM-created user.
 
 **Note:** SCIM is not part of the linked OIDC guide but is the standard way Okta provisions
 users into SaaS apps and is in scope for this PRD.
+
+## Database schema
+
+Use `make db.migration.create NAME=<name>` for all DDL (see `AGENTS.md`); this section is the
+intended shape only.
+
+### New table: `organization_okta_idp`
+
+One row per SuperPlane organization (matches **one Okta tenant per org**). Suggested columns:
+
+- **`id`**: primary key UUID.
+- **`organization_id`**: FK → `organizations.id`, **UNIQUE** (one Okta connection per org).
+- **`issuer_base_url`**: normalized Okta issuer base (e.g. `https://dev-xxx.okta.com`) for
+  discovery and ID token `iss` checks.
+- **`oauth_client_id`**: OIDC client identifier from the customer’s Okta app.
+- **`oauth_client_secret_encrypted`**: ciphertext from `pkg/crypto` `Encryptor`; never store
+  plaintext.
+- **`oidc_enabled`**: whether org admins turned on Okta sign-in.
+- **`scim_bearer_token_hash`**: hash of the SCIM bearer secret (same idea as `users.token_hash`,
+  e.g. SHA-256 of raw token). Nullable until SCIM is configured.
+- **`scim_enabled`**: whether SCIM is accepted for this org.
+- **`created_at`, `updated_at`**: audit timestamps.
+
+Optional later: `last_scim_request_at`, rotation metadata for secrets, encrypted backup of SCIM
+token if you ever need “show once” UX (prefer hash-only if rotation is easy).
+
+### `users`
+
+- **No schema changes** for Okta or SCIM — keep the existing `users` / `accounts` model stable.
+
+SCIM **User create** still follows the same pattern as an accepted invitation: create
+**`accounts`** + **`users`** with a real **`account_id`**, then first Okta login adds
+**`account_providers`** (see below).
+
+### New table: `organization_scim_user_mappings`
+
+Auxiliary rows for **SCIM-provisioned** humans (one per `(organization_id, user_id)`):
+
+- **`organization_id`**, **`user_id`** — FKs; **UNIQUE** together so each org member has at most
+  one SCIM mapping row.
+- **`external_id`** (`text`, nullable) — SCIM **`externalId`** from the IdP when Okta sends it.
+  **Partial UNIQUE** on `(organization_id, external_id)` **WHERE** `external_id IS NOT NULL`.
+- **`created_at`, `updated_at`** — audit.
+
+This is **not** a second user store: it only holds IdP-specific identifiers. The SCIM **`id`**
+in API responses remains **`users.id`**. If product later decides `externalId` is unnecessary,
+this table can stay minimal or merge into another artifact — but **do not** add columns to
+**`users`** for that purpose.
+
+### `accounts`
+
+No schema change required for v1; SCIM supplies `userName` / email / name to populate new rows.
+
+### `account_providers` (behavior + constants)
+
+- Add provider constant **`okta`** (alongside `github`, `google` in `pkg/models`).
+- **`provider_id`** is `varchar(255)` with a **global** unique `(provider, provider_id)` today.
+  **Encode issuer + Okta `sub`** as a short deterministic string (e.g. **64-char hex SHA-256**
+  of canonical issuer, a delimiter, and `sub`) so tenants cannot collide on the same `sub`.
+- **`UNIQUE (account_id, provider)`** still allows one Okta link per account; that matches
+“single Okta IdP per SuperPlane org” for a given person.
+
+### `organizations`
+
+- No new columns required if **`allowed_providers`** (`JSON` slice) already lists permitted IdPs:
+  **add `okta`** when Okta OIDC is enabled (and remove when disabled), same pattern as GitHub /
+  Google.
+- Alternatively, derive “Okta allowed” from **`organization_okta_idp.oidc_enabled`** in code;
+  still keep `allowed_providers` consistent so existing checks like `IsProviderAllowed` stay
+  truthful.
+
+### OIDC `state` / CSRF (not a durable table requirement)
+
+Short-lived **server-side session or cache** entry (Redis, encrypted cookie payload, or DB table
+with TTL) mapping `state` → `organization_id` + nonce for the authorize redirect. If you use a
+table, treat it as ephemeral with periodic cleanup — document in detailed design.
+
+### What we are not adding (v1)
+
+- A **`scim_users`** shadow table that duplicates name/email/profile — **`users`** remains the
+  system of record; **`organization_scim_user_mappings`** is only IdP linkage metadata.
+- **SAML** metadata tables.
+- **Group** resource persistence for SCIM (non-goal until group sync is in scope).
 
 ## SuperPlane Codebase Touchpoints (Expected)
 
@@ -155,7 +238,8 @@ users into SaaS apps and is in scope for this PRD.
   **Technologies** — prefer `go-oidc` + `x/oauth2`, not Goth, for per-org issuers).
 - **`pkg/public/server.go`**: Wire org-based Okta config (one per org); callback routes may need
   org id in path or state.
-- **`pkg/models`**: SSO connection model; SCIM token storage; provider constants.
+- **`pkg/models`**: `organization_okta_idp`; `organization_scim_user_mappings`; provider
+  constants.
 - **`organizations.allowed_providers`**: Include an `okta` (or OIDC-generic) entry when enabled.
 - **`web_src`**: Login UI: Okta button when org or instance supports it; admin settings for SSO
   + SCIM.
