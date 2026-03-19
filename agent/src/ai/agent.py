@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Any
 from typing import Literal
 
 from pydantic_ai import Agent, RunContext
@@ -30,7 +31,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         output_type=CanvasAnswer,
         system_prompt=(
             "You answer questions about Superplane canvases. "
-            "Use tools to fetch real canvas data before answering. "
+            "Use tools to fetch real canvas and catalog data before answering. "
             "Be concise and factual. Return citations when possible. "
             "Use get_canvas at most once per answer unless the user asks to refresh "
             "or use a different canvas. "
@@ -41,6 +42,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
 
     @agent.tool
     def get_canvas(ctx: RunContext[AgentDeps], canvas_id: str) -> CanvasSummary:
+        """Fetch a canvas summary (nodes/edges) by canvas ID."""
         cached_summary = ctx.deps.canvas_cache.get(canvas_id)
         if cached_summary is not None:
             return cached_summary
@@ -48,5 +50,52 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         summary = ctx.deps.client.describe_canvas(canvas_id)
         ctx.deps.canvas_cache[canvas_id] = summary
         return summary
+
+    @agent.tool
+    def list_components(
+        ctx: RunContext[AgentDeps],
+        provider: str | None = None,
+        query: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List available components; optionally filter by provider or text query."""
+        return ctx.deps.client.list_components(provider=provider, query=query)
+
+    @agent.tool
+    def describe_component(ctx: RunContext[AgentDeps], name: str) -> dict[str, Any]:
+        """Describe one component including configuration fields and output channels."""
+        return ctx.deps.client.describe_component(name)
+
+    @agent.tool
+    def list_triggers(
+        ctx: RunContext[AgentDeps],
+        provider: str | None = None,
+        query: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List available triggers; optionally filter by provider or text query."""
+        return ctx.deps.client.list_triggers(provider=provider, query=query)
+
+    @agent.tool
+    def describe_trigger(ctx: RunContext[AgentDeps], name: str) -> dict[str, Any]:
+        """Describe one trigger including configuration fields and required flags."""
+        return ctx.deps.client.describe_trigger(name)
+
+    @agent.tool
+    def list_org_integrations(ctx: RunContext[AgentDeps]) -> list[dict[str, Any]]:
+        """List integrations connected to the current organization."""
+        return ctx.deps.client.list_org_integrations()
+
+    @agent.tool
+    def list_integration_resources(
+        ctx: RunContext[AgentDeps],
+        integration_id: str,
+        type: str,
+        parameters: dict[str, str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """List selectable resources for an org integration resource type."""
+        return ctx.deps.client.list_integration_resources(
+            integration_id=integration_id,
+            type=type,
+            parameters=parameters,
+        )
 
     return agent
