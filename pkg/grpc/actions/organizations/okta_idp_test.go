@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -95,6 +96,45 @@ func Test__RotateOktaScimBearerToken(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, row.ScimBearerTokenHash)
 	assert.Equal(t, crypto.HashToken(rot.ScimBearerToken), *row.ScimBearerTokenHash)
+}
+
+func Test__UpdateOktaIdpSettings_OIDCRequiresClientSecret(t *testing.T) {
+	r := support.Setup(t)
+	ctx := context.Background()
+
+	issuer := "https://dev-example.okta.com/oauth2/default"
+	clientID := "cid"
+	oidcOn := true
+	_, err := UpdateOktaIdpSettings(ctx, r.Encryptor, r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
+		IssuerBaseUrl: &issuer,
+		OauthClientId: &clientID,
+		OidcEnabled:   &oidcOn,
+	})
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, st.Code())
+}
+
+func Test__UpdateOktaIdpSettings_OIDCEnablesOrgProvider(t *testing.T) {
+	r := support.Setup(t)
+	ctx := context.Background()
+
+	issuer := "https://dev-example.okta.com/oauth2/default"
+	clientID := "cid"
+	secret := "secret"
+	oidcOn := true
+	_, err := UpdateOktaIdpSettings(ctx, r.Encryptor, r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
+		IssuerBaseUrl:     &issuer,
+		OauthClientId:     &clientID,
+		OauthClientSecret: &secret,
+		OidcEnabled:       &oidcOn,
+	})
+	require.NoError(t, err)
+
+	org, err := models.FindOrganizationByID(r.Organization.ID.String())
+	require.NoError(t, err)
+	assert.True(t, slices.Contains(org.AllowedProviders, models.ProviderOkta))
 }
 
 func Test__UpdateOktaIdpSettings_InvalidIssuer(t *testing.T) {

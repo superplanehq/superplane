@@ -33,6 +33,7 @@ type Handler struct {
 	jwtSigner            *jwt.Signer
 	authService          authorization.Authorization
 	encryptor            crypto.Encryptor
+	publicAppBaseURL     string
 	isDev                bool
 	templateDir          string
 	blockSignup          bool
@@ -45,11 +46,21 @@ type ProviderConfig struct {
 	CallbackURL string
 }
 
-func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService authorization.Authorization, appEnv string, templateDir string, blockSignup bool, passwordLoginEnabled bool) *Handler {
+func NewHandler(
+	jwtSigner *jwt.Signer,
+	encryptor crypto.Encryptor,
+	authService authorization.Authorization,
+	appEnv string,
+	templateDir string,
+	publicAppBaseURL string,
+	blockSignup bool,
+	passwordLoginEnabled bool,
+) *Handler {
 	return &Handler{
 		jwtSigner:            jwtSigner,
 		encryptor:            encryptor,
 		authService:          authService,
+		publicAppBaseURL:     strings.TrimRight(publicAppBaseURL, "/"),
 		isDev:                appEnv == "development",
 		templateDir:          templateDir,
 		blockSignup:          blockSignup,
@@ -92,6 +103,9 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 		router.HandleFunc("/login", a.handlePasswordLogin).Methods("POST")
 		router.HandleFunc("/signup", a.handlePasswordSignup).Methods("POST")
 	}
+
+	router.HandleFunc("/auth/okta/{org_id}", a.handleOktaAuthStart).Methods("GET")
+	router.HandleFunc("/auth/okta/{org_id}/callback", a.handleOktaAuthCallback).Methods("GET")
 
 	//
 	// If we are running the application locally,
@@ -260,12 +274,20 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
-	token, err := a.jwtSigner.Generate(account.ID.String(), 24*time.Hour)
-	if err != nil {
+	if err := a.issueAccountSession(w, r, account.ID.String()); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
+	redirectURL := getRedirectURL(r)
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
+}
+
+func (a *Handler) issueAccountSession(w http.ResponseWriter, r *http.Request, accountID string) error {
+	token, err := a.jwtSigner.Generate(accountID, 24*time.Hour)
+	if err != nil {
+		return err
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "account_token",
 		Value:    token,
@@ -275,9 +297,7 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 		Secure:   r.TLS != nil,
 		SameSite: http.SameSiteLaxMode,
 	})
-
-	redirectURL := getRedirectURL(r)
-	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
+	return nil
 }
 
 func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -363,24 +383,11 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate JWT token
-	token, err := a.jwtSigner.Generate(account.ID.String(), 24*time.Hour)
-	if err != nil {
+	if err := a.issueAccountSession(w, r, account.ID.String()); err != nil {
 		log.Errorf("Failed to generate token for password login: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	// Set cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "account_token",
-		Value:    token,
-		Path:     "/",
-		MaxAge:   int(24 * time.Hour.Seconds()),
-		HttpOnly: true,
-		Secure:   r.TLS != nil,
-		SameSite: http.SameSiteLaxMode,
-	})
 
 	// Redirect
 	redirectURL := getRedirectURL(r)
@@ -469,21 +476,10 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := a.jwtSigner.Generate(account.ID.String(), 24*time.Hour)
-	if err != nil {
+	if err := a.issueAccountSession(w, r, account.ID.String()); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "account_token",
-		Value:    token,
-		Path:     "/",
-		MaxAge:   int(24 * time.Hour.Seconds()),
-		HttpOnly: true,
-		Secure:   r.TLS != nil,
-		SameSite: http.SameSiteLaxMode,
-	})
 
 	redirectURL := getRedirectURL(r)
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)

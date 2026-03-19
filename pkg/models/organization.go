@@ -27,6 +27,23 @@ func (o *Organization) IsProviderAllowed(provider string) bool {
 	return slices.Contains(o.AllowedProviders, provider)
 }
 
+// EnsureOrganizationAllowsProviderInTransaction appends provider to AllowedProviders if missing.
+func EnsureOrganizationAllowsProviderInTransaction(tx *gorm.DB, organizationID, provider string) error {
+	org, err := FindOrganizationByIDInTransaction(tx, organizationID)
+	if err != nil {
+		return err
+	}
+	if slices.Contains(org.AllowedProviders, provider) {
+		return nil
+	}
+	next := slices.Clone(org.AllowedProviders)
+	next = append(next, provider)
+	org.AllowedProviders = next
+	now := time.Now()
+	org.UpdatedAt = &now
+	return tx.Save(org).Error
+}
+
 func ListOrganizationsByIDs(ids []string) ([]Organization, error) {
 	var organizations []Organization
 

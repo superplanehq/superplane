@@ -8,6 +8,8 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
+const oktaOAuthStateSubject = "okta_oauth_state"
+
 type Signer struct {
 	Secret string
 }
@@ -96,4 +98,38 @@ func (s *Signer) ValidateAndGetClaims(tokenString string) (jwt.MapClaims, error)
 	}
 
 	return claims, nil
+}
+
+// SignOktaOAuthState returns an opaque value for the OIDC `state` parameter (CSRF + context).
+func (s *Signer) SignOktaOAuthState(orgID, redirect string, ttl time.Duration) (string, error) {
+	if ttl <= 0 {
+		ttl = 15 * time.Minute
+	}
+	now := time.Now()
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"iat": now.Unix(),
+		"nbf": now.Unix(),
+		"exp": now.Add(ttl).Unix(),
+		"sub": oktaOAuthStateSubject,
+		"org": orgID,
+		"rd":  redirect,
+	})
+	return token.SignedString([]byte(s.Secret))
+}
+
+// ParseOktaOAuthState validates `state` from the OIDC callback and returns org id and redirect path.
+func (s *Signer) ParseOktaOAuthState(tokenString string) (orgID, redirect string, err error) {
+	claims, err := s.ValidateAndGetClaims(tokenString)
+	if err != nil {
+		return "", "", err
+	}
+	if claims["sub"] != oktaOAuthStateSubject {
+		return "", "", fmt.Errorf("invalid state token")
+	}
+	org, _ := claims["org"].(string)
+	if org == "" {
+		return "", "", fmt.Errorf("invalid state org")
+	}
+	rd, _ := claims["rd"].(string)
+	return org, rd, nil
 }

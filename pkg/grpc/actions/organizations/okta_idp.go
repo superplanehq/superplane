@@ -108,6 +108,9 @@ func UpdateOktaIdpSettings(
 				}
 			}
 
+			if e := syncOktaProviderWhenOIDCEnabled(tx, orgID, row); e != nil {
+				return e
+			}
 			if e := models.CreateOrganizationOktaIDPInTransaction(tx, row); e != nil {
 				return status.Error(codes.Internal, "failed to save Okta IdP settings")
 			}
@@ -149,6 +152,9 @@ func UpdateOktaIdpSettings(
 			row.ScimEnabled = *req.ScimEnabled
 		}
 
+		if e := syncOktaProviderWhenOIDCEnabled(tx, orgID, row); e != nil {
+			return e
+		}
 		if e := models.SaveOrganizationOktaIDPInTransaction(tx, row); e != nil {
 			return status.Error(codes.Internal, "failed to save Okta IdP settings")
 		}
@@ -231,4 +237,14 @@ func validateOktaIssuerBaseURL(raw string) error {
 		return status.Error(codes.InvalidArgument, "issuer_base_url must be a valid https URL")
 	}
 	return nil
+}
+
+func syncOktaProviderWhenOIDCEnabled(tx *gorm.DB, orgID string, row *models.OrganizationOktaIDP) error {
+	if !row.OIDCEnabled {
+		return nil
+	}
+	if len(row.OAuthClientSecretCiphertext) == 0 {
+		return status.Error(codes.FailedPrecondition, "configure oauth client secret before enabling Okta OIDC sign-in")
+	}
+	return models.EnsureOrganizationAllowsProviderInTransaction(tx, orgID, models.ProviderOkta)
 }
