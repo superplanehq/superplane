@@ -29,6 +29,127 @@ const TEST_MODE_HINT =
   "Agent is running in test mode. Set AI_MODEL in agent/.env to a real model and configure agent credentials to get canvas-aware answers.";
 const GENERIC_FAILURE_MESSAGE = "I couldn't generate changes right now. Please try again.";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeNodeRef(
+  value: unknown,
+): { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null } | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const nodeKey = typeof value.nodeKey === "string" ? value.nodeKey : undefined;
+  const nodeId = typeof value.nodeId === "string" ? value.nodeId : undefined;
+  const nodeName = typeof value.nodeName === "string" ? value.nodeName : undefined;
+  const handleId = typeof value.handleId === "string" ? value.handleId : value.handleId === null ? null : undefined;
+
+  if (!nodeKey && !nodeId && !nodeName) {
+    return null;
+  }
+
+  return { nodeKey, nodeId, nodeName, handleId };
+}
+
+function normalizeAiOperation(value: unknown): AiCanvasOperation | null {
+  if (!isRecord(value) || typeof value.type !== "string") {
+    return null;
+  }
+
+  if (value.type === "add_node") {
+    const blockName = typeof value.blockName === "string" ? value.blockName : "";
+    if (!blockName) {
+      return null;
+    }
+
+    const operation: AiCanvasOperation = {
+      type: "add_node",
+      blockName,
+      nodeKey: typeof value.nodeKey === "string" ? value.nodeKey : undefined,
+      nodeName: typeof value.nodeName === "string" ? value.nodeName : undefined,
+    };
+    if (isRecord(value.configuration)) {
+      operation.configuration = value.configuration;
+    }
+    if (isRecord(value.position) && typeof value.position.x === "number" && typeof value.position.y === "number") {
+      operation.position = { x: value.position.x, y: value.position.y };
+    }
+    const source = normalizeNodeRef(value.source);
+    if (source) {
+      operation.source = source;
+    }
+    return operation;
+  }
+
+  if (value.type === "connect_nodes" || value.type === "disconnect_nodes") {
+    const source = normalizeNodeRef(value.source);
+    const target = normalizeNodeRef(value.target);
+    if (!source || !target) {
+      return null;
+    }
+
+    return {
+      type: value.type,
+      source,
+      target,
+    };
+  }
+
+  if (value.type === "update_node_config") {
+    const target = normalizeNodeRef(value.target);
+    if (!target) {
+      return null;
+    }
+
+    const operation: AiCanvasOperation = {
+      type: "update_node_config",
+      target,
+      configuration: isRecord(value.configuration) ? value.configuration : {},
+      nodeName: typeof value.nodeName === "string" ? value.nodeName : undefined,
+    };
+    return operation;
+  }
+
+  if (value.type === "delete_node") {
+    const target = normalizeNodeRef(value.target);
+    if (!target) {
+      return null;
+    }
+    return {
+      type: "delete_node",
+      target,
+    };
+  }
+
+  return null;
+}
+
+function normalizeAiProposal(value: unknown): AiBuilderProposal | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const summary = typeof value.summary === "string" ? value.summary.trim() : "";
+  if (!summary) {
+    return null;
+  }
+
+  const operationsRaw = Array.isArray(value.operations) ? value.operations : [];
+  const operations = operationsRaw
+    .map((operation) => normalizeAiOperation(operation))
+    .filter((operation): operation is AiCanvasOperation => Boolean(operation));
+  if (operations.length === 0) {
+    return null;
+  }
+
+  return {
+    id: `proposal-${Date.now()}`,
+    summary,
+    operations,
+  };
+}
+
 function compactMessageContent(content: string): string {
   const normalized = content.replace(/\s+/g, " ").trim();
   if (normalized.length <= AI_HISTORY_MAX_MESSAGE_CHARS) {
@@ -365,6 +486,14 @@ export async function sendAgentChatPrompt({
 
       if (event.type === "final_answer") {
         const output = event.output;
+        if (output && typeof output === "object") {
+          const proposal = normalizeAiProposal((output as { proposal?: unknown }).proposal);
+          if (proposal) {
+            setPendingProposal(proposal);
+          } else {
+            setPendingProposal(null);
+          }
+        }
         if (
           !streamedAnyAnswer &&
           runModel === "test" &&

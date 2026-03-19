@@ -106,7 +106,7 @@ def _to_jsonable(value: Any) -> Any:
         return [_to_jsonable(item) for item in value]
     model_dump = getattr(value, "model_dump", None)
     if callable(model_dump):
-        return model_dump(mode="json")
+        return model_dump(mode="json", by_alias=True)
     return str(value)
 
 
