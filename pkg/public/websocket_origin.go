@@ -35,7 +35,8 @@ func newWebSocketCheckOrigin(appEnv string, baseURL string) func(r *http.Request
 			return false
 		}
 
-		return origin == allowedOrigin
+		// RFC 6454 origin comparison is ASCII case-insensitive.
+		return strings.EqualFold(origin, allowedOrigin)
 	}
 }
 
