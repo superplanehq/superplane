@@ -9,6 +9,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Triggers
 
 <CardGrid>
+  <LinkCard title="On Blob Created" href="#on-blob-created" description="Listen to Azure Blob Storage blob creation events" />
+  <LinkCard title="On Blob Deleted" href="#on-blob-deleted" description="Listen to Azure Blob Storage blob deletion events" />
   <LinkCard title="On Image Deleted" href="#on-image-deleted" description="Listen to Azure Container Registry image deletion events" />
   <LinkCard title="On Image Pushed" href="#on-image-pushed" description="Listen to Azure Container Registry image push events" />
   <LinkCard title="On VM Deallocated" href="#on-vm-deallocated" description="Listen to Azure VM deallocation events" />
@@ -51,6 +53,125 @@ Enter the following information below and create the integration:
 After creation, you will be guided through configuring the Federated Identity Credential and granting the required permissions.
 
 SuperPlane will use Workload Identity Federation to authenticate without storing any credentials.
+
+<a id="on-blob-created"></a>
+
+## On Blob Created
+
+The On Blob Created trigger starts a workflow execution when a blob is created or replaced in an Azure Storage Account.
+
+### Use Cases
+
+- **Data pipelines**: Trigger processing when new files arrive in a storage container
+- **Image processing**: React to new images or media uploaded to blob storage
+- **Audit and compliance**: Record blob creation events for traceability
+- **ETL workflows**: Kick off data transformation when input files are uploaded
+
+### How It Works
+
+This trigger listens to Azure Event Grid events from a Storage Account. When a blob is created or replaced,
+the `Microsoft.Storage.BlobCreated` event is delivered and the trigger fires with the full event payload.
+
+### Configuration
+
+- **Resource Group** (required): The resource group containing the Storage Account.
+- **Storage Account** (required): The Storage Account to watch.
+- **Container Filter** (optional): A regex pattern to filter by container name.
+- **Blob Filter** (optional): A regex pattern to filter by blob path.
+
+### Event Data
+
+Each blob created event includes:
+
+- **subject**: The full blob path in the format /blobServices/default/containers/&lbrace;container&rbrace;/blobs/&lbrace;blob&rbrace;
+- **data.api**: The operation that triggered the event (e.g., PutBlob, CopyBlob)
+- **data.contentType**: The content type of the blob
+- **data.contentLength**: The size of the blob in bytes
+- **data.blobType**: The blob type (BlockBlob, PageBlob, AppendBlob)
+- **data.url**: The URL of the blob
+
+### Example Data
+
+```json
+{
+  "data": {
+    "api": "PutBlob",
+    "blobType": "BlockBlob",
+    "clientRequestId": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
+    "contentLength": 524288,
+    "contentType": "text/csv",
+    "eTag": "0x8D4BCC2E4835CD0",
+    "requestId": "d1e6b5a4-0001-0035-4a7b-2e5c4f000000",
+    "sequencer": "00000000000004420000000000028963",
+    "url": "https://mystorageaccount.blob.core.windows.net/mycontainer/path/to/myfile.csv"
+  },
+  "dataVersion": "",
+  "eventTime": "2026-03-16T10:00:00Z",
+  "eventType": "Microsoft.Storage.BlobCreated",
+  "id": "831e1650-001e-001b-66ab-eeb76e069631",
+  "metadataVersion": "1",
+  "subject": "/blobServices/default/containers/mycontainer/blobs/path/to/myfile.csv",
+  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Storage/storageAccounts/mystorageaccount"
+}
+```
+
+<a id="on-blob-deleted"></a>
+
+## On Blob Deleted
+
+The On Blob Deleted trigger starts a workflow execution when a blob is deleted from an Azure Storage Account.
+
+### Use Cases
+
+- **Cleanup workflows**: Remove associated resources or records when a blob is deleted
+- **Audit and compliance**: Record blob deletions for traceability
+- **Notification workflows**: Alert teams when important files are removed from storage
+
+### How It Works
+
+This trigger listens to Azure Event Grid events from a Storage Account. When a blob is deleted,
+the `Microsoft.Storage.BlobDeleted` event is delivered and the trigger fires with the full event payload.
+
+### Configuration
+
+- **Resource Group** (required): The resource group containing the Storage Account.
+- **Storage Account** (required): The Storage Account to watch.
+- **Container Filter** (optional): A regex pattern to filter by container name.
+- **Blob Filter** (optional): A regex pattern to filter by blob path.
+
+### Event Data
+
+Each blob deleted event includes:
+
+- **subject**: The full blob path in the format /blobServices/default/containers/&lbrace;container&rbrace;/blobs/&lbrace;blob&rbrace;
+- **data.api**: The operation that triggered the event (e.g., DeleteBlob)
+- **data.blobType**: The blob type (BlockBlob, PageBlob, AppendBlob)
+- **data.url**: The URL of the deleted blob
+
+### Example Data
+
+```json
+{
+  "data": {
+    "api": "DeleteBlob",
+    "blobType": "BlockBlob",
+    "clientRequestId": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
+    "contentLength": 0,
+    "contentType": "text/csv",
+    "eTag": "0x8D4BCC2E4835CD0",
+    "requestId": "d1e6b5a4-0001-0035-4a7b-2e5c4f000000",
+    "sequencer": "00000000000004420000000000028964",
+    "url": "https://mystorageaccount.blob.core.windows.net/mycontainer/path/to/myfile.csv"
+  },
+  "dataVersion": "",
+  "eventTime": "2026-03-16T11:00:00Z",
+  "eventType": "Microsoft.Storage.BlobDeleted",
+  "id": "afc359b4-001e-001b-66ab-eeb76e069631",
+  "metadataVersion": "1",
+  "subject": "/blobServices/default/containers/mycontainer/blobs/path/to/myfile.csv",
+  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Storage/storageAccounts/mystorageaccount"
+}
+```
 
 <a id="on-image-deleted"></a>
 

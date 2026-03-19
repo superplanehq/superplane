@@ -18,6 +18,7 @@ const (
 	ResourceTypeVMSizeDropdown            = "azure.vmSize"
 	ResourceTypeVirtualNetworkDropdown    = "azure.virtualNetwork"
 	ResourceTypeSubnetDropdown            = "azure.subnet"
+	ResourceTypeStorageAccountDropdown    = "azure.storageAccount"
 	ResourceTypeContainerRegistryDropdown = "azure.containerRegistry"
 )
 
@@ -296,6 +297,66 @@ func listSubnets(ctx core.ListResourcesContext, provider *AzureProvider, resourc
 		resources = append(resources, core.IntegrationResource{
 			Type: ResourceTypeSubnetDropdown,
 			Name: subnet.Name,
+			ID:   id,
+		})
+	}
+
+	sort.Slice(resources, func(i, j int) bool {
+		return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
+	})
+
+	return resources, nil
+}
+
+type armStorageAccount struct {
+	Name string `json:"name"`
+	ID   string `json:"id"`
+}
+
+func (a *AzureIntegration) ListStorageAccounts(ctx core.ListResourcesContext, resourceGroup string) ([]core.IntegrationResource, error) {
+	ctx.Logger.Infof("listing Azure storage accounts for resourceGroup=%s", resourceGroup)
+
+	provider, err := newProvider(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	var listURL string
+	if resourceGroup != "" {
+		listURL = fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts?api-version=2023-01-01",
+			armBaseURL, provider.GetSubscriptionID(), resourceGroup)
+	} else {
+		listURL = fmt.Sprintf("%s/subscriptions/%s/providers/Microsoft.Storage/storageAccounts?api-version=2023-01-01",
+			armBaseURL, provider.GetSubscriptionID())
+	}
+
+	items, err := provider.getClient().listAll(context.Background(), listURL)
+	if err != nil {
+		if isARMNotFound(err) {
+			ctx.Logger.Warnf("resource group %s not found, returning empty storage accounts list", resourceGroup)
+			return []core.IntegrationResource{}, nil
+		}
+		return nil, fmt.Errorf("failed to list storage accounts: %w", err)
+	}
+
+	resources := []core.IntegrationResource{}
+	for _, raw := range items {
+		var account armStorageAccount
+		if err := json.Unmarshal(raw, &account); err != nil {
+			continue
+		}
+		if account.Name == "" {
+			continue
+		}
+
+		id := account.Name
+		if account.ID != "" {
+			id = account.ID
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeStorageAccountDropdown,
+			Name: account.Name,
 			ID:   id,
 		})
 	}
