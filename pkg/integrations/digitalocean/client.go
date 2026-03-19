@@ -211,13 +211,17 @@ func (c *Client) ListImages(imageType string) ([]Image, error) {
 
 // CreateDropletRequest is the payload for creating a droplet
 type CreateDropletRequest struct {
-	Name     string   `json:"name"`
-	Region   string   `json:"region"`
-	Size     string   `json:"size"`
-	Image    string   `json:"image"`
-	SSHKeys  []string `json:"ssh_keys,omitempty"`
-	Tags     []string `json:"tags,omitempty"`
-	UserData string   `json:"user_data,omitempty"`
+	Name       string   `json:"name"`
+	Region     string   `json:"region"`
+	Size       string   `json:"size"`
+	Image      string   `json:"image"`
+	SSHKeys    []string `json:"ssh_keys,omitempty"`
+	Tags       []string `json:"tags,omitempty"`
+	UserData   string   `json:"user_data,omitempty"`
+	Backups    bool     `json:"backups,omitempty"`
+	IPv6       bool     `json:"ipv6,omitempty"`
+	Monitoring bool     `json:"monitoring,omitempty"`
+	VpcUUID    string   `json:"vpc_uuid,omitempty"`
 }
 
 // Droplet represents a DigitalOcean droplet
@@ -233,6 +237,7 @@ type Droplet struct {
 	SizeSlug string          `json:"size_slug"`
 	Networks DropletNetworks `json:"networks"`
 	Tags     []string        `json:"tags"`
+	Features []string        `json:"features"`
 }
 
 type DropletRegion struct {
@@ -1242,4 +1247,35 @@ func (c *Client) GetDropletBandwidthMetrics(dropletID, iface, direction string, 
 	}
 
 	return &response, nil
+}
+
+// VPC represents a DigitalOcean VPC
+type VPC struct {
+	ID          string `json:"id"`
+	URN         string `json:"urn"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	RegionSlug  string `json:"region"`
+	IPRange     string `json:"ip_range"`
+	CreatedAt   string `json:"created_at"`
+	Default     bool   `json:"default"`
+}
+
+// ListVPCs retrieves all VPCs in the account
+func (c *Client) ListVPCs() ([]VPC, error) {
+	url := fmt.Sprintf("%s/vpcs?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		VPCs []VPC `json:"vpcs"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.VPCs, nil
 }

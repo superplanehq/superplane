@@ -28,6 +28,8 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listReservedIPs(ctx)
 	case "ssh_key":
 		return listSSHKeys(ctx)
+	case "vpc":
+		return listVPCs(ctx)
 	case "alert_policy":
 		return listAlertPolicies(ctx)
 	default:
@@ -294,6 +296,29 @@ func listAlertPolicies(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 			Type: "alert_policy",
 			Name: policy.Description,
 			ID:   policy.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listVPCs(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	vpcs, err := client.ListVPCs()
+	if err != nil {
+		return nil, fmt.Errorf("error listing VPCs: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(vpcs))
+	for _, vpc := range vpcs {
+		resources = append(resources, core.IntegrationResource{
+			Type: "vpc",
+			Name: vpc.Name,
+			ID:   vpc.ID,
 		})
 	}
 
