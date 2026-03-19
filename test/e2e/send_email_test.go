@@ -14,20 +14,12 @@ import (
 )
 
 func TestSendEmailComponent(t *testing.T) {
-	t.Run("adding send email with email addresses", func(t *testing.T) {
+	t.Run("adding send email with user recipient", func(t *testing.T) {
 		steps := &SendEmailSteps{t: t}
 		steps.start()
-		steps.givenACanvasExists("Send Email Addresses")
-		steps.addSendEmailWithEmails("Notify", "test@example.com", "Test Subject", "Test Body")
-		steps.assertSendEmailSavedToDB("Notify", "emails", "test@example.com", "Test Subject")
-	})
-
-	t.Run("adding send email with members", func(t *testing.T) {
-		steps := &SendEmailSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists("Send Email Members")
-		steps.addSendEmailWithMember("Notify Members", "Test Subject", "Test Body")
-		steps.assertSendEmailMembersSavedToDB("Notify Members", "members", "Test Subject")
+		steps.givenACanvasExists("Send Email User")
+		steps.addSendEmailWithUser("Notify User", "Test Subject", "Test Body")
+		steps.assertSendEmailSavedToDB("Notify User", "Test Subject")
 	})
 
 	t.Run("running send email in a canvas flow", func(t *testing.T) {
@@ -43,7 +35,7 @@ func TestSendEmailComponent(t *testing.T) {
 		steps := &SendEmailSteps{t: t}
 		steps.start()
 		steps.givenCanvasWithManualTriggerSendEmailAndOutput()
-		steps.runManualTriggerAndWaitForError()
+		steps.runManualTriggerAndWaitForFinish()
 		steps.assertSendEmailExecutionFailed()
 	})
 }
@@ -65,7 +57,7 @@ func (s *SendEmailSteps) givenACanvasExists(canvasName string) {
 	s.canvas.Create()
 }
 
-func (s *SendEmailSteps) addSendEmailWithEmails(nodeName, to, subject, body string) {
+func (s *SendEmailSteps) addSendEmailWithUser(nodeName, subject, body string) {
 	s.canvas.OpenBuildingBlocksSidebar()
 
 	source := q.TestID("building-block-sendemail")
@@ -76,33 +68,6 @@ func (s *SendEmailSteps) addSendEmailWithEmails(nodeName, to, subject, body stri
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 
-	// recipientMode defaults to "emails", so just fill in the To field
-	s.session.FillIn(q.Locator("textarea[data-testid='string-field-to']"), to)
-	s.session.FillIn(q.Locator("textarea[data-testid='string-field-subject']"), subject)
-
-	s.typeIntoMonacoEditor(body)
-
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
-}
-
-func (s *SendEmailSteps) addSendEmailWithMember(nodeName, subject, body string) {
-	s.canvas.OpenBuildingBlocksSidebar()
-
-	source := q.TestID("building-block-sendemail")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, 500, 250)
-	s.session.Sleep(500)
-
-	s.session.FillIn(q.TestID("node-name-input"), nodeName)
-
-	// Switch to members mode
-	s.session.Click(q.TestID("field-recipientmode-select"))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("SuperPlane members")`))
-	s.session.Sleep(300)
-
-	// Configure recipient: select type "Specific user"
 	s.session.Click(q.TestID("field-type-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Specific user")`))
 
@@ -127,20 +92,10 @@ func (s *SendEmailSteps) typeIntoMonacoEditor(text string) {
 	}
 }
 
-func (s *SendEmailSteps) assertSendEmailSavedToDB(nodeName, expectedMode, expectedTo, expectedSubject string) {
+func (s *SendEmailSteps) assertSendEmailSavedToDB(nodeName, expectedSubject string) {
 	node := s.canvas.GetNodeFromDB(nodeName)
 	config := node.Configuration.Data()
 
-	assert.Equal(s.t, expectedMode, config["recipientMode"])
-	assert.Equal(s.t, expectedTo, config["to"])
-	assert.Equal(s.t, expectedSubject, config["subject"])
-}
-
-func (s *SendEmailSteps) assertSendEmailMembersSavedToDB(nodeName, expectedMode, expectedSubject string) {
-	node := s.canvas.GetNodeFromDB(nodeName)
-	config := node.Configuration.Data()
-
-	assert.Equal(s.t, expectedMode, config["recipientMode"])
 	assert.Equal(s.t, expectedSubject, config["subject"])
 
 	recipients, ok := config["recipients"].([]any)
@@ -177,7 +132,13 @@ func (s *SendEmailSteps) addSendEmailNode(nodeName string, pos models.Position) 
 	s.session.Sleep(500)
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
-	s.session.FillIn(q.Locator("textarea[data-testid='string-field-to']"), "test@example.com")
+
+	s.session.Click(q.TestID("field-type-select"))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("Specific user")`))
+
+	s.session.Click(q.Locator(`button:has-text("Select user")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
+
 	s.session.FillIn(q.Locator("textarea[data-testid='string-field-subject']"), "Test notification")
 
 	s.typeIntoMonacoEditor("This is a test email body")
@@ -206,7 +167,7 @@ func (s *SendEmailSteps) givenSMTPSettingsExist() {
 	require.NoError(s.t, err)
 }
 
-func (s *SendEmailSteps) runManualTriggerAndWaitForError() {
+func (s *SendEmailSteps) runManualTriggerAndWaitForFinish() {
 	s.canvas.RunManualTrigger("Start")
 	s.canvas.WaitForExecution(
 		"Send Email",

@@ -98,14 +98,7 @@ export const SEND_EMAIL_STATE_REGISTRY: EventStateRegistry = {
 };
 
 type SendEmailConfiguration = {
-  recipientMode: string;
-  to?: string;
   recipients?: Array<{ type: string; user?: string; role?: string; group?: string }>;
-  subject?: string;
-};
-
-type SendEmailMetadata = {
-  to?: string[];
   subject?: string;
 };
 
@@ -188,29 +181,9 @@ export const sendEmailMapper: ComponentBaseMapper = {
   },
 };
 
-function RecipientsLabel({ emails }: { emails: string[] }) {
-  const count = emails.length;
-  const label = `${count} recipient${count > 1 ? "s" : ""}`;
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="cursor-default underline underline-offset-3 decoration-dotted decoration-1">{label}</span>
-      </TooltipTrigger>
-      <TooltipContent side="bottom">
-        <div className="flex flex-col gap-0.5">
-          {emails.map((email) => (
-            <span key={email}>{email}</span>
-          ))}
-        </div>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-function MembersLabel({ recipients }: { recipients: SendEmailConfiguration["recipients"] }) {
+function RecipientsLabel({ recipients }: { recipients: SendEmailConfiguration["recipients"] }) {
   if (!recipients || recipients.length === 0) {
-    return <span>SuperPlane members</span>;
+    return null;
   }
 
   const count = recipients.length;
@@ -238,27 +211,14 @@ function MembersLabel({ recipients }: { recipients: SendEmailConfiguration["reci
 
 function getSendEmailMetadata(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as SendEmailConfiguration;
-  const nodeMetadata = node.metadata as SendEmailMetadata | undefined;
   const metadata: MetadataItem[] = [];
 
   if (configuration.subject) {
     metadata.push({ icon: "text", label: configuration.subject });
   }
 
-  if (configuration.recipientMode === "emails") {
-    const emails =
-      nodeMetadata?.to ||
-      (configuration.to
-        ? configuration.to
-            .split(",")
-            .map((e) => e.trim())
-            .filter(Boolean)
-        : []);
-    if (emails.length > 0) {
-      metadata.push({ icon: "at-sign", label: <RecipientsLabel emails={emails} /> });
-    }
-  } else if (configuration.recipientMode === "members") {
-    metadata.push({ icon: "users", label: <MembersLabel recipients={configuration.recipients} /> });
+  if (configuration.recipients && configuration.recipients.length > 0) {
+    metadata.push({ icon: "users", label: <RecipientsLabel recipients={configuration.recipients} /> });
   }
 
   return metadata;
