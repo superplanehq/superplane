@@ -162,6 +162,12 @@ const (
 
 	// EventTypeResourceActionCancel is sent when a resource action is canceled
 	EventTypeResourceActionCancel = "Microsoft.Resources.ResourceActionCancel"
+
+	// EventTypeBlobCreated is sent when a blob is created or replaced in Azure Blob Storage
+	EventTypeBlobCreated = "Microsoft.Storage.BlobCreated"
+
+	// EventTypeBlobDeleted is sent when a blob is deleted from Azure Blob Storage
+	EventTypeBlobDeleted = "Microsoft.Storage.BlobDeleted"
 )
 
 // Resource type constants
@@ -270,6 +276,45 @@ func extractSubscriptionID(resourceID string) string {
 // isVirtualMachineEvent reports whether an event subject targets a VM.
 func isVirtualMachineEvent(subject string) bool {
 	return strings.Contains(strings.ToLower(subject), strings.ToLower(ResourceTypeVirtualMachine))
+}
+
+// BlobEventData contains the data payload for Azure Blob Storage created/deleted events.
+type BlobEventData struct {
+	API             string `json:"api"`
+	ClientRequestID string `json:"clientRequestId"`
+	RequestID       string `json:"requestId"`
+	ETag            string `json:"eTag"`
+	ContentType     string `json:"contentType"`
+	ContentLength   int64  `json:"contentLength"`
+	BlobType        string `json:"blobType"`
+	URL             string `json:"url"`
+	Sequencer       string `json:"sequencer"`
+}
+
+// extractBlobContainer extracts the container name from an Azure Blob Storage event subject.
+// Blob subjects follow the format: /blobServices/default/containers/{container}/blobs/{blob-path}
+func extractBlobContainer(subject string) string {
+	const marker = "/containers/"
+	idx := strings.Index(subject, marker)
+	if idx < 0 {
+		return ""
+	}
+	rest := subject[idx+len(marker):]
+	slash := strings.Index(rest, "/")
+	if slash < 0 {
+		return rest
+	}
+	return rest[:slash]
+}
+
+// extractBlobName extracts the blob path from an Azure Blob Storage event subject.
+func extractBlobName(subject string) string {
+	const marker = "/blobs/"
+	idx := strings.Index(subject, marker)
+	if idx < 0 {
+		return ""
+	}
+	return subject[idx+len(marker):]
 }
 
 // extractACRRepository extracts the repository name from an ACR subject.
