@@ -275,7 +275,7 @@ openapi.client.gen:
 
 openapi.web.client.gen:
 	rm -rf web_src/src/api-client
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm run generate:api"
+	$(COMPOSE) run --rm --no-deps app bash -c "cd web_src && npm run generate:api"
 
 #
 # Image and CLI build

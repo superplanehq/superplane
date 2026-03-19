@@ -210,7 +210,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	}
 
 	for _, event := range newEvents {
-		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
 	return nil

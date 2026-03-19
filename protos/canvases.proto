@@ -889,6 +889,7 @@ message CanvasNodeEventMessage {
   string canvas_id = 2;
   string node_id = 3;
   google.protobuf.Timestamp timestamp = 4;
+  string organization_id = 5;
 }
 
 message CanvasNodeExecutionMessage {
@@ -909,6 +910,7 @@ message CanvasMessage {
   string id = 1;
   string canvas_id = 2;
   google.protobuf.Timestamp timestamp = 3;
+  string organization_id = 4;
 }
 
 message CanvasVersionMessage {

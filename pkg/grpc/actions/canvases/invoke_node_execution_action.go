@@ -122,7 +122,7 @@ func InvokeNodeExecutionAction(
 	).Publish()
 
 	for _, event := range newEvents {
-		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
 	return &pb.InvokeNodeExecutionActionResponse{}, nil

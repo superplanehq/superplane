@@ -204,7 +204,7 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 		}
 
 		for _, event := range newEvents {
-			messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+			messages.PublishCanvasEventCreatedMessage(&event)
 		}
 	}
 

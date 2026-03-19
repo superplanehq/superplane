@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -146,6 +148,10 @@ func CreateCanvasWithAutoLayout(
 	proto, err := SerializeCanvas(&canvas, false)
 	if err != nil {
 		return nil, err
+	}
+
+	if publishErr := messages.NewCanvasCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishCreated(); publishErr != nil {
+		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
 	}
 
 	return &pb.CreateCanvasResponse{
