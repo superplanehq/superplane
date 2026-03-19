@@ -1,17 +1,11 @@
-from dataclasses import dataclass, field
 from typing import Literal
 
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
-from ai.models import CanvasAnswer, CanvasQuestionRequest, CanvasSummary
-from ai.superplane_client import SuperplaneClient
-
-
-@dataclass
-class AgentDeps:
-    client: SuperplaneClient
-    canvas_cache: dict[str, CanvasSummary] = field(default_factory=dict)
+from ai.deps import AgentDeps
+from ai.models import CanvasAnswer, CanvasQuestionRequest
+from ai.tools import register_tools
 
 
 def build_prompt(payload: CanvasQuestionRequest) -> str:
@@ -38,15 +32,5 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             "for deep detail."
         ),
     )
-
-    @agent.tool
-    def get_canvas(ctx: RunContext[AgentDeps], canvas_id: str) -> CanvasSummary:
-        cached_summary = ctx.deps.canvas_cache.get(canvas_id)
-        if cached_summary is not None:
-            return cached_summary
-
-        summary = ctx.deps.client.describe_canvas(canvas_id)
-        ctx.deps.canvas_cache[canvas_id] = summary
-        return summary
-
+    register_tools(agent)
     return agent

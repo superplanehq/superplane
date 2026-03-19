@@ -26,7 +26,8 @@ from pydantic_ai.messages import (
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
 
-from ai.agent import AgentDeps, build_agent
+from ai.agent import build_agent
+from ai.deps import AgentDeps
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 
 
