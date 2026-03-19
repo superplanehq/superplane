@@ -299,7 +299,7 @@ export function CanvasVersionControlSidebar({
           <DialogHeader>
             <DialogTitle>{diffContext?.changeRequest?.metadata?.title?.trim() || "Version Node Diff"}</DialogTitle>
             <DialogDescription>
-              Comparing {formatVersionLabelWithTimestamp(diffContext?.version)} against the previous published version.
+              Comparing {formatVersionLabelWithTimestamp(diffContext?.version)} against the previous version.
             </DialogDescription>
           </DialogHeader>
 
@@ -407,7 +407,7 @@ function VersionRow({
               </span>
             </TooltipTrigger>
             <TooltipContent side="top">
-              {previousVersion ? "View node diff with previous version" : "No previous version to compare"}
+              {previousVersion ? "Compare with previous version" : "No previous version to compare"}
             </TooltipContent>
           </Tooltip>
         </div>

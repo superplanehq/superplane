@@ -880,7 +880,7 @@ function CanvasPage(props: CanvasPageProps) {
     canvasStateMode === "editing"
       ? "Edit Mode"
       : canvasStateMode === "previewing-previous-version"
-        ? "Previewing Previous Version"
+        ? "Previewing Version"
         : "";
 
   return (
