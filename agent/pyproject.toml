@@ -5,8 +5,10 @@ description = "Bootstrap repository for PydanticAI services"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "fastapi>=0.135.1",
+  "python-dateutil>=2.9.0",
   "pydantic>=2.11.0",
   "pydantic-ai>=0.4.0",
+  "urllib3>=2.0.0",
   "uvicorn>=0.42.0",
 ]
 
@@ -23,7 +25,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ai", "src/repl"]
+packages = ["src/ai", "src/repl", "src/superplaneapi"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -31,6 +33,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+extend-exclude = ["src/superplaneapi"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
@@ -39,3 +42,4 @@ select = ["E", "F", "I", "UP", "B"]
 python_version = "3.13"
 strict = true
 files = ["src", "tests"]
+exclude = ["src/superplaneapi"]

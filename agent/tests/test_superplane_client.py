@@ -1,6 +1,41 @@
 from typing import Any
 
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
+from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
+from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
+
+
+class FakeCanvasApi:
+    def __init__(self, payloads: dict[str, dict[str, Any]]) -> None:
+        self._payloads = payloads
+
+    def canvases_describe_canvas(
+        self, canvas_id: str, _request_timeout: int | tuple[int, int] | None = None
+    ) -> CanvasesDescribeCanvasResponse:
+        _ = _request_timeout
+        payload = self._payloads.get(f"/api/v1/canvases/{canvas_id}")
+        if payload is None:
+            raise ValueError(f"Missing payload for canvas: {canvas_id}")
+        return CanvasesDescribeCanvasResponse.from_dict(payload)
+
+
+class FakeCanvasNodeApi:
+    def __init__(self, payloads: dict[str, dict[str, Any]]) -> None:
+        self._payloads = payloads
+
+    def canvases_list_node_events(
+        self,
+        canvas_id: str,
+        node_id: str,
+        limit: int | None = None,
+        before: object | None = None,
+        _request_timeout: int | tuple[int, int] | None = None,
+    ) -> CanvasesListNodeEventsResponse:
+        _ = (limit, before, _request_timeout)
+        payload = self._payloads.get(f"/api/v1/canvases/{canvas_id}/nodes/{node_id}/events")
+        if payload is None:
+            raise ValueError(f"Missing payload for node events: {canvas_id}/{node_id}")
+        return CanvasesListNodeEventsResponse.from_dict(payload)
 
 
 class FakeSuperplaneClient(SuperplaneClient):
@@ -12,14 +47,8 @@ class FakeSuperplaneClient(SuperplaneClient):
                 organization_id="org-id",
             )
         )
-        self._payloads = payloads
-
-    def _request_json(self, path: str, query: dict[str, str | int] | None = None) -> dict[str, Any]:
-        _ = query
-        payload = self._payloads.get(path)
-        if payload is None:
-            raise ValueError(f"Missing payload for path: {path}")
-        return payload
+        self._canvas_api = FakeCanvasApi(payloads)
+        self._canvas_node_api = FakeCanvasNodeApi(payloads)
 
 
 def test_describe_canvas_maps_nodes_and_edges() -> None:

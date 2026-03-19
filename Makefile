@@ -237,6 +237,7 @@ gen:
 	$(MAKE) openapi.spec.gen
 	$(MAKE) openapi.client.gen
 	$(MAKE) openapi.web.client.gen
+	$(MAKE) openapi.python.client.gen
 	$(MAKE) format.go
 	$(MAKE) format.js
 	$(MAKE) gen.components.docs
@@ -276,6 +277,21 @@ openapi.client.gen:
 openapi.web.client.gen:
 	rm -rf web_src/src/api-client
 	$(COMPOSE) run --rm --no-deps app bash -c "cd web_src && npm run generate:api"
+
+openapi.python.client.gen:
+	rm -rf agent/src/superplaneapi
+	docker run --rm \
+		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
+		-i /local/api/swagger/superplane.swagger.json \
+		-g python \
+		-o /local/agent/src/superplaneapi \
+		--package-name superplaneapi \
+		--additional-properties=packageName=superplaneapi,projectName=superplaneapi,generateSourceCodeOnly=true
+	cp -R agent/src/superplaneapi/superplaneapi/. agent/src/superplaneapi/
+	rm -rf agent/src/superplaneapi/superplaneapi
+	rm -rf agent/src/superplaneapi/docs
+	rm -rf agent/src/superplaneapi/test
+	rm -rf agent/src/superplaneapi/.openapi-generator
 
 #
 # Image and CLI build
