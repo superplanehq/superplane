@@ -41,12 +41,13 @@ export const indexDocumentMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const outputs = context.execution.outputs as { default: OutputPayload[] };
-    if (!outputs?.default?.[0]?.data) {
+    const payload = getFirstOutputPayload(context.execution.outputs);
+    if (!payload?.data) {
       return {};
     }
-    const doc = outputs.default[0].data as Record<string, any>;
-    return getDetailsForDocument(doc);
+    const doc = payload.data as Record<string, any>;
+
+    return getDetailsForDocument(doc, payload.timestamp);
   },
 
   subtitle(context: SubtitleContext): string {
@@ -87,8 +88,19 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   ];
 }
 
-function getDetailsForDocument(doc: Record<string, any>): Record<string, string> {
+function getFirstOutputPayload(outputs: unknown): OutputPayload | undefined {
+  const typedOutputs = outputs as
+    | { success?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] }
+    | undefined;
+  return typedOutputs?.default?.[0] ?? typedOutputs?.success?.[0] ?? typedOutputs?.failed?.[0];
+}
+
+function getDetailsForDocument(doc: Record<string, any>, timestamp?: string): Record<string, string> {
   const details: Record<string, string> = {};
+
+  if (timestamp) {
+    details["Indexed At"] = new Date(timestamp).toLocaleString();
+  }
 
   if (doc?.id) {
     details["Document ID"] = String(doc.id);

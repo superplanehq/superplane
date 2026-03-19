@@ -19,6 +19,11 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
     const payload = context.event?.data as Record<string, any> | undefined;
 
     const details: Record<string, string> = {};
+    const receivedAt = payload?.timestamp || context.event?.createdAt;
+
+    if (receivedAt) {
+      details["Received At"] = new Date(receivedAt).toLocaleString();
+    }
 
     const rule = payload?.ruleName || payload?.alertName || payload?.ruleId;
     if (rule) details["Rule"] = String(rule);
@@ -38,7 +43,8 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
     const config = node.configuration as Record<string, any> | undefined;
-    const metadataItems: MetadataItem[] = buildMetadataItems(config);
+    const metadata = node.metadata as { ruleName?: string } | undefined;
+    const metadataItems: MetadataItem[] = buildMetadataItems(config, metadata);
 
     if (lastEvent) {
       const payload = lastEvent.data as Record<string, any> | undefined;
@@ -78,21 +84,24 @@ function predicateLabel(predicates: Predicate[]): string {
   return predicates.map((p) => (p.type === "equals" ? p.value : `${p.type}: ${p.value}`)).join(", ");
 }
 
-function buildMetadataItems(config: Record<string, any> | undefined): MetadataItem[] {
+function buildMetadataItems(
+  config: Record<string, any> | undefined,
+  metadata: { ruleName?: string } | undefined,
+): MetadataItem[] {
   const items: MetadataItem[] = [];
   if (!config) return items;
 
-  const rules: string[] = Array.isArray(config.rules) ? config.rules : [];
+  const rule = typeof config.rule === "string" ? config.rule : "";
   const spaces: string[] = Array.isArray(config.spaces) ? config.spaces : [];
   const tags: Predicate[] = Array.isArray(config.tags) ? config.tags : [];
-  const severities: Predicate[] = Array.isArray(config.severities) ? config.severities : [];
-  const statuses: Predicate[] = Array.isArray(config.statuses) ? config.statuses : [];
+  const severities: string[] = Array.isArray(config.severities) ? config.severities : [];
+  const statuses: string[] = Array.isArray(config.statuses) ? config.statuses : [];
 
-  if (rules.length > 0) items.push({ icon: "bell", label: rules.join(", ") });
+  if (metadata?.ruleName || rule) items.push({ icon: "bell", label: metadata?.ruleName || rule });
   if (spaces.length > 0) items.push({ icon: "layers", label: spaces.join(", ") });
   if (tags.length > 0) items.push({ icon: "tag", label: predicateLabel(tags) });
-  if (severities.length > 0) items.push({ icon: "alert-triangle", label: predicateLabel(severities) });
-  if (statuses.length > 0) items.push({ icon: "activity", label: predicateLabel(statuses) });
+  if (severities.length > 0) items.push({ icon: "alert-triangle", label: severities.join(", ") });
+  if (statuses.length > 0) items.push({ icon: "activity", label: statuses.join(", ") });
 
   return items;
 }
