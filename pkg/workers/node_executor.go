@@ -110,9 +110,9 @@ func (w *NodeExecutor) StartRabbitMQConsumer(ctx context.Context) {
 	options := tackle.Options{
 		URL:            w.rabbitMQURL,
 		ConnectionName: w.Name(),
-		RemoteExchange: messages.WorkflowExchange,
-		Service:        messages.WorkflowExchange + "." + messages.WorkflowExecutionRoutingKey + "." + w.Name(),
-		RoutingKey:     messages.WorkflowExecutionRoutingKey,
+		RemoteExchange: messages.CanvasExchange,
+		Service:        messages.CanvasExchange + "." + messages.CanvasExecutionRoutingKey + "." + w.Name(),
+		RoutingKey:     messages.CanvasExecutionRoutingKey,
 	}
 
 	consumer := tackle.NewConsumer()
@@ -120,16 +120,16 @@ func (w *NodeExecutor) StartRabbitMQConsumer(ctx context.Context) {
 	w.consumer = consumer
 
 	for {
-		log.Infof("Connecting to RabbitMQ queue for %s events", messages.WorkflowExecutionRoutingKey)
+		log.Infof("Connecting to RabbitMQ queue for %s events", messages.CanvasExecutionRoutingKey)
 
 		err := w.consumer.Start(&options, w.Consume)
 		if err != nil {
-			w.logger.Errorf("Error consuming messages from %s: %v", messages.WorkflowExecutionRoutingKey, err)
+			w.logger.Errorf("Error consuming messages from %s: %v", messages.CanvasExecutionRoutingKey, err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
 
-		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.WorkflowExecutionRoutingKey)
+		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.CanvasExecutionRoutingKey)
 		time.Sleep(5 * time.Second)
 	}
 }

@@ -6,7 +6,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-const WorkflowEventCreatedRoutingKey = "workflow-event-created"
+const CanvasEventCreatedRoutingKey = "canvas-event-created"
 
 type CanvasEventCreatedMessage struct {
 	message *pb.CanvasNodeEventMessage
@@ -25,7 +25,7 @@ func NewCanvasEventCreatedMessage(canvasId string, organizationID string, event 
 }
 
 func (m CanvasEventCreatedMessage) Publish() error {
-	return Publish(WorkflowExchange, WorkflowEventCreatedRoutingKey, toBytes(m.message))
+	return Publish(CanvasExchange, CanvasEventCreatedRoutingKey, toBytes(m.message))
 }
 
 func PublishCanvasEventCreatedMessage(event *models.CanvasEvent) error {

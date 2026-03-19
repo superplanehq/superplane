@@ -6,10 +6,10 @@ import (
 )
 
 const (
-	WorkflowCanvasCreatedRoutingKey        = "workflow-canvas-created"
-	WorkflowCanvasUpdatedRoutingKey        = "workflow-canvas-updated"
-	WorkflowCanvasVersionUpdatedRoutingKey = "workflow-canvas-version-updated"
-	WorkflowCanvasDeletedRoutingKey        = "workflow-canvas-deleted"
+	CanvasCreatedRoutingKey        = "canvas-created"
+	CanvasUpdatedRoutingKey        = "canvas-updated"
+	CanvasVersionUpdatedRoutingKey = "canvas-version-updated"
+	CanvasDeletedRoutingKey        = "canvas-deleted"
 )
 
 type CanvasMessage struct {
@@ -64,17 +64,17 @@ func NewCanvasVersionUpdatedMessage(canvasID string, versionID string) CanvasVer
 }
 
 func (m CanvasMessage) PublishCreated() error {
-	return Publish(WorkflowExchange, WorkflowCanvasCreatedRoutingKey, toBytes(m.message))
+	return Publish(CanvasExchange, CanvasCreatedRoutingKey, toBytes(m.message))
 }
 
 func (m CanvasMessage) PublishUpdated() error {
-	return Publish(WorkflowExchange, WorkflowCanvasUpdatedRoutingKey, toBytes(m.message))
+	return Publish(CanvasExchange, CanvasUpdatedRoutingKey, toBytes(m.message))
 }
 
 func (m CanvasMessage) PublishDeleted() error {
-	return Publish(WorkflowExchange, WorkflowCanvasDeletedRoutingKey, toBytes(m.message))
+	return Publish(CanvasExchange, CanvasDeletedRoutingKey, toBytes(m.message))
 }
 
 func (m CanvasVersionMessage) PublishVersionUpdated() error {
-	return Publish(WorkflowExchange, WorkflowCanvasVersionUpdatedRoutingKey, toBytes(m.message))
+	return Publish(CanvasExchange, CanvasVersionUpdatedRoutingKey, toBytes(m.message))
 }
