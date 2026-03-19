@@ -294,6 +294,7 @@ func Test__CreateAlertPolicy__Execute(t *testing.T) {
 				"compare":     "GreaterThan",
 				"value":       75,
 				"window":      "5m",
+				"email":       []any{"ops@example.com"},
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,

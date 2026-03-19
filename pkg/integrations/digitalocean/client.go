@@ -1229,7 +1229,6 @@ func (c *Client) GetDropletMemoryTotalMetrics(dropletID string, start, end int64
 }
 
 // GetDropletBandwidthMetrics fetches network bandwidth metrics for a droplet.
-// iface must be "public" or "private"; direction must be "outbound" or "inbound".
 func (c *Client) GetDropletBandwidthMetrics(dropletID, iface, direction string, start, end int64) (*MetricsResponse, error) {
 	url := fmt.Sprintf("%s/monitoring/metrics/droplet/bandwidth?host_id=%s&interface=%s&direction=%s&start=%d&end=%d", c.BaseURL, dropletID, iface, direction, start, end)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
