@@ -20,10 +20,11 @@ const (
 	ResourceTypeSubnetDropdown            = "azure.subnet"
 	ResourceTypeStorageAccountDropdown    = "azure.storageAccount"
 	ResourceTypeContainerRegistryDropdown = "azure.containerRegistry"
-	
-	ResourceTypeServiceBusNamespace = "azure.servicebus.namespace"
-	ResourceTypeServiceBusQueue     = "azure.servicebus.queue"
-	ResourceTypeServiceBusTopic     = "azure.servicebus.topic"
+
+	ResourceTypeServiceBusNamespace    = "azure.servicebus.namespace"
+	ResourceTypeServiceBusQueue        = "azure.servicebus.queue"
+	ResourceTypeServiceBusTopic        = "azure.servicebus.topic"
+	ResourceTypeServiceBusSubscription = "azure.servicebus.subscription"
 )
 
 type armResourceGroup struct {
@@ -554,6 +555,69 @@ func (a *AzureIntegration) ListServiceBusTopics(ctx core.ListResourcesContext, r
 	return resources, nil
 }
 
+// ListServiceBusSubscriptions lists subscriptions for a Service Bus topic.
+func (a *AzureIntegration) ListServiceBusSubscriptions(ctx core.ListResourcesContext, namespaceName, topicName string) ([]core.IntegrationResource, error) {
+	ctx.Logger.Infof("listing Azure Service Bus subscriptions for namespace=%s topic=%s", namespaceName, topicName)
+
+	if namespaceName == "" || topicName == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	provider, err := newProvider(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	ns := azureResourceName(namespaceName)
+	topic := azureResourceName(topicName)
+
+	// Resolve resource group from namespace.
+	rg := ""
+	namespaces, err := a.ListServiceBusNamespaces(ctx, "")
+	if err == nil {
+		for _, n := range namespaces {
+			if strings.EqualFold(path.Base(n.ID), ns) || strings.EqualFold(n.Name, ns) {
+				rg = extractResourceGroup(n.ID)
+				break
+			}
+		}
+	}
+
+	if rg == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	listURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.ServiceBus/namespaces/%s/topics/%s/subscriptions?api-version=%s",
+		armBaseURL, provider.GetSubscriptionID(), rg, ns, topic, armAPIVersionServiceBus)
+
+	items, err := provider.getClient().listAll(context.Background(), listURL)
+	if err != nil {
+		if isARMNotFound(err) {
+			return []core.IntegrationResource{}, nil
+		}
+		return nil, fmt.Errorf("failed to list Service Bus subscriptions: %w", err)
+	}
+
+	resources := []core.IntegrationResource{}
+	for _, raw := range items {
+		var sub armServiceBusSubscription
+		if err := json.Unmarshal(raw, &sub); err != nil || sub.Name == "" {
+			continue
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeServiceBusSubscription,
+			Name: sub.Name,
+			ID:   sub.ID,
+		})
+	}
+
+	sort.Slice(resources, func(i, j int) bool {
+		return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
+	})
+
+	return resources, nil
+}
 
 // azureResourceName extracts the final resource name segment from an Azure resource ID.
 // It handles plain names, full ARM IDs, and URL-encoded ARM IDs (e.g. from query parameters).

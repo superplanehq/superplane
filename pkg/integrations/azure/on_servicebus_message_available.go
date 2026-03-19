@@ -111,10 +111,10 @@ func (t *OnServiceBusMessageAvailable) ExampleData() map[string]any {
 		"dataVersion":     "1",
 		"metadataVersion": "1",
 		"data": map[string]any{
-			"namespaceName": "my-ns.servicebus.windows.net",
-			"requestUri":    "https://my-ns.servicebus.windows.net/my-queue/messages/head",
-			"entityType":    "queue",
-			"queueName":     "my-queue",
+			"namespaceName":   "my-ns.servicebus.windows.net",
+			"requestUri":      "https://my-ns.servicebus.windows.net/my-queue/messages/head",
+			"entityType":      "queue",
+			"queueName":       "my-queue",
 			"deadLetterQueue": false,
 		},
 	}
@@ -127,7 +127,7 @@ func (t *OnServiceBusMessageAvailable) Configuration() []configuration.Field {
 			Label:       "Resource Group",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Filter events to a specific resource group (optional - leave empty for all resource groups)",
+			Description: "Filter events to a specific resource group (optional – leave empty for all resource groups)",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:           ResourceTypeResourceGroupDropdown,
@@ -135,22 +135,8 @@ func (t *OnServiceBusMessageAvailable) Configuration() []configuration.Field {
 				},
 			},
 		},
-		{
-			Name:        "namespaceName",
-			Label:       "Namespace",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "The Service Bus namespace to monitor (short name, not FQDN)",
-			Placeholder: "my-namespace",
-		},
-		{
-			Name:        "queueName",
-			Label:       "Queue Name",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Filter to a specific queue (optional - leave empty for all queues in the namespace)",
-			Placeholder: "my-queue",
-		},
+		serviceBusTriggerNamespaceField(),
+		serviceBusTriggerOptionalQueueNameField(),
 	}
 }
 

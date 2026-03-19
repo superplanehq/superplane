@@ -139,21 +139,21 @@ func PublishServiceBusMessage(ctx context.Context, provider *AzureProvider, name
 // queueToResult converts an ARM queue response to the output shape.
 func queueToResult(queue *armServiceBusQueue, namespaceName, resourceGroup string) *ServiceBusQueueResult {
 	props := map[string]any{
-		"messageCount":                    queue.Properties.MessageCount,
-		"sizeInBytes":                     queue.Properties.SizeInBytes,
-		"maxSizeInMegabytes":              queue.Properties.MaxSizeInMegabytes,
-		"lockDuration":                    queue.Properties.LockDuration,
-		"maxDeliveryCount":                queue.Properties.MaxDeliveryCount,
-		"requiresDuplicateDetection":      queue.Properties.RequiresDuplicateDetection,
-		"requiresSession":                 queue.Properties.RequiresSession,
-		"defaultMessageTimeToLive":        queue.Properties.DefaultMessageTimeToLive,
+		"messageCount":                     queue.Properties.MessageCount,
+		"sizeInBytes":                      queue.Properties.SizeInBytes,
+		"maxSizeInMegabytes":               queue.Properties.MaxSizeInMegabytes,
+		"lockDuration":                     queue.Properties.LockDuration,
+		"maxDeliveryCount":                 queue.Properties.MaxDeliveryCount,
+		"requiresDuplicateDetection":       queue.Properties.RequiresDuplicateDetection,
+		"requiresSession":                  queue.Properties.RequiresSession,
+		"defaultMessageTimeToLive":         queue.Properties.DefaultMessageTimeToLive,
 		"deadLetteringOnMessageExpiration": queue.Properties.DeadLetteringOnMessageExpiration,
-		"enableBatchedOperations":         queue.Properties.EnableBatchedOperations,
-		"status":                          queue.Properties.Status,
-		"createdAt":                       queue.Properties.CreatedAt,
-		"updatedAt":                       queue.Properties.UpdatedAt,
-		"activeMessageCount":              queue.Properties.CountDetails.ActiveMessageCount,
-		"deadLetterMessageCount":          queue.Properties.CountDetails.DeadLetterMessageCount,
+		"enableBatchedOperations":          queue.Properties.EnableBatchedOperations,
+		"status":                           queue.Properties.Status,
+		"createdAt":                        queue.Properties.CreatedAt,
+		"updatedAt":                        queue.Properties.UpdatedAt,
+		"activeMessageCount":               queue.Properties.CountDetails.ActiveMessageCount,
+		"deadLetterMessageCount":           queue.Properties.CountDetails.DeadLetterMessageCount,
 	}
 
 	return &ServiceBusQueueResult{
