@@ -57,3 +57,38 @@ export interface CreateLoadBalancerConfiguration {
   name: string;
   region: string;
 }
+
+export interface AlertPolicyNodeMetadata {
+  policyUuid?: string;
+  policyDesc?: string;
+}
+
+export interface CreateAlertPolicyConfiguration {
+  description?: string;
+  type?: string;
+  compare?: string;
+  value?: number;
+  window?: string;
+}
+
+export interface GetAlertPolicyConfiguration {
+  alertPolicy: string;
+}
+
+export interface DeleteAlertPolicyConfiguration {
+  alertPolicy: string;
+}
+
+export interface UpdateAlertPolicyConfiguration {
+  alertPolicy: string;
+  description?: string;
+  type?: string;
+  compare?: string;
+  value?: number;
+  window?: string;
+}
+
+export interface GetDropletMetricsConfiguration {
+  droplet: string;
+  lookbackPeriod: string;
+}
