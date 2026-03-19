@@ -619,6 +619,11 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 
 	log.Infof("Organization %s (%s) created successfully", organization.Name, organization.ID)
 
+	organizationCreatedMessage := messages.NewOrganizationCreatedMessage(organization.ID.String())
+	if err := organizationCreatedMessage.Publish(); err != nil {
+		log.Errorf("Failed to publish organization created message for %s: %v", organization.ID, err)
+	}
+
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
 	w.Header().Set("Content-Type", "application/json")

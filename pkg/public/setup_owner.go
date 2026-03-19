@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"gorm.io/gorm"
@@ -148,6 +149,11 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 	middleware.MarkOwnerSetupCompleted()
 
 	// Create account cookie so the owner is signed in
+	organizationCreatedMessage := messages.NewOrganizationCreatedMessage(organization.ID.String())
+	if err := organizationCreatedMessage.Publish(); err != nil {
+		log.Errorf("Failed to publish organization created message for %s: %v", organization.ID, err)
+	}
+
 	token, err := s.jwt.Generate(account.ID.String(), 24*time.Hour)
 	if err != nil {
 		log.Errorf("Failed to generate account token for owner: %v", err)

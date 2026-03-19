@@ -18,6 +18,7 @@ type Organization struct {
 	Description       string
 	AllowedProviders  datatypes.JSONSlice[string]
 	VersioningEnabled bool
+	UsageSyncedAt     *time.Time
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 	DeletedAt         gorm.DeletedAt `gorm:"index"`
@@ -144,6 +145,55 @@ func GetActiveOrganizationIDs() ([]string, error) {
 	}
 
 	return orgIDs, nil
+}
+
+func ListOrganizationsPendingUsageSync(limit int) ([]Organization, error) {
+	return ListOrganizationsPendingUsageSyncInTransaction(database.Conn(), limit)
+}
+
+func ListOrganizationsPendingUsageSyncInTransaction(tx *gorm.DB, limit int) ([]Organization, error) {
+	var organizations []Organization
+
+	query := tx.
+		Where("deleted_at IS NULL").
+		Where("usage_synced_at IS NULL").
+		Order("created_at ASC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&organizations).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return organizations, nil
+}
+
+func MarkOrganizationUsageSynced(orgID string, syncedAt time.Time) error {
+	return MarkOrganizationUsageSyncedInTransaction(database.Conn(), orgID, syncedAt)
+}
+
+func MarkOrganizationUsageSyncedInTransaction(tx *gorm.DB, orgID string, syncedAt time.Time) error {
+	return tx.
+		Model(&Organization{}).
+		Where("id = ?", orgID).
+		Update("usage_synced_at", syncedAt.UTC()).
+		Error
+}
+
+func MarkOrganizationUsageSyncedIfUnset(orgID string, syncedAt time.Time) error {
+	return MarkOrganizationUsageSyncedIfUnsetInTransaction(database.Conn(), orgID, syncedAt)
+}
+
+func MarkOrganizationUsageSyncedIfUnsetInTransaction(tx *gorm.DB, orgID string, syncedAt time.Time) error {
+	return tx.
+		Model(&Organization{}).
+		Where("id = ?", orgID).
+		Where("usage_synced_at IS NULL").
+		Update("usage_synced_at", syncedAt.UTC()).
+		Error
 }
 
 func IsCanvasVersioningEnabled(organizationID uuid.UUID) (bool, error) {

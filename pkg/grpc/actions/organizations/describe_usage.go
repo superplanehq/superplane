@@ -6,7 +6,6 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/usage"
@@ -34,6 +33,10 @@ func DescribeUsage(ctx context.Context, usageService usage.Service, orgID string
 		return nil, err
 	}
 
+	if err := usage.MarkOrganizationSyncedIfUnset(orgID); err != nil {
+		log.Warnf("Failed to persist usage sync state for organization %s: %v", orgID, err)
+	}
+
 	return &pb.DescribeUsageResponse{
 		Enabled:       true,
 		StatusMessage: "Usage tracking is active.",
@@ -57,7 +60,17 @@ func describeUsageLimits(
 		return nil, status.Error(codes.Internal, "failed to describe organization usage limits")
 	}
 
-	return setupUsageOrganization(ctx, usageService, orgID)
+	if err := usage.SyncOrganizationForce(ctx, usageService, orgID); err != nil {
+		return nil, usageSyncError(orgID, err)
+	}
+
+	response, err = usageService.DescribeOrganizationLimits(ctx, orgID)
+	if err != nil {
+		log.Errorf("Error describing usage limits after sync for organization %s: %v", orgID, err)
+		return nil, status.Error(codes.Internal, "failed to describe organization usage limits")
+	}
+
+	return response.Limits, nil
 }
 
 func describeUsageMetrics(
@@ -75,8 +88,8 @@ func describeUsageMetrics(
 		return nil, status.Error(codes.Internal, "failed to describe organization usage")
 	}
 
-	if _, setupErr := setupUsageOrganization(ctx, usageService, orgID); setupErr != nil {
-		return nil, setupErr
+	if err := usage.SyncOrganizationForce(ctx, usageService, orgID); err != nil {
+		return nil, usageSyncError(orgID, err)
 	}
 
 	response, err = usageService.DescribeOrganizationUsage(ctx, orgID)
@@ -88,50 +101,16 @@ func describeUsageMetrics(
 	return response.Usage, nil
 }
 
-func setupUsageOrganization(
-	ctx context.Context,
-	usageService usage.Service,
-	orgID string,
-) (*usagepb.OrganizationLimits, error) {
-	billingUser, err := models.FindFirstHumanUserByOrganization(orgID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.FailedPrecondition, "organization has no billing account candidate")
-		}
-
-		log.Errorf("Error finding billing account candidate for organization %s: %v", orgID, err)
-		return nil, status.Error(codes.Internal, "failed to determine organization billing account")
+func usageSyncError(orgID string, err error) error {
+	switch {
+	case errors.Is(err, usage.ErrNoBillingAccountCandidate), errors.Is(err, gorm.ErrRecordNotFound):
+		return status.Error(codes.FailedPrecondition, "organization has no billing account candidate")
+	case status.Code(err) == codes.ResourceExhausted:
+		return status.Error(codes.ResourceExhausted, "organization exceeds configured account usage limits")
+	default:
+		log.Errorf("Error syncing usage for organization %s: %v", orgID, err)
+		return status.Error(codes.Internal, "failed to set up organization usage")
 	}
-
-	if billingUser.AccountID == nil {
-		return nil, status.Error(codes.FailedPrecondition, "organization has no billing account candidate")
-	}
-
-	accountID := billingUser.AccountID.String()
-
-	if _, err := usageService.SetupAccount(ctx, accountID); err != nil && status.Code(err) != codes.AlreadyExists {
-		log.Errorf("Error setting up usage account %s: %v", accountID, err)
-		return nil, status.Error(codes.Internal, "failed to set up usage account")
-	}
-
-	response, err := usageService.SetupOrganization(ctx, orgID, accountID)
-	if err == nil {
-		return response.Limits, nil
-	}
-
-	if status.Code(err) == codes.FailedPrecondition {
-		describeResponse, describeErr := usageService.DescribeOrganizationLimits(ctx, orgID)
-		if describeErr == nil {
-			return describeResponse.Limits, nil
-		}
-	}
-
-	if status.Code(err) == codes.ResourceExhausted {
-		return nil, status.Error(codes.ResourceExhausted, "organization exceeds configured account usage limits")
-	}
-
-	log.Errorf("Error setting up usage organization %s for account %s: %v", orgID, accountID, err)
-	return nil, status.Error(codes.Internal, "failed to set up organization usage")
 }
 
 func serializeUsageLimits(limits *usagepb.OrganizationLimits) *pb.OrganizationLimits {

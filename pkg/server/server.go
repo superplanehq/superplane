@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/templates"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers"
 
 	// Import integrations, components and triggers to register them via init()
@@ -165,6 +166,19 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 
 		w := workers.NewCanvasCleanupWorker()
 		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_USAGE_SYNC_WORKER") == "yes" {
+		usageService, err := usage.NewServiceFromEnv()
+		if err != nil {
+			log.Fatalf("failed to initialize usage sync worker: %v", err)
+		}
+
+		if usageService.Enabled() {
+			log.Println("Starting Usage Sync Worker")
+			w := workers.NewUsageSyncWorker(rabbitMQURL, usageService)
+			go w.Start(context.Background())
+		}
 	}
 }
 

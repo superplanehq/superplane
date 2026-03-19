@@ -134,7 +134,13 @@ func Test__DescribeUsage(t *testing.T) {
 		service := &fakeUsageService{
 			enabled:             true,
 			describeLimitsError: status.Error(codes.NotFound, "organization not configured"),
-			describeUsageError:  status.Error(codes.NotFound, "organization not configured"),
+			describeLimitsResponse: &pb.DescribeOrganizationLimitsResponse{
+				Limits: &pb.OrganizationLimits{
+					MaxCanvases:       12,
+					MaxNodesPerCanvas: 30,
+				},
+			},
+			describeUsageError: status.Error(codes.NotFound, "organization not configured"),
 			setupOrganizationResp: &pb.SetupOrganizationResponse{
 				Limits: &pb.OrganizationLimits{
 					MaxCanvases:       12,
