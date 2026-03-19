@@ -278,7 +278,7 @@ func computeCPUUsagePercent(resp *MetricsResponse) float64 {
 		totalDelta += delta
 
 		if result.Metric["mode"] == "idle" {
-			idleDelta = delta
+			idleDelta += delta
 		}
 	}
 

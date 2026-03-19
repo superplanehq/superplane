@@ -80,7 +80,7 @@ export interface DeleteAlertPolicyConfiguration {
 }
 
 export interface UpdateAlertPolicyConfiguration {
-  alertPolicy?: string;
+  alertPolicy: string;
   description?: string;
   type?: string;
   compare?: string;
