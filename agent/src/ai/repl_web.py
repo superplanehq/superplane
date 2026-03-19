@@ -131,7 +131,6 @@ def _build_deps(payload: ReplStreamRequest) -> AgentDeps:
     )
     return AgentDeps(
         client=client,
-        default_canvas_id=payload.canvas_id,
         allow_canvas_details=False,
     )
 
