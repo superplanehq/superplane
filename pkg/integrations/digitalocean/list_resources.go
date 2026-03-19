@@ -28,6 +28,8 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listReservedIPs(ctx)
 	case "ssh_key":
 		return listSSHKeys(ctx)
+	case "alert_policy":
+		return listAlertPolicies(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -269,6 +271,29 @@ func listSSHKeys(ctx core.ListResourcesContext) ([]core.IntegrationResource, err
 			Type: "ssh_key",
 			Name: key.Name,
 			ID:   key.Fingerprint,
+		})
+	}
+
+	return resources, nil
+}
+
+func listAlertPolicies(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	policies, err := client.ListAlertPolicies()
+	if err != nil {
+		return nil, fmt.Errorf("error listing alert policies: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(policies))
+	for _, policy := range policies {
+		resources = append(resources, core.IntegrationResource{
+			Type: "alert_policy",
+			Name: policy.Description,
+			ID:   policy.UUID,
 		})
 	}
 
