@@ -90,7 +90,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
             <button
               type="button"
               disabled={!canCreateCanvases}
-              onClick={() => navigate(`/${organizationId}/canvases/new`)}
+              onClick={() => navigate(`/${organizationId}/templates`)}
               className="w-full text-left bg-white dark:bg-gray-800 rounded-md outline outline-slate-950/10 dark:outline-gray-700 p-5 hover:shadow-md transition-shadow cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="flex items-start gap-3">
