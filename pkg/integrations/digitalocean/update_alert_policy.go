@@ -3,7 +3,6 @@ package digitalocean
 import (
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -156,6 +155,10 @@ func (u *UpdateAlertPolicy) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error resolving alert policy metadata: %v", err)
 	}
 
+	if err := resolveAlertPolicyEntitiesMetadata(ctx, spec.Entities); err != nil {
+		return fmt.Errorf("error resolving scoped droplets metadata: %v", err)
+	}
+
 	return nil
 }
 
@@ -221,7 +224,7 @@ func (u *UpdateAlertPolicy) HandleAction(ctx core.ActionContext) error {
 }
 
 func (u *UpdateAlertPolicy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return http.StatusOK, nil, nil
+	return rejectUnsupportedWebhook(ctx, u.Name())
 }
 
 func (u *UpdateAlertPolicy) Cleanup(ctx core.SetupContext) error {

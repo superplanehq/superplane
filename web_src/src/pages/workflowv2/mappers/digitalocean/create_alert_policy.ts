@@ -13,7 +13,7 @@ import {
 import { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { formatTimeAgo } from "@/utils/date";
-import { CreateAlertPolicyConfiguration } from "./types";
+import { AlertPolicyOutput, CreateAlertPolicyConfiguration } from "./types";
 
 const METRIC_TYPE_LABELS: Record<string, string> = {
   "v1/insights/droplet/cpu": "CPU Usage",
@@ -46,7 +46,7 @@ export const createAlertPolicyMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
@@ -54,7 +54,7 @@ export const createAlertPolicyMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const policy = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    const policy = outputs?.default?.[0]?.data as AlertPolicyOutput | undefined;
     if (!policy) return details;
 
     details["Policy UUID"] = policy.uuid || "-";
@@ -70,7 +70,7 @@ export const createAlertPolicyMapper: ComponentBaseMapper = {
       details["Email Notifications"] = emails.join(", ");
     }
 
-    const slackChannels: { channel: string }[] = policy.alerts?.slack ?? [];
+    const slackChannels = policy.alerts?.slack ?? [];
     if (slackChannels.length > 0) {
       details["Slack Channel"] = slackChannels.map((s) => s.channel).join(", ");
     }

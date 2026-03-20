@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"net/http"
 	"strconv"
 	"time"
 
@@ -334,7 +333,7 @@ func (g *GetDropletMetrics) HandleAction(ctx core.ActionContext) error {
 }
 
 func (g *GetDropletMetrics) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return http.StatusOK, nil, nil
+	return rejectUnsupportedWebhook(ctx, g.Name())
 }
 
 func (g *GetDropletMetrics) Cleanup(ctx core.SetupContext) error {

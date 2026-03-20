@@ -13,7 +13,7 @@ import {
 import { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { formatTimeAgo } from "@/utils/date";
-import { AlertPolicyNodeMetadata, DeleteAlertPolicyConfiguration } from "./types";
+import { AlertPolicyNodeMetadata, DeleteAlertPolicyConfiguration, DeleteAlertPolicyOutput } from "./types";
 
 export const deleteAlertPolicyMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -32,7 +32,7 @@ export const deleteAlertPolicyMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
@@ -40,7 +40,7 @@ export const deleteAlertPolicyMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    const result = outputs?.default?.[0]?.data as DeleteAlertPolicyOutput | undefined;
     if (!result) return details;
 
     details["Policy UUID"] = result.alertPolicyUuid || "-";
