@@ -1,7 +1,9 @@
 package elastic
 
 import (
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,6 +15,98 @@ import (
 
 func eq(value string) configuration.Predicate {
 	return configuration.Predicate{Type: configuration.PredicateTypeEquals, Value: value}
+}
+
+func Test__OnAlertFires__Setup(t *testing.T) {
+	trigger := &OnAlertFires{}
+
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"url":       "https://elastic.example.com",
+			"kibanaUrl": "https://kibana.example.com",
+			"authType":  "apiKey",
+			"apiKey":    "api-key",
+		},
+	}
+
+	t.Run("rules are required", func(t *testing.T) {
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: map[string]any{},
+			Integration:   integrationCtx,
+			HTTP:          &contexts.HTTPContext{},
+			Metadata:      &contexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, "at least one rule is required")
+	})
+
+	t.Run("valid rules and spaces are validated and stored in metadata", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"page": 1,
+						"per_page": 100,
+						"total": 1,
+						"data": [{"id":"rule-123","name":"High error rate"}]
+					}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[{"id":"default","name":"Default"}]`)),
+				},
+			},
+		}
+		metadataCtx := &contexts.MetadataContext{}
+		testIntegration := &contexts.IntegrationContext{
+			Configuration: integrationCtx.Configuration,
+		}
+
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: map[string]any{
+				"rules":  []string{"High error rate"},
+				"spaces": []string{"default"},
+			},
+			Integration: testIntegration,
+			HTTP:        httpCtx,
+			Metadata:    metadataCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, OnAlertFiresMetadata{
+			Rules:  []string{"High error rate"},
+			Spaces: []string{"Default"},
+		}, metadataCtx.Metadata)
+		require.Len(t, testIntegration.WebhookRequests, 1)
+		assert.Equal(t, map[string]any{
+			"kibanaUrl": "https://kibana.example.com",
+		}, testIntegration.WebhookRequests[0])
+	})
+
+	t.Run("unknown rule returns a validation error", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"page": 1,
+						"per_page": 100,
+						"total": 0,
+						"data": []
+					}`)),
+				},
+			},
+		}
+
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: map[string]any{
+				"rules": []string{"missing-rule"},
+			},
+			Integration: integrationCtx,
+			HTTP:        httpCtx,
+			Metadata:    &contexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, `selected rule "missing-rule" was not found in Kibana`)
+	})
 }
 
 func Test__OnAlertFires__HandleWebhook(t *testing.T) {

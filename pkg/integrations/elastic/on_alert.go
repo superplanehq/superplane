@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -20,6 +21,11 @@ type OnAlertFiresConfiguration struct {
 	Tags       []configuration.Predicate `json:"tags" mapstructure:"tags"`
 	Severities []configuration.Predicate `json:"severities" mapstructure:"severities"`
 	Statuses   []configuration.Predicate `json:"statuses" mapstructure:"statuses"`
+}
+
+type OnAlertFiresMetadata struct {
+	Rules  []string `json:"rules" mapstructure:"rules"`
+	Spaces []string `json:"spaces" mapstructure:"spaces"`
 }
 
 func (t *OnAlertFires) Name() string  { return "elastic.onAlertFires" }
@@ -57,9 +63,9 @@ Kibana substitutes ` + "`{{rule.id}}`" + ` and ` + "`{{rule.name}}`" + ` at deli
 
 ## Filtering
 
-All filter fields are optional. Leave them empty to fire for every incoming alert. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
+Select at least one **Rule**. Additional filter fields are optional. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
 
-**Rule ID** is the most reliable filter because rule names are user-editable. Use it as the primary key when you need precise per-rule routing.
+**Rule ID** is the most reliable selector because rule names are user-editable. Use it when you need precise per-rule routing.
 
 ## Webhook Verification
 
@@ -76,8 +82,8 @@ func (t *OnAlertFires) Configuration() []configuration.Field {
 			Name:        "rules",
 			Label:       "Rules",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
-			Description: "Only fire for alerts from these Kibana alert rules. Leave empty to accept alerts from all rules.",
+			Required:    true,
+			Description: "Only fire for alerts from these Kibana alert rules.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:           ResourceTypeKibanaRule,
@@ -139,9 +145,83 @@ func (t *OnAlertFires) Configuration() []configuration.Field {
 }
 
 func (t *OnAlertFires) Setup(ctx core.TriggerContext) error {
+	var config OnAlertFiresConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	config.Rules = normalizeStringList(config.Rules)
+	config.Spaces = normalizeStringList(config.Spaces)
+
+	if len(config.Rules) == 0 {
+		return fmt.Errorf("at least one rule is required")
+	}
+
 	kibanaURL, err := ctx.Integration.GetConfig("kibanaUrl")
 	if err != nil {
 		return fmt.Errorf("failed to get Kibana URL: %w", err)
+	}
+
+	resolvedRules := make([]string, 0, len(config.Rules))
+	resolvedSpaces := make([]string, 0, len(config.Spaces))
+
+	requiresRuleValidation := hasStaticSelection(config.Rules)
+	requiresSpaceValidation := hasStaticSelection(config.Spaces)
+
+	if requiresRuleValidation || requiresSpaceValidation {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create Elastic client: %w", err)
+		}
+
+		var rules []KibanaRule
+		if requiresRuleValidation {
+			rules, err = client.ListKibanaRules()
+			if err != nil {
+				return fmt.Errorf("failed to list Kibana rules: %w", err)
+			}
+		}
+
+		var spaces []KibanaSpace
+		if requiresSpaceValidation {
+			spaces, err = client.ListKibanaSpaces()
+			if err != nil {
+				return fmt.Errorf("failed to list Kibana spaces: %w", err)
+			}
+		}
+
+		for _, selectedRule := range config.Rules {
+			if isTemplateExpression(selectedRule) {
+				resolvedRules = append(resolvedRules, selectedRule)
+				continue
+			}
+
+			ruleName, ok := findRuleName(rules, selectedRule)
+			if !ok {
+				return fmt.Errorf("selected rule %q was not found in Kibana", selectedRule)
+			}
+			resolvedRules = append(resolvedRules, ruleName)
+		}
+
+		for _, selectedSpace := range config.Spaces {
+			if isTemplateExpression(selectedSpace) {
+				resolvedSpaces = append(resolvedSpaces, selectedSpace)
+				continue
+			}
+
+			spaceName, ok := findSpaceName(spaces, selectedSpace)
+			if !ok {
+				return fmt.Errorf("selected space %q was not found in Kibana", selectedSpace)
+			}
+			resolvedSpaces = append(resolvedSpaces, spaceName)
+		}
+	} else {
+		resolvedRules = append(resolvedRules, config.Rules...)
+		resolvedSpaces = append(resolvedSpaces, config.Spaces...)
+	}
+
+	if err := ctx.Metadata.Set(OnAlertFiresMetadata{Rules: resolvedRules, Spaces: resolvedSpaces}); err != nil {
+		return fmt.Errorf("failed to set metadata: %w", err)
 	}
 
 	return ctx.Integration.RequestWebhook(map[string]any{"kibanaUrl": string(kibanaURL)})
@@ -270,12 +350,9 @@ func extractStringSlice(payload map[string]any, key string) []string {
 
 // containsIgnoreCase reports whether value is in list (case-insensitive).
 func containsIgnoreCase(list []string, value string) bool {
-	for _, item := range list {
-		if strings.EqualFold(item, value) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(list, func(item string) bool {
+		return strings.EqualFold(item, value)
+	})
 }
 
 // matchesAnyString reports whether any candidate appears in list (case-insensitive).
@@ -290,4 +367,55 @@ func matchesAnyString(list []string, candidates ...string) bool {
 	}
 
 	return false
+}
+
+func normalizeStringList(values []string) []string {
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" {
+			normalized = append(normalized, trimmed)
+		}
+	}
+	return normalized
+}
+
+func hasStaticSelection(values []string) bool {
+	return slices.ContainsFunc(values, func(value string) bool {
+		return !isTemplateExpression(value)
+	})
+}
+
+func isTemplateExpression(value string) bool {
+	return strings.Contains(value, "{{") && strings.Contains(value, "}}")
+}
+
+func findRuleName(rules []KibanaRule, selected string) (string, bool) {
+	selected = strings.TrimSpace(selected)
+	match := slices.IndexFunc(rules, func(rule KibanaRule) bool {
+		return strings.EqualFold(strings.TrimSpace(rule.ID), selected) ||
+			strings.EqualFold(strings.TrimSpace(rule.Name), selected)
+	})
+	if match == -1 {
+		return "", false
+	}
+	if strings.TrimSpace(rules[match].Name) == "" {
+		return selected, true
+	}
+	return rules[match].Name, true
+}
+
+func findSpaceName(spaces []KibanaSpace, selected string) (string, bool) {
+	selected = strings.TrimSpace(selected)
+	match := slices.IndexFunc(spaces, func(space KibanaSpace) bool {
+		return strings.EqualFold(strings.TrimSpace(space.ID), selected) ||
+			strings.EqualFold(strings.TrimSpace(space.Name), selected)
+	})
+	if match == -1 {
+		return "", false
+	}
+	if strings.TrimSpace(spaces[match].Name) == "" {
+		return selected, true
+	}
+	return spaces[match].Name, true
 }

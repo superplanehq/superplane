@@ -14,6 +14,13 @@ import (
 
 func Test__IndexDocument__Setup(t *testing.T) {
 	c := &IndexDocument{}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"url":      "https://elastic.example.com",
+			"authType": "apiKey",
+			"apiKey":   "test-api-key",
+		},
+	}
 
 	t.Run("missing index -> error", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
@@ -40,14 +47,48 @@ func Test__IndexDocument__Setup(t *testing.T) {
 	})
 
 	t.Run("valid config -> success", func(t *testing.T) {
+		metadataCtx := &contexts.MetadataContext{}
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"index":    "my-index",
 				"document": map[string]any{"key": "value"},
 			},
-			Metadata: &contexts.MetadataContext{},
+			Metadata:    metadataCtx,
+			Integration: integrationCtx,
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`[
+							{"index":".kibana"},
+							{"index":"my-index"}
+						]`)),
+					},
+				},
+			},
 		})
 		require.NoError(t, err)
+		assert.Equal(t, IndexDocumentMetadata{Index: "my-index"}, metadataCtx.Metadata)
+	})
+
+	t.Run("unknown index -> error", func(t *testing.T) {
+		err := c.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"index":    "missing-index",
+				"document": map[string]any{"key": "value"},
+			},
+			Metadata:    &contexts.MetadataContext{},
+			Integration: integrationCtx,
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`[{"index":"my-index"}]`)),
+					},
+				},
+			},
+		})
+		require.ErrorContains(t, err, `selected index "missing-index" was not found in Elasticsearch`)
 	})
 }
 
