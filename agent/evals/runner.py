@@ -38,7 +38,7 @@ async def runner(model: str) -> None:
         return result.output
 
     report = await dataset.evaluate(task, progress=True)
-    report.print()
+    report.print(include_output=True, include_input=True)
 
 def main() -> None:
     model = os.getenv("AI_MODEL", "test")
