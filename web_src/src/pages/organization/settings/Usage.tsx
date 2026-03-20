@@ -168,7 +168,7 @@ function buildCanvasUsage(data: OrganizationsDescribeUsageResponse | null | unde
     value: `${formatNumber(used)} / ${limitLabel}`,
     subtitle: isUnlimitedNumber(limit)
       ? "This organization can create unlimited canvases."
-      : "Active canvases tracked against the configured plan limit.",
+      : "Active canvases tracked against the organization limit.",
     progress: percentage(used, limit),
   };
 }
@@ -178,9 +178,9 @@ function buildEventUsage(data: OrganizationsDescribeUsageResponse | null | undef
   const capacity = data?.usage?.eventBucketCapacity;
   const lastUpdatedAt = data?.usage?.eventBucketLastUpdatedAt;
   const isUnlimited = typeof capacity === "number" && capacity === -1;
-  const value = isUnlimited ? "Unlimited" : `${formatNumber(level)} / ${formatNumber(capacity ?? 0)}`;
+  const value = isUnlimited ? "∞" : `${formatNumber(level)} / ${formatNumber(capacity ?? 0)}`;
   const subtitle = lastUpdatedAt
-    ? `Leaky bucket level last updated ${new Date(lastUpdatedAt).toLocaleString()}.`
+    ? `Last updated ${new Date(lastUpdatedAt).toLocaleString()}.`
     : "Rolling event usage for the current 30-day window.";
 
   return {
@@ -202,7 +202,7 @@ function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): L
       label: "Members",
       value: formatNumericLimit(limits?.maxUsers),
       icon: Users,
-      description: "Maximum users allowed in the organization plan.",
+      description: "Maximum users allowed in the organization.",
     },
     {
       label: "Integrations",
@@ -220,7 +220,7 @@ function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): L
       label: "Events per month",
       value: formatStringLimit(limits?.maxEventsPerMonth),
       icon: Gauge,
-      description: "Rolling 30-day event allowance used by the leaky bucket.",
+      description: "Rolling 30-day event allowance.",
     },
   ];
 }
@@ -243,7 +243,7 @@ function formatNumericLimit(value: number | undefined) {
   }
 
   if (isUnlimitedNumber(value)) {
-    return "Unlimited";
+    return "∞";
   }
 
   return formatNumber(value);
@@ -255,7 +255,7 @@ function formatStringLimit(value: string | undefined) {
   }
 
   if (value === UNLIMITED_VALUE) {
-    return "Unlimited";
+    return "∞";
   }
 
   return new Intl.NumberFormat().format(Number(value));
@@ -267,7 +267,7 @@ function formatDaysLimit(value: number | undefined) {
   }
 
   if (isUnlimitedNumber(value)) {
-    return "Unlimited";
+    return "∞";
   }
 
   if (value === 1) {
