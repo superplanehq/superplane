@@ -2,10 +2,12 @@ package authentication
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"net/url"
 	"sort"
@@ -23,20 +25,30 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/gorm"
 )
 
 const SignupDisabledError = "signup is currently disabled"
 
+const (
+	magicCodeLength     = 6
+	magicCodeTTL        = 10 * time.Minute
+	magicCodeRateLimit  = 5
+	magicCodeRateWindow = 10 * time.Minute
+)
+
 type Handler struct {
 	jwtSigner            *jwt.Signer
 	authService          authorization.Authorization
 	encryptor            crypto.Encryptor
+	emailService         services.EmailService
 	isDev                bool
 	templateDir          string
 	blockSignup          bool
 	passwordLoginEnabled bool
+	magicCodeEnabled     bool
 }
 
 type ProviderConfig struct {
@@ -45,7 +57,7 @@ type ProviderConfig struct {
 	CallbackURL string
 }
 
-func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService authorization.Authorization, appEnv string, templateDir string, blockSignup bool, passwordLoginEnabled bool) *Handler {
+func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService authorization.Authorization, appEnv string, templateDir string, blockSignup bool, passwordLoginEnabled bool, emailService services.EmailService) *Handler {
 	return &Handler{
 		jwtSigner:            jwtSigner,
 		encryptor:            encryptor,
@@ -54,6 +66,8 @@ func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService a
 		templateDir:          templateDir,
 		blockSignup:          blockSignup,
 		passwordLoginEnabled: passwordLoginEnabled,
+		emailService:         emailService,
+		magicCodeEnabled:     emailService != nil,
 	}
 }
 
@@ -91,6 +105,10 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 	if a.passwordLoginEnabled {
 		router.HandleFunc("/login", a.handlePasswordLogin).Methods("POST")
 		router.HandleFunc("/signup", a.handlePasswordSignup).Methods("POST")
+	}
+	if a.magicCodeEnabled {
+		router.HandleFunc("/auth/magic-code/request", a.handleMagicCodeRequest).Methods("POST")
+		router.HandleFunc("/auth/magic-code/verify", a.handleMagicCodeVerify).Methods("POST")
 	}
 
 	//
@@ -300,10 +318,12 @@ func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 		Providers            []string `json:"providers"`
 		PasswordLoginEnabled bool     `json:"passwordLoginEnabled"`
 		SignupEnabled        bool     `json:"signupEnabled"`
+		MagicCodeEnabled     bool     `json:"magicCodeEnabled"`
 	}{
 		Providers:            providerNames,
 		PasswordLoginEnabled: a.passwordLoginEnabled,
 		SignupEnabled:        !a.blockSignup,
+		MagicCodeEnabled:     a.magicCodeEnabled,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -487,6 +507,176 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 
 	redirectURL := getRedirectURL(r)
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+}
+
+func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request) {
+	if !a.magicCodeEnabled {
+		http.Error(w, "Magic code login is not enabled", http.StatusForbidden)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	email := strings.TrimSpace(r.FormValue("email"))
+	if email == "" {
+		http.Error(w, "Email is required", http.StatusBadRequest)
+		return
+	}
+
+	email = utils.NormalizeEmail(email)
+
+	count, err := models.CountRecentMagicCodes(email, time.Now().Add(-magicCodeRateWindow))
+	if err != nil {
+		log.Errorf("Failed to count recent magic codes for %s: %v", email, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if count >= magicCodeRateLimit {
+		http.Error(w, "Too many code requests. Please try again later.", http.StatusTooManyRequests)
+		return
+	}
+
+	code, err := generateMagicCode()
+	if err != nil {
+		log.Errorf("Failed to generate magic code: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	codeHash := crypto.HashToken(code)
+	expiresAt := time.Now().Add(magicCodeTTL)
+
+	_, err = models.CreateAccountMagicCode(email, codeHash, expiresAt)
+	if err != nil {
+		log.Errorf("Failed to store magic code for %s: %v", email, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	err = a.emailService.SendMagicCodeEmail(email, code)
+	if err != nil {
+		log.Errorf("Failed to send magic code email to %s: %v", email, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "If an account exists with this email, a sign-in code has been sent.",
+	})
+}
+
+func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) {
+	if !a.magicCodeEnabled {
+		http.Error(w, "Magic code login is not enabled", http.StatusForbidden)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	email := strings.TrimSpace(r.FormValue("email"))
+	code := strings.TrimSpace(r.FormValue("code"))
+	name := strings.TrimSpace(r.FormValue("name"))
+	inviteToken := strings.TrimSpace(r.FormValue("invite_token"))
+
+	if email == "" || code == "" {
+		http.Error(w, "Email and code are required", http.StatusBadRequest)
+		return
+	}
+
+	email = utils.NormalizeEmail(email)
+	codeHash := crypto.HashToken(code)
+
+	magicCode, err := models.FindValidAccountMagicCode(email, codeHash)
+	if err != nil {
+		log.Warnf("Invalid magic code attempt for %s", email)
+		http.Error(w, "Invalid or expired code", http.StatusUnauthorized)
+		return
+	}
+
+	err = magicCode.MarkUsed()
+	if err != nil {
+		log.Errorf("Failed to mark magic code as used for %s: %v", email, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	account, err := models.FindAccountByEmail(email)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Errorf("Error finding account for %s: %v", email, err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if a.blockSignup && inviteToken == "" {
+			http.Error(w, SignupDisabledError, http.StatusForbidden)
+			return
+		}
+
+		if inviteToken != "" {
+			inviteLink, findErr := models.FindInviteLinkByToken(inviteToken)
+			if findErr != nil || !inviteLink.Enabled {
+				http.Error(w, "invite link not found or disabled", http.StatusForbidden)
+				return
+			}
+		}
+
+		if name == "" {
+			name = strings.Split(email, "@")[0]
+		}
+
+		account, err = models.CreateAccount(name, email)
+		if err != nil {
+			log.Errorf("Failed to create account for %s: %v", email, err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	err = a.acceptPendingInvitations(account)
+	if err != nil {
+		log.Errorf("Error accepting pending invitations for %s: %v", account.Email, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	token, err := a.jwtSigner.Generate(account.ID.String(), 24*time.Hour)
+	if err != nil {
+		log.Errorf("Failed to generate token for magic code login: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "account_token",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(24 * time.Hour.Seconds()),
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	redirectURL := getRedirectURL(r)
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+}
+
+func generateMagicCode() (string, error) {
+	max := new(big.Int).Exp(big.NewInt(10), big.NewInt(magicCodeLength), nil)
+	n, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%0*d", magicCodeLength, n), nil
 }
 
 func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Account, error) {

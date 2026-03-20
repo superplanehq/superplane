@@ -51,6 +51,7 @@ import (
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
@@ -110,7 +111,8 @@ func NewServer(
 
 	// Initialize OAuth providers from environment variables
 	passwordLoginEnabled := os.Getenv("ENABLE_PASSWORD_LOGIN") == "yes"
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup, passwordLoginEnabled)
+	emailService := buildEmailService(encryptor, templateDir)
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup, passwordLoginEnabled, emailService)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
@@ -1131,6 +1133,26 @@ func getAvatarURL(providers []models.AccountProvider) string {
 	}
 
 	return providers[0].AvatarURL
+}
+
+func buildEmailService(encryptor crypto.Encryptor, templateDir string) services.EmailService {
+	if templateDir == "" {
+		return nil
+	}
+
+	if os.Getenv("OWNER_SETUP_ENABLED") == "yes" {
+		settingsProvider := &services.DatabaseEmailSettingsProvider{Encryptor: encryptor}
+		return services.NewSMTPEmailService(settingsProvider, templateDir)
+	}
+
+	resendAPIKey := os.Getenv("RESEND_API_KEY")
+	fromName := os.Getenv("EMAIL_FROM_NAME")
+	fromEmail := os.Getenv("EMAIL_FROM_ADDRESS")
+	if resendAPIKey == "" || fromName == "" || fromEmail == "" {
+		return nil
+	}
+
+	return services.NewResendEmailService(resendAPIKey, fromName, fromEmail, templateDir)
 }
 
 func getBaseURL() string {
