@@ -37,6 +37,13 @@ func Test__GetDocument__Configuration(t *testing.T) {
 
 func Test__GetDocument__Setup(t *testing.T) {
 	c := &GetDocument{}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"url":      "https://elastic.example.com",
+			"authType": "apiKey",
+			"apiKey":   "test-api-key",
+		},
+	}
 
 	t.Run("missing index -> error", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
@@ -55,14 +62,63 @@ func Test__GetDocument__Setup(t *testing.T) {
 	})
 
 	t.Run("valid config -> success", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[{"index":"my-index"}]`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"_id": "abc123",
+						"_index": "my-index",
+						"_version": 1,
+						"found": true,
+						"_source": {"k":"v"}
+					}`)),
+				},
+			},
+		}
+		meta := &contexts.MetadataContext{}
+
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"index":    "my-index",
 				"document": "abc123",
 			},
-			Metadata: &contexts.MetadataContext{},
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Metadata:    meta,
 		})
 		require.NoError(t, err)
+		assert.Equal(t, GetDocumentSetupMetadata{Index: "my-index", Document: "abc123"}, meta.Metadata)
+	})
+
+	t.Run("document does not exist -> error", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[{"index":"my-index"}]`)),
+				},
+				{
+					StatusCode: http.StatusNotFound,
+					Body:       io.NopCloser(strings.NewReader(`{"error":{"type":"document_missing_exception"}}`)),
+				},
+			},
+		}
+
+		err := c.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"index":    "my-index",
+				"document": "missing-doc",
+			},
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Metadata:    &contexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, `failed to verify document "missing-doc" in index "my-index"`)
 	})
 
 }

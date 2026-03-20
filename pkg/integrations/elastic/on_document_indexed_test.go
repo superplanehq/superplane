@@ -32,9 +32,18 @@ func Test__OnDocumentIndexed__Setup(t *testing.T) {
 	t.Run("valid config -> schedules checkConnectorAvailability", func(t *testing.T) {
 		meta := &contexts.MetadataContext{}
 		requests := &contexts.RequestContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[{"index":"my-index"}]`)),
+				},
+			},
+		}
 		err := (&OnDocumentIndexed{}).Setup(core.TriggerContext{
 			Configuration: map[string]any{"index": "my-index"},
 			Integration:   integrationCtx,
+			HTTP:          httpCtx,
 			Metadata:      meta,
 			Requests:      requests,
 		})
@@ -42,6 +51,7 @@ func Test__OnDocumentIndexed__Setup(t *testing.T) {
 		assert.Equal(t, checkConnectorAction, requests.Action)
 		saved, ok := meta.Metadata.(OnDocumentIndexedMetadata)
 		require.True(t, ok)
+		assert.Equal(t, "my-index", saved.Index)
 		assert.NotEmpty(t, saved.RouteKey)
 		assert.NotEmpty(t, saved.LastTimestamp)
 	})
@@ -53,14 +63,44 @@ func Test__OnDocumentIndexed__Setup(t *testing.T) {
 			RuleID:        "existing-rule-id",
 		}}
 		requests := &contexts.RequestContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[{"index":"my-index"}]`)),
+				},
+			},
+		}
 		err := (&OnDocumentIndexed{}).Setup(core.TriggerContext{
 			Configuration: map[string]any{"index": "my-index"},
 			Integration:   integrationCtx,
+			HTTP:          httpCtx,
 			Metadata:      meta,
 			Requests:      requests,
 		})
 		require.NoError(t, err)
 		assert.Empty(t, requests.Action)
+	})
+
+	t.Run("index does not exist -> error", func(t *testing.T) {
+		meta := &contexts.MetadataContext{}
+		requests := &contexts.RequestContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[{"index":"other-index"}]`)),
+				},
+			},
+		}
+		err := (&OnDocumentIndexed{}).Setup(core.TriggerContext{
+			Configuration: map[string]any{"index": "my-index"},
+			Integration:   integrationCtx,
+			HTTP:          httpCtx,
+			Metadata:      meta,
+			Requests:      requests,
+		})
+		require.ErrorContains(t, err, `index "my-index" was not found`)
 	})
 }
 
