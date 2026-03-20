@@ -25,6 +25,17 @@ dataset = Dataset(
                 )
             ],
         ),
+
+        Case(
+            name="github_and_slack",
+            inputs="Listen to pull-request comments and send a slack message when a comment is made",
+            evaluators=[
+                WorkflowShape(
+                  nodes=["GitHub On PR Comment", "Slack Send Text Message"],
+                  edges=[("GitHub On PR Comment", "Slack Send Text Message")],
+                )
+            ],
+        ),
     ],
 )
 
