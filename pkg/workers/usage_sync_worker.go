@@ -46,7 +46,7 @@ func NewUsageSyncWorker(rabbitMQURL string, usageService usage.Service) *UsageSy
 }
 
 func (w *UsageSyncWorker) Start(ctx context.Context) {
-	if !w.UsageService.Enabled() {
+	if w.UsageService == nil || !w.UsageService.Enabled() {
 		log.Info("Usage sync worker not started because usage is disabled")
 		return
 	}

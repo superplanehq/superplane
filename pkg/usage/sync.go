@@ -27,7 +27,7 @@ func MarkOrganizationSyncedIfUnset(orgID string) error {
 }
 
 func syncOrganization(ctx context.Context, usageService Service, orgID string, force bool) error {
-	if !usageService.Enabled() {
+	if usageService == nil || !usageService.Enabled() {
 		return ErrUsageDisabled
 	}
 

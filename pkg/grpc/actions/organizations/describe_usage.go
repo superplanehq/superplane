@@ -16,7 +16,7 @@ import (
 )
 
 func DescribeUsage(ctx context.Context, usageService usage.Service, orgID string) (*pb.DescribeUsageResponse, error) {
-	if !usageService.Enabled() {
+	if usageService == nil || !usageService.Enabled() {
 		return &pb.DescribeUsageResponse{
 			Enabled:       false,
 			StatusMessage: "Usage tracking is disabled for this SuperPlane instance.",
@@ -133,12 +133,17 @@ func serializeUsage(orgUsage *usagepb.OrganizationUsage) *pb.OrganizationUsage {
 		return nil
 	}
 
-	return &pb.OrganizationUsage{
-		Canvases:            orgUsage.Canvases,
-		EventBucketLevel:    orgUsage.EventBucketLevel,
-		EventBucketCapacity: orgUsage.EventBucketCapacity,
-		EventBucketLastUpdatedAt: timestamppb.New(
+	var eventBucketLastUpdatedAt *timestamppb.Timestamp
+	if orgUsage.EventBucketLastUpdatedAtUnixSeconds > 0 {
+		eventBucketLastUpdatedAt = timestamppb.New(
 			time.Unix(orgUsage.EventBucketLastUpdatedAtUnixSeconds, 0).UTC(),
-		),
+		)
+	}
+
+	return &pb.OrganizationUsage{
+		Canvases:                 orgUsage.Canvases,
+		EventBucketLevel:         orgUsage.EventBucketLevel,
+		EventBucketCapacity:      orgUsage.EventBucketCapacity,
+		EventBucketLastUpdatedAt: eventBucketLastUpdatedAt,
 	}
 }
