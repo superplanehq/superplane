@@ -17,46 +17,71 @@ const usageLimitCopyByMessage: Record<string, UsageLimitCopy> = {
   "account organization limit exceeded": {
     title: "Organization limit reached",
     description:
-      "This account has reached its organization limit. Remove an unused organization or change the plan before creating another one.",
-    toastMessage: "Organization limit reached for this account.",
+      "This account already has the maximum number of organizations allowed by the current plan. Remove an unused organization or change the plan before creating another one.",
+    toastMessage: "This account already has the maximum number of organizations allowed by the current plan.",
   },
   "organization canvas limit exceeded": {
     title: "Canvas limit reached",
     description:
-      "This organization has reached its canvas limit. Remove an unused canvas or change the plan before creating another one.",
-    toastMessage: "Canvas limit reached for this organization.",
+      "This organization already has the maximum number of canvases allowed by the current plan. Remove an unused canvas or change the plan before creating another one.",
+    toastMessage: "This organization already has the maximum number of canvases allowed by the current plan.",
     needsUsagePage: true,
     actionLabel: "View usage",
   },
   "canvas node limit exceeded": {
     title: "Canvas is too large for this plan",
     description:
-      "This canvas exceeds the node limit for the current plan. Reduce the number of nodes or change the plan before saving.",
-    toastMessage: "Canvas node limit reached for this organization.",
+      "This canvas has more nodes than the current plan allows. Reduce the number of nodes or change the plan before saving.",
+    toastMessage: "This canvas has more nodes than the current plan allows.",
     needsUsagePage: true,
     actionLabel: "View usage",
   },
   "organization user limit exceeded": {
     title: "Member limit reached",
     description:
-      "This organization has reached its member limit. Remove an inactive member or change the plan before adding another person.",
-    toastMessage: "Member limit reached for this organization.",
+      "This organization already has the maximum number of members allowed by the current plan. Remove an inactive member or change the plan before adding another person.",
+    toastMessage: "This organization already has the maximum number of members allowed by the current plan.",
     needsUsagePage: true,
     actionLabel: "View usage",
   },
   "organization integration limit exceeded": {
     title: "Integration limit reached",
     description:
-      "This organization has reached its integration limit. Remove an unused integration or change the plan before connecting another one.",
-    toastMessage: "Integration limit reached for this organization.",
+      "This organization already has the maximum number of integrations allowed by the current plan. Remove an unused integration or change the plan before connecting another one.",
+    toastMessage: "This organization already has the maximum number of integrations allowed by the current plan.",
+    needsUsagePage: true,
+    actionLabel: "View usage",
+  },
+  "organization usage limit exceeded": {
+    title: "Usage limit reached",
+    description:
+      "This organization has reached a configured usage limit for the current plan. Review usage or change the plan before trying again.",
+    toastMessage: "This organization has reached a configured usage limit for the current plan.",
     needsUsagePage: true,
     actionLabel: "View usage",
   },
   "organization exceeds configured account usage limits": {
     title: "Account usage limit reached",
     description:
-      "This organization cannot be synced because the linked account is already over its configured limits in the usage service.",
-    toastMessage: "Account usage limits are blocking this organization.",
+      "This organization is blocked because its linked account is already over the configured limits in the usage service. Reduce usage on the linked account or update the account limits before trying again.",
+    toastMessage:
+      "This organization is blocked because its linked account is already over the configured usage limits.",
+    needsUsagePage: true,
+    actionLabel: "View usage",
+  },
+  "organization has no billing account candidate": {
+    title: "Usage account is not configured",
+    description:
+      "SuperPlane could not determine which billing account should own usage for this organization, so it cannot verify limits yet.",
+    toastMessage: "SuperPlane could not determine which billing account should own usage for this organization.",
+    needsUsagePage: true,
+    actionLabel: "View usage",
+  },
+  "failed to set up organization usage": {
+    title: "Usage setup failed",
+    description:
+      "SuperPlane could not set up usage tracking for this organization, so it could not verify limits. Try again in a moment.",
+    toastMessage: "SuperPlane could not set up usage tracking for this organization.",
     needsUsagePage: true,
     actionLabel: "View usage",
   },

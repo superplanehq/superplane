@@ -5,6 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { getUsageLimitNotice } from "@/utils/usageLimits";
+import { getResponseErrorMessage } from "@/utils/errors";
 
 const OrganizationCreate: React.FC = () => {
   const [name, setName] = useState("");
@@ -33,17 +34,10 @@ const OrganizationCreate: React.FC = () => {
         // Redirect to the new organization
         window.location.href = `/${org.id}`;
       } else {
-        try {
-          const errorData = await response.json();
-          setError(errorData.message || "Failed to create organization");
-        } catch {
-          // If we can't parse the error response, show a generic message based on status
-          if (response.status === 409) {
-            setError("An organization with this name already exists");
-          } else {
-            setError(`Failed to create organization (${response.status})`);
-          }
-        }
+        const fallbackMessage =
+          response.status === 409 ? "An organization with this name already exists" : "Failed to create organization";
+        const errorMessage = await getResponseErrorMessage(response, fallbackMessage);
+        setError(errorMessage);
       }
     } catch (err) {
       setError("Network error occurred");
