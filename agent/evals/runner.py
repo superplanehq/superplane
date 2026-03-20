@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import os
-from dataclasses import dataclass
-from typing import Any
 
 from pydantic_evals import Case, Dataset
 
 from ai.agent import AgentDeps, build_agent, build_prompt
 from ai.models import CanvasAnswer, CanvasQuestionRequest
-from evals.utils.stub_superplane_client import StubSuperplaneClient
+from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 
 from evals.evaluators import WorkflowShape
 
@@ -39,9 +37,29 @@ dataset = Dataset(
     ],
 )
 
-async def runner(model: str) -> None:
-    deps = AgentDeps(client=StubSuperplaneClient(), canvas_id="eval-stub-canvas")
-    agent = build_agent(model)
+def load_env() -> dict[str, str]:
+    return {
+        "model": os.getenv("AI_MODEL", "").strip(),
+        "base_url": "http://app:8000",
+        "api_token": os.getenv("SUPERPLANE_API_TOKEN", "").strip(),
+        "organization_id": os.getenv("EVAL_ORG_ID", "").strip(),
+        "canvas_id": os.getenv("EVAL_CANVAS_ID", "").strip(),
+    }
+
+async def runner() -> None:
+    env = load_env()
+
+    deps = AgentDeps(
+        client=SuperplaneClient(
+            SuperplaneClientConfig(
+                base_url=env["base_url"],
+                api_token=env["api_token"],
+                organization_id=env["organization_id"],
+            )
+        ),
+        canvas_id=env["canvas_id"],
+    )
+    agent = build_agent(env["model"])
 
     async def task(question: str) -> CanvasAnswer:
         payload = CanvasQuestionRequest(question=question, canvas_id=deps.canvas_id)
@@ -52,9 +70,7 @@ async def runner(model: str) -> None:
     report.print(include_output=True, include_input=True)
 
 def main() -> None:
-    model = os.getenv("AI_MODEL", "test")
-    asyncio.run(runner(model))
-
+    asyncio.run(runner())
 
 if __name__ == "__main__":
     main()
