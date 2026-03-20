@@ -1,4 +1,4 @@
-.PHONY: lint test agent.eval.manual_run_two_noop test.license.check
+.PHONY: lint test test.license.check
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -69,9 +69,8 @@ test.license.check:
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
-# Agent (Python): eval with real LLM + stub Superplane (no HTTP). Model/canvas via env.
-agent.eval.manual_run_two_noop:
-	$(COMPOSE) exec agent uv run python -m evals.manual_run_two_noop_live
+test.agent.evals:
+	$(COMPOSE) exec agent uv run python -m evals.runner
 
 test.shell:
 	$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
