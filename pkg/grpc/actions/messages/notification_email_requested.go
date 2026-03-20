@@ -37,5 +37,5 @@ func NewNotificationEmailRequestedMessage(
 }
 
 func (m NotificationEmailRequestedMessage) Publish() error {
-	return Publish(WorkflowExchange, NotificationEmailRequestedRoutingKey, toBytes(m.message))
+	return Publish(CanvasExchange, NotificationEmailRequestedRoutingKey, toBytes(m.message))
 }

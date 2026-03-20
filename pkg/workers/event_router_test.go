@@ -21,7 +21,7 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
-	queueConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemCreatedRoutingKey)
+	queueConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemCreatedRoutingKey)
 	queueConsumer.Start()
 	defer queueConsumer.Stop()
 
@@ -74,7 +74,7 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
-	queueConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemCreatedRoutingKey)
+	queueConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemCreatedRoutingKey)
 	queueConsumer.Start()
 	defer queueConsumer.Stop()
 
@@ -134,7 +134,7 @@ func Test__EventRouter_CustomComponent_RespectsOutputChannels(t *testing.T) {
 	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
-	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -238,7 +238,7 @@ func TestEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
-	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 

@@ -1,0 +1,7 @@
+{
+  "data": {
+    "alertPolicyUuid": "669adfc8-d72b-4d2d-80ed-bea78d6e1562"
+  },
+  "timestamp": "2026-03-17T10:00:00Z",
+  "type": "digitalocean.alertpolicy.deleted"
+}

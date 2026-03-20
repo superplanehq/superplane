@@ -22,7 +22,7 @@ type TestConsumer struct {
 func New(amqpURL string, routingKey string) TestConsumer {
 	return TestConsumer{
 		amqpURL:        amqpURL,
-		exchangeName:   messages.WorkflowExchange,
+		exchangeName:   messages.CanvasExchange,
 		routingKey:     routingKey,
 		messageChannel: make(chan bool),
 		consumer:       tackle.NewConsumer(),

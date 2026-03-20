@@ -6,9 +6,10 @@ import (
 )
 
 const (
-	WorkflowCanvasUpdatedRoutingKey        = "workflow-canvas-updated"
-	WorkflowCanvasVersionUpdatedRoutingKey = "workflow-canvas-version-updated"
-	WorkflowCanvasDeletedRoutingKey        = "workflow-canvas-deleted"
+	CanvasCreatedRoutingKey        = "canvas-created"
+	CanvasUpdatedRoutingKey        = "canvas-updated"
+	CanvasVersionUpdatedRoutingKey = "canvas-version-updated"
+	CanvasDeletedRoutingKey        = "canvas-deleted"
 )
 
 type CanvasMessage struct {
@@ -19,22 +20,35 @@ type CanvasVersionMessage struct {
 	message *pb.CanvasVersionMessage
 }
 
-func NewCanvasUpdatedMessage(canvasID string) CanvasMessage {
+func NewCanvasCreatedMessage(canvasID string, organizationID string) CanvasMessage {
 	return CanvasMessage{
 		message: &pb.CanvasMessage{
-			Id:        canvasID,
-			CanvasId:  canvasID,
-			Timestamp: timestamppb.Now(),
+			Id:             canvasID,
+			CanvasId:       canvasID,
+			Timestamp:      timestamppb.Now(),
+			OrganizationId: organizationID,
 		},
 	}
 }
 
-func NewCanvasDeletedMessage(canvasID string) CanvasMessage {
+func NewCanvasUpdatedMessage(canvasID string, organizationID string) CanvasMessage {
 	return CanvasMessage{
 		message: &pb.CanvasMessage{
-			Id:        canvasID,
-			CanvasId:  canvasID,
-			Timestamp: timestamppb.Now(),
+			Id:             canvasID,
+			CanvasId:       canvasID,
+			Timestamp:      timestamppb.Now(),
+			OrganizationId: organizationID,
+		},
+	}
+}
+
+func NewCanvasDeletedMessage(canvasID string, organizationID string) CanvasMessage {
+	return CanvasMessage{
+		message: &pb.CanvasMessage{
+			Id:             canvasID,
+			CanvasId:       canvasID,
+			Timestamp:      timestamppb.Now(),
+			OrganizationId: organizationID,
 		},
 	}
 }
@@ -49,14 +63,18 @@ func NewCanvasVersionUpdatedMessage(canvasID string, versionID string) CanvasVer
 	}
 }
 
-func (m CanvasMessage) Publish(updated bool) error {
-	if updated {
-		return Publish(WorkflowExchange, WorkflowCanvasUpdatedRoutingKey, toBytes(m.message))
-	}
+func (m CanvasMessage) PublishCreated() error {
+	return Publish(CanvasExchange, CanvasCreatedRoutingKey, toBytes(m.message))
+}
 
-	return Publish(WorkflowExchange, WorkflowCanvasDeletedRoutingKey, toBytes(m.message))
+func (m CanvasMessage) PublishUpdated() error {
+	return Publish(CanvasExchange, CanvasUpdatedRoutingKey, toBytes(m.message))
+}
+
+func (m CanvasMessage) PublishDeleted() error {
+	return Publish(CanvasExchange, CanvasDeletedRoutingKey, toBytes(m.message))
 }
 
 func (m CanvasVersionMessage) PublishVersionUpdated() error {
-	return Publish(WorkflowExchange, WorkflowCanvasVersionUpdatedRoutingKey, toBytes(m.message))
+	return Publish(CanvasExchange, CanvasVersionUpdatedRoutingKey, toBytes(m.message))
 }

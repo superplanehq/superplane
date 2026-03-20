@@ -328,6 +328,7 @@ type NotificationReceivers struct {
 
 type NotificationContext interface {
 	Send(title, body, url, urlLabel string, receivers NotificationReceivers) error
+	IsAvailable() bool
 }
 
 type SecretsContext interface {

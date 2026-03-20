@@ -22,10 +22,12 @@ type ElasticWebhookHandler struct{}
 
 type webhookConfig struct {
 	KibanaURL string `json:"kibanaUrl" mapstructure:"kibanaUrl"`
+	RuleID    string `json:"ruleId" mapstructure:"ruleId"`
 }
 
 type webhookMetadata struct {
 	ConnectorID string `json:"connectorId" mapstructure:"connectorId"`
+	RuleID      string `json:"ruleId" mapstructure:"ruleId"`
 }
 
 func (h *ElasticWebhookHandler) CompareConfig(a, b any) (bool, error) {
@@ -36,9 +38,7 @@ func (h *ElasticWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	if err := mapstructure.Decode(b, &cb); err != nil {
 		return false, fmt.Errorf("decode webhook config b: %w", err)
 	}
-	// Triggers sharing one connector only if they point at the same Kibana.
-	// A URL change returns false, triggering connector replacement.
-	return ca.KibanaURL == cb.KibanaURL, nil
+	return ca.KibanaURL == cb.KibanaURL && ca.RuleID == cb.RuleID, nil
 }
 
 func (h *ElasticWebhookHandler) Merge(current, requested any) (any, bool, error) {
@@ -50,42 +50,75 @@ func (h *ElasticWebhookHandler) Merge(current, requested any) (any, bool, error)
 		return nil, false, fmt.Errorf("decode requested webhook config: %w", err)
 	}
 
-	if cur.KibanaURL == req.KibanaURL {
+	if cur.KibanaURL == req.KibanaURL && cur.RuleID == req.RuleID {
 		return current, false, nil
 	}
 
-	// KibanaURL changed: update the stored config and re-queue for provisioning
-	// so Setup() recreates the connector on the new Kibana instance.
+	// The selected rule or Kibana instance changed. Re-queue provisioning so
+	// Setup() recreates and re-attaches the connector for the new target.
 	return req, true, nil
 }
 
 func (h *ElasticWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
+	var config webhookConfig
+	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config); err != nil {
+		return nil, fmt.Errorf("error decoding webhook config: %v", err)
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %v", err)
 	}
 
-	// Generate a random signing secret and store it on the webhook so
-	// HandleWebhook can retrieve it for validation.
-	secret, err := crypto.Base64String(32)
+	connector, err := client.FindKibanaWebhookConnector(ctx.Webhook.GetURL())
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate signing secret: %w", err)
+		return nil, fmt.Errorf("failed to find existing Kibana connector: %w", err)
 	}
 
-	if err := ctx.Webhook.SetSecret([]byte(secret)); err != nil {
-		return nil, fmt.Errorf("failed to store webhook secret: %w", err)
+	if connector == nil {
+		// Generate a random signing secret and store it on the webhook so
+		// HandleWebhook can retrieve it for validation.
+		secret, err := crypto.Base64String(32)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate signing secret: %w", err)
+		}
+
+		if err := ctx.Webhook.SetSecret([]byte(secret)); err != nil {
+			return nil, fmt.Errorf("failed to store webhook secret: %w", err)
+		}
+
+		connector, err = client.CreateKibanaConnector(
+			"SuperPlane Alert",
+			ctx.Webhook.GetURL(),
+			secret,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Kibana connector: %w", err)
+		}
+	} else if connector.Config.Headers != nil && connector.Config.Headers[SigningHeaderName] != "" {
+		if err := ctx.Webhook.SetSecret([]byte(connector.Config.Headers[SigningHeaderName])); err != nil {
+			return nil, fmt.Errorf("failed to sync webhook secret from connector: %w", err)
+		}
 	}
 
-	connector, err := client.CreateKibanaConnector(
-		KibanaConnectorName,
-		ctx.Webhook.GetURL(),
-		secret,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Kibana connector: %w", err)
+	var previousMeta webhookMetadata
+	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &previousMeta); err != nil {
+		return nil, fmt.Errorf("error decoding webhook metadata: %v", err)
 	}
 
-	return webhookMetadata{ConnectorID: connector.ID}, nil
+	if config.RuleID != "" {
+		if err := client.EnsureKibanaRuleHasConnector(config.RuleID, connector.ID); err != nil {
+			return nil, fmt.Errorf("failed to attach connector %s to rule %s: %w", connector.ID, config.RuleID, err)
+		}
+	}
+
+	if previousMeta.RuleID != "" && previousMeta.RuleID != config.RuleID {
+		if err := client.RemoveKibanaRuleConnector(previousMeta.RuleID, connector.ID); err != nil {
+			return nil, fmt.Errorf("failed to detach connector %s from previous rule %s: %w", connector.ID, previousMeta.RuleID, err)
+		}
+	}
+
+	return webhookMetadata{ConnectorID: connector.ID, RuleID: config.RuleID}, nil
 }
 
 func (h *ElasticWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
@@ -100,6 +133,12 @@ func (h *ElasticWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
+	}
+
+	if meta.RuleID != "" {
+		if err := client.RemoveKibanaRuleConnector(meta.RuleID, meta.ConnectorID); err != nil {
+			return fmt.Errorf("failed to detach Kibana connector %s from rule %s: %w", meta.ConnectorID, meta.RuleID, err)
+		}
 	}
 
 	if err := client.DeleteKibanaConnector(meta.ConnectorID); err != nil {

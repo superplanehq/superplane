@@ -17,6 +17,7 @@ import (
 	integrations "github.com/superplanehq/superplane/pkg/cli/commands/integrations"
 	queue "github.com/superplanehq/superplane/pkg/cli/commands/queue"
 	secrets "github.com/superplanehq/superplane/pkg/cli/commands/secrets"
+	usage "github.com/superplanehq/superplane/pkg/cli/commands/usage"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -58,6 +59,7 @@ func init() {
 	RootCmd.AddCommand(integrations.NewCommand(options))
 	RootCmd.AddCommand(queue.NewCommand(options))
 	RootCmd.AddCommand(secrets.NewCommand(options))
+	RootCmd.AddCommand(usage.NewCommand(options))
 }
 
 func initConfig() {

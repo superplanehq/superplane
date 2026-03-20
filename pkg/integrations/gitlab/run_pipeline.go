@@ -135,11 +135,10 @@ func (r *RunPipeline) Configuration() []configuration.Field {
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
 							{
-								Name:               "name",
-								Label:              "Name",
-								Type:               configuration.FieldTypeString,
-								Required:           true,
-								DisallowExpression: true,
+								Name:     "name",
+								Label:    "Name",
+								Type:     configuration.FieldTypeString,
+								Required: true,
 							},
 							{
 								Name:     "value",

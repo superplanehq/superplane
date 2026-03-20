@@ -13,7 +13,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -21,6 +23,20 @@ import (
 )
 
 func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string, orgID string, integrationName, name string, appConfig *structpb.Struct) (*pb.CreateIntegrationResponse, error) {
+	return CreateIntegrationWithUsage(ctx, nil, registry, oidcProvider, baseURL, webhooksBaseURL, orgID, integrationName, name, appConfig)
+}
+
+func CreateIntegrationWithUsage(
+	ctx context.Context,
+	usageService usage.Service,
+	registry *registry.Registry,
+	oidcProvider oidc.Provider,
+	baseURL string,
+	webhooksBaseURL string,
+	orgID string,
+	integrationName, name string,
+	appConfig *structpb.Struct,
+) (*pb.CreateIntegrationResponse, error) {
 	integration, err := registry.GetIntegration(integrationName)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationName)
@@ -37,6 +53,17 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 	_, err = models.FindIntegrationByName(org, name)
 	if err == nil {
 		return nil, status.Errorf(codes.AlreadyExists, "an integration with the name %s already exists in this organization", name)
+	}
+
+	integrationCount, err := models.CountIntegrationsByOrganization(orgID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to count integrations: %v", err)
+	}
+
+	if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, orgID, &usagepb.OrganizationState{
+		Integrations: int32(integrationCount + 1),
+	}, nil); err != nil {
+		return nil, err
 	}
 
 	//

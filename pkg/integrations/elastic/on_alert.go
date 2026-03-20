@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -15,12 +16,28 @@ import (
 type OnAlertFires struct{}
 
 type OnAlertFiresConfiguration struct {
-	Rules      []string                  `json:"rules" mapstructure:"rules"`
+	Rule       string                    `json:"rule" mapstructure:"rule"`
 	Spaces     []string                  `json:"spaces" mapstructure:"spaces"`
 	Tags       []configuration.Predicate `json:"tags" mapstructure:"tags"`
-	Severities []configuration.Predicate `json:"severities" mapstructure:"severities"`
-	Statuses   []configuration.Predicate `json:"statuses" mapstructure:"statuses"`
+	Severities []string                  `json:"severities" mapstructure:"severities"`
+	Statuses   []string                  `json:"statuses" mapstructure:"statuses"`
 }
+
+type OnAlertFiresMetadata struct {
+	RuleID   string   `json:"ruleId" mapstructure:"ruleId"`
+	RuleName string   `json:"ruleName" mapstructure:"ruleName"`
+	Spaces   []string `json:"spaces" mapstructure:"spaces"`
+}
+
+const kibanaAlertWebhookActionBody = `{
+  "eventType": "alert_fired",
+  "ruleId": "{{rule.id}}",
+  "ruleName": "{{rule.name}}",
+  "spaceId": "{{rule.spaceId}}",
+  "tags": {{rule.tags}},
+  "severity": "{{context.severity}}",
+  "status": "{{rule.status}}"
+}`
 
 func (t *OnAlertFires) Name() string  { return "elastic.onAlertFires" }
 func (t *OnAlertFires) Label() string { return "When Alert Fires" }
@@ -33,33 +50,30 @@ func (t *OnAlertFires) Color() string { return "gray" }
 func (t *OnAlertFires) Documentation() string {
 	return `The When Alert Fires trigger starts a workflow execution when a Kibana alert rule fires via a webhook connector.
 
+## Shared Connector
+
+SuperPlane creates **one Kibana Webhook connector per integration**, shared across all triggers that use the same Kibana instance. Each incoming request is routed to the correct trigger using the ` + "`eventType`" + ` field in the request body — this trigger only processes requests where ` + "`eventType`" + ` is ` + "`\"alert_fired\"`" + `. Requests intended for other trigger types (e.g. ` + "`\"document_indexed\"`" + `) are silently ignored.
+
 ## Setup
 
-1. Save this trigger — SuperPlane automatically creates a signed Kibana Webhook connector.
-2. In Kibana, attach the connector to one or more alert rules and configure the action body as shown below.
+1. Select the Kibana alert rule in SuperPlane and save the trigger.
+2. SuperPlane automatically creates or reuses the shared Kibana Webhook connector and attaches it to the selected rule if it is missing.
 
-### Recommended Kibana action body
+### Kibana action body
 
-For filters to work reliably, configure the rule action body in Kibana to include these fields:
+SuperPlane configures the rule action body with these fields:
 
 ` + "```" + `json
-{
-  "ruleId":   "{{rule.id}}",
-  "ruleName": "{{rule.name}}",
-  "spaceId":  "{{rule.spaceId}}",
-  "tags":     {{rule.tags}},
-  "severity": "{{context.severity}}",
-  "status":   "{{rule.status}}"
-}
+` + kibanaAlertWebhookActionBody + `
 ` + "```" + `
 
-Kibana substitutes ` + "`{{rule.id}}`" + ` and ` + "`{{rule.name}}`" + ` at delivery time. Fields omitted from the body will not be filterable in SuperPlane.
+The ` + "`eventType`" + ` field is required for routing. Kibana substitutes ` + "`{{rule.id}}`" + ` and ` + "`{{rule.name}}`" + ` at delivery time. Fields omitted from the body will not be filterable in SuperPlane.
 
 ## Filtering
 
-All filter fields are optional. Leave them empty to fire for every incoming alert. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
+Select at least one **Rule**. Additional filter fields are optional. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
 
-**Rule ID** is the most reliable filter because rule names are user-editable. Use it as the primary key when you need precise per-rule routing.
+**Rule ID** is the most reliable selector because rule names are user-editable. Use it when you need precise per-rule routing.
 
 ## Webhook Verification
 
@@ -73,16 +87,14 @@ Each received alert emits the parsed JSON body sent by Kibana directly as the ev
 func (t *OnAlertFires) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "rules",
-			Label:       "Rules",
+			Name:        "rule",
+			Label:       "Rule",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
-			Description: "Only fire for alerts from these Kibana alert rules. Leave empty to accept alerts from all rules.",
+			Required:    true,
+			Description: "Select the Kibana alert rule to listen to. SuperPlane ensures its connector is attached to the selected rule.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type:           ResourceTypeKibanaRule,
-					UseNameAsValue: true,
-					Multi:          true,
+					Type: ResourceTypeKibanaRule,
 				},
 			},
 		},
@@ -114,24 +126,26 @@ func (t *OnAlertFires) Configuration() []configuration.Field {
 		{
 			Name:        "severities",
 			Label:       "Severities",
-			Type:        configuration.FieldTypeAnyPredicateList,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Only fire for alerts whose severity matches any of these predicates. Leave empty to accept all severities.",
+			Description: "Only fire for alerts with these severity levels. Leave empty to accept all severities.",
 			TypeOptions: &configuration.TypeOptions{
-				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
-					Operators: configuration.AllPredicateOperators,
+				Resource: &configuration.ResourceTypeOptions{
+					Type:  ResourceTypeKibanaAlertSeverity,
+					Multi: true,
 				},
 			},
 		},
 		{
 			Name:        "statuses",
 			Label:       "Statuses",
-			Type:        configuration.FieldTypeAnyPredicateList,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Only fire for alerts whose status matches any of these predicates. Leave empty to accept all statuses.",
+			Description: "Only fire for alerts with these statuses. Leave empty to accept all statuses.",
 			TypeOptions: &configuration.TypeOptions{
-				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
-					Operators: configuration.AllPredicateOperators,
+				Resource: &configuration.ResourceTypeOptions{
+					Type:  ResourceTypeKibanaAlertStatus,
+					Multi: true,
 				},
 			},
 		},
@@ -139,12 +153,77 @@ func (t *OnAlertFires) Configuration() []configuration.Field {
 }
 
 func (t *OnAlertFires) Setup(ctx core.TriggerContext) error {
+	var config OnAlertFiresConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+	config.Rule = strings.TrimSpace(config.Rule)
+	config.Spaces = normalizeStringList(config.Spaces)
+	config.Severities = normalizeStringList(config.Severities)
+	config.Statuses = normalizeStringList(config.Statuses)
+
+	if config.Rule == "" {
+		return fmt.Errorf("rule is required")
+	}
 	kibanaURL, err := ctx.Integration.GetConfig("kibanaUrl")
 	if err != nil {
 		return fmt.Errorf("failed to get Kibana URL: %w", err)
 	}
+	resolvedSpaces := make([]string, 0, len(config.Spaces))
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create Elastic client: %w", err)
+	}
 
-	return ctx.Integration.RequestWebhook(map[string]any{"kibanaUrl": string(kibanaURL)})
+	rule, err := client.GetKibanaRule(config.Rule)
+	if err != nil {
+		return fmt.Errorf("failed to get Kibana rule %s: %w", config.Rule, err)
+	}
+
+	resolvedSpaces = append(resolvedSpaces, config.Spaces...)
+	if hasStaticSelection(config.Spaces) {
+		spaces, err := client.ListKibanaSpaces()
+		if err != nil {
+			return fmt.Errorf("failed to list Kibana spaces: %w", err)
+		}
+
+		for idx, selectedSpace := range config.Spaces {
+			if isTemplateExpression(selectedSpace) {
+				continue
+			}
+
+			spaceName, ok := findSpaceName(spaces, selectedSpace)
+			if !ok {
+				return fmt.Errorf("selected space %q was not found in Kibana", selectedSpace)
+			}
+			resolvedSpaces[idx] = spaceName
+		}
+	}
+
+	if err := validateStaticSelections(config.Severities, allowedAlertSeverities()); err != nil {
+		return fmt.Errorf("invalid severity selection: %w", err)
+	}
+	if err := validateStaticSelections(config.Statuses, allowedAlertStatuses()); err != nil {
+		return fmt.Errorf("invalid status selection: %w", err)
+	}
+
+	ruleName := strings.TrimSpace(rule.Name)
+	if ruleName == "" {
+		ruleName = config.Rule
+	}
+
+	if err := ctx.Metadata.Set(OnAlertFiresMetadata{
+		RuleID:   config.Rule,
+		RuleName: ruleName,
+		Spaces:   resolvedSpaces,
+	}); err != nil {
+		return fmt.Errorf("failed to store rule metadata: %w", err)
+	}
+
+	return ctx.Integration.RequestWebhook(map[string]any{
+		"kibanaUrl": string(kibanaURL),
+		"ruleId":    config.Rule,
+	})
 }
 
 func (t *OnAlertFires) Actions() []core.Action {
@@ -174,7 +253,7 @@ func (t *OnAlertFires) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 		return http.StatusBadRequest, nil, fmt.Errorf("invalid JSON payload: %w", err)
 	}
 
-	if eventType := extractString(payload, "eventType"); eventType != "" && eventType != "alert_fired" {
+	if eventType := extractString(payload, "eventType"); eventType != "alert_fired" {
 		return http.StatusOK, nil, nil
 	}
 
@@ -201,8 +280,9 @@ func (t *OnAlertFires) Cleanup(_ core.TriggerContext) error {
 // matchesFilters returns true if the alert payload satisfies all configured filters.
 // An empty/nil filter is treated as a pass-through (no restriction).
 func matchesFilters(payload map[string]any, config OnAlertFiresConfiguration) bool {
-	if len(config.Rules) > 0 {
-		if !matchesAnyString(config.Rules, extractString(payload, "ruleName"), extractString(payload, "ruleId")) {
+	if config.Rule != "" {
+		ruleID := extractString(payload, "ruleId")
+		if ruleID != "" && !strings.EqualFold(strings.TrimSpace(config.Rule), strings.TrimSpace(ruleID)) {
 			return false
 		}
 	}
@@ -227,13 +307,13 @@ func matchesFilters(payload map[string]any, config OnAlertFiresConfiguration) bo
 	}
 
 	if len(config.Severities) > 0 {
-		if !configuration.MatchesAnyPredicate(config.Severities, extractString(payload, "severity")) {
+		if !containsIgnoreCase(config.Severities, extractString(payload, "severity")) {
 			return false
 		}
 	}
 
 	if len(config.Statuses) > 0 {
-		if !configuration.MatchesAnyPredicate(config.Statuses, extractString(payload, "status")) {
+		if !containsIgnoreCase(config.Statuses, extractString(payload, "status")) {
 			return false
 		}
 	}
@@ -274,24 +354,74 @@ func extractStringSlice(payload map[string]any, key string) []string {
 
 // containsIgnoreCase reports whether value is in list (case-insensitive).
 func containsIgnoreCase(list []string, value string) bool {
-	for _, item := range list {
-		if strings.EqualFold(item, value) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(list, func(item string) bool {
+		return strings.EqualFold(item, value)
+	})
 }
 
 // matchesAnyString reports whether any candidate appears in list (case-insensitive).
 func matchesAnyString(list []string, candidates ...string) bool {
-	for _, candidate := range candidates {
+	return slices.ContainsFunc(candidates, func(candidate string) bool {
 		if candidate == "" {
+			return false
+		}
+		return containsIgnoreCase(list, candidate)
+	})
+}
+
+func normalizeStringList(values []string) []string {
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" {
+			normalized = append(normalized, trimmed)
+		}
+	}
+	return normalized
+}
+
+func hasStaticSelection(values []string) bool {
+	return slices.ContainsFunc(values, func(value string) bool {
+		return !isTemplateExpression(value)
+	})
+}
+
+func isTemplateExpression(value string) bool {
+	return strings.Contains(value, "{{") && strings.Contains(value, "}}")
+}
+
+func findSpaceName(spaces []KibanaSpace, selected string) (string, bool) {
+	selected = strings.TrimSpace(selected)
+	match := slices.IndexFunc(spaces, func(space KibanaSpace) bool {
+		return strings.EqualFold(strings.TrimSpace(space.ID), selected) ||
+			strings.EqualFold(strings.TrimSpace(space.Name), selected)
+	})
+	if match == -1 {
+		return "", false
+	}
+	if strings.TrimSpace(spaces[match].Name) == "" {
+		return selected, true
+	}
+	return spaces[match].Name, true
+}
+
+func validateStaticSelections(selected []string, allowed []string) error {
+	for _, value := range selected {
+		if isTemplateExpression(value) {
 			continue
 		}
-		if containsIgnoreCase(list, candidate) {
-			return true
+		if !containsIgnoreCase(allowed, value) {
+			return fmt.Errorf("%q is not supported", value)
 		}
 	}
 
-	return false
+	return nil
+}
+
+func allowedAlertSeverities() []string {
+	return []string{"low", "medium", "high", "critical"}
+}
+
+func allowedAlertStatuses() []string {
+	return []string{"active", "flapping", "recovered", "untracked"}
 }

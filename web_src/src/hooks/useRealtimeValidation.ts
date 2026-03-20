@@ -69,7 +69,7 @@ export function useRealtimeValidation(
           }
 
           if (shouldValidate) {
-            const fieldErrors = validateFieldForSubmission(field, value, currentValues);
+            const fieldErrors = validateFieldForSubmission(field, value);
             fieldErrors.forEach((message) => {
               errors.push({
                 field: fullFieldName,

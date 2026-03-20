@@ -1,0 +1,13 @@
+{
+  "type": "elastic.document.retrieved",
+  "data": {
+    "id": "aB3kLmN4oPqR",
+    "index": "workflow-audit",
+    "version": 3,
+    "source": {
+      "message": "deployment started",
+      "env": "production"
+    }
+  },
+  "timestamp": "2026-03-12T09:00:00Z"
+}

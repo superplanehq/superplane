@@ -5,7 +5,6 @@ import type {
   SuperplaneBlueprintsOutputChannel,
   SuperplaneComponentsOutputChannel,
 } from "@/api-client";
-import { canvasesSendAiMessage } from "@/api-client/sdk.gen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -14,9 +13,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { resolveIcon } from "@/lib/utils";
-import { isCustomComponentsEnabled } from "@/lib/env";
+import { getAgentUrl, isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getComponentSubtype } from "../buildingBlocks";
 import {
   ChevronRight,
@@ -30,11 +28,15 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
+import remarkGfm from "remark-gfm";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
 import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
+import { AiBuilderMessage, AiBuilderProposal, pushAiMessages, sendAgentChatPrompt } from "./agentChat";
 
 export interface BuildingBlock {
   name: string;
@@ -63,6 +65,7 @@ export interface BuildingBlocksSidebarProps {
   blocks: BuildingBlockCategory[];
   showAiBuilderTab?: boolean;
   canvasId?: string;
+  organizationId?: string;
   canvasNodes?: Array<{
     id: string;
     name?: string;
@@ -121,75 +124,13 @@ export type AiCanvasOperation =
       target: { nodeKey?: string; nodeId?: string; nodeName?: string };
     };
 
-type AiBuilderMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-};
-
-type AiBuilderProposal = {
-  id: string;
-  summary: string;
-  operations: AiCanvasOperation[];
-};
-
-const AI_HISTORY_RECENT_TURNS = 8;
-const AI_HISTORY_OLDER_TURNS = 6;
-const AI_HISTORY_MAX_MESSAGE_CHARS = 320;
-const AI_MAX_STORED_MESSAGES = 50;
-
-function compactMessageContent(content: string): string {
-  const normalized = content.replace(/\s+/g, " ").trim();
-  if (normalized.length <= AI_HISTORY_MAX_MESSAGE_CHARS) {
-    return normalized;
-  }
-
-  return `${normalized.slice(0, AI_HISTORY_MAX_MESSAGE_CHARS)}...`;
-}
-
-function formatConversationTurns(messages: AiBuilderMessage[]): string[] {
-  return messages
-    .map((message) => `${message.role}: ${compactMessageContent(message.content)}`)
-    .filter((line) => line.length > 0);
-}
-
-function buildPromptWithConversationContext(messages: AiBuilderMessage[], prompt: string): string {
-  const turns = formatConversationTurns(messages);
-  if (turns.length === 0) {
-    return prompt;
-  }
-
-  const recentTurns = turns.slice(-AI_HISTORY_RECENT_TURNS);
-  const olderTurns = turns.slice(0, -AI_HISTORY_RECENT_TURNS).slice(-AI_HISTORY_OLDER_TURNS);
-  const contextSections = [
-    "Conversation context (use this for continuity and intent resolution):",
-    ...(olderTurns.length > 0 ? [`Earlier turns summary:\n${olderTurns.join("\n")}`] : []),
-    `Recent turns:\n${recentTurns.join("\n")}`,
-    `Current user request:\n${prompt}`,
-  ];
-
-  return contextSections.join("\n\n");
-}
-
-function pushAiMessages(previous: AiBuilderMessage[], next: AiBuilderMessage | AiBuilderMessage[]): AiBuilderMessage[] {
-  const nextMessages = Array.isArray(next) ? next : [next];
-  const merged = [...previous, ...nextMessages];
-  if (merged.length <= AI_MAX_STORED_MESSAGES) {
-    return merged;
-  }
-
-  return merged.slice(-AI_MAX_STORED_MESSAGES);
-}
-
 export function BuildingBlocksSidebar({
   isOpen,
   onToggle,
   blocks,
   showAiBuilderTab = false,
   canvasId,
-  canvasNodes = [],
-  aiCanvas,
-  selectedNodeIds = [],
+  organizationId,
   onApplyAiOperations,
   integrations = [],
   canvasZoom = 1,
@@ -292,109 +233,28 @@ export function BuildingBlocksSidebar({
     const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
     return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
   }, []);
+  const agentUrl = getAgentUrl().replace(/\/+$/, "");
 
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
     async (value?: string) => {
-      const nextPrompt = (value ?? aiInput).trim();
-      if (!nextPrompt || isGeneratingResponse || !canvasId) {
-        return;
-      }
-
-      if (nextPrompt.toLowerCase() === "/clear") {
-        setAiMessages([]);
-        setPendingProposal(null);
-        setAiError(null);
-        setAiInput("");
-        requestAnimationFrame(() => {
-          aiInputRef.current?.focus();
-        });
-        return;
-      }
-
-      const contextualPrompt = buildPromptWithConversationContext(aiMessages, nextPrompt);
-
-      const userMessage: AiBuilderMessage = {
-        id: `user-${Date.now()}`,
-        role: "user",
-        content: nextPrompt,
-      };
-      setAiMessages((prev) => pushAiMessages(prev, userMessage));
-      setAiInput("");
-      requestAnimationFrame(() => {
-        aiInputRef.current?.focus();
+      await sendAgentChatPrompt({
+        value,
+        aiInput,
+        aiMessages,
+        canvasId,
+        organizationId,
+        agentUrl,
+        isGeneratingResponse,
+        setAiMessages,
+        setAiInput,
+        setAiError,
+        setIsGeneratingResponse,
+        setPendingProposal,
+        focusInput: () => aiInputRef.current?.focus(),
       });
-      setAiError(null);
-      setIsGeneratingResponse(true);
-
-      try {
-        const availableBlocks = (blocks || []).flatMap((category) =>
-          category.blocks
-            .filter((block) => block.isLive && !block.deprecated)
-            .map((block) => ({
-              name: block.name,
-              label: block.label || block.name,
-              type: block.type,
-            })),
-        );
-
-        const apiResponse = await canvasesSendAiMessage(
-          withOrganizationHeader({
-            path: { canvasId },
-            body: {
-              prompt: contextualPrompt,
-              canvasContext: {
-                nodes: canvasNodes,
-                availableBlocks,
-                canvas: {
-                  metadata: {
-                    name: aiCanvas?.name || "",
-                    description: aiCanvas?.description || "",
-                  },
-                  spec: {
-                    nodes: aiCanvas?.nodes || [],
-                    edges: aiCanvas?.edges || [],
-                  },
-                },
-                selectedNodeIds,
-              },
-            },
-          }),
-        );
-
-        const payload = apiResponse.data as { assistantMessage?: string; operations?: AiCanvasOperation[] } | undefined;
-        const proposal: AiBuilderProposal = {
-          id: `proposal-${Date.now()}`,
-          summary: payload?.assistantMessage || "I prepared a draft change set you can review and apply.",
-          operations: payload?.operations || [],
-        };
-
-        const assistantMessage: AiBuilderMessage = {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: proposal.summary,
-        };
-        setAiMessages((prev) => pushAiMessages(prev, assistantMessage));
-        if (proposal.operations.length > 0) {
-          setPendingProposal(proposal);
-        } else {
-          setPendingProposal(null);
-        }
-      } catch (error) {
-        const fallbackMessage = "I couldn't generate changes right now. Please try again.";
-        setAiError(error instanceof Error ? error.message : fallbackMessage);
-        setAiMessages((prev) =>
-          pushAiMessages(prev, {
-            id: `assistant-${Date.now()}`,
-            role: "assistant",
-            content: fallbackMessage,
-          }),
-        );
-      } finally {
-        setIsGeneratingResponse(false);
-      }
     },
-    [aiInput, aiMessages, blocks, canvasId, canvasNodes, isGeneratingResponse],
+    [aiInput, aiMessages, agentUrl, canvasId, isGeneratingResponse, organizationId],
   );
 
   const handleDiscardProposal = useCallback(() => {
@@ -435,38 +295,6 @@ export function BuildingBlocksSidebar({
       default:
         return "Update canvas";
     }
-  }, []);
-
-  const extractAssistantOptions = useCallback((content: string): string[] => {
-    const optionSet = new Set<string>();
-
-    const lines = content
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    for (const line of lines) {
-      const bulletMatch = line.match(/^[-*]\s+(.+)$/);
-      const numberedMatch = line.match(/^\d+[.)]\s+(.+)$/);
-      const optionText = bulletMatch?.[1] || numberedMatch?.[1];
-      if (!optionText) continue;
-
-      const normalized = optionText.replace(/\s+/g, " ").trim();
-      if (normalized.length < 2 || normalized.length > 140) continue;
-      optionSet.add(normalized.replace(/[.;,\s]+$/, ""));
-    }
-
-    if (optionSet.size === 0) {
-      const codeMatches = [...content.matchAll(/`([^`]+)`/g)];
-      for (const match of codeMatches) {
-        const value = (match[1] || "").trim();
-        if (!value || value.length > 80) continue;
-        if (value.toLowerCase() === "etc.") continue;
-        optionSet.add(value);
-      }
-    }
-
-    return Array.from(optionSet).slice(0, 8);
   }, []);
 
   const handleApplyProposal = useCallback(async () => {
@@ -833,7 +661,7 @@ export function BuildingBlocksSidebar({
         {showAiBuilderTab && (
           <TabsContent value="ai" className="mt-0 flex-1 overflow-hidden px-5 pb-5">
             <div className="h-full rounded-md border border-border bg-slate-50/30 flex flex-col">
-              <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+              <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
                 {aiMessages.length === 0 ? (
                   <div className="text-sm text-gray-600">
                     <div className="flex items-start gap-2">
@@ -842,45 +670,56 @@ export function BuildingBlocksSidebar({
                   </div>
                 ) : (
                   <>
-                    {aiMessages.map((message) => (
-                      <div key={message.id} className={message.role === "user" ? "ml-6" : "mr-6"}>
+                    {aiMessages.map((message) => {
+                      const isEmptyAssistantPlaceholder =
+                        message.role === "assistant" && message.content.trim().length === 0;
+                      if (isEmptyAssistantPlaceholder) {
+                        return null;
+                      }
+
+                      const isToolMessage = message.role === "tool";
+                      const isRunningToolMessage = isToolMessage && message.toolStatus === "running";
+                      return (
                         <div
-                          className={
-                            message.role === "user"
-                              ? "rounded-md bg-blue-600 text-white px-3 py-2 text-sm"
-                              : "rounded-md bg-white border border-border px-3 py-2 text-sm text-gray-800"
-                          }
+                          key={message.id}
+                          className={message.role === "user" ? "w-full" : isToolMessage ? "mr-6 pl-1" : "mr-6"}
                         >
-                          {message.content}
+                          <div
+                            className={
+                              message.role === "user"
+                                ? "w-full rounded-md bg-blue-600 text-white px-3 py-2 text-sm"
+                                : isToolMessage
+                                  ? `px-0.5 py-0.5 text-[11px] leading-relaxed text-gray-500 ${
+                                      isRunningToolMessage ? "sp-ai-thinking" : ""
+                                    }`
+                                  : "px-0.5 py-0.5 text-sm text-gray-800"
+                            }
+                          >
+                            {message.role === "assistant" ? (
+                              <div className="max-w-none [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal [&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_li]:mb-1 [&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs [&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-100 [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold">
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkGfm, remarkBreaks]}
+                                  components={{
+                                    a: ({ children, href }) => (
+                                      <a href={href} target="_blank" rel="noopener noreferrer" className="underline">
+                                        {children}
+                                      </a>
+                                    ),
+                                  }}
+                                >
+                                  {message.content}
+                                </ReactMarkdown>
+                              </div>
+                            ) : (
+                              message.content
+                            )}
+                          </div>
                         </div>
-                        {message.role === "assistant" && !pendingProposal
-                          ? (() => {
-                              const options = extractAssistantOptions(message.content);
-                              if (options.length === 0) return null;
-                              return (
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {options.map((option) => (
-                                    <Button
-                                      key={`${message.id}-${option}`}
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 text-xs"
-                                      onClick={() => handleSendPrompt(option)}
-                                      disabled={disabled || isGeneratingResponse || !canvasId}
-                                    >
-                                      {option}
-                                    </Button>
-                                  ))}
-                                </div>
-                              );
-                            })()
-                          : null}
-                      </div>
-                    ))}
+                      );
+                    })}
                     {isGeneratingResponse ? (
                       <div className="sp-ai-thinking text-xs text-gray-500 px-1 py-1 rounded-sm">
-                        Planing next steps...
+                        Planning next steps...
                       </div>
                     ) : null}
                   </>
@@ -919,7 +758,7 @@ export function BuildingBlocksSidebar({
                 {!pendingProposal && aiError ? <p className="text-xs text-red-700">{aiError}</p> : null}
               </div>
 
-              <div className="border-t border-border px-4 py-3">
+              <div className="border-t border-border px-3 py-2">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();

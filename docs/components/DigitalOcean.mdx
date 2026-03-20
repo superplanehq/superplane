@@ -9,14 +9,22 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Assign Reserved IP" href="#assign-reserved-ip" description="Assign or unassign a DigitalOcean Reserved IP to a Droplet" />
+  <LinkCard title="Create Alert Policy" href="#create-alert-policy" description="Create a DigitalOcean monitoring alert policy for droplet metrics" />
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record for a DigitalOcean domain" />
   <LinkCard title="Create Droplet" href="#create-droplet" description="Create a new DigitalOcean Droplet" />
+  <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a DigitalOcean Load Balancer with forwarding rules and targets" />
   <LinkCard title="Create Snapshot" href="#create-snapshot" description="Create a snapshot of a DigitalOcean Droplet" />
+  <LinkCard title="Delete Alert Policy" href="#delete-alert-policy" description="Delete a DigitalOcean monitoring alert policy" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a DigitalOcean domain" />
   <LinkCard title="Delete Droplet" href="#delete-droplet" description="Delete a DigitalOcean Droplet by ID" />
+  <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a DigitalOcean Load Balancer" />
   <LinkCard title="Delete Snapshot" href="#delete-snapshot" description="Delete a DigitalOcean snapshot" />
+  <LinkCard title="Get Alert Policy" href="#get-alert-policy" description="Fetch details of a DigitalOcean monitoring alert policy" />
   <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
+  <LinkCard title="Get Droplet Metrics" href="#get-droplet-metrics" description="Fetch CPU, memory, and network bandwidth metrics for a DigitalOcean Droplet" />
   <LinkCard title="Manage Droplet Power" href="#manage-droplet-power" description="Perform power operations on a DigitalOcean Droplet" />
+  <LinkCard title="Update Alert Policy" href="#update-alert-policy" description="Update an existing DigitalOcean monitoring alert policy" />
   <LinkCard title="Upsert DNS Record" href="#upsert-dns-record" description="Idempotently create or update a DNS record for a DigitalOcean domain" />
 </CardGrid>
 
@@ -34,6 +42,132 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 5. Copy the token and paste it below
 
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.
+
+<a id="assign-reserved-ip"></a>
+
+## Assign Reserved IP
+
+The Assign Reserved IP component assigns or unassigns a DigitalOcean Reserved IP to a droplet.
+
+### Use Cases
+
+- **Blue/green deployments**: Reassign a reserved IP to the new deployment with zero downtime
+- **Failover**: Quickly reassign a reserved IP from a failed droplet to a healthy replacement
+- **Maintenance**: Temporarily unassign a reserved IP while a droplet is being serviced
+
+### Configuration
+
+- **Reserved IP**: The reserved IP address to manage (required)
+- **Action**: The operation to perform: assign or unassign (required)
+- **Droplet ID**: The target droplet for the assignment (required when action is assign)
+
+### Output
+
+Returns the action result including:
+- **id**: Action ID
+- **status**: Final action status (completed)
+- **type**: Type of action performed (assign or unassign)
+- **started_at**: When the action started
+- **completed_at**: When the action completed
+- **resource_id**: Reserved IP resource identifier
+
+### Important Notes
+
+- The component polls until the action completes
+- For **assign**, the reserved IP will be unassigned from any current droplet first
+- For **unassign**, the **Droplet ID** field is ignored
+
+### Example Output
+
+```json
+{
+  "data": {
+    "completed_at": "2026-03-13T10:10:05Z",
+    "id": 2048576123,
+    "region_slug": "nyc3",
+    "resource_id": 2335912909,
+    "resource_type": "floating_ip",
+    "started_at": "2026-03-13T10:10:00Z",
+    "status": "completed",
+    "type": "assign_ip"
+  },
+  "timestamp": "2026-03-13T10:10:08.000000000Z",
+  "type": "digitalocean.reservedip.assign"
+}
+```
+
+<a id="create-alert-policy"></a>
+
+## Create Alert Policy
+
+The Create Alert Policy component creates a monitoring alert policy that triggers notifications when droplet metrics cross defined thresholds.
+
+> **Note:** Monitoring is only available for droplets that had monitoring enabled during creation. Droplets created without monitoring will not report metrics or trigger alerts.
+
+### Use Cases
+
+- **Capacity management**: Get notified when CPU or memory usage consistently exceeds a safe operating level
+- **Performance monitoring**: Detect and respond to high load averages or network saturation
+- **Automated workflows**: Chain downstream actions when infrastructure metrics breach limits
+
+### Configuration
+
+- **Description**: Human-readable name for the alert policy (required)
+- **Metric Type**: The droplet metric to monitor, such as CPU Usage or Memory Usage (required)
+- **Comparison**: Alert when the value is GreaterThan or LessThan the threshold (required)
+- **Threshold Value**: The numeric threshold that triggers the alert (required)
+- **Evaluation Window**: The rolling time window over which the metric is averaged (required)
+- **Droplets**: Specific droplets to scope the policy to (optional)
+- **Tags**: Monitor all droplets with matching tags (optional)
+- **Enabled**: Whether the alert policy is immediately active (default: true)
+- **Email Notifications**: Email addresses to notify when the alert fires (optional)
+- **Slack Channel**: Slack channel to post alerts to, e.g. #alerts (optional)
+- **Slack Webhook URL**: Incoming webhook URL for the Slack workspace (required when Slack Channel is set)
+
+### Output
+
+Returns the created alert policy including:
+- **uuid**: Alert policy UUID for use in Get/Delete operations
+- **description**: Human-readable description
+- **type**: Metric type being monitored
+- **compare**: Comparison operator (GreaterThan/LessThan)
+- **value**: Threshold value
+- **window**: Evaluation window
+- **enabled**: Whether the policy is active
+- **alerts**: Configured notification channels (email and/or Slack)
+
+### Important Notes
+
+- At least one notification channel (email or Slack) is required
+- **Slack Channel** and **Slack Webhook URL** must be provided together
+- Scoping by **Droplets** and **Tags** are independent — you can use either, both, or neither (applies to all droplets)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alerts": {
+      "email": [
+        "sammy@digitalocean.com"
+      ]
+    },
+    "compare": "GreaterThan",
+    "description": "High CPU Usage",
+    "enabled": true,
+    "entities": [
+      "558899681"
+    ],
+    "tags": [],
+    "type": "v1/insights/droplet/cpu",
+    "uuid": "ffcaf816-f6a5-4b4a-b4c4-e84532755e82",
+    "value": 20,
+    "window": "5m"
+  },
+  "timestamp": "2026-03-18T09:29:00.308296519Z",
+  "type": "digitalocean.alertpolicy.created"
+}
+```
 
 <a id="create-dns-record"></a>
 
@@ -108,9 +242,13 @@ The Create Droplet component creates a new droplet in DigitalOcean.
 - **Region**: Region slug where the droplet will be created (required)
 - **Size**: Size slug for the droplet (required)
 - **Image**: Image slug or ID for the droplet OS (required)
-- **SSH Keys**: SSH key fingerprints or IDs to add to the droplet (optional)
+- **SSH Keys**: SSH keys to add to the droplet. Must have been added to the DigitalOcean team. (optional)
 - **Tags**: Tags to apply to the droplet (optional)
 - **User Data**: Cloud-init user data script (optional)
+- **Backups**: Enable automated backups for the droplet (optional)
+- **IPv6**: Enable IPv6 networking on the droplet (optional)
+- **Monitoring**: Enable DigitalOcean monitoring agent on the droplet (optional)
+- **VPC UUID**: UUID of the VPC to create the droplet in (optional)
 
 ### Output
 
@@ -153,7 +291,81 @@ Returns the created droplet object including:
       "web"
     ],
     "vcpus": 1
-  }
+  },
+  "timestamp": "2026-03-12T21:10:00.000000000Z",
+  "type": "digitalocean.droplet.created"
+}
+```
+
+<a id="create-load-balancer"></a>
+
+## Create Load Balancer
+
+The Create Load Balancer component creates a new load balancer in DigitalOcean and waits until it is active.
+
+### Use Cases
+
+- **Traffic distribution**: Distribute incoming requests across multiple droplets
+- **High availability**: Ensure zero-downtime deployments by routing traffic across instances
+- **Scalable infrastructure**: Provision load balancers as part of automated environment setup
+
+### Configuration
+
+- **Name**: The name of the load balancer (required, only letters, numbers, and hyphens)
+- **Region**: Region where the load balancer will be created (required)
+- **Forwarding Rules**: One or more forwarding rules specifying entry/target protocol, port, and optional TLS passthrough (required)
+- **Droplets**: The droplets to add as targets — must be in the same region as the load balancer (optional, mutually exclusive with Tag)
+- **Tag**: Tag used to dynamically target droplets (optional, mutually exclusive with Droplets)
+
+### Output
+
+Returns the created load balancer object including:
+- **id**: Load balancer ID (UUID)
+- **name**: Load balancer name
+- **ip**: Assigned public IP address
+- **status**: Current status (active)
+- **region**: Region information
+- **forwarding_rules**: Configured forwarding rules
+- **droplet_ids**: Targeted droplet IDs
+
+### Important Notes
+
+- The component polls until the load balancer status becomes **active**
+- Specify either **Droplet IDs** or **Tag** to define targets, not both
+- The load balancer name must contain only letters, numbers, and hyphens
+- All specified droplets must be in the same region as the load balancer
+
+### Example Output
+
+```json
+{
+  "data": {
+    "algorithm": "round_robin",
+    "created_at": "2026-03-13T10:00:00Z",
+    "droplet_ids": [
+      98765432,
+      98765433
+    ],
+    "forwarding_rules": [
+      {
+        "entry_port": 80,
+        "entry_protocol": "http",
+        "target_port": 80,
+        "target_protocol": "http"
+      }
+    ],
+    "id": "4de7ac8b-495b-4884-9a69-1050c6793cd6",
+    "ip": "104.131.186.241",
+    "name": "my-load-balancer",
+    "region": {
+      "name": "New York 3",
+      "slug": "nyc3"
+    },
+    "status": "active",
+    "tag": ""
+  },
+  "timestamp": "2026-03-13T10:01:15.000000000Z",
+  "type": "digitalocean.loadbalancer.created"
 }
 ```
 
@@ -203,6 +415,44 @@ Returns the snapshot details including:
   },
   "timestamp": "2026-03-13T13:36:14.803060936Z",
   "type": "digitalocean.snapshot.created"
+}
+```
+
+<a id="delete-alert-policy"></a>
+
+## Delete Alert Policy
+
+The Delete Alert Policy component permanently removes a monitoring alert policy from your DigitalOcean account.
+
+### Use Cases
+
+- **Cleanup**: Remove alert policies that are no longer needed
+- **Policy rotation**: Delete old policies as part of a replace workflow
+- **Automated teardown**: Remove monitoring policies when decommissioning environments
+
+### Configuration
+
+- **Alert Policy**: The alert policy to delete (required, supports expressions)
+
+### Output
+
+Returns information about the deleted policy:
+- **alertPolicyUuid**: The UUID of the alert policy that was deleted
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone
+- If the policy does not exist (already deleted), the component completes successfully (idempotent)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alertPolicyUuid": "669adfc8-d72b-4d2d-80ed-bea78d6e1562"
+  },
+  "timestamp": "2026-03-17T10:00:00Z",
+  "type": "digitalocean.alertpolicy.deleted"
 }
 ```
 
@@ -290,6 +540,45 @@ Returns information about the deleted droplet:
 }
 ```
 
+<a id="delete-load-balancer"></a>
+
+## Delete Load Balancer
+
+The Delete Load Balancer component permanently deletes a load balancer from your DigitalOcean account.
+
+### Use Cases
+
+- **Cleanup**: Remove load balancers after decommissioning a service
+- **Cost optimization**: Automatically tear down unused load balancers
+- **Environment management**: Delete load balancers as part of environment teardown workflows
+
+### Configuration
+
+- **Load Balancer**: The load balancer to delete (required, supports expressions)
+
+### Output
+
+Returns information about the deleted load balancer:
+- **loadBalancerID**: The UUID of the load balancer that was deleted
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone
+- Deleting a load balancer does not delete the targeted droplets
+- If the load balancer does not exist (404), the component emits success (idempotent)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "loadBalancerID": "4de7ac8b-495b-4884-9a69-1050c6793cd6"
+  },
+  "timestamp": "2026-03-13T10:05:30.000000000Z",
+  "type": "digitalocean.loadbalancer.deleted"
+}
+```
+
 <a id="delete-snapshot"></a>
 
 ## Delete Snapshot
@@ -322,6 +611,63 @@ Returns confirmation of the deleted snapshot including:
   },
   "timestamp": "2026-03-13T06:27:06.208635289Z",
   "type": "digitalocean.snapshot.deleted"
+}
+```
+
+<a id="get-alert-policy"></a>
+
+## Get Alert Policy
+
+The Get Alert Policy component retrieves the full details of a monitoring alert policy.
+
+### Use Cases
+
+- **Policy inspection**: Verify the current configuration of an alert policy
+- **Conditional logic**: Check whether a policy is enabled before modifying it downstream
+- **Audit workflows**: Retrieve alert policy details as part of a compliance or reporting pipeline
+
+### Configuration
+
+- **Alert Policy**: The alert policy to retrieve (required, supports expressions)
+
+### Output
+
+Returns the alert policy object including:
+- **uuid**: Alert policy UUID
+- **description**: Human-readable description
+- **type**: Metric type being monitored (e.g. v1/insights/droplet/cpu)
+- **compare**: Comparison operator (GreaterThan/LessThan)
+- **value**: Threshold value
+- **window**: Evaluation window (5m, 10m, 30m, 1h)
+- **entities**: Scoped droplet IDs
+- **tags**: Scoped droplet tags
+- **enabled**: Whether the policy is active
+- **alerts**: Configured notification channels
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alerts": {
+      "email": [
+        "sammy@digitalocean.com"
+      ]
+    },
+    "compare": "GreaterThan",
+    "description": "High CPU Usage",
+    "enabled": true,
+    "entities": [
+      "558899681"
+    ],
+    "tags": [],
+    "type": "v1/insights/droplet/cpu",
+    "uuid": "ffcaf816-f6a5-4b4a-b4c4-e84532755e82",
+    "value": 20,
+    "window": "5m"
+  },
+  "timestamp": "2026-03-18T09:54:58.914731251Z",
+  "type": "digitalocean.alertpolicy.fetched"
 }
 ```
 
@@ -397,6 +743,65 @@ Returns the droplet object including:
 }
 ```
 
+<a id="get-droplet-metrics"></a>
+
+## Get Droplet Metrics
+
+The Get Droplet Metrics component retrieves CPU usage, memory utilization, and network bandwidth metrics for a droplet over a specified lookback window.
+
+> **Note:** Monitoring is only available for droplets that had monitoring enabled during creation. Droplets created without monitoring will not report metrics.
+
+### Use Cases
+
+- **Performance monitoring**: Sample current resource utilization before scaling decisions
+- **Incident investigation**: Pull recent metrics when responding to an alert
+- **Capacity planning**: Gather trend data to inform right-sizing of infrastructure
+- **Automated scaling**: Use metric outputs to conditionally trigger resize or power operations
+
+### Configuration
+
+- **Droplet**: The droplet to fetch metrics for (required, supports expressions)
+- **Lookback Period**: How far back to retrieve metrics — 1h, 6h, 24h, 7d, or 14d (required)
+
+### Output
+
+Returns a combined metrics payload with averaged values over the lookback window:
+- **dropletId**: The ID of the queried droplet
+- **start**: ISO 8601 timestamp of the start of the metrics window
+- **end**: ISO 8601 timestamp of the end of the metrics window
+- **lookbackPeriod**: The selected lookback period
+- **avgCpuUsagePercent**: Average CPU usage percentage over the window
+- **avgMemoryUsagePercent**: Average memory utilization percentage, computed from (total − available) / total × 100
+- **avgPublicOutboundBandwidthMbps**: Average public outbound bandwidth in Mbps (as reported by the DigitalOcean API)
+- **avgPublicInboundBandwidthMbps**: Average public inbound bandwidth in Mbps (as reported by the DigitalOcean API)
+
+All metric values are rounded to two decimal places.
+
+### Important Notes
+
+- Metrics are only available for droplets with the DigitalOcean Monitoring Agent installed
+- The Monitoring Agent is pre-installed on droplets using official DigitalOcean images created after 2018
+- Data point resolution varies by window: shorter windows return finer-grained data
+
+### Example Output
+
+```json
+{
+  "data": {
+    "avgCpuUsagePercent": 0.18,
+    "avgMemoryUsagePercent": 34.39,
+    "avgPublicInboundBandwidthMbps": 0.36,
+    "avgPublicOutboundBandwidthMbps": 0.15,
+    "dropletId": "559378149",
+    "end": "2026-03-19T08:36:34Z",
+    "lookbackPeriod": "1h",
+    "start": "2026-03-19T07:36:34Z"
+  },
+  "timestamp": "2026-03-19T08:36:37.115389929Z",
+  "type": "digitalocean.droplet.metrics"
+}
+```
+
 <a id="manage-droplet-power"></a>
 
 ## Manage Droplet Power
@@ -454,6 +859,82 @@ Returns the action result including:
   },
   "timestamp": "2026-03-12T22:27:20.613332846Z",
   "type": "digitalocean.droplet.power.power_off"
+}
+```
+
+<a id="update-alert-policy"></a>
+
+## Update Alert Policy
+
+The Update Alert Policy component modifies an existing monitoring alert policy with new settings.
+
+> **Note:** Monitoring is only available for droplets that had monitoring enabled during creation. Droplets created without monitoring will not report metrics or trigger alerts.
+
+### Use Cases
+
+- **Threshold tuning**: Adjust alert thresholds in response to changing baselines or scaling events
+- **Enable/disable policies**: Toggle alert policies on or off as part of maintenance windows or incident management
+- **Notification changes**: Update notification channels (email or Slack) without recreating the policy
+- **Automated policy management**: Programmatically adjust alert policies as part of infrastructure workflows
+
+### Configuration
+
+- **Alert Policy**: The alert policy to update (required, supports expressions)
+- **Description**: Human-readable name for the alert policy (required)
+- **Metric Type**: The droplet metric to monitor, such as CPU Usage or Memory Usage (required)
+- **Comparison**: Alert when the value is GreaterThan or LessThan the threshold (required)
+- **Threshold Value**: The numeric threshold that triggers the alert (required)
+- **Evaluation Window**: The rolling time window over which the metric is averaged (required)
+- **Droplets**: Specific droplets to scope the policy to (optional)
+- **Tags**: Monitor all droplets with matching tags (optional)
+- **Enabled**: Whether the alert policy is active (default: true)
+- **Email Notifications**: Email addresses to notify when the alert fires (optional)
+- **Slack Channel**: Slack channel to post alerts to, e.g. #alerts (optional)
+- **Slack Webhook URL**: Incoming webhook URL for the Slack workspace (required when Slack Channel is set)
+
+### Output
+
+Returns the updated alert policy including:
+- **uuid**: Alert policy UUID
+- **description**: Human-readable description
+- **type**: Metric type being monitored
+- **compare**: Comparison operator (GreaterThan/LessThan)
+- **value**: Threshold value
+- **window**: Evaluation window
+- **enabled**: Whether the policy is active
+- **alerts**: Configured notification channels (email and/or Slack)
+
+### Important Notes
+
+- The update operation replaces the entire alert policy — all fields must be provided, not just the ones being changed
+- At least one notification channel (email or Slack) is required
+- **Slack Channel** and **Slack Webhook URL** must be provided together
+- Scoping by **Droplets** and **Tags** are independent — you can use either, both, or neither (applies to all droplets)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alerts": {
+      "email": [
+        "sammy@digitalocean.com"
+      ]
+    },
+    "compare": "GreaterThan",
+    "description": "High CPU Usage",
+    "enabled": true,
+    "entities": [
+      "558899681"
+    ],
+    "tags": [],
+    "type": "v1/insights/droplet/cpu",
+    "uuid": "ffcaf816-f6a5-4b4a-b4c4-e84532755e82",
+    "value": 80,
+    "window": "5m"
+  },
+  "timestamp": "2026-03-18T09:29:00.308296519Z",
+  "type": "digitalocean.alertpolicy.updated"
 }
 ```
 

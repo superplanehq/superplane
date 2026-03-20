@@ -34,6 +34,7 @@ const (
 	Organizations_UpdateAgentSettings_FullMethodName      = "/Superplane.Organizations.Organizations/UpdateAgentSettings"
 	Organizations_SetAgentOpenAIKey_FullMethodName        = "/Superplane.Organizations.Organizations/SetAgentOpenAIKey"
 	Organizations_DeleteAgentOpenAIKey_FullMethodName     = "/Superplane.Organizations.Organizations/DeleteAgentOpenAIKey"
+	Organizations_DescribeUsage_FullMethodName            = "/Superplane.Organizations.Organizations/DescribeUsage"
 	Organizations_AcceptInviteLink_FullMethodName         = "/Superplane.Organizations.Organizations/AcceptInviteLink"
 	Organizations_ListIntegrations_FullMethodName         = "/Superplane.Organizations.Organizations/ListIntegrations"
 	Organizations_DescribeIntegration_FullMethodName      = "/Superplane.Organizations.Organizations/DescribeIntegration"
@@ -61,6 +62,7 @@ type OrganizationsClient interface {
 	UpdateAgentSettings(ctx context.Context, in *UpdateAgentSettingsRequest, opts ...grpc.CallOption) (*UpdateAgentSettingsResponse, error)
 	SetAgentOpenAIKey(ctx context.Context, in *SetAgentOpenAIKeyRequest, opts ...grpc.CallOption) (*SetAgentOpenAIKeyResponse, error)
 	DeleteAgentOpenAIKey(ctx context.Context, in *DeleteAgentOpenAIKeyRequest, opts ...grpc.CallOption) (*DeleteAgentOpenAIKeyResponse, error)
+	DescribeUsage(ctx context.Context, in *DescribeUsageRequest, opts ...grpc.CallOption) (*DescribeUsageResponse, error)
 	AcceptInviteLink(ctx context.Context, in *InviteLink, opts ...grpc.CallOption) (*_struct.Struct, error)
 	ListIntegrations(ctx context.Context, in *ListIntegrationsRequest, opts ...grpc.CallOption) (*ListIntegrationsResponse, error)
 	DescribeIntegration(ctx context.Context, in *DescribeIntegrationRequest, opts ...grpc.CallOption) (*DescribeIntegrationResponse, error)
@@ -218,6 +220,16 @@ func (c *organizationsClient) DeleteAgentOpenAIKey(ctx context.Context, in *Dele
 	return out, nil
 }
 
+func (c *organizationsClient) DescribeUsage(ctx context.Context, in *DescribeUsageRequest, opts ...grpc.CallOption) (*DescribeUsageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DescribeUsageResponse)
+	err := c.cc.Invoke(ctx, Organizations_DescribeUsage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *organizationsClient) AcceptInviteLink(ctx context.Context, in *InviteLink, opts ...grpc.CallOption) (*_struct.Struct, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(_struct.Struct)
@@ -306,6 +318,7 @@ type OrganizationsServer interface {
 	UpdateAgentSettings(context.Context, *UpdateAgentSettingsRequest) (*UpdateAgentSettingsResponse, error)
 	SetAgentOpenAIKey(context.Context, *SetAgentOpenAIKeyRequest) (*SetAgentOpenAIKeyResponse, error)
 	DeleteAgentOpenAIKey(context.Context, *DeleteAgentOpenAIKeyRequest) (*DeleteAgentOpenAIKeyResponse, error)
+	DescribeUsage(context.Context, *DescribeUsageRequest) (*DescribeUsageResponse, error)
 	AcceptInviteLink(context.Context, *InviteLink) (*_struct.Struct, error)
 	ListIntegrations(context.Context, *ListIntegrationsRequest) (*ListIntegrationsResponse, error)
 	DescribeIntegration(context.Context, *DescribeIntegrationRequest) (*DescribeIntegrationResponse, error)
@@ -363,6 +376,9 @@ func (UnimplementedOrganizationsServer) SetAgentOpenAIKey(context.Context, *SetA
 }
 func (UnimplementedOrganizationsServer) DeleteAgentOpenAIKey(context.Context, *DeleteAgentOpenAIKeyRequest) (*DeleteAgentOpenAIKeyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteAgentOpenAIKey not implemented")
+}
+func (UnimplementedOrganizationsServer) DescribeUsage(context.Context, *DescribeUsageRequest) (*DescribeUsageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DescribeUsage not implemented")
 }
 func (UnimplementedOrganizationsServer) AcceptInviteLink(context.Context, *InviteLink) (*_struct.Struct, error) {
 	return nil, status.Error(codes.Unimplemented, "method AcceptInviteLink not implemented")
@@ -657,6 +673,24 @@ func _Organizations_DeleteAgentOpenAIKey_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Organizations_DescribeUsage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DescribeUsageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).DescribeUsage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_DescribeUsage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).DescribeUsage(ctx, req.(*DescribeUsageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Organizations_AcceptInviteLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(InviteLink)
 	if err := dec(in); err != nil {
@@ -845,6 +879,10 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteAgentOpenAIKey",
 			Handler:    _Organizations_DeleteAgentOpenAIKey_Handler,
+		},
+		{
+			MethodName: "DescribeUsage",
+			Handler:    _Organizations_DescribeUsage_Handler,
 		},
 		{
 			MethodName: "AcceptInviteLink",

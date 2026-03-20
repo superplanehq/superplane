@@ -34,7 +34,7 @@ func Test__DescribeOrganization(t *testing.T) {
 		assert.Equal(t, r.Organization.Description, response.Organization.Metadata.Description)
 		assert.Equal(t, *r.Organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime())
 		assert.Equal(t, *r.Organization.UpdatedAt, response.Organization.Metadata.UpdatedAt.AsTime())
-		require.NotNil(t, response.Organization.Metadata.CanvasVersioningEnabled)
-		assert.Equal(t, r.Organization.CanvasVersioningEnabled, response.Organization.Metadata.GetCanvasVersioningEnabled())
+		require.NotNil(t, response.Organization.Metadata.VersioningEnabled)
+		assert.Equal(t, r.Organization.VersioningEnabled, response.Organization.Metadata.GetVersioningEnabled())
 	})
 }

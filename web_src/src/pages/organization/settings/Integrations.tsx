@@ -1,6 +1,7 @@
 import { Loader2, Plug, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import {
   useAvailableIntegrations,
   useConnectedIntegrations,
@@ -14,17 +15,21 @@ import { usePermissions } from "@/contexts/PermissionsContext";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { IntegrationsIntegrationDefinition } from "../../../api-client/types.gen";
 import { getApiErrorMessage } from "@/utils/errors";
+import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/utils/usageLimits";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { Icon } from "@/components/Icon";
+import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { showErrorToast } from "@/utils/toast";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 
 interface IntegrationsProps {
   organizationId: string;
 }
 
 export function Integrations({ organizationId }: IntegrationsProps) {
+  usePageTitle(["Integrations"]);
   const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationDefinition | null>(null);
@@ -177,7 +182,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
         navigate(`/${organizationId}/settings/integrations/${result.data.integration.metadata.id}`);
       }
     } catch (_error) {
-      showErrorToast("Failed to create integration");
+      showErrorToast(getUsageLimitToastMessage(_error, "Failed to create integration"));
     }
   };
 
@@ -188,6 +193,10 @@ export function Integrations({ organizationId }: IntegrationsProps) {
     setConfiguration({});
     createIntegrationMutation.reset();
   };
+
+  const createIntegrationNotice = createIntegrationMutation.isError
+    ? getUsageLimitNotice(createIntegrationMutation.error, organizationId)
+    : null;
 
   if (isLoading) {
     return (
@@ -442,13 +451,17 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     </Button>
                   </div>
 
-                  {createIntegrationMutation.isError && (
-                    <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                      <p className="text-sm text-red-800 dark:text-red-200">
+                  {createIntegrationMutation.isError && createIntegrationNotice ? (
+                    <UsageLimitAlert notice={createIntegrationNotice} className="mt-4" />
+                  ) : null}
+                  {createIntegrationMutation.isError && !createIntegrationNotice ? (
+                    <Alert variant="destructive" className="mt-4">
+                      <AlertTitle>Unable to create integration</AlertTitle>
+                      <AlertDescription>
                         Failed to create integration: {getApiErrorMessage(createIntegrationMutation.error)}
-                      </p>
-                    </div>
-                  )}
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
                 </div>
               </div>
             </div>

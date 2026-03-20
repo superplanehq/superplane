@@ -1,0 +1,131 @@
+syntax = "proto3";
+
+package superplane.usage.v1;
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/usage";
+
+service Usage {
+  rpc SetupOrganization(SetupOrganizationRequest) returns (SetupOrganizationResponse);
+  rpc SetupAccount(SetupAccountRequest) returns (SetupAccountResponse);
+
+  rpc DescribeOrganizationLimits(DescribeOrganizationLimitsRequest) returns (DescribeOrganizationLimitsResponse);
+  rpc DescribeAccountLimits(DescribeAccountLimitsRequest) returns (DescribeAccountLimitsResponse);
+
+  rpc DescribeOrganizationUsage(DescribeOrganizationUsageRequest) returns (DescribeOrganizationUsageResponse);
+  rpc CheckOrganizationLimits(CheckOrganizationLimitsRequest) returns (CheckOrganizationLimitsResponse);
+  rpc CheckAccountLimits(CheckAccountLimitsRequest) returns (CheckAccountLimitsResponse);
+}
+
+message SetupOrganizationRequest {
+  string organization_id = 1;
+  string account_id = 2;
+}
+
+message SetupOrganizationResponse {
+  OrganizationLimits limits = 1;
+}
+
+message SetupAccountRequest {
+  string account_id = 1;
+}
+
+message SetupAccountResponse {
+  AccountLimits limits = 1;
+}
+
+message DescribeOrganizationLimitsRequest {
+  string organization_id = 1;
+}
+
+message DescribeOrganizationLimitsResponse {
+  OrganizationLimits limits = 1;
+}
+
+message DescribeAccountLimitsRequest {
+  string account_id = 1;
+}
+
+message DescribeAccountLimitsResponse {
+  AccountLimits limits = 1;
+}
+
+message DescribeOrganizationUsageRequest {
+  string organization_id = 1;
+}
+
+message DescribeOrganizationUsageResponse {
+  OrganizationUsage usage = 1;
+}
+
+message CheckOrganizationLimitsRequest {
+  string organization_id = 1;
+  OrganizationState state = 2;
+  CanvasState canvas = 3;
+}
+
+message CheckOrganizationLimitsResponse {
+  bool allowed = 1;
+  OrganizationLimits limits = 2;
+  repeated LimitViolation violations = 3;
+}
+
+message CheckAccountLimitsRequest {
+  string account_id = 1;
+  AccountState state = 2;
+}
+
+message CheckAccountLimitsResponse {
+  bool allowed = 1;
+  AccountLimits limits = 2;
+  repeated LimitViolation violations = 3;
+}
+
+message OrganizationLimits {
+  int32 max_canvases = 1;
+  int32 max_nodes_per_canvas = 2;
+  int32 max_users = 3;
+  int32 retention_window_days = 4;
+  int64 max_events_per_month = 5;
+  int32 max_integrations = 6;
+}
+
+message AccountLimits {
+  int32 max_organizations = 1;
+}
+
+message AccountState {
+  int32 organizations = 1;
+}
+
+message OrganizationUsage {
+  int32 canvases = 1;
+  double event_bucket_level = 2;
+  double event_bucket_capacity = 3;
+  int64 event_bucket_last_updated_at_unix_seconds = 4;
+}
+
+message OrganizationState {
+  int32 canvases = 1;
+  int32 users = 2;
+  int32 integrations = 3;
+}
+
+message CanvasState {
+  int32 nodes = 1;
+}
+
+enum LimitName {
+  LIMIT_NAME_UNSPECIFIED = 0;
+  LIMIT_NAME_MAX_ORGANIZATIONS = 1;
+  LIMIT_NAME_MAX_CANVASES = 2;
+  LIMIT_NAME_MAX_NODES_PER_CANVAS = 3;
+  LIMIT_NAME_MAX_USERS = 4;
+  LIMIT_NAME_MAX_EVENTS_PER_MONTH = 5;
+  LIMIT_NAME_MAX_INTEGRATIONS = 6;
+}
+
+message LimitViolation {
+  LimitName limit = 1;
+  int64 configured_limit = 2;
+  int64 current_value = 3;
+}

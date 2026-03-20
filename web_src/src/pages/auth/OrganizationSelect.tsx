@@ -2,6 +2,8 @@ import SuperplaneLogo from "@/assets/superplane.svg";
 import { Building, Palette, User } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getUsageLimitNotice } from "@/utils/usageLimits";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
 
@@ -10,6 +12,14 @@ interface Organization {
   name: string;
   canvasCount?: number;
   memberCount?: number;
+}
+
+interface OrganizationCreationStatus {
+  allowed: boolean;
+  usageEnabled: boolean;
+  currentOrganizations: number;
+  maxOrganizations: number;
+  message?: string;
 }
 
 const formatCount = (count: number, noun: string) => {
@@ -24,6 +34,7 @@ const formatCount = (count: number, noun: string) => {
 
 const OrganizationSelect: React.FC = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [organizationCreationStatus, setOrganizationCreationStatus] = useState<OrganizationCreationStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { account, loading: accountLoading } = useAccount();
@@ -52,22 +63,62 @@ const OrganizationSelect: React.FC = () => {
     }
 
     try {
-      const orgsResponse = await fetch("/organizations", {
-        credentials: "include",
-      });
+      const [orgsResponseResult, creationStatusResponseResult] = await Promise.allSettled([
+        fetch("/organizations", {
+          credentials: "include",
+        }),
+        fetch("/account/limits", {
+          credentials: "include",
+        }),
+      ]);
 
-      if (orgsResponse.ok) {
-        const organizations = await orgsResponse.json();
+      if (orgsResponseResult.status === "fulfilled" && orgsResponseResult.value.ok) {
+        const organizations = await orgsResponseResult.value.json();
         setOrganizations(organizations);
       } else {
         setError("Failed to load organizations");
       }
+
+      if (creationStatusResponseResult.status === "fulfilled" && creationStatusResponseResult.value.ok) {
+        const creationStatus = (await creationStatusResponseResult.value.json()) as OrganizationCreationStatus;
+        setOrganizationCreationStatus(creationStatus);
+      } else {
+        setOrganizationCreationStatus(null);
+      }
     } catch {
       setError("Failed to load organizations");
+      setOrganizationCreationStatus(null);
     } finally {
       setLoading(false);
     }
   };
+
+  const createOrganizationDisabled = organizationCreationStatus?.allowed === false;
+  const createOrganizationTooltip =
+    (createOrganizationDisabled ? getUsageLimitNotice(organizationCreationStatus?.message)?.description : null) ||
+    organizationCreationStatus?.message ||
+    "This account cannot create another organization right now.";
+
+  const createOrganizationCardClasses = createOrganizationDisabled
+    ? "h-48 bg-slate-200/70 border-1 border-dashed border-slate-300 rounded-lg p-6 flex flex-col items-center justify-center text-slate-500 cursor-not-allowed"
+    : "h-48 bg-white/50 hover:bg-white border-1 border-dashed border-gray-400 rounded-lg p-6 flex flex-col items-center justify-center transition-colors cursor-pointer";
+
+  const createOrganizationCard = (
+    <div
+      className={createOrganizationCardClasses}
+      aria-disabled={createOrganizationDisabled}
+      tabIndex={createOrganizationDisabled ? 0 : -1}
+    >
+      <div className="flex items-center">
+        <h4 className="text-lg font-medium text-center">+ Create new</h4>
+      </div>
+      <Text className="text-[13px] font-medium text-center">
+        {createOrganizationDisabled
+          ? "Organization limit reached for this account"
+          : "Start fresh with a new organization"}
+      </Text>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -107,7 +158,11 @@ const OrganizationSelect: React.FC = () => {
           {organizations.length === 0 && (
             <div className="text-left py-2 mb-4">
               <Text className="font-medium text-gray-800">You're not a member of any organizations yet.</Text>
-              <Text className="font-medium text-gray-800">Create a new organization to get started!</Text>
+              <Text className="font-medium text-gray-800">
+                {createOrganizationDisabled
+                  ? "This account has reached its organization limit."
+                  : "Create a new organization to get started!"}
+              </Text>
             </div>
           )}
 
@@ -140,17 +195,18 @@ const OrganizationSelect: React.FC = () => {
               </Link>
             ))}
 
-            <Link
-              to="/create"
-              className="h-48 bg-white/50 hover:bg-white border-1 border-dashed border-gray-400 rounded-lg p-6 flex flex-col items-center justify-center transition-colors cursor-pointer"
-            >
-              <div className="flex items-center">
-                <h4 className="text-lg font-medium text-gray-800 text-center">+ Create new</h4>
-              </div>
-              <Text className="text-[13px] text-gray-500 font-medium text-center">
-                Start fresh with a new organization
-              </Text>
-            </Link>
+            {createOrganizationDisabled ? (
+              <Tooltip>
+                <TooltipTrigger asChild>{createOrganizationCard}</TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  {createOrganizationTooltip}
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <Link to="/create" className="block">
+                {createOrganizationCard}
+              </Link>
+            )}
           </div>
         </div>
       </div>

@@ -162,6 +162,12 @@ const (
 
 	// EventTypeResourceActionCancel is sent when a resource action is canceled
 	EventTypeResourceActionCancel = "Microsoft.Resources.ResourceActionCancel"
+
+	// EventTypeBlobCreated is sent when a blob is created or replaced in Azure Blob Storage
+	EventTypeBlobCreated = "Microsoft.Storage.BlobCreated"
+
+	// EventTypeBlobDeleted is sent when a blob is deleted from Azure Blob Storage
+	EventTypeBlobDeleted = "Microsoft.Storage.BlobDeleted"
 )
 
 // Resource type constants
@@ -180,7 +186,61 @@ const (
 
 	// ResourceTypePublicIPAddress is the resource type for Azure Public IP Addresses
 	ResourceTypePublicIPAddress = "Microsoft.Network/publicIPAddresses"
+
+	// ResourceTypeContainerRegistry is the resource type for Azure Container Registries
+	ResourceTypeContainerRegistry = "Microsoft.ContainerRegistry/registries"
 )
+
+// ACR event type constants
+const (
+	// EventTypeContainerImagePushed is sent when a container image is pushed to an ACR registry
+	EventTypeContainerImagePushed = "Microsoft.ContainerRegistry.ImagePushed"
+
+	// EventTypeContainerImageDeleted is sent when a container image is deleted from an ACR registry
+	EventTypeContainerImageDeleted = "Microsoft.ContainerRegistry.ImageDeleted"
+)
+
+// ACRTarget contains information about the image that was pushed or deleted
+type ACRTarget struct {
+	MediaType  string `json:"mediaType"`
+	Size       int64  `json:"size"`
+	Digest     string `json:"digest"`
+	Length     int64  `json:"length"`
+	Repository string `json:"repository"`
+	Tag        string `json:"tag"`
+	URL        string `json:"url"`
+}
+
+// ACRRequest contains information about the HTTP request that triggered the ACR event
+type ACRRequest struct {
+	ID        string `json:"id"`
+	Addr      string `json:"addr"`
+	Host      string `json:"host"`
+	Method    string `json:"method"`
+	UserAgent string `json:"useragent"`
+}
+
+// ACRActorInfo contains information about the actor that triggered the ACR event
+type ACRActorInfo struct {
+	Name string `json:"name"`
+}
+
+// ACRSource contains information about the registry instance that generated the event
+type ACRSource struct {
+	Addr       string `json:"addr"`
+	InstanceID string `json:"instanceID"`
+}
+
+// ACREventData contains the data payload for ACR Image Push and Delete events
+type ACREventData struct {
+	ID        string        `json:"id"`
+	Timestamp string        `json:"timestamp"`
+	Action    string        `json:"action"`
+	Target    *ACRTarget    `json:"target"`
+	Request   *ACRRequest   `json:"request"`
+	Actor     *ACRActorInfo `json:"actor"`
+	Source    *ACRSource    `json:"source"`
+}
 
 // extractVMName returns VM name from ARM resource ID.
 func extractVMName(resourceID string) string {
@@ -216,6 +276,78 @@ func extractSubscriptionID(resourceID string) string {
 // isVirtualMachineEvent reports whether an event subject targets a VM.
 func isVirtualMachineEvent(subject string) bool {
 	return strings.Contains(strings.ToLower(subject), strings.ToLower(ResourceTypeVirtualMachine))
+}
+
+// BlobEventData contains the data payload for Azure Blob Storage created/deleted events.
+type BlobEventData struct {
+	API             string `json:"api"`
+	ClientRequestID string `json:"clientRequestId"`
+	RequestID       string `json:"requestId"`
+	ETag            string `json:"eTag"`
+	ContentType     string `json:"contentType"`
+	ContentLength   int64  `json:"contentLength"`
+	BlobType        string `json:"blobType"`
+	URL             string `json:"url"`
+	Sequencer       string `json:"sequencer"`
+}
+
+// extractBlobContainer extracts the container name from an Azure Blob Storage event subject.
+// Blob subjects follow the format: /blobServices/default/containers/{container}/blobs/{blob-path}
+func extractBlobContainer(subject string) string {
+	const marker = "/containers/"
+	idx := strings.Index(subject, marker)
+	if idx < 0 {
+		return ""
+	}
+	rest := subject[idx+len(marker):]
+	slash := strings.Index(rest, "/")
+	if slash < 0 {
+		return rest
+	}
+	return rest[:slash]
+}
+
+// extractBlobName extracts the blob path from an Azure Blob Storage event subject.
+func extractBlobName(subject string) string {
+	const marker = "/blobs/"
+	idx := strings.Index(subject, marker)
+	if idx < 0 {
+		return ""
+	}
+	return subject[idx+len(marker):]
+}
+
+// extractACRRepository extracts the repository name from an ACR subject.
+// ACR subjects follow the format: registry.azurecr.io/repository:tag
+// or registry.azurecr.io/repository@sha256:digest
+func extractACRRepository(subject string) string {
+	slashIdx := strings.Index(subject, "/")
+	if slashIdx < 0 {
+		return ""
+	}
+	repoAndRef := subject[slashIdx+1:]
+	if colonIdx := strings.Index(repoAndRef, ":"); colonIdx >= 0 {
+		return repoAndRef[:colonIdx]
+	}
+	if atIdx := strings.Index(repoAndRef, "@"); atIdx >= 0 {
+		return repoAndRef[:atIdx]
+	}
+	return repoAndRef
+}
+
+// extractACRTag extracts the tag from an ACR subject.
+// Returns empty string if the subject uses a digest reference.
+func extractACRTag(subject string) string {
+	slashIdx := strings.Index(subject, "/")
+	if slashIdx < 0 {
+		return ""
+	}
+	repoAndRef := subject[slashIdx+1:]
+	colonIdx := strings.Index(repoAndRef, ":")
+	if colonIdx < 0 {
+		return ""
+	}
+	return repoAndRef[colonIdx+1:]
 }
 
 // isSuccessfulStatus reports whether the event status indicates success.

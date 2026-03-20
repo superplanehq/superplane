@@ -198,8 +198,6 @@ export interface CanvasPageProps {
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
-  onExportYamlCopy?: (nodes: CanvasNode[]) => void;
-  onExportYamlDownload?: (nodes: CanvasNode[]) => void;
   // Undo functionality
   onUndo?: () => void;
   canUndo?: boolean;
@@ -868,10 +866,10 @@ function CanvasPage(props: CanvasPageProps) {
   const canvasStateMode = props.canvasStateMode || "default";
   const canvasStateBorderClass =
     canvasStateMode === "editing"
-      ? "border-amber-500"
+      ? "border-3 border-amber-500"
       : canvasStateMode === "previewing-previous-version"
-        ? "border-sky-500"
-        : "border-transparent";
+        ? "border-3 border-sky-500"
+        : "";
   const canvasStateBadgeClass =
     canvasStateMode === "editing"
       ? "bg-amber-500"
@@ -928,8 +926,6 @@ function CanvasPage(props: CanvasPageProps) {
           showVersioningTab={props.showVersioningTab}
           memoryItemCount={props.memoryItemCount}
           versioningItemCount={props.versioningItemCount}
-          onExportYamlCopy={props.onExportYamlCopy}
-          onExportYamlDownload={props.onExportYamlDownload}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -949,6 +945,7 @@ function CanvasPage(props: CanvasPageProps) {
             blocks={props.buildingBlocks || []}
             showAiBuilderTab={props.showAiBuilderTab}
             canvasId={props.canvasId}
+            organizationId={props.organizationId}
             canvasNodes={canvasNodesForAiContext}
             onApplyAiOperations={props.onApplyAiOperations}
             integrations={props.integrations}
@@ -959,7 +956,7 @@ function CanvasPage(props: CanvasPageProps) {
             onAddNote={handleAddNote}
           />
 
-          <div className={`flex-1 relative border-3 ${canvasStateBorderClass}`}>
+          <div className={`flex-1 relative ${canvasStateBorderClass}`}>
             {canvasStateLabel ? (
               <div
                 className={`uppercase absolute bottom-0 right-0 z-20 px-3 py-1 text-xs font-semibold text-white ${canvasStateBadgeClass}`}
@@ -1436,8 +1433,6 @@ function CanvasContentHeader({
   showVersioningTab,
   memoryItemCount,
   versioningItemCount,
-  onExportYamlCopy,
-  onExportYamlDownload,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1477,8 +1472,6 @@ function CanvasContentHeader({
   showVersioningTab?: boolean;
   memoryItemCount?: number;
   versioningItemCount?: number;
-  onExportYamlCopy?: (nodes: CanvasNode[]) => void;
-  onExportYamlDownload?: (nodes: CanvasNode[]) => void;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1488,18 +1481,6 @@ function CanvasContentHeader({
       onSave(stateRef.current.nodes);
     }
   }, [onSave]);
-
-  const handleExportYamlCopy = useCallback(() => {
-    if (onExportYamlCopy) {
-      onExportYamlCopy(stateRef.current.nodes);
-    }
-  }, [onExportYamlCopy]);
-
-  const handleExportYamlDownload = useCallback(() => {
-    if (onExportYamlDownload) {
-      onExportYamlDownload(stateRef.current.nodes);
-    }
-  }, [onExportYamlDownload]);
 
   const handleLogoClick = useCallback(() => {
     if (organizationId) {
@@ -1548,8 +1529,6 @@ function CanvasContentHeader({
       showVersioningTab={showVersioningTab}
       memoryItemCount={memoryItemCount}
       versioningItemCount={versioningItemCount}
-      onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
-      onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
     />
   );
 }

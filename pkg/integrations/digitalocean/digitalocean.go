@@ -79,6 +79,14 @@ func (d *DigitalOcean) Components() []core.Component {
 		&CreateDNSRecord{},
 		&DeleteDNSRecord{},
 		&UpsertDNSRecord{},
+		&CreateLoadBalancer{},
+		&DeleteLoadBalancer{},
+		&AssignReservedIP{},
+		&CreateAlertPolicy{},
+		&GetAlertPolicy{},
+		&UpdateAlertPolicy{},
+		&DeleteAlertPolicy{},
+		&GetDropletMetrics{},
 	}
 }
 

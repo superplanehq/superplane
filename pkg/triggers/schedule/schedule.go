@@ -157,9 +157,6 @@ func (s *Schedule) Configuration() []configuration.Field {
 			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "type", Values: []string{"days", "weeks", "months", "cron"}},
 			},
-			TypeOptions: &configuration.TypeOptions{
-				Timezone: &configuration.TimezoneTypeOptions{},
-			},
 		},
 		{
 			Name:        "minutesInterval",
@@ -344,9 +341,6 @@ func (s *Schedule) Configuration() []configuration.Field {
 			},
 			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "type", Values: []string{"cron"}},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				Cron: &configuration.CronTypeOptions{},
 			},
 		},
 	}
