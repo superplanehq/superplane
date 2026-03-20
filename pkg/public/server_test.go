@@ -546,7 +546,7 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 
 		response := execRequest(server, requestParams{
 			method:     "GET",
-			path:       "/organizations/creation-status",
+			path:       "/account/limits",
 			authCookie: token,
 		})
 
@@ -611,7 +611,7 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 
 		response := execRequest(server, requestParams{
 			method:     "GET",
-			path:       "/organizations/creation-status",
+			path:       "/account/limits",
 			authCookie: token,
 		})
 

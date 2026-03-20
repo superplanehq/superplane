@@ -67,7 +67,7 @@ const OrganizationSelect: React.FC = () => {
         fetch("/organizations", {
           credentials: "include",
         }),
-        fetch("/organizations/creation-status", {
+        fetch("/account/limits", {
           credentials: "include",
         }),
       ]);
