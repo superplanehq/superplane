@@ -102,7 +102,7 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 	}
 
 	for _, event := range newEvents {
-		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
 	return nil

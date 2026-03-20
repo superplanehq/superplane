@@ -1,6 +1,6 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Box, GitBranch, MoreVertical, Palette, Pencil, Plus, Rainbow, Search, Trash2 } from "lucide-react";
+import { Box, GitBranch, MoreVertical, Pencil, Plus, Rainbow, Search, Trash2, Upload } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -19,10 +19,13 @@ import { useDeleteCanvas, useCanvases, canvasKeys } from "../../hooks/useCanvasD
 import { resolveIcon } from "../../lib/utils";
 import { isCustomComponentsEnabled } from "../../lib/env";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
+import { ImportYamlDialog } from "../canvas/ImportYamlDialog";
 
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
 import { useCreateCustomComponentModalState } from "./useCreateCustomComponentModalState";
+import { OnboardingWelcome } from "./OnboardingWelcome";
 import type { ComponentsEdge, ComponentsNode } from "@/api-client";
 
 type TabType = "canvases" | "custom-components";
@@ -51,6 +54,7 @@ const HomePage = () => {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<TabType>("canvases");
+  const [isImportYamlOpen, setIsImportYamlOpen] = useState(false);
 
   const canvasModalState = useCreateCanvasModalState();
   const customComponentModalState = useCreateCustomComponentModalState();
@@ -166,6 +170,7 @@ const HomePage = () => {
               <PageHeader
                 activeTab={activeTab}
                 onNewClick={onNewClick}
+                onImportYamlClick={() => setIsImportYamlOpen(true)}
                 canCreateCanvases={canCreateCanvases}
                 canCreateBlueprints={canCreateBlueprints}
                 permissionsLoading={permissionsLoading}
@@ -201,7 +206,6 @@ const HomePage = () => {
                 organizationId={organizationId}
                 searchQuery={searchQuery}
                 onEditCanvas={canvasModalState.onOpenEdit}
-                onNewClick={onNewClick}
                 canCreateCanvases={canCreateCanvases}
                 canUpdateCanvases={canUpdateCanvases}
                 canDeleteCanvases={canDeleteCanvases}
@@ -216,6 +220,14 @@ const HomePage = () => {
 
       <CreateCanvasModal {...canvasModalState} />
       {isCustomComponentsEnabled() && <CreateCustomComponentModal {...customComponentModalState} />}
+      {organizationId && (
+        <ImportYamlDialog
+          open={isImportYamlOpen}
+          onOpenChange={setIsImportYamlOpen}
+          organizationId={organizationId}
+          onSuccess={(canvasId) => navigate(`/${organizationId}/canvases/${canvasId}`)}
+        />
+      )}
     </div>
   );
 };
@@ -290,6 +302,7 @@ function SearchBar({ activeTab, searchQuery, setSearchQuery }: SearchBarProps) {
 interface PageHeaderProps {
   activeTab: TabType;
   onNewClick: () => void;
+  onImportYamlClick: () => void;
   canCreateCanvases: boolean;
   canCreateBlueprints: boolean;
   permissionsLoading: boolean;
@@ -298,6 +311,7 @@ interface PageHeaderProps {
 function PageHeader({
   activeTab,
   onNewClick,
+  onImportYamlClick,
   canCreateCanvases,
   canCreateBlueprints,
   permissionsLoading,
@@ -323,12 +337,28 @@ function PageHeader({
         <Text className="text-gray-800 dark:text-gray-400">{description}</Text>
       </div>
 
-      <PermissionTooltip allowed={canCreate || permissionsLoading} message={createMessage}>
-        <Button onClick={onNewClick} size="sm" disabled={!canCreate}>
-          <Plus size={16} />
-          {buttonText}
-        </Button>
-      </PermissionTooltip>
+      <div className="flex items-center gap-2">
+        {activeTab === "canvases" && (
+          <PermissionTooltip allowed={canCreate || permissionsLoading} message={createMessage}>
+            <Button
+              data-testid="import-yaml-button"
+              variant="outline"
+              size="sm"
+              onClick={onImportYamlClick}
+              disabled={!canCreate}
+            >
+              <Upload size={16} />
+              Import YAML
+            </Button>
+          </PermissionTooltip>
+        )}
+        <PermissionTooltip allowed={canCreate || permissionsLoading} message={createMessage}>
+          <Button onClick={onNewClick} size="sm" disabled={!canCreate}>
+            <Plus size={16} />
+            {buttonText}
+          </Button>
+        </PermissionTooltip>
+      </div>
     </div>
   );
 }
@@ -356,7 +386,6 @@ function Content({
   organizationId,
   searchQuery,
   onEditCanvas,
-  onNewClick,
   canCreateCanvases,
   canUpdateCanvases,
   canDeleteCanvases,
@@ -370,7 +399,6 @@ function Content({
   organizationId: string;
   searchQuery: string;
   onEditCanvas: (canvas: CanvasCardData) => void;
-  onNewClick: () => void;
   canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
@@ -380,10 +408,12 @@ function Content({
 }) {
   if (activeTab === "canvases") {
     if (filteredCanvases.length === 0) {
+      if (searchQuery) {
+        return <CanvasesSearchEmptyState />;
+      }
       return (
-        <CanvasesEmptyState
-          searchQuery={searchQuery}
-          onNewClick={onNewClick}
+        <OnboardingWelcome
+          organizationId={organizationId}
           canCreateCanvases={canCreateCanvases}
           permissionsLoading={permissionsLoading}
         />
@@ -433,44 +463,14 @@ function CustomComponentsEmptyState({ searchQuery }: { searchQuery: string }) {
   );
 }
 
-function CanvasesEmptyState({
-  searchQuery,
-  onNewClick,
-  canCreateCanvases,
-  permissionsLoading,
-}: {
-  searchQuery: string;
-  onNewClick: () => void;
-  canCreateCanvases: boolean;
-  permissionsLoading: boolean;
-}) {
-  // Show different state when there's a search query vs when it's truly empty
-  if (searchQuery) {
-    return (
-      <div className="text-center py-12">
-        <GitBranch className="mx-auto text-gray-400 mb-4" size={48} />
-        <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
-          No canvases found
-        </Heading>
-        <Text className="text-gray-500 dark:text-gray-400 mb-6">Try adjusting your search criteria.</Text>
-      </div>
-    );
-  }
-
-  // Empty state when there are no canvases at all
+function CanvasesSearchEmptyState() {
   return (
     <div className="text-center py-12">
-      <Palette className="mx-auto text-gray-800 dark:text-gray-300 mb-4" size={24} />
-      <p className="text-sm text-gray-800 dark:text-gray-300 mb-6">Create your first Canvas</p>
-      <PermissionTooltip
-        allowed={canCreateCanvases || permissionsLoading}
-        message="You don't have permission to create canvases."
-      >
-        <Button onClick={onNewClick} size="sm" disabled={!canCreateCanvases}>
-          <Plus size={16} />
-          New Canvas
-        </Button>
-      </PermissionTooltip>
+      <GitBranch className="mx-auto text-gray-400 mb-4" size={48} />
+      <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
+        No canvases found
+      </Heading>
+      <Text className="text-gray-500 dark:text-gray-400 mb-6">Try adjusting your search criteria.</Text>
     </div>
   );
 }
@@ -824,18 +824,20 @@ function CanvasActionsMenu({
           This cannot be undone. Are you sure you want to continue?
         </DialogDescription>
         <DialogActions>
-          <Button
+          <LoadingButton
             variant="destructive"
             onClick={(event) => {
               event.stopPropagation();
               handleDelete();
             }}
-            disabled={deleteCanvasMutation.isPending || !canDeleteCanvases}
+            disabled={!canDeleteCanvases}
+            loading={deleteCanvasMutation.isPending}
+            loadingText="Deleting..."
             className="flex items-center gap-2"
           >
             <Trash2 size={16} />
-            {deleteCanvasMutation.isPending ? "Deleting..." : "Delete"}
-          </Button>
+            Delete
+          </LoadingButton>
           <Button
             variant="outline"
             onClick={(event) => {
@@ -973,15 +975,17 @@ function BlueprintActionsMenu({
           This cannot be undone. Are you sure you want to continue?
         </DialogDescription>
         <DialogActions>
-          <Button
+          <LoadingButton
             variant="destructive"
             onClick={handleDelete}
-            disabled={deleteBlueprintMutation.isPending || !canDeleteBlueprints}
+            disabled={!canDeleteBlueprints}
+            loading={deleteBlueprintMutation.isPending}
+            loadingText="Deleting..."
             className="flex items-center gap-2"
           >
             <Trash2 size={16} />
-            {deleteBlueprintMutation.isPending ? "Deleting..." : "Delete"}
-          </Button>
+            Delete
+          </LoadingButton>
           <Button variant="outline" onClick={closeDialog}>
             Cancel
           </Button>

@@ -3,10 +3,8 @@ import {
   CloudAlert,
   CloudCheck,
   CloudUpload,
-  Copy,
   Home,
   ChevronDown,
-  Download,
   LogOut,
   Palette,
   RotateCcw,
@@ -22,7 +20,6 @@ import { Link, useParams } from "react-router-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 export interface BreadcrumbItem {
   label: string;
@@ -62,8 +59,6 @@ interface HeaderProps {
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
-  onExportYamlCopy?: () => void;
-  onExportYamlDownload?: () => void;
   topViewMode?: "canvas" | "yaml" | "memory" | "settings" | "versioning";
   onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings" | "versioning") => void;
   showVersioningTab?: boolean;
@@ -102,8 +97,6 @@ export function Header({
   onToggleAutoSave,
   autoSaveDisabled,
   autoSaveDisabledTooltip,
-  onExportYamlCopy,
-  onExportYamlDownload,
   topViewMode,
   onTopViewModeChange,
   showVersioningTab = true,
@@ -122,10 +115,8 @@ export function Header({
   const { workflowId } = useParams<{ workflowId?: string }>();
   const { data: workflows = [], isLoading: workflowsLoading } = useCanvases(organizationId || "");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isYamlMenuOpen, setIsYamlMenuOpen] = useState(false);
   const [isEditingMenuOpen, setIsEditingMenuOpen] = useState(false);
   const [isSaveMenuOpen, setIsSaveMenuOpen] = useState(false);
-  const [exportAction, setExportAction] = useState<string>("");
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   // Get the workflow name from the workflows list if workflowId is available
@@ -374,75 +365,6 @@ export function Header({
           <div className="flex items-center gap-2 justify-self-end">
             {isDefaultMode ? (
               <>
-                {isVersioningDisabledMode && onExportYamlCopy && onExportYamlDownload ? (
-                  <Select
-                    value={exportAction || undefined}
-                    onValueChange={(value) => {
-                      setExportAction(value);
-                      if (value === "copy") {
-                        onExportYamlCopy();
-                      }
-                      if (value === "download") {
-                        onExportYamlDownload();
-                      }
-                      setExportAction("");
-                    }}
-                  >
-                    <SelectTrigger className="h-5 w-fit min-w-0 rounded-md border-gray-300 px-1 py-0 text-xs font-mono text-gray-500 data-[placeholder]:text-gray-500 shadow-none [&>svg]:hidden">
-                      <SelectValue placeholder=".yaml" />
-                    </SelectTrigger>
-                    <SelectContent align="end">
-                      <SelectItem value="copy">
-                        <span className="flex items-center gap-2">
-                          <Copy className="h-3.5 w-3.5" />
-                          Copy to Clipboard
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="download">
-                        <span className="flex items-center gap-2">
-                          <Download className="h-3.5 w-3.5" />
-                          Download File
-                        </span>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : null}
-                {!isVersioningDisabledMode && onExportYamlCopy && onExportYamlDownload ? (
-                  <DropdownMenu open={isYamlMenuOpen} onOpenChange={setIsYamlMenuOpen}>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 px-2 text-xs font-mono">
-                        .yaml
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44 p-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="w-full justify-start"
-                        size="sm"
-                        onClick={() => {
-                          onExportYamlCopy();
-                          setIsYamlMenuOpen(false);
-                        }}
-                      >
-                        Copy to clipboard
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="w-full justify-start"
-                        size="sm"
-                        onClick={() => {
-                          onExportYamlDownload();
-                          setIsYamlMenuOpen(false);
-                        }}
-                      >
-                        Download file
-                      </Button>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : null}
                 {!isVersioningDisabledMode && unsavedMessage ? (
                   <span className="text-xs font-medium text-yellow-700 bg-orange-100 px-2 py-1 rounded hidden sm:inline">
                     {unsavedMessage}

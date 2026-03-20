@@ -208,6 +208,26 @@ func (c *armClient) put(ctx context.Context, url string, body any) (*http.Respon
 	return resp, nil
 }
 
+// patch performs a PATCH request with a JSON body and returns the raw response.
+func (c *armClient) patch(ctx context.Context, url string, body any) (*http.Response, error) {
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	resp, err := c.doRequest(ctx, http.MethodPatch, url, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode >= 400 {
+		defer resp.Body.Close()
+		return nil, readARMError(resp)
+	}
+
+	return resp, nil
+}
+
 // deleteAndPoll performs a DELETE, then polls the LRO until terminal state.
 func (c *armClient) deleteAndPoll(ctx context.Context, url string) error {
 	resp, err := c.doRequest(ctx, http.MethodDelete, url, nil)
@@ -247,6 +267,62 @@ func (c *armClient) deleteAndPoll(ctx context.Context, url string) error {
 
 	if pollURL == "" {
 		// No poll URL but 202 — treat as success
+		return nil
+	}
+
+	_, err = c.pollLRO(ctx, pollURL, "")
+	return err
+}
+
+// postAndPoll performs a POST (with an optional JSON body), then polls the
+// LRO until terminal state. Used for VM actions (start, stop, deallocate,
+// restart) that return 202 Accepted.
+func (c *armClient) postAndPoll(ctx context.Context, url string, body any) error {
+	var bodyReader io.Reader
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("failed to marshal request body: %w", err)
+		}
+		bodyReader = bytes.NewReader(jsonBody)
+	}
+
+	resp, err := c.doRequest(ctx, http.MethodPost, url, bodyReader)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return readARMError(resp)
+	}
+
+	// 200 or 204 with no async header means synchronous completion
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
+		asyncURL := resp.Header.Get("Azure-AsyncOperation")
+		locationURL := resp.Header.Get("Location")
+		if asyncURL == "" && locationURL == "" {
+			return nil
+		}
+
+		pollURL := asyncURL
+		if pollURL == "" {
+			pollURL = locationURL
+		}
+		_, err = c.pollLRO(ctx, pollURL, "")
+		return err
+	}
+
+	// 202 Accepted — poll the LRO
+	asyncURL := resp.Header.Get("Azure-AsyncOperation")
+	locationURL := resp.Header.Get("Location")
+
+	pollURL := asyncURL
+	if pollURL == "" {
+		pollURL = locationURL
+	}
+
+	if pollURL == "" {
 		return nil
 	}
 

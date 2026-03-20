@@ -46,14 +46,18 @@ import (
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbServiceAccounts "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
 	grpcLib "google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -80,6 +84,7 @@ type Server struct {
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
 	isDev                 bool
+	usageService          usage.Service
 }
 
 // WebsocketHub returns the websocket hub for this server
@@ -98,6 +103,7 @@ func NewServer(
 	appEnv string,
 	templateDir string,
 	authorizationService authorization.Authorization,
+	usageService usage.Service,
 	blockSignup bool,
 	middlewares ...mux.MiddlewareFunc,
 ) (*Server, error) {
@@ -118,6 +124,7 @@ func NewServer(
 		timeoutHandlerTimeout: 15 * time.Second,
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
+		usageService:          usageService,
 		oidcProvider:          oidcProvider,
 		registry:              registry,
 		authService:           authorizationService,
@@ -430,6 +437,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute := r.NewRoute().Subrouter()
 	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
 	accountRoute.HandleFunc("/account", s.getAccount).Methods("GET")
+	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
 
@@ -533,12 +541,101 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	for _, event := range newEvents {
-		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 }
 
 type OrganizationCreationRequest struct {
 	Name string `json:"name"`
+}
+
+type organizationCreationStatusResponse struct {
+	Allowed              bool   `json:"allowed"`
+	UsageEnabled         bool   `json:"usageEnabled"`
+	CurrentOrganizations int32  `json:"currentOrganizations"`
+	MaxOrganizations     int32  `json:"maxOrganizations"`
+	Message              string `json:"message,omitempty"`
+}
+
+func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Request) {
+	account, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+
+	response, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
+	if err != nil {
+		log.Errorf("Error loading organization creation status for account %s: %v", account.ID, err)
+		http.Error(w, "Failed to load organization creation status", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func (s *Server) describeOrganizationCreationStatus(
+	ctx context.Context,
+	accountID string,
+) (*organizationCreationStatusResponse, error) {
+	organizationCount, err := models.CountOrganizationsByBillingAccount(accountID)
+	if err != nil {
+		return nil, fmt.Errorf("count organizations for account %s: %w", accountID, err)
+	}
+
+	response := &organizationCreationStatusResponse{
+		Allowed:              true,
+		UsageEnabled:         s.usageService != nil && s.usageService.Enabled(),
+		CurrentOrganizations: int32(organizationCount),
+	}
+
+	if !response.UsageEnabled {
+		return response, nil
+	}
+
+	checkResponse, err := s.checkAccountOrganizationCreationLimits(
+		ctx,
+		accountID,
+		&usagepb.AccountState{Organizations: int32(organizationCount + 1)},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("check account limits for account %s: %w", accountID, err)
+	}
+
+	response.MaxOrganizations = checkResponse.GetLimits().GetMaxOrganizations()
+
+	if violationErr := usage.LimitViolationError(checkResponse.GetViolations()); violationErr != nil {
+		response.Allowed = false
+		response.Message = status.Convert(violationErr).Message()
+	}
+
+	return response, nil
+}
+
+func (s *Server) checkAccountOrganizationCreationLimits(
+	ctx context.Context,
+	accountID string,
+	state *usagepb.AccountState,
+) (*usagepb.CheckAccountLimitsResponse, error) {
+	if s.usageService == nil || !s.usageService.Enabled() {
+		return &usagepb.CheckAccountLimitsResponse{Allowed: true}, nil
+	}
+
+	response, err := s.usageService.CheckAccountLimits(ctx, accountID, state)
+	if err == nil {
+		return response, nil
+	}
+
+	if status.Code(err) != codes.NotFound {
+		return nil, err
+	}
+
+	if _, setupErr := s.usageService.SetupAccount(ctx, accountID); setupErr != nil && status.Code(setupErr) != codes.AlreadyExists {
+		return nil, setupErr
+	}
+
+	return s.usageService.CheckAccountLimits(ctx, accountID, state)
 }
 
 func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
@@ -563,6 +660,18 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 
 	if req.Name == "" {
 		http.Error(w, "Name is required", http.StatusBadRequest)
+		return
+	}
+
+	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
+	if err != nil {
+		log.Errorf("Error checking organization creation status for account %s: %v", account.ID, err)
+		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		return
+	}
+
+	if !creationStatus.Allowed {
+		http.Error(w, creationStatus.Message, http.StatusTooManyRequests)
 		return
 	}
 
@@ -618,6 +727,11 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Infof("Organization %s (%s) created successfully", organization.Name, organization.ID)
+
+	organizationCreatedMessage := messages.NewOrganizationCreatedMessage(organization.ID.String())
+	if err := organizationCreatedMessage.Publish(); err != nil {
+		log.Errorf("Failed to publish organization created message for %s: %v", organization.ID, err)
+	}
 
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
@@ -799,7 +913,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, event := range newEvents {
-		messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
 	if firstResponse != nil {

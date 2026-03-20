@@ -96,9 +96,6 @@ import type {
   CanvasesResolveExecutionErrorsData,
   CanvasesResolveExecutionErrorsErrors,
   CanvasesResolveExecutionErrorsResponses,
-  CanvasesSendAiMessageData,
-  CanvasesSendAiMessageErrors,
-  CanvasesSendAiMessageResponses,
   CanvasesUpdateCanvasData,
   CanvasesUpdateCanvasErrors,
   CanvasesUpdateCanvasResponses,
@@ -177,6 +174,9 @@ import type {
   OrganizationsDescribeOrganizationData,
   OrganizationsDescribeOrganizationErrors,
   OrganizationsDescribeOrganizationResponses,
+  OrganizationsDescribeUsageData,
+  OrganizationsDescribeUsageErrors,
+  OrganizationsDescribeUsageResponses,
   OrganizationsGetAgentSettingsData,
   OrganizationsGetAgentSettingsErrors,
   OrganizationsGetAgentSettingsResponses,
@@ -411,23 +411,6 @@ export const canvasesCreateCanvas = <ThrowOnError extends boolean = true>(
 ) =>
   (options.client ?? client).post<CanvasesCreateCanvasResponses, CanvasesCreateCanvasErrors, ThrowOnError>({
     url: "/api/v1/canvases",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
-
-/**
- * Generate AI canvas proposal
- *
- * Generates a structured, non-persistent canvas proposal from a natural language prompt
- */
-export const canvasesSendAiMessage = <ThrowOnError extends boolean = true>(
-  options: Options<CanvasesSendAiMessageData, ThrowOnError>,
-) =>
-  (options.client ?? client).post<CanvasesSendAiMessageResponses, CanvasesSendAiMessageErrors, ThrowOnError>({
-    url: "/api/v1/canvases/{canvasId}/ai/messages",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1418,6 +1401,19 @@ export const organizationsResetInviteLink = <ThrowOnError extends boolean = true
     OrganizationsResetInviteLinkErrors,
     ThrowOnError
   >({ url: "/api/v1/organizations/{id}/invite-link/reset", ...options });
+
+/**
+ * Describe organization usage
+ *
+ * Returns usage tracking and limits for an organization
+ */
+export const organizationsDescribeUsage = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsDescribeUsageData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<OrganizationsDescribeUsageResponses, OrganizationsDescribeUsageErrors, ThrowOnError>({
+    url: "/api/v1/organizations/{id}/usage",
+    ...options,
+  });
 
 /**
  * Remove a user from an organization

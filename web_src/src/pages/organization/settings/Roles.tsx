@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { AuthorizationPermission, RolesRole } from "../../../api-client/types.gen";
 import { Icon } from "../../../components/Icon";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
@@ -16,6 +17,7 @@ interface RolesProps {
 }
 
 export function Roles({ organizationId }: RolesProps) {
+  usePageTitle(["Roles"]);
   const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   // Use React Query hooks for data fetching

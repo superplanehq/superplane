@@ -265,7 +265,7 @@ func PublishCanvasChangeRequest(
 		return nil, nil, actions.ToStatus(err)
 	}
 
-	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String()).Publish(true); err != nil {
+	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishUpdated(); err != nil {
 		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", err)
 	}
 	if liveVersion != nil {

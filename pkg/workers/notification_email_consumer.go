@@ -16,7 +16,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const NotificationEmailServiceName = "superplane" + "." + messages.WorkflowExchange + "." + messages.NotificationEmailRequestedRoutingKey + ".worker-consumer"
+const NotificationEmailServiceName = "superplane" + "." + messages.CanvasExchange + "." + messages.NotificationEmailRequestedRoutingKey + ".worker-consumer"
 const NotificationEmailConnectionName = "superplane"
 
 type NotificationEmailConsumer struct {
@@ -51,7 +51,7 @@ func (c *NotificationEmailConsumer) Start() error {
 		URL:            c.RabbitMQURL,
 		ConnectionName: NotificationEmailConnectionName,
 		Service:        NotificationEmailServiceName,
-		RemoteExchange: messages.WorkflowExchange,
+		RemoteExchange: messages.CanvasExchange,
 		RoutingKey:     messages.NotificationEmailRequestedRoutingKey,
 	}
 

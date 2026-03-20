@@ -14,13 +14,15 @@ import (
 
 type IndexDocument struct{}
 
+const defaultDocumentTimestampTemplate = `{{ now().UTC().Format("2006-01-02T15:04:05Z") }}`
+
 type IndexDocumentConfiguration struct {
 	Index      string         `json:"index" mapstructure:"index"`
 	Document   map[string]any `json:"document" mapstructure:"document"`
 	DocumentID string         `json:"documentId" mapstructure:"documentId"`
 }
 
-type IndexDocumentMetadata struct {
+type IndexDocumentSetupMetadata struct {
 	Index string `json:"index" mapstructure:"index"`
 }
 
@@ -44,7 +46,7 @@ func (c *IndexDocument) Documentation() string {
 ## Configuration
 
 - **Index**: The Elasticsearch index name to write to (e.g. ` + "`workflow-audit`" + `)
-- **Document**: The JSON object to index
+- **Document**: The JSON object to index. The editor starts with an ` + "`@timestamp`" + ` template so documents are compatible with On Document Indexed by default.
 - **Document ID** *(optional)*: A stable ID for idempotent writes. If omitted, Elasticsearch generates one automatically. Providing an ID means re-runs update the existing document rather than creating a duplicate.
 
 ## Outputs
@@ -75,12 +77,14 @@ func (c *IndexDocument) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "document",
-			Label:       "Document",
-			Type:        configuration.FieldTypeObject,
-			Required:    true,
-			Default:     map[string]any{},
-			Description: "The JSON document to index.",
+			Name:     "document",
+			Label:    "Document",
+			Type:     configuration.FieldTypeObject,
+			Required: true,
+			Default: map[string]any{
+				onDocumentIndexedTimeField: defaultDocumentTimestampTemplate,
+			},
+			Description: "The JSON document to index. Defaults to include an @timestamp field template.",
 		},
 		{
 			Name:        "documentId",
@@ -129,8 +133,10 @@ func (c *IndexDocument) Setup(ctx core.SetupContext) error {
 		resolvedIndex = indices[match].Index
 	}
 
-	if err := ctx.Metadata.Set(IndexDocumentMetadata{Index: resolvedIndex}); err != nil {
-		return fmt.Errorf("failed to set metadata: %w", err)
+	if ctx.Metadata != nil {
+		if err := ctx.Metadata.Set(IndexDocumentSetupMetadata{Index: resolvedIndex}); err != nil {
+			return fmt.Errorf("failed to save metadata: %w", err)
+		}
 	}
 
 	return nil

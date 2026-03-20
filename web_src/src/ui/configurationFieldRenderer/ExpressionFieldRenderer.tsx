@@ -13,7 +13,7 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
 }) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
 
-  if (field.disallowExpression || !allowExpressions) {
+  if (!allowExpressions) {
     return (
       <Input
         type={field.sensitive ? "password" : "text"}

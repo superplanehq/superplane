@@ -2,13 +2,14 @@
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
-DOCKER_COMPOSE_OPTS=-f docker-compose.dev.yml
 BASE_URL?=https://app.superplane.com
 
 export BUILDKIT_PROGRESS ?= plain
 
 PKG_TEST_PACKAGES := ./pkg/...
 E2E_TEST_PACKAGES := ./test/e2e/...
+
+COMPOSE=docker compose -f docker-compose.dev.yml
 
 #
 # Long sausage command to run tests with gotestsum
@@ -18,42 +19,43 @@ E2E_TEST_PACKAGES := ./test/e2e/...
 # - exports junit report
 # - sets parallelism to 1
 #
-GOTESTSUM=docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml 
+GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml 
 
 #
 # Targets for test environment
 #
 
 lint:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app revive -formatter friendly -config lint.toml -exclude ./tmp/... ./...
+	$(COMPOSE) exec app revive -formatter friendly -config lint.toml -exclude ./tmp/... ./...
 
 tidy:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app go mod tidy
+	$(COMPOSE) exec app go mod tidy
 
 test.setup:
+	@touch agent/.env
 	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
 	@mkdir -p tmp/screenshots
-	docker compose $(DOCKER_COMPOSE_OPTS) build
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go mod download
+	$(COMPOSE) build
+	$(COMPOSE) run --rm app go mod download
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
 test.start:
-	docker compose $(DOCKER_COMPOSE_OPTS) up -d
+	$(COMPOSE) up -d
 	sleep 5
 
 test.down:
-	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans
+	$(COMPOSE) down --remove-orphans
 
 test.e2e.setup:
 	$(MAKE) test.setup
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "cd web_src && npm ci"
+	$(COMPOSE) exec app bash -c "cd web_src && npm ci"
 
 test.e2e:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1
+	$(COMPOSE) exec app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1
 
 test.e2e.autoparallel:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec -e INDEX -e TOTAL app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
+	$(COMPOSE) exec -e INDEX -e TOTAL app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
 
 test.e2e.single:
 	bash ./scripts/vscode_run_tests.sh line $(FILE) $(LINE)
@@ -67,22 +69,25 @@ test.license.check:
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
+test.agent.evals:
+	$(COMPOSE) exec agent uv run python -m evals.runner
+
 test.shell:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
+	$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
 
 setup.playwright:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "bash scripts/docker/retry.sh 6 2s go install github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1"
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "if [ -d /app/tmp/ms-playwright ] && [ \"$(ls -A /app/tmp/ms-playwright 2>/dev/null)\" ]; then echo \"Playwright browsers cache present, skipping install\"; else bash scripts/docker/retry.sh 6 2s playwright install chromium-headless-shell --with-deps; fi"
+	$(COMPOSE) exec app bash -c "bash scripts/docker/retry.sh 6 2s go install github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1"
+	$(COMPOSE) exec app bash -c "if [ -d /app/tmp/ms-playwright ] && [ \"$(ls -A /app/tmp/ms-playwright 2>/dev/null)\" ]; then echo \"Playwright browsers cache present, skipping install\"; else bash scripts/docker/retry.sh 6 2s playwright install chromium-headless-shell --with-deps; fi"
 
 #
 # Code formatting
 #
 
 format.go:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "find . -name '*.go' -not -path './tmp/*' -print0 | xargs -0 gofmt -s -w"
+	$(COMPOSE) exec app bash -c "find . -name '*.go' -not -path './tmp/*' -print0 | xargs -0 gofmt -s -w"
 
 format.go.check:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "find . -name '*.go' -not -path './tmp/*' -print0 | xargs -0 gofmt -s -l | tee /dev/stderr | if read; then exit 1; else exit 0; fi"
+	$(COMPOSE) exec app bash -c "find . -name '*.go' -not -path './tmp/*' -print0 | xargs -0 gofmt -s -l | tee /dev/stderr | if read; then exit 1; else exit 0; fi"
 
 format.js:
 	cd web_src && npm run format
@@ -95,55 +100,69 @@ format.js.check:
 #
 
 dev.setup:
-	docker compose $(DOCKER_COMPOSE_OPTS) build
-	docker compose $(DOCKER_COMPOSE_OPTS) pull
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go mod download
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go build cmd/server/main.go
+	@touch agent/.env
+	$(COMPOSE) build
+	$(COMPOSE) pull
+	$(MAKE) dev.setup.app
+	$(MAKE) dev.setup.agent
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 
+dev.setup.app:
+	$(COMPOSE) run --rm app go mod download
+	$(COMPOSE) run --rm app go build cmd/server/main.go
+
+dev.setup.agent:
+	$(COMPOSE) run --rm agent uv sync --frozen || $(COMPOSE) run --rm agent uv sync
+
 dev.setup.no.cache:
-	docker compose $(DOCKER_COMPOSE_OPTS) down -v --remove-orphans
 	rm -rf tmp
-	docker compose $(DOCKER_COMPOSE_OPTS) build --no-cache
+	$(COMPOSE) down -v --remove-orphans
+	$(COMPOSE) build --no-cache
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 
 dev.start.fg:
-	docker compose $(DOCKER_COMPOSE_OPTS) up
+	$(COMPOSE) up
 
 dev.start:
-	docker compose $(DOCKER_COMPOSE_OPTS) up -d
+	$(COMPOSE) up -d
 	@bash ./scripts/wait-for-app
 
 dev.start.ephemeral:
 	bash ./scripts/ephemeral/start-caddy.sh $(BASE_URL)
 	bash ./scripts/ephemeral/setup-env.sh $(BASE_URL)
-	docker compose $(DOCKER_COMPOSE_OPTS) up -d
+	$(COMPOSE) up -d
 
 dev.logs:
-	docker compose $(DOCKER_COMPOSE_OPTS) logs -f
+	$(COMPOSE) logs -f
 
 dev.logs.app:
-	docker compose $(DOCKER_COMPOSE_OPTS) logs -f app
+	$(COMPOSE) logs -f app
 
 dev.logs.otel:
-	docker compose $(DOCKER_COMPOSE_OPTS) logs -f otel
+	$(COMPOSE) logs -f otel
+
+dev.logs.agent:
+	$(COMPOSE) logs -f agent
 
 dev.down:
-	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans
+	$(COMPOSE) down --remove-orphans
 
 dev.console:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app /bin/bash
+	$(COMPOSE) run --rm app /bin/bash
 
 dev.db:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app sh -c 'PGPASSWORD=$(DB_PASSWORD) psql -h db -p 5432 -U postgres -d superplane_dev'
+	$(COMPOSE) run --rm app sh -c 'PGPASSWORD=$(DB_PASSWORD) psql -h db -p 5432 -U postgres -d superplane_dev'
 
 dev.db.console:
 	$(MAKE) db.console DB_NAME=superplane_dev
 
 dev.pr.clean.checkout:
 	bash ./scripts/clean-pr-checkout $(PR)
+
+dev.agent.console:
+	$(COMPOSE) exec agent uv run python -m repl.main --interactive --canvas-id "$(CANVAS_ID)" --start-repl-web
 
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
@@ -152,14 +171,14 @@ check.db.migrations:
 	bash ./scripts/verify_no_future_migrations.sh
 
 check.build.ui:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "cd web_src && npm run build"
+	$(COMPOSE) exec app bash -c "cd web_src && npm run build"
 
 check.build.app:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app go build cmd/server/main.go
+	$(COMPOSE) exec app go build cmd/server/main.go
 
 
 storybook:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app /bin/bash -c "cd web_src && npm install && npm run storybook"
+	$(COMPOSE) exec app /bin/bash -c "cd web_src && npm install && npm run storybook"
 
 ui.setup:
 	npm install
@@ -172,39 +191,39 @@ ui.start:
 #
 
 db.create:
-	-docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE template1 REFRESH COLLATION VERSION';
-	-docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE postgres REFRESH COLLATION VERSION';
-	-docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE template1 REFRESH COLLATION VERSION';
+	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE postgres REFRESH COLLATION VERSION';
+	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
+	$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
 
 db.migration.create:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app mkdir -p db/migrations
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app migrate create -ext sql -dir db/migrations $(NAME)
+	$(COMPOSE) run --rm app mkdir -p db/migrations
+	$(COMPOSE) run --rm app migrate create -ext sql -dir db/migrations $(NAME)
 	ls -lah db/migrations/*$(NAME)*
 
 db.data_migration.create:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app mkdir -p db/data_migrations
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app migrate create -ext sql -dir db/data_migrations $(NAME)
+	$(COMPOSE) run --rm app mkdir -p db/data_migrations
+	$(COMPOSE) run --rm app migrate create -ext sql -dir db/data_migrations $(NAME)
 	ls -lah db/data_migrations/*$(NAME)*
 
 db.migrate:
 	rm -f db/structure.sql
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/data_migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable\&x-migrations-table=data_migrations up
+	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
+	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/data_migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable\&x-migrations-table=data_migrations up
 	# echo dump schema to db/structure.sql
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table data_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
+	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
+	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
+	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table data_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
 
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
 db.console:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)
+	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)
 
 db.delete:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) --rm -e PGPASSWORD=$(DB_PASSWORD) app dropdb -h db -p 5432 -U postgres $(DB_NAME)
+	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) --rm -e PGPASSWORD=$(DB_PASSWORD) app dropdb -h db -p 5432 -U postgres $(DB_NAME)
 
 db.recreate.all.dangerous:
 	$(MAKE) dev.down
@@ -224,6 +243,7 @@ gen:
 	$(MAKE) openapi.spec.gen
 	$(MAKE) openapi.client.gen
 	$(MAKE) openapi.web.client.gen
+	$(MAKE) openapi.python.client.gen
 	$(MAKE) format.go
 	$(MAKE) format.js
 	$(MAKE) gen.components.docs
@@ -236,14 +256,14 @@ gen.components.local.update: gen.components.docs
 	rm -rf ../docs/src/content/docs/components
 	cp -R docs/components ../docs/src/content/docs/components
 
-MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts
+MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,usage
 REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts
 pb.gen:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
+	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
 
 openapi.spec.gen:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
 
 openapi.client.gen:
 	rm -rf pkg/openapi_client
@@ -262,14 +282,29 @@ openapi.client.gen:
 
 openapi.web.client.gen:
 	rm -rf web_src/src/api-client
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm run generate:api"
+	$(COMPOSE) run --rm --no-deps app bash -c "cd web_src && npm run generate:api"
+
+openapi.python.client.gen:
+	rm -rf agent/src/superplaneapi
+	docker run --rm \
+		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
+		-i /local/api/swagger/superplane.swagger.json \
+		-g python \
+		-o /local/agent/src/superplaneapi \
+		--package-name superplaneapi \
+		--additional-properties=packageName=superplaneapi,projectName=superplaneapi,generateSourceCodeOnly=true
+	cp -R agent/src/superplaneapi/superplaneapi/. agent/src/superplaneapi/
+	rm -rf agent/src/superplaneapi/superplaneapi
+	rm -rf agent/src/superplaneapi/docs
+	rm -rf agent/src/superplaneapi/test
+	rm -rf agent/src/superplaneapi/.openapi-generator
 
 #
 # Image and CLI build
 #
 
 cli.build:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -o build/cli cmd/cli/main.go'
+	$(COMPOSE) run --rm --no-deps -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -o build/cli cmd/cli/main.go'
 
 cli.build.m1:
 	$(MAKE) cli.build OS=darwin ARCH=arm64
@@ -296,4 +331,3 @@ tag.create.patch:
 
 tag.create.minor:
 	./release/create_tag.sh minor
-		

@@ -30,6 +30,7 @@ type OnAlertFiresMetadata struct {
 }
 
 const kibanaAlertWebhookActionBody = `{
+  "eventType": "alert_fired",
   "ruleId": "{{rule.id}}",
   "ruleName": "{{rule.name}}",
   "spaceId": "{{rule.spaceId}}",
@@ -49,12 +50,16 @@ func (t *OnAlertFires) Color() string { return "gray" }
 func (t *OnAlertFires) Documentation() string {
 	return `The When Alert Fires trigger starts a workflow execution when a Kibana alert rule fires via a webhook connector.
 
+## Shared Connector
+
+SuperPlane creates **one Kibana Webhook connector per integration**, shared across all triggers that use the same Kibana instance. Each incoming request is routed to the correct trigger using the ` + "`eventType`" + ` field in the request body — this trigger only processes requests where ` + "`eventType`" + ` is ` + "`\"alert_fired\"`" + `. Requests intended for other trigger types (e.g. ` + "`\"document_indexed\"`" + `) are silently ignored.
+
 ## Setup
 
-1. Save this trigger — SuperPlane automatically creates a signed Kibana Webhook connector.
-2. Optionally select a Kibana alert rule in SuperPlane. When a rule is selected, SuperPlane checks that rule's actions and attaches the existing SuperPlane connector if it is missing.
+1. Select the Kibana alert rule in SuperPlane and save the trigger.
+2. SuperPlane automatically creates or reuses the shared Kibana Webhook connector and attaches it to the selected rule if it is missing.
 
-### Recommended Kibana action body
+### Kibana action body
 
 SuperPlane configures the rule action body with these fields:
 
@@ -62,7 +67,7 @@ SuperPlane configures the rule action body with these fields:
 ` + kibanaAlertWebhookActionBody + `
 ` + "```" + `
 
-Kibana substitutes ` + "`{{rule.id}}`" + ` and ` + "`{{rule.name}}`" + ` at delivery time. Fields omitted from the body will not be filterable in SuperPlane.
+The ` + "`eventType`" + ` field is required for routing. Kibana substitutes ` + "`{{rule.id}}`" + ` and ` + "`{{rule.name}}`" + ` at delivery time. Fields omitted from the body will not be filterable in SuperPlane.
 
 ## Filtering
 
@@ -248,6 +253,10 @@ func (t *OnAlertFires) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 		return http.StatusBadRequest, nil, fmt.Errorf("invalid JSON payload: %w", err)
 	}
 
+	if eventType := extractString(payload, "eventType"); eventType != "alert_fired" {
+		return http.StatusOK, nil, nil
+	}
+
 	var config OnAlertFiresConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
@@ -352,16 +361,12 @@ func containsIgnoreCase(list []string, value string) bool {
 
 // matchesAnyString reports whether any candidate appears in list (case-insensitive).
 func matchesAnyString(list []string, candidates ...string) bool {
-	for _, candidate := range candidates {
+	return slices.ContainsFunc(candidates, func(candidate string) bool {
 		if candidate == "" {
-			continue
+			return false
 		}
-		if containsIgnoreCase(list, candidate) {
-			return true
-		}
-	}
-
-	return false
+		return containsIgnoreCase(list, candidate)
+	})
 }
 
 func normalizeStringList(values []string) []string {

@@ -2,6 +2,7 @@ package elastic
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -18,7 +19,10 @@ type Elastic struct{}
 type Configuration struct {
 	URL       string `json:"url"`
 	KibanaURL string `json:"kibanaUrl"`
+	AuthType  string `json:"authType"`
 	APIKey    string `json:"apiKey"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
 }
 
 const installationInstructions = `
@@ -33,10 +37,11 @@ To connect Elastic to SuperPlane:
    - **Self-managed Elastic**: Use the base URL of your Kibana instance.
    - Keep only the base URL: protocol, host, and port.
    - Example: ` + "`https://my-cluster.kb.us-east-1.aws.found.io:9243`" + `.
-3. **API Key**:
-   - In Kibana, go to **Stack Management → API Keys**.
+3. **Auth Method**:
+   - **API Key**: In Kibana, go to **Stack Management → API Keys**.
    - Create an API key that can index documents in Elasticsearch and manage Kibana connectors.
    - Paste that API key into SuperPlane.
+   - **Username / Password**: Provide credentials for a user with permission to access Elasticsearch and manage Kibana connectors.
 `
 
 func (e *Elastic) Name() string {
@@ -76,12 +81,52 @@ func (e *Elastic) Configuration() []configuration.Field {
 			Description: "Base URL of your Kibana instance, such as https://my-cluster.kb.us-east-1.aws.found.io:9243. In Elastic Cloud, get it from Deployments -> your deployment -> Manage.",
 		},
 		{
+			Name:        "authType",
+			Label:       "Auth Method",
+			Type:        configuration.FieldTypeSelect,
+			Required:    true,
+			Default:     "apiKey",
+			Description: "Choose whether SuperPlane should authenticate with an API key or a username/password.",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "API Key", Value: "apiKey"},
+						{Label: "Username / Password", Value: "basic"},
+					},
+				},
+			},
+		},
+		{
 			Name:        "apiKey",
 			Label:       "API Key",
 			Type:        configuration.FieldTypeString,
-			Required:    true,
+			Required:    false,
 			Sensitive:   true,
 			Description: "API key used to authenticate Elastic API calls.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "authType", Values: []string{"apiKey"}},
+			},
+		},
+		{
+			Name:        "username",
+			Label:       "Username",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Username for basic authentication.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "authType", Values: []string{"basic"}},
+			},
+		},
+		{
+			Name:        "password",
+			Label:       "Password",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Sensitive:   true,
+			Description: "Password for basic authentication.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "authType", Values: []string{"basic"}},
+			},
 		},
 	}
 }
@@ -89,12 +134,15 @@ func (e *Elastic) Configuration() []configuration.Field {
 func (e *Elastic) Components() []core.Component {
 	return []core.Component{
 		&IndexDocument{},
+		&GetDocument{},
+		&UpdateDocument{},
 	}
 }
 
 func (e *Elastic) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnAlertFires{},
+		&OnDocumentIndexed{},
 	}
 }
 
@@ -116,8 +164,24 @@ func (e *Elastic) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("kibanaUrl is required")
 	}
 
-	if config.APIKey == "" {
-		return fmt.Errorf("apiKey is required")
+	if config.AuthType == "" {
+		config.AuthType = "apiKey"
+	}
+
+	switch config.AuthType {
+	case "apiKey":
+		if config.APIKey == "" {
+			return fmt.Errorf("apiKey is required when authType is apiKey")
+		}
+	case "basic":
+		if config.Username == "" {
+			return fmt.Errorf("username is required when authType is basic")
+		}
+		if config.Password == "" {
+			return fmt.Errorf("password is required when authType is basic")
+		}
+	default:
+		return fmt.Errorf("unknown authType %q: must be apiKey or basic", config.AuthType)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -141,6 +205,7 @@ func (e *Elastic) HandleRequest(_ core.HTTPRequestContext) {}
 
 const (
 	ResourceTypeIndex               = "elastic.index"
+	ResourceTypeDocument            = "elastic.document"
 	ResourceTypeKibanaRule          = "elastic.kibana.rule"
 	ResourceTypeKibanaSpace         = "elastic.kibana.space"
 	ResourceTypeKibanaAlertSeverity = "elastic.kibana.alert.severity"
@@ -161,6 +226,32 @@ func (e *Elastic) ListResources(resourceType string, ctx core.ListResourcesConte
 		resources := make([]core.IntegrationResource, 0, len(indices))
 		for _, idx := range indices {
 			resources = append(resources, core.IntegrationResource{ID: idx.Index, Name: idx.Index})
+		}
+		return resources, nil
+
+	case ResourceTypeDocument:
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %v", err)
+		}
+
+		index := ctx.Parameters["index"]
+		if index == "" || strings.Contains(index, "{{") {
+			return []core.IntegrationResource{}, nil
+		}
+
+		documents, err := client.ListDocuments(index)
+		if err != nil {
+			return nil, fmt.Errorf("error listing documents: %v", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(documents))
+		for _, doc := range documents {
+			resources = append(resources, core.IntegrationResource{
+				ID:   doc.ID,
+				Name: doc.ID,
+				Type: ResourceTypeDocument,
+			})
 		}
 		return resources, nil
 

@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -22,6 +23,7 @@ type OrganizationService struct {
 	oidcProvider         oidc.Provider
 	baseURL              string
 	webhooksBaseURL      string
+	usageService         usage.Service
 }
 
 func NewOrganizationService(
@@ -31,12 +33,14 @@ func NewOrganizationService(
 	oidcProvider oidc.Provider,
 	baseURL string,
 	webhooksBaseURL string,
+	usageService usage.Service,
 ) *OrganizationService {
 	return &OrganizationService{
 		registry:             registry,
 		oidcProvider:         oidcProvider,
 		baseURL:              baseURL,
 		webhooksBaseURL:      webhooksBaseURL,
+		usageService:         usageService,
 		encryptor:            encryptor,
 		authorizationService: authorizationService,
 	}
@@ -64,7 +68,7 @@ func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.De
 
 func (s *OrganizationService) CreateInvitation(ctx context.Context, req *pb.CreateInvitationRequest) (*pb.CreateInvitationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.CreateInvitation(ctx, s.authorizationService, orgID, req.Email)
+	return organizations.CreateInvitationWithUsage(ctx, s.authorizationService, s.usageService, orgID, req.Email)
 }
 
 func (s *OrganizationService) ListInvitations(ctx context.Context, req *pb.ListInvitationsRequest) (*pb.ListInvitationsResponse, error) {
@@ -136,13 +140,21 @@ func (s *OrganizationService) DeleteAgentOpenAIKey(
 	return organizations.DeleteAgentOpenAIKey(orgID, userID)
 }
 
+func (s *OrganizationService) DescribeUsage(
+	ctx context.Context,
+	req *pb.DescribeUsageRequest,
+) (*pb.DescribeUsageResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.DescribeUsage(ctx, s.usageService, orgID)
+}
+
 func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.InviteLink) (*structpb.Struct, error) {
 	accountID, err := accountIDFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return organizations.AcceptInviteLink(ctx, s.authorizationService, accountID, req.Token)
+	return organizations.AcceptInviteLinkWithUsage(ctx, s.authorizationService, s.usageService, accountID, req.Token)
 }
 
 func (s *OrganizationService) ListIntegrations(ctx context.Context, req *pb.ListIntegrationsRequest) (*pb.ListIntegrationsResponse, error) {
@@ -162,8 +174,9 @@ func (s *OrganizationService) ListIntegrationResources(ctx context.Context, req 
 
 func (s *OrganizationService) CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.CreateIntegration(
+	return organizations.CreateIntegrationWithUsage(
 		ctx,
+		s.usageService,
 		s.registry,
 		s.oidcProvider,
 		s.baseURL,

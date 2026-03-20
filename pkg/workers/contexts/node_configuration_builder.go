@@ -13,6 +13,7 @@ import (
 	"github.com/expr-lang/expr/parser"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/exprruntime"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -124,10 +125,6 @@ func (b *NodeConfigurationBuilder) resolveWithSchema(config map[string]any, fiel
 }
 
 func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configuration.Field) (any, error) {
-	if field.DisallowExpression {
-		return value, nil
-	}
-
 	if field.TypeOptions != nil {
 		if field.TypeOptions.Object != nil && len(field.TypeOptions.Object.Schema) > 0 {
 			if obj, ok := asAnyMap(value); ok {
@@ -316,6 +313,7 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 		expr.AsAny(),
 		expr.WithContext("ctx"),
 		expr.Timezone(time.UTC.String()),
+		exprruntime.DateFunctionOption(),
 		expr.Function("root", func(params ...any) (any, error) {
 			if len(params) != 0 {
 				return nil, fmt.Errorf("root() takes no arguments")

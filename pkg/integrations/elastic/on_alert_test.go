@@ -30,6 +30,21 @@ func Test__OnAlertFires__Configuration(t *testing.T) {
 	require.NotNil(t, ruleField.TypeOptions.Resource)
 	assert.Equal(t, ResourceTypeKibanaRule, ruleField.TypeOptions.Resource.Type)
 	assert.False(t, ruleField.TypeOptions.Resource.Multi)
+
+	var statusesField *configuration.Field
+	for i := range fields {
+		if fields[i].Name == "statuses" {
+			statusesField = &fields[i]
+			break
+		}
+	}
+
+	require.NotNil(t, statusesField)
+	assert.Equal(t, configuration.FieldTypeIntegrationResource, statusesField.Type)
+	require.NotNil(t, statusesField.TypeOptions)
+	require.NotNil(t, statusesField.TypeOptions.Resource)
+	assert.Equal(t, ResourceTypeKibanaAlertStatus, statusesField.TypeOptions.Resource.Type)
+	assert.True(t, statusesField.TypeOptions.Resource.Multi)
 }
 
 func Test__OnAlertFires__Setup(t *testing.T) {
@@ -120,6 +135,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 	webhook := &contexts.NodeWebhookContext{Secret: secret}
 
 	validBody := []byte(`{
+		"eventType": "alert_fired",
 		"ruleId":   "rule-123",
 		"ruleName": "High error rate",
 		"spaceId":  "default",
@@ -191,6 +207,20 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		assert.NotContains(t, eventData, "payload")
 	})
 
+	t.Run("wrong eventType -> silent pass", func(t *testing.T) {
+		eventsCtx := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          []byte(`{"eventType":"document_indexed","index":"my-index"}`),
+			Headers:       headersWithSecret(),
+			Configuration: map[string]any{},
+			Events:        eventsCtx,
+			Webhook:       webhook,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Empty(t, eventsCtx.Payloads)
+	})
+
 	// --- rule ---
 
 	t.Run("selected rule matches by rule ID -> emits event", func(t *testing.T) {
@@ -225,6 +255,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body: []byte(`{
+				"eventType": "alert_fired",
 				"ruleName": "High error rate",
 				"spaceId": "default",
 				"tags": ["team:infra", "env:prod"],

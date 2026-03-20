@@ -1,4 +1,8 @@
 import { useEffect, useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { getApiErrorMessage } from "@/utils/errors";
+import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/utils/usageLimits";
+import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { showErrorToast } from "../../utils/toast";
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "../Dialog/dialog";
 import { Field, Label } from "../Fieldset/fieldset";
@@ -12,6 +16,7 @@ interface CreateCanvasModalProps {
   onClose: () => void;
   onSubmit: (data: { name: string; description?: string; templateId?: string }) => Promise<void>;
   isLoading?: boolean;
+  organizationId?: string;
   initialData?: { name: string; description?: string };
   templates?: { id: string; name: string; description?: string }[];
   defaultTemplateId?: string;
@@ -27,6 +32,7 @@ export function CreateCanvasModal({
   onClose,
   onSubmit,
   isLoading = false,
+  organizationId,
   initialData,
   defaultTemplateId,
   mode = "create",
@@ -36,12 +42,14 @@ export function CreateCanvasModal({
   const [description, setDescription] = useState("");
   const [nameError, setNameError] = useState("");
   const [templateId, setTemplateId] = useState("");
+  const [submitError, setSubmitError] = useState<unknown>(null);
 
   useEffect(() => {
     if (isOpen) {
       setName(initialData?.name ?? "");
       setDescription(initialData?.description ?? "");
       setNameError("");
+      setSubmitError(null);
     }
     if (isOpen && mode === "create") {
       setTemplateId(defaultTemplateId || "");
@@ -56,6 +64,7 @@ export function CreateCanvasModal({
     setDescription("");
     setNameError("");
     setTemplateId("");
+    setSubmitError(null);
     onClose();
   };
 
@@ -73,6 +82,7 @@ export function CreateCanvasModal({
     }
 
     try {
+      setSubmitError(null);
       await onSubmit({
         name: name.trim(),
         description: description.trim() || undefined,
@@ -86,15 +96,16 @@ export function CreateCanvasModal({
       setTemplateId("");
       onClose();
     } catch (error) {
-      const errorMessage = (error as Error)?.message || error?.toString() || "Failed to create canvas";
-
-      showErrorToast(errorMessage);
-
+      const errorMessage = getApiErrorMessage(error, "Failed to create canvas");
+      setSubmitError(error);
+      showErrorToast(getUsageLimitToastMessage(error, "Failed to create canvas"));
       if (errorMessage.toLowerCase().includes("already") || errorMessage.toLowerCase().includes("exists")) {
         setNameError("A canvas with this name already exists");
       }
     }
   };
+
+  const usageLimitNotice = submitError ? getUsageLimitNotice(submitError, organizationId) : null;
 
   return (
     <Dialog open={isOpen} onClose={handleClose} size="lg" className="text-left relative">
@@ -114,6 +125,13 @@ export function CreateCanvasModal({
 
       <DialogBody>
         <div className="space-y-6">
+          {usageLimitNotice ? <UsageLimitAlert notice={usageLimitNotice} /> : null}
+          {submitError && !usageLimitNotice ? (
+            <Alert variant="destructive">
+              <AlertTitle>Unable to save canvas</AlertTitle>
+              <AlertDescription>{getApiErrorMessage(submitError, "Failed to create canvas")}</AlertDescription>
+            </Alert>
+          ) : null}
           <Field>
             <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Canvas name *</Label>
             <Input
@@ -127,6 +145,9 @@ export function CreateCanvasModal({
                 }
                 if (nameError) {
                   setNameError("");
+                }
+                if (submitError) {
+                  setSubmitError(null);
                 }
               }}
               placeholder=""

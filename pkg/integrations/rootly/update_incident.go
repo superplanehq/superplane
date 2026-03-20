@@ -196,12 +196,11 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
 							{
-								Name:               "key",
-								Label:              "Key",
-								Type:               configuration.FieldTypeString,
-								Required:           true,
-								DisallowExpression: true,
-								Description:        "Label key",
+								Name:        "key",
+								Label:       "Key",
+								Type:        configuration.FieldTypeString,
+								Required:    true,
+								Description: "Label key",
 							},
 							{
 								Name:        "value",

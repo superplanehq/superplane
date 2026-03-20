@@ -11,6 +11,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -18,6 +20,16 @@ import (
 )
 
 func CreateInvitation(ctx context.Context, authService authorization.Authorization, orgID string, email string) (*pb.CreateInvitationResponse, error) {
+	return CreateInvitationWithUsage(ctx, authService, nil, orgID, email)
+}
+
+func CreateInvitationWithUsage(
+	ctx context.Context,
+	authService authorization.Authorization,
+	usageService usage.Service,
+	orgID string,
+	email string,
+) (*pb.CreateInvitationResponse, error) {
 	authenticatedUserID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -36,22 +48,39 @@ func CreateInvitation(ctx context.Context, authService authorization.Authorizati
 	//
 	user, err := models.FindMaybeDeletedUserByEmail(orgID, email)
 	if err == nil {
-		return handleExistingUser(authService, authenticatedUser, org, user)
+		return handleExistingUser(ctx, authService, usageService, authenticatedUser, org, user)
 	}
 
 	//
 	// Otherwise, handle case where user has never been invited to this organization.
 	//
-	return handleNewUser(authService, org, authenticatedUser, email)
+	return handleNewUser(ctx, authService, usageService, org, authenticatedUser, email)
 }
 
-func handleExistingUser(authService authorization.Authorization, authenticatedUserID, orgID uuid.UUID, user *models.User) (*pb.CreateInvitationResponse, error) {
+func handleExistingUser(
+	ctx context.Context,
+	authService authorization.Authorization,
+	usageService usage.Service,
+	authenticatedUserID, orgID uuid.UUID,
+	user *models.User,
+) (*pb.CreateInvitationResponse, error) {
 	if !user.DeletedAt.Valid {
 		return nil, status.Errorf(codes.InvalidArgument, "user %s is already an active member of organization", user.GetEmail())
 	}
 
 	var invitation *models.OrganizationInvitation
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		userCount, countErr := models.CountActiveHumanUsersByOrganizationInTransaction(tx, orgID.String())
+		if countErr != nil {
+			return countErr
+		}
+
+		if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, orgID.String(), &usagepb.OrganizationState{
+			Users: int32(userCount + 1),
+		}, nil); err != nil {
+			return err
+		}
+
 		i, err := models.CreateInvitationInTransaction(tx, orgID, authenticatedUserID, user.GetEmail(), models.InvitationStateAccepted)
 		if err != nil {
 			return status.Errorf(codes.InvalidArgument, "Failed to create invitation: %v", err)
@@ -78,7 +107,13 @@ func handleExistingUser(authService authorization.Authorization, authenticatedUs
 	}, nil
 }
 
-func handleNewUser(authService authorization.Authorization, orgID, userID uuid.UUID, email string) (*pb.CreateInvitationResponse, error) {
+func handleNewUser(
+	ctx context.Context,
+	authService authorization.Authorization,
+	usageService usage.Service,
+	orgID, userID uuid.UUID,
+	email string,
+) (*pb.CreateInvitationResponse, error) {
 	//
 	// Check if account already exists.
 	// If it doesn't, we will create a pending invitation,
@@ -106,6 +141,19 @@ func handleNewUser(authService authorization.Authorization, orgID, userID uuid.U
 	// we add a new user for it to the organization immediately.
 	//
 	tx := database.Conn().Begin()
+	userCount, countErr := models.CountActiveHumanUsersByOrganizationInTransaction(tx, orgID.String())
+	if countErr != nil {
+		tx.Rollback()
+		return nil, status.Errorf(codes.Internal, "failed to count organization users: %v", countErr)
+	}
+
+	if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, orgID.String(), &usagepb.OrganizationState{
+		Users: int32(userCount + 1),
+	}, nil); err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
 	invitation, err := models.CreateInvitationInTransaction(tx, orgID, userID, email, models.InvitationStateAccepted)
 	if err != nil {
 		tx.Rollback()

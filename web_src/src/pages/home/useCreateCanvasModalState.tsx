@@ -71,6 +71,7 @@ export function useCreateCanvasModalState() {
     onClose,
     onSubmit,
     isLoading: modalState?.mode === "edit" ? updateMutation.isPending : createMutation.isPending,
+    organizationId,
     initialData: modalState?.workflow
       ? { name: modalState.workflow.name, description: modalState.workflow.description }
       : undefined,

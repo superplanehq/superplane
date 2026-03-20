@@ -5,7 +5,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-const WorkflowExecutionRoutingKey = "workflow-execution"
+const CanvasExecutionRoutingKey = "canvas-execution"
 
 type CanvasExecutionMessage struct {
 	message *pb.CanvasNodeExecutionMessage
@@ -23,5 +23,5 @@ func NewCanvasExecutionMessage(canvasId string, executionID, nodeID string) Canv
 }
 
 func (m CanvasExecutionMessage) Publish() error {
-	return Publish(WorkflowExchange, WorkflowExecutionRoutingKey, toBytes(m.message))
+	return Publish(CanvasExchange, CanvasExecutionRoutingKey, toBytes(m.message))
 }

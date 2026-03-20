@@ -12,67 +12,125 @@ import (
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__Elastic__Sync__Validation(t *testing.T) {
-	integration := &Elastic{}
-	integrationCtx := &contexts.IntegrationContext{}
+func Test__Elastic__Sync(t *testing.T) {
+	e := &Elastic{}
 
-	t.Run("missing url", func(t *testing.T) {
-		err := integration.Sync(core.SyncContext{
+	t.Run("missing url -> error", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"kibanaUrl": "https://kibana.example.com",
+				"authType":  "apiKey",
 				"apiKey":    "test-api-key",
 			},
-			Integration: integrationCtx,
-			HTTP:        &contexts.HTTPContext{},
+		}
+
+		err := e.Sync(core.SyncContext{
+			Configuration: integrationCtx.Configuration,
+			Integration:   integrationCtx,
+			HTTP:          &contexts.HTTPContext{},
 		})
 		require.ErrorContains(t, err, "url is required")
 	})
 
-	t.Run("missing kibanaUrl", func(t *testing.T) {
-		err := integration.Sync(core.SyncContext{
+	t.Run("missing kibanaUrl -> error", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"url":    "https://elastic.example.com",
-				"apiKey": "test-api-key",
+				"url":      "https://elastic.example.com",
+				"authType": "apiKey",
+				"apiKey":   "test-api-key",
 			},
-			Integration: integrationCtx,
-			HTTP:        &contexts.HTTPContext{},
+		}
+
+		err := e.Sync(core.SyncContext{
+			Configuration: integrationCtx.Configuration,
+			Integration:   integrationCtx,
+			HTTP:          &contexts.HTTPContext{},
 		})
 		require.ErrorContains(t, err, "kibanaUrl is required")
 	})
 
-	t.Run("missing apiKey", func(t *testing.T) {
-		err := integration.Sync(core.SyncContext{
+	t.Run("invalid credentials -> error", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"url":       "https://elastic.example.com",
 				"kibanaUrl": "https://kibana.example.com",
+				"authType":  "apiKey",
+				"apiKey":    "test-api-key",
 			},
-			Integration: integrationCtx,
-			HTTP:        &contexts.HTTPContext{},
-		})
-		require.ErrorContains(t, err, "apiKey is required")
-	})
-}
-
-func Test__Elastic__Sync__Ready(t *testing.T) {
-	integration := &Elastic{}
-
-	t.Run("apiKey auth marks integration ready", func(t *testing.T) {
-		config := map[string]any{
-			"url":       "https://elastic.example.com",
-			"kibanaUrl": "https://kibana.example.com",
-			"apiKey":    "test-api-key",
 		}
-
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[]`))},
+				{
+					StatusCode: http.StatusUnauthorized,
+					Body:       io.NopCloser(strings.NewReader(`{"error":"unauthorized"}`)),
+				},
 			},
 		}
-		integrationCtx := &contexts.IntegrationContext{Configuration: config}
 
-		err := integration.Sync(core.SyncContext{
-			Configuration: config,
+		err := e.Sync(core.SyncContext{
+			Configuration: integrationCtx.Configuration,
+			Integration:   integrationCtx,
+			HTTP:          httpCtx,
+		})
+		require.ErrorContains(t, err, "invalid Elasticsearch credentials")
+		assert.NotEqual(t, "ready", integrationCtx.State)
+	})
+
+	t.Run("invalid kibana configuration -> error", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"url":       "https://elastic.example.com",
+				"kibanaUrl": "https://kibana.example.com",
+				"authType":  "apiKey",
+				"apiKey":    "test-api-key",
+			},
+		}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"cluster_name":"test"}`)),
+				},
+				{
+					StatusCode: http.StatusForbidden,
+					Body:       io.NopCloser(strings.NewReader(`{"error":"forbidden"}`)),
+				},
+			},
+		}
+
+		err := e.Sync(core.SyncContext{
+			Configuration: integrationCtx.Configuration,
+			Integration:   integrationCtx,
+			HTTP:          httpCtx,
+		})
+		require.ErrorContains(t, err, "invalid Kibana configuration")
+		assert.NotEqual(t, "ready", integrationCtx.State)
+	})
+
+	t.Run("valid api key configuration -> ready", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"url":       "https://elastic.example.com",
+				"kibanaUrl": "https://kibana.example.com",
+				"authType":  "apiKey",
+				"apiKey":    "test-api-key",
+			},
+		}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"cluster_name":"test"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[]`)),
+				},
+			},
+		}
+
+		err := e.Sync(core.SyncContext{
+			Configuration: integrationCtx.Configuration,
 			Integration:   integrationCtx,
 			HTTP:          httpCtx,
 		})

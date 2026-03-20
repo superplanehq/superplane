@@ -12,18 +12,18 @@ import (
 )
 
 type Canvas struct {
-	ID                      uuid.UUID
-	OrganizationID          uuid.UUID
-	LiveVersionID           *uuid.UUID
-	IsTemplate              bool
-	CanvasVersioningEnabled bool
-	ChangeRequestApprovers  datatypes.JSONSlice[CanvasChangeRequestApprover]
-	Name                    string
-	Description             string
-	CreatedBy               *uuid.UUID
-	CreatedAt               *time.Time
-	UpdatedAt               *time.Time
-	DeletedAt               gorm.DeletedAt `gorm:"index"`
+	ID                     uuid.UUID
+	OrganizationID         uuid.UUID
+	LiveVersionID          *uuid.UUID
+	IsTemplate             bool
+	VersioningEnabled      bool
+	ChangeRequestApprovers datatypes.JSONSlice[CanvasChangeRequestApprover]
+	Name                   string
+	Description            string
+	CreatedBy              *uuid.UUID
+	CreatedAt              *time.Time
+	UpdatedAt              *time.Time
+	DeletedAt              gorm.DeletedAt `gorm:"index"`
 }
 
 func (c *Canvas) EffectiveChangeRequestApprovers() []CanvasChangeRequestApprover {
@@ -322,4 +322,22 @@ func CountCanvasesByOrganizationIDs(orgIDs []string) (map[string]int64, error) {
 	}
 
 	return counts, nil
+}
+
+func CountCanvasesByOrganization(orgID string) (int64, error) {
+	return CountCanvasesByOrganizationInTransaction(database.Conn(), orgID)
+}
+
+func CountCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID string) (int64, error) {
+	var count int64
+	err := tx.
+		Model(&Canvas{}).
+		Where("organization_id = ?", orgID).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }

@@ -16,7 +16,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const InvitationEmailServiceName = "superplane" + "." + messages.WorkflowExchange + "." + messages.InvitationCreatedRoutingKey + ".worker-consumer"
+const InvitationEmailServiceName = "superplane" + "." + messages.CanvasExchange + "." + messages.InvitationCreatedRoutingKey + ".worker-consumer"
 const InvitationEmailConnectionName = "superplane"
 
 type InvitationEmailConsumer struct {
@@ -47,7 +47,7 @@ func (c *InvitationEmailConsumer) Start() error {
 		URL:            c.RabbitMQURL,
 		ConnectionName: InvitationEmailConnectionName,
 		Service:        InvitationEmailServiceName,
-		RemoteExchange: messages.WorkflowExchange,
+		RemoteExchange: messages.CanvasExchange,
 		RoutingKey:     messages.InvitationCreatedRoutingKey,
 	}
 

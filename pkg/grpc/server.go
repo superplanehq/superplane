@@ -27,6 +27,7 @@ import (
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	widgetPb "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	health "google.golang.org/grpc/health/grpc_health_v1"
@@ -89,7 +90,20 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 	//
 	// Initialize services exposed by this server.
 	//
-	organizationService := NewOrganizationService(authService, encryptor, registry, oidcProvider, baseURL, webhooksBaseURL)
+	usageService, err := usage.NewServiceFromEnv()
+	if err != nil {
+		log.Fatalf("failed to initialize usage service: %v", err)
+	}
+
+	organizationService := NewOrganizationService(
+		authService,
+		encryptor,
+		registry,
+		oidcProvider,
+		baseURL,
+		webhooksBaseURL,
+		usageService,
+	)
 	organizationPb.RegisterOrganizationsServer(grpcServer, organizationService)
 
 	userService := NewUsersService(authService)
@@ -119,7 +133,7 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 	blueprintService := NewBlueprintService(registry)
 	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
 
-	canvasService := NewCanvasService(authService, registry, encryptor, webhooksBaseURL)
+	canvasService := NewCanvasService(authService, registry, encryptor, webhooksBaseURL, usageService)
 	pbCanvases.RegisterCanvasesServer(grpcServer, canvasService)
 
 	integrationService := NewIntegrationService(encryptor, registry)

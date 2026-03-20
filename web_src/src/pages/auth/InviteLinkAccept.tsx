@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { useAccount } from "@/contexts/AccountContext";
 import { showErrorToast } from "@/utils/toast";
+import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/utils/usageLimits";
 
 type AcceptStatus = "idle" | "loading" | "error";
 
@@ -41,8 +44,19 @@ export default function InviteLinkAccept() {
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || "Unable to accept invite link.");
+          const rawResponse = await response.text();
+          let responseMessage = rawResponse;
+
+          try {
+            const responseBody = JSON.parse(rawResponse) as { message?: string };
+            if (typeof responseBody.message === "string" && responseBody.message.trim()) {
+              responseMessage = responseBody.message;
+            }
+          } catch {
+            responseMessage = rawResponse;
+          }
+
+          throw new Error(responseMessage || "Unable to accept invite link.");
         }
 
         const data = (await response.json()) as { organization_id?: string };
@@ -55,7 +69,7 @@ export default function InviteLinkAccept() {
         const message = err instanceof Error ? err.message : "Unable to accept invite link.";
         setStatus("error");
         setErrorMessage(message);
-        showErrorToast(message);
+        showErrorToast(getUsageLimitToastMessage(err, message));
       }
     };
 
@@ -63,13 +77,19 @@ export default function InviteLinkAccept() {
   }, [account, loading, navigate, token]);
 
   if (status === "error") {
+    const usageLimitNotice = getUsageLimitNotice(errorMessage);
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-6">
-        <div className="max-w-md text-center">
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Invite link not available</h1>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            {errorMessage || "This invite link is invalid or has been disabled."}
-          </p>
+        <div className="max-w-md w-full">
+          {usageLimitNotice ? (
+            <UsageLimitAlert notice={usageLimitNotice} />
+          ) : (
+            <Alert variant="destructive">
+              <AlertTitle>Invite link not available</AlertTitle>
+              <AlertDescription>{errorMessage || "This invite link is invalid or has been disabled."}</AlertDescription>
+            </Alert>
+          )}
         </div>
       </div>
     );

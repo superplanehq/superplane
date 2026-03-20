@@ -47,49 +47,62 @@ func Test__IndexDocument__Setup(t *testing.T) {
 	})
 
 	t.Run("valid config -> success", func(t *testing.T) {
-		metadataCtx := &contexts.MetadataContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[{"index":"my-index"}]`)),
+				},
+			},
+		}
+		meta := &contexts.MetadataContext{}
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"index":    "my-index",
 				"document": map[string]any{"key": "value"},
 			},
-			Metadata:    metadataCtx,
+			HTTP:        httpCtx,
 			Integration: integrationCtx,
-			HTTP: &contexts.HTTPContext{
-				Responses: []*http.Response{
-					{
-						StatusCode: http.StatusOK,
-						Body: io.NopCloser(strings.NewReader(`[
-							{"index":".kibana"},
-							{"index":"my-index"}
-						]`)),
-					},
-				},
-			},
+			Metadata:    meta,
 		})
 		require.NoError(t, err)
-		assert.Equal(t, IndexDocumentMetadata{Index: "my-index"}, metadataCtx.Metadata)
+		assert.Equal(t, IndexDocumentSetupMetadata{Index: "my-index"}, meta.Metadata)
 	})
 
-	t.Run("unknown index -> error", func(t *testing.T) {
-		err := c.Setup(core.SetupContext{
-			Configuration: map[string]any{
-				"index":    "missing-index",
-				"document": map[string]any{"key": "value"},
-			},
-			Metadata:    &contexts.MetadataContext{},
-			Integration: integrationCtx,
-			HTTP: &contexts.HTTPContext{
-				Responses: []*http.Response{
-					{
-						StatusCode: http.StatusOK,
-						Body:       io.NopCloser(strings.NewReader(`[{"index":"my-index"}]`)),
-					},
+	t.Run("index does not exist -> error", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[{"index":"other-index"}]`)),
 				},
 			},
+		}
+
+		err := c.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"index":    "my-index",
+				"document": map[string]any{"key": "value"},
+			},
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Metadata:    &contexts.MetadataContext{},
 		})
-		require.ErrorContains(t, err, `selected index "missing-index" was not found in Elasticsearch`)
+		require.ErrorContains(t, err, `selected index "my-index" was not found in Elasticsearch`)
 	})
+}
+
+func Test__IndexDocument__Configuration(t *testing.T) {
+	c := &IndexDocument{}
+
+	fields := c.Configuration()
+	require.Len(t, fields, 3)
+
+	documentField := fields[1]
+	assert.Equal(t, "document", documentField.Name)
+	assert.Equal(t, map[string]any{
+		onDocumentIndexedTimeField: defaultDocumentTimestampTemplate,
+	}, documentField.Default)
 }
 
 func Test__IndexDocument__Execute(t *testing.T) {

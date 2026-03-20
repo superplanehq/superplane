@@ -7,7 +7,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-const WorkflowExchange = "superplane.workflow-exchange"
+const CanvasExchange = "superplane.canvas-exchange"
 
 func Publish(exchange string, routingKey string, message []byte) error {
 	amqpURL, err := config.RabbitMQURL()
