@@ -149,7 +149,7 @@ func (d *DeleteAlertPolicy) HandleAction(ctx core.ActionContext) error {
 }
 
 func (d *DeleteAlertPolicy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return http.StatusOK, nil, nil
+	return rejectUnsupportedWebhook(ctx, d.Name())
 }
 
 func (d *DeleteAlertPolicy) Cleanup(ctx core.SetupContext) error {

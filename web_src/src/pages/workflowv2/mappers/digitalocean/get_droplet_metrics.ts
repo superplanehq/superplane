@@ -13,7 +13,7 @@ import {
 import { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { formatTimeAgo } from "@/utils/date";
-import { DropletNodeMetadata, GetDropletMetricsConfiguration } from "./types";
+import { DropletNodeMetadata, GetDropletMetricsConfiguration, GetDropletMetricsOutput } from "./types";
 
 const LOOKBACK_PERIOD_LABELS: Record<string, string> = {
   "1h": "Last 1 hour",
@@ -48,7 +48,7 @@ export const getDropletMetricsMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    const result = outputs?.default?.[0]?.data as GetDropletMetricsOutput | undefined;
     if (!result) return details;
 
     details["Droplet ID"] = result.dropletId?.toString() || "-";

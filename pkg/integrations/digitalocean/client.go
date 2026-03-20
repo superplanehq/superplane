@@ -1057,8 +1057,8 @@ func (c *Client) CreateAlertPolicy(req CreateAlertPolicyRequest) (*AlertPolicy, 
 }
 
 // UpdateAlertPolicy updates an existing monitoring alert policy
-func (c *Client) UpdateAlertPolicy(policyUUID string, req UpdateAlertPolicyRequest) (*AlertPolicy, error) {
-	url := fmt.Sprintf("%s/monitoring/alerts/%s", c.BaseURL, policyUUID)
+func (c *Client) UpdateAlertPolicy(policyID string, req UpdateAlertPolicyRequest) (*AlertPolicy, error) {
+	url := fmt.Sprintf("%s/monitoring/alerts/%s", c.BaseURL, policyID)
 
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -1082,8 +1082,8 @@ func (c *Client) UpdateAlertPolicy(policyUUID string, req UpdateAlertPolicyReque
 }
 
 // GetAlertPolicy retrieves a monitoring alert policy by its UUID
-func (c *Client) GetAlertPolicy(policyUUID string) (*AlertPolicy, error) {
-	url := fmt.Sprintf("%s/monitoring/alerts/%s", c.BaseURL, policyUUID)
+func (c *Client) GetAlertPolicy(policyID string) (*AlertPolicy, error) {
+	url := fmt.Sprintf("%s/monitoring/alerts/%s", c.BaseURL, policyID)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -1101,8 +1101,8 @@ func (c *Client) GetAlertPolicy(policyUUID string) (*AlertPolicy, error) {
 }
 
 // DeleteAlertPolicy deletes a monitoring alert policy by its UUID
-func (c *Client) DeleteAlertPolicy(policyUUID string) error {
-	url := fmt.Sprintf("%s/monitoring/alerts/%s", c.BaseURL, policyUUID)
+func (c *Client) DeleteAlertPolicy(policyID string) error {
+	url := fmt.Sprintf("%s/monitoring/alerts/%s", c.BaseURL, policyID)
 	_, err := c.execRequest(http.MethodDelete, url, nil)
 	return err
 }
@@ -1128,21 +1128,21 @@ func (c *Client) ListAlertPolicies() ([]AlertPolicy, error) {
 
 // AlertPolicyNodeMetadata stores metadata about an alert policy for display in the UI
 type AlertPolicyNodeMetadata struct {
-	PolicyUUID string `json:"policyUuid" mapstructure:"policyUuid"`
-	PolicyDesc string `json:"policyDesc" mapstructure:"policyDesc"`
+	PolicyID       string                             `json:"policyUuid" mapstructure:"policyUuid"`
+	PolicyDesc     string                             `json:"policyDesc" mapstructure:"policyDesc"`
+	ScopedDroplets []AlertPolicyScopedDropletMetadata `json:"scopedDroplets,omitempty" mapstructure:"scopedDroplets"`
 }
 
 // resolveAlertPolicyMetadata fetches the alert policy description from the API and stores it in metadata
-func resolveAlertPolicyMetadata(ctx core.SetupContext, policyUUID string) error {
-	if strings.Contains(policyUUID, "{{") {
-		return ctx.Metadata.Set(AlertPolicyNodeMetadata{
-			PolicyDesc: policyUUID,
-		})
-	}
-
+func resolveAlertPolicyMetadata(ctx core.SetupContext, policyID string) error {
 	var existing AlertPolicyNodeMetadata
 	err := mapstructure.Decode(ctx.Metadata.Get(), &existing)
-	if err == nil && existing.PolicyUUID == policyUUID && existing.PolicyDesc != "" {
+	if strings.Contains(policyID, "{{") {
+		existing.PolicyID = ""
+		existing.PolicyDesc = policyID
+		return ctx.Metadata.Set(existing)
+	}
+	if err == nil && existing.PolicyID == policyID && existing.PolicyDesc != "" {
 		return nil
 	}
 
@@ -1151,15 +1151,64 @@ func resolveAlertPolicyMetadata(ctx core.SetupContext, policyUUID string) error 
 		return fmt.Errorf("failed to create client for metadata resolution: %w", err)
 	}
 
-	policy, err := client.GetAlertPolicy(policyUUID)
+	policy, err := client.GetAlertPolicy(policyID)
 	if err != nil {
-		return fmt.Errorf("failed to fetch alert policy %s for metadata: %w", policyUUID, err)
+		return fmt.Errorf("failed to fetch alert policy %s for metadata: %w", policyID, err)
 	}
 
-	return ctx.Metadata.Set(AlertPolicyNodeMetadata{
-		PolicyUUID: policyUUID,
-		PolicyDesc: policy.Description,
-	})
+	existing.PolicyID = policyID
+	existing.PolicyDesc = policy.Description
+	return ctx.Metadata.Set(existing)
+}
+
+// AlertPolicyScopedDropletMetadata stores the selected scope droplets for alert policy components.
+type AlertPolicyScopedDropletMetadata struct {
+	DropletID   string `json:"dropletId" mapstructure:"dropletId"`
+	DropletName string `json:"dropletName" mapstructure:"dropletName"`
+}
+
+// resolveAlertPolicyEntitiesMetadata validates configured droplets and stores their labels in metadata.
+func resolveAlertPolicyEntitiesMetadata(ctx core.SetupContext, dropletIDs []string) error {
+	var existing AlertPolicyNodeMetadata
+	_ = mapstructure.Decode(ctx.Metadata.Get(), &existing)
+
+	scopedDroplets := make([]AlertPolicyScopedDropletMetadata, 0, len(dropletIDs))
+
+	var client *Client
+	for _, dropletID := range dropletIDs {
+		if strings.Contains(dropletID, "{{") {
+			scopedDroplets = append(scopedDroplets, AlertPolicyScopedDropletMetadata{
+				DropletID:   dropletID,
+				DropletName: dropletID,
+			})
+			continue
+		}
+
+		id, err := strconv.Atoi(dropletID)
+		if err != nil {
+			return fmt.Errorf("invalid droplet ID %q: must be a number", dropletID)
+		}
+
+		if client == nil {
+			client, err = NewClient(ctx.HTTP, ctx.Integration)
+			if err != nil {
+				return fmt.Errorf("failed to create client for metadata resolution: %w", err)
+			}
+		}
+
+		droplet, err := client.GetDroplet(id)
+		if err != nil {
+			return fmt.Errorf("failed to fetch droplet %s for metadata: %w", dropletID, err)
+		}
+
+		scopedDroplets = append(scopedDroplets, AlertPolicyScopedDropletMetadata{
+			DropletID:   dropletID,
+			DropletName: droplet.Name,
+		})
+	}
+
+	existing.ScopedDroplets = scopedDroplets
+	return ctx.Metadata.Set(existing)
 }
 
 // MetricsValue represents a single data point in a metric series: [unix_timestamp, string_value]
