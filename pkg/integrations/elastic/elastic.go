@@ -38,10 +38,12 @@ To connect Elastic to SuperPlane:
    - Keep only the base URL: protocol, host, and port.
    - Example: ` + "`https://my-cluster.kb.us-east-1.aws.found.io:9243`" + `.
 3. **Auth Method**:
-   - **API Key**: In Kibana, go to **Stack Management → API Keys**.
-   - Create an API key that can index documents in Elasticsearch and manage Kibana connectors.
-   - Paste that API key into SuperPlane.
-   - **Username / Password**: Provide credentials for a user with permission to access Elasticsearch and manage Kibana connectors.
+   - **API Key** (recommended for Elastic Cloud): Go to Kibana → Stack Management → API Keys and create a new key. Paste the base64-encoded ` + "`id:api_key`" + ` value.
+   - Create an API key that can index documents in Elasticsearch, access Kibana cases, and manage Kibana connectors.
+   - **Username / Password**: Provide the credentials for a user with the required privileges.
+4. **Kibana webhook connector**: SuperPlane creates or reuses one shared Kibana Webhook connector per integration and uses it across the Elastic triggers.
+5. **Alert trigger**: For ` + "`When Alert Fires`" + `, SuperPlane attaches the shared connector to the selected Kibana alert rule automatically.
+6. **Document and case triggers**: For ` + "`On Document Indexed`" + ` and ` + "`When Case Status Changes`" + `, SuperPlane automatically provisions the Kibana Elasticsearch query rules needed for those triggers.
 `
 
 func (e *Elastic) Name() string {
@@ -57,7 +59,7 @@ func (e *Elastic) Icon() string {
 }
 
 func (e *Elastic) Description() string {
-	return "Index documents into Elasticsearch and receive Kibana alert webhooks"
+	return "Index documents into Elasticsearch and receive Kibana webhooks"
 }
 
 func (e *Elastic) Instructions() string {
@@ -134,6 +136,9 @@ func (e *Elastic) Configuration() []configuration.Field {
 func (e *Elastic) Components() []core.Component {
 	return []core.Component{
 		&IndexDocument{},
+		&CreateCase{},
+		&GetCase{},
+		&UpdateCase{},
 		&GetDocument{},
 		&UpdateDocument{},
 	}
@@ -142,6 +147,7 @@ func (e *Elastic) Components() []core.Component {
 func (e *Elastic) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnAlertFires{},
+		&OnCaseStatusChange{},
 		&OnDocumentIndexed{},
 	}
 }
@@ -210,6 +216,10 @@ const (
 	ResourceTypeKibanaSpace         = "elastic.kibana.space"
 	ResourceTypeKibanaAlertSeverity = "elastic.kibana.alert.severity"
 	ResourceTypeKibanaAlertStatus   = "elastic.kibana.alert.status"
+	ResourceTypeCase                = "elastic.case"
+	ResourceTypeCaseStatus          = "elastic.case.status"
+	ResourceTypeCaseSeverity        = "elastic.case.severity"
+	ResourceTypeCaseVersion         = "elastic.case.version"
 )
 
 func (e *Elastic) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -284,6 +294,51 @@ func (e *Elastic) ListResources(resourceType string, ctx core.ListResourcesConte
 			resources = append(resources, core.IntegrationResource{ID: s.ID, Name: s.Name})
 		}
 		return resources, nil
+
+	case ResourceTypeCase:
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %v", err)
+		}
+		cases, err := client.ListCases()
+		if err != nil {
+			return nil, fmt.Errorf("error listing cases: %v", err)
+		}
+		resources := make([]core.IntegrationResource, 0, len(cases))
+		for _, c := range cases {
+			resources = append(resources, core.IntegrationResource{ID: c.ID, Name: c.Title})
+		}
+		return resources, nil
+
+	case ResourceTypeCaseStatus:
+		return []core.IntegrationResource{
+			{ID: "open", Name: "Open"},
+			{ID: "in-progress", Name: "In Progress"},
+			{ID: "closed", Name: "Closed"},
+		}, nil
+
+	case ResourceTypeCaseSeverity:
+		return []core.IntegrationResource{
+			{ID: "critical", Name: "Critical"},
+			{ID: "high", Name: "High"},
+			{ID: "medium", Name: "Medium"},
+			{ID: "low", Name: "Low"},
+		}, nil
+
+	case ResourceTypeCaseVersion:
+		caseID := ctx.Parameters["caseId"]
+		if caseID == "" {
+			return nil, nil
+		}
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %v", err)
+		}
+		c, err := client.GetCase(caseID)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching case: %v", err)
+		}
+		return []core.IntegrationResource{{Type: ResourceTypeCaseVersion, ID: c.Version, Name: c.Version}}, nil
 
 	case ResourceTypeKibanaAlertSeverity:
 		return []core.IntegrationResource{
