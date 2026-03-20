@@ -28,6 +28,10 @@ func DescribeUsage(ctx context.Context, usageService usage.Service, orgID string
 		return nil, err
 	}
 
+	if err := usage.CacheOrganizationLimits(orgID, limits, time.Now()); err != nil {
+		log.Warnf("Failed to persist usage limits cache for organization %s: %v", orgID, err)
+	}
+
 	orgUsage, err := describeUsageMetrics(ctx, usageService, orgID)
 	if err != nil {
 		return nil, err

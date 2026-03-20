@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -24,6 +25,15 @@ func SyncOrganizationForce(ctx context.Context, usageService Service, orgID stri
 
 func MarkOrganizationSyncedIfUnset(orgID string) error {
 	return models.MarkOrganizationUsageSyncedIfUnset(orgID, time.Now())
+}
+
+func markOrganizationUsageSynced(orgID string, syncedAt time.Time, limits *pb.OrganizationLimits) error {
+	if limits == nil {
+		return models.MarkOrganizationUsageSynced(orgID, syncedAt)
+	}
+
+	retentionWindowDays := limits.RetentionWindowDays
+	return models.MarkOrganizationUsageSyncedWithLimits(orgID, syncedAt, &retentionWindowDays, syncedAt)
 }
 
 func syncOrganization(ctx context.Context, usageService Service, orgID string, force bool) error {
@@ -49,21 +59,38 @@ func syncOrganization(ctx context.Context, usageService Service, orgID string, f
 		return fmt.Errorf("set up usage account %s: %w", accountID, err)
 	}
 
-	_, err = usageService.SetupOrganization(ctx, orgID, accountID)
+	response, err := usageService.SetupOrganization(ctx, orgID, accountID)
 	if err == nil {
-		return models.MarkOrganizationUsageSynced(orgID, time.Now())
+		syncedAt := time.Now()
+		if response.GetLimits() != nil {
+			return markOrganizationUsageSynced(orgID, syncedAt, response.GetLimits())
+		}
+
+		describeResponse, describeErr := usageService.DescribeOrganizationLimits(ctx, orgID)
+		if describeErr == nil {
+			return markOrganizationUsageSynced(orgID, syncedAt, describeResponse.GetLimits())
+		}
+
+		return models.MarkOrganizationUsageSynced(orgID, syncedAt)
 	}
 
 	switch status.Code(err) {
 	case codes.AlreadyExists:
+		describeResponse, describeErr := usageService.DescribeOrganizationLimits(ctx, orgID)
+		if describeErr == nil {
+			return markOrganizationUsageSynced(orgID, time.Now(), describeResponse.GetLimits())
+		}
+
 		return models.MarkOrganizationUsageSynced(orgID, time.Now())
 	case codes.FailedPrecondition:
-		if _, describeErr := usageService.DescribeOrganizationLimits(ctx, orgID); describeErr == nil {
-			return models.MarkOrganizationUsageSynced(orgID, time.Now())
+		describeResponse, describeErr := usageService.DescribeOrganizationLimits(ctx, orgID)
+		if describeErr == nil {
+			return markOrganizationUsageSynced(orgID, time.Now(), describeResponse.GetLimits())
 		}
 	case codes.ResourceExhausted:
-		if _, describeErr := usageService.DescribeOrganizationLimits(ctx, orgID); describeErr == nil {
-			return models.MarkOrganizationUsageSynced(orgID, time.Now())
+		describeResponse, describeErr := usageService.DescribeOrganizationLimits(ctx, orgID)
+		if describeErr == nil {
+			return markOrganizationUsageSynced(orgID, time.Now(), describeResponse.GetLimits())
 		}
 
 		return err

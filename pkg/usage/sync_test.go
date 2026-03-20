@@ -103,6 +103,9 @@ func TestSyncOrganizationMarksOrganizationAsSynced(t *testing.T) {
 	organization, err := models.FindOrganizationByID(r.Organization.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, organization.UsageSyncedAt)
+	require.NotNil(t, organization.UsageRetentionWindowDays)
+	assert.Equal(t, int32(0), *organization.UsageRetentionWindowDays)
+	require.NotNil(t, organization.UsageLimitsSyncedAt)
 	assert.Len(t, service.setupAccountCalls, 1)
 	assert.Len(t, service.setupOrganizationCalls, 1)
 }
@@ -131,6 +134,8 @@ func TestSyncOrganizationTreatsExistingRemoteOrganizationAsSynced(t *testing.T) 
 	organization, err := models.FindOrganizationByID(r.Organization.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, organization.UsageSyncedAt)
+	require.NotNil(t, organization.UsageRetentionWindowDays)
+	require.NotNil(t, organization.UsageLimitsSyncedAt)
 }
 
 func TestSyncOrganizationTreatsResourceExhaustedWithExistingRemoteOrganizationAsSynced(t *testing.T) {
@@ -146,4 +151,6 @@ func TestSyncOrganizationTreatsResourceExhaustedWithExistingRemoteOrganizationAs
 	organization, err := models.FindOrganizationByID(r.Organization.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, organization.UsageSyncedAt)
+	require.NotNil(t, organization.UsageRetentionWindowDays)
+	require.NotNil(t, organization.UsageLimitsSyncedAt)
 }

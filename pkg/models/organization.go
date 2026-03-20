@@ -13,15 +13,17 @@ import (
 )
 
 type Organization struct {
-	ID                uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Name              string    `gorm:"uniqueIndex"`
-	Description       string
-	AllowedProviders  datatypes.JSONSlice[string]
-	VersioningEnabled bool
-	UsageSyncedAt     *time.Time
-	CreatedAt         *time.Time
-	UpdatedAt         *time.Time
-	DeletedAt         gorm.DeletedAt `gorm:"index"`
+	ID                       uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Name                     string    `gorm:"uniqueIndex"`
+	Description              string
+	AllowedProviders         datatypes.JSONSlice[string]
+	VersioningEnabled        bool
+	UsageSyncedAt            *time.Time
+	UsageRetentionWindowDays *int32
+	UsageLimitsSyncedAt      *time.Time
+	CreatedAt                *time.Time
+	UpdatedAt                *time.Time
+	DeletedAt                gorm.DeletedAt `gorm:"index"`
 }
 
 func (o *Organization) IsProviderAllowed(provider string) bool {
@@ -183,6 +185,34 @@ func MarkOrganizationUsageSyncedInTransaction(tx *gorm.DB, orgID string, syncedA
 		Error
 }
 
+func MarkOrganizationUsageSyncedWithLimits(orgID string, usageSyncedAt time.Time, retentionWindowDays *int32, limitsSyncedAt time.Time) error {
+	return MarkOrganizationUsageSyncedWithLimitsInTransaction(
+		database.Conn(),
+		orgID,
+		usageSyncedAt,
+		retentionWindowDays,
+		limitsSyncedAt,
+	)
+}
+
+func MarkOrganizationUsageSyncedWithLimitsInTransaction(
+	tx *gorm.DB,
+	orgID string,
+	usageSyncedAt time.Time,
+	retentionWindowDays *int32,
+	limitsSyncedAt time.Time,
+) error {
+	return tx.
+		Model(&Organization{}).
+		Where("id = ?", orgID).
+		Updates(map[string]any{
+			"usage_synced_at":             usageSyncedAt.UTC(),
+			"usage_retention_window_days": retentionWindowDays,
+			"usage_limits_synced_at":      limitsSyncedAt.UTC(),
+		}).
+		Error
+}
+
 func MarkOrganizationUsageSyncedIfUnset(orgID string, syncedAt time.Time) error {
 	return MarkOrganizationUsageSyncedIfUnsetInTransaction(database.Conn(), orgID, syncedAt)
 }
@@ -194,6 +224,55 @@ func MarkOrganizationUsageSyncedIfUnsetInTransaction(tx *gorm.DB, orgID string, 
 		Where("usage_synced_at IS NULL").
 		Update("usage_synced_at", syncedAt.UTC()).
 		Error
+}
+
+func MarkOrganizationUsageLimitsSynced(orgID string, retentionWindowDays *int32, syncedAt time.Time) error {
+	return MarkOrganizationUsageLimitsSyncedInTransaction(database.Conn(), orgID, retentionWindowDays, syncedAt)
+}
+
+func MarkOrganizationUsageLimitsSyncedInTransaction(
+	tx *gorm.DB,
+	orgID string,
+	retentionWindowDays *int32,
+	syncedAt time.Time,
+) error {
+	return tx.
+		Model(&Organization{}).
+		Where("id = ?", orgID).
+		Updates(map[string]any{
+			"usage_retention_window_days": retentionWindowDays,
+			"usage_limits_synced_at":      syncedAt.UTC(),
+		}).
+		Error
+}
+
+func ListOrganizationsPendingUsageLimitsRefresh(staleBefore time.Time, limit int) ([]Organization, error) {
+	return ListOrganizationsPendingUsageLimitsRefreshInTransaction(database.Conn(), staleBefore, limit)
+}
+
+func ListOrganizationsPendingUsageLimitsRefreshInTransaction(
+	tx *gorm.DB,
+	staleBefore time.Time,
+	limit int,
+) ([]Organization, error) {
+	var organizations []Organization
+
+	query := tx.
+		Where("deleted_at IS NULL").
+		Where("usage_synced_at IS NOT NULL").
+		Where("usage_limits_synced_at IS NULL OR usage_limits_synced_at < ?", staleBefore.UTC()).
+		Order("COALESCE(usage_limits_synced_at, to_timestamp(0)) ASC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&organizations).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return organizations, nil
 }
 
 func IsCanvasVersioningEnabled(organizationID uuid.UUID) (bool, error) {
