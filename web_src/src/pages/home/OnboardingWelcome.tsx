@@ -1,10 +1,15 @@
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Activity, ArrowRight, LayoutTemplate, Loader2, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Heading } from "@/components/Heading/heading";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { useCreateCanvas } from "@/hooks/useCanvasData";
+import { useCreateCanvas, useCanvasTemplates } from "@/hooks/useCanvasData";
+import { canvasesUpdateCanvasVersion2 } from "@/api-client/sdk.gen";
+import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { showErrorToast } from "@/utils/toast";
+
+const QUICK_START_TEMPLATE_NAME = "Health Check Monitor";
 
 interface OnboardingWelcomeProps {
   organizationId: string;
@@ -14,19 +19,49 @@ interface OnboardingWelcomeProps {
 
 export function OnboardingWelcome({ organizationId, canCreateCanvases, permissionsLoading }: OnboardingWelcomeProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const permissionAllowed = canCreateCanvases || permissionsLoading;
   const createCanvasMutation = useCreateCanvas(organizationId);
+  const { data: templates = [] } = useCanvasTemplates(organizationId);
 
   const handleQuickStart = async () => {
+    const template = templates.find((t: any) => t.metadata?.name === QUICK_START_TEMPLATE_NAME);
+    if (!template) {
+      showErrorToast("Quick start template not found. Please try again later.");
+      return;
+    }
+
     try {
+      const nodes = template.spec?.nodes || [];
+      const edges = template.spec?.edges || [];
+      const description = template.metadata?.description || "";
+
       const result = await createCanvasMutation.mutateAsync({
-        name: "Health Check Monitor",
-        description: "Monitor an endpoint and get notified when it goes down.",
+        name: QUICK_START_TEMPLATE_NAME,
+        description,
+        nodes,
+        edges,
       });
+
       const canvasId = result?.data?.canvas?.metadata?.id;
-      if (canvasId) {
-        navigate(`/${organizationId}/canvases/${canvasId}`);
-      }
+      if (!canvasId) return;
+
+      // Trigger a save so the backend runs Setup() validation on each node,
+      // surfacing warnings for incomplete configuration (e.g. empty HTTP URL).
+      await canvasesUpdateCanvasVersion2(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: {
+            canvas: {
+              metadata: { name: QUICK_START_TEMPLATE_NAME, description },
+              spec: { nodes, edges },
+            },
+          },
+        }),
+      );
+
+      await queryClient.invalidateQueries({ queryKey: ["canvases"] });
+      navigate(`/${organizationId}/canvases/${canvasId}`);
     } catch (error) {
       const message = (error as Error)?.message || "Failed to create canvas";
       showErrorToast(message);

@@ -1,0 +1,73 @@
+metadata:
+  name: "Health Check Monitor"
+  description: "Monitor any endpoint and get notified when it goes down. No integrations required."
+  isTemplate: false
+spec:
+  nodes:
+    - id: "schedule-trigger-001"
+      name: "Check every minute"
+      type: "TYPE_TRIGGER"
+      configuration:
+        type: "minutes"
+        minutesInterval: 1
+      metadata: null
+      position:
+        x: 300
+        "y": 400
+      component: null
+      blueprint: null
+      trigger:
+        name: "schedule"
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "http-check-002"
+      name: "Health check request"
+      type: "TYPE_COMPONENT"
+      configuration:
+        method: "GET"
+        url: ""
+        successCodes: "2xx"
+        timeoutSeconds: 10
+      metadata: null
+      position:
+        x: 900
+        "y": 400
+      component:
+        name: "http"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "send-email-003"
+      name: "Send alert email"
+      type: "TYPE_COMPONENT"
+      configuration:
+        recipients: []
+        subject: "Health check failed (status {{ $[\"Health check request\"].data.status }})"
+        body: "Your health check returned a non-success status.\n\nStatus code: {{ $[\"Health check request\"].data.status }}\nChecked at: {{ $[\"Check every minute\"].data.calendar.hour }}:{{ $[\"Check every minute\"].data.calendar.minute }} on {{ $[\"Check every minute\"].data.calendar.month }} {{ $[\"Check every minute\"].data.calendar.day }}, {{ $[\"Check every minute\"].data.calendar.year }}"
+      metadata: null
+      position:
+        x: 1500
+        "y": 400
+      component:
+        name: "sendEmail"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+  edges:
+    - sourceId: "schedule-trigger-001"
+      targetId: "http-check-002"
+      channel: "default"
+    - sourceId: "http-check-002"
+      targetId: "send-email-003"
+      channel: "failure"
