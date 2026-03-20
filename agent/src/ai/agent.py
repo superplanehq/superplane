@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass, field
 from typing import Any
 from typing import Literal
@@ -34,6 +35,12 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             "You answer questions about Superplane canvases. "
             "Use tools to fetch real canvas and catalog data before answering. "
             "Be concise and factual. Return citations when possible. "
+            "Use list_available_integrations to verify provider availability when needed. "
+            "Do not block proposing provider nodes just because org integrations are missing; "
+            "it is valid to add nodes first and configure integration bindings later. "
+            "When integration is missing, still provide the node proposal and mention setup as a follow-up. "
+            "Do not claim a provider is unavailable unless a catalog tool succeeds and clearly shows no matches. "
+            "If catalog tools fail, state that availability could not be verified and proceed with a best-effort proposal. "
             "When the user asks for canvas edits, include a structured proposal with "
             "operations that can be applied in the UI. Supported operation types are: "
             "add_node, connect_nodes, disconnect_nodes, update_node_config, and delete_node. "
@@ -43,9 +50,21 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             "Use get_canvas at most once per answer unless the user asks to refresh "
             "or use a different canvas. "
             "Keep responses short by default (about 6-10 lines) unless the user asks "
-            "for deep detail."
+            "for deep detail. "
+            "If a tool returns an error payload, continue with other tools and provide the "
+            "best-effort proposal instead of aborting."
         ),
     )
+
+    def _tool_debug(message: str) -> None:
+        if os.getenv("REPL_WEB_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}:
+            print(f"[web][agent] {message}", flush=True)
+
+    def _tool_error_entry(tool_name: str, error: Exception) -> dict[str, Any]:
+        return {
+            "__tool_error__": str(error),
+            "__tool_name__": tool_name,
+        }
 
     @agent.tool
     def get_canvas(ctx: RunContext[AgentDeps]) -> CanvasSummary:
@@ -66,12 +85,20 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         query: str | None = None,
     ) -> list[dict[str, Any]]:
         """List available components; optionally filter by provider or text query."""
-        return ctx.deps.client.list_components(provider=provider, query=query)
+        try:
+            return ctx.deps.client.list_components(provider=provider, query=query)
+        except Exception as error:
+            _tool_debug(f"list_components failed: {error}")
+            return [_tool_error_entry("list_components", error)]
 
     @agent.tool
     def describe_component(ctx: RunContext[AgentDeps], name: str) -> dict[str, Any]:
         """Describe one component including configuration fields and output channels."""
-        return ctx.deps.client.describe_component(name)
+        try:
+            return ctx.deps.client.describe_component(name)
+        except Exception as error:
+            _tool_debug(f"describe_component failed for {name}: {error}")
+            return {"name": name, "error": str(error)}
 
     @agent.tool
     def list_triggers(
@@ -80,17 +107,38 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         query: str | None = None,
     ) -> list[dict[str, Any]]:
         """List available triggers; optionally filter by provider or text query."""
-        return ctx.deps.client.list_triggers(provider=provider, query=query)
+        try:
+            return ctx.deps.client.list_triggers(provider=provider, query=query)
+        except Exception as error:
+            _tool_debug(f"list_triggers failed: {error}")
+            return [_tool_error_entry("list_triggers", error)]
 
     @agent.tool
     def describe_trigger(ctx: RunContext[AgentDeps], name: str) -> dict[str, Any]:
         """Describe one trigger including configuration fields and required flags."""
-        return ctx.deps.client.describe_trigger(name)
+        try:
+            return ctx.deps.client.describe_trigger(name)
+        except Exception as error:
+            _tool_debug(f"describe_trigger failed for {name}: {error}")
+            return {"name": name, "error": str(error)}
 
     @agent.tool
     def list_org_integrations(ctx: RunContext[AgentDeps]) -> list[dict[str, Any]]:
         """List integrations connected to the current organization."""
-        return ctx.deps.client.list_org_integrations()
+        try:
+            return ctx.deps.client.list_org_integrations()
+        except Exception as error:
+            _tool_debug(f"list_org_integrations failed: {error}")
+            return [_tool_error_entry("list_org_integrations", error)]
+
+    @agent.tool
+    def list_available_integrations(ctx: RunContext[AgentDeps]) -> list[dict[str, Any]]:
+        """List available provider integrations from catalog metadata."""
+        try:
+            return ctx.deps.client.list_available_integrations()
+        except Exception as error:
+            _tool_debug(f"list_available_integrations failed: {error}")
+            return [_tool_error_entry("list_available_integrations", error)]
 
     @agent.tool
     def list_integration_resources(
@@ -100,10 +148,14 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         parameters: dict[str, str] | None = None,
     ) -> list[dict[str, Any]]:
         """List selectable resources for an org integration resource type."""
-        return ctx.deps.client.list_integration_resources(
-            integration_id=integration_id,
-            type=type,
-            parameters=parameters,
-        )
+        try:
+            return ctx.deps.client.list_integration_resources(
+                integration_id=integration_id,
+                type=type,
+                parameters=parameters,
+            )
+        except Exception as error:
+            _tool_debug(f"list_integration_resources failed: {error}")
+            return [_tool_error_entry("list_integration_resources", error)]
 
     return agent
