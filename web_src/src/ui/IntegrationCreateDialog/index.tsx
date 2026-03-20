@@ -178,9 +178,8 @@ export function IntegrationCreateDialog({
         onCreated?.(integration.metadata.id);
       }
     } catch (error) {
-      const message = getApiErrorMessage(error);
       setCreateError(error);
-      showErrorToast(`Failed to create integration: ${getUsageLimitToastMessage(error, message)}`);
+      showErrorToast(getUsageLimitToastMessage(error, "Failed to create integration"));
     } finally {
       setIsCreatePending(false);
     }

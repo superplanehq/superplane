@@ -40,6 +40,22 @@ export function getApiErrorMessage(error: unknown, fallback = "An error occurred
   return fallback;
 }
 
+export async function getResponseErrorMessage(response: Response, fallback = "An error occurred"): Promise<string> {
+  const rawBody = await response.text();
+  const trimmedBody = rawBody.trim();
+
+  if (!trimmedBody) {
+    return fallback;
+  }
+
+  try {
+    const parsedBody = JSON.parse(trimmedBody) as unknown;
+    return getApiErrorMessage(parsedBody, trimmedBody);
+  } catch {
+    return trimmedBody;
+  }
+}
+
 export function getApiErrorCode(error: unknown): number | null {
   if (!error) {
     return null;

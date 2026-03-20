@@ -17,7 +17,7 @@ describe("usageLimits", () => {
 
   it("uses mapped usage text when available and falls back otherwise", () => {
     expect(getUsageLimitToastMessage({ error: { message: "organization user limit exceeded" } }, "fallback")).toBe(
-      "Member limit reached for this organization.",
+      "This organization already has the maximum number of members allowed by the current plan.",
     );
     expect(getUsageLimitToastMessage(undefined, "fallback")).toBe("fallback");
   });
@@ -27,6 +27,15 @@ describe("usageLimits", () => {
 
     expect(notice).not.toBeNull();
     expect(notice?.title).toBe("Member limit reached");
+    expect(notice?.href).toBe("/org-123/settings/billing");
+  });
+
+  it("maps generic usage setup errors to descriptive notices", () => {
+    const notice = getUsageLimitNotice("organization has no billing account candidate", "org-123");
+
+    expect(notice).not.toBeNull();
+    expect(notice?.title).toBe("Usage account is not configured");
+    expect(notice?.description).toContain("billing account");
     expect(notice?.href).toBe("/org-123/settings/billing");
   });
 });
