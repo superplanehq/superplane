@@ -8,12 +8,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__IndexDocument__Setup(t *testing.T) {
-	c := &IndexDocument{}
+func Test__UpdateDocument__Setup(t *testing.T) {
+	c := &UpdateDocument{}
 	integrationCtx := &contexts.IntegrationContext{
 		Configuration: map[string]any{
 			"url":      "https://elastic.example.com",
@@ -30,20 +31,23 @@ func Test__IndexDocument__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "index is required")
 	})
 
-	t.Run("whitespace-only index -> error", func(t *testing.T) {
-		err := c.Setup(core.SetupContext{
-			Configuration: map[string]any{"index": "   "},
-			Metadata:      &contexts.MetadataContext{},
-		})
-		require.ErrorContains(t, err, "index is required")
-	})
-
 	t.Run("missing document -> error", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{"index": "my-index"},
 			Metadata:      &contexts.MetadataContext{},
 		})
 		require.ErrorContains(t, err, "document is required")
+	})
+
+	t.Run("missing fields -> error", func(t *testing.T) {
+		err := c.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"index":    "my-index",
+				"document": "doc-1",
+			},
+			Metadata: &contexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, "fields is required")
 	})
 
 	t.Run("valid config -> success", func(t *testing.T) {
@@ -53,6 +57,16 @@ func Test__IndexDocument__Setup(t *testing.T) {
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`[{"index":"my-index"}]`)),
 				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"_id": "doc-1",
+						"_index": "my-index",
+						"_version": 2,
+						"found": true,
+						"_source": {"status":"open"}
+					}`)),
+				},
 			},
 		}
 		meta := &contexts.MetadataContext{}
@@ -60,14 +74,15 @@ func Test__IndexDocument__Setup(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"index":    "my-index",
-				"document": map[string]any{"key": "value"},
+				"document": "doc-1",
+				"fields":   map[string]any{"status": "done"},
 			},
 			HTTP:        httpCtx,
 			Integration: integrationCtx,
 			Metadata:    meta,
 		})
 		require.NoError(t, err)
-		assert.Equal(t, IndexDocumentSetupMetadata{Index: "my-index"}, meta.Metadata)
+		assert.Equal(t, UpdateDocumentSetupMetadata{Index: "my-index", Document: "doc-1"}, meta.Metadata)
 	})
 
 	t.Run("index does not exist -> error", func(t *testing.T) {
@@ -83,7 +98,8 @@ func Test__IndexDocument__Setup(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"index":    "my-index",
-				"document": map[string]any{"key": "value"},
+				"document": "doc-1",
+				"fields":   map[string]any{"status": "done"},
 			},
 			HTTP:        httpCtx,
 			Integration: integrationCtx,
@@ -91,22 +107,41 @@ func Test__IndexDocument__Setup(t *testing.T) {
 		})
 		require.ErrorContains(t, err, `index "my-index" was not found`)
 	})
+
 }
 
-func Test__IndexDocument__Configuration(t *testing.T) {
-	c := &IndexDocument{}
+func Test__UpdateDocument__Configuration(t *testing.T) {
+	c := &UpdateDocument{}
 
 	fields := c.Configuration()
 	require.Len(t, fields, 3)
 
-	documentField := fields[1]
-	assert.Equal(t, "document", documentField.Name)
+	var documentIDField *configuration.Field
+	for i := range fields {
+		if fields[i].Name == "document" {
+			documentIDField = &fields[i]
+			break
+		}
+	}
+
+	require.NotNil(t, documentIDField)
+	assert.Equal(t, configuration.FieldTypeIntegrationResource, documentIDField.Type)
+	require.NotNil(t, documentIDField.TypeOptions)
+	require.NotNil(t, documentIDField.TypeOptions.Resource)
+	assert.Equal(t, ResourceTypeDocument, documentIDField.TypeOptions.Resource.Type)
+	require.Len(t, documentIDField.TypeOptions.Resource.Parameters, 1)
+	assert.Equal(t, "index", documentIDField.TypeOptions.Resource.Parameters[0].Name)
+	require.NotNil(t, documentIDField.TypeOptions.Resource.Parameters[0].ValueFrom)
+	assert.Equal(t, "index", documentIDField.TypeOptions.Resource.Parameters[0].ValueFrom.Field)
+
+	updateFields := fields[2]
+	assert.Equal(t, "fields", updateFields.Name)
 	assert.Equal(t, map[string]any{
 		onDocumentIndexedTimeField: defaultDocumentTimestampTemplate,
-	}, documentField.Default)
+	}, updateFields.Default)
 }
 
-func Test__IndexDocument__Execute(t *testing.T) {
+func Test__UpdateDocument__Execute(t *testing.T) {
 	integrationCtx := func(authType string) *contexts.IntegrationContext {
 		cfg := map[string]any{
 			"url":      "https://elastic.example.com",
@@ -123,27 +158,27 @@ func Test__IndexDocument__Execute(t *testing.T) {
 
 	successResponse := func() *http.Response {
 		return &http.Response{
-			StatusCode: http.StatusCreated,
+			StatusCode: http.StatusOK,
 			Body: io.NopCloser(strings.NewReader(`{
-				"_id": "abc123",
+				"_id": "doc-1",
 				"_index": "workflow-audit",
-				"result": "created",
-				"_version": 1,
-				"_shards": {"successful": 1, "failed": 0}
+				"result": "updated",
+				"_version": 4
 			}`)),
 		}
 	}
 
-	t.Run("indexes document with auto-generated ID (POST)", func(t *testing.T) {
+	t.Run("updates document and emits payload", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{successResponse()},
 		}
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		err := (&IndexDocument{}).Execute(core.ExecutionContext{
+		err := (&UpdateDocument{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
 				"index":    "workflow-audit",
-				"document": map[string]any{"event": "deploy", "version": "1.2.3"},
+				"document": "doc-1",
+				"fields":   map[string]any{"status": "done"},
 			},
 			HTTP:           httpCtx,
 			Integration:    integrationCtx("apiKey"),
@@ -155,52 +190,29 @@ func Test__IndexDocument__Execute(t *testing.T) {
 		require.Len(t, httpCtx.Requests, 1)
 		req := httpCtx.Requests[0]
 		assert.Equal(t, http.MethodPost, req.Method)
-		assert.Equal(t, "https://elastic.example.com/workflow-audit/_doc", req.URL.String())
+		assert.Equal(t, "https://elastic.example.com/workflow-audit/_update/doc-1", req.URL.String())
 		assert.Equal(t, "ApiKey test-api-key", req.Header.Get("Authorization"))
 
 		require.Len(t, state.Payloads, 1)
 		wrapper := state.Payloads[0].(map[string]any)
 		data := wrapper["data"].(map[string]any)
-		assert.Equal(t, "abc123", data["id"])
+		assert.Equal(t, "doc-1", data["id"])
 		assert.Equal(t, "workflow-audit", data["index"])
-		assert.Equal(t, "created", data["result"])
-		assert.Equal(t, 1, data["version"])
+		assert.Equal(t, "updated", data["result"])
+		assert.Equal(t, 4, data["version"])
 	})
 
-	t.Run("indexes document with explicit ID (PUT)", func(t *testing.T) {
+	t.Run("uses basic auth when authType is basic", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{successResponse()},
 		}
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		err := (&IndexDocument{}).Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"index":      "workflow-audit",
-				"document":   map[string]any{"event": "deploy"},
-				"documentId": "run-42",
-			},
-			HTTP:           httpCtx,
-			Integration:    integrationCtx("apiKey"),
-			ExecutionState: state,
-		})
-
-		require.NoError(t, err)
-		assert.True(t, state.Passed)
-		req := httpCtx.Requests[0]
-		assert.Equal(t, http.MethodPut, req.Method)
-		assert.Equal(t, "https://elastic.example.com/workflow-audit/_doc/run-42", req.URL.String())
-	})
-
-	t.Run("uses basic auth header when authType is basic", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{
-			Responses: []*http.Response{successResponse()},
-		}
-		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := (&IndexDocument{}).Execute(core.ExecutionContext{
+		err := (&UpdateDocument{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
 				"index":    "my-index",
-				"document": map[string]any{"k": "v"},
+				"document": "doc-1",
+				"fields":   map[string]any{"k": "v"},
 			},
 			HTTP:           httpCtx,
 			Integration:    integrationCtx("basic"),
@@ -219,17 +231,18 @@ func Test__IndexDocument__Execute(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
-					StatusCode: http.StatusBadRequest,
-					Body:       io.NopCloser(strings.NewReader(`{"error":{"type":"mapper_parsing_exception"}}`)),
+					StatusCode: http.StatusNotFound,
+					Body:       io.NopCloser(strings.NewReader(`{"error":{"type":"document_missing_exception"}}`)),
 				},
 			},
 		}
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		err := (&IndexDocument{}).Execute(core.ExecutionContext{
+		err := (&UpdateDocument{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
 				"index":    "my-index",
-				"document": map[string]any{"k": "v"},
+				"document": "doc-1",
+				"fields":   map[string]any{"k": "v"},
 			},
 			HTTP:           httpCtx,
 			Integration:    integrationCtx("apiKey"),
@@ -238,15 +251,16 @@ func Test__IndexDocument__Execute(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.False(t, state.Passed)
-		assert.Contains(t, state.FailureMessage, "failed to index document")
+		assert.Contains(t, state.FailureMessage, "failed to update document")
 	})
 
-	t.Run("nil document -> fails execution", func(t *testing.T) {
+	t.Run("nil fields -> fails execution", func(t *testing.T) {
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		err := (&IndexDocument{}).Execute(core.ExecutionContext{
+		err := (&UpdateDocument{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"index": "my-index",
+				"index":    "my-index",
+				"document": "doc-1",
 			},
 			HTTP:           &contexts.HTTPContext{},
 			Integration:    integrationCtx("apiKey"),
@@ -255,6 +269,7 @@ func Test__IndexDocument__Execute(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.False(t, state.Passed)
-		assert.Contains(t, state.FailureMessage, "document is required")
+		assert.Contains(t, state.FailureMessage, "fields is required")
 	})
+
 }

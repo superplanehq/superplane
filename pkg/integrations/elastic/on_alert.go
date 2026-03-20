@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -33,17 +34,20 @@ func (t *OnAlertFires) Color() string { return "gray" }
 func (t *OnAlertFires) Documentation() string {
 	return `The When Alert Fires trigger starts a workflow execution when a Kibana alert rule fires via a webhook connector.
 
+## Shared Connector
+
+SuperPlane creates **one Kibana Webhook connector per integration**, shared across all triggers that use the same Kibana instance. Each incoming request is routed to the correct trigger using the ` + "`eventType`" + ` field in the request body — this trigger only processes requests where ` + "`eventType`" + ` is ` + "`\"alert_fired\"`" + `. Requests intended for other trigger types (e.g. ` + "`\"document_indexed\"`" + `) are silently ignored.
+
 ## Setup
 
-1. Save this trigger — SuperPlane automatically creates a signed Kibana Webhook connector.
+1. Save this trigger — SuperPlane automatically creates or reuses the shared Kibana Webhook connector.
 2. In Kibana, attach the connector to one or more alert rules and configure the action body as shown below.
 
-### Recommended Kibana action body
-
-For filters to work reliably, configure the rule action body in Kibana to include these fields:
+### Required Kibana action body
 
 ` + "```" + `json
 {
+  "eventType": "alert_fired",
   "ruleId":   "{{rule.id}}",
   "ruleName": "{{rule.name}}",
   "spaceId":  "{{rule.spaceId}}",
@@ -53,7 +57,7 @@ For filters to work reliably, configure the rule action body in Kibana to includ
 }
 ` + "```" + `
 
-Kibana substitutes ` + "`{{rule.id}}`" + ` and ` + "`{{rule.name}}`" + ` at delivery time. Fields omitted from the body will not be filterable in SuperPlane.
+The ` + "`eventType`" + ` field is required for routing. Kibana substitutes ` + "`{{rule.id}}`" + ` and ` + "`{{rule.name}}`" + ` at delivery time. Fields omitted from the body will not be filterable in SuperPlane.
 
 ## Filtering
 
@@ -128,6 +132,7 @@ func (t *OnAlertFires) Configuration() []configuration.Field {
 			Label:       "Statuses",
 			Type:        configuration.FieldTypeAnyPredicateList,
 			Required:    false,
+			Default:     []map[string]any{{"type": configuration.PredicateTypeEquals, "value": "active"}},
 			Description: "Only fire for alerts whose status matches any of these predicates. Leave empty to accept all statuses.",
 			TypeOptions: &configuration.TypeOptions{
 				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
@@ -172,6 +177,10 @@ func (t *OnAlertFires) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 	var payload map[string]any
 	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
 		return http.StatusBadRequest, nil, fmt.Errorf("invalid JSON payload: %w", err)
+	}
+
+	if eventType := extractString(payload, "eventType"); eventType != "alert_fired" {
+		return http.StatusOK, nil, nil
 	}
 
 	var config OnAlertFiresConfiguration
@@ -270,24 +279,17 @@ func extractStringSlice(payload map[string]any, key string) []string {
 
 // containsIgnoreCase reports whether value is in list (case-insensitive).
 func containsIgnoreCase(list []string, value string) bool {
-	for _, item := range list {
-		if strings.EqualFold(item, value) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(list, func(item string) bool {
+		return strings.EqualFold(item, value)
+	})
 }
 
 // matchesAnyString reports whether any candidate appears in list (case-insensitive).
 func matchesAnyString(list []string, candidates ...string) bool {
-	for _, candidate := range candidates {
+	return slices.ContainsFunc(candidates, func(candidate string) bool {
 		if candidate == "" {
-			continue
+			return false
 		}
-		if containsIgnoreCase(list, candidate) {
-			return true
-		}
-	}
-
-	return false
+		return containsIgnoreCase(list, candidate)
+	})
 }
