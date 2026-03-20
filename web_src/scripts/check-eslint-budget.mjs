@@ -35,7 +35,8 @@ function extractIssues(results) {
   for (const result of results) {
     const filePath = toRelativeFilePath(result.filePath);
     const isIgnoredPath = ignoredPrefixes.some((prefix) => filePath.startsWith(prefix));
-    if (isIgnoredPath) {
+    const isStorybookStoryFile = filePath.endsWith(".stories.tsx");
+    if (isIgnoredPath || isStorybookStoryFile) {
       continue;
     }
 

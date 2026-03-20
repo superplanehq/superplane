@@ -1,17 +1,14 @@
 {
-  "maxAllowedTotalIssues": 2909,
+  "maxAllowedTotalIssues": 2486,
   "maxAllowedByRule": {
-    "@typescript-eslint/consistent-type-imports": 1063,
-    "@typescript-eslint/no-explicit-any": 595,
-    "complexity": 281,
-    "no-console": 257,
-    "max-lines-per-function": 110,
+    "@typescript-eslint/consistent-type-imports": 1051,
+    "@typescript-eslint/no-explicit-any": 583,
+    "complexity": 279,
+    "max-lines-per-function": 109,
     "max-statements": 109,
     "@typescript-eslint/no-non-null-asserted-optional-chain": 102,
-    "no-restricted-imports": 68,
-    "storybook/no-renderer-packages": 68,
     "react-hooks/exhaustive-deps": 65,
-    "@typescript-eslint/no-unused-vars": 50,
+    "@typescript-eslint/no-unused-vars": 49,
     "react-hooks/rules-of-hooks": 47,
     "react-refresh/only-export-components": 28,
     "eqeqeq": 16,
@@ -20,14 +17,13 @@
     "jsx-a11y/label-has-associated-control": 8,
     "prefer-const": 5,
     "no-empty": 4,
+    "no-console": 2,
     "no-case-declarations": 2,
     "no-constant-binary-expression": 2,
     "@typescript-eslint/no-namespace": 2,
-    "storybook/no-redundant-story-name": 2,
     "@typescript-eslint/no-empty-object-type": 1,
     "no-async-promise-executor": 1,
-    "storybook/prefer-pascal-case": 1,
     "unknown": 1
   },
-  "updatedAt": "2026-03-20T16:16:56.068Z"
+  "updatedAt": "2026-03-20T16:53:10.002Z"
 }
