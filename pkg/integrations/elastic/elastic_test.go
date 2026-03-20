@@ -137,6 +137,7 @@ func Test__Elastic__Sync(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "ready", integrationCtx.State)
 		require.Len(t, httpCtx.Requests, 2)
+		assert.Equal(t, "ApiKey test-api-key", httpCtx.Requests[0].Header.Get("Authorization"))
 		assert.Equal(t, "https://elastic.example.com/", httpCtx.Requests[0].URL.String())
 		assert.Equal(t, "https://kibana.example.com/api/actions/connectors", httpCtx.Requests[1].URL.String())
 	})

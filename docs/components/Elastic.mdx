@@ -25,12 +25,20 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 To connect Elastic to SuperPlane:
 
-1. **Elasticsearch URL**: Full URL of your Elasticsearch cluster (e.g. `https://my-cluster.es.us-east-1.aws.found.io:9243`).
-2. **Kibana URL**: Full URL of your Kibana instance (e.g. `https://my-cluster.kb.us-east-1.aws.found.io:9243`). Required for automatic Kibana webhook connector setup.
+1. **Elasticsearch URL**:
+   - **Elastic Cloud**: Start at https://cloud.elastic.co/home. In **Hosted deployments**, find your deployment, click **Manage** (or open it from **Open**), then copy the **Elasticsearch endpoint** from the **Application endpoints, cluster and component IDs** section.
+   - **Self-managed Elastic**: Use your Elasticsearch server URL.
+   - Example: `https://my-cluster.es.us-east-1.aws.found.io:9243`.
+2. **Kibana URL**:
+   - **Elastic Cloud**: From the same deployment page opened from https://cloud.elastic.co/home, copy the **Kibana endpoint** from **Manage**.
+   - **Self-managed Elastic**: Use the base URL of your Kibana instance.
+   - Keep only the base URL: protocol, host, and port.
+   - Example: `https://my-cluster.kb.us-east-1.aws.found.io:9243`.
 3. **Auth Method**:
-   - **API Key** (recommended for Elastic Cloud): Go to Kibana → Stack Management → API Keys and create a new key. Paste the base64-encoded `id:api_key` value.
-   - **Username / Password**: Provide the credentials for a user with the required privileges.
-4. **Kibana alerts (trigger)**: SuperPlane automatically creates a signed Kibana Webhook connector. You still need to attach that connector to your alert rules in Kibana.
+   - **API Key**: In Kibana, go to **Stack Management → API Keys**.
+   - Create an API key that can index documents in Elasticsearch and manage Kibana connectors.
+   - Paste that API key into SuperPlane.
+   - **Username / Password**: Provide credentials for a user with permission to access Elasticsearch and manage Kibana connectors.
 
 <a id="when-alert-fires"></a>
 
@@ -44,20 +52,22 @@ SuperPlane creates **one Kibana Webhook connector per integration**, shared acro
 
 ### Setup
 
-1. Save this trigger — SuperPlane automatically creates or reuses the shared Kibana Webhook connector.
-2. In Kibana, attach the connector to one or more alert rules and configure the action body as shown below.
+1. Select the Kibana alert rule in SuperPlane and save the trigger.
+2. SuperPlane automatically creates or reuses the shared Kibana Webhook connector and attaches it to the selected rule if it is missing.
 
-#### Required Kibana action body
+#### Kibana action body
+
+SuperPlane configures the rule action body with these fields:
 
 ```json
 {
   "eventType": "alert_fired",
-  "ruleId":   "{{rule.id}}",
+  "ruleId": "{{rule.id}}",
   "ruleName": "{{rule.name}}",
-  "spaceId":  "{{rule.spaceId}}",
-  "tags":     {{rule.tags}},
+  "spaceId": "{{rule.spaceId}}",
+  "tags": {{rule.tags}},
   "severity": "{{context.severity}}",
-  "status":   "{{rule.status}}"
+  "status": "{{rule.status}}"
 }
 ```
 
@@ -65,9 +75,9 @@ The `eventType` field is required for routing. Kibana substitutes `{{rule.id}}` 
 
 ### Filtering
 
-All filter fields are optional. Leave them empty to fire for every incoming alert. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
+Select at least one **Rule**. Additional filter fields are optional. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
 
-**Rule ID** is the most reliable filter because rule names are user-editable. Use it as the primary key when you need precise per-rule routing.
+**Rule ID** is the most reliable selector because rule names are user-editable. Use it when you need precise per-rule routing.
 
 ### Webhook Verification
 

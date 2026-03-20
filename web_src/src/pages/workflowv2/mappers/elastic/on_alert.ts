@@ -5,9 +5,36 @@ import { TriggerProps } from "@/ui/trigger";
 import { MetadataItem } from "@/ui/metadataList";
 import elasticIcon from "@/assets/icons/integrations/elastic.svg";
 
+type UnknownRecord = Record<string, unknown>;
+
+interface ElasticAlertPayload {
+  ruleName?: string;
+  alertName?: string;
+  ruleId?: string;
+  spaceId?: string;
+  status?: string;
+  severity?: string;
+  tags?: string[];
+  name?: string;
+  title?: string;
+  timestamp?: string;
+}
+
+interface OnAlertConfiguration {
+  rule?: string;
+  spaces: string[];
+  tags: Predicate[];
+  severities: string[];
+  statuses: string[];
+}
+
+interface OnAlertMetadata {
+  ruleName?: string;
+}
+
 export const onAlertFiresTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const payload = context.event?.data as Record<string, any> | undefined;
+    const payload = toAlertPayload(context.event?.data);
 
     const title = alertTitle(payload);
     const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
@@ -16,9 +43,14 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const payload = context.event?.data as Record<string, any> | undefined;
+    const payload = toAlertPayload(context.event?.data);
 
     const details: Record<string, string> = {};
+    const receivedAt = payload?.timestamp || context.event?.createdAt;
+
+    if (receivedAt) {
+      details["Received At"] = new Date(receivedAt).toLocaleString();
+    }
 
     const rule = payload?.ruleName || payload?.alertName || payload?.ruleId;
     if (rule) details["Rule"] = String(rule);
@@ -37,11 +69,12 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
-    const config = node.configuration as Record<string, any> | undefined;
-    const metadataItems: MetadataItem[] = buildMetadataItems(config);
+    const config = toOnAlertConfiguration(node.configuration);
+    const metadata = toOnAlertMetadata(node.metadata);
+    const metadataItems: MetadataItem[] = buildMetadataItems(config, metadata);
 
     if (lastEvent) {
-      const payload = lastEvent.data as Record<string, any> | undefined;
+      const payload = toAlertPayload(lastEvent.data);
       const title = alertTitle(payload);
       const subtitle = formatTimeAgo(new Date(lastEvent.createdAt));
 
@@ -78,27 +111,85 @@ function predicateLabel(predicates: Predicate[]): string {
   return predicates.map((p) => (p.type === "equals" ? p.value : `${p.type}: ${p.value}`)).join(", ");
 }
 
-function buildMetadataItems(config: Record<string, any> | undefined): MetadataItem[] {
+function buildMetadataItems(config: OnAlertConfiguration, metadata: OnAlertMetadata): MetadataItem[] {
   const items: MetadataItem[] = [];
-  if (!config) return items;
+  const { rule, spaces, tags, severities, statuses } = config;
 
-  const rules: string[] = Array.isArray(config.rules) ? config.rules : [];
-  const spaces: string[] = Array.isArray(config.spaces) ? config.spaces : [];
-  const tags: Predicate[] = Array.isArray(config.tags) ? config.tags : [];
-  const severities: Predicate[] = Array.isArray(config.severities) ? config.severities : [];
-  const statuses: Predicate[] = Array.isArray(config.statuses) ? config.statuses : [];
-
-  if (rules.length > 0) items.push({ icon: "bell", label: rules.join(", ") });
+  if (metadata?.ruleName || rule) items.push({ icon: "bell", label: metadata?.ruleName || rule });
   if (spaces.length > 0) items.push({ icon: "layers", label: spaces.join(", ") });
   if (tags.length > 0) items.push({ icon: "tag", label: predicateLabel(tags) });
-  if (severities.length > 0) items.push({ icon: "alert-triangle", label: predicateLabel(severities) });
-  if (statuses.length > 0) items.push({ icon: "activity", label: predicateLabel(statuses) });
+  if (severities.length > 0) items.push({ icon: "alert-triangle", label: severities.join(", ") });
+  if (statuses.length > 0) items.push({ icon: "activity", label: statuses.join(", ") });
 
   return items;
 }
 
-function alertTitle(payload: Record<string, any> | undefined): string {
+function alertTitle(payload: ElasticAlertPayload | undefined): string {
   if (!payload) return "Elastic alert received";
   const baseTitle = payload.ruleName || payload.alertName || payload.name || payload.title || "Elastic alert received";
   return payload.spaceId ? `${baseTitle} · ${payload.spaceId}` : baseTitle;
+}
+
+function toOnAlertConfiguration(value: unknown): OnAlertConfiguration {
+  const config = toUnknownRecord(value);
+  return {
+    rule: toOptionalString(config?.rule),
+    spaces: toStringList(config?.spaces),
+    tags: toPredicates(config?.tags),
+    severities: toStringList(config?.severities),
+    statuses: toStringList(config?.statuses),
+  };
+}
+
+function toOnAlertMetadata(value: unknown): OnAlertMetadata {
+  const metadata = toUnknownRecord(value);
+  return {
+    ruleName: toOptionalString(metadata?.ruleName),
+  };
+}
+
+function toAlertPayload(value: unknown): ElasticAlertPayload | undefined {
+  const payload = toUnknownRecord(value);
+  if (!payload) return undefined;
+
+  return {
+    ruleName: toOptionalString(payload.ruleName),
+    alertName: toOptionalString(payload.alertName),
+    ruleId: toOptionalString(payload.ruleId),
+    spaceId: toOptionalString(payload.spaceId),
+    status: toOptionalString(payload.status),
+    severity: toOptionalString(payload.severity),
+    tags: toStringList(payload.tags),
+    name: toOptionalString(payload.name),
+    title: toOptionalString(payload.title),
+    timestamp: toOptionalString(payload.timestamp),
+  };
+}
+
+function toUnknownRecord(value: unknown): UnknownRecord | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  return value as UnknownRecord;
+}
+
+function toOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function toStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+function toPredicates(value: unknown): Predicate[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      const predicate = toUnknownRecord(item);
+      const type = toOptionalString(predicate?.type);
+      const predicateValue = toOptionalString(predicate?.value);
+      if (!type || !predicateValue) return undefined;
+      return { type, value: predicateValue };
+    })
+    .filter((predicate): predicate is Predicate => predicate !== undefined);
 }

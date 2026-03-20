@@ -7,7 +7,6 @@ import {
   ExecutionDetailsContext,
   ExecutionInfo,
   NodeInfo,
-  OutputPayload,
   SubtitleContext,
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
@@ -17,6 +16,20 @@ import { formatTimeAgo } from "@/utils/date";
 interface IndexDocumentConfiguration {
   index?: string;
   documentId?: string;
+}
+
+type UnknownRecord = Record<string, unknown>;
+
+interface OutputPayloadView {
+  timestamp?: string;
+  data?: unknown;
+}
+
+interface IndexDocumentOutputData {
+  id?: string;
+  index?: string;
+  result?: string;
+  version?: string | number;
 }
 
 export const indexDocumentMapper: ComponentBaseMapper = {
@@ -41,12 +54,12 @@ export const indexDocumentMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const outputs = context.execution.outputs as { default: OutputPayload[] };
-    if (!outputs?.default?.[0]?.data) {
+    const payload = getFirstOutputPayload(context.execution.outputs);
+    const doc = toIndexDocumentOutputData(payload?.data);
+    if (!doc) {
       return {};
     }
-    const doc = outputs.default[0].data as Record<string, any>;
-    return getDetailsForDocument(doc);
+    return getDetailsForDocument(doc, payload?.timestamp);
   },
 
   subtitle(context: SubtitleContext): string {
@@ -57,7 +70,7 @@ export const indexDocumentMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as IndexDocumentConfiguration | undefined;
+  const configuration = toIndexDocumentConfiguration(node.configuration);
 
   if (configuration?.index) {
     metadata.push({ icon: "database", label: configuration.index });
@@ -87,8 +100,12 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   ];
 }
 
-function getDetailsForDocument(doc: Record<string, any>): Record<string, string> {
+function getDetailsForDocument(doc: IndexDocumentOutputData, timestamp?: string): Record<string, string> {
   const details: Record<string, string> = {};
+
+  if (timestamp) {
+    details["Indexed At"] = new Date(timestamp).toLocaleString();
+  }
 
   if (doc?.id) {
     details["Document ID"] = String(doc.id);
@@ -107,4 +124,58 @@ function getDetailsForDocument(doc: Record<string, any>): Record<string, string>
   }
 
   return details;
+}
+
+function getFirstOutputPayload(outputs: unknown): OutputPayloadView | undefined {
+  const outputRecord = toUnknownRecord(outputs);
+  if (!outputRecord) return undefined;
+
+  const payload =
+    getOutputPayloadFromChannel(outputRecord.default) ||
+    getOutputPayloadFromChannel(outputRecord.success) ||
+    getOutputPayloadFromChannel(outputRecord.failed);
+
+  if (!payload) return undefined;
+
+  return {
+    timestamp: toOptionalString(payload.timestamp),
+    data: payload.data,
+  };
+}
+
+function getOutputPayloadFromChannel(channel: unknown): UnknownRecord | undefined {
+  if (!Array.isArray(channel) || channel.length === 0) return undefined;
+  return toUnknownRecord(channel[0]);
+}
+
+function toIndexDocumentConfiguration(value: unknown): IndexDocumentConfiguration {
+  const config = toUnknownRecord(value);
+  return {
+    index: toOptionalString(config?.index),
+    documentId: toOptionalString(config?.documentId),
+  };
+}
+
+function toIndexDocumentOutputData(value: unknown): IndexDocumentOutputData | undefined {
+  const payload = toUnknownRecord(value);
+  if (!payload) return undefined;
+
+  const version = payload.version;
+  const parsedVersion = typeof version === "number" || typeof version === "string" ? version : undefined;
+
+  return {
+    id: toOptionalString(payload.id),
+    index: toOptionalString(payload.index),
+    result: toOptionalString(payload.result),
+    version: parsedVersion,
+  };
+}
+
+function toUnknownRecord(value: unknown): UnknownRecord | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  return value as UnknownRecord;
+}
+
+function toOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }

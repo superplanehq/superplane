@@ -3,6 +3,7 @@ package elastic
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -101,7 +102,8 @@ func (c *IndexDocument) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(config.Index) == "" {
+	config.Index = strings.TrimSpace(config.Index)
+	if config.Index == "" {
 		return fmt.Errorf("index is required")
 	}
 
@@ -109,16 +111,30 @@ func (c *IndexDocument) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("document is required and must be a JSON object")
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create Elastic client: %w", err)
-	}
-	if err := ensureIndexExists(client, config.Index); err != nil {
-		return err
+	resolvedIndex := config.Index
+	if !isTemplateExpression(config.Index) {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create Elastic client: %w", err)
+		}
+
+		indices, err := client.ListIndices()
+		if err != nil {
+			return fmt.Errorf("failed to list Elasticsearch indices: %w", err)
+		}
+
+		match := slices.IndexFunc(indices, func(index IndexInfo) bool {
+			return strings.EqualFold(index.Index, config.Index)
+		})
+		if match == -1 {
+			return fmt.Errorf("selected index %q was not found in Elasticsearch", config.Index)
+		}
+
+		resolvedIndex = indices[match].Index
 	}
 
 	if ctx.Metadata != nil {
-		if err := ctx.Metadata.Set(IndexDocumentSetupMetadata{Index: config.Index}); err != nil {
+		if err := ctx.Metadata.Set(IndexDocumentSetupMetadata{Index: resolvedIndex}); err != nil {
 			return fmt.Errorf("failed to save metadata: %w", err)
 		}
 	}

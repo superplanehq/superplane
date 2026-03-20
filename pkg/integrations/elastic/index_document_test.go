@@ -56,7 +56,6 @@ func Test__IndexDocument__Setup(t *testing.T) {
 			},
 		}
 		meta := &contexts.MetadataContext{}
-
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"index":    "my-index",
@@ -89,7 +88,7 @@ func Test__IndexDocument__Setup(t *testing.T) {
 			Integration: integrationCtx,
 			Metadata:    &contexts.MetadataContext{},
 		})
-		require.ErrorContains(t, err, `index "my-index" was not found`)
+		require.ErrorContains(t, err, `selected index "my-index" was not found in Elasticsearch`)
 	})
 }
 
@@ -107,18 +106,13 @@ func Test__IndexDocument__Configuration(t *testing.T) {
 }
 
 func Test__IndexDocument__Execute(t *testing.T) {
-	integrationCtx := func(authType string) *contexts.IntegrationContext {
-		cfg := map[string]any{
-			"url":      "https://elastic.example.com",
-			"authType": authType,
+	integrationCtx := func() *contexts.IntegrationContext {
+		return &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"url":    "https://elastic.example.com",
+				"apiKey": "test-api-key",
+			},
 		}
-		if authType == "apiKey" {
-			cfg["apiKey"] = "test-api-key"
-		} else {
-			cfg["username"] = "elastic"
-			cfg["password"] = "secret"
-		}
-		return &contexts.IntegrationContext{Configuration: cfg}
 	}
 
 	successResponse := func() *http.Response {
@@ -146,7 +140,7 @@ func Test__IndexDocument__Execute(t *testing.T) {
 				"document": map[string]any{"event": "deploy", "version": "1.2.3"},
 			},
 			HTTP:           httpCtx,
-			Integration:    integrationCtx("apiKey"),
+			Integration:    integrationCtx(),
 			ExecutionState: state,
 		})
 
@@ -180,7 +174,7 @@ func Test__IndexDocument__Execute(t *testing.T) {
 				"documentId": "run-42",
 			},
 			HTTP:           httpCtx,
-			Integration:    integrationCtx("apiKey"),
+			Integration:    integrationCtx(),
 			ExecutionState: state,
 		})
 
@@ -189,30 +183,6 @@ func Test__IndexDocument__Execute(t *testing.T) {
 		req := httpCtx.Requests[0]
 		assert.Equal(t, http.MethodPut, req.Method)
 		assert.Equal(t, "https://elastic.example.com/workflow-audit/_doc/run-42", req.URL.String())
-	})
-
-	t.Run("uses basic auth header when authType is basic", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{
-			Responses: []*http.Response{successResponse()},
-		}
-		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := (&IndexDocument{}).Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"index":    "my-index",
-				"document": map[string]any{"k": "v"},
-			},
-			HTTP:           httpCtx,
-			Integration:    integrationCtx("basic"),
-			ExecutionState: state,
-		})
-
-		require.NoError(t, err)
-		req := httpCtx.Requests[0]
-		user, pass, ok := req.BasicAuth()
-		require.True(t, ok)
-		assert.Equal(t, "elastic", user)
-		assert.Equal(t, "secret", pass)
 	})
 
 	t.Run("Elasticsearch error -> fails execution", func(t *testing.T) {
@@ -232,7 +202,7 @@ func Test__IndexDocument__Execute(t *testing.T) {
 				"document": map[string]any{"k": "v"},
 			},
 			HTTP:           httpCtx,
-			Integration:    integrationCtx("apiKey"),
+			Integration:    integrationCtx(),
 			ExecutionState: state,
 		})
 
@@ -249,7 +219,7 @@ func Test__IndexDocument__Execute(t *testing.T) {
 				"index": "my-index",
 			},
 			HTTP:           &contexts.HTTPContext{},
-			Integration:    integrationCtx("apiKey"),
+			Integration:    integrationCtx(),
 			ExecutionState: state,
 		})
 
