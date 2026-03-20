@@ -1,0 +1,8 @@
+Your SuperPlane sign-in code is: {{.Code}}
+
+Enter this code to sign in to SuperPlane.
+
+This code expires in 10 minutes. If you didn't request this code, you can safely ignore this email.
+
+Best regards,
+The SuperPlane Team

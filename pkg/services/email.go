@@ -13,6 +13,7 @@ import (
 type EmailService interface {
 	SendInvitationEmail(toEmail, organizationName, invitationLink, inviterEmail string) error
 	SendNotificationEmail(bccEmails []string, title, body, url, urlLabel string) error
+	SendMagicCodeEmail(toEmail, code string) error
 }
 
 type InvitationTemplateData struct {
@@ -27,6 +28,10 @@ type NotificationTemplateData struct {
 	Body     string
 	URL      string
 	URLLabel string
+}
+
+type MagicCodeTemplateData struct {
+	Code string
 }
 
 type ResendEmailService struct {
@@ -82,6 +87,39 @@ func (s *ResendEmailService) SendInvitationEmail(toEmail, organizationName, invi
 	}
 
 	log.Infof("Invitation email sent successfully to %s (ID: %s)", toEmail, response.Id)
+	return nil
+}
+
+func (s *ResendEmailService) SendMagicCodeEmail(toEmail, code string) error {
+	templateData := MagicCodeTemplateData{Code: code}
+
+	plainTextContent, err := s.renderTemplate("magic_code.txt", templateData)
+	if err != nil {
+		log.Errorf("Error rendering magic code plain text template: %v", err)
+		return fmt.Errorf("failed to render magic code plain text template: %w", err)
+	}
+
+	htmlContent, err := s.renderTemplate("magic_code.html", templateData)
+	if err != nil {
+		log.Errorf("Error rendering magic code HTML template: %v", err)
+		return fmt.Errorf("failed to render magic code HTML template: %w", err)
+	}
+
+	params := &resend.SendEmailRequest{
+		From:    fmt.Sprintf("%s <%s>", s.fromName, s.fromEmail),
+		To:      []string{toEmail},
+		Subject: "Your SuperPlane sign-in code",
+		Text:    plainTextContent,
+		Html:    htmlContent,
+	}
+
+	response, err := s.client.Emails.Send(params)
+	if err != nil {
+		log.Errorf("Error sending magic code email to %s: %v", toEmail, err)
+		return err
+	}
+
+	log.Infof("Magic code email sent successfully to %s (ID: %s)", toEmail, response.Id)
 	return nil
 }
 

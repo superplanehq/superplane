@@ -166,6 +166,28 @@ func (s *SMTPEmailService) SendInvitationEmail(toEmail, organizationName, invita
 	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
 }
 
+func (s *SMTPEmailService) SendMagicCodeEmail(toEmail, code string) error {
+	settings, err := s.settingsProvider.GetSMTPSettings(context.Background())
+	if err != nil {
+		return err
+	}
+
+	templateData := MagicCodeTemplateData{Code: code}
+
+	plainTextContent, err := s.renderTemplate("magic_code.txt", templateData)
+	if err != nil {
+		return fmt.Errorf("failed to render magic code plain text template: %w", err)
+	}
+
+	htmlContent, err := s.renderTemplate("magic_code.html", templateData)
+	if err != nil {
+		return fmt.Errorf("failed to render magic code HTML template: %w", err)
+	}
+
+	subject := "Your SuperPlane sign-in code"
+	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
+}
+
 func (s *SMTPEmailService) SendNotificationEmail(bccEmails []string, title, body, url, urlLabel string) error {
 	if len(bccEmails) == 0 {
 		return nil
