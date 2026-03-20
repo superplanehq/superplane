@@ -10,12 +10,15 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="When Alert Fires" href="#when-alert-fires" description="Trigger a workflow when a Kibana alert rule fires" />
+  <LinkCard title="On Document Indexed" href="#on-document-indexed" description="React when new documents are indexed in Elasticsearch" />
 </CardGrid>
 
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Get Document" href="#get-document" description="Retrieve a document from Elasticsearch by index and document ID" />
   <LinkCard title="Index Document" href="#index-document" description="Write a JSON document to an Elasticsearch index" />
+  <LinkCard title="Update Document" href="#update-document" description="Partially update an existing document in an Elasticsearch index" />
 </CardGrid>
 
 ## Instructions
@@ -35,17 +38,20 @@ To connect Elastic to SuperPlane:
 
 The When Alert Fires trigger starts a workflow execution when a Kibana alert rule fires via a webhook connector.
 
+### Shared Connector
+
+SuperPlane creates **one Kibana Webhook connector per integration**, shared across all triggers that use the same Kibana instance. Each incoming request is routed to the correct trigger using the `eventType` field in the request body — this trigger only processes requests where `eventType` is `"alert_fired"`. Requests intended for other trigger types (e.g. `"document_indexed"`) are silently ignored.
+
 ### Setup
 
-1. Save this trigger — SuperPlane automatically creates a signed Kibana Webhook connector.
+1. Save this trigger — SuperPlane automatically creates or reuses the shared Kibana Webhook connector.
 2. In Kibana, attach the connector to one or more alert rules and configure the action body as shown below.
 
-#### Recommended Kibana action body
-
-For filters to work reliably, configure the rule action body in Kibana to include these fields:
+#### Required Kibana action body
 
 ```json
 {
+  "eventType": "alert_fired",
   "ruleId":   "{{rule.id}}",
   "ruleName": "{{rule.name}}",
   "spaceId":  "{{rule.spaceId}}",
@@ -55,7 +61,7 @@ For filters to work reliably, configure the rule action body in Kibana to includ
 }
 ```
 
-Kibana substitutes `{{rule.id}}` and `{{rule.name}}` at delivery time. Fields omitted from the body will not be filterable in SuperPlane.
+The `eventType` field is required for routing. Kibana substitutes `{{rule.id}}` and `{{rule.name}}` at delivery time. Fields omitted from the body will not be filterable in SuperPlane.
 
 ### Filtering
 
@@ -81,6 +87,7 @@ Each received alert emits the parsed JSON body sent by Kibana directly as the ev
       "threshold": 10,
       "value": 15
     },
+    "eventType": "alert_fired",
     "ruleId": "abc-123",
     "ruleName": "High error rate detected",
     "severity": "critical",
@@ -93,6 +100,97 @@ Each received alert emits the parsed JSON body sent by Kibana directly as the ev
   },
   "timestamp": "2026-03-12T09:00:00Z",
   "type": "elastic.alert"
+}
+```
+
+<a id="on-document-indexed"></a>
+
+## On Document Indexed
+
+The On Document Indexed trigger starts a workflow execution when a new document is indexed into an Elasticsearch index.
+
+### Shared Connector
+
+SuperPlane creates **one Kibana Webhook connector per integration**, shared across all triggers that use the same Kibana instance. Each incoming request is routed to the correct trigger instance using two fields in the request body:
+
+- `eventType`: must be `"document_indexed"` — requests with any other value are silently ignored, allowing the shared connector to serve both this trigger and others (e.g. When Alert Fires).
+- `routeKey`: a unique ID assigned per trigger node — allows multiple On Document Indexed nodes on the same canvas to each react only to their own Kibana rule.
+
+### How it works
+
+1. When the trigger is saved, SuperPlane creates or reuses the shared Kibana Webhook connector and provisions a Kibana Elasticsearch query rule for the configured index.
+2. Every minute, the rule checks for documents with an `@timestamp` value within the current window. When matches are found, Kibana fires the connector.
+3. SuperPlane receives the webhook, queries Elasticsearch for all documents newer than its stored checkpoint, and emits one event per document.
+
+### Configuration
+
+- **Index**: The Elasticsearch index to monitor for new documents.
+
+> **Note**: This trigger requires an `@timestamp` field mapped as `date` on indexed documents. Documents without that field will be missed. To ensure all documents are captured, configure an ingest pipeline on the index to auto-populate the field if absent:
+> ```json
+> &lbrace; "set": &lbrace; "field": "@timestamp", "value": "&lbrace;&lbrace;&lbrace;_ingest.timestamp&rbrace;&rbrace;&rbrace;", "override": false &rbrace; &rbrace;
+> ```
+
+### Webhook Verification
+
+SuperPlane generates a random signing secret and configures the Kibana connector to include it on every request. Requests without the correct secret are rejected automatically.
+
+### Event Data
+
+The webhook acts as a signal. When it fires, SuperPlane queries Elasticsearch for documents newer than the stored checkpoint and emits one event per document containing its ID, index, and full source.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "id": "doc-1",
+    "index": "workflow-audit",
+    "source": {
+      "@timestamp": "2026-03-12T09:00:00Z",
+      "message": "deployment started",
+      "service": "api"
+    }
+  },
+  "timestamp": "2026-03-12T09:00:00Z",
+  "type": "elastic.document.indexed"
+}
+```
+
+<a id="get-document"></a>
+
+## Get Document
+
+The Get Document component retrieves a JSON document from an Elasticsearch index by its ID.
+
+### Configuration
+
+- **Index**: The Elasticsearch index to read from
+- **Document**: The document to retrieve
+
+### Outputs
+
+The component emits an event containing:
+- `id`: The document ID
+- `index`: The index the document was read from
+- `version`: The document version number
+- `source`: The document fields
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "aB3kLmN4oPqR",
+    "index": "workflow-audit",
+    "source": {
+      "env": "production",
+      "message": "deployment started"
+    },
+    "version": 3
+  },
+  "timestamp": "2026-03-12T09:00:00Z",
+  "type": "elastic.document.retrieved"
 }
 ```
 
@@ -111,7 +209,7 @@ The Index Document component writes a JSON document to an Elasticsearch index.
 ### Configuration
 
 - **Index**: The Elasticsearch index name to write to (e.g. `workflow-audit`)
-- **Document**: The JSON object to index
+- **Document**: The JSON object to index. The editor starts with an `@timestamp` template so documents are compatible with On Document Indexed by default.
 - **Document ID** *(optional)*: A stable ID for idempotent writes. If omitted, Elasticsearch generates one automatically. Providing an ID means re-runs update the existing document rather than creating a duplicate.
 
 ### Outputs
@@ -134,6 +232,41 @@ The component emits an event containing:
   },
   "timestamp": "2026-03-12T09:00:00Z",
   "type": "elastic.document.indexed"
+}
+```
+
+<a id="update-document"></a>
+
+## Update Document
+
+The Update Document component applies a partial update to an existing document in an Elasticsearch index.
+
+### Configuration
+
+- **Index**: The Elasticsearch index containing the document
+- **Document**: The document to update
+- **Fields**: The fields to merge into the existing document (partial update). The editor starts with an `@timestamp` template for convenience.
+
+### Outputs
+
+The component emits an event containing:
+- `id`: The document ID
+- `index`: The index the document belongs to
+- `result`: Operation result (`updated`)
+- `version`: The new document version number
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "aB3kLmN4oPqR",
+    "index": "workflow-audit",
+    "result": "updated",
+    "version": 4
+  },
+  "timestamp": "2026-03-12T09:00:00Z",
+  "type": "elastic.document.updated"
 }
 ```
 

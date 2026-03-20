@@ -12,6 +12,10 @@ import (
 // delivery to prove the request originates from the configured connector.
 const SigningHeaderName = "X-Superplane-Secret"
 
+// KibanaConnectorName is the display name used for all Kibana webhook connectors
+// created by SuperPlane. Used by triggers to locate the shared connector.
+const KibanaConnectorName = "SuperPlane Alert"
+
 // ElasticWebhookHandler automatically creates and tears down Kibana Webhook
 // connectors when the OnAlertFires trigger is set up or removed.
 type ElasticWebhookHandler struct{}
@@ -73,7 +77,7 @@ func (h *ElasticWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 	}
 
 	connector, err := client.CreateKibanaConnector(
-		"SuperPlane Alert",
+		KibanaConnectorName,
 		ctx.Webhook.GetURL(),
 		secret,
 	)
